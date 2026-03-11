@@ -173,7 +173,8 @@ function DealCard({ deal, onMoveStage }: { deal: any; onMoveStage: (id: string, 
 }
 
 export default function PipelinePage() {
-  const { data: deals, isLoading } = useSWR('/api/deals', fetcher)
+  const { data: dealsData, isLoading } = useSWR('/api/deals', fetcher)
+  const deals: any[] = dealsData?.data ?? []
 
   const moveStage = async (dealId: string, stage: string) => {
     await fetch(`/api/deals/${dealId}/stage`, {
@@ -185,10 +186,10 @@ export default function PipelinePage() {
   }
 
   const activeStages = STAGES.filter(s => s.id !== 'closed_won' && s.id !== 'closed_lost')
-  const totalPipeline = (deals ?? [])
+  const totalPipeline = deals
     .filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
     .reduce((sum: number, d: any) => sum + (d.dealValue ?? 0), 0)
-  const topDeals = (deals ?? [])
+  const topDeals = deals
     .filter((d: any) => d.conversionScore)
     .sort((a: any, b: any) => (b.conversionScore ?? 0) - (a.conversionScore ?? 0))
     .slice(0, 3)
@@ -203,7 +204,7 @@ export default function PipelinePage() {
             Sales Pipeline
           </h1>
           <p style={{ fontSize: '13px', color: '#9CA3AF' }}>
-            {(deals ?? []).filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost').length} active deals
+            {deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost').length} active deals
             {totalPipeline > 0 && ` · $${(totalPipeline / 100).toLocaleString()} pipeline value`}
           </p>
         </div>
@@ -261,7 +262,7 @@ export default function PipelinePage() {
       <div style={{ overflowX: 'auto', paddingBottom: '8px' }}>
         <div style={{ display: 'flex', gap: '12px', minWidth: 'max-content' }}>
           {activeStages.map(stage => {
-            const stageDeals = (deals ?? []).filter((d: any) => d.stage === stage.id)
+            const stageDeals = deals.filter((d: any) => d.stage === stage.id)
             const stageValue = stageDeals.reduce((s: number, d: any) => s + (d.dealValue ?? 0), 0)
             return (
               <div key={stage.id} style={{ width: '260px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -331,7 +332,7 @@ export default function PipelinePage() {
           <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {['closed_won', 'closed_lost'].map(stageId => {
               const s = STAGES.find(x => x.id === stageId)!
-              const stageDeals = (deals ?? []).filter((d: any) => d.stage === stageId)
+              const stageDeals = deals.filter((d: any) => d.stage === stageId)
               const val = stageDeals.reduce((sum: number, d: any) => sum + (d.dealValue ?? 0), 0)
               return (
                 <div key={stageId} style={{
