@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Building2, Swords, BookOpen,
   ClipboardList, FileText, Settings, LogOut, Search,
   Kanban, AlertTriangle, Sparkles, ChevronLeft, ChevronRight,
-  X, MessageSquare,
+  X,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 
@@ -227,36 +227,6 @@ export default function Sidebar() {
             background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(139,92,246,0.25)',
           }}>
             <Sparkles size={13} color="#A78BFA" />
-          </Link>
-        )}
-
-        {/* AI Chat */}
-        {!collapsed ? (
-          <Link href="/chat" onClick={() => closeMobile()} style={{
-            display: 'flex', alignItems: 'center', gap: '9px',
-            padding: '0 10px', height: '33px', borderRadius: '100px', marginBottom: '10px',
-            textDecoration: 'none', fontSize: '12px', fontWeight: '600', color: '#60A5FA',
-            background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.2)',
-            transition: 'all 0.15s',
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.background = 'rgba(59,130,246,0.18)'
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.background = 'rgba(59,130,246,0.10)'
-          }}
-          >
-            <MessageSquare size={12} color="#60A5FA" />
-            Ask AI
-          </Link>
-        ) : (
-          <Link href="/chat" onClick={() => closeMobile()} title="Ask AI" style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            height: '33px', borderRadius: '8px', marginBottom: '4px',
-            textDecoration: 'none',
-            background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.2)',
-          }}>
-            <MessageSquare size={13} color="#60A5FA" />
           </Link>
         )}
 

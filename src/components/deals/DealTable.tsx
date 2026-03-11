@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { FileText, ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -36,6 +37,7 @@ function SortIcon({ field, active, direction }: { field: string; active: boolean
 }
 
 export function DealTable({ deals, onAdd, onDelete }: DealTableProps) {
+  const router = useRouter()
   const [sortField, setSortField] = useState<SortField>('createdAt')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [filter, setFilter] = useState<FilterOutcome>('all')
@@ -149,13 +151,14 @@ export function DealTable({ deals, onAdd, onDelete }: DealTableProps) {
         {sorted.map((deal) => (
           <div
             key={deal.id}
-            style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 120px 32px', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center', transition: 'background-color 100ms ease' }}
-            onMouseEnter={() => setHoveredId(deal.id)}
-            onMouseLeave={() => { setHoveredId(null); setConfirmId(null) }}
+            onClick={() => router.push(`/deals/${deal.id}`)}
+            style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 120px 32px', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center', transition: 'background-color 100ms ease', cursor: 'pointer' }}
+            onMouseEnter={(e) => { setHoveredId(deal.id); e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)' }}
+            onMouseLeave={(e) => { setHoveredId(null); setConfirmId(null); e.currentTarget.style.backgroundColor = 'transparent' }}
           >
             {/* Deal name */}
             <div>
-              <p style={{ fontSize: '13px', fontWeight: 500, color: '#EBEBEB', margin: 0, marginBottom: '1px' }}>{deal.dealName}</p>
+              <p style={{ fontSize: '13px', fontWeight: 500, color: hoveredId === deal.id ? '#A5B4FC' : '#EBEBEB', margin: 0, marginBottom: '1px', transition: 'color 100ms ease' }}>{deal.dealName}</p>
               {deal.prospectName && (
                 <p style={{ fontSize: '11px', color: '#555', margin: 0 }}>{deal.prospectName}{deal.prospectTitle ? `, ${deal.prospectTitle}` : ''}</p>
               )}
@@ -183,7 +186,7 @@ export function DealTable({ deals, onAdd, onDelete }: DealTableProps) {
             </span>
 
             {/* Delete */}
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center' }} onClick={(e) => e.stopPropagation()}>
               {onDelete && hoveredId === deal.id && (
                 confirmId === deal.id ? (
                   <button

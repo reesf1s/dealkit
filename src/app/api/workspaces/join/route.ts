@@ -5,71 +5,83 @@ import { db } from '@/lib/db'
 import { workspaces, workspaceMemberships, users } from '@/lib/db/schema'
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const { userId } = await auth()
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { slug } = await req.json()
-  if (!slug) return NextResponse.json({ error: 'slug is required' }, { status: 400 })
+    const body = await req.json()
+    const code: string = body?.code?.trim()?.toLowerCase()
+    if (!code) return NextResponse.json({ error: 'Join code is required' }, { status: 400 })
 
-  // Ensure user row exists without triggering workspace auto-creation
-  await db.insert(users).values({
-    id: userId,
-    email: `${userId}@clerk.placeholder`,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }).onConflictDoNothing()
+    // Find the target workspace by slug (join code)
+    const [targetWorkspace] = await db
+      .select()
+      .from(workspaces)
+      .where(eq(workspaces.slug, code))
+      .limit(1)
 
-  // Find the target workspace by slug
-  const [target] = await db.select().from(workspaces).where(eq(workspaces.slug, slug.toLowerCase().trim())).limit(1)
-  if (!target) return NextResponse.json({ error: 'Workspace not found. Check the join code and try again.' }, { status: 404 })
-
-  // Check if user already has a membership
-  const [existing] = await db
-    .select({ id: workspaceMemberships.id, workspaceId: workspaceMemberships.workspaceId, role: workspaceMemberships.role })
-    .from(workspaceMemberships)
-    .where(eq(workspaceMemberships.userId, userId))
-    .limit(1)
-
-  if (existing) {
-    // Already in the target workspace — idempotent
-    if (existing.workspaceId === target.id) {
-      return NextResponse.json({ data: { workspaceId: target.id, name: target.name, slug: target.slug } })
+    if (!targetWorkspace) {
+      return NextResponse.json(
+        { error: 'No workspace found with that code. Double-check and try again.' },
+        { status: 404 },
+      )
     }
 
-    if (existing.role === 'owner') {
-      // Only allow auto-swap if they are the SOLE member of their own workspace
+    // Already a member — just return success
+    const [existing] = await db
+      .select()
+      .from(workspaceMemberships)
+      .where(and(eq(workspaceMemberships.workspaceId, targetWorkspace.id), eq(workspaceMemberships.userId, userId)))
+      .limit(1)
+
+    if (existing) {
+      return NextResponse.json({ data: { workspaceId: targetWorkspace.id, workspaceName: targetWorkspace.name } })
+    }
+
+    // Ensure user row exists
+    await db.insert(users).values({
+      id: userId,
+      email: `${userId}@clerk.placeholder`,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).onConflictDoNothing()
+
+    // Check if user has an auto-created personal workspace to clean up
+    const [personalMembership] = await db
+      .select({ workspaceId: workspaceMemberships.workspaceId, role: workspaceMemberships.role })
+      .from(workspaceMemberships)
+      .where(eq(workspaceMemberships.userId, userId))
+      .limit(1)
+
+    if (personalMembership?.role === 'owner') {
+      const [ws] = await db
+        .select({ name: workspaces.name })
+        .from(workspaces)
+        .where(eq(workspaces.id, personalMembership.workspaceId))
+        .limit(1)
+
       const [{ value: memberCount }] = await db
         .select({ value: count() })
         .from(workspaceMemberships)
-        .where(eq(workspaceMemberships.workspaceId, existing.workspaceId))
+        .where(eq(workspaceMemberships.workspaceId, personalMembership.workspaceId))
 
-      if (Number(memberCount) > 1) {
-        return NextResponse.json(
-          { error: 'You own a workspace with other members. Transfer ownership before joining another workspace.' },
-          { status: 409 },
-        )
+      // Only delete the workspace if it is the default placeholder with no other members
+      if (ws?.name === 'My Workspace' && Number(memberCount) <= 1) {
+        await db.delete(workspaces).where(eq(workspaces.id, personalMembership.workspaceId))
       }
-
-      // Sole owner of a personal workspace — delete it to make way for team join
-      await db.delete(workspaces).where(and(
-        eq(workspaces.id, existing.workspaceId),
-        eq(workspaces.ownerId, userId),
-      ))
-      // workspace_memberships cascade-deletes with the workspace
-    } else {
-      return NextResponse.json(
-        { error: 'You are already a member of a workspace. Leave your current workspace first.' },
-        { status: 409 },
-      )
     }
+
+    // Add user to the target workspace as a member
+    await db.insert(workspaceMemberships).values({
+      workspaceId: targetWorkspace.id,
+      userId,
+      role: 'member',
+      createdAt: new Date(),
+    }).onConflictDoNothing()
+
+    return NextResponse.json({ data: { workspaceId: targetWorkspace.id, workspaceName: targetWorkspace.name } })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
-
-  await db.insert(workspaceMemberships).values({
-    workspaceId: target.id,
-    userId,
-    role: 'member',
-    createdAt: new Date(),
-  })
-
-  return NextResponse.json({ data: { workspaceId: target.id, name: target.name, slug: target.slug } })
 }

@@ -2,11 +2,34 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparkles, ArrowRight, CheckCircle, Building2, Users, Loader2, ClipboardPaste, Zap, Target, FileText, ClipboardList } from 'lucide-react'
+import { Sparkles, ArrowRight, CheckCircle, Building2, Users, Loader2, ClipboardPaste, Zap, Target, FileText, ClipboardList, LogIn } from 'lucide-react'
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const [step, setStep] = useState<'paste' | 'review' | 'saving' | 'generating' | 'done'>('paste')
+  const [step, setStep] = useState<'paste' | 'review' | 'saving' | 'generating' | 'done' | 'join'>('paste')
+  const [joinCode, setJoinCode] = useState('')
+  const [joinLoading, setJoinLoading] = useState(false)
+  const [joinError, setJoinError] = useState('')
+
+  async function handleJoin() {
+    if (!joinCode.trim()) return
+    setJoinLoading(true)
+    setJoinError('')
+    try {
+      const res = await fetch('/api/workspaces/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: joinCode.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Failed to join workspace')
+      router.push('/dashboard')
+    } catch (e: unknown) {
+      setJoinError(e instanceof Error ? e.message : 'Failed to join. Try again.')
+    } finally {
+      setJoinLoading(false)
+    }
+  }
   const [text, setText] = useState('')
   const [parsed, setParsed] = useState<any>(null)
   const [loading, setLoading] = useState(false)
@@ -189,12 +212,80 @@ export default function OnboardingPage() {
             </div>
           </div>
 
-          <div style={{ textAlign: 'center' }}>
+          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button
+              onClick={() => setStep('join')}
+              style={{ background: 'none', border: 'none', color: '#6366F1', fontSize: '12px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}
+            >
+              <LogIn size={12} />
+              Joining a team? Enter your invite code instead
+            </button>
             <button onClick={() => router.push('/dashboard')} style={{ background: 'none', border: 'none', color: '#444', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}>
               Skip — set up manually
             </button>
           </div>
         </>
+      )}
+
+      {step === 'join' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <LogIn size={15} color="#818CF8" />
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#EBEBEB' }}>Join your team's workspace</span>
+            </div>
+            <p style={{ fontSize: '13px', color: '#888', margin: 0, lineHeight: '1.6' }}>
+              Ask your team admin for the workspace invite code (visible in their Settings → Team section). It looks like <code style={{ color: '#818CF8', background: 'rgba(99,102,241,0.1)', padding: '1px 6px', borderRadius: '4px', fontSize: '12px' }}>crane-47</code>.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <input
+                type="text"
+                value={joinCode}
+                onChange={(e) => setJoinCode(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
+                placeholder="e.g. crane-47"
+                style={{
+                  width: '100%',
+                  height: '42px',
+                  padding: '0 14px',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '10px',
+                  color: '#EBEBEB',
+                  fontSize: '14px',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                  boxSizing: 'border-box',
+                  letterSpacing: '0.05em',
+                }}
+                onFocus={(e) => (e.target.style.borderColor = 'rgba(99,102,241,0.4)')}
+                onBlur={(e) => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
+              />
+              {joinError && <div style={{ fontSize: '12px', color: '#EF4444' }}>{joinError}</div>}
+            </div>
+            <button
+              onClick={handleJoin}
+              disabled={!joinCode.trim() || joinLoading}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                padding: '12px', borderRadius: '10px', border: 'none',
+                cursor: joinLoading || !joinCode.trim() ? 'not-allowed' : 'pointer',
+                background: joinLoading || !joinCode.trim() ? 'rgba(99,102,241,0.2)' : 'linear-gradient(135deg, #6366F1, #7C3AED)',
+                color: '#fff', fontSize: '14px', fontWeight: '600',
+                boxShadow: joinLoading || !joinCode.trim() ? 'none' : '0 0 24px rgba(99,102,241,0.4)',
+                transition: 'all 0.2s',
+              }}
+            >
+              {joinLoading ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Joining...</> : <>Join workspace <ArrowRight size={14} /></>}
+            </button>
+          </div>
+
+          <div style={{ textAlign: 'center' }}>
+            <button onClick={() => setStep('paste')} style={{ background: 'none', border: 'none', color: '#555', fontSize: '12px', cursor: 'pointer' }}>
+              ← Back to create a new workspace instead
+            </button>
+          </div>
+        </div>
       )}
 
       {step === 'review' && parsed && (

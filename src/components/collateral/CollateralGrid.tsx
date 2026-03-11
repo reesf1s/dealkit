@@ -1,7 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { FileText, Download, Eye, RefreshCw } from 'lucide-react'
+import { FileText, Download, Eye, Trash2 } from 'lucide-react'
 import { CollateralTypeBadge } from './CollateralTypeBadge'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -11,6 +12,7 @@ interface CollateralGridProps {
   collateral: Collateral[]
   onGenerate?: () => void
   onExport?: (id: string) => void
+  onDelete?: (id: string) => void
 }
 
 function formatDate(d: Date | string | null) {
@@ -18,7 +20,17 @@ function formatDate(d: Date | string | null) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function CollateralCard({ item, onExport }: { item: Collateral; onExport?: (id: string) => void }) {
+function CollateralCard({
+  item,
+  onExport,
+  onDelete,
+}: {
+  item: Collateral
+  onExport?: (id: string) => void
+  onDelete?: (id: string) => void
+}) {
+  const [confirming, setConfirming] = useState(false)
+
   return (
     <div
       style={{
@@ -109,12 +121,95 @@ function CollateralCard({ item, onExport }: { item: Collateral; onExport?: (id: 
             <Download size={12} strokeWidth={2} />
           </button>
         )}
+
+        {onDelete && (
+          confirming ? (
+            <>
+              <button
+                onClick={() => { onDelete(item.id); setConfirming(false) }}
+                title="Confirm delete"
+                style={{
+                  height: '30px',
+                  padding: '0 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(239,68,68,0.15)',
+                  border: '1px solid rgba(239,68,68,0.35)',
+                  cursor: 'pointer',
+                  color: '#EF4444',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  transition: 'background-color 150ms ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.25)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.15)' }}
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setConfirming(false)}
+                title="Cancel"
+                style={{
+                  height: '30px',
+                  width: '30px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  cursor: 'pointer',
+                  color: '#888',
+                  fontSize: '13px',
+                  transition: 'background-color 150ms ease',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)' }}
+              >
+                ✕
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setConfirming(true)}
+              title="Delete"
+              style={{
+                height: '30px',
+                width: '30px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '6px',
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                cursor: 'pointer',
+                color: '#555',
+                transition: 'all 150ms ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.1)'
+                e.currentTarget.style.borderColor = 'rgba(239,68,68,0.25)'
+                e.currentTarget.style.color = '#EF4444'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
+                e.currentTarget.style.color = '#555'
+              }}
+            >
+              <Trash2 size={12} strokeWidth={2} />
+            </button>
+          )
+        )}
       </div>
     </div>
   )
 }
 
-export function CollateralGrid({ collateral, onGenerate, onExport }: CollateralGridProps) {
+export function CollateralGrid({ collateral, onGenerate, onExport, onDelete }: CollateralGridProps) {
   if (collateral.length === 0) {
     return (
       <EmptyState
@@ -135,7 +230,7 @@ export function CollateralGrid({ collateral, onGenerate, onExport }: CollateralG
       }}
     >
       {collateral.map((item) => (
-        <CollateralCard key={item.id} item={item} onExport={onExport} />
+        <CollateralCard key={item.id} item={item} onExport={onExport} onDelete={onDelete} />
       ))}
     </div>
   )

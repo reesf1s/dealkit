@@ -319,6 +319,37 @@ Rules: matchedDealId must be one of the IDs listed above (or null). stage values
         reply += `_No open deals found. Log a deal first, then I can link meeting notes to it._`
       }
 
+      // Extract Q&A pairs from the call and append to company knowledge base (runs after response)
+      after(async () => {
+        try {
+          const qaMsg = await anthropic.messages.create({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: 512,
+            messages: [{
+              role: 'user',
+              content: `From these B2B sales meeting notes, extract questions the prospect asked and a concise ideal answer for each. Return ONLY a JSON array of strings in this format: ["Q: [question] | A: [answer]"]. Max 6 items. Return [] if no clear Q&A pairs found.\n\n${lastText.slice(0, 4000)}`,
+            }],
+          })
+          const raw = (qaMsg.content[0] as { type: string; text: string }).text.trim()
+          const newQAs: string[] = JSON.parse(raw.replace(/^```json?\n?/, '').replace(/\n?```$/, ''))
+          if (Array.isArray(newQAs) && newQAs.length > 0) {
+            const [profile] = await db
+              .select({ id: companyProfiles.id, commonObjections: companyProfiles.commonObjections })
+              .from(companyProfiles)
+              .where(eq(companyProfiles.workspaceId, workspaceId))
+              .limit(1)
+            if (profile) {
+              const existing = (profile.commonObjections as string[]) ?? []
+              // De-duplicate by question prefix, keep newest, cap at 30 total
+              const merged = [...new Set([...existing, ...newQAs])].slice(-30)
+              await db.update(companyProfiles)
+                .set({ commonObjections: merged, updatedAt: new Date() })
+                .where(eq(companyProfiles.id, profile.id))
+            }
+          }
+        } catch { /* best effort — never block the response */ }
+      })
+
       return NextResponse.json({ reply })
     }
 

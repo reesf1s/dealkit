@@ -9,6 +9,10 @@ interface SidebarCtx {
   openMobile: () => void
   closeMobile: () => void
   sidebarWidth: number
+  // AI sidebar
+  aiCollapsed: boolean
+  toggleAiCollapsed: () => void
+  aiSidebarWidth: number
 }
 
 const Ctx = createContext<SidebarCtx>({
@@ -18,16 +22,23 @@ const Ctx = createContext<SidebarCtx>({
   openMobile: () => {},
   closeMobile: () => {},
   sidebarWidth: 220,
+  aiCollapsed: false,
+  toggleAiCollapsed: () => {},
+  aiSidebarWidth: 280,
 })
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [aiCollapsed, setAiCollapsed] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem('sidebar-collapsed')
     if (stored === 'true') setCollapsed(true)
+
+    const storedAi = localStorage.getItem('ai-sidebar-collapsed')
+    if (storedAi === 'true') setAiCollapsed(true)
 
     const mq = window.matchMedia('(max-width: 768px)')
     setIsMobile(mq.matches)
@@ -43,7 +54,15 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     })
   }
 
+  const toggleAiCollapsed = () => {
+    setAiCollapsed(p => {
+      localStorage.setItem('ai-sidebar-collapsed', String(!p))
+      return !p
+    })
+  }
+
   const sidebarWidth = isMobile ? 0 : collapsed ? 64 : 220
+  const aiSidebarWidth = isMobile ? 0 : aiCollapsed ? 48 : 280
 
   return (
     <Ctx.Provider value={{
@@ -53,6 +72,9 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
       openMobile: () => setMobileOpen(true),
       closeMobile: () => setMobileOpen(false),
       sidebarWidth,
+      aiCollapsed,
+      toggleAiCollapsed,
+      aiSidebarWidth,
     }}>
       {children}
     </Ctx.Provider>
