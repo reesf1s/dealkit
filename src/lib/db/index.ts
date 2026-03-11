@@ -8,16 +8,16 @@ import * as schema from './schema'
 const connectionString = (process.env.DATABASE_URL ?? 'postgresql://placeholder:placeholder@placeholder/placeholder').trim()
 
 const isSupabase = connectionString.includes('supabase.co') || connectionString.includes('pooler.supabase.com')
+// Supabase pgBouncer pooler (port 6543) doesn't support prepared statements
+const isPooler = connectionString.includes('pooler.supabase.com') || connectionString.includes(':6543/')
 
 const client = postgres(connectionString, {
-  // Allow up to 5 concurrent queries per serverless invocation so that
-  // Promise.all([5 queries]) runs in parallel instead of serializing.
-  // Each Vercel lambda instance has its own pool; 5 concurrent invocations
-  // × 1 active connection each = 5 Supabase connections (within free tier).
   max: 5,
   idle_timeout: 20,
   connect_timeout: 10,
   ssl: isSupabase ? 'require' : false,
+  // pgBouncer in transaction mode doesn't support prepared statements
+  prepare: !isPooler,
 })
 export const db = drizzle(client, { schema })
 
