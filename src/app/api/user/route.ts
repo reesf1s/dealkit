@@ -2,18 +2,11 @@ import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import {
-  users,
-  competitors,
-  caseStudies,
-  dealLogs,
-  collateral,
-  companyProfiles,
-  events,
-} from '@/lib/db/schema'
+import { users } from '@/lib/db/schema'
+import { getWorkspaceContext } from '@/lib/workspace'
 import { dbErrResponse } from '@/lib/api-helpers'
 
-// GET /api/user — returns { data: User }
+// GET /api/user — returns user + workspace context
 export async function GET() {
   try {
     const { userId } = await auth()
@@ -25,30 +18,21 @@ export async function GET() {
       .where(eq(users.id, userId))
       .limit(1)
 
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const ctx = await getWorkspaceContext(userId)
 
-    return NextResponse.json({ data: user })
-  } catch (err) {
-    return dbErrResponse(err)
-  }
-}
-
-// DELETE /api/user — deletes ALL user data then returns { ok: true }
-export async function DELETE() {
-  try {
-    const { userId } = await auth()
-    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-    // Delete in dependency order (cascade handles most, but explicit is safer)
-    await db.delete(events).where(eq(events.userId, userId))
-    await db.delete(collateral).where(eq(collateral.userId, userId))
-    await db.delete(dealLogs).where(eq(dealLogs.userId, userId))
-    await db.delete(caseStudies).where(eq(caseStudies.userId, userId))
-    await db.delete(competitors).where(eq(competitors.userId, userId))
-    await db.delete(companyProfiles).where(eq(companyProfiles.userId, userId))
-    await db.delete(users).where(eq(users.id, userId))
-
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({
+      data: {
+        id: userId,
+        email: user?.email ?? '',
+        createdAt: user?.createdAt ?? new Date(),
+        updatedAt: user?.updatedAt ?? new Date(),
+        plan: ctx.plan,
+        workspaceId: ctx.workspaceId,
+        workspaceName: ctx.workspace.name,
+        workspaceSlug: ctx.workspace.slug,
+        role: ctx.role,
+      }
+    })
   } catch (err) {
     return dbErrResponse(err)
   }
