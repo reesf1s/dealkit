@@ -113,23 +113,37 @@ export default function DashboardPage() {
 
   const dbNotConnected = isDbNotConfigured(companyErr)
 
-  const hasCompany = !!company?.id
-  const competitorCount = competitors?.length ?? 0
-  const caseStudyCount = caseStudies?.length ?? 0
-  const dealCount = deals?.length ?? 0
-  const staleItems = (collateral ?? []).filter((c: { status: string }) => c.status === 'stale')
-  const winRate = insights?.winRate ?? 0
+  // APIs return { data: ... } — unwrap correctly
+  const companyData = company?.data
+  const competitorList: { id: string }[] = competitors?.data ?? []
+  const caseStudyList: { id: string }[] = caseStudies?.data ?? []
+  const dealList: { id: string; stage: string; dealName: string; prospectCompany: string; todos: { id: string; text: string; done: boolean }[] }[] = deals?.data ?? []
+  const collateralList: { id: string; title: string; type: string; status: string }[] = collateral?.data ?? []
+  const insightsData = insights?.data
+
+  const hasCompany = !!companyData?.id
+  const competitorCount = competitorList.length
+  const caseStudyCount = caseStudyList.length
+  const dealCount = dealList.length
+  const staleItems = collateralList.filter(c => c.status === 'stale')
+  const winRate = insightsData?.winRate ?? 0
+
+  // Urgent todos: undone todos from open deals
+  const urgentTodos = dealList
+    .filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+    .flatMap(d => (d.todos ?? []).filter(t => !t.done).map(t => ({ ...t, dealName: d.dealName, dealId: d.id, company: d.prospectCompany })))
+    .slice(0, 6)
 
   const steps = [
     { done: hasCompany, label: 'Complete company profile', href: '/company' },
     { done: competitorCount > 0, label: 'Add your first competitor', href: '/competitors' },
     { done: caseStudyCount > 0, label: 'Add a case study', href: '/case-studies' },
     { done: dealCount > 0, label: 'Log your first deal', href: '/deals' },
-    { done: (collateral?.length ?? 0) > 0, label: 'Generate first collateral', href: '/collateral' },
+    { done: collateralList.length > 0, label: 'Generate first collateral', href: '/collateral' },
   ]
   const completedSteps = steps.filter(s => s.done).length
   const healthPct = Math.round((completedSteps / steps.length) * 100)
-  const recentCollateral = (collateral ?? []).slice(0, 5)
+  const recentCollateral = collateralList.slice(0, 5)
 
   const firstName = user?.firstName
   const hour = new Date().getHours()
@@ -203,14 +217,56 @@ export default function DashboardPage() {
         <StatCard label="Win rate" value={`${winRate}%`} icon={TrendingUp} color="#22C55E" />
       </div>
 
+      {/* Urgent Todos */}
+      {urgentTodos.length > 0 && (
+        <div style={{
+          background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+          border: '1px solid rgba(239,68,68,0.2)', borderRadius: '14px', overflow: 'hidden',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid rgba(239,68,68,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ width: '26px', height: '26px', background: 'rgba(239,68,68,0.1)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ClipboardList size={13} color="#EF4444" />
+              </div>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Open Action Items</span>
+              <span style={{ fontSize: '11px', color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '1px 7px', borderRadius: '100px', fontWeight: '600' }}>{urgentTodos.length}</span>
+            </div>
+            <Link href="/pipeline" style={{ fontSize: '12px', color: '#EF4444', textDecoration: 'none', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '3px' }}>
+              View pipeline <ArrowUpRight size={11} />
+            </Link>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {urgentTodos.map((todo, i) => (
+              <Link key={todo.id} href={`/deals/${todo.dealId}`} style={{
+                display: 'flex', alignItems: 'flex-start', gap: '12px',
+                padding: '11px 18px',
+                borderBottom: i < urgentTodos.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none',
+                textDecoration: 'none',
+                transition: 'background 0.1s',
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.03)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+              >
+                <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#EF4444', flexShrink: 0, marginTop: '6px' }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '12px', color: '#EBEBEB', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{todo.text}</div>
+                  <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>{todo.company}</div>
+                </div>
+                <ArrowUpRight size={11} color="#333" style={{ flexShrink: 0 }} />
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ROI Widget */}
       <ROIWidget
-        deals={(deals ?? []).map((d: { outcome: 'won' | 'lost' | 'open'; dealValue?: number | null; competitors?: string[] }) => ({
-          outcome: d.outcome,
+        deals={dealList.map((d: { stage: string; dealValue?: number | null; competitors?: string[] }) => ({
+          outcome: d.stage === 'closed_won' ? 'won' : d.stage === 'closed_lost' ? 'lost' : 'open',
           dealValue: d.dealValue,
-          competitors: d.competitors,
+          competitors: d.competitors ?? [],
         }))}
-        collateralCount={collateral?.length ?? 0}
+        collateralCount={collateralList.length}
       />
 
       {/* Main content */}
