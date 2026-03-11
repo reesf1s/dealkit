@@ -23,57 +23,69 @@ export type WorkspaceContext = {
   workspace: { id: string; name: string; slug: string; plan: Plan; stripeCustomerId: string | null }
 }
 
-/**
- * Ensures the user row exists and returns their active workspace context.
- * Auto-creates a personal workspace on first sign-in (zero friction onboarding).
- *
- * Optimized: single LEFT JOIN query for the happy path (user + workspace exist).
- */
-export async function getWorkspaceContext(userId: string, userEmail?: string): Promise<WorkspaceContext> {
-  // Single query: check user existence + membership + workspace in one round trip
+const CONTEXT_FIELDS = {
+  userExists: users.id,
+  role: workspaceMemberships.role,
+  workspaceId: workspaceMemberships.workspaceId,
+  workspacePlan: workspaces.plan,
+  workspaceName: workspaces.name,
+  workspaceSlug: workspaces.slug,
+  stripeCustomerId: workspaces.stripeCustomerId,
+}
+
+async function queryContext(userId: string) {
   const [row] = await db
-    .select({
-      userExists: users.id,
-      role: workspaceMemberships.role,
-      workspaceId: workspaceMemberships.workspaceId,
-      workspacePlan: workspaces.plan,
-      workspaceName: workspaces.name,
-      workspaceSlug: workspaces.slug,
-      stripeCustomerId: workspaces.stripeCustomerId,
-    })
+    .select(CONTEXT_FIELDS)
     .from(users)
     .leftJoin(workspaceMemberships, eq(workspaceMemberships.userId, users.id))
     .leftJoin(workspaces, eq(workspaceMemberships.workspaceId, workspaces.id))
     .where(eq(users.id, userId))
     .limit(1)
+  return row
+}
 
-  // Happy path: user + workspace both exist
-  if (row?.workspaceId && row.workspacePlan) {
-    return {
-      workspaceId: row.workspaceId,
-      role: row.role!,
-      plan: row.workspacePlan,
-      workspace: {
-        id: row.workspaceId,
-        name: row.workspaceName!,
-        slug: row.workspaceSlug!,
-        plan: row.workspacePlan,
-        stripeCustomerId: row.stripeCustomerId ?? null,
-      },
-    }
+function buildContext(row: NonNullable<Awaited<ReturnType<typeof queryContext>>>): WorkspaceContext {
+  return {
+    workspaceId: row.workspaceId!,
+    role: row.role!,
+    plan: row.workspacePlan!,
+    workspace: {
+      id: row.workspaceId!,
+      name: row.workspaceName!,
+      slug: row.workspaceSlug!,
+      plan: row.workspacePlan!,
+      stripeCustomerId: row.stripeCustomerId ?? null,
+    },
   }
+}
 
-  // New user — create user row first
+/**
+ * Ensures the user row exists and returns their active workspace context.
+ * Auto-creates a personal workspace on first sign-in (zero friction onboarding).
+ *
+ * Race-safe: concurrent requests on first login use onConflictDoNothing + re-query
+ * so only one request wins the INSERT race; all others find the created data.
+ */
+export async function getWorkspaceContext(userId: string, userEmail?: string): Promise<WorkspaceContext> {
+  // Step 1: Happy path — single LEFT JOIN query covers user + workspace in one round trip
+  const row = await queryContext(userId)
+  if (row?.workspaceId && row.workspacePlan) return buildContext(row)
+
+  // Step 2: Ensure user row exists — onConflictDoNothing handles concurrent first-logins
   if (!row) {
     await db.insert(users).values({
       id: userId,
       email: userEmail ?? `${userId}@clerk.placeholder`,
       createdAt: new Date(),
       updatedAt: new Date(),
-    })
+    }).onConflictDoNothing()
   }
 
-  // Create workspace + membership (user exists but has no workspace)
+  // Step 3: Re-query — a concurrent request may have already created workspace+membership
+  const row2 = await queryContext(userId)
+  if (row2?.workspaceId && row2.workspacePlan) return buildContext(row2)
+
+  // Step 4: We're first — create workspace + membership
   let slug = generateSlug()
   for (let i = 0; i < 5; i++) {
     const [existing] = await db.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.slug, slug)).limit(1)
@@ -81,21 +93,30 @@ export async function getWorkspaceContext(userId: string, userEmail?: string): P
     slug = generateSlug()
   }
 
-  const [workspace] = await db.insert(workspaces).values({
-    name: 'My Workspace',
-    slug,
-    ownerId: userId,
-    plan: 'free',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }).returning()
+  let workspace: typeof workspaces.$inferSelect | undefined
+  try {
+    const [created] = await db.insert(workspaces).values({
+      name: 'My Workspace',
+      slug,
+      ownerId: userId,
+      plan: 'free',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning()
+    workspace = created
+  } catch {
+    // Another concurrent request created a workspace first — re-query and return it
+    const row3 = await queryContext(userId)
+    if (row3?.workspaceId && row3.workspacePlan) return buildContext(row3)
+    throw new Error('Failed to create workspace')
+  }
 
   await db.insert(workspaceMemberships).values({
     workspaceId: workspace.id,
     userId,
     role: 'owner',
     createdAt: new Date(),
-  })
+  }).onConflictDoNothing()
 
   return {
     workspaceId: workspace.id,
