@@ -32,9 +32,12 @@ export function dbNotConfigured(): NextResponse {
 export function dbErrResponse(err: unknown): NextResponse {
   if (isDbConnectionError(err)) return dbNotConfigured()
   const msg = err instanceof Error ? err.message : String(err)
-  console.error('API error:', msg, err)
+  // postgres.js wraps the real PG error in err.cause — expose it for debugging
+  const cause = (err as { cause?: unknown })?.cause
+  const causeMsg = cause instanceof Error ? cause.message : cause ? String(cause) : undefined
+  console.error('API error:', msg, causeMsg ?? '', err)
   return NextResponse.json(
-    { error: 'Internal server error', code: 'INTERNAL_ERROR', detail: msg },
+    { error: 'Internal server error', code: 'INTERNAL_ERROR', detail: msg, cause: causeMsg },
     { status: 500 },
   )
 }
