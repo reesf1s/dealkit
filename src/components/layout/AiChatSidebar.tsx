@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Sparkles, Loader2, User, Bot, RotateCcw, X } from 'lucide-react'
+import { Send, Sparkles, Loader2, User, Bot, RotateCcw, X, Square, MessageSquare } from 'lucide-react'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -19,12 +19,19 @@ export default function AiChatSidebar() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false) // mobile toggle
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
+
+  const stop = () => {
+    abortRef.current?.abort()
+    setLoading(false)
+  }
 
   const send = async (text: string) => {
     if (!text.trim() || loading) return
@@ -33,18 +40,27 @@ export default function AiChatSidebar() {
     setMessages(updated)
     setInput('')
     setLoading(true)
+    abortRef.current = new AbortController()
+    const timeoutId = setTimeout(() => abortRef.current?.abort(), 45000) // 45s timeout
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: updated }),
+        signal: abortRef.current.signal,
       })
+      clearTimeout(timeoutId)
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply }])
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Unknown error'
-      setMessages(prev => [...prev, { role: 'assistant', content: `Sorry, something went wrong: ${msg}` }])
+      clearTimeout(timeoutId)
+      if (e instanceof Error && e.name === 'AbortError') {
+        setMessages(prev => [...prev, { role: 'assistant', content: 'Stopped.' }])
+      } else {
+        const msg = e instanceof Error ? e.message : 'Unknown error'
+        setMessages(prev => [...prev, { role: 'assistant', content: `Sorry, something went wrong: ${msg}` }])
+      }
     } finally {
       setLoading(false)
       inputRef.current?.focus()
@@ -58,21 +74,17 @@ export default function AiChatSidebar() {
     }
   }
 
-  return (
+  const sidebarContent = (
     <div style={{
       width: '280px',
       minWidth: '280px',
       height: '100vh',
-      position: 'fixed',
-      right: 0,
-      top: 0,
       display: 'flex',
       flexDirection: 'column',
       borderLeft: '1px solid rgba(255,255,255,0.07)',
-      background: 'rgba(10,8,18,0.95)',
+      background: 'rgba(10,8,18,0.97)',
       backdropFilter: 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
-      zIndex: 40,
     }}>
       {/* Header */}
       <div style={{
@@ -94,7 +106,20 @@ export default function AiChatSidebar() {
           <Sparkles size={13} color="#818CF8" />
         </div>
         <span style={{ fontSize: '13px', fontWeight: 600, color: '#F0EEFF', flex: 1 }}>Ask AI</span>
-        {messages.length > 0 && (
+        {loading && (
+          <button
+            onClick={stop}
+            title="Stop"
+            style={{
+              background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+              cursor: 'pointer', color: '#EF4444', padding: '3px 7px', borderRadius: '6px',
+              display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px',
+            }}
+          >
+            <Square size={10} /> Stop
+          </button>
+        )}
+        {!loading && messages.length > 0 && (
           <button
             onClick={() => setMessages([])}
             title="New chat"
@@ -109,6 +134,18 @@ export default function AiChatSidebar() {
             <RotateCcw size={13} />
           </button>
         )}
+        {/* Mobile close */}
+        <button
+          onClick={() => setOpen(false)}
+          className="ai-sidebar-close"
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: '#555', padding: '4px', borderRadius: '6px',
+            display: 'none', alignItems: 'center',
+          }}
+        >
+          <X size={14} />
+        </button>
       </div>
 
       {/* Messages */}
@@ -116,7 +153,7 @@ export default function AiChatSidebar() {
         {messages.length === 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '8px' }}>
             <p style={{ fontSize: '11px', color: '#444', margin: '0 0 4px', textAlign: 'center' }}>
-              Ask about your deals, competitors, or objections
+              Ask about your deals, paste meeting notes to auto-update records
             </p>
             {SUGGESTED.map(s => (
               <button key={s} onClick={() => send(s)} style={{
@@ -215,7 +252,7 @@ export default function AiChatSidebar() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKey}
-            placeholder="Ask anything… (Enter to send)"
+            placeholder="Ask anything or paste meeting notes…"
             rows={1}
             style={{
               flex: 1, background: 'none', border: 'none', outline: 'none',
@@ -241,7 +278,60 @@ export default function AiChatSidebar() {
         </div>
       </div>
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } } @media (max-width: 900px) { .ai-sidebar-close { display: flex !important; } }`}</style>
     </div>
+  )
+
+  return (
+    <>
+      {/* Desktop: fixed right sidebar */}
+      <div className="ai-sidebar-desktop" style={{
+        position: 'fixed', right: 0, top: 0, zIndex: 40,
+      }}>
+        {sidebarContent}
+      </div>
+
+      {/* Mobile: floating button + slide-in panel */}
+      <div className="ai-sidebar-mobile">
+        {/* Floating button */}
+        {!open && (
+          <button
+            onClick={() => setOpen(true)}
+            style={{
+              position: 'fixed', bottom: '20px', right: '20px', zIndex: 50,
+              width: '48px', height: '48px', borderRadius: '50%',
+              background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
+              boxShadow: '0 0 24px rgba(99,102,241,0.5)',
+              border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <MessageSquare size={20} color="#fff" />
+          </button>
+        )}
+
+        {/* Slide-in panel */}
+        {open && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 50,
+            display: 'flex', justifyContent: 'flex-end',
+          }}>
+            {/* Backdrop */}
+            <div
+              onClick={() => setOpen(false)}
+              style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}
+            />
+            <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: '320px' }}>
+              {sidebarContent}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <style>{`
+        @media (min-width: 901px) { .ai-sidebar-mobile { display: none !important; } }
+        @media (max-width: 900px) { .ai-sidebar-desktop { display: none !important; } }
+      `}</style>
+    </>
   )
 }

@@ -1,4 +1,4 @@
-import { eq, and } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { users, workspaces, workspaceMemberships } from '@/lib/db/schema'
 import type { Plan } from '@/types'
@@ -26,11 +26,45 @@ export type WorkspaceContext = {
 /**
  * Ensures the user row exists and returns their active workspace context.
  * Auto-creates a personal workspace on first sign-in (zero friction onboarding).
+ *
+ * Optimized: single LEFT JOIN query for the happy path (user + workspace exist).
  */
 export async function getWorkspaceContext(userId: string, userEmail?: string): Promise<WorkspaceContext> {
-  // 1. Ensure user row exists
-  const [existingUser] = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1)
-  if (!existingUser) {
+  // Single query: check user existence + membership + workspace in one round trip
+  const [row] = await db
+    .select({
+      userExists: users.id,
+      role: workspaceMemberships.role,
+      workspaceId: workspaceMemberships.workspaceId,
+      workspacePlan: workspaces.plan,
+      workspaceName: workspaces.name,
+      workspaceSlug: workspaces.slug,
+      stripeCustomerId: workspaces.stripeCustomerId,
+    })
+    .from(users)
+    .leftJoin(workspaceMemberships, eq(workspaceMemberships.userId, users.id))
+    .leftJoin(workspaces, eq(workspaceMemberships.workspaceId, workspaces.id))
+    .where(eq(users.id, userId))
+    .limit(1)
+
+  // Happy path: user + workspace both exist
+  if (row?.workspaceId && row.workspacePlan) {
+    return {
+      workspaceId: row.workspaceId,
+      role: row.role!,
+      plan: row.workspacePlan,
+      workspace: {
+        id: row.workspaceId,
+        name: row.workspaceName!,
+        slug: row.workspaceSlug!,
+        plan: row.workspacePlan,
+        stripeCustomerId: row.stripeCustomerId ?? null,
+      },
+    }
+  }
+
+  // New user — create user row first
+  if (!row) {
     await db.insert(users).values({
       id: userId,
       email: userEmail ?? `${userId}@clerk.placeholder`,
@@ -39,39 +73,8 @@ export async function getWorkspaceContext(userId: string, userEmail?: string): P
     })
   }
 
-  // 2. Find membership
-  const [membership] = await db
-    .select({
-      role: workspaceMemberships.role,
-      workspaceId: workspaceMemberships.workspaceId,
-      workspacePlan: workspaces.plan,
-      workspaceName: workspaces.name,
-      workspaceSlug: workspaces.slug,
-      stripeCustomerId: workspaces.stripeCustomerId,
-    })
-    .from(workspaceMemberships)
-    .innerJoin(workspaces, eq(workspaceMemberships.workspaceId, workspaces.id))
-    .where(eq(workspaceMemberships.userId, userId))
-    .limit(1)
-
-  if (membership) {
-    return {
-      workspaceId: membership.workspaceId,
-      role: membership.role,
-      plan: membership.workspacePlan,
-      workspace: {
-        id: membership.workspaceId,
-        name: membership.workspaceName,
-        slug: membership.workspaceSlug,
-        plan: membership.workspacePlan,
-        stripeCustomerId: membership.stripeCustomerId,
-      },
-    }
-  }
-
-  // 3. No workspace yet — auto-create a personal workspace
+  // Create workspace + membership (user exists but has no workspace)
   let slug = generateSlug()
-  // Retry until unique (very unlikely to collide but safe)
   for (let i = 0; i < 5; i++) {
     const [existing] = await db.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.slug, slug)).limit(1)
     if (!existing) break
