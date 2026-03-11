@@ -71,6 +71,7 @@ export default function SignUpPage() {
             <p style={{ fontSize: '13px', color: '#555' }}>Start closing more deals today</p>
           </div>
           <SignUp
+            fallbackRedirectUrl="/dashboard"
             appearance={{
               elements: {
                 rootBox: { width: '100%' },
