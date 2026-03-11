@@ -1,4 +1,6 @@
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
+import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { and, count, eq, sql } from 'drizzle-orm'
@@ -41,90 +43,144 @@ export async function POST(req: NextRequest) {
     const looksLikeBattlecardRequest = battlecardKeywords.some(kw => lastText.toLowerCase().includes(kw))
 
     if (looksLikeBattlecardRequest) {
-      // Extract competitor names via AI
+      const { workspaceId, plan } = await getWorkspaceContext(userId)
+
+      // Check for company profile upfront — required for battlecard generation
+      const [profileRow] = await db.select({ id: companyProfiles.id }).from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)).limit(1)
+      const hasCompanyProfile = !!profileRow
+
+      // Extract rich competitor data via AI (names + descriptions + strengths/weaknesses)
       const extractMsg = await anthropic.messages.create({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 512,
+        max_tokens: 2048,
         messages: [{
           role: 'user',
-          content: `Extract competitor names from this message. Return ONLY a JSON array of strings, e.g. ["Salesforce","HubSpot"]. If no competitors are clearly listed, return [].
-Message: ${lastText}`,
+          content: `Extract competitor information from this text. Return ONLY a JSON array of competitor objects, no markdown, no extra text.
+
+Each object must have:
+- "name": string (required)
+- "description": string (what they do, 1-2 sentences)
+- "strengths": string[] (up to 5 key strengths)
+- "weaknesses": string[] (up to 5 key weaknesses)
+- "keyFeatures": string[] (up to 5 main features)
+- "notes": string (any other relevant notes)
+
+Return [] if no competitors are clearly mentioned.
+
+Text: ${lastText.slice(0, 6000)}`,
         }],
       })
 
-      let names: string[] = []
+      interface ExtractedCompetitor {
+        name: string
+        description?: string
+        strengths?: string[]
+        weaknesses?: string[]
+        keyFeatures?: string[]
+        notes?: string
+      }
+
+      let extracted: ExtractedCompetitor[] = []
       try {
         const raw = (extractMsg.content[0] as { type: string; text: string }).text.trim()
-        names = JSON.parse(raw.replace(/^```json?\n?/, '').replace(/\n?```$/, ''))
-        if (!Array.isArray(names)) names = []
-      } catch { names = [] }
+        const parsed = JSON.parse(raw.replace(/^```json?\n?/, '').replace(/\n?```$/, ''))
+        if (Array.isArray(parsed)) extracted = parsed.filter((c: ExtractedCompetitor) => c?.name)
+      } catch { extracted = [] }
 
-      if (names.length === 0) {
+      if (extracted.length === 0) {
         return NextResponse.json({ reply: "I couldn't find specific competitor names in your message. Try: _\"Create battlecards for Salesforce, HubSpot, Pipedrive\"_" })
       }
 
-      const { workspaceId, plan } = await getWorkspaceContext(userId)
       const limits = PLAN_LIMITS[plan]
       const created: string[] = []
+      const savedOnly: string[] = [] // saved competitor but no battlecard
       const failed: string[] = []
 
-      for (const name of names.slice(0, 10)) {
-        if (!name?.trim()) continue
+      for (const comp of extracted.slice(0, 15)) {
+        const name = comp.name?.trim()
+        if (!name) continue
         try {
-          // Check plan limit
+          // Check competitor plan limit
           if (limits.competitors !== null) {
             const [{ value: currentCount }] = await db.select({ value: count() }).from(competitors).where(eq(competitors.workspaceId, workspaceId))
             if (!isWithinLimit(Number(currentCount), limits.competitors)) {
-              failed.push(`${name} (plan limit reached)`)
+              failed.push(`${name} (competitor limit reached — upgrade your plan)`)
               continue
             }
           }
 
-          // Check collateral limit
-          if (limits.collateral !== null) {
-            const [{ value: collCount }] = await db.select({ value: count() }).from(collateral).where(eq(collateral.workspaceId, workspaceId))
-            if (!isWithinLimit(Number(collCount), limits.collateral)) {
-              failed.push(`${name} (collateral limit reached)`)
-              continue
-            }
-          }
-
-          // Create competitor record
+          // Create competitor record with rich extracted data
           const now = new Date()
           const [competitor] = await db.insert(competitors).values({
-            workspaceId, userId, name: name.trim(),
-            strengths: [], weaknesses: [], keyFeatures: [], differentiators: [],
+            workspaceId, userId, name,
+            description: comp.description ?? null,
+            strengths: comp.strengths ?? [],
+            weaknesses: comp.weaknesses ?? [],
+            keyFeatures: comp.keyFeatures ?? [],
+            differentiators: [],
+            notes: comp.notes ?? null,
             createdAt: now, updatedAt: now,
           }).returning()
 
           await db.insert(events).values({ workspaceId, userId, type: 'competitor.created', metadata: { competitorId: competitor.id, name: competitor.name, source: 'ai_chat' }, createdAt: now })
 
-          // Generate battlecard
+          // Skip battlecard if no company profile — competitor data is saved though
+          if (!hasCompanyProfile) {
+            savedOnly.push(name)
+            continue
+          }
+
+          // Check collateral plan limit
+          if (limits.collateral !== null) {
+            const [{ value: collCount }] = await db.select({ value: count() }).from(collateral).where(eq(collateral.workspaceId, workspaceId))
+            if (!isWithinLimit(Number(collCount), limits.collateral)) {
+              savedOnly.push(`${name} (collateral limit reached)`)
+              continue
+            }
+          }
+
+          // Create collateral placeholder — generation runs after response via after()
           const colRecord = await db.insert(collateral).values({
-            workspaceId, userId, type: 'battlecard', title: `Generating battlecard for ${name}…`,
+            workspaceId, userId, type: 'battlecard', title: `Battlecard: ${name}`,
             status: 'generating', sourceCompetitorId: competitor.id,
             sourceCaseStudyId: null, sourceDealLogId: null, content: null, rawResponse: null,
             generatedAt: null, createdAt: now, updatedAt: now,
           }).returning()
 
-          try {
-            const result = await generateCollateral({ workspaceId, type: 'battlecard', competitorId: competitor.id })
-            const generatedAt = new Date()
-            await db.update(collateral).set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt }).where(eq(collateral.id, colRecord[0].id))
-            await db.insert(events).values({ workspaceId, userId, type: 'collateral.generated', metadata: { collateralId: colRecord[0].id, collateralType: 'battlecard', title: result.title }, createdAt: new Date() })
-            created.push(name.trim())
-          } catch {
-            await db.update(collateral).set({ status: 'stale', updatedAt: new Date() }).where(eq(collateral.id, colRecord[0].id))
-            failed.push(`${name} (generation failed)`)
-          }
+          const colId = colRecord[0].id
+          const competitorId = competitor.id
+
+          // Fire generation AFTER the response is sent — avoids timeout
+          after(async () => {
+            try {
+              const result = await generateCollateral({ workspaceId, type: 'battlecard', competitorId })
+              const generatedAt = new Date()
+              await db.update(collateral).set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt }).where(eq(collateral.id, colId))
+              await db.insert(events).values({ workspaceId, userId, type: 'collateral.generated', metadata: { collateralId: colId, collateralType: 'battlecard', title: result.title }, createdAt: new Date() })
+            } catch {
+              await db.update(collateral).set({ status: 'stale', updatedAt: new Date() }).where(eq(collateral.id, colId))
+            }
+          })
+
+          created.push(name)
         } catch {
           failed.push(name)
         }
       }
 
       let reply = ''
-      if (created.length > 0) reply += `✅ Created ${created.length} competitor${created.length > 1 ? 's' : ''} and generated battlecard${created.length > 1 ? 's' : ''}:\n${created.map(n => `• **${n}**`).join('\n')}\n\nView them in **Collateral → Battlecards**. You can add more details to each competitor profile in the **Competitors** section.`
-      if (failed.length > 0) reply += `\n\n⚠️ Couldn't process: ${failed.join(', ')}`
+      if (created.length > 0) {
+        reply += `✅ Saved ${created.length} competitor${created.length > 1 ? 's' : ''} and started generating battlecard${created.length > 1 ? 's' : ''} in the background:\n${created.map(n => `• **${n}**`).join('\n')}\n\nBattlecards will be ready in **Collateral → Battlecards** in about 1–2 minutes (generating now).`
+      }
+      if (savedOnly.length > 0) {
+        if (!hasCompanyProfile) {
+          reply += `\n\n📋 Saved ${savedOnly.length} competitor${savedOnly.length > 1 ? 's' : ''} to your Competitors section:\n${savedOnly.map(n => `• **${n}**`).join('\n')}\n\n⚠️ **Battlecards couldn't be generated yet** — you need to complete your [Company Profile](/company) first. Once done, go to **Collateral** and generate battlecards for each competitor.`
+        } else {
+          reply += `\n\n📋 Saved (no battlecard): ${savedOnly.join(', ')}`
+        }
+      }
+      if (failed.length > 0) reply += `\n\n❌ Couldn't process: ${failed.join(', ')}`
+      if (!reply) reply = 'No competitors were found in your message.'
 
       return NextResponse.json({ reply })
     }
