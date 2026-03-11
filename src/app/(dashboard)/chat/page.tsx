@@ -10,12 +10,12 @@ interface Message {
 }
 
 const SUGGESTED = [
-  'How do we compare against our top competitor?',
-  'What are the common objections and how should I handle them?',
-  'What deals are most likely to close this month?',
-  'What product gaps are hurting us the most?',
-  'Give me a pitch for a prospect in [industry]',
-  'Summarize our win rate and key reasons for losses',
+  '📋 Paste meeting notes here → I\'ll extract todos, blockers & opportunities',
+  '⚔️ Create battlecards for [Competitor1, Competitor2, Competitor3]',
+  '🎯 What deals are most likely to close this month?',
+  '🔍 What product gaps are costing us the most revenue?',
+  '🏆 How do we compare against our top competitor?',
+  '📊 Summarize our win rate and key reasons for losses',
 ]
 
 export default function ChatPage() {
@@ -70,7 +70,7 @@ export default function ChatPage() {
             Ask AI
           </h1>
           <p style={{ fontSize: '13px', color: '#555' }}>
-            Chat with your knowledge base — competitors, deals, case studies, product gaps
+            Paste meeting notes · create battlecards · analyze deals · find product gaps
           </p>
         </div>
         {messages.length > 0 && (
@@ -98,8 +98,8 @@ export default function ChatPage() {
               <Sparkles size={28} color="#818CF8" />
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '17px', fontWeight: '700', color: '#F0EEFF', marginBottom: '6px' }}>How can I help you close more deals?</div>
-              <div style={{ fontSize: '13px', color: '#555', lineHeight: '1.6' }}>I know your company, competitors, deals, and product gaps.</div>
+              <div style={{ fontSize: '17px', fontWeight: '700', color: '#F0EEFF', marginBottom: '6px' }}>Your AI deal conversion assistant</div>
+              <div style={{ fontSize: '13px', color: '#555', lineHeight: '1.6' }}>Paste meeting notes, create battlecards, or ask anything about your deals &amp; competitors.</div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', width: '100%' }}>
               {SUGGESTED.map(s => (

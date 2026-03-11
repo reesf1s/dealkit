@@ -159,7 +159,7 @@ export default function DashboardPage() {
           <h1 style={{ fontSize: '24px', fontWeight: '700', letterSpacing: '-0.04em', color: '#F0EEFF', marginBottom: '4px', background: 'linear-gradient(135deg, #F0EEFF, #A78BFA)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             {greeting}
           </h1>
-          <p style={{ fontSize: '13px', color: '#9CA3AF' }}>Your sales intelligence hub</p>
+          <p style={{ fontSize: '13px', color: '#9CA3AF' }}>AI-powered deal conversion · not just a pipeline</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <Link href="/deals" style={{
@@ -208,6 +208,80 @@ export default function DashboardPage() {
           </Link>
         </div>
       )}
+
+      {/* AI Superpowers callout */}
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(124,58,237,0.12) 100%)',
+        border: '1px solid rgba(139,92,246,0.25)',
+        borderRadius: '16px',
+        padding: '18px 20px',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* Glow */}
+        <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '200px', height: '200px', background: 'radial-gradient(circle, rgba(124,58,237,0.15), transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+          <div style={{ width: '28px', height: '28px', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 12px rgba(99,102,241,0.4)' }}>
+            <Zap size={13} color="#fff" />
+          </div>
+          <span style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF', letterSpacing: '-0.01em' }}>AI Deal Conversion · How to use DealKit</span>
+          <span style={{ fontSize: '11px', color: '#A78BFA', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', padding: '2px 8px', borderRadius: '100px', fontWeight: '600' }}>Unlike HubSpot</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+          {[
+            {
+              icon: '📋',
+              title: 'Paste meeting notes → AI action plan',
+              desc: 'Open any deal, paste your call notes. AI extracts todos, deal blockers, opportunities, and product gaps instantly.',
+              href: '/deals',
+              cta: 'Open a deal →',
+              color: '#F59E0B',
+            },
+            {
+              icon: '⚔️',
+              title: 'AI battlecards from competitor names',
+              desc: 'Ask the AI assistant to "create battlecards for Salesforce, HubSpot" — it builds full competitive intel automatically.',
+              href: '/chat',
+              cta: 'Open AI chat →',
+              color: '#6366F1',
+            },
+            {
+              icon: '🎯',
+              title: 'AI conversion score + next steps',
+              desc: 'Every deal gets an AI score (0–100) and specific actions to improve your win probability. Real-time as data changes.',
+              href: '/pipeline',
+              cta: 'View pipeline →',
+              color: '#22C55E',
+            },
+          ].map(item => (
+            <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
+              <div style={{
+                background: 'rgba(9,6,18,0.5)',
+                border: '1px solid rgba(124,58,237,0.15)',
+                borderRadius: '12px',
+                padding: '14px',
+                height: '100%',
+                transition: 'border-color 0.15s, background 0.15s',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => {
+                ;(e.currentTarget as HTMLElement).style.borderColor = `${item.color}44`
+                ;(e.currentTarget as HTMLElement).style.background = 'rgba(9,6,18,0.7)'
+              }}
+              onMouseLeave={e => {
+                ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,58,237,0.15)'
+                ;(e.currentTarget as HTMLElement).style.background = 'rgba(9,6,18,0.5)'
+              }}
+              >
+                <div style={{ fontSize: '20px', marginBottom: '8px' }}>{item.icon}</div>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: '#F0EEFF', marginBottom: '6px', lineHeight: '1.4' }}>{item.title}</div>
+                <div style={{ fontSize: '11px', color: '#9CA3AF', lineHeight: '1.6', marginBottom: '10px' }}>{item.desc}</div>
+                <div style={{ fontSize: '11px', color: item.color, fontWeight: '600' }}>{item.cta}</div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
 
       {/* Stats grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>

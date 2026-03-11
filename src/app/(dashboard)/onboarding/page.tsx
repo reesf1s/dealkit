@@ -2,15 +2,16 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparkles, ArrowRight, CheckCircle, Building2, Users, Loader2, ClipboardPaste } from 'lucide-react'
+import { Sparkles, ArrowRight, CheckCircle, Building2, Users, Loader2, ClipboardPaste, Zap, Target, FileText, ClipboardList } from 'lucide-react'
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const [step, setStep] = useState<'paste' | 'review' | 'saving'>('paste')
+  const [step, setStep] = useState<'paste' | 'review' | 'saving' | 'generating' | 'done'>('paste')
   const [text, setText] = useState('')
   const [parsed, setParsed] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [generatingProgress, setGeneratingProgress] = useState<{ name: string; done: boolean }[]>([])
 
   const handleParse = async () => {
     if (!text.trim()) return
@@ -42,15 +43,43 @@ export default function OnboardingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(parsed.company),
       })
-      // Save competitors
+
+      // Save competitors + collect their IDs
+      const createdCompetitors: { id: string; name: string }[] = []
       for (const comp of (parsed.competitors ?? [])) {
-        await fetch('/api/competitors', {
+        const res = await fetch('/api/competitors', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(comp),
         })
+        const data = await res.json()
+        if (data.data?.id) {
+          createdCompetitors.push({ id: data.data.id, name: comp.name })
+        }
       }
-      router.push('/dashboard?onboarded=1')
+
+      // If we have competitors, generate battlecards for each
+      if (createdCompetitors.length > 0) {
+        setStep('generating')
+        setGeneratingProgress(createdCompetitors.map(c => ({ name: c.name, done: false })))
+
+        await Promise.all(createdCompetitors.map(async (comp, idx) => {
+          try {
+            await fetch('/api/collateral/generate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'battlecard', competitorId: comp.id }),
+            })
+          } catch { /* best effort */ }
+          setGeneratingProgress(prev =>
+            prev.map((p, i) => i === idx ? { ...p, done: true } : p)
+          )
+        }))
+
+        setStep('done')
+      } else {
+        router.push('/dashboard?onboarded=1')
+      }
     } catch (e) {
       setStep('review')
       setError('Failed to save. Please try again.')
@@ -75,7 +104,7 @@ export default function OnboardingPage() {
           Set up DealKit in 30 seconds
         </h1>
         <p style={{ fontSize: '14px', color: '#555', lineHeight: '1.6' }}>
-          Paste anything — a pitch deck, company page, or notes — and AI will fill in your profile automatically
+          Paste anything — a pitch deck, company page, or notes — and AI will fill in your profile <em>and</em> generate your first battlecards automatically
         </p>
       </div>
 
@@ -117,24 +146,53 @@ export default function OnboardingPage() {
             </button>
           </div>
 
-          {/* What gets filled */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            {[
-              { icon: Building2, label: 'Company profile', desc: 'Name, industry, description, products' },
-              { icon: Users, label: 'Competitors', desc: 'Any competitors mentioned in text' },
-              { icon: Sparkles, label: 'Value props', desc: 'Key differentiators and advantages' },
-              { icon: CheckCircle, label: 'Target market', desc: 'ICP and target customer info' },
-            ].map(({ icon: Icon, label, desc }) => (
-              <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px' }}>
-                <div style={{ width: '28px', height: '28px', background: 'rgba(99,102,241,0.1)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Icon size={13} color="#818CF8" />
+          {/* What AI creates */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: '4px' }}>What AI creates automatically</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              {[
+                { icon: Building2, label: 'Company profile', desc: 'Name, industry, description, products', color: '#818CF8' },
+                { icon: Users, label: 'Competitors', desc: 'Any competitors mentioned in text', color: '#A78BFA' },
+                { icon: Sparkles, label: 'Value props & differentiators', desc: 'Key advantages and objections', color: '#6366F1' },
+                { icon: FileText, label: 'Battlecards (auto-generated)', desc: 'Full AI battlecard per competitor found', color: '#22C55E' },
+              ].map(({ icon: Icon, label, desc, color }) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px' }}>
+                  <div style={{ width: '28px', height: '28px', background: `${color}14`, border: `1px solid ${color}22`, borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon size={13} color={color} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: '#EBEBEB', marginBottom: '2px' }}>{label}</div>
+                    <div style={{ fontSize: '11px', color: '#555' }}>{desc}</div>
+                  </div>
                 </div>
-                <div>
-                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#EBEBEB', marginBottom: '2px' }}>{label}</div>
-                  <div style={{ fontSize: '11px', color: '#555' }}>{desc}</div>
+              ))}
+            </div>
+          </div>
+
+          {/* AI workflows preview */}
+          <div style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '12px', padding: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+              <Zap size={13} color="#818CF8" />
+              <span style={{ fontSize: '12px', fontWeight: '600', color: '#818CF8' }}>After setup, you'll be able to:</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {[
+                '📋 Paste call notes → AI extracts todos, blockers & opportunities',
+                '🎯 Get AI conversion score (0-100) + specific next steps per deal',
+                '⚔️ Ask AI to create battlecards: "Create battlecard for Salesforce"',
+                '🔍 AI auto-identifies product gaps from lost deals',
+              ].map(item => (
+                <div key={item} style={{ fontSize: '12px', color: '#9CA3AF', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                  {item}
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+
+          <div style={{ textAlign: 'center' }}>
+            <button onClick={() => router.push('/dashboard')} style={{ background: 'none', border: 'none', color: '#444', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}>
+              Skip — set up manually
+            </button>
           </div>
         </>
       )}
@@ -176,9 +234,13 @@ export default function OnboardingPage() {
           {/* Competitors preview */}
           {parsed.competitors?.length > 0 && (
             <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <Users size={14} color="#818CF8" />
                 <span style={{ fontSize: '13px', fontWeight: '600', color: '#EBEBEB' }}>{parsed.competitors.length} Competitors Found</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px', padding: '8px 10px', background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.12)', borderRadius: '8px' }}>
+                <Sparkles size={11} color="#22C55E" />
+                <span style={{ fontSize: '11px', color: '#22C55E' }}>AI will automatically generate a battlecard for each competitor after saving</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {parsed.competitors.map((c: any, i: number) => (
@@ -186,9 +248,12 @@ export default function OnboardingPage() {
                     <div style={{ width: '28px', height: '28px', background: 'rgba(99,102,241,0.1)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '11px', fontWeight: '700', color: '#818CF8' }}>
                       {c.name?.[0]?.toUpperCase() ?? '?'}
                     </div>
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '13px', fontWeight: '500', color: '#EBEBEB' }}>{c.name}</div>
                       {c.description && <div style={{ fontSize: '11px', color: '#555', marginTop: '1px' }}>{c.description.slice(0, 80)}{c.description.length > 80 ? '...' : ''}</div>}
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#6366F1', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', padding: '2px 7px', borderRadius: '100px', fontWeight: '600', flexShrink: 0 }}>
+                      + Battlecard
                     </div>
                   </div>
                 ))}
@@ -209,7 +274,7 @@ export default function OnboardingPage() {
               color: '#fff', fontSize: '13px', fontWeight: '600',
               boxShadow: '0 0 24px rgba(99,102,241,0.3)',
             }}>
-              Save & go to dashboard <ArrowRight size={14} />
+              Save & generate battlecards <ArrowRight size={14} />
             </button>
           </div>
         </div>
@@ -225,7 +290,99 @@ export default function OnboardingPage() {
         </div>
       )}
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      {step === 'generating' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '8px' }}>
+              <Sparkles size={18} color="#818CF8" style={{ animation: 'pulse 1.5s ease-in-out infinite' }} />
+              <span style={{ fontSize: '16px', fontWeight: '600', color: '#F0EEFF' }}>Generating your battlecards...</span>
+            </div>
+            <p style={{ fontSize: '13px', color: '#555' }}>AI is building competitive intelligence for each competitor</p>
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {generatingProgress.map((item, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
+                <div style={{ width: '28px', height: '28px', background: item.done ? 'rgba(34,197,94,0.1)' : 'rgba(99,102,241,0.1)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {item.done
+                    ? <CheckCircle size={14} color="#22C55E" />
+                    : <Loader2 size={14} color="#818CF8" style={{ animation: 'spin 1s linear infinite' }} />
+                  }
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: '500', color: '#EBEBEB' }}>{item.name}</div>
+                  <div style={{ fontSize: '11px', color: item.done ? '#22C55E' : '#555', marginTop: '1px' }}>
+                    {item.done ? 'Battlecard generated ✓' : 'Generating battlecard...'}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {step === 'done' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ width: '56px', height: '56px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 0 24px rgba(34,197,94,0.15)' }}>
+              <CheckCircle size={24} color="#22C55E" />
+            </div>
+            <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#F0EEFF', marginBottom: '8px', letterSpacing: '-0.03em' }}>You're all set!</h2>
+            <p style={{ fontSize: '13px', color: '#555', lineHeight: '1.6' }}>
+              Your company profile, competitors, and battlecards are ready.<br />Here's what to do next:
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {[
+              { icon: ClipboardList, label: 'Log your first deal', desc: 'Track a prospect and get AI deal scoring', href: '/deals', color: '#F59E0B' },
+              { icon: FileText, label: 'View your battlecards', desc: 'AI-generated competitive intel is ready', href: '/collateral?type=battlecard', color: '#6366F1' },
+              { icon: Target, label: 'Open AI chat', desc: 'Ask AI to create more collateral or analyze deals', href: '/chat', color: '#A78BFA' },
+            ].map(({ icon: Icon, label, desc, href, color }) => (
+              <a key={href} href={href} style={{
+                display: 'flex', alignItems: 'center', gap: '12px',
+                padding: '14px', background: 'rgba(255,255,255,0.02)',
+                border: '1px solid rgba(255,255,255,0.05)',
+                borderRadius: '10px', textDecoration: 'none',
+                transition: 'border-color 0.1s, background 0.1s',
+              }}
+              onMouseEnter={e => {
+                ;(e.currentTarget as HTMLElement).style.borderColor = `${color}33`
+                ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'
+              }}
+              onMouseLeave={e => {
+                ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.05)'
+                ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'
+              }}
+              >
+                <div style={{ width: '32px', height: '32px', background: `${color}14`, border: `1px solid ${color}22`, borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Icon size={15} color={color} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>{label}</div>
+                  <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>{desc}</div>
+                </div>
+                <ArrowRight size={14} color="#444" />
+              </a>
+            ))}
+          </div>
+
+          <button onClick={() => router.push('/dashboard?onboarded=1')} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            padding: '14px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+            background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
+            color: '#fff', fontSize: '14px', fontWeight: '600',
+            boxShadow: '0 0 24px rgba(99,102,241,0.4)',
+          }}>
+            Go to Dashboard <ArrowRight size={15} />
+          </button>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg) } }
+        @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.5 } }
+      `}</style>
     </div>
   )
 }

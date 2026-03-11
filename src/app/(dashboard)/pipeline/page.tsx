@@ -3,11 +3,11 @@ export const dynamic = 'force-dynamic'
 
 import useSWR, { mutate } from 'swr'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   Plus, TrendingUp, DollarSign, ChevronRight, Sparkles,
   CheckSquare, Square, MoreHorizontal, Target, Zap, ArrowUpRight,
-  AlertCircle, Star
+  AlertCircle, Star, GripVertical
 } from 'lucide-react'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
@@ -36,7 +36,19 @@ function ScoreBadge({ score }: { score?: number | null }) {
   )
 }
 
-function DealCard({ deal, onMoveStage }: { deal: any; onMoveStage: (id: string, stage: string) => void }) {
+function DealCard({
+  deal,
+  onMoveStage,
+  onDragStart,
+  onDragEnd,
+  isDragging,
+}: {
+  deal: any
+  onMoveStage: (id: string, stage: string) => void
+  onDragStart: (id: string) => void
+  onDragEnd: () => void
+  isDragging: boolean
+}) {
   const [menuOpen, setMenuOpen] = useState(false)
   const nextStages = STAGES.filter(s => s.id !== deal.stage && s.id !== 'closed_won' && s.id !== 'closed_lost')
   const stageConfig = STAGES.find(s => s.id === deal.stage)
@@ -45,25 +57,42 @@ function DealCard({ deal, onMoveStage }: { deal: any; onMoveStage: (id: string, 
   const doneTodos = todos.filter((t: any) => t.done).length
 
   return (
-    <div style={{
-      background: 'rgba(18,12,32,0.7)',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      border: '1px solid rgba(124,58,237,0.18)',
-      borderRadius: '14px',
-      padding: '14px',
-      position: 'relative',
-      transition: 'border-color 0.2s, transform 0.15s',
-      cursor: 'default',
-    }}
-    onMouseEnter={e => {
-      (e.currentTarget as HTMLElement).style.borderColor = `${stageConfig?.color ?? '#8B5CF6'}55`
-      ;(e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'
-    }}
-    onMouseLeave={e => {
-      (e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,58,237,0.18)'
-      ;(e.currentTarget as HTMLElement).style.transform = 'translateY(0)'
-    }}
+    <div
+      draggable
+      onDragStart={e => {
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', deal.id)
+        // small delay so the ghost image captures before opacity change
+        requestAnimationFrame(() => {
+          onDragStart(deal.id)
+        })
+      }}
+      onDragEnd={() => {
+        onDragEnd()
+      }}
+      style={{
+        background: 'rgba(18,12,32,0.7)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        border: '1px solid rgba(124,58,237,0.18)',
+        borderRadius: '14px',
+        padding: '14px',
+        position: 'relative',
+        transition: 'border-color 0.2s, transform 0.15s, opacity 0.15s',
+        cursor: 'grab',
+        opacity: isDragging ? 0.4 : 1,
+        userSelect: 'none',
+      }}
+      onMouseEnter={e => {
+        if (!isDragging) {
+          ;(e.currentTarget as HTMLElement).style.borderColor = `${stageConfig?.color ?? '#8B5CF6'}55`
+          ;(e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'
+        }
+      }}
+      onMouseLeave={e => {
+        ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,58,237,0.18)'
+        ;(e.currentTarget as HTMLElement).style.transform = 'translateY(0)'
+      }}
     >
       {/* Top row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -79,7 +108,7 @@ function DealCard({ deal, onMoveStage }: { deal: any; onMoveStage: (id: string, 
           <ScoreBadge score={deal.conversionScore} />
           <div style={{ position: 'relative' }}>
             <button
-              onClick={() => setMenuOpen(!menuOpen)}
+              onClick={e => { e.stopPropagation(); setMenuOpen(!menuOpen) }}
               style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', padding: '2px', display: 'flex', borderRadius: '4px' }}
             >
               <MoreHorizontal size={14} />
@@ -150,7 +179,7 @@ function DealCard({ deal, onMoveStage }: { deal: any; onMoveStage: (id: string, 
         {deal.dealValue ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: '700', color: '#22C55E' }}>
             <DollarSign size={11} />
-            {(deal.dealValue / 100).toLocaleString()}
+            {deal.dealValue.toLocaleString()}
           </div>
         ) : <div />}
         {todos.length > 0 && (
@@ -176,13 +205,38 @@ export default function PipelinePage() {
   const { data: dealsData, isLoading } = useSWR('/api/deals', fetcher)
   const deals: any[] = dealsData?.data ?? []
 
+  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [dragOverStage, setDragOverStage] = useState<string | null>(null)
+
   const moveStage = async (dealId: string, stage: string) => {
+    // Optimistic update
+    mutate('/api/deals', (current: any) => {
+      if (!current?.data) return current
+      return {
+        ...current,
+        data: current.data.map((d: any) =>
+          d.id === dealId ? { ...d, stage } : d
+        ),
+      }
+    }, false)
+
     await fetch(`/api/deals/${dealId}/stage`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ stage }),
     })
     mutate('/api/deals')
+  }
+
+  const handleDrop = (stageId: string) => {
+    if (draggedId && draggedId !== '') {
+      const deal = deals.find(d => d.id === draggedId)
+      if (deal && deal.stage !== stageId) {
+        moveStage(draggedId, stageId)
+      }
+    }
+    setDraggedId(null)
+    setDragOverStage(null)
   }
 
   const activeStages = STAGES.filter(s => s.id !== 'closed_won' && s.id !== 'closed_lost')
@@ -205,7 +259,9 @@ export default function PipelinePage() {
           </h1>
           <p style={{ fontSize: '13px', color: '#9CA3AF' }}>
             {deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost').length} active deals
-            {totalPipeline > 0 && ` · $${(totalPipeline / 100).toLocaleString()} pipeline value`}
+            {totalPipeline > 0 && ` · $${totalPipeline.toLocaleString()} pipeline value`}
+            {' · '}
+            <span style={{ color: '#6B7280' }}>Drag cards to move stages</span>
           </p>
         </div>
         <Link href="/deals" style={{
@@ -246,7 +302,7 @@ export default function PipelinePage() {
                   <div style={{ fontSize: '12px', fontWeight: '600', color: '#F0EEFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.prospectCompany}</div>
                   <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '1px' }}>
                     {STAGES.find(s => s.id === deal.stage)?.label}
-                    {deal.dealValue && ` · $${(deal.dealValue / 100).toLocaleString()}`}
+                    {deal.dealValue && ` · $${deal.dealValue.toLocaleString()}`}
                   </div>
                 </div>
                 <div style={{ fontSize: '16px', fontWeight: '800', color: deal.conversionScore >= 70 ? '#22C55E' : '#F59E0B' }}>
@@ -264,18 +320,42 @@ export default function PipelinePage() {
           {activeStages.map(stage => {
             const stageDeals = deals.filter((d: any) => d.stage === stage.id)
             const stageValue = stageDeals.reduce((s: number, d: any) => s + (d.dealValue ?? 0), 0)
-            return (
-              <div key={stage.id} style={{ width: '260px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            const isDropTarget = dragOverStage === stage.id && draggedId !== null
 
+            return (
+              <div
+                key={stage.id}
+                style={{ width: '260px', display: 'flex', flexDirection: 'column', gap: '10px' }}
+                onDragOver={e => {
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                  setDragOverStage(stage.id)
+                }}
+                onDragLeave={e => {
+                  // Only clear if leaving the column itself (not a child)
+                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                  if (
+                    e.clientX < rect.left || e.clientX > rect.right ||
+                    e.clientY < rect.top || e.clientY > rect.bottom
+                  ) {
+                    setDragOverStage(null)
+                  }
+                }}
+                onDrop={e => {
+                  e.preventDefault()
+                  handleDrop(stage.id)
+                }}
+              >
                 {/* Column header */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px',
-                  background: 'rgba(18,12,32,0.7)',
+                  background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.12)` : 'rgba(18,12,32,0.7)',
                   backdropFilter: 'blur(16px)',
                   WebkitBackdropFilter: 'blur(16px)',
-                  border: '1px solid rgba(124,58,237,0.18)',
+                  border: isDropTarget ? `1px solid ${stage.color}55` : '1px solid rgba(124,58,237,0.18)',
                   borderRadius: '12px',
                   borderTop: `3px solid ${stage.color}`,
+                  transition: 'background 0.15s, border-color 0.15s',
                 }}>
                   <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: stage.color, boxShadow: `0 0 8px ${stage.color}` }} />
                   <span style={{ fontSize: '12px', fontWeight: '600', color: '#F0EEFF', flex: 1 }}>{stage.label}</span>
@@ -284,7 +364,7 @@ export default function PipelinePage() {
                 {stageValue > 0 && (
                   <div style={{ fontSize: '11px', color: '#9CA3AF', padding: '0 4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <TrendingUp size={10} />
-                    ${(stageValue / 100).toLocaleString()} value
+                    ${stageValue.toLocaleString()} value
                   </div>
                 )}
 
@@ -294,12 +374,27 @@ export default function PipelinePage() {
                     <div style={{ fontSize: '11px', color: '#4B5563' }}>Loading...</div>
                   </div>
                 ) : stageDeals.length === 0 ? (
-                  <div style={{ height: '80px', background: 'rgba(18,12,32,0.3)', border: '1px dashed rgba(124,58,237,0.12)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '11px', color: '#4B5563' }}>No deals</span>
+                  <div style={{
+                    height: '80px',
+                    background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.06)` : 'rgba(18,12,32,0.3)',
+                    border: isDropTarget ? `1px dashed ${stage.color}88` : '1px dashed rgba(124,58,237,0.12)',
+                    borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'background 0.15s, border-color 0.15s',
+                  }}>
+                    <span style={{ fontSize: '11px', color: isDropTarget ? stage.color : '#4B5563' }}>
+                      {isDropTarget ? 'Drop here' : 'No deals'}
+                    </span>
                   </div>
                 ) : (
                   stageDeals.map((deal: any) => (
-                    <DealCard key={deal.id} deal={deal} onMoveStage={moveStage} />
+                    <DealCard
+                      key={deal.id}
+                      deal={deal}
+                      onMoveStage={moveStage}
+                      onDragStart={setDraggedId}
+                      onDragEnd={() => { setDraggedId(null); setDragOverStage(null) }}
+                      isDragging={draggedId === deal.id}
+                    />
                   ))
                 )}
 
@@ -328,29 +423,58 @@ export default function PipelinePage() {
             )
           })}
 
-          {/* Won/Lost summary */}
+          {/* Won/Lost summary columns */}
           <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {['closed_won', 'closed_lost'].map(stageId => {
               const s = STAGES.find(x => x.id === stageId)!
               const stageDeals = deals.filter((d: any) => d.stage === stageId)
               const val = stageDeals.reduce((sum: number, d: any) => sum + (d.dealValue ?? 0), 0)
+              const isDropTarget = dragOverStage === stageId && draggedId !== null
+
               return (
-                <div key={stageId} style={{
-                  padding: '14px',
-                  background: 'rgba(18,12,32,0.7)',
-                  backdropFilter: 'blur(16px)',
-                  WebkitBackdropFilter: 'blur(16px)',
-                  border: `1px solid rgba(124,58,237,0.18)`,
-                  borderRadius: '14px',
-                  borderTop: `3px solid ${s.color}`,
-                }}>
+                <div
+                  key={stageId}
+                  style={{
+                    padding: '14px',
+                    background: isDropTarget ? `rgba(${hexToRgb(s.color)},0.1)` : 'rgba(18,12,32,0.7)',
+                    backdropFilter: 'blur(16px)',
+                    WebkitBackdropFilter: 'blur(16px)',
+                    border: isDropTarget ? `1px solid ${s.color}55` : `1px solid rgba(124,58,237,0.18)`,
+                    borderRadius: '14px',
+                    borderTop: `3px solid ${s.color}`,
+                    transition: 'background 0.15s, border-color 0.15s',
+                    flex: 1,
+                  }}
+                  onDragOver={e => {
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'move'
+                    setDragOverStage(stageId)
+                  }}
+                  onDragLeave={e => {
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                    if (
+                      e.clientX < rect.left || e.clientX > rect.right ||
+                      e.clientY < rect.top || e.clientY > rect.bottom
+                    ) {
+                      setDragOverStage(null)
+                    }
+                  }}
+                  onDrop={e => {
+                    e.preventDefault()
+                    handleDrop(stageId)
+                  }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                     <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: s.color, boxShadow: `0 0 8px ${s.color}` }} />
                     <span style={{ fontSize: '12px', fontWeight: '600', color: '#F0EEFF' }}>{s.label}</span>
                     <span style={{ fontSize: '11px', color: '#9CA3AF', background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.15)', padding: '1px 7px', borderRadius: '100px', marginLeft: 'auto' }}>{stageDeals.length}</span>
                   </div>
-                  {val > 0 && <div style={{ fontSize: '18px', fontWeight: '700', color: s.color }}>${(val / 100).toLocaleString()}</div>}
-                  {stageDeals.length === 0 && <div style={{ fontSize: '11px', color: '#4B5563' }}>No deals yet</div>}
+                  {val > 0 && <div style={{ fontSize: '18px', fontWeight: '700', color: s.color }}>${val.toLocaleString()}</div>}
+                  {stageDeals.length === 0 && (
+                    <div style={{ fontSize: '11px', color: isDropTarget ? s.color : '#4B5563' }}>
+                      {isDropTarget ? 'Drop to close' : 'No deals yet'}
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -359,4 +483,11 @@ export default function PipelinePage() {
       </div>
     </div>
   )
+}
+
+// Utility: convert hex color to "r,g,b" string for rgba()
+function hexToRgb(hex: string): string {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+  if (!result) return '124,58,237'
+  return `${parseInt(result[1], 16)},${parseInt(result[2], 16)},${parseInt(result[3], 16)}`
 }
