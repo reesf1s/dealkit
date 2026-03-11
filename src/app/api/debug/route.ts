@@ -18,9 +18,9 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       database: safeUrl,
-      tables: (tables as { table_name: string }[]).map(r => r.table_name),
-      userCount: (userCount as { n: string }[])[0]?.n,
-      workspaceCount: (wsCount as { n: string }[])[0]?.n,
+      tables: (tables as unknown as { table_name: string }[]).map(r => r.table_name),
+      userCount: (userCount as unknown as { n: string }[])[0]?.n,
+      workspaceCount: (wsCount as unknown as { n: string }[])[0]?.n,
     })
   } catch (e) {
     return NextResponse.json({
