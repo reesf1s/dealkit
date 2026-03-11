@@ -7,9 +7,17 @@ import * as schema from './schema'
 // module load time. API routes catch the resulting query error and return 503.
 const connectionString = process.env.DATABASE_URL ?? 'postgresql://placeholder:placeholder@placeholder/placeholder'
 
+const isSupabase = connectionString.includes('supabase.co') || connectionString.includes('pooler.supabase.com')
+
 const client = postgres(connectionString, {
-  max: 1,
-  ssl: connectionString.includes('supabase.co') ? 'require' : false,
+  // Allow up to 5 concurrent queries per serverless invocation so that
+  // Promise.all([5 queries]) runs in parallel instead of serializing.
+  // Each Vercel lambda instance has its own pool; 5 concurrent invocations
+  // × 1 active connection each = 5 Supabase connections (within free tier).
+  max: 5,
+  idle_timeout: 20,
+  connect_timeout: 10,
+  ssl: isSupabase ? 'require' : false,
 })
 export const db = drizzle(client, { schema })
 
