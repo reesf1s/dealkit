@@ -197,6 +197,7 @@ export const dealLogs = pgTable('deal_logs', {
   aiSummary: text('ai_summary'),
   conversionScore: integer('conversion_score'),
   conversionInsights: jsonb('conversion_insights').notNull().default([]),
+  dealRisks: jsonb('deal_risks').notNull().default([]),
   todos: jsonb('todos').notNull().default([]),
   nextSteps: text('next_steps'),
   closeDate: timestamp('close_date', { withTimezone: true }),

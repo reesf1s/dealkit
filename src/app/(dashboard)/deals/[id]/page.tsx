@@ -100,6 +100,23 @@ function MeetingNotesTab({ dealId, deal, onUpdate }: { dealId: string; deal: any
               ))}
             </div>
           )}
+          {/* Deal Risks */}
+          {deal?.dealRisks?.length > 0 && (
+            <div style={{ marginTop: '12px', padding: '12px 14px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '8px' }}>
+              <div style={{ fontSize: '11px', color: '#F59E0B', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                ⚠ Deal Risks
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                {(deal.dealRisks as string[]).map((risk: string, i: number) => (
+                  <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: '#C9820A' }}>
+                    <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#F59E0B', flexShrink: 0, marginTop: '5px' }} />
+                    {risk}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {result?.productGaps?.length > 0 && (
             <div style={{ marginTop: '12px', padding: '10px 12px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '8px' }}>
               <div style={{ fontSize: '11px', color: '#EF4444', fontWeight: '600', marginBottom: '4px' }}>

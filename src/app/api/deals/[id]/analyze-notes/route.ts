@@ -33,16 +33,22 @@ Return this exact JSON structure:
   "summary": "2-3 sentence deal summary",
   "conversionScore": 65,
   "conversionInsights": ["Why score is X", "Key risk or opportunity", "Recommended next action"],
+  "risks": ["Deal risk or warning signal observed in the notes"],
   "todos": [{"text": "action item"}],
   "productGaps": [{"title": "gap title", "description": "what customer needs that product lacks", "priority": "high"}]
 }
 
 conversionScore: 0-100. priority: critical | high | medium | low
 
+IMPORTANT — risks rules:
+- Include any signals that could jeopardise this deal: disengagement, slow responses, champion leaving, budget concerns, competing priorities, late-stage hesitation, unclear decision-maker, etc.
+- These are deal-level risks, NOT product feature complaints. A risk is something about this specific sales cycle.
+- Keep each risk concise (1 sentence). Max 4 risks. Return [] if none observed.
+
 IMPORTANT — productGaps rules:
 - Only include a product gap if the prospect EXPLICITLY mentioned a missing feature, integration, or capability that your product does not currently support.
 - Examples of real product gaps: "we need Salesforce integration", "it doesn't support SSO", "we require an API for X".
-- DO NOT create product gaps from: scheduling tasks, follow-up emails, admin work, attendance tracking requests (unless the prospect said the product lacks it), general to-dos, or anything that is a sales/process action rather than a product capability complaint.
+- DO NOT create product gaps from: scheduling tasks, follow-up emails, admin work, attendance tracking requests (unless the prospect said the product lacks it), general to-dos, deal risks, or anything that is a sales/process action rather than a product capability complaint.
 - If no explicit product gaps are mentioned, return an empty array: "productGaps": []` }],
     })
     let parsed: any = {}
@@ -50,12 +56,13 @@ IMPORTANT — productGaps rules:
       const raw = (msg.content[0] as any).text.trim()
       parsed = JSON.parse(raw.replace(/^```json?\n?/, '').replace(/\n?```$/, ''))
     } catch {
-      parsed = { summary: meetingNotes.slice(0, 200), conversionScore: 50, conversionInsights: [], todos: [], productGaps: [] }
+      parsed = { summary: meetingNotes.slice(0, 200), conversionScore: 50, conversionInsights: [], risks: [], todos: [], productGaps: [] }
     }
     const todos = (parsed.todos ?? []).map((t: any) => ({ id: crypto.randomUUID(), text: t.text, done: false, createdAt: new Date().toISOString() }))
     const [updatedDeal] = await db.update(dealLogs).set({
       meetingNotes, aiSummary: parsed.summary, conversionScore: parsed.conversionScore,
       conversionInsights: parsed.conversionInsights ?? [],
+      dealRisks: parsed.risks ?? [],
       todos: [...((deal.todos as any[]) ?? []), ...todos], updatedAt: new Date(),
     }).where(eq(dealLogs.id, id)).returning()
     const createdGaps = []
