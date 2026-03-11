@@ -31,9 +31,10 @@ export function dbNotConfigured(): NextResponse {
 /** Wraps a route handler with standard DB error handling */
 export function dbErrResponse(err: unknown): NextResponse {
   if (isDbConnectionError(err)) return dbNotConfigured()
-  console.error('API error:', err)
+  const msg = err instanceof Error ? err.message : String(err)
+  console.error('API error:', msg, err)
   return NextResponse.json(
-    { error: 'Internal server error', code: 'INTERNAL_ERROR' },
+    { error: 'Internal server error', code: 'INTERNAL_ERROR', detail: msg },
     { status: 500 },
   )
 }
