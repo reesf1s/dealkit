@@ -363,7 +363,7 @@ export default function AiChatSidebar() {
           </button>
         </div>
       </div>
-      <style>{\`@keyframes spin { to { transform: rotate(360deg) } }\`}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 
@@ -392,10 +392,10 @@ export default function AiChatSidebar() {
           </div>
         )}
       </div>
-      <style>{\`
+      <style>{`
         @media (min-width: 901px) { .ai-sidebar-mobile { display: none !important; } }
         @media (max-width: 900px) { .ai-sidebar-desktop { display: none !important; } }
-      \`}</style>
+      `}</style>
     </>
   )
 }
