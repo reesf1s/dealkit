@@ -5,9 +5,9 @@ import useSWR from 'swr'
 import Link from 'next/link'
 import { TrendingUp, Users, BookOpen, ClipboardList, FileText, Plus, RefreshCw, AlertTriangle, CheckCircle, Circle, ArrowUpRight, Zap, Target, BarChart3, Sparkles } from 'lucide-react'
 import ROIWidget from '@/components/dashboard/ROIWidget'
+import { SetupAlert } from '@/components/shared/SetupBanner'
 import { useUser } from '@clerk/nextjs'
-
-const fetcher = (url: string) => fetch(url).then(r => r.json())
+import { fetcher, isDbNotConfigured } from '@/lib/fetcher'
 
 function StatCard({ label, value, icon: Icon, color, trend }: { label: string; value: string | number; icon: React.ElementType; color: string; trend?: string }) {
   return (
@@ -89,12 +89,14 @@ const TYPE_COLORS: Record<string, { bg: string; color: string; border: string }>
 
 export default function DashboardPage() {
   const { user } = useUser()
-  const { data: company } = useSWR('/api/company', fetcher)
+  const { data: company, error: companyErr } = useSWR('/api/company', fetcher)
   const { data: competitors } = useSWR('/api/competitors', fetcher)
   const { data: caseStudies } = useSWR('/api/case-studies', fetcher)
   const { data: deals } = useSWR('/api/deals', fetcher)
   const { data: collateral } = useSWR('/api/collateral', fetcher)
   const { data: insights } = useSWR('/api/insights', fetcher)
+
+  const dbNotConnected = isDbNotConfigured(companyErr)
 
   const hasCompany = !!company?.id
   const competitorCount = competitors?.length ?? 0
@@ -151,6 +153,9 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* DB setup alert */}
+      {dbNotConnected && <SetupAlert />}
 
       {/* Stale alert */}
       {staleItems.length > 0 && (

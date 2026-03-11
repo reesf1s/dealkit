@@ -4,13 +4,10 @@ export const dynamic = 'force-dynamic'
 import useSWR from 'swr'
 import { CompanyForm } from '@/components/company/CompanyForm'
 import { SkeletonCard } from '@/components/shared/SkeletonCard'
+import SetupBanner from '@/components/shared/SetupBanner'
+import { fetcher, isDbNotConfigured } from '@/lib/fetcher'
 import type { CompanyProfile } from '@/types'
-
-const fetcher = (url: string) =>
-  fetch(url).then((r) => {
-    if (!r.ok) throw new Error('Failed to fetch')
-    return r.json()
-  })
+import { Building2, Sparkles } from 'lucide-react'
 
 export default function CompanyPage() {
   const { data, isLoading, error, mutate } = useSWR<{ data: CompanyProfile | null }>(
@@ -18,23 +15,30 @@ export default function CompanyPage() {
     fetcher,
   )
 
+  const dbError = isDbNotConfigured(error)
+
   return (
-    <div style={{ padding: '32px', maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '760px' }}>
+      {/* Header */}
       <div style={{ marginBottom: '28px' }}>
-        <h1
-          style={{
-            fontSize: '22px',
-            fontWeight: 700,
-            color: '#EBEBEB',
-            letterSpacing: '-0.03em',
-            margin: 0,
-            marginBottom: '4px',
-          }}
-        >
-          Company profile
-        </h1>
-        <p style={{ fontSize: '13px', color: '#888888', margin: 0 }}>
-          This information powers all AI-generated collateral. Keep it accurate for best results.
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+          <div style={{ width: '32px', height: '32px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Building2 size={15} color="#818CF8" />
+          </div>
+          <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#EBEBEB', letterSpacing: '-0.03em', margin: 0 }}>
+            Company Profile
+          </h1>
+        </div>
+        <p style={{ fontSize: '13px', color: '#555', margin: 0, paddingLeft: '42px', lineHeight: '1.6' }}>
+          This is the foundation of your AI-generated collateral. The more detail you add, the better the output.
+        </p>
+      </div>
+
+      {/* AI tip */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 16px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '10px', marginBottom: '24px' }}>
+        <Sparkles size={14} color="#818CF8" style={{ marginTop: '1px', flexShrink: 0 }} />
+        <p style={{ fontSize: '12px', color: '#818CF8', margin: 0, lineHeight: '1.6' }}>
+          <strong>AI tip:</strong> Fill in your value propositions, differentiators, and common objections to get the most targeted battlecards and email sequences. The AI uses every field here.
         </p>
       </div>
 
@@ -46,17 +50,12 @@ export default function CompanyPage() {
         </div>
       )}
 
-      {error && (
-        <div
-          style={{
-            padding: '16px',
-            borderRadius: '8px',
-            backgroundColor: 'rgba(239,68,68,0.08)',
-            border: '1px solid rgba(239,68,68,0.25)',
-            color: '#EF4444',
-            fontSize: '13px',
-          }}
-        >
+      {dbError && (
+        <SetupBanner context="Add a DATABASE_URL to save your company profile and power AI collateral generation." />
+      )}
+
+      {error && !dbError && (
+        <div style={{ padding: '14px 18px', borderRadius: '10px', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', color: '#F87171', fontSize: '13px' }}>
           Failed to load company profile. Please refresh the page.
         </div>
       )}

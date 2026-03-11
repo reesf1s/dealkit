@@ -10,21 +10,18 @@ import { DealForm } from '@/components/deals/DealForm'
 import { DealInsights } from '@/components/deals/DealInsights'
 import { SkeletonCard } from '@/components/shared/SkeletonCard'
 import { useToast } from '@/components/shared/Toast'
+import SetupBanner from '@/components/shared/SetupBanner'
+import { fetcher, isDbNotConfigured } from '@/lib/fetcher'
 import type { DealLog } from '@/types'
-
-const fetcher = (url: string) =>
-  fetch(url).then((r) => {
-    if (!r.ok) throw new Error('Failed to fetch')
-    return r.json()
-  })
 
 export default function DealsPage() {
   const { toast } = useToast()
   const [addOpen, setAddOpen] = useState(false)
   const [addLoading, setAddLoading] = useState(false)
 
-  const { data, isLoading, mutate } = useSWR<{ data: DealLog[] }>('/api/deals', fetcher)
+  const { data, isLoading, error, mutate } = useSWR<{ data: DealLog[] }>('/api/deals', fetcher)
   const deals = data?.data ?? []
+  const dbError = isDbNotConfigured(error)
 
   async function handleAdd(payload: Partial<DealLog>) {
     setAddLoading(true)
@@ -70,6 +67,10 @@ export default function DealsPage() {
           Log Deal
         </button>
       </div>
+
+      {dbError && (
+        <SetupBanner context="Add a DATABASE_URL to start logging deals and tracking your win rate." />
+      )}
 
       {isLoading ? (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '24px' }}>
