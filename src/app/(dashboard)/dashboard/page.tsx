@@ -9,35 +9,48 @@ import { SetupAlert } from '@/components/shared/SetupBanner'
 import { useUser } from '@clerk/nextjs'
 import { fetcher, isDbNotConfigured } from '@/lib/fetcher'
 
-function StatCard({ label, value, icon: Icon, color, trend }: { label: string; value: string | number; icon: React.ElementType; color: string; trend?: string }) {
+function StatCard({ label, value, icon: Icon, color, trend, featured }: { label: string; value: string | number; icon: React.ElementType; color: string; trend?: string; featured?: boolean }) {
   return (
     <div
       style={{
         position: 'relative',
-        background: 'linear-gradient(135deg, #141414 0%, #111111 100%)',
-        border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: '12px',
+        background: 'rgba(18,12,32,0.7)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        border: featured
+          ? '1px solid rgba(139,92,246,0.45)'
+          : '1px solid rgba(124,58,237,0.18)',
+        borderRadius: '14px',
         padding: '20px',
         overflow: 'hidden',
         transition: 'border-color 0.2s, transform 0.15s',
         cursor: 'default',
+        boxShadow: featured
+          ? '0 0 30px rgba(99,102,241,0.2), inset 0 1px 0 rgba(139,92,246,0.2)'
+          : 'none',
       }}
       onMouseEnter={e => {
-        (e.currentTarget as HTMLElement).style.borderColor = `${color}40`
+        (e.currentTarget as HTMLElement).style.borderColor = featured ? 'rgba(139,92,246,0.65)' : `${color}55`
         ;(e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'
       }}
       onMouseLeave={e => {
-        (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'
+        (e.currentTarget as HTMLElement).style.borderColor = featured ? 'rgba(139,92,246,0.45)' : 'rgba(124,58,237,0.18)'
         ;(e.currentTarget as HTMLElement).style.transform = 'translateY(0)'
       }}
     >
-      <div style={{ position: 'absolute', top: 0, right: 0, width: '100px', height: '100px', background: `radial-gradient(circle at top right, ${color}12, transparent 65%)`, pointerEvents: 'none' }} />
+      {/* Corner radial gradient */}
+      <div style={{ position: 'absolute', top: 0, right: 0, width: '120px', height: '120px', background: `radial-gradient(circle at top right, ${color}18, transparent 65%)`, pointerEvents: 'none' }} />
+
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '18px' }}>
+        {/* Icon in glass container */}
         <div style={{
           width: '36px', height: '36px', borderRadius: '10px',
-          background: `linear-gradient(135deg, ${color}20, ${color}08)`,
-          border: `1px solid ${color}22`,
+          background: `rgba(18,12,32,0.8)`,
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          border: `1px solid ${color}30`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: `0 0 12px ${color}18`,
         }}>
           <Icon size={16} color={color} />
         </div>
@@ -47,8 +60,10 @@ function StatCard({ label, value, icon: Icon, color, trend }: { label: string; v
           </span>
         )}
       </div>
-      <div style={{ fontSize: '30px', fontWeight: '700', letterSpacing: '-0.04em', color: '#EBEBEB', lineHeight: 1, marginBottom: '6px' }}>{value}</div>
-      <div style={{ fontSize: '12px', color: '#555', fontWeight: '500', letterSpacing: '0.01em' }}>{label}</div>
+      {/* Large number value */}
+      <div style={{ fontSize: '32px', fontWeight: '700', letterSpacing: '-0.04em', color: '#F0EEFF', lineHeight: 1, marginBottom: '6px' }}>{value}</div>
+      {/* Small label */}
+      <div style={{ fontSize: '12px', color: '#9CA3AF', fontWeight: '500', letterSpacing: '0.01em' }}>{label}</div>
     </div>
   )
 }
@@ -127,18 +142,19 @@ export default function DashboardPage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingBottom: '4px' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: '700', letterSpacing: '-0.04em', color: '#EBEBEB', marginBottom: '4px', background: 'linear-gradient(135deg, #EBEBEB, #888)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: '700', letterSpacing: '-0.04em', color: '#F0EEFF', marginBottom: '4px', background: 'linear-gradient(135deg, #F0EEFF, #A78BFA)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             {greeting}
           </h1>
-          <p style={{ fontSize: '13px', color: '#555' }}>Your sales intelligence hub</p>
+          <p style={{ fontSize: '13px', color: '#9CA3AF' }}>Your sales intelligence hub</p>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <Link href="/deals" style={{
             display: 'flex', alignItems: 'center', gap: '6px',
             padding: '8px 14px',
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: '8px', color: '#EBEBEB', fontSize: '13px', fontWeight: '500', textDecoration: 'none',
+            background: 'rgba(18,12,32,0.7)',
+            backdropFilter: 'blur(16px)',
+            border: '1px solid rgba(124,58,237,0.18)',
+            borderRadius: '9px', color: '#F0EEFF', fontSize: '13px', fontWeight: '500', textDecoration: 'none',
           }}>
             <Plus size={13} /> Log Deal
           </Link>
@@ -147,7 +163,7 @@ export default function DashboardPage() {
             padding: '8px 14px',
             background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
             boxShadow: '0 0 24px rgba(99,102,241,0.35)',
-            borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none',
+            borderRadius: '9px', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none',
           }}>
             <Sparkles size={13} /> Generate
           </Link>
@@ -169,7 +185,7 @@ export default function DashboardPage() {
             <div style={{ width: '30px', height: '30px', background: 'rgba(234,179,8,0.1)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <AlertTriangle size={13} color="#EAB308" />
             </div>
-            <span style={{ fontSize: '13px', color: '#EBEBEB' }}>
+            <span style={{ fontSize: '13px', color: '#F0EEFF' }}>
               <strong style={{ color: '#EAB308' }}>{staleItems.length}</strong> collateral {staleItems.length === 1 ? 'item needs' : 'items need'} regenerating
             </span>
           </div>
@@ -181,7 +197,7 @@ export default function DashboardPage() {
 
       {/* Stats grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-        <StatCard label="Competitors tracked" value={competitorCount} icon={Users} color="#6366F1" />
+        <StatCard label="Competitors tracked" value={competitorCount} icon={Users} color="#8B5CF6" featured />
         <StatCard label="Case studies" value={caseStudyCount} icon={BookOpen} color="#22C55E" />
         <StatCard label="Deals logged" value={dealCount} icon={ClipboardList} color="#F59E0B" />
         <StatCard label="Win rate" value={`${winRate}%`} icon={TrendingUp} color="#22C55E" />
@@ -201,13 +217,13 @@ export default function DashboardPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 288px', gap: '14px', alignItems: 'start' }}>
 
         {/* Collateral table */}
-        <div style={{ background: 'linear-gradient(160deg, #141414 0%, #0F0F0F 100%)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(124,58,237,0.18)', borderRadius: '14px', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '1px solid rgba(124,58,237,0.1)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div style={{ width: '26px', height: '26px', background: 'rgba(99,102,241,0.1)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <FileText size={13} color="#818CF8" />
               </div>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: '#EBEBEB' }}>Collateral Library</span>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Collateral Library</span>
               {(collateral?.length ?? 0) > 0 && (
                 <span style={{ fontSize: '11px', color: '#555', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '100px', border: '1px solid rgba(255,255,255,0.06)' }}>{collateral?.length}</span>
               )}
@@ -251,7 +267,7 @@ export default function DashboardPage() {
                       <FileText size={14} color={typeStyle.color} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '13px', fontWeight: '500', color: '#EBEBEB', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '3px' }}>{item.title}</div>
+                      <div style={{ fontSize: '13px', fontWeight: '500', color: '#F0EEFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '3px' }}>{item.title}</div>
                       <span style={{ fontSize: '11px', color: typeStyle.color, background: typeStyle.bg, border: `1px solid ${typeStyle.border}`, padding: '1px 7px', borderRadius: '100px', fontWeight: '500' }}>
                         {TYPE_LABELS[item.type] ?? item.type.replace('_', ' ')}
                       </span>
@@ -275,12 +291,12 @@ export default function DashboardPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
           {/* KB Health */}
-          <div style={{ background: 'linear-gradient(160deg, #141414 0%, #0F0F0F 100%)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '18px' }}>
+          <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(124,58,237,0.18)', borderRadius: '14px', padding: '18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
               <div style={{ width: '26px', height: '26px', background: 'rgba(99,102,241,0.1)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Target size={12} color="#818CF8" />
               </div>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: '#EBEBEB' }}>Knowledge Base</span>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Knowledge Base</span>
               <span style={{ marginLeft: 'auto', fontSize: '13px', color: healthPct === 100 ? '#22C55E' : '#6366F1', fontWeight: '700' }}>{healthPct}%</span>
             </div>
             <div style={{ height: '3px', background: '#1A1A1A', borderRadius: '2px', marginBottom: '14px', overflow: 'hidden' }}>
@@ -303,12 +319,12 @@ export default function DashboardPage() {
           </div>
 
           {/* Quick actions */}
-          <div style={{ background: 'linear-gradient(160deg, #141414 0%, #0F0F0F 100%)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '18px' }}>
+          <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(124,58,237,0.18)', borderRadius: '14px', padding: '18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
               <div style={{ width: '26px', height: '26px', background: 'rgba(99,102,241,0.1)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <BarChart3 size={12} color="#818CF8" />
               </div>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: '#EBEBEB' }}>Quick Actions</span>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Quick Actions</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {[
@@ -337,8 +353,8 @@ export default function DashboardPage() {
                     <Icon size={13} color={color} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', fontWeight: '500', color: '#EBEBEB' }}>{label}</div>
-                    <div style={{ fontSize: '11px', color: '#555', marginTop: '1px' }}>{desc}</div>
+                    <div style={{ fontSize: '12px', fontWeight: '500', color: '#F0EEFF' }}>{label}</div>
+                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '1px' }}>{desc}</div>
                   </div>
                   <ArrowUpRight size={12} color="#333" />
                 </Link>

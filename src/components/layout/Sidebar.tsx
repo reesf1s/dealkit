@@ -30,15 +30,15 @@ export default function Sidebar() {
   return (
     <aside style={{
       position: 'fixed', left: 0, top: 0, bottom: 0, width: '220px',
-      background: 'rgba(8,8,14,0.85)',
+      background: 'rgba(9,6,18,0.95)',
       backdropFilter: 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
-      borderRight: '1px solid rgba(255,255,255,0.06)',
+      borderRight: '1px solid rgba(139,92,246,0.1)',
       display: 'flex', flexDirection: 'column', zIndex: 40,
     }}>
 
       {/* Logo */}
-      <div style={{ padding: '18px 14px 14px' }}>
+      <div style={{ padding: '18px 14px 10px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '9px', padding: '6px 8px', borderRadius: '10px' }}>
           <div style={{
             width: '30px', height: '30px',
@@ -50,18 +50,21 @@ export default function Sidebar() {
             <FileText size={14} color="#fff" strokeWidth={2.5} />
           </div>
           <div>
-            <div style={{ fontWeight: '700', fontSize: '14px', letterSpacing: '-0.03em', color: '#F1F1F3', lineHeight: 1 }}>DealKit</div>
-            <div style={{ fontSize: '10px', color: '#555', marginTop: '2px', letterSpacing: '0.04em' }}>Sales Intelligence</div>
+            <div style={{ fontWeight: '700', fontSize: '14px', letterSpacing: '-0.03em', color: '#F0EEFF', lineHeight: 1 }}>DealKit</div>
+            <div style={{ fontSize: '10px', color: '#4B5563', marginTop: '2px', letterSpacing: '0.04em' }}>Sales Intelligence</div>
           </div>
         </div>
+
+        {/* Thin divider */}
+        <div style={{ height: '1px', background: 'rgba(139,92,246,0.1)', marginTop: '12px', marginLeft: '8px', marginRight: '8px' }} />
       </div>
 
-      {/* Search button */}
+      {/* Search / ⌘K button */}
       <div style={{ padding: '0 10px 10px' }}>
         <button
           onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
           style={{
-            width: '100%', height: '33px', borderRadius: '8px',
+            width: '100%', height: '33px', borderRadius: '100px',
             backgroundColor: 'rgba(255,255,255,0.04)',
             backdropFilter: 'blur(8px)',
             WebkitBackdropFilter: 'blur(8px)',
@@ -70,23 +73,23 @@ export default function Sidebar() {
             transition: 'background 0.15s, border-color 0.15s',
           }}
           onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'
-            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.12)'
+            (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.08)'
+            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.2)'
           }}
           onMouseLeave={e => {
             (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'
             ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'
           }}
         >
-          <Search size={12} color="#555" strokeWidth={2} />
-          <span style={{ flex: 1, fontSize: '12px', color: '#555', textAlign: 'left' }}>Search...</span>
-          <span style={{ fontSize: '10px', color: '#444', background: 'rgba(255,255,255,0.06)', padding: '2px 5px', borderRadius: '4px', letterSpacing: '0.02em', border: '1px solid rgba(255,255,255,0.06)' }}>⌘K</span>
+          <Search size={12} color="#4B5563" strokeWidth={2} />
+          <span style={{ flex: 1, fontSize: '12px', color: '#4B5563', textAlign: 'left' }}>Search...</span>
+          <span style={{ fontSize: '10px', color: '#4B5563', background: 'rgba(255,255,255,0.06)', padding: '2px 5px', borderRadius: '4px', letterSpacing: '0.02em', border: '1px solid rgba(255,255,255,0.06)' }}>⌘K</span>
         </button>
       </div>
 
-      {/* Nav section label */}
+      {/* MENU section label */}
       <div style={{ padding: '0 18px 6px' }}>
-        <span style={{ fontSize: '10px', color: '#444', fontWeight: '600', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Main</span>
+        <span style={{ fontSize: '10px', color: '#4B5563', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Menu</span>
       </div>
 
       {/* Nav items */}
@@ -99,24 +102,24 @@ export default function Sidebar() {
               href={href}
               style={{
                 display: 'flex', alignItems: 'center', gap: '9px',
-                padding: '0 10px', height: '36px', borderRadius: '8px',
+                padding: '0 10px', height: '36px', borderRadius: '9px',
                 marginBottom: '2px', textDecoration: 'none',
                 fontSize: '13px', fontWeight: active ? '500' : '400',
-                color: active ? '#F1F1F3' : '#666',
-                background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
+                color: active ? '#A78BFA' : '#9CA3AF',
+                background: active ? 'rgba(99,102,241,0.18)' : 'transparent',
                 backdropFilter: active ? 'blur(8px)' : 'none',
                 WebkitBackdropFilter: active ? 'blur(8px)' : 'none',
-                border: active ? '1px solid rgba(99,102,241,0.2)' : '1px solid transparent',
+                border: active ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent',
                 transition: 'all 0.15s',
                 position: 'relative',
               }}
               onMouseEnter={e => { if (!active) {
-                (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'
-                ;(e.currentTarget as HTMLElement).style.color = '#A0A0B0'
+                (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.07)'
+                ;(e.currentTarget as HTMLElement).style.color = '#F0EEFF'
               }}}
               onMouseLeave={e => { if (!active) {
                 (e.currentTarget as HTMLElement).style.background = 'transparent'
-                ;(e.currentTarget as HTMLElement).style.color = '#666'
+                ;(e.currentTarget as HTMLElement).style.color = '#9CA3AF'
               }}}
             >
               {active && (
@@ -130,81 +133,91 @@ export default function Sidebar() {
                   <div style={{
                     position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
                     width: '6px', height: '6px', borderRadius: '50%',
-                    background: '#6366F1',
-                    boxShadow: '0 0 6px rgba(99,102,241,0.8)',
+                    background: '#8B5CF6',
+                    boxShadow: '0 0 6px rgba(139,92,246,0.8)',
                     animation: 'pulse-glow 2s ease-in-out infinite',
                   }} />
                 </>
               )}
-              <Icon size={14} color={active ? '#818CF8' : 'currentColor'} style={{ flexShrink: 0, marginLeft: active ? '3px' : 0 }} />
+              <Icon size={14} color={active ? '#A78BFA' : 'currentColor'} style={{ flexShrink: 0, marginLeft: active ? '3px' : 0 }} />
               {label}
             </Link>
           )
         })}
 
-        <div style={{ margin: '10px 2px', height: '1px', background: 'rgba(255,255,255,0.05)' }} />
+        {/* Divider */}
+        <div style={{ margin: '10px 2px', height: '1px', background: 'rgba(139,92,246,0.08)' }} />
 
-        {/* Onboarding shortcut */}
+        {/* AI Setup pill */}
         <Link href="/onboarding" style={{
           display: 'flex', alignItems: 'center', gap: '9px',
-          padding: '0 10px', height: '33px', borderRadius: '8px', marginBottom: '8px',
-          textDecoration: 'none', fontSize: '12px', fontWeight: '500', color: '#818CF8',
-          background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)',
+          padding: '0 10px', height: '33px', borderRadius: '100px', marginBottom: '10px',
+          textDecoration: 'none', fontSize: '12px', fontWeight: '600', color: '#A78BFA',
+          background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(139,92,246,0.25)',
           transition: 'all 0.15s',
+          boxShadow: '0 0 16px rgba(124,58,237,0.1)',
         }}
-        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.14)' }}
-        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.08)' }}
+        onMouseEnter={e => {
+          (e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.2)'
+          ;(e.currentTarget as HTMLElement).style.boxShadow = '0 0 20px rgba(124,58,237,0.2)'
+        }}
+        onMouseLeave={e => {
+          (e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.12)'
+          ;(e.currentTarget as HTMLElement).style.boxShadow = '0 0 16px rgba(124,58,237,0.1)'
+        }}
         >
-          <Sparkles size={12} color="#818CF8" />
+          <Sparkles size={12} color="#A78BFA" />
           AI Setup
         </Link>
 
+        {/* OTHER section label */}
         <div style={{ padding: '0 10px 6px' }}>
-          <span style={{ fontSize: '10px', color: '#444', fontWeight: '600', letterSpacing: '0.10em', textTransform: 'uppercase' }}>Account</span>
+          <span style={{ fontSize: '10px', color: '#4B5563', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Other</span>
         </div>
 
+        {/* Settings */}
         <Link
           href="/settings"
           style={{
             display: 'flex', alignItems: 'center', gap: '9px',
-            padding: '0 10px', height: '36px', borderRadius: '8px',
+            padding: '0 10px', height: '36px', borderRadius: '9px',
             textDecoration: 'none', fontSize: '13px',
             fontWeight: isActive('/settings') ? '500' : '400',
-            color: isActive('/settings') ? '#F1F1F3' : '#666',
-            background: isActive('/settings') ? 'rgba(99,102,241,0.15)' : 'transparent',
-            border: isActive('/settings') ? '1px solid rgba(99,102,241,0.2)' : '1px solid transparent',
+            color: isActive('/settings') ? '#A78BFA' : '#9CA3AF',
+            background: isActive('/settings') ? 'rgba(99,102,241,0.18)' : 'transparent',
+            border: isActive('/settings') ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent',
             position: 'relative',
             transition: 'all 0.15s',
           }}
           onMouseEnter={e => { if (!isActive('/settings')) {
-            (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'
-            ;(e.currentTarget as HTMLElement).style.color = '#A0A0B0'
+            (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.07)'
+            ;(e.currentTarget as HTMLElement).style.color = '#F0EEFF'
           }}}
           onMouseLeave={e => { if (!isActive('/settings')) {
             (e.currentTarget as HTMLElement).style.background = 'transparent'
-            ;(e.currentTarget as HTMLElement).style.color = '#666'
+            ;(e.currentTarget as HTMLElement).style.color = '#9CA3AF'
           }}}
         >
           {isActive('/settings') && (
             <>
               <div style={{ position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)', width: '3px', height: '18px', background: 'linear-gradient(180deg, #6366F1, #8B5CF6)', borderRadius: '0 3px 3px 0', boxShadow: '0 0 8px rgba(99,102,241,0.7)' }} />
-              <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', width: '6px', height: '6px', borderRadius: '50%', background: '#6366F1', boxShadow: '0 0 6px rgba(99,102,241,0.8)' }} />
+              <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', width: '6px', height: '6px', borderRadius: '50%', background: '#8B5CF6', boxShadow: '0 0 6px rgba(139,92,246,0.8)' }} />
             </>
           )}
-          <Settings size={14} color={isActive('/settings') ? '#818CF8' : 'currentColor'} style={{ marginLeft: isActive('/settings') ? '3px' : 0 }} />
+          <Settings size={14} color={isActive('/settings') ? '#A78BFA' : 'currentColor'} style={{ marginLeft: isActive('/settings') ? '3px' : 0 }} />
           Settings
         </Link>
       </nav>
 
-      {/* User */}
-      <div style={{ padding: '10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+      {/* User card */}
+      <div style={{ padding: '10px', borderTop: '1px solid rgba(139,92,246,0.08)' }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: '9px',
           padding: '9px 10px', borderRadius: '10px',
-          background: 'rgba(255,255,255,0.04)',
+          background: 'rgba(18,12,32,0.7)',
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          border: '1px solid rgba(124,58,237,0.18)',
           boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
         }}>
           <div style={{
@@ -217,22 +230,22 @@ export default function Sidebar() {
             {user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0]?.toUpperCase() ?? '?'}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '12px', fontWeight: '500', color: '#F1F1F3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: '12px', fontWeight: '500', color: '#F0EEFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Account'}
             </div>
-            <div style={{ fontSize: '10px', color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
+            <div style={{ fontSize: '10px', color: '#4B5563', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
               {user?.emailAddresses?.[0]?.emailAddress ?? ''}
             </div>
           </div>
           <button
             onClick={() => signOut({ redirectUrl: '/' })}
             style={{
-              background: 'none', border: 'none', padding: '4px', color: '#444',
+              background: 'none', border: 'none', padding: '4px', color: '#4B5563',
               borderRadius: '5px', display: 'flex', alignItems: 'center', cursor: 'pointer',
               transition: 'color 0.15s',
             }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#888'}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#444'}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#A78BFA'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#4B5563'}
             title="Sign out"
           >
             <LogOut size={12} />
@@ -242,8 +255,8 @@ export default function Sidebar() {
 
       <style>{`
         @keyframes pulse-glow {
-          0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(99,102,241,0.8); }
-          50% { opacity: 0.5; box-shadow: 0 0 12px rgba(99,102,241,0.4); }
+          0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(139,92,246,0.8); }
+          50% { opacity: 0.5; box-shadow: 0 0 12px rgba(139,92,246,0.4); }
         }
       `}</style>
     </aside>

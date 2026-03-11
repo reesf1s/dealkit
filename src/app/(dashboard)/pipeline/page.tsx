@@ -46,33 +46,33 @@ function DealCard({ deal, onMoveStage }: { deal: any; onMoveStage: (id: string, 
 
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.04)',
-      backdropFilter: 'blur(12px)',
-      WebkitBackdropFilter: 'blur(12px)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: '12px',
+      background: 'rgba(18,12,32,0.7)',
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
+      border: '1px solid rgba(124,58,237,0.18)',
+      borderRadius: '14px',
       padding: '14px',
       position: 'relative',
       transition: 'border-color 0.2s, transform 0.15s',
       cursor: 'default',
     }}
     onMouseEnter={e => {
-      (e.currentTarget as HTMLElement).style.borderColor = `${stageConfig?.color ?? '#6366F1'}40`
+      (e.currentTarget as HTMLElement).style.borderColor = `${stageConfig?.color ?? '#8B5CF6'}55`
       ;(e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'
     }}
     onMouseLeave={e => {
-      (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'
+      (e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,58,237,0.18)'
       ;(e.currentTarget as HTMLElement).style.transform = 'translateY(0)'
     }}
     >
       {/* Top row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <Link href={`/deals/${deal.id}`} style={{ fontSize: '13px', fontWeight: '600', color: '#F1F1F3', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+          <Link href={`/deals/${deal.id}`} style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
             {deal.prospectCompany}
           </Link>
           {deal.prospectName && (
-            <div style={{ fontSize: '11px', color: '#666', marginTop: '1px' }}>{deal.prospectName}</div>
+            <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '1px' }}>{deal.prospectName}</div>
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '8px' }}>
@@ -87,11 +87,12 @@ function DealCard({ deal, onMoveStage }: { deal: any; onMoveStage: (id: string, 
             {menuOpen && (
               <div style={{
                 position: 'absolute', right: 0, top: '22px', zIndex: 50,
-                background: 'rgba(20,20,28,0.95)',
-                backdropFilter: 'blur(12px)',
-                border: '1px solid rgba(255,255,255,0.12)',
+                background: 'rgba(9,6,18,0.97)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: '1px solid rgba(139,92,246,0.2)',
                 borderRadius: '10px', padding: '6px', minWidth: '160px',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 20px rgba(124,58,237,0.08)',
               }}
               onMouseLeave={() => setMenuOpen(false)}
               >
@@ -132,13 +133,15 @@ function DealCard({ deal, onMoveStage }: { deal: any; onMoveStage: (id: string, 
       {/* AI Insights */}
       {deal.conversionInsights?.[0] && (
         <div style={{
-          background: 'rgba(99,102,241,0.06)',
-          border: '1px solid rgba(99,102,241,0.12)',
-          borderRadius: '7px', padding: '8px 10px', marginBottom: '10px',
+          background: 'rgba(124,58,237,0.08)',
+          border: '1px solid rgba(139,92,246,0.2)',
+          borderRadius: '9px', padding: '8px 10px', marginBottom: '10px',
           display: 'flex', gap: '6px', alignItems: 'flex-start',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
         }}>
-          <Sparkles size={11} color="#818CF8" style={{ marginTop: '1px', flexShrink: 0 }} />
-          <span style={{ fontSize: '11px', color: '#818CF8', lineHeight: '1.5' }}>{deal.conversionInsights[0]}</span>
+          <Sparkles size={11} color="#A78BFA" style={{ marginTop: '1px', flexShrink: 0 }} />
+          <span style={{ fontSize: '11px', color: '#A78BFA', lineHeight: '1.5' }}>{deal.conversionInsights[0]}</span>
         </div>
       )}
 
@@ -159,9 +162,9 @@ function DealCard({ deal, onMoveStage }: { deal: any; onMoveStage: (id: string, 
       </div>
 
       {/* Bottom: view link */}
-      <Link href={`/deals/${deal.id}`} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '10px', fontSize: '11px', color: '#444', textDecoration: 'none', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '8px', transition: 'color 0.1s' }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#6366F1'}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#444'}
+      <Link href={`/deals/${deal.id}`} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '10px', fontSize: '11px', color: '#4B5563', textDecoration: 'none', borderTop: '1px solid rgba(124,58,237,0.1)', paddingTop: '8px', transition: 'color 0.1s' }}
+        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#A78BFA'}
+        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#4B5563'}
       >
         Open deal <ArrowUpRight size={10} style={{ marginLeft: 'auto' }} />
       </Link>
@@ -196,10 +199,10 @@ export default function PipelinePage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: '700', letterSpacing: '-0.03em', color: '#F1F1F3', marginBottom: '4px' }}>
+          <h1 style={{ fontSize: '22px', fontWeight: '700', letterSpacing: '-0.03em', color: '#F0EEFF', marginBottom: '4px' }}>
             Sales Pipeline
           </h1>
-          <p style={{ fontSize: '13px', color: '#555' }}>
+          <p style={{ fontSize: '13px', color: '#9CA3AF' }}>
             {(deals ?? []).filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost').length} active deals
             {totalPipeline > 0 && ` · $${(totalPipeline / 100).toLocaleString()} pipeline value`}
           </p>
@@ -217,30 +220,30 @@ export default function PipelinePage() {
 
       {/* AI Top Picks */}
       {topDeals.length > 0 && (
-        <div style={{ background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.12)', borderRadius: '12px', padding: '16px 18px' }}>
+        <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '14px', padding: '16px 18px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-            <div style={{ width: '26px', height: '26px', background: 'rgba(99,102,241,0.12)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Star size={12} color="#818CF8" />
+            <div style={{ width: '26px', height: '26px', background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Star size={12} color="#A78BFA" />
             </div>
-            <span style={{ fontSize: '13px', fontWeight: '600', color: '#EBEBEB' }}>AI Top Picks to Close</span>
-            <span style={{ fontSize: '11px', color: '#555' }}>Highest conversion probability</span>
+            <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>AI Top Picks to Close</span>
+            <span style={{ fontSize: '11px', color: '#9CA3AF' }}>Highest conversion probability</span>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
             {topDeals.map((deal: any) => (
               <Link key={deal.id} href={`/deals/${deal.id}`} style={{
                 flex: 1, display: 'flex', alignItems: 'center', gap: '10px',
                 padding: '10px 12px',
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.06)',
+                background: 'rgba(124,58,237,0.06)',
+                border: '1px solid rgba(124,58,237,0.15)',
                 borderRadius: '9px', textDecoration: 'none',
                 transition: 'border-color 0.1s',
               }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.3)'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.35)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,58,237,0.15)'}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#EBEBEB', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.prospectCompany}</div>
-                  <div style={{ fontSize: '11px', color: '#555', marginTop: '1px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#F0EEFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.prospectCompany}</div>
+                  <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '1px' }}>
                     {STAGES.find(s => s.id === deal.stage)?.label}
                     {deal.dealValue && ` · $${(deal.dealValue / 100).toLocaleString()}`}
                   </div>
@@ -266,17 +269,19 @@ export default function PipelinePage() {
                 {/* Column header */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px',
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                  borderRadius: '10px',
+                  background: 'rgba(18,12,32,0.7)',
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
+                  border: '1px solid rgba(124,58,237,0.18)',
+                  borderRadius: '12px',
                   borderTop: `3px solid ${stage.color}`,
                 }}>
-                  <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: stage.color, boxShadow: `0 0 6px ${stage.color}` }} />
-                  <span style={{ fontSize: '12px', fontWeight: '600', color: '#EBEBEB', flex: 1 }}>{stage.label}</span>
-                  <span style={{ fontSize: '11px', color: '#555', background: 'rgba(255,255,255,0.06)', padding: '1px 7px', borderRadius: '100px' }}>{stageDeals.length}</span>
+                  <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: stage.color, boxShadow: `0 0 8px ${stage.color}` }} />
+                  <span style={{ fontSize: '12px', fontWeight: '600', color: '#F0EEFF', flex: 1 }}>{stage.label}</span>
+                  <span style={{ fontSize: '11px', color: '#9CA3AF', background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.15)', padding: '1px 7px', borderRadius: '100px' }}>{stageDeals.length}</span>
                 </div>
                 {stageValue > 0 && (
-                  <div style={{ fontSize: '11px', color: '#555', padding: '0 4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div style={{ fontSize: '11px', color: '#9CA3AF', padding: '0 4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <TrendingUp size={10} />
                     ${(stageValue / 100).toLocaleString()} value
                   </div>
@@ -284,12 +289,12 @@ export default function PipelinePage() {
 
                 {/* Cards */}
                 {isLoading ? (
-                  <div style={{ height: '80px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ fontSize: '11px', color: '#333' }}>Loading...</div>
+                  <div style={{ height: '80px', background: 'rgba(18,12,32,0.4)', borderRadius: '10px', border: '1px solid rgba(124,58,237,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ fontSize: '11px', color: '#4B5563' }}>Loading...</div>
                   </div>
                 ) : stageDeals.length === 0 ? (
-                  <div style={{ height: '80px', background: 'rgba(255,255,255,0.01)', border: '1px dashed rgba(255,255,255,0.06)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '11px', color: '#333' }}>No deals</span>
+                  <div style={{ height: '80px', background: 'rgba(18,12,32,0.3)', border: '1px dashed rgba(124,58,237,0.12)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '11px', color: '#4B5563' }}>No deals</span>
                   </div>
                 ) : (
                   stageDeals.map((deal: any) => (
@@ -300,18 +305,20 @@ export default function PipelinePage() {
                 {/* Add to stage */}
                 <Link href="/deals" style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                  padding: '9px', background: 'rgba(255,255,255,0.01)',
-                  border: '1px dashed rgba(255,255,255,0.06)',
-                  borderRadius: '9px', color: '#333', fontSize: '12px', textDecoration: 'none',
-                  transition: 'color 0.1s, border-color 0.1s',
+                  padding: '9px', background: 'rgba(18,12,32,0.3)',
+                  border: '1px dashed rgba(124,58,237,0.15)',
+                  borderRadius: '9px', color: '#4B5563', fontSize: '12px', textDecoration: 'none',
+                  transition: 'color 0.1s, border-color 0.1s, background 0.1s',
                 }}
                 onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.color = '#6366F1'
-                  ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.25)'
+                  (e.currentTarget as HTMLElement).style.color = '#A78BFA'
+                  ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.3)'
+                  ;(e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.08)'
                 }}
                 onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.color = '#333'
-                  ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'
+                  (e.currentTarget as HTMLElement).style.color = '#4B5563'
+                  ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,58,237,0.15)'
+                  ;(e.currentTarget as HTMLElement).style.background = 'rgba(18,12,32,0.3)'
                 }}
                 >
                   <Plus size={12} /> Add deal
@@ -329,18 +336,20 @@ export default function PipelinePage() {
               return (
                 <div key={stageId} style={{
                   padding: '14px',
-                  background: 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${s.color}22`,
-                  borderRadius: '12px',
+                  background: 'rgba(18,12,32,0.7)',
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
+                  border: `1px solid rgba(124,58,237,0.18)`,
+                  borderRadius: '14px',
                   borderTop: `3px solid ${s.color}`,
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: s.color }} />
-                    <span style={{ fontSize: '12px', fontWeight: '600', color: '#EBEBEB' }}>{s.label}</span>
-                    <span style={{ fontSize: '11px', color: '#555', background: 'rgba(255,255,255,0.06)', padding: '1px 7px', borderRadius: '100px', marginLeft: 'auto' }}>{stageDeals.length}</span>
+                    <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: s.color, boxShadow: `0 0 8px ${s.color}` }} />
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: '#F0EEFF' }}>{s.label}</span>
+                    <span style={{ fontSize: '11px', color: '#9CA3AF', background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.15)', padding: '1px 7px', borderRadius: '100px', marginLeft: 'auto' }}>{stageDeals.length}</span>
                   </div>
                   {val > 0 && <div style={{ fontSize: '18px', fontWeight: '700', color: s.color }}>${(val / 100).toLocaleString()}</div>}
-                  {stageDeals.length === 0 && <div style={{ fontSize: '11px', color: '#333' }}>No deals yet</div>}
+                  {stageDeals.length === 0 && <div style={{ fontSize: '11px', color: '#4B5563' }}>No deals yet</div>}
                 </div>
               )
             })}
