@@ -22,21 +22,21 @@ const PLAN_DETAILS: Record<Plan, { name: string; price: string; color: string; b
     price: '$0/mo',
     color: '#888',
     bg: 'rgba(136,136,136,0.08)',
-    features: ['1 product', '2 competitors', '5 case studies', '10 deal logs', '5 collateral pieces'],
+    features: ['1 product', '2 competitors', '5 case studies', '10 deal logs', '5 collateral items'],
   },
   starter: {
     name: 'Starter',
-    price: '$49/mo',
+    price: '$79/mo',
     color: '#6366F1',
     bg: 'rgba(99,102,241,0.08)',
-    features: ['3 products', '10 competitors', 'Unlimited case studies', 'Unlimited deals', 'Unlimited collateral'],
+    features: ['3 products', '10 competitors', 'Unlimited case studies', 'Unlimited deals', 'Unlimited collateral', '.docx export', 'No watermark'],
   },
   pro: {
     name: 'Pro',
-    price: '$99/mo',
+    price: '$149/mo',
     color: '#22C55E',
     bg: 'rgba(34,197,94,0.08)',
-    features: ['Unlimited everything', 'Priority generation', 'API access (soon)', 'Custom export formats'],
+    features: ['Everything in Starter', 'Unlimited products', 'Batch regenerate', 'Email sequences', 'AI meeting prep', 'Team features'],
   },
 }
 

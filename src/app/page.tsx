@@ -21,18 +21,18 @@ const COLLATERAL_TYPES = [
 
 const PRICING = [
   {
-    name: 'Free', price: '£0', period: '',
+    name: 'Free', price: '$0', period: '',
     features: ['1 product', '2 competitors', '5 case studies', '10 deal logs', '5 collateral items'],
     cta: 'Get started', highlight: false,
   },
   {
-    name: 'Starter', price: '£79', period: '/mo',
+    name: 'Starter', price: '$79', period: '/mo',
     features: ['3 products', '10 competitors', 'Unlimited case studies', 'Unlimited deals', 'Unlimited collateral', '.docx export', 'No watermark'],
     cta: 'Start free trial', highlight: true,
   },
   {
-    name: 'Pro', price: '£149', period: '/mo',
-    features: ['Everything in Starter', 'Unlimited products', 'Batch regenerate', 'Email sequences', 'Priority AI', 'Team features'],
+    name: 'Pro', price: '$149', period: '/mo',
+    features: ['Everything in Starter', 'Unlimited products', 'Batch regenerate', 'Email sequences', 'AI meeting prep', 'Team features'],
     cta: 'Start free trial', highlight: false,
   },
 ]
