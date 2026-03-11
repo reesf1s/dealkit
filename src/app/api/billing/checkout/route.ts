@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
     success_url: `${appUrl}/settings?upgraded=1`,
     cancel_url: `${appUrl}/settings`,
     metadata: { workspaceId },
+    allow_promotion_codes: true,
     ...(workspace.stripeCustomerId
       ? { customer: workspace.stripeCustomerId }
       : { customer_email: undefined }),
