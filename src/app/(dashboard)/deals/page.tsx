@@ -23,6 +23,17 @@ export default function DealsPage() {
   const deals = data?.data ?? []
   const dbError = isDbNotConfigured(error)
 
+  async function handleDelete(id: string) {
+    try {
+      const res = await fetch(`/api/deals/${id}`, { method: 'DELETE' })
+      if (!res.ok) { toast('Failed to delete deal', 'error'); return }
+      await mutate()
+      toast('Deal deleted', 'success')
+    } catch {
+      toast('Failed to delete deal', 'error')
+    }
+  }
+
   async function handleAdd(payload: Partial<DealLog>) {
     setAddLoading(true)
     try {
@@ -112,7 +123,7 @@ export default function DealsPage() {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '24px', alignItems: 'start' }}>
-          <DealTable deals={deals} onAdd={() => setAddOpen(true)} />
+          <DealTable deals={deals} onAdd={() => setAddOpen(true)} onDelete={handleDelete} />
           <DealInsights deals={deals} />
         </div>
       )}

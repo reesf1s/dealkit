@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FileText, ChevronUp, ChevronDown } from 'lucide-react'
+import { FileText, ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import type { DealLog } from '@/types'
@@ -9,6 +9,7 @@ import type { DealLog } from '@/types'
 interface DealTableProps {
   deals: DealLog[]
   onAdd?: () => void
+  onDelete?: (id: string) => void
 }
 
 type SortField = 'dealName' | 'stage' | 'prospectCompany' | 'createdAt'
@@ -34,10 +35,12 @@ function SortIcon({ field, active, direction }: { field: string; active: boolean
   return direction === 'asc' ? <ChevronUp size={12} style={{ color: '#6366F1' }} /> : <ChevronDown size={12} style={{ color: '#6366F1' }} />
 }
 
-export function DealTable({ deals, onAdd }: DealTableProps) {
+export function DealTable({ deals, onAdd, onDelete }: DealTableProps) {
   const [sortField, setSortField] = useState<SortField>('createdAt')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [filter, setFilter] = useState<FilterOutcome>('all')
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
 
   function toggleSort(field: SortField) {
     if (sortField === field) {
@@ -121,7 +124,7 @@ export function DealTable({ deals, onAdd }: DealTableProps) {
 
       <div style={{ backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
         {/* Header row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 120px', padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 120px 32px', padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           {[
             { label: 'Deal / Prospect', field: 'dealName' as SortField },
             { label: 'Company', field: 'prospectCompany' as SortField },
@@ -139,15 +142,16 @@ export function DealTable({ deals, onAdd }: DealTableProps) {
               {field && <SortIcon field={field} active={sortField === field} direction={sortDir} />}
             </button>
           ))}
+          <div />
         </div>
 
         {/* Data rows */}
         {sorted.map((deal) => (
           <div
             key={deal.id}
-            style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 120px', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center', transition: 'background-color 100ms ease' }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+            style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 120px 32px', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center', transition: 'background-color 100ms ease' }}
+            onMouseEnter={() => setHoveredId(deal.id)}
+            onMouseLeave={() => { setHoveredId(null); setConfirmId(null) }}
           >
             {/* Deal name */}
             <div>
@@ -177,6 +181,29 @@ export function DealTable({ deals, onAdd }: DealTableProps) {
             <span style={{ fontSize: '12px', color: '#555', fontVariantNumeric: 'tabular-nums' }}>
               {formatDate(deal.createdAt)}
             </span>
+
+            {/* Delete */}
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              {onDelete && hoveredId === deal.id && (
+                confirmId === deal.id ? (
+                  <button
+                    onClick={() => { onDelete(deal.id); setConfirmId(null) }}
+                    style={{ fontSize: '10px', fontWeight: 600, color: '#fff', backgroundColor: '#ef4444', border: 'none', borderRadius: '4px', padding: '2px 6px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  >
+                    Confirm
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setConfirmId(deal.id)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', padding: '2px', display: 'flex', alignItems: 'center', borderRadius: '4px', transition: 'color 100ms' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = '#555' }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                )
+              )}
+            </div>
           </div>
         ))}
       </div>
