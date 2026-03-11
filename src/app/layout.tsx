@@ -32,8 +32,9 @@ export default function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
           style={{ backgroundColor: '#0A0A0A', color: '#EBEBEB' }}
         >
-          {children}
-          <Toaster />
+          <Toaster>
+            {children}
+          </Toaster>
           <CookieBanner />
         </body>
       </html>
