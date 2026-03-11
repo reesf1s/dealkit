@@ -7,7 +7,10 @@ import * as schema from './schema'
 // module load time. API routes catch the resulting query error and return 503.
 const connectionString = process.env.DATABASE_URL ?? 'postgresql://placeholder:placeholder@placeholder/placeholder'
 
-const client = postgres(connectionString, { max: 1 })
+const client = postgres(connectionString, {
+  max: 1,
+  ssl: connectionString.includes('supabase.co') ? 'require' : false,
+})
 export const db = drizzle(client, { schema })
 
 export function isDatabaseConfigured(): boolean {

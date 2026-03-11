@@ -26,6 +26,7 @@ import type { ZodSchema } from 'zod'
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface GenerateCollateralInput {
+  workspaceId: string
   type: CollateralType
   competitorId?: string
   caseStudyId?: string
@@ -148,30 +149,15 @@ function buildTitle(type: CollateralType, context: {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function generateCollateral(
-  input: GenerateCollateralInput & { userId: string },
-): Promise<GenerateResult>
-export async function generateCollateral(
   input: GenerateCollateralInput,
-): Promise<GenerateResult>
-export async function generateCollateral(
-  input: GenerateCollateralInput & { userId?: string },
 ): Promise<GenerateResult> {
-  const { type, competitorId, caseStudyId, productName, buyerRole } = input
-
-  // The generate route passes userId via the collateral record insertion; we
-  // receive it optionally here. When not passed we cannot fetch from DB and
-  // will fall back gracefully.
-  const userId = (input as { userId?: string }).userId
-
-  if (!userId) {
-    throw new Error('generateCollateral requires a userId to fetch company context')
-  }
+  const { workspaceId, type, competitorId, caseStudyId, productName, buyerRole } = input
 
   // 1. Fetch company profile (required)
   const [profileRow] = await db
     .select()
     .from(companyProfiles)
-    .where(eq(companyProfiles.userId, userId))
+    .where(eq(companyProfiles.workspaceId, workspaceId))
     .limit(1)
 
   if (!profileRow) {
@@ -180,7 +166,7 @@ export async function generateCollateral(
 
   const company: CompanyProfile = {
     id: profileRow.id,
-    userId: profileRow.userId,
+    userId: profileRow.userId ?? '',
     companyName: profileRow.companyName,
     website: profileRow.website,
     industry: profileRow.industry,
@@ -201,12 +187,12 @@ export async function generateCollateral(
   const allDeals = await db
     .select()
     .from(dealLogs)
-    .where(eq(dealLogs.userId, userId))
+    .where(eq(dealLogs.workspaceId, workspaceId))
 
   const allCaseStudies = await db
     .select()
     .from(caseStudies)
-    .where(eq(caseStudies.userId, userId))
+    .where(eq(caseStudies.workspaceId, workspaceId))
 
   // ─── BATTLECARD ─────────────────────────────────────────────────────────────
   if (type === 'battlecard') {
@@ -215,14 +201,14 @@ export async function generateCollateral(
     const [competitorRow] = await db
       .select()
       .from(competitors)
-      .where(and(eq(competitors.id, competitorId), eq(competitors.userId, userId)))
+      .where(and(eq(competitors.id, competitorId), eq(competitors.workspaceId, workspaceId)))
       .limit(1)
 
     if (!competitorRow) throw new Error('Competitor not found')
 
     const competitor = {
       id: competitorRow.id,
-      userId: competitorRow.userId,
+      userId: competitorRow.userId ?? '',
       name: competitorRow.name,
       website: competitorRow.website,
       description: competitorRow.description,
@@ -261,14 +247,14 @@ export async function generateCollateral(
     const [csRow] = await db
       .select()
       .from(caseStudies)
-      .where(and(eq(caseStudies.id, caseStudyId), eq(caseStudies.userId, userId)))
+      .where(and(eq(caseStudies.id, caseStudyId), eq(caseStudies.workspaceId, workspaceId)))
       .limit(1)
 
     if (!csRow) throw new Error('Case study not found')
 
     const caseStudy = {
       id: csRow.id,
-      userId: csRow.userId,
+      userId: csRow.userId ?? '',
       customerName: csRow.customerName,
       customerIndustry: csRow.customerIndustry,
       customerSize: csRow.customerSize,

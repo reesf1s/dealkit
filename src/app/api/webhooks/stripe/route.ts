@@ -2,22 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { users, events } from '@/lib/db/schema'
+import { workspaces, events } from '@/lib/db/schema'
 import { planFromPriceId } from '@/lib/stripe/plans'
 import type { Plan } from '@/types'
 
-// Initialise Stripe lazily so the route doesn't crash if the env var is missing at build time
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY
   if (!key) throw new Error('STRIPE_SECRET_KEY is not set')
   return new Stripe(key, { apiVersion: '2026-02-25.clover' })
 }
 
-async function logEvent(userId: string, type: string, metadata: Record<string, unknown>) {
-  await db.insert(events).values({ userId, type, metadata, createdAt: new Date() })
+async function logEvent(workspaceId: string, userId: string | null, type: string, metadata: Record<string, unknown>) {
+  await db.insert(events).values({ workspaceId, userId, type, metadata, createdAt: new Date() })
 }
 
-// POST /api/webhooks/stripe
 export async function POST(req: NextRequest) {
   const stripe = getStripe()
 
@@ -46,19 +44,17 @@ export async function POST(req: NextRequest) {
 
   try {
     switch (event.type) {
-      // ── checkout.session.completed ────────────────────────────────────────
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
-        const clerkUserId = session.metadata?.clerkUserId
+        const workspaceId = session.metadata?.workspaceId
         const stripeCustomerId =
           typeof session.customer === 'string' ? session.customer : session.customer?.id ?? null
 
-        if (!clerkUserId) {
-          console.warn('[stripe-webhook] checkout.session.completed missing clerkUserId in metadata')
+        if (!workspaceId) {
+          console.warn('[stripe-webhook] checkout.session.completed missing workspaceId in metadata')
           break
         }
 
-        // Resolve the plan from the line items' price ID
         let plan: Plan = 'free'
         if (session.subscription) {
           const subscriptionId =
@@ -73,27 +69,22 @@ export async function POST(req: NextRequest) {
         }
 
         const [existing] = await db
-          .select({ plan: users.plan })
-          .from(users)
-          .where(eq(users.id, clerkUserId))
+          .select({ plan: workspaces.plan })
+          .from(workspaces)
+          .where(eq(workspaces.id, workspaceId))
           .limit(1)
 
         const fromPlan = existing?.plan ?? 'free'
 
         await db
-          .update(users)
-          .set({
-            plan,
-            stripeCustomerId: stripeCustomerId ?? undefined,
-            updatedAt: new Date(),
-          })
-          .where(eq(users.id, clerkUserId))
+          .update(workspaces)
+          .set({ plan, stripeCustomerId: stripeCustomerId ?? undefined, updatedAt: new Date() })
+          .where(eq(workspaces.id, workspaceId))
 
-        await logEvent(clerkUserId, 'plan.upgraded', { fromPlan, toPlan: plan, stripeCustomerId })
+        await logEvent(workspaceId, null, 'plan.upgraded', { fromPlan, toPlan: plan, stripeCustomerId })
         break
       }
 
-      // ── customer.subscription.updated ─────────────────────────────────────
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription
         const stripeCustomerId =
@@ -104,37 +95,33 @@ export async function POST(req: NextRequest) {
         const priceId = subscription.items.data[0]?.price.id
         const plan: Plan = priceId ? (planFromPriceId(priceId) ?? 'free') : 'free'
 
-        const [user] = await db
-          .select({ id: users.id, plan: users.plan })
-          .from(users)
-          .where(eq(users.stripeCustomerId, stripeCustomerId))
+        const [workspace] = await db
+          .select({ id: workspaces.id, plan: workspaces.plan })
+          .from(workspaces)
+          .where(eq(workspaces.stripeCustomerId, stripeCustomerId))
           .limit(1)
 
-        if (!user) {
-          console.warn(
-            `[stripe-webhook] customer.subscription.updated: no user found for customer ${stripeCustomerId}`,
-          )
+        if (!workspace) {
+          console.warn(`[stripe-webhook] customer.subscription.updated: no workspace found for customer ${stripeCustomerId}`)
           break
         }
 
-        const fromPlan = user.plan
+        const fromPlan = workspace.plan
 
         await db
-          .update(users)
+          .update(workspaces)
           .set({ plan, updatedAt: new Date() })
-          .where(eq(users.id, user.id))
+          .where(eq(workspaces.id, workspace.id))
 
         const eventType =
-          ['free', 'starter', 'pro'].indexOf(plan) >
-          ['free', 'starter', 'pro'].indexOf(fromPlan)
+          ['free', 'starter', 'pro'].indexOf(plan) > ['free', 'starter', 'pro'].indexOf(fromPlan)
             ? 'plan.upgraded'
             : 'plan.downgraded'
 
-        await logEvent(user.id, eventType, { fromPlan, toPlan: plan })
+        await logEvent(workspace.id, null, eventType, { fromPlan, toPlan: plan })
         break
       }
 
-      // ── customer.subscription.deleted ─────────────────────────────────────
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription
         const stripeCustomerId =
@@ -142,31 +129,28 @@ export async function POST(req: NextRequest) {
             ? subscription.customer
             : subscription.customer.id
 
-        const [user] = await db
-          .select({ id: users.id, plan: users.plan })
-          .from(users)
-          .where(eq(users.stripeCustomerId, stripeCustomerId))
+        const [workspace] = await db
+          .select({ id: workspaces.id, plan: workspaces.plan })
+          .from(workspaces)
+          .where(eq(workspaces.stripeCustomerId, stripeCustomerId))
           .limit(1)
 
-        if (!user) {
-          console.warn(
-            `[stripe-webhook] customer.subscription.deleted: no user found for customer ${stripeCustomerId}`,
-          )
+        if (!workspace) {
+          console.warn(`[stripe-webhook] customer.subscription.deleted: no workspace found for customer ${stripeCustomerId}`)
           break
         }
 
-        const fromPlan = user.plan
+        const fromPlan = workspace.plan
 
         await db
-          .update(users)
+          .update(workspaces)
           .set({ plan: 'free', updatedAt: new Date() })
-          .where(eq(users.id, user.id))
+          .where(eq(workspaces.id, workspace.id))
 
-        await logEvent(user.id, 'plan.downgraded', { fromPlan, toPlan: 'free' })
+        await logEvent(workspace.id, null, 'plan.downgraded', { fromPlan, toPlan: 'free' })
         break
       }
 
-      // ── invoice.payment_failed ─────────────────────────────────────────────
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice
         const stripeCustomerId =
@@ -174,20 +158,18 @@ export async function POST(req: NextRequest) {
 
         if (!stripeCustomerId) break
 
-        const [user] = await db
-          .select({ id: users.id })
-          .from(users)
-          .where(eq(users.stripeCustomerId, stripeCustomerId))
+        const [workspace] = await db
+          .select({ id: workspaces.id })
+          .from(workspaces)
+          .where(eq(workspaces.stripeCustomerId, stripeCustomerId))
           .limit(1)
 
-        if (!user) {
-          console.warn(
-            `[stripe-webhook] invoice.payment_failed: no user found for customer ${stripeCustomerId}`,
-          )
+        if (!workspace) {
+          console.warn(`[stripe-webhook] invoice.payment_failed: no workspace found for customer ${stripeCustomerId}`)
           break
         }
 
-        await logEvent(user.id, 'plan.downgraded', {
+        await logEvent(workspace.id, null, 'plan.downgraded', {
           reason: 'payment_failed',
           invoiceId: invoice.id,
           amountDue: invoice.amount_due,
@@ -197,7 +179,6 @@ export async function POST(req: NextRequest) {
       }
 
       default:
-        // Unhandled event type — acknowledge receipt without error
         console.log(`[stripe-webhook] Unhandled event type: ${event.type}`)
     }
   } catch (err) {

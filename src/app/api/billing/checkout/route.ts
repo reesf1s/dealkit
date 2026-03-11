@@ -1,8 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { eq } from 'drizzle-orm'
-import { db } from '@/lib/db'
-import { users } from '@/lib/db/schema'
+import { getWorkspaceContext } from '@/lib/workspace'
 import { getStripe } from '@/lib/stripe/client'
 import type { Plan } from '@/types'
 
@@ -46,13 +44,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const [user] = await db
-    .select({ stripeCustomerId: users.stripeCustomerId, email: users.email })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1)
-
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const { workspaceId, workspace } = await getWorkspaceContext(userId)
 
   const stripe = getStripe()
 
@@ -61,10 +53,10 @@ export async function POST(req: NextRequest) {
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${appUrl}/settings?upgraded=1`,
     cancel_url: `${appUrl}/settings`,
-    metadata: { clerkUserId: userId },
-    ...(user.stripeCustomerId
-      ? { customer: user.stripeCustomerId }
-      : { customer_email: user.email ?? undefined }),
+    metadata: { workspaceId },
+    ...(workspace.stripeCustomerId
+      ? { customer: workspace.stripeCustomerId }
+      : { customer_email: undefined }),
   })
 
   return NextResponse.json({ url: session.url })

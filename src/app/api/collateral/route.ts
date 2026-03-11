@@ -5,34 +5,20 @@ import { db } from '@/lib/db'
 import { collateral } from '@/lib/db/schema'
 import type { CollateralType, CollateralStatus } from '@/types'
 import { dbErrResponse } from '@/lib/api-helpers'
+import { getWorkspaceContext } from '@/lib/workspace'
 
-// GET /api/collateral — list collateral with optional type and status filters
 export async function GET(req: NextRequest) {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
+    const { workspaceId } = await getWorkspaceContext(userId)
     const { searchParams } = new URL(req.url)
     const typeFilter = searchParams.get('type') as CollateralType | null
     const statusFilter = searchParams.get('status') as CollateralStatus | null
-
-    const conditions = [eq(collateral.userId, userId)]
-
-    if (typeFilter) {
-      conditions.push(eq(collateral.type, typeFilter))
-    }
-    if (statusFilter) {
-      conditions.push(eq(collateral.status, statusFilter))
-    }
-
-    const rows = await db
-      .select()
-      .from(collateral)
-      .where(and(...conditions))
-      .orderBy(collateral.createdAt)
-
+    const conditions = [eq(collateral.workspaceId, workspaceId)]
+    if (typeFilter) conditions.push(eq(collateral.type, typeFilter))
+    if (statusFilter) conditions.push(eq(collateral.status, statusFilter))
+    const rows = await db.select().from(collateral).where(and(...conditions)).orderBy(collateral.createdAt)
     return NextResponse.json({ data: rows })
-  } catch (err) {
-    return dbErrResponse(err)
-  }
+  } catch (err) { return dbErrResponse(err) }
 }
