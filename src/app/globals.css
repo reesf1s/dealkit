@@ -20,6 +20,9 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Prevent browser UA stylesheet from making dialogs white */
+dialog { background: transparent; border: none; padding: 0; }
+
 html, body {
   background: var(--bg);
   color: var(--text-primary);
@@ -49,6 +52,14 @@ html, body {
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 .animate-in { animation: fadeIn 0.15s ease-out forwards; }
 

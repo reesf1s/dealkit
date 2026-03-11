@@ -22,21 +22,21 @@ const PLAN_DETAILS: Record<Plan, { name: string; price: string; color: string; b
     price: '$0/mo',
     color: '#888',
     bg: 'rgba(136,136,136,0.08)',
-    features: ['1 product', '2 competitors', '5 case studies', '10 deal logs', '5 collateral items'],
+    features: ['1 product', '1 competitor', '2 case studies', '5 deal logs', '3 AI collateral pieces'],
   },
   starter: {
     name: 'Starter',
     price: '$79/mo',
     color: '#6366F1',
     bg: 'rgba(99,102,241,0.08)',
-    features: ['3 products', '10 competitors', 'Unlimited case studies', 'Unlimited deals', 'Unlimited collateral', '.docx export', 'No watermark'],
+    features: ['5 products', '15 competitors', 'Unlimited case studies', 'Unlimited deals', 'Unlimited collateral', 'AI meeting prep', '.docx export'],
   },
   pro: {
     name: 'Pro',
     price: '$149/mo',
     color: '#22C55E',
     bg: 'rgba(34,197,94,0.08)',
-    features: ['Everything in Starter', 'Unlimited products', 'Batch regenerate', 'Email sequences', 'AI meeting prep', 'Team features'],
+    features: ['Everything in Starter', 'Unlimited everything', 'AI deal scoring', 'PDF export', 'Priority support', 'Early access'],
   },
 }
 
@@ -90,7 +90,7 @@ export default function SettingsPage() {
   async function handleExportData() {
     setExportLoading(true)
     try {
-      const res = await fetch('/api/export/data')
+      const res = await fetch('/api/account/export')
       if (!res.ok) throw new Error('Failed')
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
@@ -147,9 +147,10 @@ export default function SettingsPage() {
 
   async function handleDeleteAccount() {
     try {
-      const res = await fetch('/api/user', { method: 'DELETE' })
+      const res = await fetch('/api/account', { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed')
-      toast('Account deletion requested', 'info')
+      toast('Account deleted successfully', 'success')
+      window.location.href = '/'
     } catch {
       toast('Failed to delete account. Please contact support.', 'error')
     }

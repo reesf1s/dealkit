@@ -24,7 +24,8 @@ const STATUS_CONFIG: Record<string, { color: string; icon: React.ElementType; la
 }
 
 export default function ProductGapsPage() {
-  const { data: gaps, isLoading } = useSWR('/api/product-gaps', fetcher)
+  const { data: gapsRaw, isLoading } = useSWR('/api/product-gaps', fetcher)
+  const gaps: any[] = Array.isArray(gapsRaw) ? gapsRaw : (Array.isArray(gapsRaw?.data) ? gapsRaw.data : [])
   const [statusFilter, setStatusFilter] = useState<string>('open')
 
   const updateStatus = async (id: string, status: string) => {
@@ -36,10 +37,10 @@ export default function ProductGapsPage() {
     mutate('/api/product-gaps')
   }
 
-  const filtered = (gaps ?? []).filter((g: any) => statusFilter === 'all' || g.status === statusFilter)
-  const openCount = (gaps ?? []).filter((g: any) => g.status === 'open').length
-  const criticalCount = (gaps ?? []).filter((g: any) => g.priority === 'critical' && g.status === 'open').length
-  const totalRevAtRisk = (gaps ?? [])
+  const filtered = gaps.filter((g: any) => statusFilter === 'all' || g.status === statusFilter)
+  const openCount = gaps.filter((g: any) => g.status === 'open').length
+  const criticalCount = gaps.filter((g: any) => g.priority === 'critical' && g.status === 'open').length
+  const totalRevAtRisk = gaps
     .filter((g: any) => g.status === 'open' && g.affectedRevenue)
     .reduce((s: number, g: any) => s + g.affectedRevenue, 0)
 

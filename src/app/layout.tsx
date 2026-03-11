@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import { Toaster } from '@/components/shared/Toast'
+import CookieBanner from '@/components/shared/CookieBanner'
 import './globals.css'
 
 const geistSans = Geist({
@@ -33,6 +34,7 @@ export default function RootLayout({
         >
           {children}
           <Toaster />
+          <CookieBanner />
         </body>
       </html>
     </ClerkProvider>
