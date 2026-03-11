@@ -37,7 +37,13 @@ Return this exact JSON structure:
   "productGaps": [{"title": "gap title", "description": "what customer needs that product lacks", "priority": "high"}]
 }
 
-conversionScore: 0-100. priority: critical | high | medium | low` }],
+conversionScore: 0-100. priority: critical | high | medium | low
+
+IMPORTANT — productGaps rules:
+- Only include a product gap if the prospect EXPLICITLY mentioned a missing feature, integration, or capability that your product does not currently support.
+- Examples of real product gaps: "we need Salesforce integration", "it doesn't support SSO", "we require an API for X".
+- DO NOT create product gaps from: scheduling tasks, follow-up emails, admin work, attendance tracking requests (unless the prospect said the product lacks it), general to-dos, or anything that is a sales/process action rather than a product capability complaint.
+- If no explicit product gaps are mentioned, return an empty array: "productGaps": []` }],
     })
     let parsed: any = {}
     try {

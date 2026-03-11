@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Collateral limit reached. Your ${plan} plan allows up to ${limits.collateral} items. Please upgrade.`, code: 'PLAN_LIMIT_REACHED' }, { status: 403 })
     }
     const body = await req.json()
-    const { type, competitorId, caseStudyId, productName, buyerRole }: { type: CollateralType; competitorId?: string; caseStudyId?: string; productName?: string; buyerRole?: string } = body
+    const { type, competitorId, caseStudyId, productName, buyerRole, customPrompt }: { type: CollateralType; competitorId?: string; caseStudyId?: string; productName?: string; buyerRole?: string; customPrompt?: string } = body
     const validTypes: CollateralType[] = ['battlecard','case_study_doc','one_pager','objection_handler','talk_track','email_sequence']
     if (!type || !validTypes.includes(type)) return NextResponse.json({ error: `type must be one of: ${validTypes.join(', ')}` }, { status: 400 })
     const now = new Date()
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       sourceDealLogId: null, content: null, rawResponse: null, generatedAt: null, createdAt: now, updatedAt: now,
     }).returning()
     try {
-      const result = await generateCollateral({ workspaceId, type, competitorId, caseStudyId, productName, buyerRole })
+      const result = await generateCollateral({ workspaceId, type, competitorId, caseStudyId, productName, buyerRole, customPrompt })
       const generatedAt = new Date()
       const [updated] = await db.update(collateral).set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt }).where(eq(collateral.id, record.id)).returning()
       await logEvent(workspaceId, userId, 'collateral.generated', { collateralId: updated.id, collateralType: updated.type, title: updated.title })

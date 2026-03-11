@@ -1,11 +1,11 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import useSWR from 'swr'
 import Link from 'next/link'
 import { useRef, useState, useEffect } from 'react'
-import { ArrowLeft, RefreshCw, Download, Share2, Copy, Check } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Download, Share2, Copy, Check, Trash2 } from 'lucide-react'
 import { CollateralViewer } from '@/components/collateral/CollateralViewer'
 import { CollateralTypeBadge } from '@/components/collateral/CollateralTypeBadge'
 import { StatusBadge } from '@/components/shared/StatusBadge'
@@ -26,10 +26,13 @@ function formatDate(d: Date | string | null) {
 
 export default function CollateralDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const router = useRouter()
   const { toast } = useToast()
   const [sharePopoverOpen, setSharePopoverOpen] = useState(false)
   const [shareLoading, setShareLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const shareRef = useRef<HTMLDivElement>(null)
 
   const { data, isLoading, error, mutate } = useSWR<{ data: Collateral }>(
@@ -105,21 +108,28 @@ export default function CollateralDetailPage() {
   async function handleRegenerate() {
     if (!item) return
     try {
-      const res = await fetch('/api/collateral/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: item.type,
-          sourceCompetitorId: item.sourceCompetitorId,
-          sourceCaseStudyId: item.sourceCaseStudyId,
-          sourceDealLogId: item.sourceDealLogId,
-        }),
-      })
+      // PATCH regenerates the existing record in-place — no new record, no plan limit check
+      const res = await fetch(`/api/collateral/${id}`, { method: 'PATCH' })
       if (!res.ok) throw new Error('Failed')
       await mutate()
-      toast('Regeneration started', 'success')
+      toast('Regeneration started — updates in ~30 seconds', 'success')
     } catch {
       toast('Failed to regenerate', 'error')
+    }
+  }
+
+  async function handleDelete() {
+    if (!deleteConfirm) { setDeleteConfirm(true); return }
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/collateral/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed')
+      toast('Collateral deleted', 'success')
+      router.push('/collateral')
+    } catch {
+      toast('Failed to delete', 'error')
+      setDeleting(false)
+      setDeleteConfirm(false)
     }
   }
 
@@ -175,6 +185,24 @@ export default function CollateralDetailPage() {
               >
                 <RefreshCw size={13} strokeWidth={2} />
                 Regenerate
+              </button>
+
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px',
+                  fontSize: '13px', fontWeight: 500, cursor: deleting ? 'not-allowed' : 'pointer', transition: 'all 150ms ease',
+                  color: deleteConfirm ? '#fff' : '#EF4444',
+                  backgroundColor: deleteConfirm ? '#EF4444' : 'rgba(239,68,68,0.08)',
+                  border: deleteConfirm ? '1px solid #EF4444' : '1px solid rgba(239,68,68,0.25)',
+                  opacity: deleting ? 0.6 : 1,
+                }}
+                onMouseEnter={(e) => { if (!deleteConfirm) e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.15)' }}
+                onMouseLeave={(e) => { if (!deleteConfirm) e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.08)'; setDeleteConfirm(false) }}
+              >
+                <Trash2 size={13} strokeWidth={2} />
+                {deleting ? 'Deleting…' : deleteConfirm ? 'Confirm delete' : 'Delete'}
               </button>
 
               {/* Share button with popover */}

@@ -3,11 +3,13 @@ export const dynamic = 'force-dynamic'
 
 import useSWR from 'swr'
 import Link from 'next/link'
-import { TrendingUp, Users, BookOpen, ClipboardList, FileText, Plus, RefreshCw, AlertTriangle, CheckCircle, Circle, ArrowUpRight, Zap, Target, BarChart3, Sparkles } from 'lucide-react'
+import { useState } from 'react'
+import { TrendingUp, Users, BookOpen, ClipboardList, FileText, Plus, RefreshCw, AlertTriangle, CheckCircle, Circle, ArrowUpRight, Zap, Target, BarChart3, Sparkles, Copy, Check } from 'lucide-react'
 import ROIWidget from '@/components/dashboard/ROIWidget'
 import { SetupAlert } from '@/components/shared/SetupBanner'
 import { useUser } from '@clerk/nextjs'
 import { fetcher, isDbNotConfigured } from '@/lib/fetcher'
+import { useToast } from '@/components/shared/Toast'
 
 function StatCard({ label, value, icon: Icon, color, trend, featured }: { label: string; value: string | number; icon: React.ElementType; color: string; trend?: string; featured?: boolean }) {
   return (
@@ -104,7 +106,13 @@ const TYPE_COLORS: Record<string, { bg: string; color: string; border: string }>
 
 export default function DashboardPage() {
   const { user } = useUser()
+  const { toast } = useToast()
+  const [joinCode, setJoinCode] = useState('')
+  const [joining, setJoining] = useState(false)
+  const [codeCopied, setCodeCopied] = useState(false)
   const { data: company, error: companyErr } = useSWR('/api/company', fetcher)
+  const { data: userRes } = useSWR('/api/user', fetcher)
+  const dbUser = userRes?.data
   const { data: competitors } = useSWR('/api/competitors', fetcher)
   const { data: caseStudies } = useSWR('/api/case-studies', fetcher)
   const { data: deals } = useSWR('/api/deals', fetcher)
@@ -144,6 +152,31 @@ export default function DashboardPage() {
   const completedSteps = steps.filter(s => s.done).length
   const healthPct = Math.round((completedSteps / steps.length) * 100)
   const recentCollateral = collateralList.slice(0, 5)
+
+  async function handleJoinWorkspace(e: React.FormEvent) {
+    e.preventDefault()
+    if (!joinCode.trim()) return
+    setJoining(true)
+    try {
+      const res = await fetch('/api/workspaces/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug: joinCode.trim() }),
+      })
+      const json = await res.json()
+      if (!res.ok) { toast(json.error ?? 'Invalid join code', 'error'); return }
+      toast('Joined workspace! Reloading…', 'success')
+      setTimeout(() => window.location.reload(), 1000)
+    } catch { toast('Failed to join workspace', 'error') }
+    finally { setJoining(false) }
+  }
+
+  function handleCopyCode() {
+    if (!dbUser?.workspaceSlug) return
+    navigator.clipboard.writeText(dbUser.workspaceSlug)
+    setCodeCopied(true)
+    setTimeout(() => setCodeCopied(false), 2000)
+  }
 
   const firstName = user?.firstName
   const hour = new Date().getHours()
@@ -446,6 +479,69 @@ export default function DashboardPage() {
                 <span style={{ fontSize: '11px', color: '#818CF8', lineHeight: '1.6' }}>Complete your KB for significantly better AI outputs</span>
               </div>
             )}
+          </div>
+
+          {/* Team card */}
+          <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '14px', padding: '14px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+              <div style={{ width: '26px', height: '26px', background: 'rgba(99,102,241,0.1)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Users size={12} color="#818CF8" />
+              </div>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF', flex: 1 }}>Team</span>
+              <Link href="/settings" style={{ fontSize: '11px', color: '#555', textDecoration: 'none' }}>Settings →</Link>
+            </div>
+
+            {/* Your invite code */}
+            <div style={{ marginBottom: '10px' }}>
+              <p style={{ fontSize: '10px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 5px' }}>Your invite code</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <code style={{
+                  flex: 1, fontSize: '12px', fontWeight: 700, color: '#818CF8',
+                  background: 'rgba(99,102,241,0.1)', padding: '5px 9px', borderRadius: '7px',
+                  border: '1px solid rgba(99,102,241,0.25)', fontFamily: 'monospace',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {dbUser?.workspaceSlug ?? '…'}
+                </code>
+                <button onClick={handleCopyCode} title="Copy code" style={{
+                  flexShrink: 0, width: '28px', height: '28px', borderRadius: '7px',
+                  background: codeCopied ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)',
+                  border: codeCopied ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.1)',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: codeCopied ? '#22C55E' : '#888', transition: 'all 150ms',
+                }}>
+                  {codeCopied ? <Check size={11} /> : <Copy size={11} />}
+                </button>
+              </div>
+              <p style={{ fontSize: '10px', color: '#444', margin: '4px 0 0', lineHeight: 1.5 }}>Share with teammates to invite them</p>
+            </div>
+
+            {/* Join a workspace */}
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+              <p style={{ fontSize: '10px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 5px' }}>Join a workspace</p>
+              <form onSubmit={handleJoinWorkspace} style={{ display: 'flex', gap: '6px' }}>
+                <input
+                  value={joinCode}
+                  onChange={e => setJoinCode(e.target.value)}
+                  placeholder="Enter code (e.g. crane-47)"
+                  style={{
+                    flex: 1, height: '28px', padding: '0 9px', borderRadius: '7px', fontSize: '11px',
+                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)',
+                    color: '#F1F1F3', outline: 'none', fontFamily: 'inherit', minWidth: 0,
+                  }}
+                  onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.4)')}
+                  onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.09)')}
+                />
+                <button type="submit" disabled={joining || !joinCode.trim()} style={{
+                  height: '28px', padding: '0 10px', borderRadius: '7px', fontSize: '11px', fontWeight: 600,
+                  color: '#fff', background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
+                  border: 'none', cursor: joining || !joinCode.trim() ? 'not-allowed' : 'pointer',
+                  opacity: joining || !joinCode.trim() ? 0.5 : 1, whiteSpace: 'nowrap', flexShrink: 0,
+                }}>
+                  {joining ? '…' : 'Join'}
+                </button>
+              </form>
+            </div>
           </div>
 
           {/* Quick actions */}

@@ -3,12 +3,13 @@ export const dynamic = 'force-dynamic'
 
 import useSWR, { mutate as globalMutate } from 'swr'
 import { useParams, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import * as Dialog from '@radix-ui/react-dialog'
 import {
   ArrowLeft, Sparkles, CheckSquare, Square, Plus, Target, Loader2,
   FileText, Clipboard, ChevronDown, TrendingUp, DollarSign, Calendar,
-  Building2, User, Edit, Trash2, MoreHorizontal, CheckCircle
+  Building2, User, Edit, Trash2, MoreHorizontal, CheckCircle, X
 } from 'lucide-react'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
@@ -255,6 +256,171 @@ function TodosTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpd
   )
 }
 
+const STAGES_OPTS = ['prospecting','qualification','discovery','proposal','negotiation','closed_won','closed_lost'] as const
+
+function EditDealModal({ deal, dealId, open, onOpenChange, onSaved }: {
+  deal: any; dealId: string; open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void
+}) {
+  const [form, setForm] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
+
+  // sync form state when deal or open changes
+  useEffect(() => {
+    if (open && deal) {
+      setForm({
+        dealName: deal.dealName ?? '',
+        prospectCompany: deal.prospectCompany ?? '',
+        prospectName: deal.prospectName ?? '',
+        prospectTitle: deal.prospectTitle ?? '',
+        dealValue: deal.dealValue != null ? String(deal.dealValue) : '',
+        stage: deal.stage ?? 'proposal',
+        competitors: Array.isArray(deal.competitors) ? deal.competitors.join(', ') : '',
+        notes: deal.notes ?? '',
+        nextSteps: deal.nextSteps ?? '',
+        lostReason: deal.lostReason ?? '',
+      })
+    }
+  }, [open, deal])
+
+  const u = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
+  const inputStyle: React.CSSProperties = {
+    width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px',
+    background: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)',
+    color: '#EBEBEB', fontSize: '13px', outline: 'none', boxSizing: 'border-box',
+  }
+  const labelStyle: React.CSSProperties = {
+    display: 'block', fontSize: '11px', fontWeight: 600, color: '#666',
+    textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '5px',
+  }
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await fetch(`/api/deals/${dealId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dealName: form.dealName,
+          prospectCompany: form.prospectCompany,
+          prospectName: form.prospectName || null,
+          prospectTitle: form.prospectTitle || null,
+          dealValue: form.dealValue ? Number(form.dealValue) : null,
+          stage: form.stage,
+          competitors: form.competitors.split(',').map((s: string) => s.trim()).filter(Boolean),
+          notes: form.notes || null,
+          nextSteps: form.nextSteps || null,
+          lostReason: form.lostReason || null,
+        }),
+      })
+      onSaved()
+      onOpenChange(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', zIndex: 500 }} />
+        <Dialog.Content style={{
+          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+          zIndex: 501, width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto',
+          background: 'rgba(14,10,26,0.98)', border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '14px', padding: '24px', outline: 'none',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.8)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+            <Dialog.Title style={{ fontSize: '15px', fontWeight: 700, color: '#F1F1F3', margin: 0 }}>Edit deal</Dialog.Title>
+            <Dialog.Close asChild>
+              <button style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', display: 'flex', padding: '4px', borderRadius: '5px' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#EBEBEB')} onMouseLeave={e => (e.currentTarget.style.color = '#555')}>
+                <X size={15} />
+              </button>
+            </Dialog.Close>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '13px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={labelStyle}>Deal name</label>
+                <input style={inputStyle} value={form.dealName ?? ''} onChange={e => u('dealName', e.target.value)}
+                  onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+              </div>
+              <div>
+                <label style={labelStyle}>Company</label>
+                <input style={inputStyle} value={form.prospectCompany ?? ''} onChange={e => u('prospectCompany', e.target.value)}
+                  onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={labelStyle}>Contact name</label>
+                <input style={inputStyle} value={form.prospectName ?? ''} onChange={e => u('prospectName', e.target.value)} placeholder="Jane Smith"
+                  onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+              </div>
+              <div>
+                <label style={labelStyle}>Contact title</label>
+                <input style={inputStyle} value={form.prospectTitle ?? ''} onChange={e => u('prospectTitle', e.target.value)} placeholder="VP of Engineering"
+                  onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={labelStyle}>Deal value ($)</label>
+                <input style={inputStyle} type="number" value={form.dealValue ?? ''} onChange={e => u('dealValue', e.target.value)} placeholder="50000"
+                  onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+              </div>
+              <div>
+                <label style={labelStyle}>Stage</label>
+                <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.stage ?? ''} onChange={e => u('stage', e.target.value)}>
+                  {STAGES_OPTS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Competitors (comma-separated)</label>
+              <input style={inputStyle} value={form.competitors ?? ''} onChange={e => u('competitors', e.target.value)} placeholder="Competitor A, Competitor B"
+                onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+            </div>
+            {form.stage === 'closed_lost' && (
+              <div>
+                <label style={labelStyle}>Lost reason</label>
+                <input style={inputStyle} value={form.lostReason ?? ''} onChange={e => u('lostReason', e.target.value)} placeholder="e.g. Price too high"
+                  onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+              </div>
+            )}
+            <div>
+              <label style={labelStyle}>Notes</label>
+              <textarea style={{ ...inputStyle, height: 'auto', padding: '8px 10px', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5' }}
+                rows={3} value={form.notes ?? ''} onChange={e => u('notes', e.target.value)}
+                onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+            </div>
+            <div>
+              <label style={labelStyle}>Next steps</label>
+              <input style={inputStyle} value={form.nextSteps ?? ''} onChange={e => u('nextSteps', e.target.value)} placeholder="Schedule follow-up call"
+                onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '4px' }}>
+              <Dialog.Close asChild>
+                <button style={{ height: '34px', padding: '0 14px', borderRadius: '7px', fontSize: '13px', fontWeight: 500, color: '#888', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              </Dialog.Close>
+              <button onClick={save} disabled={saving} style={{
+                height: '34px', padding: '0 18px', borderRadius: '7px', fontSize: '13px', fontWeight: 600,
+                color: '#fff', background: saving ? '#333' : 'linear-gradient(135deg, #6366F1, #7C3AED)',
+                border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
+              }}>
+                {saving ? 'Saving…' : 'Save changes'}
+              </button>
+            </div>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  )
+}
+
 export default function DealDetailPage() {
   const { id } = useParams() as { id: string }
   const router = useRouter()
@@ -262,6 +428,7 @@ export default function DealDetailPage() {
   const deal = data?.data ?? data
 
   const [activeTab, setActiveTab] = useState<'overview' | 'meeting-notes' | 'prep' | 'todos'>('overview')
+  const [editOpen, setEditOpen] = useState(false)
 
   if (!deal && data !== undefined) {
     return (
@@ -312,11 +479,18 @@ export default function DealDetailPage() {
               </div>
               <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#555' }}>
                 {deal.prospectName && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><User size={11} />{deal.prospectName}</span>}
-                {deal.dealValue && <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#22C55E', fontWeight: '600' }}><DollarSign size={11} />${(deal.dealValue / 100).toLocaleString()}</span>}
+                {deal.dealValue && <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#22C55E', fontWeight: '600' }}><DollarSign size={11} />${deal.dealValue.toLocaleString()}</span>}
                 {deal.closeDate && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} />Close {new Date(deal.closeDate).toLocaleDateString()}</span>}
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setEditOpen(true)} style={{
+                display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '8px', color: '#EBEBEB', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+              }}>
+                <Edit size={13} /> Edit
+              </button>
               <Link href={`/collateral?dealId=${id}`} style={{
                 display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
                 background: 'linear-gradient(135deg, #6366F1, #7C3AED)', boxShadow: '0 0 16px rgba(99,102,241,0.3)',
@@ -350,6 +524,9 @@ export default function DealDetailPage() {
         ))}
       </div>
 
+      {/* Edit deal modal */}
+      <EditDealModal deal={deal} dealId={id} open={editOpen} onOpenChange={setEditOpen} onSaved={() => mutate()} />
+
       {/* Tab content */}
       {!deal ? (
         <div style={{ height: '200px', background: 'rgba(255,255,255,0.02)', borderRadius: '12px' }} />
@@ -363,7 +540,7 @@ export default function DealDetailPage() {
                 { label: 'Contact', value: deal.prospectName },
                 { label: 'Title', value: deal.prospectTitle },
                 { label: 'Stage', value: deal.stage?.replace('_', ' ') },
-                { label: 'Deal Value', value: deal.dealValue ? `$${(deal.dealValue/100).toLocaleString()}` : null },
+                { label: 'Deal Value', value: deal.dealValue ? `$${deal.dealValue.toLocaleString()}` : null },
                 { label: 'Competitors', value: (deal.competitors as string[])?.join(', ') },
                 { label: 'Notes', value: deal.notes },
                 { label: 'Next Steps', value: deal.nextSteps },

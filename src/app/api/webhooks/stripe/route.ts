@@ -93,7 +93,14 @@ export async function POST(req: NextRequest) {
             : subscription.customer.id
 
         const priceId = subscription.items.data[0]?.price.id
-        const plan: Plan = priceId ? (planFromPriceId(priceId) ?? 'free') : 'free'
+
+        // If subscription is canceled or pending cancellation at period end, immediately downgrade to free
+        let plan: Plan
+        if (subscription.status === 'canceled' || subscription.cancel_at_period_end) {
+          plan = 'free'
+        } else {
+          plan = priceId ? (planFromPriceId(priceId) ?? 'free') : 'free'
+        }
 
         const [workspace] = await db
           .select({ id: workspaces.id, plan: workspaces.plan })
@@ -118,7 +125,7 @@ export async function POST(req: NextRequest) {
             ? 'plan.upgraded'
             : 'plan.downgraded'
 
-        await logEvent(workspace.id, null, eventType, { fromPlan, toPlan: plan })
+        await logEvent(workspace.id, null, eventType, { fromPlan, toPlan: plan, cancelAtPeriodEnd: subscription.cancel_at_period_end })
         break
       }
 

@@ -9,7 +9,7 @@ import { CollateralGrid } from '@/components/collateral/CollateralGrid'
 import { CollateralTypeBadge } from '@/components/collateral/CollateralTypeBadge'
 import { SkeletonGrid } from '@/components/shared/SkeletonCard'
 import { useToast } from '@/components/shared/Toast'
-import type { Collateral, CollateralType, Competitor, CaseStudy } from '@/types'
+import type { Collateral, CollateralType, Competitor, CaseStudy, CompanyProfile } from '@/types'
 
 const fetcher = (url: string) =>
   fetch(url).then((r) => {
@@ -26,13 +26,31 @@ const ALL_TYPES: CollateralType[] = [
   'email_sequence',
 ]
 
-const TYPE_LABELS: Record<CollateralType, string> = {
-  battlecard: 'Battlecard',
-  case_study_doc: 'Case Study Doc',
-  one_pager: 'One-Pager',
-  objection_handler: 'Objection Handler',
-  talk_track: 'Talk Track',
-  email_sequence: 'Email Sequence',
+const TYPE_META: Record<CollateralType, { label: string; description: string }> = {
+  battlecard: {
+    label: 'Battlecard',
+    description: 'Counter competitors on live calls — strengths, weaknesses, win themes',
+  },
+  case_study_doc: {
+    label: 'Case Study Doc',
+    description: 'Prove ROI against a prospect\'s risk or blocker using real customer evidence',
+  },
+  one_pager: {
+    label: 'One-Pager',
+    description: 'Executive summary of your product for quick sharing with stakeholders',
+  },
+  objection_handler: {
+    label: 'Objection Handler',
+    description: 'Q&A from recurring sales call objections — confident, ready-to-use answers',
+  },
+  talk_track: {
+    label: 'Talk Track',
+    description: 'Structured narrative for discovery and demo calls with key questions',
+  },
+  email_sequence: {
+    label: 'Email Sequence',
+    description: 'Multi-touch follow-up emails for prospects post-meeting',
+  },
 }
 
 export default function CollateralPage() {
@@ -44,14 +62,19 @@ export default function CollateralPage() {
   const [generating, setGenerating] = useState(false)
   const [typeFilter, setTypeFilter] = useState<CollateralType | 'all'>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [selectedProduct, setSelectedProduct] = useState('')
+  const [buyerRole, setBuyerRole] = useState('')
+  const [customPrompt, setCustomPrompt] = useState('')
 
   const { data: collRes, isLoading, mutate } = useSWR<{ data: Collateral[] }>('/api/collateral', fetcher)
   const { data: compRes } = useSWR<{ data: Competitor[] }>('/api/competitors', fetcher)
   const { data: csRes } = useSWR<{ data: CaseStudy[] }>('/api/case-studies', fetcher)
+  const { data: profileRes } = useSWR<{ data: CompanyProfile }>('/api/company-profile', fetcher)
 
   const collateral = collRes?.data ?? []
   const competitors = compRes?.data ?? []
   const caseStudies = csRes?.data ?? []
+  const products = profileRes?.data?.products ?? []
 
   const filtered = collateral.filter((c) => {
     const typeOk = typeFilter === 'all' || c.type === typeFilter
@@ -64,10 +87,19 @@ export default function CollateralPage() {
     try {
       const body: Record<string, string> = { type: selectedType }
       if (selectedType === 'battlecard' && selectedCompetitor) {
-        body.sourceCompetitorId = selectedCompetitor
+        body.competitorId = selectedCompetitor
       }
       if (selectedType === 'case_study_doc' && selectedCaseStudy) {
-        body.sourceCaseStudyId = selectedCaseStudy
+        body.caseStudyId = selectedCaseStudy
+      }
+      if (selectedType === 'one_pager' && selectedProduct) {
+        body.productName = selectedProduct
+      }
+      if ((selectedType === 'talk_track' || selectedType === 'email_sequence') && buyerRole.trim()) {
+        body.buyerRole = buyerRole.trim()
+      }
+      if (customPrompt.trim()) {
+        body.customPrompt = customPrompt.trim()
       }
 
       const res = await fetch('/api/collateral/generate', {
@@ -82,6 +114,9 @@ export default function CollateralPage() {
       }
       await mutate()
       setGenerateOpen(false)
+      setSelectedProduct('')
+      setBuyerRole('')
+      setCustomPrompt('')
       toast('Generation started — check back in a moment', 'success')
     } finally {
       setGenerating(false)
@@ -90,6 +125,21 @@ export default function CollateralPage() {
 
   function handleExport(id: string) {
     window.open(`/api/export/${id}`, '_blank')
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      const res = await fetch(`/api/collateral/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const json = await res.json()
+        toast(json.error ?? 'Failed to delete', 'error')
+        return
+      }
+      await mutate()
+      toast('Deleted', 'success')
+    } catch {
+      toast('Failed to delete', 'error')
+    }
   }
 
   return (
@@ -132,7 +182,7 @@ export default function CollateralPage() {
               onClick={() => setTypeFilter(type)}
               style={{ height: '28px', padding: '0 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, color: typeFilter === type ? '#EBEBEB' : '#888', backgroundColor: typeFilter === type ? 'rgba(255,255,255,0.08)' : 'transparent', border: typeFilter === type ? '1px solid rgba(255,255,255,0.12)' : '1px solid transparent', cursor: 'pointer' }}
             >
-              {TYPE_LABELS[type]}
+              {TYPE_META[type].label}
             </button>
           ))}
         </div>
@@ -158,14 +208,15 @@ export default function CollateralPage() {
           collateral={filtered}
           onGenerate={() => setGenerateOpen(true)}
           onExport={handleExport}
+          onDelete={handleDelete}
         />
       )}
 
       {/* Generate modal */}
-      <Dialog.Root open={generateOpen} onOpenChange={setGenerateOpen}>
+      <Dialog.Root open={generateOpen} onOpenChange={(open) => { setGenerateOpen(open); if (!open) { setSelectedProduct(''); setBuyerRole(''); setCustomPrompt('') } }}>
         <Dialog.Portal>
           <Dialog.Overlay style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 500 }} />
-          <Dialog.Content style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 501, width: '100%', maxWidth: '480px', backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px', boxShadow: '0 16px 48px rgba(0,0,0,0.8)', outline: 'none' }}>
+          <Dialog.Content style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 501, width: '100%', maxWidth: '520px', backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px', boxShadow: '0 16px 48px rgba(0,0,0,0.8)', outline: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <Dialog.Title style={{ fontSize: '16px', fontWeight: 600, color: '#EBEBEB', margin: 0 }}>
                 Generate collateral
@@ -190,9 +241,10 @@ export default function CollateralPage() {
                       onClick={() => setSelectedType(type)}
                       style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '10px 12px',
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        gap: '6px',
+                        padding: '12px',
                         borderRadius: '8px',
                         backgroundColor: selectedType === type ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.03)',
                         border: `1px solid ${selectedType === type ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.06)'}`,
@@ -200,8 +252,23 @@ export default function CollateralPage() {
                         transition: 'all 150ms ease',
                         textAlign: 'left',
                       }}
+                      onMouseEnter={(e) => {
+                        if (selectedType !== type) {
+                          e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'
+                          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedType !== type) {
+                          e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'
+                          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'
+                        }
+                      }}
                     >
                       <CollateralTypeBadge type={type} />
+                      <span style={{ fontSize: '11px', color: '#666', lineHeight: 1.4 }}>
+                        {TYPE_META[type].description}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -240,6 +307,53 @@ export default function CollateralPage() {
                   </select>
                 </div>
               )}
+
+              {/* Product selector for one-pager */}
+              {selectedType === 'one_pager' && products.length > 0 && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    Product (optional)
+                  </label>
+                  <select
+                    value={selectedProduct}
+                    onChange={(e) => setSelectedProduct(e.target.value)}
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', backgroundColor: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="">Use first product ({products[0]?.name ?? '—'})</option>
+                    {products.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {/* Buyer role for talk track / email sequence */}
+              {(selectedType === 'talk_track' || selectedType === 'email_sequence') && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    Target buyer role (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={buyerRole}
+                    onChange={(e) => setBuyerRole(e.target.value)}
+                    placeholder="e.g. VP of Operations, CTO, Head of Finance"
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', backgroundColor: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                  />
+                </div>
+              )}
+
+              {/* Custom prompt */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  Additional context <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                </label>
+                <textarea
+                  value={customPrompt}
+                  onChange={(e) => setCustomPrompt(e.target.value)}
+                  placeholder="e.g. Focus on enterprise deals, highlight our integration capabilities, tone should be formal…"
+                  rows={3}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', backgroundColor: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5', boxSizing: 'border-box' }}
+                />
+              </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '4px' }}>
                 <Dialog.Close asChild>
