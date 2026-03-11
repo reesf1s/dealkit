@@ -49,19 +49,47 @@ export default function DealsPage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', margin: 0, marginBottom: '4px' }}>
-            Deals
+          <h1 style={{
+            fontSize: '24px',
+            fontWeight: 800,
+            color: '#F1F1F3',
+            letterSpacing: '-0.04em',
+            margin: 0,
+            marginBottom: '5px',
+            background: 'linear-gradient(135deg, #F1F1F3 0%, #A5A5C0 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}>
+            Deal Log
           </h1>
           <p style={{ fontSize: '13px', color: '#888', margin: 0 }}>
-            {deals.length} logged • Track wins and losses to improve closing
+            <span style={{ color: '#6366F1', fontWeight: 600 }}>{deals.length}</span>
+            {' '}logged{deals.length !== 1 ? '' : ''} · Track wins and losses to improve closing
           </p>
         </div>
 
         <button
           onClick={() => setAddOpen(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: '#6366F1', border: 'none', cursor: 'pointer', transition: 'background-color 150ms ease' }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4F46E5' }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#6366F1' }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '7px',
+            height: '36px', padding: '0 16px',
+            borderRadius: '8px', fontSize: '13px', fontWeight: 600,
+            color: '#fff',
+            background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+            border: '1px solid rgba(99,102,241,0.4)',
+            cursor: 'pointer',
+            boxShadow: '0 0 20px rgba(99,102,241,0.3), 0 2px 8px rgba(0,0,0,0.3)',
+            transition: 'opacity 150ms ease, box-shadow 150ms ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = '0.9'
+            e.currentTarget.style.boxShadow = '0 0 28px rgba(99,102,241,0.45), 0 2px 8px rgba(0,0,0,0.3)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = '1'
+            e.currentTarget.style.boxShadow = '0 0 20px rgba(99,102,241,0.3), 0 2px 8px rgba(0,0,0,0.3)'
+          }}
         >
           <Plus size={14} strokeWidth={2.5} />
           Log Deal
@@ -92,14 +120,43 @@ export default function DealsPage() {
       {/* Add modal */}
       <Dialog.Root open={addOpen} onOpenChange={setAddOpen}>
         <Dialog.Portal>
-          <Dialog.Overlay style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 500 }} />
-          <Dialog.Content style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 501, width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px', boxShadow: '0 16px 48px rgba(0,0,0,0.8)', outline: 'none' }}>
+          <Dialog.Overlay style={{
+            position: 'fixed', inset: 0,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            zIndex: 500,
+          }} />
+          <Dialog.Content style={{
+            position: 'fixed', top: '50%', left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 501, width: '100%', maxWidth: '520px',
+            maxHeight: '90vh', overflowY: 'auto',
+            background: 'rgba(12,12,20,0.95)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.10)',
+            borderRadius: '16px', padding: '24px',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.8), 0 0 0 1px rgba(99,102,241,0.1), inset 0 1px 0 rgba(255,255,255,0.08)',
+            outline: 'none',
+          }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <Dialog.Title style={{ fontSize: '16px', fontWeight: 600, color: '#EBEBEB', margin: 0 }}>
+              <Dialog.Title style={{ fontSize: '16px', fontWeight: 700, color: '#F1F1F3', margin: 0, letterSpacing: '-0.02em' }}>
                 Log a deal
               </Dialog.Title>
               <Dialog.Close asChild>
-                <button style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#888' }}>
+                <button style={{
+                  width: '28px', height: '28px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  cursor: 'pointer', color: '#888',
+                  transition: 'background 0.15s',
+                }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+                >
                   <X size={14} strokeWidth={2} />
                 </button>
               </Dialog.Close>

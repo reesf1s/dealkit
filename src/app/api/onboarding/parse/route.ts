@@ -1,0 +1,57 @@
+export const dynamic = 'force-dynamic'
+import { auth } from '@clerk/nextjs/server'
+import { NextRequest, NextResponse } from 'next/server'
+import Anthropic from '@anthropic-ai/sdk'
+
+const anthropic = new Anthropic()
+
+export async function POST(req: NextRequest) {
+  try {
+    const { userId } = await auth()
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { text } = await req.json()
+    if (!text?.trim()) return NextResponse.json({ error: 'No text provided' }, { status: 400 })
+
+    const msg = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      messages: [{
+        role: 'user',
+        content: `Extract company and competitor information from this text. Return ONLY valid JSON, no markdown.
+
+Text:
+${text.slice(0, 4000)}
+
+Return this exact JSON:
+{
+  "company": {
+    "companyName": "",
+    "website": "",
+    "industry": "",
+    "description": "",
+    "targetMarket": "",
+    "valuePropositions": [],
+    "differentiators": [],
+    "products": [{"name": "", "description": ""}],
+    "commonObjections": []
+  },
+  "competitors": [
+    {"name": "", "description": "", "strengths": [], "weaknesses": []}
+  ]
+}
+
+Only include fields you can infer from the text. Return empty arrays for fields with no data.`
+      }],
+    })
+
+    let parsed: any = { company: {}, competitors: [] }
+    try {
+      const raw = (msg.content[0] as any).text.trim()
+      parsed = JSON.parse(raw.replace(/^```json?\n?/, '').replace(/\n?```$/, ''))
+    } catch { /* use defaults */ }
+
+    return NextResponse.json(parsed)
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
+}

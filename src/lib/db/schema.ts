@@ -42,6 +42,14 @@ export const dealStageEnum = pgEnum('deal_stage', [
   'closed_lost',
 ])
 
+export const productGapStatusEnum = pgEnum('product_gap_status', [
+  'open',
+  'in_review',
+  'on_roadmap',
+  'wont_fix',
+  'shipped',
+])
+
 // ─────────────────────────────────────────────────────────────────────────────
 // users
 // ─────────────────────────────────────────────────────────────────────────────
@@ -145,11 +153,38 @@ export const dealLogs = pgTable('deal_logs', {
   stage: dealStageEnum('stage').notNull().default('prospecting'),
   competitors: jsonb('competitors').notNull().default([]), // string[]
   notes: text('notes'),
+  meetingNotes: text('meeting_notes'),              // raw pasted meeting notes
+  aiSummary: text('ai_summary'),                    // AI-generated deal summary
+  conversionScore: integer('conversion_score'),     // 0-100 AI scoring
+  conversionInsights: jsonb('conversion_insights').notNull().default([]), // string[]
+  todos: jsonb('todos').notNull().default([]),       // {id,text,done,createdAt}[]
   nextSteps: text('next_steps'),
   closeDate: timestamp('close_date', { withTimezone: true }),
   wonDate: timestamp('won_date', { withTimezone: true }),
   lostDate: timestamp('lost_date', { withTimezone: true }),
   lostReason: text('lost_reason'),
+  kanbanOrder: integer('kanban_order').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// product_gaps
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const productGaps = pgTable('product_gaps', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  priority: text('priority').notNull().default('medium'),   // low | medium | high | critical
+  frequency: integer('frequency').notNull().default(1),     // how many deals mention it
+  status: productGapStatusEnum('status').notNull().default('open'),
+  sourceDeals: jsonb('source_deals').notNull().default([]), // string[] deal IDs
+  affectedRevenue: integer('affected_revenue'),             // estimated revenue at risk (cents)
+  suggestedFix: text('suggested_fix'),                      // AI suggestion
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
@@ -274,6 +309,13 @@ export const eventsRelations = relations(events, ({ one }) => ({
   }),
 }))
 
+export const productGapsRelations = relations(productGaps, ({ one }) => ({
+  user: one(users, {
+    fields: [productGaps.userId],
+    references: [users.id],
+  }),
+}))
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Inferred row types (useful for type-safe queries)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -298,3 +340,6 @@ export type NewCollateralRow = typeof collateral.$inferInsert
 
 export type EventRow = typeof events.$inferSelect
 export type NewEventRow = typeof events.$inferInsert
+
+export type ProductGapRow = typeof productGaps.$inferSelect
+export type NewProductGapRow = typeof productGaps.$inferInsert
