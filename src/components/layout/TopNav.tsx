@@ -5,8 +5,9 @@ import { useUser } from '@clerk/nextjs'
 import {
   LayoutDashboard, Kanban, ClipboardList, FileText,
   AlertTriangle, Building2, Swords, BookOpen, Settings,
-  Search, Bell, Sparkles,
+  Search, Bell, Sparkles, Menu, MessageSquare,
 } from 'lucide-react'
+import { useSidebar } from './SidebarContext'
 
 const PAGE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   '/dashboard':    { label: 'Dashboard',    Icon: LayoutDashboard },
@@ -19,6 +20,7 @@ const PAGE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   '/case-studies': { label: 'Case Studies', Icon: BookOpen },
   '/settings':     { label: 'Settings',     Icon: Settings },
   '/onboarding':   { label: 'AI Setup',     Icon: Sparkles },
+  '/chat':         { label: 'Ask AI',       Icon: MessageSquare },
 }
 
 function getPageInfo(pathname: string) {
@@ -34,6 +36,7 @@ function getPageInfo(pathname: string) {
 export default function TopNav() {
   const pathname = usePathname()
   const { user } = useUser()
+  const { sidebarWidth, openMobile } = useSidebar()
 
   const { label, Icon } = getPageInfo(pathname)
   const avatarLetter =
@@ -45,7 +48,7 @@ export default function TopNav() {
     <header style={{
       position: 'fixed',
       top: 0,
-      left: '220px',
+      left: `${sidebarWidth}px`,
       right: 0,
       height: '56px',
       zIndex: 30,
@@ -60,15 +63,33 @@ export default function TopNav() {
       justifyContent: 'space-between',
     }}>
 
-      {/* Left: Breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <span style={{ fontSize: '12px', color: '#4B5563', fontWeight: '500' }}>Menu</span>
-        <span style={{ fontSize: '12px', color: '#4B5563' }}>/</span>
+      {/* Left: Mobile hamburger + Breadcrumb */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <button
+          onClick={openMobile}
+          className="mobile-menu-btn"
+          style={{
+            display: 'none', width: '34px', height: '34px', borderRadius: '8px',
+            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+            alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+          }}
+        >
+          <Menu size={15} color="#9CA3AF" />
+        </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Icon size={13} color="#A78BFA" strokeWidth={2} />
-          <span style={{ fontSize: '13px', color: '#F0EEFF', fontWeight: '600' }}>{label}</span>
+          <span style={{ fontSize: '12px', color: '#4B5563', fontWeight: '500' }}>Menu</span>
+          <span style={{ fontSize: '12px', color: '#4B5563' }}>/</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Icon size={13} color="#A78BFA" strokeWidth={2} />
+            <span style={{ fontSize: '13px', color: '#F0EEFF', fontWeight: '600' }}>{label}</span>
+          </div>
         </div>
       </div>
+      <style>{`
+        @media (max-width: 768px) {
+          .mobile-menu-btn { display: flex !important; }
+        }
+      `}</style>
 
       {/* Center: Search pill */}
       <button

@@ -8,14 +8,14 @@ import type { Plan, PlanDefinition, PlanLimits } from '@/types'
 export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   free: {
     products: 1,
-    competitors: 2,
-    caseStudies: 5,
-    dealLogs: 10,
-    collateral: 5,
+    competitors: 1,   // 1 competitor — forces upsell fast
+    caseStudies: 2,   // very low to show value gap
+    dealLogs: 5,      // 5 deals then must upgrade
+    collateral: 3,    // 3 AI pieces then must upgrade
   },
   starter: {
-    products: 3,
-    competitors: 10,
+    products: 5,
+    competitors: 15,
     caseStudies: null,   // unlimited
     dealLogs: null,      // unlimited
     collateral: null,    // unlimited
@@ -41,13 +41,13 @@ export const PLANS: Record<Plan, PlanDefinition> = {
     priceMonthly: 0,
     priceId: null,
     limits: PLAN_LIMITS.free,
-    features: [
+        features: [
       '1 product',
-      '2 competitors',
-      'Up to 5 case studies',
-      'Up to 10 deal logs',
-      'Up to 5 AI-generated collateral pieces',
-      'Battlecards, one-pagers, objection handlers',
+      '1 competitor',
+      'Up to 2 case studies',
+      'Up to 5 deal logs',
+      'Up to 3 AI-generated collateral pieces',
+      'Battlecards & one-pagers',
       'Community support',
     ],
   },
@@ -55,16 +55,17 @@ export const PLANS: Record<Plan, PlanDefinition> = {
     id: 'starter',
     name: 'Starter',
     description: 'For growing sales teams that need more firepower.',
-    priceMonthly: 49,
+    priceMonthly: 79,
     priceId: process.env.STRIPE_STARTER_PRICE_ID ?? null,
     limits: PLAN_LIMITS.starter,
-    features: [
-      '3 products',
-      'Up to 10 competitors',
+        features: [
+      '5 products',
+      'Up to 15 competitors',
       'Unlimited case studies',
       'Unlimited deal logs',
       'Unlimited AI-generated collateral',
       'All collateral types (incl. talk tracks & email sequences)',
+      'AI meeting prep & deal scoring',
       'Export to DOCX',
       'Email support',
     ],

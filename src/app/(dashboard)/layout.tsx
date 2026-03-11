@@ -1,8 +1,13 @@
+'use client'
+
 import Sidebar from '@/components/layout/Sidebar'
 import TopNav from '@/components/layout/TopNav'
 import CommandPalette from '@/components/shared/CommandPalette'
+import { SidebarProvider, useSidebar } from '@/components/layout/SidebarContext'
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+function LayoutShell({ children }: { children: React.ReactNode }) {
+  const { sidebarWidth } = useSidebar()
+
   return (
     <div style={{
       display: 'flex',
@@ -13,40 +18,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }}>
       {/* Purple blob top-left */}
       <div style={{
-        position: 'fixed',
-        top: '-120px',
-        left: '-80px',
-        width: '400px',
-        height: '400px',
+        position: 'fixed', top: '-120px', left: '-80px',
+        width: '400px', height: '400px',
         background: 'radial-gradient(circle, rgba(99,102,241,0.1) 0%, transparent 70%)',
-        filter: 'blur(60px)',
-        pointerEvents: 'none',
-        zIndex: 0,
+        filter: 'blur(60px)', pointerEvents: 'none', zIndex: 0,
       }} />
       {/* Purple blob bottom-right */}
       <div style={{
-        position: 'fixed',
-        bottom: '-120px',
-        right: '-80px',
-        width: '500px',
-        height: '500px',
+        position: 'fixed', bottom: '-120px', right: '-80px',
+        width: '500px', height: '500px',
         background: 'radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%)',
-        filter: 'blur(80px)',
-        pointerEvents: 'none',
-        zIndex: 0,
+        filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0,
       }} />
       {/* Center blob */}
       <div style={{
-        position: 'fixed',
-        top: '40%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        width: '600px',
-        height: '600px',
+        position: 'fixed', top: '40%', left: '50%', transform: 'translate(-50%, -50%)',
+        width: '600px', height: '600px',
         background: 'radial-gradient(circle, rgba(124,58,237,0.05) 0%, transparent 70%)',
-        filter: 'blur(80px)',
-        pointerEvents: 'none',
-        zIndex: 0,
+        filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0,
       }} />
 
       <Sidebar />
@@ -54,18 +43,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <CommandPalette />
       <main style={{
         flex: 1,
-        marginLeft: '220px',
+        marginLeft: `${sidebarWidth}px`,
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
         zIndex: 1,
         paddingTop: '56px',
+        transition: 'margin-left 0.22s cubic-bezier(0.4,0,0.2,1)',
       }}>
         <div style={{ flex: 1, padding: '32px', maxWidth: '960px', width: '100%' }}>
           {children}
         </div>
       </main>
+
+      <style>{`
+        @media (max-width: 768px) {
+          main { margin-left: 0 !important; }
+          main > div { padding: 16px !important; }
+        }
+      `}</style>
     </div>
+  )
+}
+
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <SidebarProvider>
+      <LayoutShell>{children}</LayoutShell>
+    </SidebarProvider>
   )
 }
