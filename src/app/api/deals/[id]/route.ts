@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     const body = await req.json()
     const updateData: Record<string, unknown> = { updatedAt: new Date() }
-    const fields = ['dealName','prospectCompany','prospectName','prospectTitle','dealValue','stage','competitors','notes','meetingNotes','aiSummary','conversionScore','conversionInsights','todos','nextSteps','closeDate','wonDate','lostDate','lostReason','kanbanOrder']
+    const fields = ['dealName','prospectCompany','prospectName','prospectTitle','dealValue','stage','competitors','notes','meetingNotes','aiSummary','conversionScore','conversionInsights','todos','nextSteps','closeDate','wonDate','lostDate','lostReason','dealType','recurringInterval','kanbanOrder']
     for (const f of fields) if (body[f] !== undefined) updateData[f] = body[f]
     const [updated] = await db.update(dealLogs).set(updateData).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).returning()
     await logEvent(workspaceId, userId, 'deal_log.updated', { dealLogId: id, dealName: updated.dealName })

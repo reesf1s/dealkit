@@ -1,11 +1,13 @@
 export const dynamic = 'force-dynamic'
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, count, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { companyProfiles, competitors, caseStudies, dealLogs, productGaps } from '@/lib/db/schema'
+import { companyProfiles, competitors, caseStudies, dealLogs, productGaps, collateral, events } from '@/lib/db/schema'
 import Anthropic from '@anthropic-ai/sdk'
 import { getWorkspaceContext } from '@/lib/workspace'
+import { generateCollateral } from '@/lib/ai/generate'
+import { PLAN_LIMITS, isWithinLimit } from '@/lib/stripe/plans'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -33,6 +35,99 @@ export async function POST(req: NextRequest) {
 
     const lastUserMsg = [...messages].reverse().find((m: { role: string }) => m.role === 'user')
     const lastText: string = lastUserMsg?.content ?? ''
+
+    // ── Competitor battlecard creation branch ──────────────────────────────────
+    const battlecardKeywords = ['battlecard', 'battle card', 'add competitor', 'create competitor', 'new competitor']
+    const looksLikeBattlecardRequest = battlecardKeywords.some(kw => lastText.toLowerCase().includes(kw))
+
+    if (looksLikeBattlecardRequest) {
+      // Extract competitor names via AI
+      const extractMsg = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        messages: [{
+          role: 'user',
+          content: `Extract competitor names from this message. Return ONLY a JSON array of strings, e.g. ["Salesforce","HubSpot"]. If no competitors are clearly listed, return [].
+Message: ${lastText}`,
+        }],
+      })
+
+      let names: string[] = []
+      try {
+        const raw = (extractMsg.content[0] as { type: string; text: string }).text.trim()
+        names = JSON.parse(raw.replace(/^```json?\n?/, '').replace(/\n?```$/, ''))
+        if (!Array.isArray(names)) names = []
+      } catch { names = [] }
+
+      if (names.length === 0) {
+        return NextResponse.json({ reply: "I couldn't find specific competitor names in your message. Try: _\"Create battlecards for Salesforce, HubSpot, Pipedrive\"_" })
+      }
+
+      const { workspaceId, plan } = await getWorkspaceContext(userId)
+      const limits = PLAN_LIMITS[plan]
+      const created: string[] = []
+      const failed: string[] = []
+
+      for (const name of names.slice(0, 10)) {
+        if (!name?.trim()) continue
+        try {
+          // Check plan limit
+          if (limits.competitors !== null) {
+            const [{ value: currentCount }] = await db.select({ value: count() }).from(competitors).where(eq(competitors.workspaceId, workspaceId))
+            if (!isWithinLimit(Number(currentCount), limits.competitors)) {
+              failed.push(`${name} (plan limit reached)`)
+              continue
+            }
+          }
+
+          // Check collateral limit
+          if (limits.collateral !== null) {
+            const [{ value: collCount }] = await db.select({ value: count() }).from(collateral).where(eq(collateral.workspaceId, workspaceId))
+            if (!isWithinLimit(Number(collCount), limits.collateral)) {
+              failed.push(`${name} (collateral limit reached)`)
+              continue
+            }
+          }
+
+          // Create competitor record
+          const now = new Date()
+          const [competitor] = await db.insert(competitors).values({
+            workspaceId, userId, name: name.trim(),
+            strengths: [], weaknesses: [], keyFeatures: [], differentiators: [],
+            createdAt: now, updatedAt: now,
+          }).returning()
+
+          await db.insert(events).values({ workspaceId, userId, type: 'competitor.created', metadata: { competitorId: competitor.id, name: competitor.name, source: 'ai_chat' }, createdAt: now })
+
+          // Generate battlecard
+          const colRecord = await db.insert(collateral).values({
+            workspaceId, userId, type: 'battlecard', title: `Generating battlecard for ${name}…`,
+            status: 'generating', sourceCompetitorId: competitor.id,
+            sourceCaseStudyId: null, sourceDealLogId: null, content: null, rawResponse: null,
+            generatedAt: null, createdAt: now, updatedAt: now,
+          }).returning()
+
+          try {
+            const result = await generateCollateral({ workspaceId, type: 'battlecard', competitorId: competitor.id })
+            const generatedAt = new Date()
+            await db.update(collateral).set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt }).where(eq(collateral.id, colRecord[0].id))
+            await db.insert(events).values({ workspaceId, userId, type: 'collateral.generated', metadata: { collateralId: colRecord[0].id, collateralType: 'battlecard', title: result.title }, createdAt: new Date() })
+            created.push(name.trim())
+          } catch {
+            await db.update(collateral).set({ status: 'stale', updatedAt: new Date() }).where(eq(collateral.id, colRecord[0].id))
+            failed.push(`${name} (generation failed)`)
+          }
+        } catch {
+          failed.push(name)
+        }
+      }
+
+      let reply = ''
+      if (created.length > 0) reply += `✅ Created ${created.length} competitor${created.length > 1 ? 's' : ''} and generated battlecard${created.length > 1 ? 's' : ''}:\n${created.map(n => `• **${n}**`).join('\n')}\n\nView them in **Collateral → Battlecards**. You can add more details to each competitor profile in the **Competitors** section.`
+      if (failed.length > 0) reply += `\n\n⚠️ Couldn't process: ${failed.join(', ')}`
+
+      return NextResponse.json({ reply })
+    }
 
     // ── Meeting transcript branch ──────────────────────────────────────────────
     if (looksLikeMeetingTranscript(lastText)) {

@@ -6,6 +6,19 @@ interface DealInsightsProps {
   deals: DealLog[]
 }
 
+function toMRR(deal: DealLog): number {
+  if (!deal.dealValue) return 0
+  if (deal.recurringInterval === 'monthly') return deal.dealValue
+  if (deal.recurringInterval === 'quarterly') return deal.dealValue / 3
+  return deal.dealValue / 12 // annual (default)
+}
+
+function fmt(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}k`
+  return `$${Math.round(n).toLocaleString()}`
+}
+
 function WinRateGauge({ rate }: { rate: number }) {
   const color = rate >= 60 ? '#22C55E' : rate >= 40 ? '#F59E0B' : '#EF4444'
   const circumference = 2 * Math.PI * 40
@@ -46,6 +59,11 @@ export function DealInsights({ deals }: DealInsightsProps) {
   const lostDeals = deals.filter((d) => d.stage === 'closed_lost')
   const winRate = closedDeals.length > 0 ? (wonDeals.length / closedDeals.length) * 100 : 0
 
+  // MRR / ARR from recurring won deals
+  const recurringWon = wonDeals.filter((d) => d.dealType === 'recurring')
+  const mrr = recurringWon.reduce((sum, d) => sum + toMRR(d), 0)
+  const arr = mrr * 12
+
   // Top loss reasons
   const lossReasonCounts: Record<string, number> = {}
   lostDeals.forEach((d) => {
@@ -79,6 +97,28 @@ export function DealInsights({ deals }: DealInsightsProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* MRR / ARR projection */}
+      {recurringWon.length > 0 && (
+        <div style={{ backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB' }}>Revenue projection</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ padding: '14px 16px', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>MRR</div>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#6366F1', fontVariantNumeric: 'tabular-nums' }}>{fmt(mrr)}</div>
+            </div>
+            <div style={{ padding: '14px 16px' }}>
+              <div style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>ARR</div>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#8B5CF6', fontVariantNumeric: 'tabular-nums' }}>{fmt(arr)}</div>
+            </div>
+          </div>
+          <div style={{ padding: '8px 16px' }}>
+            <span style={{ fontSize: '11px', color: '#444' }}>From {recurringWon.length} recurring deal{recurringWon.length !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+      )}
+
       {/* Win rate gauge */}
       <div style={{ backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
         <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -139,7 +179,6 @@ export function DealInsights({ deals }: DealInsightsProps) {
           <p style={{ fontSize: '13px', color: '#555', margin: 0, textAlign: 'center', padding: '16px' }}>No competitor data yet.</p>
         ) : (
           <div style={{ overflow: 'hidden' }}>
-            {/* Table header */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 50px 70px', padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
               {['Competitor', 'W', 'L', 'Rate'].map((h) => (
                 <span key={h} style={{ fontSize: '10px', fontWeight: 600, color: '#444', letterSpacing: '0.05em', textTransform: 'uppercase', textAlign: h === 'Competitor' ? 'left' : 'right' }}>

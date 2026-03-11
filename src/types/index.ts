@@ -111,6 +111,8 @@ export interface DealLog {
   wonDate: Date | null
   lostDate: Date | null
   lostReason: string | null
+  dealType: 'one_off' | 'recurring'
+  recurringInterval: 'monthly' | 'quarterly' | 'annual' | null
   createdAt: Date
   updatedAt: Date
 }

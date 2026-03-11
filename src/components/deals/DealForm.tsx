@@ -52,6 +52,8 @@ interface FormState {
   prospectTitle: string
   dealValue: string
   stage: DealStage
+  dealType: 'one_off' | 'recurring'
+  recurringInterval: 'monthly' | 'quarterly' | 'annual'
   competitors: string
   notes: string
   nextSteps: string
@@ -66,6 +68,8 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
     prospectTitle: '',
     dealValue: '',
     stage: 'closed_won',
+    dealType: 'one_off',
+    recurringInterval: 'annual',
     competitors: '',
     notes: '',
     nextSteps: '',
@@ -91,6 +95,8 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
       prospectTitle: form.prospectTitle || null,
       dealValue: form.dealValue ? Number(form.dealValue) : null,
       stage: form.stage,
+      dealType: form.dealType,
+      recurringInterval: form.dealType === 'recurring' ? form.recurringInterval : null,
       competitors: form.competitors
         .split(',')
         .map((s) => s.trim())
@@ -158,6 +164,53 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
         </div>
       )}
 
+      {/* Deal type */}
+      <div>
+        <Label>Deal type</Label>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {([
+            { type: 'one_off' as const, label: 'One-off' },
+            { type: 'recurring' as const, label: 'Recurring' },
+          ]).map(({ type, label }) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => u({ dealType: type })}
+              style={{
+                flex: 1, height: '34px', borderRadius: '6px', fontSize: '13px', fontWeight: 500,
+                color: form.dealType === type ? '#EBEBEB' : '#555',
+                backgroundColor: form.dealType === type ? 'rgba(99,102,241,0.15)' : 'transparent',
+                border: `1px solid ${form.dealType === type ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                cursor: 'pointer', transition: 'all 150ms ease',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {form.dealType === 'recurring' && (
+          <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+            {(['monthly', 'quarterly', 'annual'] as const).map((interval) => (
+              <button
+                key={interval}
+                type="button"
+                onClick={() => u({ recurringInterval: interval })}
+                style={{
+                  flex: 1, height: '28px', borderRadius: '6px', fontSize: '11px', fontWeight: 500,
+                  textTransform: 'capitalize',
+                  color: form.recurringInterval === interval ? '#EBEBEB' : '#666',
+                  backgroundColor: form.recurringInterval === interval ? 'rgba(255,255,255,0.08)' : 'transparent',
+                  border: `1px solid ${form.recurringInterval === interval ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)'}`,
+                  cursor: 'pointer', transition: 'all 150ms ease',
+                }}
+              >
+                {interval}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Competitor */}
       <div>
         <Label>Competitor(s)</Label>
@@ -166,7 +219,7 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
 
       {/* Deal value */}
       <div>
-        <Label>Deal value ($)</Label>
+        <Label>{form.dealType === 'recurring' ? `Deal value (${form.recurringInterval === 'monthly' ? 'MRR' : form.recurringInterval === 'quarterly' ? 'QRR' : 'ARR'} $)` : 'Deal value ($)'}</Label>
         <Input value={form.dealValue} onChange={(v) => u({ dealValue: v })} placeholder="50000" type="number" />
       </div>
 

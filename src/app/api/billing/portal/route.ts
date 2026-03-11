@@ -8,7 +8,7 @@ export async function POST() {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim()
   if (!appUrl) {
     return NextResponse.json(
       { error: 'Missing NEXT_PUBLIC_APP_URL environment variable.' },
