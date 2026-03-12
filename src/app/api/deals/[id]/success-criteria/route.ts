@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import Anthropic from '@anthropic-ai/sdk'
 import { db } from '@/lib/db'
-import { dealLogs } from '@/lib/db/schema'
+import { dealLogs, companyProfiles } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 
 const anthropic = new Anthropic()
@@ -19,31 +19,47 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { text } = await req.json()
     if (!text?.trim()) return NextResponse.json({ error: 'No text provided' }, { status: 400 })
 
-    const [deal] = await db.select().from(dealLogs)
-      .where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
+    const [[deal], [profile]] = await Promise.all([
+      db.select().from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1),
+      db.select({ companyName: companyProfiles.companyName, knownCapabilities: companyProfiles.knownCapabilities })
+        .from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)).limit(1),
+    ])
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+    const dealContext = [
+      `Deal: ${deal.dealName} with ${deal.prospectCompany}`,
+      deal.stage ? `Stage: ${deal.stage}` : '',
+      profile?.companyName ? `Our company: ${profile.companyName}` : '',
+      (profile?.knownCapabilities as string[])?.length
+        ? `Confirmed capabilities (already supported — do NOT flag as missing): ${(profile.knownCapabilities as string[]).join(', ')}`
+        : '',
+      deal.aiSummary ? `Deal summary: ${deal.aiSummary}` : '',
+    ].filter(Boolean).join('\n')
+
     const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001', max_tokens: 800,
-      messages: [{ role: 'user', content: `Extract success criteria from this proposal/deal text. Each criterion should be a concrete, testable requirement.
+      model: 'claude-haiku-4-5-20251001', max_tokens: 900,
+      system: 'You are a JSON-only API. You never use markdown fences, prose, or explanation. Every response is a raw JSON array starting with [ and ending with ].',
+      messages: [{ role: 'user', content: `Extract success criteria from this proposal text for the following deal.
 
-Return ONLY valid JSON array, no markdown:
-[{"id": "uuid", "text": "specific criterion", "category": "short category label", "achieved": false, "note": ""}]
+DEAL CONTEXT:
+${dealContext}
 
-Text:
+PROPOSAL TEXT:
 ${text.trim()}
 
-Rules:
-- Each item must be a single, specific, actionable criterion (not a vague goal)
-- category: group similar items (e.g. "Security", "Integration", "Reporting", "Performance")
-- Keep text concise — max 15 words per item
-- Return 3–15 items depending on complexity` }],
+Return a JSON array of criteria objects. Each object: {"text": "concise requirement (max 15 words)", "category": "theme label"}
+- 3–15 items depending on complexity
+- category examples: Security, Integration, Reporting, Performance, Compliance, Onboarding
+- Each criterion must be a single, specific, measurable requirement` }],
     })
 
     let items: any[] = []
     try {
-      const raw = (msg.content[0] as any).text.trim().replace(/^```json?\n?/, '').replace(/\n?```$/, '')
-      const parsed = JSON.parse(raw)
+      const raw = (msg.content[0] as any).text.trim()
+      // Strip any markdown fences or leading/trailing text
+      const jsonMatch = raw.match(/\[[\s\S]*\]/)
+      if (!jsonMatch) throw new Error(`No JSON array found in: ${raw.slice(0, 200)}`)
+      const parsed = JSON.parse(jsonMatch[0])
       items = parsed.map((item: any) => ({
         id: crypto.randomUUID(),
         text: item.text ?? '',
@@ -52,8 +68,9 @@ Rules:
         note: '',
         createdAt: new Date().toISOString(),
       }))
-    } catch {
-      return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 500 })
+    } catch (parseErr: any) {
+      console.error('[success-criteria] parse error:', parseErr.message)
+      return NextResponse.json({ error: `Failed to parse AI response: ${parseErr.message}` }, { status: 500 })
     }
 
     // Merge with any existing criteria (append new, keep achieved ones)

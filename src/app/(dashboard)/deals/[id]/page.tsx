@@ -1020,6 +1020,7 @@ function ActivityLog({ dealId, deal, onUpdate }: { dealId: string; deal: any; on
 function SuccessCriteriaTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
+  const [extractError, setExtractError] = useState<string | null>(null)
   const [editingNote, setEditingNote] = useState<string | null>(null)
   const [noteText, setNoteText] = useState('')
   const criteria: any[] = deal?.successCriteriaTodos ?? []
@@ -1030,11 +1031,17 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate }: { dealId: string; deal: 
   const extract = async () => {
     if (!text.trim()) return
     setLoading(true)
+    setExtractError(null)
     try {
-      await fetch(`/api/deals/${dealId}/success-criteria`, {
+      const res = await fetch(`/api/deals/${dealId}/success-criteria`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setExtractError(data.error ?? 'Failed to extract criteria')
+        return
+      }
       setText('')
       onUpdate()
     } finally { setLoading(false) }
@@ -1145,13 +1152,18 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate }: { dealId: string; deal: 
           rows={5}
           style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '10px 12px', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, fontFamily: 'inherit' }}
         />
-        <button
-          onClick={extract}
-          disabled={loading || !text.trim()}
-          style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', background: loading ? 'rgba(99,102,241,0.15)' : 'linear-gradient(135deg, #6366F1, #7C3AED)', border: loading ? '1px solid rgba(99,102,241,0.3)' : 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: loading || !text.trim() ? 'not-allowed' : 'pointer' }}
-        >
-          {loading ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Extracting…</> : <><Sparkles size={13} /> Extract Criteria</>}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={extract}
+            disabled={loading || !text.trim()}
+            style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', background: loading ? 'rgba(99,102,241,0.15)' : 'linear-gradient(135deg, #6366F1, #7C3AED)', border: loading ? '1px solid rgba(99,102,241,0.3)' : 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: loading || !text.trim() ? 'not-allowed' : 'pointer' }}
+          >
+            {loading ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Extracting…</> : <><Sparkles size={13} /> Extract Criteria</>}
+          </button>
+          {extractError && (
+            <span style={{ fontSize: '12px', color: '#EF4444' }}>{extractError}</span>
+          )}
+        </div>
       </div>
     </div>
   )
