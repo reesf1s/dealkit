@@ -397,6 +397,73 @@ export default function SettingsPage() {
         </SectionCard>
 
         {/* Data */}
+        <SectionCard title="Privacy & compliance" description="How DealKit handles your data">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+            {/* Key facts */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              {[
+                { icon: '🔒', label: 'Encryption in transit', sub: 'TLS on all connections' },
+                { icon: '🏦', label: 'No card storage', sub: 'Payments via Stripe (PCI-DSS)' },
+                { icon: '🚫', label: 'No data selling', sub: 'Your data is never sold' },
+                { icon: '🤖', label: 'No AI training', sub: 'Your data never trains models' },
+                { icon: '✅', label: 'SOC 2 auth provider', sub: 'Clerk (SOC 2 Type II)' },
+                { icon: '🌍', label: 'GDPR & CCPA ready', sub: 'EU/UK/California rights supported' },
+              ].map(({ icon, label, sub }) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderRadius: '9px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <span style={{ fontSize: '14px', flexShrink: 0, marginTop: '1px' }}>{icon}</span>
+                  <div>
+                    <p style={{ fontSize: '12px', fontWeight: 600, color: '#EBEBEB', margin: 0 }}>{label}</p>
+                    <p style={{ fontSize: '11px', color: '#666', margin: '2px 0 0' }}>{sub}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Sub-processors */}
+            <div style={{ padding: '12px 14px', borderRadius: '9px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>Sub-processors</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {[
+                  ['Clerk', 'Auth & user management', 'US (SOC 2)'],
+                  ['Neon', 'Database hosting', 'AWS US-East-2'],
+                  ['Anthropic', 'AI generation', 'US (DPA / SCCs)'],
+                  ['Stripe', 'Payments', 'US/EU (PCI-DSS)'],
+                  ['Vercel', 'Hosting & CDN', 'US/Global (SCCs)'],
+                ].map(([name, purpose, location]) => (
+                  <div key={name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+                    <span style={{ color: '#EBEBEB', fontWeight: 500, width: '80px', flexShrink: 0 }}>{name}</span>
+                    <span style={{ color: '#666', flex: 1 }}>{purpose}</span>
+                    <span style={{ color: '#555', fontSize: '11px', textAlign: 'right' }}>{location}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Rights */}
+            <div style={{ padding: '10px 14px', borderRadius: '9px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)' }}>
+              <p style={{ fontSize: '11px', color: '#818CF8', fontWeight: 600, margin: '0 0 6px' }}>Your rights (GDPR / CCPA)</p>
+              <p style={{ fontSize: '12px', color: '#777', margin: 0, lineHeight: 1.6 }}>
+                Access, correct, export, or delete your data at any time using the buttons below, or email <a href="mailto:privacy@dealkit.io" style={{ color: '#818CF8' }}>privacy@dealkit.io</a>. We respond within 30 days.
+              </p>
+            </div>
+
+            {/* Links */}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <a href="/privacy" target="_blank" rel="noopener noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#818CF8', backgroundColor: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', textDecoration: 'none' }}>
+                <ExternalLink size={11} />
+                Privacy Policy
+              </a>
+              <a href="/terms" target="_blank" rel="noopener noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#9CA3AF', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', textDecoration: 'none' }}>
+                <ExternalLink size={11} />
+                Terms of Service
+              </a>
+            </div>
+          </div>
+        </SectionCard>
+
         <SectionCard title="Your data" description="Export or delete all workspace data">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
