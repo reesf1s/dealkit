@@ -1017,6 +1017,146 @@ function ActivityLog({ dealId, deal, onUpdate }: { dealId: string; deal: any; on
   )
 }
 
+function SuccessCriteriaTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
+  const [text, setText] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [editingNote, setEditingNote] = useState<string | null>(null)
+  const [noteText, setNoteText] = useState('')
+  const criteria: any[] = deal?.successCriteriaTodos ?? []
+
+  const categories = [...new Set(criteria.map((c: any) => c.category ?? 'General'))]
+  const achieved = criteria.filter((c: any) => c.achieved).length
+
+  const extract = async () => {
+    if (!text.trim()) return
+    setLoading(true)
+    try {
+      await fetch(`/api/deals/${dealId}/success-criteria`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      setText('')
+      onUpdate()
+    } finally { setLoading(false) }
+  }
+
+  const toggle = async (criterionId: string, achieved: boolean) => {
+    await fetch(`/api/deals/${dealId}/success-criteria`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ criterionId, achieved }),
+    })
+    onUpdate()
+  }
+
+  const saveNote = async (criterionId: string) => {
+    await fetch(`/api/deals/${dealId}/success-criteria`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ criterionId, note: noteText }),
+    })
+    setEditingNote(null)
+    onUpdate()
+  }
+
+  const remove = async (criterionId: string) => {
+    await fetch(`/api/deals/${dealId}/success-criteria`, {
+      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ criterionId }),
+    })
+    onUpdate()
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      {/* Progress bar */}
+      {criteria.length > 0 && (
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '12px', color: '#888' }}>Progress</span>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: achieved === criteria.length ? '#22C55E' : '#EBEBEB' }}>
+              {achieved}/{criteria.length} met
+            </span>
+          </div>
+          <div style={{ height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${criteria.length ? (achieved / criteria.length) * 100 : 0}%`, background: 'linear-gradient(90deg, #6366F1, #22C55E)', borderRadius: '3px', transition: 'width 0.3s' }} />
+          </div>
+        </div>
+      )}
+
+      {/* Criteria list grouped by category */}
+      {categories.map(cat => (
+        <div key={cat} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '14px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#555', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '10px' }}>{cat}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {criteria.filter((c: any) => (c.category ?? 'General') === cat).map((c: any) => (
+              <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                  <button
+                    onClick={() => toggle(c.id, !c.achieved)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: '1px', flexShrink: 0, color: c.achieved ? '#22C55E' : '#444' }}
+                  >
+                    {c.achieved
+                      ? <CheckCircle size={16} />
+                      : <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid #444' }} />}
+                  </button>
+                  <span style={{ flex: 1, fontSize: '13px', color: c.achieved ? '#555' : '#C0C0C8', lineHeight: 1.5, textDecoration: c.achieved ? 'line-through' : 'none' }}>
+                    {c.text}
+                  </span>
+                  <button onClick={() => { setEditingNote(c.id); setNoteText(c.note ?? '') }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', fontSize: '11px', color: c.note ? '#818CF8' : '#333' }}>
+                    {c.note ? '✎' : '+ note'}
+                  </button>
+                  <button onClick={() => remove(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', color: '#333' }}>
+                    <X size={12} />
+                  </button>
+                </div>
+                {c.note && editingNote !== c.id && (
+                  <div style={{ marginLeft: '26px', fontSize: '11px', color: '#818CF8', background: 'rgba(99,102,241,0.06)', borderRadius: '6px', padding: '5px 8px' }}>
+                    {c.note}
+                  </div>
+                )}
+                {editingNote === c.id && (
+                  <div style={{ marginLeft: '26px', display: 'flex', gap: '6px' }}>
+                    <input
+                      autoFocus
+                      value={noteText}
+                      onChange={e => setNoteText(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveNote(c.id); if (e.key === 'Escape') setEditingNote(null) }}
+                      placeholder="How was this achieved?"
+                      style={{ flex: 1, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '6px', padding: '5px 8px', color: '#EBEBEB', fontSize: '12px', outline: 'none' }}
+                    />
+                    <button onClick={() => saveNote(c.id)} style={{ padding: '5px 10px', background: 'rgba(99,102,241,0.2)', border: 'none', borderRadius: '6px', color: '#818CF8', fontSize: '11px', cursor: 'pointer' }}>Save</button>
+                    <button onClick={() => setEditingNote(null)} style={{ padding: '5px 8px', background: 'none', border: 'none', color: '#555', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* Paste new criteria */}
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '14px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: '#555', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '10px' }}>
+          {criteria.length > 0 ? 'Add More Criteria' : 'Paste Success Criteria'}
+        </div>
+        <textarea
+          value={text}
+          onChange={e => setText(e.target.value)}
+          placeholder="Paste the success criteria from your proposal, RFP, or stakeholder requirements — AI will extract individual testable items..."
+          rows={5}
+          style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '10px 12px', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, fontFamily: 'inherit' }}
+        />
+        <button
+          onClick={extract}
+          disabled={loading || !text.trim()}
+          style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', background: loading ? 'rgba(99,102,241,0.15)' : 'linear-gradient(135deg, #6366F1, #7C3AED)', border: loading ? '1px solid rgba(99,102,241,0.3)' : 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: loading || !text.trim() ? 'not-allowed' : 'pointer' }}
+        >
+          {loading ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Extracting…</> : <><Sparkles size={13} /> Extract Criteria</>}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function DealDetailPage() {
   const { id } = useParams() as { id: string }
   const router = useRouter()
@@ -1025,7 +1165,7 @@ export default function DealDetailPage() {
   const { data: gapsData } = useSWR('/api/product-gaps', fetcher)
   const dealGaps: any[] = (gapsData?.data ?? []).filter((g: any) => (g.sourceDeals as string[] ?? []).includes(id))
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'meeting-notes' | 'prep' | 'todos'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'meeting-notes' | 'prep' | 'todos' | 'success'>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [winStoryOpen, setWinStoryOpen] = useState(false)
   const [wonDeal, setWonDeal] = useState<any>(null)
@@ -1112,6 +1252,7 @@ export default function DealDetailPage() {
           { id: 'meeting-notes', label: 'Meeting Notes + AI' },
           { id: 'prep', label: 'Meeting Prep' },
           { id: 'todos', label: `To-Dos ${deal?.todos?.length > 0 ? `(${deal.todos.filter((t: any) => !t.done).length})` : ''}` },
+          { id: 'success', label: `Success Criteria${(deal?.successCriteriaTodos as any[])?.length > 0 ? ` (${(deal.successCriteriaTodos as any[]).filter((c: any) => !c.achieved).length} open)` : ''}` },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{
             padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '500',
@@ -1209,6 +1350,9 @@ export default function DealDetailPage() {
           {activeTab === 'prep' && <MeetingPrepTab dealId={id} deal={deal} />}
           {activeTab === 'todos' && (
             <TodosTab dealId={id} deal={deal} onUpdate={() => mutate()} />
+          )}
+          {activeTab === 'success' && (
+            <SuccessCriteriaTab dealId={id} deal={deal} onUpdate={() => mutate()} />
           )}
         </div>
       )}

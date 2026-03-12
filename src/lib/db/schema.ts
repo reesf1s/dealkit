@@ -200,6 +200,8 @@ export const dealLogs = pgTable('deal_logs', {
   conversionInsights: jsonb('conversion_insights').notNull().default([]),
   dealRisks: jsonb('deal_risks').notNull().default([]),
   todos: jsonb('todos').notNull().default([]),
+  successCriteria: text('success_criteria'),
+  successCriteriaTodos: jsonb('success_criteria_todos').notNull().default([]),
   nextSteps: text('next_steps'),
   closeDate: timestamp('close_date', { withTimezone: true }),
   wonDate: timestamp('won_date', { withTimezone: true }),
