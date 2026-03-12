@@ -454,8 +454,10 @@ export function CompanyForm({ initialData, onSave }: CompanyFormProps) {
       })
       if (!res.ok) throw new Error('Failed to save')
       const json = await res.json()
-      toast('Saved ✓', 'success')
       if (onSave && json.data) onSave(json.data)
+      // Auto-regenerate any stale collateral in background
+      fetch('/api/collateral/regenerate-stale', { method: 'POST' }).catch(() => {})
+      toast('Saved ✓ — collateral regenerating', 'success')
     } catch {
       toast('Failed to save. Please try again.', 'error')
     } finally {

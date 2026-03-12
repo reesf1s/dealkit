@@ -178,20 +178,18 @@ async function handleCompetitorBattlecard(
       }).returning()
       const colId = colRecord.id
       const competitorId = competitor.id
-      after(async () => {
-        try {
-          const result = await generateCollateral({ workspaceId, type: 'battlecard', competitorId })
-          const generatedAt = new Date()
-          await db.update(collateral).set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt }).where(eq(collateral.id, colId))
-          await db.insert(events).values({ workspaceId, userId, type: 'collateral.generated', metadata: { collateralId: colId, collateralType: 'battlecard', title: result.title }, createdAt: new Date() })
-        } catch { await db.update(collateral).set({ status: 'stale', updatedAt: new Date() }).where(eq(collateral.id, colId)) }
-      })
+      try {
+        const result = await generateCollateral({ workspaceId, type: 'battlecard', competitorId })
+        const generatedAt = new Date()
+        await db.update(collateral).set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt }).where(eq(collateral.id, colId))
+        await db.insert(events).values({ workspaceId, userId, type: 'collateral.generated', metadata: { collateralId: colId, collateralType: 'battlecard', title: result.title }, createdAt: new Date() })
+      } catch { await db.update(collateral).set({ status: 'stale', updatedAt: new Date() }).where(eq(collateral.id, colId)) }
       created.push(name)
     } catch { failed.push(name) }
   }
 
   let reply = ''
-  if (created.length > 0) reply += `Saved **${created.join(', ')}** and started generating ${created.length > 1 ? 'battlecards' : 'a battlecard'} — ready in **Collateral** in ~1–2 minutes.`
+  if (created.length > 0) reply += `Saved **${created.join(', ')}** and generated ${created.length > 1 ? 'battlecards' : 'a battlecard'} — ready in [Collateral](/collateral).`
   if (savedOnly.length > 0) {
     if (!hasCompanyProfile) reply += `\n\nSaved **${savedOnly.join(', ')}** — no battlecard yet. Complete your [Company Profile](/company) first.`
     else reply += `\n\nSaved (no battlecard — plan limit): ${savedOnly.join(', ')}`
@@ -548,19 +546,24 @@ async function handleCollateralGeneration(
 
   const colId = record.id
   const colType = match.type
-  after(async () => {
-    try {
-      const result = await generateCollateral({ workspaceId, type: colType, buyerRole })
-      const generatedAt = new Date()
-      await db.update(collateral)
-        .set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt })
-        .where(eq(collateral.id, colId))
-      await db.insert(events).values({ workspaceId, userId, type: 'collateral.generated', metadata: { collateralId: colId, collateralType: colType, title: result.title }, createdAt: new Date() })
-    } catch { await db.update(collateral).set({ status: 'stale', updatedAt: new Date() }).where(eq(collateral.id, colId)) }
-  })
+  try {
+    const result = await generateCollateral({ workspaceId, type: colType, buyerRole })
+    const generatedAt = new Date()
+    await db.update(collateral)
+      .set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt })
+      .where(eq(collateral.id, colId))
+    await db.insert(events).values({ workspaceId, userId, type: 'collateral.generated', metadata: { collateralId: colId, collateralType: colType, title: result.title }, createdAt: new Date() })
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err)
+    await db.update(collateral).set({ status: 'stale', rawResponse: { error: errMsg }, updatedAt: new Date() }).where(eq(collateral.id, colId))
+    return {
+      reply: `❌ Failed to generate **${title}**: ${errMsg}`,
+      actions: [],
+    }
+  }
 
   return {
-    reply: `Generating your **${title}** now — it'll be ready in [Collateral](/collateral) in about 1 minute.`,
+    reply: `Your **${title}** is ready in [Collateral](/collateral).`,
     actions: [{ type: 'collateral_generating', colType: match.type, title }],
   }
 }

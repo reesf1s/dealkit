@@ -7,14 +7,17 @@ import type { CompanyProfile, Competitor, CaseStudy, DealLog } from '@/types'
 function companyBrief(c: CompanyProfile): string {
   const vp = (c.valuePropositions ?? []).slice(0, 3).join(', ')
   const diff = (c.differentiators ?? []).slice(0, 2).join(', ')
-  const prods = (c.products ?? []).slice(0, 2).map(p => p.name).join(', ')
+  const prodLines = (c.products ?? []).slice(0, 2).map(p => {
+    const features = (p.keyFeatures as unknown as string[] | null)?.slice(0, 3).join(', ')
+    return [p.name, p.description, features ? `Features: ${features}` : ''].filter(Boolean).join(' — ')
+  }).join(' | ')
   return [
     `Company: ${c.companyName}`,
     c.industry ? `Industry: ${c.industry}` : '',
     c.targetMarket ? `Market: ${c.targetMarket}` : '',
     vp ? `Value props: ${vp}` : '',
     diff ? `Differentiators: ${diff}` : '',
-    prods ? `Products: ${prods}` : '',
+    prodLines ? `Products: ${prodLines}` : '',
     c.competitiveAdvantage ? `Advantage: ${c.competitiveAdvantage}` : '',
   ].filter(Boolean).join('\n')
 }
@@ -104,6 +107,8 @@ export function caseStudyDocPrompt(
     messages: [{
       role: 'user',
       content: `Write a case study doc JSON for ${company.companyName}.
+
+${companyBrief(company)}
 
 Customer: ${caseStudy.customerName}${caseStudy.customerIndustry ? ` (${caseStudy.customerIndustry})` : ''}
 Challenge: ${caseStudy.challenge}
@@ -223,6 +228,8 @@ export function talkTrackPrompt(
     .filter(Boolean)
     .join(' | ')
 
+  const objections = (company.commonObjections ?? []).slice(0, 4).join('; ')
+
   const schema = `{
   "type": "talk_track",
   "purpose": "short description of call type",
@@ -242,6 +249,7 @@ export function talkTrackPrompt(
       content: `Write a talk track JSON for ${company.companyName} — persona: ${buyerRole}.
 
 ${companyBrief(company)}
+${objections ? `Known objections from this persona: ${objections}` : ''}
 ${relevantNotes ? `Notes from similar deals: ${relevantNotes}` : ''}
 
 Return ONLY this JSON (3 keyPoints per section, 3 tipsAndNotes). Keep scripts concise and natural — not robotic.
@@ -261,6 +269,7 @@ export function emailSequencePrompt(
   caseStudies: CaseStudy[],
 ): { system: string; messages: Array<{ role: 'user'; content: string }> } {
   const proof = caseStudies.slice(0, 2).map(cs => `${cs.customerName}: ${cs.results}`).join(' | ')
+  const objections = (company.commonObjections ?? []).slice(0, 3).join('; ')
 
   const schema = `{
   "type": "email_sequence",
@@ -286,6 +295,7 @@ export function emailSequencePrompt(
 
 ${companyBrief(company)}
 ${proof ? `Customer proof: ${proof}` : ''}
+${objections ? `Common objections to address: ${objections}` : ''}
 
 Email structure: Day 0 pattern-interrupt opener, Day 3 customer story, Day 10 value/insight, Day 21 break-up.
 Rules: No "just following up". Subjects must be curiosity-driven. Bodies 80-120 words each. Use {{first_name}}.

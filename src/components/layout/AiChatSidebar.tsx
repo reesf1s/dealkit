@@ -18,8 +18,12 @@ function invalidateCaches(actions: ActionCard[]) {
       globalMutate((key: unknown) => typeof key === 'string' && key.startsWith('/api/competitors/'), undefined, { revalidate: true })
     }
     if (action.type === 'company_updated') {
+      globalMutate('/api/company')
       globalMutate('/api/company-profile')
       globalMutate('/api/onboarding/parse')
+      // Auto-regenerate stale collateral after company profile update
+      fetch('/api/collateral/regenerate-stale', { method: 'POST' }).catch(() => {})
+      setTimeout(() => globalMutate('/api/collateral'), 15000)
     }
     if (action.type === 'collateral_generating') {
       globalMutate('/api/collateral')

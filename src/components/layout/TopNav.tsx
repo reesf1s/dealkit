@@ -36,7 +36,7 @@ function getPageInfo(pathname: string) {
 export default function TopNav() {
   const pathname = usePathname()
   const { user } = useUser()
-  const { sidebarWidth, openMobile } = useSidebar()
+  const { sidebarWidth, aiSidebarWidth, openMobile } = useSidebar()
 
   const { label, Icon } = getPageInfo(pathname)
   const avatarLetter =
@@ -49,7 +49,7 @@ export default function TopNav() {
       position: 'fixed',
       top: 0,
       left: `${sidebarWidth}px`,
-      right: 0,
+      right: `${aiSidebarWidth}px`,
       height: '56px',
       zIndex: 30,
       background: 'rgba(11,7,22,0.92)',

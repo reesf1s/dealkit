@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import useSWR from 'swr'
 import Link from 'next/link'
 import { useState } from 'react'
-import { TrendingUp, Users, BookOpen, ClipboardList, FileText, Plus, RefreshCw, AlertTriangle, CheckCircle, Circle, ArrowUpRight, Zap, Target, BarChart3, Sparkles, Copy, Check } from 'lucide-react'
+import { TrendingUp, Users, BookOpen, ClipboardList, FileText, Plus, RefreshCw, AlertTriangle, CheckCircle, Circle, ArrowUpRight, Zap, Target, BarChart3, Sparkles, Copy, Check, Map } from 'lucide-react'
 import ROIWidget from '@/components/dashboard/ROIWidget'
 import { SetupAlert } from '@/components/shared/SetupBanner'
 import { useUser } from '@clerk/nextjs'
@@ -118,6 +118,7 @@ export default function DashboardPage() {
   const { data: deals } = useSWR('/api/deals', fetcher)
   const { data: collateral } = useSWR('/api/collateral', fetcher)
   const { data: insights } = useSWR('/api/insights', fetcher)
+  const { data: productGapsData } = useSWR('/api/product-gaps', fetcher)
 
   const dbNotConnected = isDbNotConfigured(companyErr)
 
@@ -128,6 +129,10 @@ export default function DashboardPage() {
   const dealList: { id: string; stage: string; dealName: string; prospectCompany: string; todos: { id: string; text: string; done: boolean }[] }[] = deals?.data ?? []
   const collateralList: { id: string; title: string; type: string; status: string }[] = collateral?.data ?? []
   const insightsData = insights?.data
+  const gapList: { id: string; title: string; description?: string; priority: string; status: string; requestCount?: number }[] = productGapsData?.data ?? []
+  const roadmapNow = gapList.filter(g => g.status === 'on_roadmap')
+  const roadmapNext = gapList.filter(g => g.status === 'in_review')
+  const roadmapLater = gapList.filter(g => g.status === 'open').slice(0, 6)
 
   const hasCompany = !!companyData?.id
   const competitorCount = competitorList.length
@@ -250,6 +255,16 @@ export default function DashboardPage() {
         <StatCard label="AI collateral" value={collateralList.length} icon={FileText} color="#F59E0B" />
       </div>
 
+      {/* ROI strip — full width, right below KPIs */}
+      <ROIWidget
+        deals={dealList.map((d: { stage: string; dealValue?: number | null; competitors?: string[] }) => ({
+          outcome: d.stage === 'closed_won' ? 'won' : d.stage === 'closed_lost' ? 'lost' : 'open',
+          dealValue: d.dealValue,
+          competitors: d.competitors ?? [],
+        }))}
+        collateralCount={collateralList.length}
+      />
+
       {/* Urgent todos — most actionable */}
       {urgentTodos.length > 0 && (
         <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '14px', overflow: 'hidden' }}>
@@ -290,7 +305,7 @@ export default function DashboardPage() {
       {/* Main content grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 288px', gap: '14px', alignItems: 'start' }}>
 
-        {/* Left: Collateral Library + ROI */}
+        {/* Left: Collateral Library + Roadmap */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(124,58,237,0.18)', borderRadius: '14px', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid rgba(124,58,237,0.1)' }}>
@@ -356,15 +371,53 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* ROI Widget */}
-          <ROIWidget
-            deals={dealList.map((d: { stage: string; dealValue?: number | null; competitors?: string[] }) => ({
-              outcome: d.stage === 'closed_won' ? 'won' : d.stage === 'closed_lost' ? 'lost' : 'open',
-              dealValue: d.dealValue,
-              competitors: d.competitors ?? [],
-            }))}
-            collateralCount={collateralList.length}
-          />
+          {/* Roadmap — Now / Next / Later */}
+          {(roadmapNow.length > 0 || roadmapNext.length > 0 || roadmapLater.length > 0) && (
+            <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(124,58,237,0.18)', borderRadius: '14px', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid rgba(124,58,237,0.1)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '24px', height: '24px', background: 'rgba(99,102,241,0.1)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Map size={12} color="#818CF8" />
+                  </div>
+                  <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Product Roadmap</span>
+                </div>
+                <Link href="/product-gaps" style={{ fontSize: '12px', color: '#6366F1', textDecoration: 'none', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  Manage <ArrowUpRight size={11} />
+                </Link>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0', borderBottom: 'none' }}>
+                {[
+                  { label: 'Now', items: roadmapNow, color: '#22C55E', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.15)', dot: '#22C55E' },
+                  { label: 'Next', items: roadmapNext, color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.15)', dot: '#F59E0B' },
+                  { label: 'Later', items: roadmapLater, color: '#6366F1', bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.15)', dot: '#818CF8' },
+                ].map(({ label, items, color, bg, border, dot }, colIdx) => (
+                  <div key={label} style={{ padding: '14px 16px', borderRight: colIdx < 2 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{label}</span>
+                      {items.length > 0 && (
+                        <span style={{ fontSize: '10px', color, background: bg, border: `1px solid ${border}`, padding: '1px 6px', borderRadius: '100px', fontWeight: '600' }}>{items.length}</span>
+                      )}
+                    </div>
+                    {items.length === 0 ? (
+                      <div style={{ fontSize: '11px', color: '#333', fontStyle: 'italic' }}>Nothing here yet</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {items.slice(0, 4).map(gap => (
+                          <div key={gap.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
+                            <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: dot, flexShrink: 0, marginTop: '5px' }} />
+                            <span style={{ fontSize: '12px', color: '#EBEBEB', lineHeight: '1.4' }}>{gap.title}</span>
+                          </div>
+                        ))}
+                        {items.length > 4 && (
+                          <span style={{ fontSize: '11px', color: '#444', paddingLeft: '12px' }}>+{items.length - 4} more</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right column */}
@@ -377,7 +430,7 @@ export default function DashboardPage() {
                 <Target size={12} color="#818CF8" />
               </div>
               <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>AI Setup</span>
-              <span style={{ marginLeft: 'auto', fontSize: '13px', color: healthPct === 100 ? '#22C55E' : '#6366F1', fontWeight: '700' }}>{healthPct}%</span>
+              <span style={{ marginLeft: 'auto', fontSize: '11px', color: healthPct === 100 ? '#22C55E' : '#555', fontWeight: '600', background: healthPct === 100 ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${healthPct === 100 ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.06)'}`, padding: '1px 7px', borderRadius: '100px' }}>{healthPct}%</span>
             </div>
             <div style={{ height: '3px', background: '#1A1A1A', borderRadius: '2px', marginBottom: '12px', overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${healthPct}%`, background: healthPct === 100 ? 'linear-gradient(90deg, #22C55E, #16A34A)' : 'linear-gradient(90deg, #6366F1, #818CF8)', borderRadius: '2px', transition: 'width 1s cubic-bezier(0.4,0,0.2,1)', boxShadow: healthPct > 0 ? `0 0 8px ${healthPct === 100 ? 'rgba(34,197,94,0.4)' : 'rgba(99,102,241,0.4)'}` : 'none' }} />
