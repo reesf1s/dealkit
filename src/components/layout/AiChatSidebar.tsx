@@ -2,8 +2,37 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Send, Sparkles, User, Bot, RotateCcw, Square, MessageSquare, ChevronRight, ChevronLeft, FileText, Sword, Building2, Zap, CheckCircle2, PlusCircle, RefreshCw, BookOpen, AlertTriangle } from 'lucide-react'
+import { mutate as globalMutate } from 'swr'
 import { useSidebar } from './SidebarContext'
 import type { ActionCard } from '@/app/api/chat/route'
+
+function invalidateCaches(actions: ActionCard[]) {
+  for (const action of actions) {
+    if (action.type === 'todos_updated' || action.type === 'deal_updated' || action.type === 'deal_created') {
+      globalMutate('/api/deals')
+      // Revalidate any individual deal SWR keys (e.g. /api/deals/uuid)
+      globalMutate((key: unknown) => typeof key === 'string' && key.startsWith('/api/deals/'), undefined, { revalidate: true })
+    }
+    if (action.type === 'competitor_created') {
+      globalMutate('/api/competitors')
+      globalMutate((key: unknown) => typeof key === 'string' && key.startsWith('/api/competitors/'), undefined, { revalidate: true })
+    }
+    if (action.type === 'company_updated') {
+      globalMutate('/api/company-profile')
+      globalMutate('/api/onboarding/parse')
+    }
+    if (action.type === 'collateral_generating') {
+      globalMutate('/api/collateral')
+    }
+    if (action.type === 'case_study_created') {
+      globalMutate('/api/case-studies')
+      globalMutate((key: unknown) => typeof key === 'string' && key.startsWith('/api/case-studies/'), undefined, { revalidate: true })
+    }
+    if (action.type === 'gaps_logged') {
+      globalMutate('/api/product-gaps')
+    }
+  }
+}
 
 interface Message {
   role: 'user' | 'assistant'
@@ -341,6 +370,10 @@ export default function AiChatSidebar() {
         content: data.reply,
         actions: data.actions ?? [],
       }])
+      // Revalidate SWR caches for any pages affected by the AI actions
+      if (data.actions?.length) {
+        invalidateCaches(data.actions)
+      }
     } catch (e: unknown) {
       clearTimeout(timeoutId)
       if (e instanceof Error && e.name === 'AbortError') {
