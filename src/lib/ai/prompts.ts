@@ -115,7 +115,8 @@ RULES:
 - Do NOT fabricate quotes — set quote to null always
 - Keep metrics, customer name, and industry accurate to the source data
 - Write all section bodies as FRESH narrative sentences — do not copy source text word for word
-- If SPECIFIC INSTRUCTIONS or DEAL CONTEXT appear at the top of this message, they are your PRIMARY directive. The headline and every section body must tell the story through that angle. The source data below is your factual foundation — reframe it around those instructions.
+- If SPECIFIC INSTRUCTIONS appear at the top: use them as the narrative angle for the headline and every section body. Reframe the challenge, solution, and results through that lens.
+- If DEAL CONTEXT appears: the callToAction MUST name the prospect company from that context, reference their specific scenario or stage, and invite them to see the same outcome. Also echo the prospect's situation in the section bodies where natural (e.g. "just as [ProspectCompany] is facing…").
 
 ${companyBrief(company)}
 
