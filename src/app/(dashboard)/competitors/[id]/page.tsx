@@ -60,7 +60,7 @@ export default function CompetitorDetailPage() {
     const res = await fetch('/api/collateral/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'battlecard', sourceCompetitorId: id }),
+      body: JSON.stringify({ type: 'battlecard', competitorId: id }),
     })
     if (!res.ok) throw new Error('Failed to start generation')
     await mutateColl()
