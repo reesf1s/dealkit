@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { users, workspaces, workspaceMemberships } from '@/lib/db/schema'
 import type { Plan } from '@/types'
@@ -40,6 +40,7 @@ async function queryContext(userId: string) {
     .leftJoin(workspaceMemberships, eq(workspaceMemberships.userId, users.id))
     .leftJoin(workspaces, eq(workspaceMemberships.workspaceId, workspaces.id))
     .where(eq(users.id, userId))
+    .orderBy(desc(workspaceMemberships.createdAt))
     .limit(1)
   return row
 }

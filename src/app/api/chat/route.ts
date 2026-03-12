@@ -365,7 +365,8 @@ Rules: matchedDealId must be one of the IDs listed above (or null). stage values
     const profile = profileRows[0]
     const kbParts: string[] = []
     if (profile) {
-      kbParts.push(`## Company: ${profile.companyName}\nIndustry: ${profile.industry ?? 'unknown'}\nDescription: ${profile.description ?? 'none'}\nTarget market: ${profile.targetMarket ?? 'none'}\nValue props: ${(profile.valuePropositions as string[]).join(', ')}\nDifferentiators: ${(profile.differentiators as string[]).join(', ')}\nCommon objections: ${(profile.commonObjections as string[]).join('; ')}`)
+      const knownCaps = (profile.knownCapabilities as string[]) ?? []
+      kbParts.push(`## Company: ${profile.companyName}\nIndustry: ${profile.industry ?? 'unknown'}\nDescription: ${profile.description ?? 'none'}\nTarget market: ${profile.targetMarket ?? 'none'}\nValue props: ${(profile.valuePropositions as string[]).join(', ')}\nDifferentiators: ${(profile.differentiators as string[]).join(', ')}\nCommon objections: ${(profile.commonObjections as string[]).join('; ')}${knownCaps.length > 0 ? `\nConfirmed capabilities (NOT product gaps): ${knownCaps.join('; ')}` : ''}`)
     }
     if (competitorRows.length > 0) {
       kbParts.push(`## Competitors (${competitorRows.length})`)

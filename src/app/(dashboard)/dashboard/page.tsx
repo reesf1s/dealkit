@@ -161,7 +161,7 @@ export default function DashboardPage() {
       const res = await fetch('/api/workspaces/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug: joinCode.trim() }),
+        body: JSON.stringify({ code: joinCode.trim() }),
       })
       const json = await res.json()
       if (!res.ok) { toast(json.error ?? 'Invalid join code', 'error'); return }

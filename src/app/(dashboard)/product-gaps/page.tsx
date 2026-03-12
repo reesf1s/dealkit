@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import useSWR, { mutate } from 'swr'
 import Link from 'next/link'
 import { useState } from 'react'
-import { AlertTriangle, TrendingUp, CheckCircle, Circle, Clock, ArrowUpRight, Zap, Plus, DollarSign, ChevronDown } from 'lucide-react'
+import { AlertTriangle, TrendingUp, CheckCircle, Circle, Clock, Zap, DollarSign, Trash2, X } from 'lucide-react'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -27,12 +27,35 @@ export default function ProductGapsPage() {
   const { data: gapsRaw, isLoading } = useSWR('/api/product-gaps', fetcher)
   const gaps: any[] = Array.isArray(gapsRaw) ? gapsRaw : (Array.isArray(gapsRaw?.data) ? gapsRaw.data : [])
   const [statusFilter, setStatusFilter] = useState<string>('open')
+  // delete flow: { [gapId]: 'idle' | 'confirming' | 'deleting' }
+  const [deleteState, setDeleteState] = useState<Record<string, string>>({})
+  const [deleteReasons, setDeleteReasons] = useState<Record<string, string>>({})
 
   const updateStatus = async (id: string, status: string) => {
     await fetch(`/api/product-gaps/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
+    })
+    mutate('/api/product-gaps')
+  }
+
+  const startDelete = (id: string) => {
+    setDeleteState(s => ({ ...s, [id]: 'confirming' }))
+  }
+
+  const cancelDelete = (id: string) => {
+    setDeleteState(s => ({ ...s, [id]: 'idle' }))
+    setDeleteReasons(r => ({ ...r, [id]: '' }))
+  }
+
+  const confirmDelete = async (id: string) => {
+    setDeleteState(s => ({ ...s, [id]: 'deleting' }))
+    const reason = deleteReasons[id]?.trim() || undefined
+    await fetch(`/api/product-gaps/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
     })
     mutate('/api/product-gaps')
   }
@@ -170,20 +193,69 @@ export default function ProductGapsPage() {
                   </div>
                 </div>
 
-                {/* Status actions */}
-                <div style={{ display: 'flex', gap: '6px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                  {Object.entries(STATUS_CONFIG).map(([id, cfg]) => id !== gap.status && (
-                    <button key={id} onClick={() => updateStatus(gap.id, id)} style={{
-                      padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)',
-                      background: 'rgba(255,255,255,0.03)', color: '#555', fontSize: '11px', cursor: 'pointer', fontWeight: '500',
-                      transition: 'all 0.1s',
-                    }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = cfg.color; (e.currentTarget as HTMLElement).style.borderColor = cfg.color + '40' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#555'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)' }}
-                    >
-                      → {cfg.label}
-                    </button>
-                  ))}
+                {/* Status actions + delete */}
+                <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                  {deleteState[gap.id] !== 'confirming' && deleteState[gap.id] !== 'deleting' ? (
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      {Object.entries(STATUS_CONFIG).map(([sid, cfg]) => sid !== gap.status && (
+                        <button key={sid} onClick={() => updateStatus(gap.id, sid)} style={{
+                          padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)',
+                          background: 'rgba(255,255,255,0.03)', color: '#555', fontSize: '11px', cursor: 'pointer', fontWeight: '500',
+                          transition: 'all 0.1s',
+                        }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = cfg.color; (e.currentTarget as HTMLElement).style.borderColor = cfg.color + '40' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#555'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)' }}
+                        >
+                          → {cfg.label}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => startDelete(gap.id)}
+                        title="Delete gap"
+                        style={{ marginLeft: 'auto', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.03)', color: '#555', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'all 0.1s' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#EF4444'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(239,68,68,0.3)' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#555'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)' }}
+                      >
+                        <Trash2 size={11} /> Delete
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ fontSize: '11px', color: '#888' }}>
+                        Why is this not a real gap? <span style={{ color: '#555' }}>(optional — helps the AI learn)</span>
+                      </div>
+                      <input
+                        autoFocus
+                        type="text"
+                        value={deleteReasons[gap.id] ?? ''}
+                        onChange={e => setDeleteReasons(r => ({ ...r, [gap.id]: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') confirmDelete(gap.id); if (e.key === 'Escape') cancelDelete(gap.id) }}
+                        placeholder="e.g. We support CAD import natively — prospect was unaware"
+                        style={{
+                          width: '100%', height: '34px', padding: '0 10px', borderRadius: '7px', boxSizing: 'border-box',
+                          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)',
+                          color: '#EBEBEB', fontSize: '12px', outline: 'none', fontFamily: 'inherit',
+                        }}
+                        onFocus={e => (e.target.style.borderColor = 'rgba(239,68,68,0.4)')}
+                        onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')}
+                      />
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          onClick={() => confirmDelete(gap.id)}
+                          disabled={deleteState[gap.id] === 'deleting'}
+                          style={{ padding: '5px 14px', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.15)', color: '#EF4444', fontSize: '12px', fontWeight: '600', cursor: 'pointer' } as React.CSSProperties}
+                        >
+                          {deleteState[gap.id] === 'deleting' ? 'Deleting…' : 'Confirm delete'}
+                        </button>
+                        <button
+                          onClick={() => cancelDelete(gap.id)}
+                          style={{ padding: '5px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)', background: 'none', color: '#555', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          <X size={11} /> Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )

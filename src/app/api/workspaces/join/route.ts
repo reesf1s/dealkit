@@ -46,29 +46,30 @@ export async function POST(req: NextRequest) {
       updatedAt: new Date(),
     }).onConflictDoNothing()
 
-    // Check if user has an auto-created personal workspace to clean up
-    const [personalMembership] = await db
+    // Remove ALL existing memberships for this user so they land cleanly in the new workspace.
+    // For workspaces they owned solo → delete the workspace (membership cascades).
+    // For shared workspaces → just remove their membership row.
+    const existingMemberships = await db
       .select({ workspaceId: workspaceMemberships.workspaceId, role: workspaceMemberships.role })
       .from(workspaceMemberships)
       .where(eq(workspaceMemberships.userId, userId))
-      .limit(1)
 
-    if (personalMembership?.role === 'owner') {
-      const [ws] = await db
-        .select({ name: workspaces.name })
-        .from(workspaces)
-        .where(eq(workspaces.id, personalMembership.workspaceId))
-        .limit(1)
-
-      const [{ value: memberCount }] = await db
-        .select({ value: count() })
-        .from(workspaceMemberships)
-        .where(eq(workspaceMemberships.workspaceId, personalMembership.workspaceId))
-
-      // Only delete the workspace if it is the default placeholder with no other members
-      if (ws?.name === 'My Workspace' && Number(memberCount) <= 1) {
-        await db.delete(workspaces).where(eq(workspaces.id, personalMembership.workspaceId))
+    for (const mem of existingMemberships) {
+      if (mem.role === 'owner') {
+        const [{ value: memberCount }] = await db
+          .select({ value: count() })
+          .from(workspaceMemberships)
+          .where(eq(workspaceMemberships.workspaceId, mem.workspaceId))
+        if (Number(memberCount) <= 1) {
+          // Sole owner — delete workspace (cascades the membership row)
+          await db.delete(workspaces).where(eq(workspaces.id, mem.workspaceId))
+          continue
+        }
       }
+      // Member or non-sole-owner — just remove membership row
+      await db.delete(workspaceMemberships).where(
+        and(eq(workspaceMemberships.workspaceId, mem.workspaceId), eq(workspaceMemberships.userId, userId))
+      )
     }
 
     // Add user to the target workspace as a member

@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import Anthropic from '@anthropic-ai/sdk'
 import { db } from '@/lib/db'
-import { dealLogs, productGaps } from '@/lib/db/schema'
+import { dealLogs, productGaps, companyProfiles } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 
 const anthropic = new Anthropic()
@@ -19,6 +19,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!meetingNotes?.trim()) return NextResponse.json({ error: 'No meeting notes provided' }, { status: 400 })
     const [deal] = await db.select().from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    // Fetch known capabilities so AI doesn't re-flag confirmed product features as gaps
+    const [profile] = await db
+      .select({ knownCapabilities: companyProfiles.knownCapabilities })
+      .from(companyProfiles)
+      .where(eq(companyProfiles.workspaceId, workspaceId))
+      .limit(1)
+    const knownCapabilities = (profile?.knownCapabilities as string[]) ?? []
+    const capabilitiesContext = knownCapabilities.length > 0
+      ? `\n\nCONFIRMED PRODUCT CAPABILITIES (do NOT flag these as product gaps under any circumstances):\n${knownCapabilities.map(c => `- ${c}`).join('\n')}`
+      : ''
+
     const msg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001', max_tokens: 1024,
       messages: [{ role: 'user', content: `You are analyzing B2B sales meeting notes. Extract structured information and return ONLY valid JSON, no markdown.
@@ -26,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 Meeting notes:
 ${meetingNotes}
 
-Deal context: ${deal.dealName} with ${deal.prospectCompany}
+Deal context: ${deal.dealName} with ${deal.prospectCompany}${capabilitiesContext}
 
 Return this exact JSON structure:
 {

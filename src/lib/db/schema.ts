@@ -117,6 +117,7 @@ export const companyProfiles = pgTable('company_profiles', {
   valuePropositions: jsonb('value_propositions').notNull().default([]),
   differentiators: jsonb('differentiators').notNull().default([]),
   commonObjections: jsonb('common_objections').notNull().default([]),
+  knownCapabilities: jsonb('known_capabilities').notNull().default([]),
   targetMarket: text('target_market'),
   competitiveAdvantage: text('competitive_advantage'),
   founded: integer('founded'),

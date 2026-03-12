@@ -80,7 +80,7 @@ export default function SettingsPage() {
   const { toast } = useToast()
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
-  const [billingLoading, setBillingLoading] = useState<Plan | 'portal' | null>(null)
+  const [billingLoading, setBillingLoading] = useState<Plan | 'portal' | 'sync' | null>(null)
   const [leaveOpen, setLeaveOpen] = useState(false)
 
   const { data: userRes, isLoading: loadingUser } = useSWR<{ data: DbUser }>('/api/user', fetcher)
@@ -124,6 +124,23 @@ export default function SettingsPage() {
       if (!res.ok) { toast(json.error ?? 'Failed to open billing portal', 'error'); return }
       if (json.url) window.location.href = json.url
     } catch { toast('Stripe not configured.', 'error') }
+    finally { setBillingLoading(null) }
+  }
+
+  async function handleSyncPlan() {
+    setBillingLoading('sync')
+    try {
+      const res = await fetch('/api/billing/sync', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) { toast(json.error ?? 'Sync failed', 'error'); return }
+      if (json.synced) {
+        toast(`Plan updated to ${json.plan}`, 'success')
+        // Reload to show new plan
+        window.location.reload()
+      } else {
+        toast(`Plan is already ${json.plan} — no change needed`, 'success')
+      }
+    } catch { toast('Sync failed', 'error') }
     finally { setBillingLoading(null) }
   }
 
@@ -368,6 +385,13 @@ export default function SettingsPage() {
                   </button>.
                 </p>
               )}
+              <p style={{ fontSize: '11px', color: '#555', margin: '8px 0 0' }}>
+                Plan not reflecting a recent change?{' '}
+                <button onClick={handleSyncPlan} disabled={billingLoading === 'sync'}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6366F1', fontSize: '11px', padding: 0 }}>
+                  {billingLoading === 'sync' ? 'Syncing…' : 'Sync from Stripe'}
+                </button>
+              </p>
             </div>
           )}
         </SectionCard>
@@ -428,7 +452,7 @@ function JoinWorkspaceForm({ onJoined }: { onJoined: () => void }) {
       const res = await fetch('/api/workspaces/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug: slug.trim() }),
+        body: JSON.stringify({ code: slug.trim() }),
       })
       const json = await res.json()
       if (!res.ok) { toast(json.error ?? 'Failed to join', 'error'); return }
