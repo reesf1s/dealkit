@@ -295,6 +295,8 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved }: {
         prospectTitle: deal.prospectTitle ?? '',
         dealValue: deal.dealValue != null ? String(deal.dealValue) : '',
         stage: deal.stage ?? 'proposal',
+        dealType: deal.dealType ?? 'one_off',
+        recurringInterval: deal.recurringInterval ?? 'annual',
         competitors: Array.isArray(deal.competitors) ? deal.competitors.join(', ') : '',
         notes: deal.notes ?? '',
         nextSteps: deal.nextSteps ?? '',
@@ -327,6 +329,8 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved }: {
           prospectTitle: form.prospectTitle || null,
           dealValue: form.dealValue ? Number(form.dealValue) : null,
           stage: form.stage,
+          dealType: form.dealType ?? 'one_off',
+          recurringInterval: form.dealType === 'recurring' ? (form.recurringInterval ?? 'annual') : null,
           competitors: form.competitors.split(',').map((s: string) => s.trim()).filter(Boolean),
           notes: form.notes || null,
           nextSteps: form.nextSteps || null,
@@ -385,9 +389,44 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved }: {
                   onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
               </div>
             </div>
+            <div>
+              <label style={labelStyle}>Deal type</label>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: form.dealType === 'recurring' ? '8px' : '0' }}>
+                {(['one_off', 'recurring'] as const).map(type => (
+                  <button key={type} type="button" onClick={() => u('dealType', type)} style={{
+                    flex: 1, height: '32px', borderRadius: '6px', fontSize: '12px', fontWeight: 500,
+                    color: form.dealType === type ? '#EBEBEB' : '#555',
+                    backgroundColor: form.dealType === type ? 'rgba(99,102,241,0.15)' : 'transparent',
+                    border: `1px solid ${form.dealType === type ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                    cursor: 'pointer', transition: 'all 150ms ease',
+                  }}>
+                    {type === 'one_off' ? 'One-off' : 'Recurring'}
+                  </button>
+                ))}
+              </div>
+              {form.dealType === 'recurring' && (
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {(['monthly', 'quarterly', 'annual'] as const).map(interval => (
+                    <button key={interval} type="button" onClick={() => u('recurringInterval', interval)} style={{
+                      flex: 1, height: '26px', borderRadius: '5px', fontSize: '11px', fontWeight: 500, textTransform: 'capitalize',
+                      color: form.recurringInterval === interval ? '#EBEBEB' : '#555',
+                      backgroundColor: form.recurringInterval === interval ? 'rgba(255,255,255,0.08)' : 'transparent',
+                      border: `1px solid ${form.recurringInterval === interval ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)'}`,
+                      cursor: 'pointer', transition: 'all 150ms ease',
+                    }}>
+                      {interval}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
-                <label style={labelStyle}>Deal value ($)</label>
+                <label style={labelStyle}>
+                  {form.dealType === 'recurring'
+                    ? `Value (${form.recurringInterval === 'monthly' ? 'MRR' : form.recurringInterval === 'quarterly' ? 'QRR' : 'ARR'} $)`
+                    : 'Deal value ($)'}
+                </label>
                 <input style={inputStyle} type="number" value={form.dealValue ?? ''} onChange={e => u('dealValue', e.target.value)} placeholder="50000"
                   onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
               </div>

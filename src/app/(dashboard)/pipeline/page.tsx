@@ -12,6 +12,24 @@ import {
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
+// Annualise a deal's stored value so one-off and recurring are comparable
+function annualizedValue(value: number, dealType?: string | null, recurringInterval?: string | null): number {
+  if (!value) return 0
+  if (dealType !== 'recurring') return value
+  if (recurringInterval === 'monthly') return value * 12
+  if (recurringInterval === 'quarterly') return value * 4
+  return value
+}
+
+// Short label for a deal's value (e.g. "$5k/mo", "$60k ARR", "$30k")
+function dealValueLabel(value: number, dealType?: string | null, recurringInterval?: string | null): string {
+  const fmt = (v: number) => v >= 1_000_000 ? `$${(v/1_000_000).toFixed(1)}m` : v >= 1_000 ? `$${(v/1_000).toFixed(0)}k` : `$${v}`
+  if (dealType !== 'recurring') return fmt(value)
+  if (recurringInterval === 'monthly') return `${fmt(value)}/mo`
+  if (recurringInterval === 'quarterly') return `${fmt(value)}/qtr`
+  return `${fmt(value)} ARR`
+}
+
 const STAGES = [
   { id: 'prospecting',   label: 'Prospecting',   color: '#6B7280' },
   { id: 'qualification', label: 'Qualification',  color: '#3B82F6' },
@@ -179,7 +197,7 @@ function DealCard({
         {deal.dealValue ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: '700', color: '#22C55E' }}>
             <DollarSign size={11} />
-            {deal.dealValue.toLocaleString()}
+            {dealValueLabel(deal.dealValue, deal.dealType, deal.recurringInterval)}
           </div>
         ) : <div />}
         {todos.length > 0 && (
@@ -242,7 +260,7 @@ export default function PipelinePage() {
   const activeStages = STAGES.filter(s => s.id !== 'closed_won' && s.id !== 'closed_lost')
   const totalPipeline = deals
     .filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
-    .reduce((sum: number, d: any) => sum + (d.dealValue ?? 0), 0)
+    .reduce((sum: number, d: any) => sum + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
   const topDeals = deals
     .filter((d: any) => d.conversionScore)
     .sort((a: any, b: any) => (b.conversionScore ?? 0) - (a.conversionScore ?? 0))
@@ -314,7 +332,7 @@ export default function PipelinePage() {
                       <div style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.prospectCompany}</div>
                       <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
                         {STAGES.find(s => s.id === deal.stage)?.label}
-                        {deal.dealValue && ` · $${deal.dealValue.toLocaleString()}`}
+                        {deal.dealValue && ` · ${dealValueLabel(deal.dealValue, deal.dealType, deal.recurringInterval)}`}
                       </div>
                     </div>
                     <div style={{ fontSize: '17px', fontWeight: '800', color: scoreColor, flexShrink: 0 }}>
@@ -360,7 +378,7 @@ export default function PipelinePage() {
         <div style={{ display: 'flex', gap: '12px', minWidth: 'max-content' }}>
           {activeStages.map(stage => {
             const stageDeals = deals.filter((d: any) => d.stage === stage.id)
-            const stageValue = stageDeals.reduce((s: number, d: any) => s + (d.dealValue ?? 0), 0)
+            const stageValue = stageDeals.reduce((s: number, d: any) => s + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
             const isDropTarget = dragOverStage === stage.id && draggedId !== null
 
             return (
@@ -405,7 +423,7 @@ export default function PipelinePage() {
                 {stageValue > 0 && (
                   <div style={{ fontSize: '11px', color: '#9CA3AF', padding: '0 4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <TrendingUp size={10} />
-                    ${stageValue.toLocaleString()} value
+                    ${stageValue.toLocaleString()} annualised
                   </div>
                 )}
 
@@ -469,7 +487,7 @@ export default function PipelinePage() {
             {['closed_won', 'closed_lost'].map(stageId => {
               const s = STAGES.find(x => x.id === stageId)!
               const stageDeals = deals.filter((d: any) => d.stage === stageId)
-              const val = stageDeals.reduce((sum: number, d: any) => sum + (d.dealValue ?? 0), 0)
+              const val = stageDeals.reduce((sum: number, d: any) => sum + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
               const isDropTarget = dragOverStage === stageId && draggedId !== null
 
               return (

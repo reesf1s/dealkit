@@ -72,7 +72,7 @@ export function battlecardPrompt(
 CONTEXT:
 ${context}
 
-Return ONLY this JSON (3 ourStrengths, 2 theirStrengths, 1 ourWeakness, 3 winThemes, 3 objectionResponses, 3 landmines, 3 discoveryQuestions, 3 proofPoints). Keep all strings concise — max 1-2 sentences each.
+Return ONLY this JSON (3 ourStrengths, 2 theirStrengths, 1 ourWeakness, 3 winThemes, 2 objectionResponses, 3 landmines, 3 discoveryQuestions, 3 proofPoints). Keep all strings concise — max 1 sentence each.
 ${workspaceContext ? `\nWORKSPACE INTEL (use to sharpen positioning):\n${workspaceContext}` : ''}
 ${schema}`,
     }],
@@ -239,12 +239,12 @@ export function talkTrackPrompt(
   "type": "talk_track",
   "purpose": "short description of call type",
   "targetPersona": "${buyerRole}",
-  "opener": {"title": "Opener", "script": "3-4 sentence opener", "keyPoints": ["point"], "transitionPhrase": "exact transition phrase"},
-  "discovery": {"title": "Discovery", "script": "3-4 key discovery questions with brief framing", "keyPoints": ["what to uncover"], "transitionPhrase": "exact phrase"},
-  "pitchSection": {"title": "Pitch", "script": "3-4 sentences tailored to ${buyerRole}", "keyPoints": ["key point"], "transitionPhrase": "exact phrase"},
-  "objectionHandling": {"title": "Objections", "script": "handle top 2 objections from this persona", "keyPoints": ["objection + response"], "transitionPhrase": "exact phrase"},
-  "close": {"title": "Close", "script": "2-3 sentences + next step ask", "keyPoints": ["closing point"], "transitionPhrase": "exact phrase"},
-  "tipsAndNotes": ["practical tip for this persona"]
+  "opener": {"title": "Opener", "script": "2 sentence opener", "keyPoints": ["point1", "point2"]},
+  "discovery": {"title": "Discovery", "script": "2-3 focused discovery questions", "keyPoints": ["what to uncover 1", "what to uncover 2"]},
+  "pitchSection": {"title": "Pitch", "script": "2 sentences tailored to ${buyerRole}", "keyPoints": ["key point 1", "key point 2"]},
+  "objectionHandling": {"title": "Objections", "script": "handle top objection from this persona in 2 sentences", "keyPoints": ["objection + response"]},
+  "close": {"title": "Close", "script": "1-2 sentences + next step ask", "keyPoints": ["closing point"]},
+  "tipsAndNotes": ["tip1", "tip2"]
 }`
 
   return {
@@ -257,7 +257,7 @@ ${companyBrief(company)}
 ${objections ? `Known objections from this persona: ${objections}` : ''}
 ${relevantNotes ? `Notes from similar deals: ${relevantNotes}` : ''}
 
-Return ONLY this JSON (3 keyPoints per section, 3 tipsAndNotes). Keep scripts concise and natural — not robotic.
+Return ONLY this JSON (2 keyPoints per section, 2 tipsAndNotes). Keep scripts short and natural.
 ${workspaceContext ? `\nWORKSPACE INTEL (use to reference real competitors, wins, and proof points in the script):\n${workspaceContext}` : ''}
 ${schema}`,
     }],
@@ -304,7 +304,7 @@ ${proof ? `Customer proof: ${proof}` : ''}
 ${objections ? `Common objections to address: ${objections}` : ''}
 
 Email structure: Day 0 pattern-interrupt opener, Day 3 customer story, Day 10 value/insight, Day 21 break-up.
-Rules: No "just following up". Subjects must be curiosity-driven. Bodies 80-120 words each. Use {{first_name}}.
+Rules: No "just following up". Subjects must be curiosity-driven. Bodies 60-80 words each. Use {{first_name}}.
 
 Return ONLY this JSON (4 emails, 1 sendingTip each).
 ${workspaceContext ? `\nWORKSPACE INTEL (use to name competitors, reference real wins, address known objections):\n${workspaceContext}` : ''}

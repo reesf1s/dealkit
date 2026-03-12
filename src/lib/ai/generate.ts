@@ -55,7 +55,7 @@ async function callClaude(
   const attempt = async () => {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1200,
+      max_tokens: 2048,
       temperature,
       system,
       messages,

@@ -1,12 +1,24 @@
 'use client'
 
+interface Deal {
+  outcome: 'won' | 'lost' | 'open'
+  dealValue?: number | null
+  dealType?: string | null
+  recurringInterval?: string | null
+}
+
 interface ROIWidgetProps {
-  deals: Array<{
-    outcome: 'won' | 'lost' | 'open'
-    dealValue?: number | null
-    competitors?: string[]
-  }>
+  deals: Deal[]
   collateralCount: number
+}
+
+// Convert a deal's stored value to its annual equivalent
+export function annualizedValue(value: number, dealType?: string | null, recurringInterval?: string | null): number {
+  if (!value) return 0
+  if (dealType !== 'recurring') return value
+  if (recurringInterval === 'monthly') return value * 12
+  if (recurringInterval === 'quarterly') return value * 4
+  return value // annual
 }
 
 function formatCurrency(value: number): string {
@@ -20,47 +32,71 @@ export default function ROIWidget({ deals, collateralCount }: ROIWidgetProps) {
   const lostDeals = deals.filter(d => d.outcome === 'lost')
   const openDeals = deals.filter(d => d.outcome === 'open')
 
-  const wonRevenue = wonDeals.reduce((sum, d) => sum + (d.dealValue ?? 0), 0)
-  const openRevenue = openDeals.reduce((sum, d) => sum + (d.dealValue ?? 0), 0)
+  // Separate one-off won revenue from recurring ARR
+  const wonOneOff = wonDeals
+    .filter(d => d.dealType !== 'recurring')
+    .reduce((sum, d) => sum + (d.dealValue ?? 0), 0)
+
+  const wonARR = wonDeals
+    .filter(d => d.dealType === 'recurring')
+    .reduce((sum, d) => sum + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
+
+  // Pipeline: annualized total of all open deals
+  const openPipeline = openDeals.reduce((sum, d) =>
+    sum + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
+
+  // Avg deal: annualized across all closed deals with a value
+  const closedWithValue = [...wonDeals, ...lostDeals].filter(d => d.dealValue && d.dealValue > 0)
+  const avgDealSize = closedWithValue.length > 0
+    ? closedWithValue.reduce((sum, d) =>
+        sum + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0
+      ) / closedWithValue.length
+    : 0
+
   const timeSaved = collateralCount * 3
 
-  const closedDealsWithValue = [...wonDeals, ...lostDeals].filter(d => d.dealValue && d.dealValue > 0)
-  const avgDealSize = closedDealsWithValue.length > 0
-    ? closedDealsWithValue.reduce((sum, d) => sum + (d.dealValue ?? 0), 0) / closedDealsWithValue.length
-    : 0
+  const hasDeals = deals.length > 0
 
   const cells = [
     {
       label: 'Won Revenue',
-      value: deals.length === 0 ? '—' : formatCurrency(wonRevenue),
-      hint: deals.length === 0 ? 'No deals yet' : `${wonDeals.length} deal${wonDeals.length !== 1 ? 's' : ''} closed`,
+      sublabel: 'one-off',
+      value: !hasDeals ? '—' : wonOneOff > 0 ? formatCurrency(wonOneOff) : '—',
+      hint: !hasDeals ? 'No deals yet' : wonOneOff > 0
+        ? `${wonDeals.filter(d => d.dealType !== 'recurring').length} deal${wonDeals.filter(d => d.dealType !== 'recurring').length !== 1 ? 's' : ''}`
+        : 'No won one-off deals',
       color: '#22C55E',
       glow: 'rgba(34,197,94,0.12)',
       border: 'rgba(34,197,94,0.15)',
     },
     {
-      label: 'Pipeline Value',
-      value: deals.length === 0 ? '—' : formatCurrency(openRevenue),
-      hint: deals.length === 0 ? 'Log a deal' : `${openDeals.length} open deal${openDeals.length !== 1 ? 's' : ''}`,
+      label: 'Won ARR',
+      sublabel: 'recurring',
+      value: !hasDeals ? '—' : wonARR > 0 ? formatCurrency(wonARR) : '—',
+      hint: !hasDeals ? 'Log deals' : wonARR > 0
+        ? `${wonDeals.filter(d => d.dealType === 'recurring').length} recurring deal${wonDeals.filter(d => d.dealType === 'recurring').length !== 1 ? 's' : ''}`
+        : 'No recurring wins yet',
+      color: '#10B981',
+      glow: 'rgba(16,185,129,0.12)',
+      border: 'rgba(16,185,129,0.15)',
+    },
+    {
+      label: 'Pipeline',
+      sublabel: 'annualised',
+      value: !hasDeals ? '—' : openPipeline > 0 ? formatCurrency(openPipeline) : '—',
+      hint: !hasDeals ? 'Log a deal' : `${openDeals.length} open deal${openDeals.length !== 1 ? 's' : ''}`,
       color: '#6366F1',
       glow: 'rgba(99,102,241,0.12)',
       border: 'rgba(99,102,241,0.15)',
     },
     {
-      label: 'Avg Deal Size',
+      label: 'Avg Deal',
+      sublabel: 'annualised',
       value: avgDealSize > 0 ? formatCurrency(avgDealSize) : '—',
-      hint: avgDealSize > 0 ? `${closedDealsWithValue.length} deals with value` : 'Add deal values',
+      hint: avgDealSize > 0 ? `${closedWithValue.length} closed deals` : 'Add deal values',
       color: '#F59E0B',
       glow: 'rgba(245,158,11,0.12)',
       border: 'rgba(245,158,11,0.15)',
-    },
-    {
-      label: 'Time Saved',
-      value: timeSaved > 0 ? `${timeSaved}h` : '—',
-      hint: collateralCount > 0 ? `${collateralCount} collateral × 3h` : 'Generate collateral',
-      color: '#8B5CF6',
-      glow: 'rgba(139,92,246,0.12)',
-      border: 'rgba(139,92,246,0.15)',
     },
   ]
 
@@ -88,18 +124,27 @@ export default function ROIWidget({ deals, collateralCount }: ROIWidgetProps) {
           </svg>
         </div>
         <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Revenue Impact</span>
+        <span style={{ fontSize: '11px', color: '#444', marginLeft: '4px' }}>Recurring values annualised</span>
+        {collateralCount > 0 && (
+          <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#666' }}>
+            ⏱ {timeSaved}h saved · {collateralCount} collateral
+          </span>
+        )}
       </div>
 
       {/* 4-metric grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
-        {cells.map(({ label, value, hint, color, glow, border }) => (
+        {cells.map(({ label, sublabel, value, hint, color, glow, border }) => (
           <div key={label} style={{
             background: glow,
             border: `1px solid ${border}`,
             borderRadius: '10px',
             padding: '12px',
           }}>
-            <div style={{ fontSize: '11px', color: '#666', marginBottom: '6px', letterSpacing: '0.02em' }}>{label}</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginBottom: '6px' }}>
+              <span style={{ fontSize: '11px', color: '#666', letterSpacing: '0.02em' }}>{label}</span>
+              <span style={{ fontSize: '10px', color: '#444' }}>{sublabel}</span>
+            </div>
             <div style={{
               fontSize: '22px', fontWeight: 800, letterSpacing: '-0.04em',
               color, lineHeight: 1, marginBottom: '4px',
