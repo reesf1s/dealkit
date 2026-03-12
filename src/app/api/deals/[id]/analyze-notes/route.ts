@@ -40,7 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const existingTodos = (deal.todos as any[]) ?? []
     const openTodos = existingTodos.filter((t: any) => !t.done)
     const existingTodosContext = openTodos.length > 0
-      ? `\n\nEXISTING OPEN ACTION ITEMS (do not duplicate these — if a new action item is substantially the same as an existing one, do NOT add it again):\n${openTodos.map((t: any) => `- [${t.id}] ${t.text}`).join('\n')}\n\nAlso review whether any existing action items are now OBSOLETE given the new meeting notes (e.g. a task that's clearly been completed, superseded, or no longer relevant). Return their IDs in obsoleteTodoIds.`
+      ? `\n\nEXISTING OPEN ACTION ITEMS:\n${openTodos.map((t: any) => `- [${t.id}] ${t.text}`).join('\n')}\n\nRules for todos:\n- Do NOT add duplicates or near-duplicates of existing items\n- Return obsoleteTodoIds: IDs of existing items that are now done, superseded, irrelevant, or duplicated — these will be DELETED`
       : ''
 
     const msg = await anthropic.messages.create({
@@ -100,13 +100,12 @@ IMPORTANT — productGaps rules:
     const appendedNotes = deal.meetingNotes
       ? `${deal.meetingNotes}\n${compactEntry}`
       : compactEntry
-    // Keep existing todos, marking obsolete ones as done; append new todos
-    const mergedTodos = [
-      ...((deal.todos as any[]) ?? []).map((t: any) =>
-        obsoleteIds.has(t.id) ? { ...t, done: true } : t
-      ),
-      ...newTodos,
-    ]
+    // Remove obsolete todos entirely; deduplicate by normalising text; append new non-duplicate todos
+    const existingKept = ((deal.todos as any[]) ?? []).filter((t: any) => !obsoleteIds.has(t.id))
+    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 60)
+    const existingKeys = new Set(existingKept.map((t: any) => normalize(t.text)))
+    const dedupedNew = newTodos.filter((t: any) => !existingKeys.has(normalize(t.text)))
+    const mergedTodos = [...existingKept, ...dedupedNew]
     const [updatedDeal] = await db.update(dealLogs).set({
       meetingNotes: appendedNotes, aiSummary: parsed.summary, conversionScore: parsed.conversionScore,
       conversionInsights: parsed.conversionInsights ?? [],
