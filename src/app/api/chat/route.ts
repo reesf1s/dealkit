@@ -255,7 +255,7 @@ Return:
   "summary": "2-3 sentence summary",
   "todos": [{"text": "specific action item"}],
   "productGaps": [{"title": "feature", "description": "what they need", "priority": "high|medium|low"}],
-  "dealUpdate": {"stage": "stage_or_null", "dealValue": null_or_cents, "notes": "brief note or null"},
+  "dealUpdate": {"stage": "stage_or_null", "dealValue": null_or_dollars, "notes": "brief note or null"},
   "risks": ["risk or blocker"]
 }
 
