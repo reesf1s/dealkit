@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { FileText, Download, Eye, Trash2 } from 'lucide-react'
+import { FileText, Download, Eye, Trash2, RefreshCw } from 'lucide-react'
 import { CollateralTypeBadge } from './CollateralTypeBadge'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -13,6 +13,7 @@ interface CollateralGridProps {
   onGenerate?: () => void
   onExport?: (id: string) => void
   onDelete?: (id: string) => void
+  onRegenerate?: (id: string) => void
 }
 
 function formatDate(d: Date | string | null) {
@@ -24,10 +25,12 @@ function CollateralCard({
   item,
   onExport,
   onDelete,
+  onRegenerate,
 }: {
   item: Collateral
   onExport?: (id: string) => void
   onDelete?: (id: string) => void
+  onRegenerate?: (id: string) => void
 }) {
   const [confirming, setConfirming] = useState(false)
 
@@ -97,6 +100,30 @@ function CollateralCard({
           <Eye size={11} strokeWidth={2} />
           View
         </Link>
+
+        {item.status === 'stale' && onRegenerate && (
+          <button
+            onClick={() => onRegenerate(item.id)}
+            title="Regenerate"
+            style={{
+              height: '30px',
+              width: '30px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '6px',
+              backgroundColor: 'rgba(245,158,11,0.1)',
+              border: '1px solid rgba(245,158,11,0.25)',
+              cursor: 'pointer',
+              color: '#F59E0B',
+              transition: 'background-color 150ms ease',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.2)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.1)' }}
+          >
+            <RefreshCw size={12} strokeWidth={2} />
+          </button>
+        )}
 
         {item.status === 'ready' && onExport && (
           <button
@@ -209,7 +236,7 @@ function CollateralCard({
   )
 }
 
-export function CollateralGrid({ collateral, onGenerate, onExport, onDelete }: CollateralGridProps) {
+export function CollateralGrid({ collateral, onGenerate, onExport, onDelete, onRegenerate }: CollateralGridProps) {
   if (collateral.length === 0) {
     return (
       <EmptyState
@@ -230,7 +257,7 @@ export function CollateralGrid({ collateral, onGenerate, onExport, onDelete }: C
       }}
     >
       {collateral.map((item) => (
-        <CollateralCard key={item.id} item={item} onExport={onExport} onDelete={onDelete} />
+        <CollateralCard key={item.id} item={item} onExport={onExport} onDelete={onDelete} onRegenerate={onRegenerate} />
       ))}
     </div>
   )

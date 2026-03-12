@@ -1,5 +1,8 @@
+export const maxDuration = 60
+
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { after } from 'next/server'
 import { and, count, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { collateral, events } from '@/lib/db/schema'
@@ -28,22 +31,38 @@ export async function POST(req: NextRequest) {
     const { type, competitorId, caseStudyId, productName, buyerRole, customPrompt }: { type: CollateralType; competitorId?: string; caseStudyId?: string; productName?: string; buyerRole?: string; customPrompt?: string } = body
     const validTypes: CollateralType[] = ['battlecard','case_study_doc','one_pager','objection_handler','talk_track','email_sequence']
     if (!type || !validTypes.includes(type)) return NextResponse.json({ error: `type must be one of: ${validTypes.join(', ')}` }, { status: 400 })
+
+    // Validate required params before inserting a record (fail fast, no orphaned rows)
+    if (type === 'battlecard' && !competitorId) {
+      return NextResponse.json({ error: 'competitorId is required for battlecard generation' }, { status: 400 })
+    }
+    if (type === 'case_study_doc' && !caseStudyId) {
+      return NextResponse.json({ error: 'caseStudyId is required for case study doc generation' }, { status: 400 })
+    }
+
     const now = new Date()
     const [record] = await db.insert(collateral).values({
       workspaceId, userId, type, title: `Generating ${type.replace(/_/g, ' ')}…`, status: 'generating',
       sourceCompetitorId: competitorId ?? null, sourceCaseStudyId: caseStudyId ?? null,
       sourceDealLogId: null, content: null, rawResponse: null, generatedAt: null, createdAt: now, updatedAt: now,
     }).returning()
-    try {
-      const result = await generateCollateral({ workspaceId, type, competitorId, caseStudyId, productName, buyerRole, customPrompt })
-      const generatedAt = new Date()
-      const [updated] = await db.update(collateral).set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt }).where(eq(collateral.id, record.id)).returning()
-      await logEvent(workspaceId, userId, 'collateral.generated', { collateralId: updated.id, collateralType: updated.type, title: updated.title })
-      return NextResponse.json({ data: updated }, { status: 201 })
-    } catch (err) {
-      await db.update(collateral).set({ status: 'stale', updatedAt: new Date() }).where(eq(collateral.id, record.id))
-      console.error('[collateral/generate] AI generation failed:', err)
-      return NextResponse.json({ error: 'AI generation failed. The collateral record has been marked stale.' }, { status: 500 })
-    }
+
+    // Run generation after the response is sent — avoids Vercel timeout killing the AI call
+    after(async () => {
+      try {
+        const result = await generateCollateral({ workspaceId, type, competitorId, caseStudyId, productName, buyerRole, customPrompt })
+        const generatedAt = new Date()
+        const [updated] = await db.update(collateral)
+          .set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt })
+          .where(eq(collateral.id, record.id))
+          .returning()
+        await logEvent(workspaceId, userId, 'collateral.generated', { collateralId: updated.id, collateralType: updated.type, title: updated.title })
+      } catch (err) {
+        console.error('[collateral/generate] AI generation failed:', err)
+        await db.update(collateral).set({ status: 'stale', updatedAt: new Date() }).where(eq(collateral.id, record.id))
+      }
+    })
+
+    return NextResponse.json({ data: { id: record.id, status: 'generating' } }, { status: 201 })
   } catch (err) { return dbErrResponse(err) }
 }

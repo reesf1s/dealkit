@@ -69,7 +69,7 @@ export default function CollateralPage() {
   const { data: collRes, isLoading, mutate } = useSWR<{ data: Collateral[] }>('/api/collateral', fetcher)
   const { data: compRes } = useSWR<{ data: Competitor[] }>('/api/competitors', fetcher)
   const { data: csRes } = useSWR<{ data: CaseStudy[] }>('/api/case-studies', fetcher)
-  const { data: profileRes } = useSWR<{ data: CompanyProfile }>('/api/company-profile', fetcher)
+  const { data: profileRes } = useSWR<{ data: CompanyProfile }>('/api/company', fetcher)
 
   const collateral = collRes?.data ?? []
   const competitors = compRes?.data ?? []
@@ -120,6 +120,21 @@ export default function CollateralPage() {
       toast('Generation started — check back in a moment', 'success')
     } finally {
       setGenerating(false)
+    }
+  }
+
+  async function handleRegenerate(id: string) {
+    try {
+      const res = await fetch(`/api/collateral/${id}`, { method: 'PATCH' })
+      if (!res.ok) {
+        const json = await res.json()
+        toast(json.error ?? 'Failed to regenerate', 'error')
+        return
+      }
+      await mutate()
+      toast('Regenerating — check back in a moment', 'success')
+    } catch {
+      toast('Failed to regenerate', 'error')
     }
   }
 
@@ -209,6 +224,7 @@ export default function CollateralPage() {
           onGenerate={() => setGenerateOpen(true)}
           onExport={handleExport}
           onDelete={handleDelete}
+          onRegenerate={handleRegenerate}
         />
       )}
 

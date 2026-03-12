@@ -21,10 +21,14 @@ export async function POST() {
 
   const { workspace } = await getWorkspaceContext(userId)
   const stripeCustomerId = workspace.stripeCustomerId
+  const fromPlan = workspace.plan as Plan
 
   if (!stripeCustomerId) {
-    // No billing account — they are on free
-    return NextResponse.json({ plan: 'free', synced: false, reason: 'no_stripe_customer' })
+    // No Stripe account linked — ensure workspace plan is free (fixes stale pro state)
+    if (fromPlan !== 'free') {
+      await db.update(workspaces).set({ plan: 'free', updatedAt: new Date() }).where(eq(workspaces.id, workspace.id))
+    }
+    return NextResponse.json({ plan: 'free', fromPlan, synced: fromPlan !== 'free', reason: 'no_stripe_customer' })
   }
 
   const stripe = getStripe()
@@ -52,7 +56,6 @@ export async function POST() {
   }
   // If no active subscription found, or subscription is set to cancel → plan stays 'free'
 
-  const fromPlan = workspace.plan as Plan
   if (fromPlan !== plan) {
     await db
       .update(workspaces)
