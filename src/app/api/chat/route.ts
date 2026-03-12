@@ -42,7 +42,14 @@ function looksLikeMeetingTranscript(text: string): boolean {
   return keywordMatches >= 2 || (lineCount >= 8 && keywordMatches >= 1)
 }
 
-const BATTLECARD_KEYWORDS = ['battlecard', 'battle card', 'add competitor', 'create competitor', 'new competitor', 'research competitor']
+const BATTLECARD_PATTERNS = [
+  /battlecard/i, /battle[\s-]card/i,
+  /add competitor/i, /create competitor/i, /new competitor/i, /research competitor/i,
+  /track competitor/i, /save competitor/i, /add a competitor/i,
+  /competitor:/i, /competing with/i, /they compete/i, /our competitor/i,
+  /add.*as a competitor/i, /track.*as competitor/i,
+  /going up against/i, /we('re| are) competing/i,
+]
 
 const COLLATERAL_TYPES: { keyword: string; type: CollateralType }[] = [
   { keyword: 'objection handler', type: 'objection_handler' },
@@ -93,7 +100,7 @@ type Intent = 'meeting_notes' | 'competitor_battlecard' | 'company_update' |
 function detectIntent(text: string): Intent {
   const lower = text.toLowerCase()
   if (looksLikeMeetingTranscript(text)) return 'meeting_notes'
-  if (BATTLECARD_KEYWORDS.some(k => lower.includes(k))) return 'competitor_battlecard'
+  if (BATTLECARD_PATTERNS.some(p => p.test(text))) return 'competitor_battlecard'
   const hasGenerateVerb = /\b(generate|create|make|write|build)\b/.test(lower)
   if (hasGenerateVerb && COLLATERAL_TYPES.some(c => lower.includes(c.keyword))) return 'collateral_generate'
   if (COMPANY_UPDATE_PATTERNS.some(p => p.test(text))) return 'company_update'
@@ -116,10 +123,10 @@ async function handleCompetitorBattlecard(
   const hasCompanyProfile = !!profileRow
 
   const extractMsg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001', max_tokens: 2048,
+    model: 'claude-haiku-4-5-20251001', max_tokens: 600,
     messages: [{
       role: 'user',
-      content: `Extract competitor information from this text. Return ONLY a JSON array. Each object must have: "name" (required), "description" (1-2 sentences), "strengths" (string[]), "weaknesses" (string[]), "keyFeatures" (string[]), "notes" (string). Return [] if no competitors clearly mentioned.\n\nText: ${text.slice(0, 6000)}`,
+      content: `Extract competitor names from this text. The user wants to add/track these competitors. Return ONLY a JSON array of objects — even if only a name is given with no details.\n\nEach object: { "name": "required", "description": "1-2 sentences or null", "strengths": [], "weaknesses": [], "keyFeatures": [], "notes": null }\n\nExamples that should return results:\n- "add Salesforce as a competitor" → [{"name":"Salesforce",...}]\n- "track HubSpot and Pipedrive" → two objects\n- "we're competing against Notion" → [{"name":"Notion",...}]\n\nReturn [] ONLY if absolutely no company/product names are present.\n\nText: ${text.slice(0, 3000)}`,
     }],
   })
 
