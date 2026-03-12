@@ -81,7 +81,7 @@ export default function PrivacyPage() {
             <tbody>
               {[
                 ['Clerk', 'Authentication & user management', 'US (SOC 2)', 'clerk.com/legal/privacy'],
-                ['Neon', 'Database hosting', 'AWS US-East-2', 'neon.tech/privacy'],
+                ['Supabase', 'Database hosting', 'AWS US-East-1', 'supabase.com/privacy'],
                 ['Anthropic', 'AI text generation', 'US', 'anthropic.com/privacy'],
                 ['Stripe', 'Payment processing', 'US/EU (PCI-DSS)', 'stripe.com/privacy'],
                 ['Vercel', 'Hosting & CDN', 'US/Global', 'vercel.com/legal/privacy'],
@@ -103,7 +103,7 @@ export default function PrivacyPage() {
           <P>Our primary infrastructure is located in the United States. If you are located in the EU/EEA or UK, your data is transferred to the US under the following safeguards:</P>
           <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', color: '#9CA3AF', fontSize: '14px', lineHeight: '1.7' }}>
             <li>Clerk and Stripe are certified under the EU–US Data Privacy Framework</li>
-            <li>Vercel and Neon use Standard Contractual Clauses (SCCs) approved by the European Commission</li>
+            <li>Vercel and Supabase use Standard Contractual Clauses (SCCs) approved by the European Commission</li>
             <li>Anthropic processes data under SCCs and their Data Processing Addendum</li>
           </ul>
         </Section>

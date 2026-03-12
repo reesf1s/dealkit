@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 import useSWR, { mutate } from 'swr'
 import Link from 'next/link'
 import { useState, useRef } from 'react'
+import { useSidebar } from '@/components/layout/SidebarContext'
 import {
   Plus, TrendingUp, DollarSign, ChevronRight, Sparkles,
   CheckSquare, Square, MoreHorizontal, Target, Zap, ArrowUpRight,
@@ -220,6 +221,7 @@ function DealCard({
 }
 
 export default function PipelinePage() {
+  const { sidebarWidth, aiSidebarWidth } = useSidebar()
   const { data: dealsData, isLoading } = useSWR('/api/deals', fetcher)
   const deals: any[] = dealsData?.data ?? []
 
@@ -374,7 +376,7 @@ export default function PipelinePage() {
       )}
 
       {/* Kanban board */}
-      <div style={{ overflowX: 'auto', paddingBottom: '8px', width: '100%' }}>
+      <div style={{ overflowX: 'auto', paddingBottom: '8px', maxWidth: `calc(100vw - ${sidebarWidth}px - ${aiSidebarWidth}px - 48px)` }}>
         <div style={{ display: 'flex', gap: '12px', minWidth: 'max-content' }}>
           {activeStages.map(stage => {
             const stageDeals = deals.filter((d: any) => d.stage === stage.id)

@@ -181,12 +181,25 @@ export default function DashboardPage() {
   const totalObjections = (companyData?.commonObjections as string[] | null)?.length ?? 0
 
   const steps = [
-    { done: hasCompany, label: 'Complete company profile', href: '/company' },
-    { done: competitorCount > 0, label: 'Add your first competitor', href: '/competitors' },
-    { done: caseStudyCount > 0, label: 'Add a case study', href: '/case-studies' },
-    { done: dealCount > 0, label: 'Log your first deal', href: '/deals' },
-    { done: collateralList.length > 0, label: 'Generate first collateral', href: '/collateral' },
+    { done: hasCompany, label: 'Complete company profile', unlock: 'Personalises every AI output', href: '/company' },
+    { done: competitorCount > 0, label: 'Add a competitor', unlock: 'Get instant AI battlecard + objection responses', href: '/competitors' },
+    { done: caseStudyCount > 0, label: 'Add a case study', unlock: 'AI uses win stories to strengthen pitches', href: '/case-studies' },
+    { done: dealCount > 0, label: 'Log a deal', unlock: 'Unlock meeting prep + AI win probability scoring', href: '/deals' },
+    { done: collateralList.length > 0, label: 'Generate collateral', unlock: 'Battlecards & one-pagers in seconds', href: '/collateral' },
   ]
+
+  // Smart contextual nudges derived from current data
+  const smartNudges: { icon: string; message: string; cta: string; href: string; color: string }[] = []
+  if (hasCompany && competitorCount === 0)
+    smartNudges.push({ icon: '⚔️', message: 'Add a competitor to get an AI battlecard — know exactly what to say when they come up on a call.', cta: 'Add competitor', href: '/competitors', color: '#6366F1' })
+  if (dealCount > 1 && caseStudyCount === 0)
+    smartNudges.push({ icon: '🏆', message: `You have ${dealCount} deals logged but no win stories. Case studies power your AI proof points and email sequences.`, cta: 'Add case study', href: '/case-studies', color: '#22C55E' })
+  if (dealCount > 2 && collateralList.length === 0)
+    smartNudges.push({ icon: '📄', message: 'You\'re tracking deals but haven\'t generated any collateral yet. A personalised battlecard or one-pager takes 30 seconds.', cta: 'Generate now', href: '/collateral', color: '#F59E0B' })
+  if (wonDeals > 0 && caseStudyCount === 0)
+    smartNudges.push({ icon: '🎯', message: `You've won ${wonDeals} deal${wonDeals > 1 ? 's' : ''} — turn ${wonDeals > 1 ? 'them' : 'it'} into a case study so your AI can use this proof in future pitches.`, cta: 'Log case study', href: '/case-studies', color: '#A855F7' })
+  if (dealCount > 3 && gapList.length === 0)
+    smartNudges.push({ icon: '🔍', message: 'Log product gaps from your deals to track blocked revenue and spot patterns across your pipeline.', cta: 'Log gaps', href: '/product-gaps', color: '#EF4444' })
   const completedSteps = steps.filter(s => s.done).length
   const healthPct = Math.round((completedSteps / steps.length) * 100)
   const recentCollateral = collateralList.slice(0, 5)
@@ -283,13 +296,33 @@ export default function DashboardPage() {
                   <CheckCircle size={11} /> {step.label}
                 </div>
               ) : (
-                <Link key={step.href} href={step.href} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 10px', borderRadius: '7px', fontSize: '12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(99,102,241,0.3)', color: '#EBEBEB', textDecoration: 'none', fontWeight: '500' }}>
-                  <span style={{ width: '16px', height: '16px', borderRadius: '50%', background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: '#818CF8', fontWeight: '700', flexShrink: 0 }}>{i + 1}</span>
-                  {step.label} →
+                <Link key={step.href} href={step.href} style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '7px 11px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(99,102,241,0.3)', color: '#EBEBEB', textDecoration: 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '600' }}>
+                    <span style={{ width: '16px', height: '16px', borderRadius: '50%', background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: '#818CF8', fontWeight: '700', flexShrink: 0 }}>{i + 1}</span>
+                    {step.label} →
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#818CF8', paddingLeft: '22px', lineHeight: '1.3' }}>{step.unlock}</div>
                 </Link>
               )
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Smart AI nudges — contextual suggestions based on current data */}
+      {smartNudges.length > 0 && !dbNotConnected && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {smartNudges.slice(0, 2).map((nudge, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 16px', background: 'rgba(18,12,32,0.6)', border: `1px solid ${nudge.color}22`, borderRadius: '10px', borderLeft: `3px solid ${nudge.color}` }}>
+              <span style={{ fontSize: '18px', flexShrink: 0 }}>{nudge.icon}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ fontSize: '13px', color: '#EBEBEB', lineHeight: '1.5' }}>{nudge.message}</span>
+              </div>
+              <Link href={nudge.href} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: '600', color: nudge.color, background: `${nudge.color}14`, border: `1px solid ${nudge.color}30`, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                {nudge.cta} <ArrowUpRight size={11} />
+              </Link>
+            </div>
+          ))}
         </div>
       )}
 
@@ -424,7 +457,8 @@ export default function DashboardPage() {
                   <Sparkles size={18} color="#6366F1" />
                 </div>
                 <div style={{ fontSize: '13px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>No collateral yet</div>
-                <div style={{ fontSize: '12px', color: '#444', marginBottom: '16px', lineHeight: '1.6' }}>AI-powered battlecards, one-pagers, email sequences and more</div>
+                <div style={{ fontSize: '12px', color: '#444', marginBottom: '4px', lineHeight: '1.6' }}>Battlecards, one-pagers, email sequences — personalised to your deals</div>
+                <div style={{ fontSize: '11px', color: '#6366F1', marginBottom: '16px' }}>Takes 30 seconds vs. 2+ hours manually</div>
                 <Link href="/collateral" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '8px', color: '#818CF8', fontSize: '13px', fontWeight: '500', textDecoration: 'none' }}>
                   <Plus size={13} /> Generate first
                 </Link>
@@ -543,7 +577,9 @@ export default function DashboardPage() {
             {completedSteps < steps.length && (
               <div style={{ marginTop: '10px', padding: '8px 10px', background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.1)', borderRadius: '7px', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
                 <Zap size={10} color="#818CF8" style={{ marginTop: '2px', flexShrink: 0 }} />
-                <span style={{ fontSize: '11px', color: '#818CF8', lineHeight: '1.5' }}>Complete your setup for better AI outputs</span>
+                <span style={{ fontSize: '11px', color: '#818CF8', lineHeight: '1.5' }}>
+                  {steps.find(s => !s.done)?.unlock ?? 'Complete your setup for the best AI outputs'}
+                </span>
               </div>
             )}
           </div>
@@ -591,12 +627,12 @@ export default function DashboardPage() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
               {[
-                { href: '/competitors', label: 'Competitors mapped', value: competitorCount, color: '#6366F1', icon: Users, empty: 'Add competitor →' },
-                { href: '/deals', label: 'Deals in pipeline', value: dealCount, color: '#8B5CF6', icon: TrendingUp, empty: 'Log first deal →' },
-                { href: '/case-studies', label: 'Win stories', value: caseStudyCount, color: '#22C55E', icon: BookOpen, empty: 'Add case study →' },
-                { href: '/collateral', label: 'Collateral generated', value: collateralList.length, color: '#F59E0B', icon: FileText, empty: 'Generate first →' },
-                { href: '/product-gaps', label: 'Product gaps tracked', value: gapList.length, color: '#EF4444', icon: AlertTriangle, empty: 'None logged yet' },
-              ].map(({ href, label, value, color, icon: Icon, empty }) => (
+                { href: '/competitors', label: 'Competitors mapped', value: competitorCount, color: '#6366F1', icon: Users, empty: 'Add competitor →', hint: 'Powers battlecards' },
+                { href: '/deals', label: 'Deals in pipeline', value: dealCount, color: '#8B5CF6', icon: TrendingUp, empty: 'Log first deal →', hint: 'Tracks win rate' },
+                { href: '/case-studies', label: 'Win stories', value: caseStudyCount, color: '#22C55E', icon: BookOpen, empty: 'Add case study →', hint: 'Strengthens pitches' },
+                { href: '/collateral', label: 'Collateral generated', value: collateralList.length, color: '#F59E0B', icon: FileText, empty: 'Generate first →', hint: 'AI sales docs' },
+                { href: '/product-gaps', label: 'Feature gaps tracked', value: gapList.length, color: '#EF4444', icon: AlertTriangle, empty: 'None logged yet', hint: 'Blocked revenue' },
+              ].map(({ href, label, value, color, icon: Icon, empty, hint }) => (
                 <Link key={href} href={href} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '7px', textDecoration: 'none', transition: 'background 0.1s' }}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'}
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'}
@@ -604,7 +640,10 @@ export default function DashboardPage() {
                   <div style={{ width: '24px', height: '24px', background: `${color}12`, border: `1px solid ${color}20`, borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Icon size={11} color={color} />
                   </div>
-                  <span style={{ flex: 1, fontSize: '12px', color: '#888' }}>{label}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', color: '#888' }}>{label}</div>
+                    <div style={{ fontSize: '10px', color: '#444', marginTop: '1px' }}>{hint}</div>
+                  </div>
                   {value > 0
                     ? <span style={{ fontSize: '14px', fontWeight: '700', color, letterSpacing: '-0.02em' }}>{value}</span>
                     : <span style={{ fontSize: '11px', color: '#444' }}>{empty}</span>
@@ -616,31 +655,53 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* AI How-to callout — compact, shown at bottom for new users only */}
-      {dealCount < 5 && (
+      {/* Value chain explainer — shown for early-stage users */}
+      {dealCount < 5 && !dbNotConnected && (
         <div style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(124,58,237,0.09) 100%)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '14px', padding: '14px 18px', position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '150px', height: '150px', background: 'radial-gradient(circle, rgba(124,58,237,0.12), transparent 70%)', pointerEvents: 'none' }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
             <div style={{ width: '26px', height: '26px', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 10px rgba(99,102,241,0.3)' }}>
               <Zap size={12} color="#fff" />
             </div>
-            <span style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF', letterSpacing: '-0.01em' }}>Getting started with DealKit</span>
-            <span style={{ fontSize: '11px', color: '#A78BFA', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', padding: '2px 8px', borderRadius: '100px', fontWeight: '600' }}>3 key workflows</span>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF', letterSpacing: '-0.01em' }}>How DealKit saves you time</span>
+            <span style={{ fontSize: '11px', color: '#A78BFA', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', padding: '2px 8px', borderRadius: '100px', fontWeight: '600' }}>fastest path to ROI</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
             {[
-              { icon: '📋', title: 'Paste meeting notes → AI action plan', href: '/deals', cta: 'Open a deal →', color: '#F59E0B' },
-              { icon: '⚔️', title: 'AI battlecards for every competitor', href: '/competitors', cta: 'Add competitor →', color: '#6366F1' },
-              { icon: '🎯', title: 'AI conversion score + next steps', href: '/pipeline', cta: 'View pipeline →', color: '#22C55E' },
+              {
+                icon: '⚔️',
+                title: 'Competitive call comes up',
+                body: 'Pull up a battlecard in seconds. Exact talk tracks, objection responses, and win angles — all AI-generated from your competitor data.',
+                href: '/competitors',
+                cta: 'Add a competitor',
+                color: '#6366F1',
+              },
+              {
+                icon: '📋',
+                title: 'Just finished a sales call',
+                body: 'Paste your notes into any deal. AI extracts action items, updates the deal score, and flags risks — no manual logging required.',
+                href: '/deals',
+                cta: 'Open a deal',
+                color: '#F59E0B',
+              },
+              {
+                icon: '📄',
+                title: 'Prospect wants a one-pager',
+                body: 'Generate a personalised, branded sales doc in 30 seconds. Pulls in your case studies, product strengths, and competitive position automatically.',
+                href: '/collateral',
+                cta: 'Generate collateral',
+                color: '#22C55E',
+              },
             ].map(item => (
               <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
-                <div style={{ background: 'rgba(9,6,18,0.4)', border: '1px solid rgba(124,58,237,0.12)', borderRadius: '10px', padding: '12px', transition: 'border-color 0.15s' }}
+                <div style={{ background: 'rgba(9,6,18,0.4)', border: '1px solid rgba(124,58,237,0.12)', borderRadius: '10px', padding: '14px', transition: 'border-color 0.15s', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '8px' }}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = `${item.color}33`}
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,58,237,0.12)'}
                 >
-                  <div style={{ fontSize: '18px', marginBottom: '6px' }}>{item.icon}</div>
-                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#F0EEFF', marginBottom: '8px', lineHeight: '1.4' }}>{item.title}</div>
-                  <div style={{ fontSize: '11px', color: item.color, fontWeight: '600' }}>{item.cta}</div>
+                  <div style={{ fontSize: '18px' }}>{item.icon}</div>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#F0EEFF', lineHeight: '1.4' }}>{item.title}</div>
+                  <div style={{ fontSize: '11px', color: '#9CA3AF', lineHeight: '1.6', flex: 1 }}>{item.body}</div>
+                  <div style={{ fontSize: '11px', color: item.color, fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>{item.cta} <ArrowUpRight size={10} /></div>
                 </div>
               </Link>
             ))}

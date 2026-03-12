@@ -426,7 +426,7 @@ export default function SettingsPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {[
                   ['Clerk', 'Auth & user management', 'US (SOC 2)'],
-                  ['Neon', 'Database hosting', 'AWS US-East-2'],
+                  ['Supabase', 'Database hosting', 'AWS US-East-1'],
                   ['Anthropic', 'AI generation', 'US (DPA / SCCs)'],
                   ['Stripe', 'Payments', 'US/EU (PCI-DSS)'],
                   ['Vercel', 'Hosting & CDN', 'US/Global (SCCs)'],
