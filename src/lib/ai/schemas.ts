@@ -77,6 +77,7 @@ export const CaseStudyDocSchema = z.object({
     })
     .nullable(),
   callToAction: z.string(),
+  prospectRelevanceNote: z.string().optional().nullable(),
 })
 
 // ─────────────────────────────────────────────────────────────────────────────

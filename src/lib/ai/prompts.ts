@@ -101,7 +101,8 @@ export function caseStudyDocPrompt(
   "resultsSection": {"heading": "short heading", "body": "2-3 sentences on outcomes"},
   "metrics": [{"value": "e.g. 3x", "label": "e.g. ROI", "description": "1 sentence"}],
   "quote": {"text": "credible quote", "author": "Name", "title": "Title", "company": "${caseStudy.customerName}"},
-  "callToAction": "specific CTA sentence"
+  "callToAction": "specific CTA sentence",
+  "prospectRelevanceNote": "If deal context is provided: 2-3 sentences explaining exactly why this case study is relevant to the specific prospect — mirror their risks, their stage, their competitors. Otherwise null."
 }`
 
   return {

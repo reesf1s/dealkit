@@ -196,6 +196,7 @@ export interface CaseStudyDocContent {
   metrics: DisplayMetric[]
   quote: CustomerQuote | null
   callToAction: string
+  prospectRelevanceNote?: string | null
 }
 
 export interface ContentSection {
