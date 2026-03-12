@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Sparkles, User, Bot, RotateCcw, Square, MessageSquare, ChevronRight, ChevronLeft, FileText, Sword, Building2, Zap, CheckCircle2, PlusCircle, RefreshCw, BookOpen, AlertTriangle, BarChart2 } from 'lucide-react'
+import { Send, Sparkles, User, Bot, RotateCcw, Square, MessageSquare, ChevronRight, ChevronLeft, FileText, Sword, Building2, Zap, CheckCircle2, PlusCircle, RefreshCw, BookOpen, AlertTriangle, BarChart2, Mail } from 'lucide-react'
 import { mutate as globalMutate } from 'swr'
 import { useSidebar } from './SidebarContext'
 import type { ActionCard } from '@/app/api/chat/route'
@@ -88,6 +88,15 @@ const CAPABILITIES = [
     title: 'Top 5 Deals & Risks',
     desc: 'Ranked pipeline with key risks per deal',
     prompt: 'Show me my top 5 deals ranked by priority, with the biggest risk for each.',
+  },
+  {
+    icon: Mail,
+    color: '#06B6D4',
+    bg: 'rgba(6,182,212,0.1)',
+    border: 'rgba(6,182,212,0.2)',
+    title: 'Risk Outreach Emails',
+    desc: 'Write emails addressing the top risk per deal',
+    prompt: 'For my top 3 priority deals, write a personalised outreach email for each one that directly addresses the biggest risk or blocker in that deal. Include a subject line and keep each email concise.',
   },
 ]
 
