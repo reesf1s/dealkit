@@ -100,9 +100,9 @@ export function caseStudyDocPrompt(
   "solutionSection": {"heading": "short heading", "body": "2-3 sentences on the solution"},
   "resultsSection": {"heading": "short heading", "body": "2-3 sentences on outcomes"},
   "metrics": [{"value": "e.g. 3x", "label": "e.g. ROI", "description": "1 sentence"}],
-  "quote": {"text": "credible quote", "author": "Name", "title": "Title", "company": "${caseStudy.customerName}"},
+  "quote": null,
   "callToAction": "specific CTA sentence",
-  "prospectRelevanceNote": "If deal context is provided: 2-3 sentences explaining exactly why this case study is relevant to the specific prospect — mirror their risks, their stage, their competitors. Otherwise null."
+  "prospectRelevanceNote": null
 }`
 
   return {
@@ -111,6 +111,10 @@ export function caseStudyDocPrompt(
       role: 'user',
       content: `Write a case study doc JSON for ${company.companyName}.
 
+IMPORTANT RULES:
+- Base ALL content strictly on the customer data provided below — do not invent facts
+- Do NOT fabricate quotes (set quote to null always)
+- If DEAL CONTEXT or SPECIFIC INSTRUCTIONS appear at the start of this message, use them to: reframe the headline to emphasise aspects most relevant to that prospect's situation, angle the challenge/solution/results bodies to highlight themes matching their context, and write a CTA specific to their stage/scenario
 ${companyBrief(company)}
 
 Customer: ${caseStudy.customerName}${caseStudy.customerIndustry ? ` (${caseStudy.customerIndustry})` : ''}
@@ -120,7 +124,7 @@ Results: ${caseStudy.results}
 ${metricsText ? `Metrics: ${metricsText}` : ''}
 
 Return ONLY this JSON (2-3 metrics). Keep body sections to 2-3 sentences each.
-${workspaceContext ? `\nWORKSPACE INTEL (use to add relevant context):\n${workspaceContext}` : ''}
+${workspaceContext ? `\nWORKSPACE INTEL:\n${workspaceContext}` : ''}
 ${schema}`,
     }],
   }
