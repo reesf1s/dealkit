@@ -40,6 +40,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
       <CommandPalette />
       <main style={{
         flex: 1,
+        minWidth: 0,
         marginLeft: `${sidebarWidth}px`,
         marginRight: `${aiSidebarWidth}px`,
         minHeight: '100vh',
