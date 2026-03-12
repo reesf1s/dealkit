@@ -1,7 +1,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import useSWR from 'swr'
 import { useSearchParams } from 'next/navigation'
 import * as Dialog from '@radix-ui/react-dialog'
@@ -54,7 +54,7 @@ const TYPE_META: Record<CollateralType, { label: string; description: string }> 
   },
 }
 
-export default function CollateralPage() {
+function CollateralPageInner() {
   const { toast } = useToast()
   const [generateOpen, setGenerateOpen] = useState(false)
   const [selectedType, setSelectedType] = useState<CollateralType>('battlecard')
@@ -470,5 +470,13 @@ export default function CollateralPage() {
         </Dialog.Portal>
       </Dialog.Root>
     </div>
+  )
+}
+
+export default function CollateralPage() {
+  return (
+    <Suspense fallback={null}>
+      <CollateralPageInner />
+    </Suspense>
   )
 }
