@@ -47,29 +47,48 @@ function MeetingNotesTab({ dealId, deal, onUpdate }: { dealId: string; deal: any
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
       {/* Previous meeting history */}
-      {deal?.meetingNotes && (
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '14px' }}>
-          <button
-            onClick={() => setHistoryExpanded(v => !v)}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Clipboard size={13} color="#888" />
-              <span style={{ fontSize: '12px', fontWeight: '600', color: '#888' }}>Meeting History</span>
-            </div>
-            <span style={{ fontSize: '11px', color: '#555' }}>{historyExpanded ? 'Hide ↑' : 'Show ↓'}</span>
-          </button>
-          {historyExpanded && (
-            <pre style={{
-              marginTop: '12px', whiteSpace: 'pre-wrap', fontFamily: 'inherit',
-              fontSize: '12px', color: '#666', lineHeight: '1.7',
-              maxHeight: '300px', overflowY: 'auto', padding: '4px 0',
-            }}>
-              {deal.meetingNotes}
-            </pre>
-          )}
-        </div>
-      )}
+      {deal?.meetingNotes && (() => {
+        // Parse compact entries: lines starting with [date] are individual meetings
+        const lines = (deal.meetingNotes as string).split('\n').filter((l: string) => l.trim())
+        const entries = lines.filter((l: string) => /^\[\d/.test(l))
+        const legacy = lines.filter((l: string) => !/^\[\d/.test(l))
+        return (
+          <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '14px' }}>
+            <button
+              onClick={() => setHistoryExpanded(v => !v)}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Clipboard size={13} color="#888" />
+                <span style={{ fontSize: '12px', fontWeight: '600', color: '#888' }}>Meeting History</span>
+                <span style={{ fontSize: '11px', color: '#444', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', padding: '1px 6px' }}>
+                  {entries.length > 0 ? `${entries.length} meeting${entries.length > 1 ? 's' : ''}` : 'legacy notes'}
+                </span>
+              </div>
+              <span style={{ fontSize: '11px', color: '#555' }}>{historyExpanded ? 'Hide ↑' : 'Show ↓'}</span>
+            </button>
+            {historyExpanded && (
+              <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '320px', overflowY: 'auto' }}>
+                {entries.length > 0 ? entries.map((entry: string, i: number) => {
+                  const dateMatch = entry.match(/^\[([^\]]+)\]/)
+                  const date = dateMatch?.[1] ?? ''
+                  const body = entry.slice(dateMatch?.[0].length ?? 0).trim()
+                  return (
+                    <div key={i} style={{ padding: '9px 12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '10px', fontWeight: 700, color: '#555', letterSpacing: '0.04em', marginBottom: '4px', textTransform: 'uppercase' }}>{date}</div>
+                      <div style={{ fontSize: '12px', color: '#888', lineHeight: 1.6 }}>{body}</div>
+                    </div>
+                  )
+                }) : (
+                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '12px', color: '#666', lineHeight: '1.7', margin: 0 }}>
+                    {legacy.join('\n')}
+                  </pre>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', padding: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -406,9 +425,15 @@ function MeetingPrepTab({ dealId, deal }: { dealId: string; deal: any }) {
 function TodosTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
   const [newTodo, setNewTodo] = useState('')
   const [doneExpanded, setDoneExpanded] = useState(false)
+  const [copied, setCopied] = useState(false)
   const todos: any[] = deal?.todos ?? []
   const pending = todos.filter((t: any) => !t.done)
   const done = todos.filter((t: any) => t.done)
+
+  const copyPending = () => {
+    const text = `Open to-dos for ${deal?.dealName ?? 'deal'}:\n${pending.map((t: any, i: number) => `${i + 1}. ${t.text}`).join('\n')}`
+    navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
+  }
 
   const saveTodos = async (updated: any[]) => {
     await fetch(`/api/deals/${dealId}/todos`, {
@@ -433,6 +458,17 @@ function TodosTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpd
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '12px', color: '#555' }}>{pending.length} open action{pending.length !== 1 ? 's' : ''}</span>
+        {pending.length > 0 && (
+          <button onClick={copyPending} style={{
+            fontSize: '11px', color: copied ? '#22C55E' : '#555', background: 'none', border: 'none',
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 0',
+          }}>
+            {copied ? '✓ Copied' : '⎘ Copy list'}
+          </button>
+        )}
+      </div>
       <form onSubmit={addTodo} style={{ display: 'flex', gap: '8px' }}>
         <input
           value={newTodo}
@@ -986,6 +1022,8 @@ export default function DealDetailPage() {
   const router = useRouter()
   const { data, mutate } = useSWR(id ? `/api/deals/${id}` : null, fetcher)
   const deal = data?.data ?? data
+  const { data: gapsData } = useSWR('/api/product-gaps', fetcher)
+  const dealGaps: any[] = (gapsData?.data ?? []).filter((g: any) => (g.sourceDeals as string[] ?? []).includes(id))
 
   const [activeTab, setActiveTab] = useState<'overview' | 'meeting-notes' | 'prep' | 'todos'>('overview')
   const [editOpen, setEditOpen] = useState(false)
@@ -1122,6 +1160,26 @@ export default function DealDetailPage() {
                   >
                     View full AI analysis →
                   </button>
+                </div>
+              )}
+              {dealGaps.length > 0 && (
+                <div style={{ padding: '14px 16px', background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '11px', color: '#EF4444', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      Product Gaps ({dealGaps.length})
+                    </div>
+                    <Link href="/product-gaps" style={{ fontSize: '11px', color: '#EF4444', textDecoration: 'none', opacity: 0.7 }}>View all →</Link>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {dealGaps.map((g: any) => (
+                      <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: g.priority === 'critical' ? '#EF4444' : g.priority === 'high' ? '#F59E0B' : '#6366F1', flexShrink: 0 }} />
+                        <span style={{ color: '#C0C0C8', flex: 1 }}>{g.title}</span>
+                        {g.roadmap && <span style={{ fontSize: '10px', color: '#555', background: 'rgba(255,255,255,0.04)', borderRadius: '4px', padding: '1px 5px' }}>{g.roadmap}</span>}
+                        <span style={{ fontSize: '10px', color: '#555' }}>{g.priority}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
