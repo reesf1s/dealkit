@@ -12,17 +12,17 @@ import {
 import { useSidebar } from './SidebarContext'
 
 const WORKFLOW_ITEMS = [
-  { href: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/pipeline',      icon: Kanban,          label: 'Pipeline' },
-  { href: '/deals',         icon: ClipboardList,   label: 'Deal Log' },
-  { href: '/collateral',    icon: FileText,        label: 'Collateral' },
-  { href: '/product-gaps',  icon: AlertTriangle,   label: 'Product Gaps' },
+  { href: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard',      sub: 'Overview & insights' },
+  { href: '/pipeline',      icon: Kanban,          label: 'Pipeline',       sub: 'Kanban deal view' },
+  { href: '/deals',         icon: ClipboardList,   label: 'Deals',          sub: 'Log & track deals' },
+  { href: '/collateral',    icon: FileText,        label: 'Collateral',     sub: 'AI-generated docs' },
+  { href: '/product-gaps',  icon: AlertTriangle,   label: 'Feature Gaps',   sub: 'Gaps & roadmap' },
 ]
 
 const SETUP_ITEMS = [
-  { href: '/company',       icon: Building2,       label: 'Company' },
-  { href: '/competitors',   icon: Swords,          label: 'Competitors' },
-  { href: '/case-studies',  icon: BookOpen,        label: 'Case Studies' },
+  { href: '/company',       icon: Building2,       label: 'Company',        sub: 'Profile & products' },
+  { href: '/competitors',   icon: Swords,          label: 'Competitors',    sub: 'Competitor intel' },
+  { href: '/case-studies',  icon: BookOpen,        label: 'Case Studies',   sub: 'Customer wins' },
 ]
 
 export default function Sidebar() {
@@ -34,7 +34,7 @@ export default function Sidebar() {
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
   const w = collapsed ? '64px' : '220px'
 
-  function NavItem({ href, icon: Icon, label }: { href: string; icon: React.ElementType; label: string }) {
+  function NavItem({ href, icon: Icon, label, sub }: { href: string; icon: React.ElementType; label: string; sub?: string }) {
     const active = isActive(href)
     return (
       <Link
@@ -45,7 +45,7 @@ export default function Sidebar() {
           display: 'flex', alignItems: 'center', gap: collapsed ? 0 : '9px',
           padding: collapsed ? '0' : '0 10px',
           justifyContent: collapsed ? 'center' : 'flex-start',
-          height: '36px', borderRadius: '9px',
+          height: sub && !collapsed ? '42px' : '36px', borderRadius: '9px',
           marginBottom: '2px', textDecoration: 'none',
           fontSize: '13px', fontWeight: active ? '500' : '400',
           color: active ? '#A78BFA' : '#9CA3AF',
@@ -80,7 +80,14 @@ export default function Sidebar() {
           </>
         )}
         <Icon size={14} color={active ? '#A78BFA' : 'currentColor'} style={{ flexShrink: 0, marginLeft: (active && !collapsed) ? '3px' : 0 }} />
-        {!collapsed && label}
+        {!collapsed && (
+          sub ? (
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '13px', lineHeight: 1.2 }}>{label}</div>
+              <div style={{ fontSize: '10px', color: active ? '#6366F1' : '#333', marginTop: '1px', lineHeight: 1 }}>{sub}</div>
+            </div>
+          ) : label
+        )}
       </Link>
     )
   }

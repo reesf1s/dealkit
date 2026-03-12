@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic'
 
 import useSWR from 'swr'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { TrendingUp, Users, BookOpen, ClipboardList, FileText, Plus, RefreshCw, AlertTriangle, CheckCircle, Circle, ArrowUpRight, Zap, Target, BarChart3, Sparkles, Copy, Check, Map } from 'lucide-react'
 import ROIWidget from '@/components/dashboard/ROIWidget'
 import { SetupAlert } from '@/components/shared/SetupBanner'
@@ -107,6 +108,7 @@ const TYPE_COLORS: Record<string, { bg: string; color: string; border: string }>
 export default function DashboardPage() {
   const { user } = useUser()
   const { toast } = useToast()
+  const router = useRouter()
   const [joinCode, setJoinCode] = useState('')
   const [joining, setJoining] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
@@ -121,6 +123,15 @@ export default function DashboardPage() {
   const { data: productGapsData } = useSWR('/api/product-gaps', fetcher)
 
   const dbNotConnected = isDbNotConfigured(companyErr)
+
+  // Redirect new users to onboarding if they haven't set up a company profile
+  useEffect(() => {
+    if (company === undefined) return // still loading
+    if (dbNotConnected) return // don't redirect on DB error
+    if (!company?.data?.companyName) {
+      router.replace('/onboarding')
+    }
+  }, [company, dbNotConnected, router])
 
   // APIs return { data: ... } — unwrap correctly
   const companyData = company?.data
@@ -248,6 +259,39 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* Setup progress banner — shown until all steps complete */}
+      {healthPct < 100 && !dbNotConnected && (
+        <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '12px', padding: '14px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Sparkles size={13} color="#818CF8" />
+              <span style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF' }}>Get DealKit set up</span>
+              <span style={{ fontSize: '11px', color: '#6366F1', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', padding: '1px 7px', borderRadius: '100px', fontWeight: '600' }}>{completedSteps}/{steps.length} done</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ width: '80px', height: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+                <div style={{ width: `${healthPct}%`, height: '100%', background: 'linear-gradient(90deg, #6366F1, #818CF8)', borderRadius: '2px' }} />
+              </div>
+              <span style={{ fontSize: '11px', color: '#555', fontWeight: '600' }}>{healthPct}%</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {steps.map((step, i) => (
+              step.done ? (
+                <div key={step.href} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '7px', fontSize: '12px', background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', color: '#22C55E', opacity: 0.6 }}>
+                  <CheckCircle size={11} /> {step.label}
+                </div>
+              ) : (
+                <Link key={step.href} href={step.href} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 10px', borderRadius: '7px', fontSize: '12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(99,102,241,0.3)', color: '#EBEBEB', textDecoration: 'none', fontWeight: '500' }}>
+                  <span style={{ width: '16px', height: '16px', borderRadius: '50%', background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: '#818CF8', fontWeight: '700', flexShrink: 0 }}>{i + 1}</span>
+                  {step.label} →
+                </Link>
+              )
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Alerts */}
       {dbNotConnected && <SetupAlert />}
