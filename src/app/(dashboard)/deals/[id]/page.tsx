@@ -36,6 +36,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate }: { dealId: string; deal: any
       const data = await res.json()
       setResult(data.data)
       setNotes('')
+      setHistoryExpanded(true) // auto-show updated history
       onUpdate()
     } finally {
       setLoading(false)
@@ -397,7 +398,10 @@ function MeetingPrepTab({ dealId, deal }: { dealId: string; deal: any }) {
 
 function TodosTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
   const [newTodo, setNewTodo] = useState('')
+  const [doneExpanded, setDoneExpanded] = useState(false)
   const todos: any[] = deal?.todos ?? []
+  const pending = todos.filter((t: any) => !t.done)
+  const done = todos.filter((t: any) => t.done)
 
   const saveTodos = async (updated: any[]) => {
     await fetch(`/api/deals/${dealId}/todos`, {
@@ -442,36 +446,71 @@ function TodosTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpd
         </button>
       </form>
 
-      {todos.length === 0 ? (
+      {/* Pending todos */}
+      {pending.length === 0 && done.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '32px', color: '#444', fontSize: '13px' }}>
           No action items yet. Analyze meeting notes to auto-generate them.
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {todos.map((todo: any) => (
-            <div key={todo.id} style={{
-              display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
-              background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px',
-            }}>
-              <button onClick={() => toggleTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', color: todo.done ? '#22C55E' : '#333' }}>
-                {todo.done ? <CheckCircle size={15} color="#22C55E" /> : <Square size={15} color="#333" />}
-              </button>
-              <span style={{ flex: 1, fontSize: '13px', color: todo.done ? '#444' : '#EBEBEB', textDecoration: todo.done ? 'line-through' : 'none' }}>
-                {todo.text}
-              </span>
-              <button onClick={() => deleteTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#333', padding: '2px', display: 'flex', borderRadius: '4px' }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#EF4444'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#333'}
-              >
-                <Trash2 size={12} />
-              </button>
+        <>
+          {pending.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {pending.map((todo: any) => (
+                <div key={todo.id} style={{
+                  display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
+                  background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px',
+                }}>
+                  <button onClick={() => toggleTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}>
+                    <Square size={15} color="#444" />
+                  </button>
+                  <span style={{ flex: 1, fontSize: '13px', color: '#EBEBEB' }}>{todo.text}</span>
+                  <button onClick={() => deleteTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#333', padding: '2px', display: 'flex', borderRadius: '4px' }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#EF4444'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#333'}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+
+          {/* Completed todos — collapsed by default */}
+          {done.length > 0 && (
+            <div style={{ marginTop: '4px' }}>
+              <button
+                onClick={() => setDoneExpanded(v => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 2px', color: '#444', fontSize: '11px' }}
+              >
+                <CheckCircle size={11} color="#22C55E" />
+                <span style={{ color: '#22C55E', fontWeight: '600' }}>{done.length} completed</span>
+                <span style={{ color: '#333' }}>{doneExpanded ? '↑' : '↓'}</span>
+              </button>
+              {doneExpanded && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
+                  {done.map((todo: any) => (
+                    <div key={todo.id} style={{
+                      display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px',
+                      background: 'rgba(34,197,94,0.03)', border: '1px solid rgba(34,197,94,0.08)', borderRadius: '6px',
+                    }}>
+                      <button onClick={() => toggleTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}>
+                        <CheckCircle size={13} color="#22C55E" />
+                      </button>
+                      <span style={{ flex: 1, fontSize: '12px', color: '#444', textDecoration: 'line-through' }}>{todo.text}</span>
+                      <button onClick={() => deleteTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2A2A2A', padding: '1px', display: 'flex', borderRadius: '3px' }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#EF4444'}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#2A2A2A'}
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
-      <div style={{ fontSize: '11px', color: '#444', textAlign: 'right', paddingTop: '4px' }}>
-        {todos.filter((t: any) => t.done).length}/{todos.length} completed
-      </div>
     </div>
   )
 }

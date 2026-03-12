@@ -61,9 +61,18 @@ const COLLATERAL_TYPES: { keyword: string; type: CollateralType }[] = [
   { keyword: 'case study doc', type: 'case_study_doc' },
 ]
 
+const PRODUCT_GAP_PATTERNS = [
+  /product\s+gap/i, /feature\s+gap/i, /feature\s+request/i,
+  /missing\s+feature/i, /gap\s+for/i, /gap\s+from/i,
+  /add.*gap/i, /log.*gap/i, /track.*gap/i,
+  /doesn't\s+(have|support)/i, /doesn't\s+(have|support)/i,
+  /they\s+(need|want|require)\s+(an?\s+)?integration/i,
+  /as\s+a\s+(product|feature)\s+gap/i,
+]
+
 const COMPANY_UPDATE_PATTERNS = [
   /update.*compan/i, /update.*profile/i, /update our/i,
-  /add.*product/i, /new product/i, /we(('re| are) a| offer| provide| do| help)/i,
+  /add.*product(?!\s+gap)/i, /new product(?!\s+gap)/i, /we(('re| are) a| offer| provide| do| help)/i,
   /company description/i, /value prop/i, /our differentiator/i,
 ]
 
@@ -95,12 +104,14 @@ const DEAL_ACTION_PATTERNS = [
 ]
 
 type Intent = 'meeting_notes' | 'competitor_battlecard' | 'company_update' |
-  'collateral_generate' | 'deal_create' | 'case_study_create' | 'deal_action' | 'qa'
+  'collateral_generate' | 'deal_create' | 'case_study_create' | 'deal_action' | 'product_gap' | 'qa'
 
 function detectIntent(text: string): Intent {
   const lower = text.toLowerCase()
   if (looksLikeMeetingTranscript(text)) return 'meeting_notes'
   if (BATTLECARD_PATTERNS.some(p => p.test(text))) return 'competitor_battlecard'
+  // Product gap must be checked BEFORE company_update (pattern overlap)
+  if (PRODUCT_GAP_PATTERNS.some(p => p.test(text))) return 'product_gap'
   const hasGenerateVerb = /\b(generate|create|make|write|build)\b/.test(lower)
   if (hasGenerateVerb && COLLATERAL_TYPES.some(c => lower.includes(c.keyword))) return 'collateral_generate'
   if (COMPANY_UPDATE_PATTERNS.some(p => p.test(text))) return 'company_update'
@@ -394,6 +405,71 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
   })
 
   return { reply, actions }
+}
+
+// ── Handler: product gap creation ─────────────────────────────────────────────
+async function handleProductGapCreate(
+  workspaceId: string, userId: string, text: string,
+): Promise<{ reply: string; actions: ActionCard[] }> {
+  const extractMsg = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001', max_tokens: 600,
+    messages: [{
+      role: 'user',
+      content: `Extract product/feature gap details from this text. Return ONLY JSON.
+
+{
+  "gaps": [
+    {
+      "title": "concise gap title e.g. 'Appspace integration'",
+      "description": "what the customer needs / why it's missing",
+      "priority": "critical|high|medium|low",
+      "sourceDeal": "company or deal name if mentioned, or null"
+    }
+  ]
+}
+
+If no clear gap is described, return { "gaps": [] }.
+
+Text: ${text.slice(0, 3000)}`,
+    }],
+  })
+
+  let gaps: { title: string; description: string; priority: string; sourceDeal: string | null }[] = []
+  try {
+    const parsed = JSON.parse(stripJson((extractMsg.content[0] as { type: string; text: string }).text))
+    gaps = parsed.gaps ?? []
+  } catch { gaps = [] }
+
+  if (gaps.length === 0) {
+    return { reply: "I couldn't identify a specific product gap from that. Try: _\"Add Salesforce integration as a product gap for Acme deal\"_", actions: [] }
+  }
+
+  const created: string[] = []
+  for (const gap of gaps) {
+    if (!gap.title) continue
+    const [existing] = await db.select().from(productGaps)
+      .where(and(eq(productGaps.workspaceId, workspaceId), eq(productGaps.title, gap.title))).limit(1)
+    if (existing) {
+      await db.update(productGaps).set({ frequency: (existing.frequency ?? 1) + 1, updatedAt: new Date() })
+        .where(eq(productGaps.id, existing.id))
+      created.push(`${gap.title} (frequency +1)`)
+    } else {
+      await db.insert(productGaps).values({
+        workspaceId, userId, title: gap.title,
+        description: gap.description ?? '',
+        priority: (['critical', 'high', 'medium', 'low'].includes(gap.priority) ? gap.priority : 'medium') as 'critical' | 'high' | 'medium' | 'low',
+        frequency: 1, sourceDeals: [], status: 'open',
+        createdAt: new Date(), updatedAt: new Date(),
+      })
+      created.push(gap.title)
+    }
+  }
+
+  const names = created.join(', ')
+  return {
+    reply: `Logged ${created.length} product gap${created.length > 1 ? 's' : ''}: **${names}**.\n\nView and manage on the [Feature Gaps](/product-gaps) page.`,
+    actions: [{ type: 'gaps_logged', gaps: created, count: created.length }],
+  }
 }
 
 // ── Handler: company profile update ───────────────────────────────────────────
@@ -866,6 +942,11 @@ export async function POST(req: NextRequest) {
 
     if (intent === 'meeting_notes') {
       const result = await handleMeetingNotes(workspaceId, userId, lastText)
+      return NextResponse.json(result)
+    }
+
+    if (intent === 'product_gap') {
+      const result = await handleProductGapCreate(workspaceId, userId, lastText)
       return NextResponse.json(result)
     }
 

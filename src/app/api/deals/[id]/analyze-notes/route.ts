@@ -37,14 +37,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       (deal.dealRisks as string[])?.length ? `KNOWN DEAL RISKS SO FAR: ${(deal.dealRisks as string[]).join('; ')}` : '',
     ].filter(Boolean).join('\n\n')
 
+    const existingTodos = (deal.todos as any[]) ?? []
+    const openTodos = existingTodos.filter((t: any) => !t.done)
+    const existingTodosContext = openTodos.length > 0
+      ? `\n\nEXISTING OPEN ACTION ITEMS (do not duplicate these — if a new action item is substantially the same as an existing one, do NOT add it again):\n${openTodos.map((t: any) => `- [${t.id}] ${t.text}`).join('\n')}\n\nAlso review whether any existing action items are now OBSOLETE given the new meeting notes (e.g. a task that's clearly been completed, superseded, or no longer relevant). Return their IDs in obsoleteTodoIds.`
+      : ''
+
     const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001', max_tokens: 1024,
+      model: 'claude-haiku-4-5-20251001', max_tokens: 1280,
       messages: [{ role: 'user', content: `You are analyzing B2B sales meeting notes. Extract structured information and return ONLY valid JSON, no markdown.
 
 ${previousContext ? `${previousContext}\n\n---\n\n` : ''}NEW MEETING NOTES TO ANALYZE:
 ${meetingNotes}
 
-Deal context: ${deal.dealName} with ${deal.prospectCompany}${capabilitiesContext}
+Deal context: ${deal.dealName} with ${deal.prospectCompany}${capabilitiesContext}${existingTodosContext}
 
 ${previousContext ? 'Use the full meeting history above to inform your analysis — the summary, conversion score, and risks should reflect the entire deal trajectory, not just today\'s notes.' : ''}
 
@@ -55,10 +61,16 @@ Return this exact JSON structure:
   "conversionInsights": ["Why score is X", "Key risk or opportunity", "Recommended next action"],
   "risks": ["Deal risk or warning signal observed in the notes"],
   "todos": [{"text": "action item"}],
+  "obsoleteTodoIds": ["existing-todo-id-if-now-irrelevant"],
   "productGaps": [{"title": "gap title", "description": "what customer needs that product lacks", "priority": "high"}]
 }
 
 conversionScore: 0-100. priority: critical | high | medium | low
+
+IMPORTANT — todos rules:
+- Only add NEW action items not already covered by existing open items.
+- Do not duplicate: if an existing item says "Send proposal" and the notes mention sending a proposal, do NOT add it again.
+- obsoleteTodoIds: list IDs of existing open items that are now clearly done, superseded, or irrelevant based on the new notes. Return [] if none.
 
 IMPORTANT — risks rules:
 - Include any signals that could jeopardise this deal: disengagement, slow responses, champion leaving, budget concerns, competing priorities, late-stage hesitation, unclear decision-maker, etc.
@@ -78,16 +90,24 @@ IMPORTANT — productGaps rules:
     } catch {
       parsed = { summary: meetingNotes.slice(0, 200), conversionScore: 50, conversionInsights: [], risks: [], todos: [], productGaps: [] }
     }
-    const todos = (parsed.todos ?? []).map((t: any) => ({ id: crypto.randomUUID(), text: t.text, done: false, createdAt: new Date().toISOString() }))
+    const newTodos = (parsed.todos ?? []).map((t: any) => ({ id: crypto.randomUUID(), text: t.text, done: false, createdAt: new Date().toISOString() }))
+    const obsoleteIds = new Set<string>(parsed.obsoleteTodoIds ?? [])
     const dateStamp = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     const appendedNotes = deal.meetingNotes
       ? `${deal.meetingNotes}\n\n---\n[${dateStamp}]\n${meetingNotes}`
       : meetingNotes
+    // Keep existing todos, marking obsolete ones as done; append new todos
+    const mergedTodos = [
+      ...((deal.todos as any[]) ?? []).map((t: any) =>
+        obsoleteIds.has(t.id) ? { ...t, done: true } : t
+      ),
+      ...newTodos,
+    ]
     const [updatedDeal] = await db.update(dealLogs).set({
       meetingNotes: appendedNotes, aiSummary: parsed.summary, conversionScore: parsed.conversionScore,
       conversionInsights: parsed.conversionInsights ?? [],
       dealRisks: parsed.risks ?? [],
-      todos: [...((deal.todos as any[]) ?? []), ...todos], updatedAt: new Date(),
+      todos: mergedTodos, updatedAt: new Date(),
     }).where(eq(dealLogs.id, id)).returning()
     const createdGaps = []
     for (const gap of (parsed.productGaps ?? [])) {
