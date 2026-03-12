@@ -2,7 +2,7 @@ export const maxDuration = 60
 
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { and, count, eq } from 'drizzle-orm'
+import { and, count, eq, isNull, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { collateral, companyProfiles, events } from '@/lib/db/schema'
 import { PLAN_LIMITS, isWithinLimit } from '@/lib/stripe/plans'
@@ -56,11 +56,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'caseStudyId is required for case study doc generation' }, { status: 400 })
 
     const now = new Date()
-    const [record] = await db.insert(collateral).values({
-      workspaceId, userId, type, title: `Generating ${type.replace(/_/g, ' ')}…`, status: 'generating',
-      sourceCompetitorId: competitorId ?? null, sourceCaseStudyId: caseStudyId ?? null,
-      sourceDealLogId: null, content: null, rawResponse: null, generatedAt: null, createdAt: now, updatedAt: now,
-    }).returning()
+
+    // Reuse any existing non-ready record with the same key to prevent duplicates.
+    // A "stuck" generating record (e.g. from a timed-out previous request) or a stale
+    // record for the same competitor/case-study should be overwritten, not duplicated.
+    const competitorMatch = competitorId ? eq(collateral.sourceCompetitorId, competitorId) : isNull(collateral.sourceCompetitorId)
+    const caseStudyMatch = caseStudyId ? eq(collateral.sourceCaseStudyId, caseStudyId) : isNull(collateral.sourceCaseStudyId)
+
+    const [existing] = await db.select({ id: collateral.id }).from(collateral).where(
+      and(
+        eq(collateral.workspaceId, workspaceId),
+        eq(collateral.type, type),
+        competitorMatch,
+        caseStudyMatch,
+        or(eq(collateral.status, 'generating'), eq(collateral.status, 'stale')),
+      )
+    ).limit(1)
+
+    let record: { id: string }
+    if (existing) {
+      // Overwrite the stuck/stale record in-place — no new row created
+      const [updated] = await db.update(collateral)
+        .set({ userId, title: `Generating ${type.replace(/_/g, ' ')}…`, status: 'generating', content: null, rawResponse: null, generatedAt: null, updatedAt: now })
+        .where(eq(collateral.id, existing.id))
+        .returning({ id: collateral.id })
+      record = updated
+    } else {
+      const [inserted] = await db.insert(collateral).values({
+        workspaceId, userId, type, title: `Generating ${type.replace(/_/g, ' ')}…`, status: 'generating',
+        sourceCompetitorId: competitorId ?? null, sourceCaseStudyId: caseStudyId ?? null,
+        sourceDealLogId: null, content: null, rawResponse: null, generatedAt: null, createdAt: now, updatedAt: now,
+      }).returning({ id: collateral.id })
+      record = inserted
+    }
 
     // Run synchronously — Haiku at 1024 tokens typically completes in 3-8s, well within maxDuration=60
     try {
