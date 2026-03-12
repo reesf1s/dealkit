@@ -237,7 +237,7 @@ async function handleMeetingNotes(
   ).join('\n')
 
   const analysisMsg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001', max_tokens: 1500,
+    model: 'claude-haiku-4-5-20251001', max_tokens: 900,
     messages: [{
       role: 'user',
       content: `Analyze these B2B sales meeting notes. Return ONLY valid JSON.
@@ -1030,7 +1030,9 @@ export async function POST(req: NextRequest) {
         const todoText = pending.length > 0
           ? `Todos: ${pending.map(t => `• ${t.text}`).join(', ')}`
           : 'No pending todos'
-        const notesEntries = d.notes ? d.notes.split('\n').filter((l: string) => l.startsWith('[')).slice(-3).join(' | ') : ''
+        // Use compact meeting history (takeaways) if available, else fall back to notes
+        const historySource = d.meetingNotes || d.notes || ''
+        const notesEntries = historySource.split('\n').filter((l: string) => l.startsWith('[')).slice(-3).join(' | ')
         const notesCtx = notesEntries ? ` History: ${notesEntries}` : ''
         kbParts.push(`- "${d.dealName}" at ${d.prospectCompany} (${d.stage}): $${d.dealValue ? (d.dealValue / 100).toLocaleString() : '?'}. ${todoText}.${notesCtx}`)
       })

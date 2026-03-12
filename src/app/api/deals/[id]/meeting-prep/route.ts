@@ -23,35 +23,35 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     ])
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     const dealComps = comps.filter(c => (deal.competitors as string[])?.includes(c.name))
-    const prompt = `You are a world-class B2B sales coach preparing a rep for an important meeting.
+    const prompt = `You are a B2B sales coach. Generate a focused meeting prep brief — only the most critical points a rep needs. Be concise.
 
-# Deal: ${deal.dealName}
-- Prospect: ${deal.prospectName ?? 'Unknown'} at ${deal.prospectCompany}
-- Stage: ${deal.stage}
-- Value: ${deal.dealValue ? `£${(deal.dealValue/100).toLocaleString()}` : 'Unknown'}
-- General notes: ${deal.notes ?? 'None'}
-- Current deal summary: ${deal.aiSummary ?? 'None'}
-- Known deal risks: ${(deal.dealRisks as string[])?.join('; ') || 'None'}
-- Open todos: ${((deal.todos as any[]) ?? []).filter(t => !t.done).map((t: any) => t.text).join(', ') || 'None'}
-${deal.meetingNotes ? `\n# Full Meeting History (all previous meetings)\n${deal.meetingNotes}\n\nUse the meeting history above to understand deal trajectory, recurring concerns, key stakeholders mentioned, and commitments made. Your prep must be informed by this full context.` : ''}
+DEAL: ${deal.dealName} | ${deal.prospectName ?? 'Unknown'} at ${deal.prospectCompany} | Stage: ${deal.stage}${deal.dealValue ? ` | Value: £${(deal.dealValue/100).toLocaleString()}` : ''}
+${deal.aiSummary ? `Summary: ${deal.aiSummary}` : ''}
+${(deal.dealRisks as string[])?.length ? `Risks: ${(deal.dealRisks as string[]).join('; ')}` : ''}
+${((deal.todos as any[]) ?? []).filter((t: any) => !t.done).length > 0 ? `Open actions: ${((deal.todos as any[]) ?? []).filter((t: any) => !t.done).map((t: any) => t.text).join('; ')}` : ''}
+${deal.meetingNotes ? `Meeting history:\n${deal.meetingNotes}` : ''}
+${company ? `\nOUR PRODUCT: ${company.companyName} — ${(company.valuePropositions as string[])?.slice(0, 3).join(' · ')}. Key differentiators: ${(company.differentiators as string[])?.slice(0, 3).join(', ')}` : ''}
+${dealComps.length > 0 ? `\nCOMPETITORS: ${dealComps.map(c => `${c.name} (weaknesses: ${(c.weaknesses as string[])?.slice(0, 2).join(', ')})`).join('; ')}` : ''}
 
-# Our Company
-${company ? `${company.companyName} - ${company.description ?? ''}
-Value props: ${(company.valuePropositions as string[])?.join(', ') ?? ''}
-Differentiators: ${(company.differentiators as string[])?.join(', ') ?? ''}` : 'Not configured'}
+Return a brief prep doc in this exact format (use plain headers and bullet points):
 
-# Competing Against
-${dealComps.length > 0 ? dealComps.map(c => `- ${c.name}: Strengths: ${(c.strengths as string[])?.join(', ')}. Weaknesses: ${(c.weaknesses as string[])?.join(', ')}`).join('\n') : 'No known competitors'}
+## Objective
+One sentence: what must be achieved in this meeting.
 
-Generate a concise meeting prep document in markdown with these sections:
-## Meeting Objective
-## Key Talking Points (3-5 bullets)
-## Competitive Handling (if competitors known)
-## Anticipated Objections & Responses
-## Questions to Ask
-## Success Criteria for This Meeting
-## Next Steps Template`
-    const msg = await anthropic.messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 1500, messages: [{ role: 'user', content: prompt }] })
+## Key Points (max 4)
+- Most important thing to communicate
+- ...
+
+## Objections to Expect
+- Objection → short response
+- ...
+
+## Questions to Ask (max 3)
+- ...
+
+## Next Step
+One clear next action to close or advance.`
+    const msg = await anthropic.messages.create({ model: 'claude-haiku-4-5-20251001', max_tokens: 700, messages: [{ role: 'user', content: prompt }] })
     const prep = (msg.content[0] as any).text
     return NextResponse.json({ data: { prep } })
   } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }

@@ -44,7 +44,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       : ''
 
     const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001', max_tokens: 1280,
+      model: 'claude-haiku-4-5-20251001', max_tokens: 1000,
       messages: [{ role: 'user', content: `You are analyzing B2B sales meeting notes. Extract structured information and return ONLY valid JSON, no markdown.
 
 ${previousContext ? `${previousContext}\n\n---\n\n` : ''}NEW MEETING NOTES TO ANALYZE:
@@ -93,9 +93,13 @@ IMPORTANT — productGaps rules:
     const newTodos = (parsed.todos ?? []).map((t: any) => ({ id: crypto.randomUUID(), text: t.text, done: false, createdAt: new Date().toISOString() }))
     const obsoleteIds = new Set<string>(parsed.obsoleteTodoIds ?? [])
     const dateStamp = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    // Store compact takeaways (not raw notes) to keep history token-efficient across many meetings
+    const risksLine = (parsed.risks ?? []).length > 0 ? ` Risks: ${(parsed.risks as string[]).join('; ')}.` : ''
+    const actionLine = newTodos.length > 0 ? ` Actions: ${newTodos.map((t: any) => t.text).join('; ')}.` : ''
+    const compactEntry = `[${dateStamp}] ${parsed.summary ?? meetingNotes.slice(0, 150)}${risksLine}${actionLine}`
     const appendedNotes = deal.meetingNotes
-      ? `${deal.meetingNotes}\n\n---\n[${dateStamp}]\n${meetingNotes}`
-      : meetingNotes
+      ? `${deal.meetingNotes}\n${compactEntry}`
+      : compactEntry
     // Keep existing todos, marking obsolete ones as done; append new todos
     const mergedTodos = [
       ...((deal.todos as any[]) ?? []).map((t: any) =>

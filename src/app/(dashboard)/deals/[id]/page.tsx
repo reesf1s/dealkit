@@ -387,7 +387,14 @@ function MeetingPrepTab({ dealId, deal }: { dealId: string; deal: any }) {
               {loading ? 'Regenerating…' : 'Regenerate'}
             </button>
           </div>
-          <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>{prep}</div>
+          <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.8' }}>
+            {prep.split('\n').map((line, i) => {
+              if (line.startsWith('## ')) return <div key={i} style={{ fontSize: '11px', fontWeight: 700, color: '#818CF8', letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: i === 0 ? 0 : '16px', marginBottom: '6px' }}>{line.slice(3)}</div>
+              if (line.startsWith('- ')) return <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '4px' }}><span style={{ color: '#6366F1', flexShrink: 0, marginTop: '2px' }}>·</span><span>{line.slice(2)}</span></div>
+              if (line.trim() === '') return <div key={i} style={{ height: '4px' }} />
+              return <div key={i} style={{ marginBottom: '4px' }}>{line}</div>
+            })}
+          </div>
         </div>
       )}
 

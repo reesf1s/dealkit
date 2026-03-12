@@ -140,10 +140,10 @@ export default function DashboardPage() {
   const dealList: { id: string; stage: string; dealName: string; prospectCompany: string; dealValue?: number | null; dealType?: string | null; recurringInterval?: string | null; competitors?: string[]; todos: { id: string; text: string; done: boolean }[] }[] = deals?.data ?? []
   const collateralList: { id: string; title: string; type: string; status: string }[] = collateral?.data ?? []
   const insightsData = insights?.data
-  const gapList: { id: string; title: string; description?: string; priority: string; status: string; requestCount?: number; blockedRevenue?: number }[] = productGapsData?.data ?? []
-  const roadmapNow = gapList.filter(g => g.status === 'on_roadmap')
-  const roadmapNext = gapList.filter(g => g.status === 'in_review')
-  const roadmapLater = gapList.filter(g => g.status === 'open').slice(0, 6)
+  const gapList: { id: string; title: string; description?: string; priority: string; status: string; roadmap?: string | null; requestCount?: number; blockedRevenue?: number }[] = productGapsData?.data ?? []
+  const roadmapNow = gapList.filter(g => g.roadmap === 'now')
+  const roadmapNext = gapList.filter(g => g.roadmap === 'next')
+  const roadmapLater = gapList.filter(g => g.roadmap === 'later').slice(0, 6)
 
   const hasCompany = !!companyData?.id
   const competitorCount = competitorList.length
