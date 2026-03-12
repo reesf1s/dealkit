@@ -15,6 +15,12 @@ const PRIORITY_CONFIG: Record<string, { color: string; bg: string; border: strin
   low:      { color: '#6B7280', bg: 'rgba(107,114,128,0.08)', border: 'rgba(107,114,128,0.2)', label: 'Low' },
 }
 
+const ROADMAP_CONFIG: Record<string, { color: string; bg: string; border: string; label: string }> = {
+  now:  { color: '#22C55E', bg: 'rgba(34,197,94,0.08)',  border: 'rgba(34,197,94,0.2)',  label: 'Now' },
+  next: { color: '#6366F1', bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.2)', label: 'Next' },
+  later:{ color: '#6B7280', bg: 'rgba(107,114,128,0.08)',border: 'rgba(107,114,128,0.2)',label: 'Later' },
+}
+
 const STATUS_CONFIG: Record<string, { color: string; icon: React.ElementType; label: string }> = {
   open:        { color: '#EF4444', icon: Circle, label: 'Open' },
   in_review:   { color: '#F59E0B', icon: Clock, label: 'In Review' },
@@ -36,6 +42,15 @@ export default function ProductGapsPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
+    })
+    mutate('/api/product-gaps')
+  }
+
+  const updateRoadmap = async (id: string, roadmap: string | null) => {
+    await fetch(`/api/product-gaps/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roadmap }),
     })
     mutate('/api/product-gaps')
   }
@@ -168,6 +183,11 @@ export default function ProductGapsPage() {
                         <StatusIcon size={10} />
                         {sCfg.label}
                       </span>
+                      {gap.roadmap && ROADMAP_CONFIG[gap.roadmap] && (
+                        <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '100px', background: ROADMAP_CONFIG[gap.roadmap].bg, color: ROADMAP_CONFIG[gap.roadmap].color, border: `1px solid ${ROADMAP_CONFIG[gap.roadmap].border}`, fontWeight: '600' }}>
+                          {ROADMAP_CONFIG[gap.roadmap].label}
+                        </span>
+                      )}
                       {gap.frequency > 1 && (
                         <span style={{ fontSize: '11px', color: '#555', display: 'flex', alignItems: 'center', gap: '3px' }}>
                           <TrendingUp size={10} /> {gap.frequency} deals
@@ -196,7 +216,27 @@ export default function ProductGapsPage() {
                 {/* Status actions + delete */}
                 <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                   {deleteState[gap.id] !== 'confirming' && deleteState[gap.id] !== 'deleting' ? (
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {/* Roadmap position */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '11px', color: '#444', flexShrink: 0 }}>Roadmap:</span>
+                        {(['now', 'next', 'later'] as const).map(r => {
+                          const cfg = ROADMAP_CONFIG[r]
+                          const active = gap.roadmap === r
+                          return (
+                            <button key={r} onClick={() => updateRoadmap(gap.id, active ? null : r)} style={{
+                              padding: '3px 10px', borderRadius: '6px', border: `1px solid ${active ? cfg.border : 'rgba(255,255,255,0.06)'}`,
+                              background: active ? cfg.bg : 'rgba(255,255,255,0.03)',
+                              color: active ? cfg.color : '#555', fontSize: '11px', cursor: 'pointer', fontWeight: active ? '600' : '500',
+                              transition: 'all 0.1s',
+                            }}>
+                              {cfg.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      {/* Status transitions */}
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                       {Object.entries(STATUS_CONFIG).map(([sid, cfg]) => sid !== gap.status && (
                         <button key={sid} onClick={() => updateStatus(gap.id, sid)} style={{
                           padding: '4px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)',
@@ -218,6 +258,7 @@ export default function ProductGapsPage() {
                       >
                         <Trash2 size={11} /> Delete
                       </button>
+                    </div>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

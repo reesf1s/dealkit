@@ -231,6 +231,7 @@ export const productGaps = pgTable('product_gaps', {
   sourceDeals: jsonb('source_deals').notNull().default([]),
   affectedRevenue: integer('affected_revenue'),
   suggestedFix: text('suggested_fix'),
+  roadmap: text('roadmap'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

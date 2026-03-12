@@ -3,7 +3,7 @@ export const maxDuration = 60
 import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { and, count, eq, sql } from 'drizzle-orm'
+import { and, count, eq, ilike, or, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import {
   companyProfiles, competitors, caseStudies, dealLogs, productGaps, collateral, events,
@@ -447,10 +447,32 @@ Text: ${text.slice(0, 3000)}`,
   const created: string[] = []
   for (const gap of gaps) {
     if (!gap.title) continue
+
+    // Try to find a matching deal by name or company so we can link it
+    let linkedDealId: string | null = null
+    if (gap.sourceDeal) {
+      const [matchedDeal] = await db
+        .select({ id: dealLogs.id })
+        .from(dealLogs)
+        .where(and(
+          eq(dealLogs.workspaceId, workspaceId),
+          or(
+            ilike(dealLogs.dealName, `%${gap.sourceDeal}%`),
+            ilike(dealLogs.prospectCompany, `%${gap.sourceDeal}%`),
+          ),
+        ))
+        .limit(1)
+      linkedDealId = matchedDeal?.id ?? null
+    }
+
     const [existing] = await db.select().from(productGaps)
       .where(and(eq(productGaps.workspaceId, workspaceId), eq(productGaps.title, gap.title))).limit(1)
     if (existing) {
-      await db.update(productGaps).set({ frequency: (existing.frequency ?? 1) + 1, updatedAt: new Date() })
+      const existingDeals = (existing.sourceDeals as string[]) ?? []
+      const updatedDeals = linkedDealId && !existingDeals.includes(linkedDealId)
+        ? [...existingDeals, linkedDealId]
+        : existingDeals
+      await db.update(productGaps).set({ frequency: (existing.frequency ?? 1) + 1, sourceDeals: updatedDeals, updatedAt: new Date() })
         .where(eq(productGaps.id, existing.id))
       created.push(`${gap.title} (frequency +1)`)
     } else {
@@ -458,7 +480,7 @@ Text: ${text.slice(0, 3000)}`,
         workspaceId, userId, title: gap.title,
         description: gap.description ?? '',
         priority: (['critical', 'high', 'medium', 'low'].includes(gap.priority) ? gap.priority : 'medium') as 'critical' | 'high' | 'medium' | 'low',
-        frequency: 1, sourceDeals: [], status: 'open',
+        frequency: 1, sourceDeals: linkedDealId ? [linkedDealId] : [], status: 'open',
         createdAt: new Date(), updatedAt: new Date(),
       })
       created.push(gap.title)

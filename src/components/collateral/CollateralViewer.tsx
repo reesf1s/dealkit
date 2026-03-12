@@ -164,19 +164,6 @@ function BattlecardViewer({ content }: { content: BattlecardContent }) {
 function CaseStudyDocViewer({ content }: { content: CaseStudyDocContent }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Deal relevance note — shown when tailored for a specific deal */}
-      {content.prospectRelevanceNote && (
-        <Card style={{ backgroundColor: 'rgba(245,158,11,0.06)', borderColor: 'rgba(245,158,11,0.25)' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-            <span style={{ fontSize: '16px', flexShrink: 0 }}>🎯</span>
-            <div>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: '#F59E0B', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '4px' }}>Why this is relevant to your deal</div>
-              <p style={{ fontSize: '13px', color: '#EBEBEB', lineHeight: 1.65, margin: 0 }}>{content.prospectRelevanceNote}</p>
-            </div>
-          </div>
-        </Card>
-      )}
-
       {/* Hero */}
       <Card style={{ backgroundColor: 'rgba(99,102,241,0.06)', borderColor: 'rgba(99,102,241,0.2)' }}>
         <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', margin: '0 0 6px' }}>{content.headline}</h1>
