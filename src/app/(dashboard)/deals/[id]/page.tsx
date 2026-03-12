@@ -554,23 +554,47 @@ export default function DealDetailPage() {
       ) : (
         <div>
           {activeTab === 'overview' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-              {[
-                { label: 'Deal Name', value: deal.dealName },
-                { label: 'Company', value: deal.prospectCompany },
-                { label: 'Contact', value: deal.prospectName },
-                { label: 'Title', value: deal.prospectTitle },
-                { label: 'Stage', value: deal.stage?.replace('_', ' ') },
-                { label: 'Deal Value', value: deal.dealValue ? `$${deal.dealValue.toLocaleString()}` : null },
-                { label: 'Competitors', value: (deal.competitors as string[])?.join(', ') },
-                { label: 'Notes', value: deal.notes },
-                { label: 'Next Steps', value: deal.nextSteps },
-              ].filter(f => f.value).map(({ label, value }) => (
-                <div key={label} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '14px' }}>
-                  <div style={{ fontSize: '11px', color: '#555', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-                  <div style={{ fontSize: '13px', color: '#EBEBEB', fontWeight: '500' }}>{value}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Deal risks banner — only shown when AI has identified risks */}
+              {(deal.dealRisks as string[])?.length > 0 && (
+                <div style={{ padding: '14px 16px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '10px' }}>
+                  <div style={{ fontSize: '11px', color: '#F59E0B', fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    ⚠ AI-Identified Deal Risks
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    {(deal.dealRisks as string[]).map((risk: string, i: number) => (
+                      <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '13px', color: '#C9820A' }}>
+                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#F59E0B', flexShrink: 0, marginTop: '6px' }} />
+                        {risk}
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('meeting-notes')}
+                    style={{ marginTop: '10px', fontSize: '11px', color: '#F59E0B', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                  >
+                    View full AI analysis →
+                  </button>
                 </div>
-              ))}
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                {[
+                  { label: 'Deal Name', value: deal.dealName },
+                  { label: 'Company', value: deal.prospectCompany },
+                  { label: 'Contact', value: deal.prospectName },
+                  { label: 'Title', value: deal.prospectTitle },
+                  { label: 'Stage', value: deal.stage?.replace('_', ' ') },
+                  { label: 'Deal Value', value: deal.dealValue ? `$${deal.dealValue.toLocaleString()}` : null },
+                  { label: 'Competitors', value: (deal.competitors as string[])?.join(', ') },
+                  { label: 'Notes', value: deal.notes },
+                  { label: 'Next Steps', value: deal.nextSteps },
+                ].filter(f => f.value).map(({ label, value }) => (
+                  <div key={label} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '14px' }}>
+                    <div style={{ fontSize: '11px', color: '#555', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+                    <div style={{ fontSize: '13px', color: '#EBEBEB', fontWeight: '500' }}>{value}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
           {activeTab === 'meeting-notes' && (

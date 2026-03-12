@@ -51,7 +51,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
         paddingTop: '56px',
         transition: 'margin-left 0.22s cubic-bezier(0.4,0,0.2,1), margin-right 0.22s cubic-bezier(0.4,0,0.2,1)',
       }}>
-        <div style={{ flex: 1, padding: '24px', maxWidth: '880px', width: '100%' }}>
+        <div style={{ flex: 1, padding: '24px', width: '100%', boxSizing: 'border-box' }}>
           {children}
         </div>
       </main>

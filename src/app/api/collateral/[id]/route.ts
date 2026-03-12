@@ -62,12 +62,27 @@ export async function PATCH(_req: NextRequest, { params }: Params) {
       const titleMatch = item.title?.match(/^Battlecard:\s*vs\s+(.+)$/i)
       if (titleMatch) {
         const competitorName = titleMatch[1].trim()
-        const [found] = await db
+        // Strip any "(now X)" or "(formerly X)" suffix — competitor may have been renamed in the title
+        const baseName = competitorName.replace(/\s*\(.*?\)\s*$/, '').trim()
+
+        // 1. Try exact match first
+        const [exact] = await db
           .select({ id: competitors.id })
           .from(competitors)
           .where(and(eq(competitors.workspaceId, workspaceId), ilike(competitors.name, competitorName)))
           .limit(1)
-        if (found) competitorId = found.id
+
+        if (exact) {
+          competitorId = exact.id
+        } else {
+          // 2. Fall back: partial match on base name (handles renames like "Dojo AI (now OfficeSpace)")
+          const [partial] = await db
+            .select({ id: competitors.id })
+            .from(competitors)
+            .where(and(eq(competitors.workspaceId, workspaceId), ilike(competitors.name, `%${baseName}%`)))
+            .limit(1)
+          if (partial) competitorId = partial.id
+        }
       }
     }
 

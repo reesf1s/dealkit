@@ -41,12 +41,16 @@ export async function POST() {
   if (subscriptions.data.length > 0) {
     // Use the most recent active subscription
     const sub = subscriptions.data[0]
-    const priceId = sub.items.data[0]?.price.id
-    if (priceId) {
-      plan = planFromPriceId(priceId) ?? 'free'
+    // cancel_at_period_end means the user downgraded — treat as free immediately
+    // (Stripe keeps status 'active' until the period ends, but user intent is clear)
+    if (!sub.cancel_at_period_end) {
+      const priceId = sub.items.data[0]?.price.id
+      if (priceId) {
+        plan = planFromPriceId(priceId) ?? 'free'
+      }
     }
   }
-  // If no active subscription found → plan stays 'free'
+  // If no active subscription found, or subscription is set to cancel → plan stays 'free'
 
   const fromPlan = workspace.plan as Plan
   if (fromPlan !== plan) {

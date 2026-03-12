@@ -7,16 +7,19 @@ import {
   LayoutDashboard, Building2, Swords, BookOpen,
   ClipboardList, FileText, Settings, LogOut, Search,
   Kanban, AlertTriangle, Sparkles, ChevronLeft, ChevronRight,
-  X,
+  X, Zap,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 
-const NAV_ITEMS = [
+const WORKFLOW_ITEMS = [
   { href: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/pipeline',      icon: Kanban,          label: 'Pipeline' },
   { href: '/deals',         icon: ClipboardList,   label: 'Deal Log' },
   { href: '/collateral',    icon: FileText,        label: 'Collateral' },
   { href: '/product-gaps',  icon: AlertTriangle,   label: 'Product Gaps' },
+]
+
+const SETUP_ITEMS = [
   { href: '/company',       icon: Building2,       label: 'Company' },
   { href: '/competitors',   icon: Swords,          label: 'Competitors' },
   { href: '/case-studies',  icon: BookOpen,        label: 'Case Studies' },
@@ -30,6 +33,57 @@ export default function Sidebar() {
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
   const w = collapsed ? '64px' : '220px'
+
+  function NavItem({ href, icon: Icon, label }: { href: string; icon: React.ElementType; label: string }) {
+    const active = isActive(href)
+    return (
+      <Link
+        href={href}
+        onClick={() => closeMobile()}
+        title={collapsed ? label : undefined}
+        style={{
+          display: 'flex', alignItems: 'center', gap: collapsed ? 0 : '9px',
+          padding: collapsed ? '0' : '0 10px',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          height: '36px', borderRadius: '9px',
+          marginBottom: '2px', textDecoration: 'none',
+          fontSize: '13px', fontWeight: active ? '500' : '400',
+          color: active ? '#A78BFA' : '#9CA3AF',
+          background: active ? 'rgba(99,102,241,0.18)' : 'transparent',
+          border: active ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent',
+          transition: 'all 0.15s',
+          position: 'relative',
+        }}
+        onMouseEnter={e => { if (!active) {
+          (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.07)'
+          ;(e.currentTarget as HTMLElement).style.color = '#F0EEFF'
+        }}}
+        onMouseLeave={e => { if (!active) {
+          (e.currentTarget as HTMLElement).style.background = 'transparent'
+          ;(e.currentTarget as HTMLElement).style.color = '#9CA3AF'
+        }}}
+      >
+        {active && !collapsed && (
+          <>
+            <div style={{
+              position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
+              width: '3px', height: '18px', background: 'linear-gradient(180deg, #6366F1, #8B5CF6)',
+              borderRadius: '0 3px 3px 0', boxShadow: '0 0 8px rgba(99,102,241,0.7)',
+            }} />
+            <div style={{
+              position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+              width: '6px', height: '6px', borderRadius: '50%',
+              background: '#8B5CF6',
+              boxShadow: '0 0 6px rgba(139,92,246,0.8)',
+              animation: 'pulse-glow 2s ease-in-out infinite',
+            }} />
+          </>
+        )}
+        <Icon size={14} color={active ? '#A78BFA' : 'currentColor'} style={{ flexShrink: 0, marginLeft: (active && !collapsed) ? '3px' : 0 }} />
+        {!collapsed && label}
+      </Link>
+    )
+  }
 
   const SidebarContent = (
     <aside style={{
@@ -93,7 +147,7 @@ export default function Sidebar() {
       {/* Divider */}
       <div style={{ height: '1px', background: 'rgba(139,92,246,0.1)', margin: collapsed ? '0 8px 10px' : '0 22px 10px' }} />
 
-      {/* Search button — hidden when collapsed */}
+      {/* Search button */}
       {!collapsed && (
         <div style={{ padding: '0 10px 10px' }}>
           <button
@@ -133,75 +187,37 @@ export default function Sidebar() {
         </div>
       )}
 
-      {/* Section label */}
-      {!collapsed && (
-        <div style={{ padding: '0 18px 6px' }}>
-          <span style={{ fontSize: '10px', color: '#4B5563', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Menu</span>
-        </div>
-      )}
-
-      {/* Nav items */}
+      {/* Nav */}
       <nav style={{ flex: 1, padding: collapsed ? '0 8px' : '0 8px', overflowY: 'auto', overflowX: 'hidden' }}>
-        {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
-          const active = isActive(href)
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => closeMobile()}
-              title={collapsed ? label : undefined}
-              style={{
-                display: 'flex', alignItems: 'center', gap: collapsed ? 0 : '9px',
-                padding: collapsed ? '0' : '0 10px',
-                justifyContent: collapsed ? 'center' : 'flex-start',
-                height: '36px', borderRadius: '9px',
-                marginBottom: '2px', textDecoration: 'none',
-                fontSize: '13px', fontWeight: active ? '500' : '400',
-                color: active ? '#A78BFA' : '#9CA3AF',
-                background: active ? 'rgba(99,102,241,0.18)' : 'transparent',
-                border: active ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent',
-                transition: 'all 0.15s',
-                position: 'relative',
-              }}
-              onMouseEnter={e => { if (!active) {
-                (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.07)'
-                ;(e.currentTarget as HTMLElement).style.color = '#F0EEFF'
-              }}}
-              onMouseLeave={e => { if (!active) {
-                (e.currentTarget as HTMLElement).style.background = 'transparent'
-                ;(e.currentTarget as HTMLElement).style.color = '#9CA3AF'
-              }}}
-            >
-              {active && !collapsed && (
-                <>
-                  <div style={{
-                    position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
-                    width: '3px', height: '18px', background: 'linear-gradient(180deg, #6366F1, #8B5CF6)',
-                    borderRadius: '0 3px 3px 0', boxShadow: '0 0 8px rgba(99,102,241,0.7)',
-                  }} />
-                  <div style={{
-                    position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
-                    width: '6px', height: '6px', borderRadius: '50%',
-                    background: '#8B5CF6',
-                    boxShadow: '0 0 6px rgba(139,92,246,0.8)',
-                    animation: 'pulse-glow 2s ease-in-out infinite',
-                  }} />
-                </>
-              )}
-              <Icon size={14} color={active ? '#A78BFA' : 'currentColor'} style={{ flexShrink: 0, marginLeft: (active && !collapsed) ? '3px' : 0 }} />
-              {!collapsed && label}
-            </Link>
-          )
-        })}
+
+        {/* WORKFLOW section */}
+        {!collapsed && (
+          <div style={{ padding: '0 10px 5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Zap size={9} color="#6366F1" />
+            <span style={{ fontSize: '10px', color: '#6366F1', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Workflow</span>
+          </div>
+        )}
+        {collapsed && <div style={{ height: '8px' }} />}
+
+        {WORKFLOW_ITEMS.map(item => <NavItem key={item.href} {...item} />)}
 
         {/* Divider */}
         <div style={{ margin: '10px 2px', height: '1px', background: 'rgba(139,92,246,0.08)' }} />
+
+        {/* SETUP section */}
+        {!collapsed && (
+          <div style={{ padding: '0 10px 5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '10px', color: '#4B5563', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Setup</span>
+          </div>
+        )}
+
+        {SETUP_ITEMS.map(item => <NavItem key={item.href} {...item} />)}
 
         {/* AI Setup pill */}
         {!collapsed ? (
           <Link href="/onboarding" onClick={() => closeMobile()} style={{
             display: 'flex', alignItems: 'center', gap: '9px',
-            padding: '0 10px', height: '33px', borderRadius: '100px', marginBottom: '10px',
+            padding: '0 10px', height: '33px', borderRadius: '100px', marginTop: '4px', marginBottom: '10px',
             textDecoration: 'none', fontSize: '12px', fontWeight: '600', color: '#A78BFA',
             background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(139,92,246,0.25)',
             transition: 'all 0.15s',
@@ -222,7 +238,7 @@ export default function Sidebar() {
         ) : (
           <Link href="/onboarding" onClick={() => closeMobile()} title="AI Setup" style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            height: '33px', borderRadius: '8px', marginBottom: '4px',
+            height: '33px', borderRadius: '8px', marginBottom: '4px', marginTop: '4px',
             textDecoration: 'none',
             background: 'rgba(124,58,237,0.12)', border: '1px solid rgba(139,92,246,0.25)',
           }}>
@@ -230,12 +246,8 @@ export default function Sidebar() {
           </Link>
         )}
 
-        {/* OTHER section label */}
-        {!collapsed && (
-          <div style={{ padding: '0 10px 6px' }}>
-            <span style={{ fontSize: '10px', color: '#4B5563', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Other</span>
-          </div>
-        )}
+        {/* Divider */}
+        <div style={{ margin: '2px 2px 6px', height: '1px', background: 'rgba(139,92,246,0.08)' }} />
 
         {/* Settings */}
         <Link
