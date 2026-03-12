@@ -259,7 +259,7 @@ Return:
   "risks": ["risk or blocker"]
 }
 
-matchedDealId must be one of the IDs above (or null). Stage values: prospecting|qualification|discovery|proposal|negotiation|closed_won|closed_lost. dealValue in cents. Priority: critical|high|medium|low.`,
+matchedDealId must be one of the IDs above (or null). Stage values: prospecting|qualification|discovery|proposal|negotiation|closed_won|closed_lost. dealValue in dollars (integer). Priority: critical|high|medium|low.`,
     }],
   })
 
@@ -335,7 +335,7 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
 
       const updatePayload: Record<string, unknown> = { todos: mergedTodos, meetingNotes: text, notes: accumulatedNotes, updatedAt: new Date() }
       if (parsed.dealUpdate?.stage) { updatePayload.stage = parsed.dealUpdate.stage; dealChanges.push(`stage → **${parsed.dealUpdate.stage}**`) }
-      if (parsed.dealUpdate?.dealValue) { updatePayload.dealValue = parsed.dealUpdate.dealValue; dealChanges.push(`value → **$${(parsed.dealUpdate.dealValue / 100).toLocaleString()}**`) }
+      if (parsed.dealUpdate?.dealValue) { updatePayload.dealValue = parsed.dealUpdate.dealValue; dealChanges.push(`value → **$${parsed.dealUpdate.dealValue.toLocaleString()}**`) }
 
       await db.update(dealLogs).set(updatePayload).where(eq(dealLogs.id, parsed.matchedDealId))
 
@@ -693,7 +693,7 @@ async function handleDealCreate(
   "prospectCompany": "string",
   "prospectName": "string or null",
   "prospectTitle": "string or null",
-  "dealValue": "number in cents or null",
+  "dealValue": "number in dollars (integer) or null",
   "stage": "prospecting|qualification|discovery|proposal|negotiation or null",
   "competitors": ["string"] or [],
   "notes": "string or null"
@@ -734,7 +734,7 @@ Text: ${text.slice(0, 3000)}`,
   await db.insert(events).values({ workspaceId, userId, type: 'deal_log.created', metadata: { dealId: deal.id, dealName: deal.dealName, source: 'ai_chat' }, createdAt: now })
 
   return {
-    reply: `Created deal **${deal.dealName}** at **${deal.prospectCompany}**${deal.dealValue ? ` ($${(deal.dealValue / 100).toLocaleString()})` : ''}. Stage: **${deal.stage}**.\n\nView and edit it in [Deal Log](/deals/${deal.id}).`,
+    reply: `Created deal **${deal.dealName}** at **${deal.prospectCompany}**${deal.dealValue ? ` ($${deal.dealValue.toLocaleString()})` : ''}. Stage: **${deal.stage}**.\n\nView and edit it in [Deal Log](/deals/${deal.id}).`,
     actions: [{ type: 'deal_created', dealId: deal.id, dealName: deal.dealName, company: deal.prospectCompany }],
   }
 }
@@ -824,7 +824,7 @@ Return ONLY JSON:
   "action": "remove_outdated_todos|complete_todos|remove_specific_todos|update_stage|update_value|update_notes|qa",
   "description": "brief description of what to do",
   "stageValue": "new stage if action=update_stage, else null — one of: prospecting|qualification|discovery|proposal|negotiation|closed_won|closed_lost",
-  "valueInCents": "integer if action=update_value, else null",
+  "valueInDollars": "integer in dollars if action=update_value, else null",
   "notesText": "text to append if action=update_notes, else null"
 }
 
@@ -834,7 +834,7 @@ Match the deal by name/company. If no clear deal match, return dealId: null.`,
 
   interface ActionIdentified {
     dealId: string | null; action: string; description: string
-    stageValue?: string | null; valueInCents?: number | null; notesText?: string | null
+    stageValue?: string | null; valueInDollars?: number | null; notesText?: string | null
   }
   let identified: ActionIdentified = { dealId: null, action: 'qa', description: '' }
   try { identified = JSON.parse(stripJson((identifyMsg.content[0] as { type: string; text: string }).text)) } catch { /* use defaults */ }
@@ -861,12 +861,12 @@ Match the deal by name/company. If no clear deal match, return dealId: null.`,
     }
   }
 
-  if (identified.action === 'update_value' && identified.valueInCents != null) {
-    await db.update(dealLogs).set({ dealValue: identified.valueInCents, updatedAt: new Date() }).where(eq(dealLogs.id, deal.id))
-    await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'dealValue', value: identified.valueInCents, source: 'ai_chat' }, createdAt: new Date() })
+  if (identified.action === 'update_value' && identified.valueInDollars != null) {
+    await db.update(dealLogs).set({ dealValue: identified.valueInDollars, updatedAt: new Date() }).where(eq(dealLogs.id, deal.id))
+    await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'dealValue', value: identified.valueInDollars, source: 'ai_chat' }, createdAt: new Date() })
     return {
-      reply: `Updated **${deal.dealName}** deal value to **$${(identified.valueInCents / 100).toLocaleString()}**.`,
-      actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: [`value → $${(identified.valueInCents / 100).toLocaleString()}`] }],
+      reply: `Updated **${deal.dealName}** deal value to **$${identified.valueInDollars.toLocaleString()}**.`,
+      actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: [`value → $${identified.valueInDollars.toLocaleString()}`] }],
     }
   }
 
@@ -1034,7 +1034,7 @@ export async function POST(req: NextRequest) {
         const historySource = d.meetingNotes || d.notes || ''
         const notesEntries = historySource.split('\n').filter((l: string) => l.startsWith('[')).slice(-3).join(' | ')
         const notesCtx = notesEntries ? ` History: ${notesEntries}` : ''
-        kbParts.push(`- "${d.dealName}" at ${d.prospectCompany} (${d.stage}): $${d.dealValue ? (d.dealValue / 100).toLocaleString() : '?'}. ${todoText}.${notesCtx}`)
+        kbParts.push(`- "${d.dealName}" at ${d.prospectCompany} (${d.stage}): $${d.dealValue ? d.dealValue.toLocaleString() : '?'}. ${todoText}.${notesCtx}`)
       })
     }
     if (gapRows.length > 0) {
