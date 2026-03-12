@@ -481,6 +481,101 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved }: {
   )
 }
 
+function ActivityLog({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
+  const [entry, setEntry] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  // Parse date-stamped entries from accumulated notes
+  const entries: string[] = deal?.notes
+    ? deal.notes.split('\n').filter((l: string) => l.trim().length > 0)
+    : []
+
+  const logActivity = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!entry.trim()) return
+    setSaving(true)
+    try {
+      const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      const newEntry = `[${dateStr}] ${entry.trim()}`
+      const updatedNotes = deal?.notes ? `${deal.notes}\n${newEntry}` : newEntry
+      await fetch(`/api/deals/${dealId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: updatedNotes }),
+      })
+      setEntry('')
+      onUpdate()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <Clipboard size={13} color="#818CF8" />
+        <span style={{ fontSize: '13px', fontWeight: '600', color: '#EBEBEB' }}>Activity Log</span>
+        <span style={{ fontSize: '11px', color: '#444' }}>· manual entries + meeting summaries</span>
+      </div>
+
+      {/* Quick log input */}
+      <form onSubmit={logActivity} style={{ display: 'flex', gap: '8px', padding: '12px 16px', borderBottom: entries.length > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+        <input
+          value={entry}
+          onChange={e => setEntry(e.target.value)}
+          placeholder="Log an activity… e.g. 'Sent account access email to john@acme.com'"
+          style={{
+            flex: 1, height: '34px', padding: '0 10px', borderRadius: '7px',
+            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+            color: '#EBEBEB', fontSize: '12px', outline: 'none', fontFamily: 'inherit',
+          }}
+          onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.4)')}
+          onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
+        />
+        <button type="submit" disabled={saving || !entry.trim()} style={{
+          height: '34px', padding: '0 14px', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
+          color: '#fff', background: saving || !entry.trim() ? '#1A1A1A' : 'rgba(99,102,241,0.8)',
+          border: '1px solid rgba(99,102,241,0.3)', cursor: saving || !entry.trim() ? 'not-allowed' : 'pointer',
+          transition: 'background 150ms', whiteSpace: 'nowrap',
+        }}>
+          {saving ? '…' : 'Log'}
+        </button>
+      </form>
+
+      {/* Timeline */}
+      {entries.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0', maxHeight: '240px', overflowY: 'auto' }}>
+          {[...entries].reverse().map((e, i) => {
+            const isDateStamped = e.startsWith('[')
+            const dateMatch = e.match(/^\[([^\]]+)\]\s*(.*)/)
+            const date = dateMatch?.[1] ?? ''
+            const text = dateMatch?.[2] ?? e
+            return (
+              <div key={i} style={{
+                display: 'flex', gap: '12px', padding: '9px 16px',
+                borderBottom: i < entries.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none',
+              }}>
+                <div style={{ flexShrink: 0, marginTop: '4px' }}>
+                  <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'rgba(99,102,241,0.6)' }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {isDateStamped && <div style={{ fontSize: '10px', color: '#444', marginBottom: '2px' }}>{date}</div>}
+                  <div style={{ fontSize: '12px', color: '#888', lineHeight: '1.5' }}>{text}</div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      {entries.length === 0 && (
+        <div style={{ padding: '20px 16px', fontSize: '12px', color: '#333', textAlign: 'center' }}>
+          No activity logged yet. Log meetings via the AI tab or add manual entries above.
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function DealDetailPage() {
   const { id } = useParams() as { id: string }
   const router = useRouter()
@@ -634,6 +729,7 @@ export default function DealDetailPage() {
                   </div>
                 ))}
               </div>
+              <ActivityLog dealId={id} deal={deal} onUpdate={() => mutate()} />
             </div>
           )}
           {activeTab === 'meeting-notes' && (

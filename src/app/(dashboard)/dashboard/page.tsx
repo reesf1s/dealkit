@@ -145,11 +145,29 @@ export default function DashboardPage() {
   const openDeals = dealList.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost').length
   const wonDeals = dealList.filter(d => d.stage === 'closed_won').length
 
-  // Urgent todos: undone todos from open deals
+  // Stage priority: later stage = higher urgency
+  const STAGE_PRIORITY: Record<string, number> = { negotiation: 5, proposal: 4, discovery: 3, qualification: 2, prospecting: 1 }
+  const STAGE_STYLE: Record<string, { color: string; label: string }> = {
+    negotiation: { color: '#EF4444', label: 'Negotiation' },
+    proposal:    { color: '#F59E0B', label: 'Proposal' },
+    discovery:   { color: '#8B5CF6', label: 'Discovery' },
+    qualification: { color: '#3B82F6', label: 'Qualification' },
+    prospecting:  { color: '#6B7280', label: 'Prospecting' },
+  }
+
+  // Priority todos — sorted by deal stage (negotiation first)
   const urgentTodos = dealList
     .filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
-    .flatMap(d => (d.todos ?? []).filter(t => !t.done).map(t => ({ ...t, dealName: d.dealName, dealId: d.id, company: d.prospectCompany })))
-    .slice(0, 6)
+    .flatMap(d => (d.todos ?? []).filter(t => !t.done).map(t => ({
+      ...t, dealName: d.dealName, dealId: d.id, company: d.prospectCompany,
+      stage: d.stage, stagePriority: STAGE_PRIORITY[d.stage] ?? 0,
+    })))
+    .sort((a, b) => b.stagePriority - a.stagePriority)
+    .slice(0, 8)
+
+  // KB intelligence counters
+  const meetingsLogged = dealList.filter(d => d.todos && (d.todos as unknown[]).length > 0).length
+  const totalObjections = (companyData?.commonObjections as string[] | null)?.length ?? 0
 
   const steps = [
     { done: hasCompany, label: 'Complete company profile', href: '/company' },
@@ -267,39 +285,49 @@ export default function DashboardPage() {
         collateralCount={collateralList.length}
       />
 
-      {/* Urgent todos — most actionable */}
+      {/* Priority actions — sorted by deal stage */}
       {urgentTodos.length > 0 && (
-        <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '14px', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderBottom: '1px solid rgba(239,68,68,0.1)' }}>
+        <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: '14px', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '24px', height: '24px', background: 'rgba(239,68,68,0.1)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ClipboardList size={12} color="#EF4444" />
+              <div style={{ width: '24px', height: '24px', background: 'rgba(99,102,241,0.12)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ClipboardList size={12} color="#818CF8" />
               </div>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Open Action Items</span>
-              <span style={{ fontSize: '11px', color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '1px 7px', borderRadius: '100px', fontWeight: '600' }}>{urgentTodos.length}</span>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Priority Actions</span>
+              <span style={{ fontSize: '11px', color: '#818CF8', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', padding: '1px 7px', borderRadius: '100px', fontWeight: '600' }}>{urgentTodos.length}</span>
+              <span style={{ fontSize: '11px', color: '#444' }}>· sorted by deal stage</span>
             </div>
-            <Link href="/pipeline" style={{ fontSize: '12px', color: '#EF4444', textDecoration: 'none', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '3px' }}>
+            <Link href="/pipeline" style={{ fontSize: '12px', color: '#6366F1', textDecoration: 'none', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '3px' }}>
               View pipeline <ArrowUpRight size={11} />
             </Link>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {urgentTodos.map((todo, i) => (
-              <Link key={todo.id} href={`/deals/${todo.dealId}`} style={{
-                display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '10px 18px',
-                borderBottom: i < urgentTodos.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none',
-                textDecoration: 'none', transition: 'background 0.1s',
-              }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.03)'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-              >
-                <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#EF4444', flexShrink: 0, marginTop: '6px' }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '12px', color: '#EBEBEB', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{todo.text}</div>
-                  <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>{todo.company}</div>
-                </div>
-                <ArrowUpRight size={11} color="#333" style={{ flexShrink: 0 }} />
-              </Link>
-            ))}
+            {urgentTodos.map((todo, i) => {
+              const stageInfo = STAGE_STYLE[todo.stage] ?? { color: '#6B7280', label: todo.stage }
+              return (
+                <Link key={todo.id} href={`/deals/${todo.dealId}`} style={{
+                  display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 18px',
+                  borderBottom: i < urgentTodos.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none',
+                  textDecoration: 'none', transition: 'background 0.1s',
+                }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                >
+                  <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: stageInfo.color, flexShrink: 0, boxShadow: `0 0 6px ${stageInfo.color}80` }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', color: '#EBEBEB', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{todo.text}</div>
+                    <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>{todo.company}</div>
+                  </div>
+                  <span style={{
+                    fontSize: '10px', padding: '2px 7px', borderRadius: '100px', fontWeight: '600', flexShrink: 0,
+                    color: stageInfo.color, background: `${stageInfo.color}14`, border: `1px solid ${stageInfo.color}30`,
+                  }}>
+                    {stageInfo.label}
+                  </span>
+                  <ArrowUpRight size={11} color="#333" style={{ flexShrink: 0 }} />
+                </Link>
+              )
+            })}
           </div>
         </div>
       )}
@@ -480,32 +508,35 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Quick actions */}
+          {/* Sales Brain — KB intelligence */}
           <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(124,58,237,0.18)', borderRadius: '14px', padding: '14px 16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               <div style={{ width: '24px', height: '24px', background: 'rgba(99,102,241,0.1)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <BarChart3 size={12} color="#818CF8" />
+                <BookOpen size={12} color="#818CF8" />
               </div>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Quick Actions</span>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Sales Brain</span>
+              <span style={{ fontSize: '10px', color: '#444', marginLeft: '2px' }}>what the KB knows</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
               {[
-                { href: '/deals', label: 'Log a Deal', icon: ClipboardList, color: '#F59E0B', desc: 'Paste notes, AI scores it' },
-                { href: '/competitors', label: 'Track Competitor', icon: Users, color: '#6366F1', desc: 'Generate battlecard' },
-                { href: '/collateral', label: 'Generate Collateral', icon: RefreshCw, color: '#22C55E', desc: 'AI battlecards & more' },
-              ].map(({ href, label, icon: Icon, color, desc }) => (
-                <Link key={href} href={href} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', textDecoration: 'none', transition: 'background 0.1s, border-color 0.1s' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.045)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.09)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.05)' }}
+                { href: '/competitors', label: 'Competitors mapped', value: competitorCount, color: '#6366F1', icon: Users, empty: 'Add competitor →' },
+                { href: '/deals', label: 'Deals in pipeline', value: dealCount, color: '#8B5CF6', icon: TrendingUp, empty: 'Log first deal →' },
+                { href: '/case-studies', label: 'Win stories', value: caseStudyCount, color: '#22C55E', icon: BookOpen, empty: 'Add case study →' },
+                { href: '/collateral', label: 'Collateral generated', value: collateralList.length, color: '#F59E0B', icon: FileText, empty: 'Generate first →' },
+                { href: '/product-gaps', label: 'Product gaps tracked', value: gapList.length, color: '#EF4444', icon: AlertTriangle, empty: 'None logged yet' },
+              ].map(({ href, label, value, color, icon: Icon, empty }) => (
+                <Link key={href} href={href} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '7px', textDecoration: 'none', transition: 'background 0.1s' }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'}
                 >
-                  <div style={{ width: '28px', height: '28px', background: `${color}12`, border: `1px solid ${color}22`, borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Icon size={12} color={color} />
+                  <div style={{ width: '24px', height: '24px', background: `${color}12`, border: `1px solid ${color}20`, borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon size={11} color={color} />
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', fontWeight: '500', color: '#F0EEFF' }}>{label}</div>
-                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '1px' }}>{desc}</div>
-                  </div>
-                  <ArrowUpRight size={11} color="#333" />
+                  <span style={{ flex: 1, fontSize: '12px', color: '#888' }}>{label}</span>
+                  {value > 0
+                    ? <span style={{ fontSize: '14px', fontWeight: '700', color, letterSpacing: '-0.02em' }}>{value}</span>
+                    : <span style={{ fontSize: '11px', color: '#444' }}>{empty}</span>
+                  }
                 </Link>
               ))}
             </div>

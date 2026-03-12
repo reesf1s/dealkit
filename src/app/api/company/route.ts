@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { companyProfiles, collateral, events } from '@/lib/db/schema'
+import { companyProfiles, events } from '@/lib/db/schema'
 import { dbErrResponse } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 
@@ -50,7 +50,6 @@ export async function POST(req: NextRequest) {
       }).returning()
       profile = created
     }
-    await db.update(collateral).set({ status: 'stale', updatedAt: now }).where(eq(collateral.workspaceId, workspaceId))
     await logEvent(workspaceId, userId, 'company_profile.updated', { companyName })
     return NextResponse.json({ data: profile })
   } catch (err) { return dbErrResponse(err) }
