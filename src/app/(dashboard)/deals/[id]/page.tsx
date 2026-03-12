@@ -20,9 +20,10 @@ const STAGE_COLORS: Record<string, string> = {
 }
 
 function MeetingNotesTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
-  const [notes, setNotes] = useState(deal?.meetingNotes ?? '')
+  const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
+  const [historyExpanded, setHistoryExpanded] = useState(false)
 
   const analyze = async () => {
     if (!notes.trim()) return
@@ -34,6 +35,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate }: { dealId: string; deal: any
       })
       const data = await res.json()
       setResult(data.data)
+      setNotes('')
       onUpdate()
     } finally {
       setLoading(false)
@@ -42,11 +44,39 @@ function MeetingNotesTab({ dealId, deal, onUpdate }: { dealId: string; deal: any
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+      {/* Previous meeting history */}
+      {deal?.meetingNotes && (
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px', padding: '14px' }}>
+          <button
+            onClick={() => setHistoryExpanded(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Clipboard size={13} color="#888" />
+              <span style={{ fontSize: '12px', fontWeight: '600', color: '#888' }}>Meeting History</span>
+            </div>
+            <span style={{ fontSize: '11px', color: '#555' }}>{historyExpanded ? 'Hide ↑' : 'Show ↓'}</span>
+          </button>
+          {historyExpanded && (
+            <pre style={{
+              marginTop: '12px', whiteSpace: 'pre-wrap', fontFamily: 'inherit',
+              fontSize: '12px', color: '#666', lineHeight: '1.7',
+              maxHeight: '300px', overflowY: 'auto', padding: '4px 0',
+            }}>
+              {deal.meetingNotes}
+            </pre>
+          )}
+        </div>
+      )}
+
       <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', padding: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Clipboard size={14} color="#818CF8" />
-            <span style={{ fontSize: '13px', fontWeight: '600', color: '#EBEBEB' }}>Meeting Notes</span>
+            <span style={{ fontSize: '13px', fontWeight: '600', color: '#EBEBEB' }}>
+              {deal?.meetingNotes ? 'New Meeting Notes' : 'Meeting Notes'}
+            </span>
           </div>
           <button onClick={analyze} disabled={loading || !notes.trim()} style={{
             display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
@@ -62,7 +92,9 @@ function MeetingNotesTab({ dealId, deal, onUpdate }: { dealId: string; deal: any
         <textarea
           value={notes}
           onChange={e => setNotes(e.target.value)}
-          placeholder="Paste your meeting notes here — AI will extract action items, score conversion probability, and identify product gaps..."
+          placeholder={deal?.meetingNotes
+            ? 'Paste notes from your latest meeting — AI will analyze these in context of all previous meetings...'
+            : 'Paste your meeting notes here — AI will extract action items, score conversion probability, and identify product gaps...'}
           rows={10}
           style={{
             width: '100%', resize: 'vertical', background: 'rgba(255,255,255,0.02)',

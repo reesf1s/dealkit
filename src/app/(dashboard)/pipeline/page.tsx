@@ -374,7 +374,7 @@ export default function PipelinePage() {
       )}
 
       {/* Kanban board */}
-      <div style={{ overflowX: 'auto', paddingBottom: '8px' }}>
+      <div style={{ overflowX: 'auto', paddingBottom: '8px', width: '100%' }}>
         <div style={{ display: 'flex', gap: '12px', minWidth: 'max-content' }}>
           {activeStages.map(stage => {
             const stageDeals = deals.filter((d: any) => d.stage === stage.id)

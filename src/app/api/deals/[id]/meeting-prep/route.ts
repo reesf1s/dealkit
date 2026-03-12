@@ -28,10 +28,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 # Deal: ${deal.dealName}
 - Prospect: ${deal.prospectName ?? 'Unknown'} at ${deal.prospectCompany}
 - Stage: ${deal.stage}
-- Value: ${deal.dealValue ? `$${(deal.dealValue/100).toLocaleString()}` : 'Unknown'}
-- Notes: ${deal.notes ?? 'None'}
-- AI summary: ${deal.aiSummary ?? 'None'}
+- Value: ${deal.dealValue ? `£${(deal.dealValue/100).toLocaleString()}` : 'Unknown'}
+- General notes: ${deal.notes ?? 'None'}
+- Current deal summary: ${deal.aiSummary ?? 'None'}
+- Known deal risks: ${(deal.dealRisks as string[])?.join('; ') || 'None'}
 - Open todos: ${((deal.todos as any[]) ?? []).filter(t => !t.done).map((t: any) => t.text).join(', ') || 'None'}
+${deal.meetingNotes ? `\n# Full Meeting History (all previous meetings)\n${deal.meetingNotes}\n\nUse the meeting history above to understand deal trajectory, recurring concerns, key stakeholders mentioned, and commitments made. Your prep must be informed by this full context.` : ''}
 
 # Our Company
 ${company ? `${company.companyName} - ${company.description ?? ''}

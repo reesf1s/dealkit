@@ -31,14 +31,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       ? `\n\nCONFIRMED PRODUCT CAPABILITIES (do NOT flag these as product gaps under any circumstances):\n${knownCapabilities.map(c => `- ${c}`).join('\n')}`
       : ''
 
+    const previousContext = [
+      deal.meetingNotes ? `PREVIOUS MEETING HISTORY (all prior meetings for this deal):\n${deal.meetingNotes}` : '',
+      deal.aiSummary ? `CURRENT DEAL SUMMARY: ${deal.aiSummary}` : '',
+      (deal.dealRisks as string[])?.length ? `KNOWN DEAL RISKS SO FAR: ${(deal.dealRisks as string[]).join('; ')}` : '',
+    ].filter(Boolean).join('\n\n')
+
     const msg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001', max_tokens: 1024,
       messages: [{ role: 'user', content: `You are analyzing B2B sales meeting notes. Extract structured information and return ONLY valid JSON, no markdown.
 
-Meeting notes:
+${previousContext ? `${previousContext}\n\n---\n\n` : ''}NEW MEETING NOTES TO ANALYZE:
 ${meetingNotes}
 
 Deal context: ${deal.dealName} with ${deal.prospectCompany}${capabilitiesContext}
+
+${previousContext ? 'Use the full meeting history above to inform your analysis — the summary, conversion score, and risks should reflect the entire deal trajectory, not just today\'s notes.' : ''}
 
 Return this exact JSON structure:
 {
@@ -71,8 +79,12 @@ IMPORTANT — productGaps rules:
       parsed = { summary: meetingNotes.slice(0, 200), conversionScore: 50, conversionInsights: [], risks: [], todos: [], productGaps: [] }
     }
     const todos = (parsed.todos ?? []).map((t: any) => ({ id: crypto.randomUUID(), text: t.text, done: false, createdAt: new Date().toISOString() }))
+    const dateStamp = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    const appendedNotes = deal.meetingNotes
+      ? `${deal.meetingNotes}\n\n---\n[${dateStamp}]\n${meetingNotes}`
+      : meetingNotes
     const [updatedDeal] = await db.update(dealLogs).set({
-      meetingNotes, aiSummary: parsed.summary, conversionScore: parsed.conversionScore,
+      meetingNotes: appendedNotes, aiSummary: parsed.summary, conversionScore: parsed.conversionScore,
       conversionInsights: parsed.conversionInsights ?? [],
       dealRisks: parsed.risks ?? [],
       todos: [...((deal.todos as any[]) ?? []), ...todos], updatedAt: new Date(),
