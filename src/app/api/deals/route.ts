@@ -45,13 +45,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Deal log limit reached. Your ${plan} plan allows up to ${limits.dealLogs} deals. Please upgrade.`, code: 'PLAN_LIMIT_REACHED' }, { status: 403 })
     }
     const body = await req.json()
-    const { dealName, prospectCompany, prospectName, prospectTitle, dealValue, stage, competitors: dealCompetitors, notes, nextSteps, closeDate, wonDate, lostDate, lostReason } = body
+    const { dealName, prospectCompany, prospectName, prospectTitle, dealValue, stage, dealType, recurringInterval, competitors: dealCompetitors, notes, nextSteps, closeDate, wonDate, lostDate, lostReason } = body
     if (!dealName || !prospectCompany) return NextResponse.json({ error: 'dealName and prospectCompany are required' }, { status: 400 })
     const now = new Date()
     const [deal] = await db.insert(dealLogs).values({
       workspaceId, userId, dealName, prospectCompany,
       prospectName: prospectName ?? null, prospectTitle: prospectTitle ?? null, dealValue: dealValue ?? null,
-      stage: stage ?? 'prospecting', competitors: dealCompetitors ?? [], notes: notes ?? null,
+      stage: stage ?? 'prospecting', dealType: dealType ?? 'one_off', recurringInterval: recurringInterval ?? null,
+      competitors: dealCompetitors ?? [], notes: notes ?? null,
       nextSteps: nextSteps ?? null, closeDate: closeDate ? new Date(closeDate) : null,
       wonDate: wonDate ? new Date(wonDate) : null, lostDate: lostDate ? new Date(lostDate) : null,
       lostReason: lostReason ?? null, createdAt: now, updatedAt: now,

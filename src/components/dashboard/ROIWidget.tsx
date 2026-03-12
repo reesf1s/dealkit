@@ -45,12 +45,12 @@ export default function ROIWidget({ deals, collateralCount }: ROIWidgetProps) {
   const openPipeline = openDeals.reduce((sum, d) =>
     sum + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
 
-  // Avg deal: annualized across all closed deals with a value
-  const closedWithValue = [...wonDeals, ...lostDeals].filter(d => d.dealValue && d.dealValue > 0)
-  const avgDealSize = closedWithValue.length > 0
-    ? closedWithValue.reduce((sum, d) =>
+  // Avg deal: annualized across all deals with a value (open + won + lost)
+  const allWithValue = deals.filter(d => d.dealValue && d.dealValue > 0)
+  const avgDealSize = allWithValue.length > 0
+    ? allWithValue.reduce((sum, d) =>
         sum + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0
-      ) / closedWithValue.length
+      ) / allWithValue.length
     : 0
 
   const timeSaved = collateralCount * 3
@@ -93,7 +93,7 @@ export default function ROIWidget({ deals, collateralCount }: ROIWidgetProps) {
       label: 'Avg Deal',
       sublabel: 'annualised',
       value: avgDealSize > 0 ? formatCurrency(avgDealSize) : '—',
-      hint: avgDealSize > 0 ? `${closedWithValue.length} closed deals` : 'Add deal values',
+      hint: avgDealSize > 0 ? `${allWithValue.length} deal${allWithValue.length !== 1 ? 's' : ''}` : 'Add deal values',
       color: '#F59E0B',
       glow: 'rgba(245,158,11,0.12)',
       border: 'rgba(245,158,11,0.15)',

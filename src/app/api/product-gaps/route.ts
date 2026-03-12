@@ -12,7 +12,7 @@ export async function GET() {
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { workspaceId } = await getWorkspaceContext(userId)
     const gaps = await db.select().from(productGaps).where(eq(productGaps.workspaceId, workspaceId)).orderBy(desc(productGaps.frequency), desc(productGaps.createdAt))
-    return NextResponse.json(gaps)
+    return NextResponse.json({ data: gaps })
   } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
 }
 
