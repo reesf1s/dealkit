@@ -1,10 +1,10 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Plus, X } from 'lucide-react'
+import { Plus, X, RefreshCw } from 'lucide-react'
 import { CollateralGrid } from '@/components/collateral/CollateralGrid'
 import { CollateralTypeBadge } from '@/components/collateral/CollateralTypeBadge'
 import { SkeletonGrid } from '@/components/shared/SkeletonCard'
@@ -76,6 +76,16 @@ export default function CollateralPage() {
   const caseStudies = csRes?.data ?? []
   const products = profileRes?.data?.products ?? []
 
+  // Auto-poll every 4s while any item is generating
+  const hasGenerating = collateral.some(c => c.status === 'generating')
+  useEffect(() => {
+    if (!hasGenerating) return
+    const t = setInterval(() => mutate(), 4000)
+    return () => clearInterval(t)
+  }, [hasGenerating, mutate])
+
+  const staleCount = collateral.filter(c => c.status === 'stale').length
+
   const filtered = collateral.filter((c) => {
     const typeOk = typeFilter === 'all' || c.type === typeFilter
     const statusOk = statusFilter === 'all' || c.status === statusFilter
@@ -120,6 +130,18 @@ export default function CollateralPage() {
       toast('Generation started — check back in a moment', 'success')
     } finally {
       setGenerating(false)
+    }
+  }
+
+  async function handleRegenAll() {
+    try {
+      const res = await fetch('/api/collateral/regenerate-stale', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) { toast(json.error ?? 'Failed', 'error'); return }
+      await mutate()
+      toast(`Regenerating ${json.data?.queued ?? staleCount} items — refreshing automatically`, 'success')
+    } catch {
+      toast('Failed to start bulk regeneration', 'error')
     }
   }
 
@@ -170,15 +192,28 @@ export default function CollateralPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setGenerateOpen(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: '#6366F1', border: 'none', cursor: 'pointer', transition: 'background-color 150ms ease' }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4F46E5' }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#6366F1' }}
-        >
-          <Plus size={14} strokeWidth={2.5} />
-          Generate New
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {staleCount > 0 && (
+            <button
+              onClick={handleRegenAll}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', cursor: 'pointer', transition: 'all 150ms ease' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.18)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.1)' }}
+            >
+              <RefreshCw size={13} strokeWidth={2.5} />
+              Regen All Stale ({staleCount})
+            </button>
+          )}
+          <button
+            onClick={() => setGenerateOpen(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: '#6366F1', border: 'none', cursor: 'pointer', transition: 'background-color 150ms ease' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4F46E5' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#6366F1' }}
+          >
+            <Plus size={14} strokeWidth={2.5} />
+            Generate New
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

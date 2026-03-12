@@ -98,7 +98,7 @@ async function handleCompetitorBattlecard(
   const hasCompanyProfile = !!profileRow
 
   const extractMsg = await anthropic.messages.create({
-    model: 'claude-3-5-haiku-20241022', max_tokens: 2048,
+    model: 'claude-haiku-4-5-20251001', max_tokens: 2048,
     messages: [{
       role: 'user',
       content: `Extract competitor information from this text. Return ONLY a JSON array. Each object must have: "name" (required), "description" (1-2 sentences), "strengths" (string[]), "weaknesses" (string[]), "keyFeatures" (string[]), "notes" (string). Return [] if no competitors clearly mentioned.\n\nText: ${text.slice(0, 6000)}`,
@@ -194,7 +194,7 @@ async function handleMeetingNotes(
   const dealList = openDeals.map(d => `id:${d.id} | "${d.dealName}" — ${d.prospectCompany} (${d.stage})`).join('\n')
 
   const analysisMsg = await anthropic.messages.create({
-    model: 'claude-3-5-haiku-20241022', max_tokens: 1500,
+    model: 'claude-haiku-4-5-20251001', max_tokens: 1500,
     messages: [{
       role: 'user',
       content: `Analyze these B2B sales meeting notes. Return ONLY valid JSON.
@@ -249,7 +249,7 @@ matchedDealId must be one of the IDs above (or null). Stage values: prospecting|
       if (pendingTodos.length > 0 && parsed.todos.length > 0) {
         try {
           const todoMsg = await anthropic.messages.create({
-            model: 'claude-3-5-haiku-20241022', max_tokens: 512,
+            model: 'claude-haiku-4-5-20251001', max_tokens: 512,
             messages: [{
               role: 'user',
               content: `You are reviewing a CRM deal's todos after a sales meeting.
@@ -341,7 +341,7 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
   after(async () => {
     try {
       const qaMsg = await anthropic.messages.create({
-        model: 'claude-3-5-haiku-20241022', max_tokens: 512,
+        model: 'claude-haiku-4-5-20251001', max_tokens: 512,
         messages: [{ role: 'user', content: `Extract prospect questions + ideal answers from these sales meeting notes. Return ONLY a JSON array of strings: ["Q: [question] | A: [answer]"]. Max 6. Return [] if none.\n\n${text.slice(0, 4000)}` }],
       })
       const newQAs: string[] = JSON.parse(stripJson((qaMsg.content[0] as { type: string; text: string }).text))
@@ -365,7 +365,7 @@ async function handleCompanyUpdate(
   workspaceId: string, userId: string, text: string,
 ): Promise<{ reply: string; actions: ActionCard[] }> {
   const extractMsg = await anthropic.messages.create({
-    model: 'claude-3-5-haiku-20241022', max_tokens: 1024,
+    model: 'claude-haiku-4-5-20251001', max_tokens: 1024,
     messages: [{
       role: 'user',
       content: `Extract company profile information from this text. Return ONLY JSON. Only include fields clearly mentioned — use null for anything not mentioned.
@@ -545,7 +545,7 @@ async function handleDealCreate(
   workspaceId: string, userId: string, text: string,
 ): Promise<{ reply: string; actions: ActionCard[] }> {
   const extractMsg = await anthropic.messages.create({
-    model: 'claude-3-5-haiku-20241022', max_tokens: 512,
+    model: 'claude-haiku-4-5-20251001', max_tokens: 512,
     messages: [{
       role: 'user',
       content: `Extract deal/prospect information from this text. Return ONLY JSON:
@@ -605,7 +605,7 @@ async function handleCaseStudyCreate(
   workspaceId: string, userId: string, text: string,
 ): Promise<{ reply: string; actions: ActionCard[] }> {
   const extractMsg = await anthropic.messages.create({
-    model: 'claude-3-5-haiku-20241022', max_tokens: 768,
+    model: 'claude-haiku-4-5-20251001', max_tokens: 768,
     messages: [{
       role: 'user',
       content: `Extract case study information from this text. Return ONLY JSON:
@@ -753,7 +753,7 @@ What I can do automatically (just tell me):
 ${kbParts.join('\n\n') || 'No workspace data yet. Help the user set up their profile.'}`
 
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022', max_tokens: 1024,
+      model: 'claude-haiku-4-5-20251001', max_tokens: 1024,
       system: systemPrompt,
       messages: messages.map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })),
     })

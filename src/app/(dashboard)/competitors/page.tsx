@@ -1,10 +1,10 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Plus, X } from 'lucide-react'
+import { Plus, X, RefreshCw } from 'lucide-react'
 import { CompetitorTable } from '@/components/competitors/CompetitorTable'
 import { CompetitorForm } from '@/components/competitors/CompetitorForm'
 import { SkeletonCard } from '@/components/shared/SkeletonCard'
@@ -27,6 +27,27 @@ export default function CompetitorsPage() {
 
   const competitors = compRes?.data ?? []
   const collateral = collRes?.data ?? []
+
+  // Auto-poll every 4s while any battlecard is generating
+  const hasGenerating = collateral.some(c => c.status === 'generating')
+  const staleCount = collateral.filter(c => c.status === 'stale' && c.type === 'battlecard').length
+  useEffect(() => {
+    if (!hasGenerating) return
+    const t = setInterval(() => mutateColl(), 4000)
+    return () => clearInterval(t)
+  }, [hasGenerating, mutateColl])
+
+  async function handleRegenAll() {
+    try {
+      const res = await fetch('/api/collateral/regenerate-stale', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) { toast(json.error ?? 'Failed', 'error'); return }
+      await mutateColl()
+      toast(`Regenerating ${json.data?.queued ?? staleCount} battlecards — refreshing automatically`, 'success')
+    } catch {
+      toast('Failed to start bulk regeneration', 'error')
+    }
+  }
 
   async function handleAdd(data: Partial<Competitor>) {
     setAddLoading(true)
@@ -87,7 +108,19 @@ export default function CompetitorsPage() {
           </p>
         </div>
 
-        <button
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {staleCount > 0 && (
+            <button
+              onClick={handleRegenAll}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', cursor: 'pointer', transition: 'all 150ms ease' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.18)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.1)' }}
+            >
+              <RefreshCw size={13} strokeWidth={2.5} />
+              Regen All ({staleCount})
+            </button>
+          )}
+          <button
           onClick={() => setAddOpen(true)}
           style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: '#6366F1', border: 'none', cursor: 'pointer', transition: 'background-color 150ms ease' }}
           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4F46E5' }}
@@ -95,7 +128,8 @@ export default function CompetitorsPage() {
         >
           <Plus size={14} strokeWidth={2.5} />
           Add Competitor
-        </button>
+          </button>
+        </div>
       </div>
 
       {(loadingComp || loadingColl) ? (
