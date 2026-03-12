@@ -287,7 +287,7 @@ export function emailSequencePrompt(
     "dayOffset": 0,
     "subject": "subject line max 50 chars",
     "previewText": "preview text max 80 chars",
-    "body": "email body — use {{first_name}}, plain text, 80-120 words",
+    "body": "email body — use {{first_name}} and {{company_name}} placeholders, plain text, 80-120 words",
     "callToAction": "specific CTA",
     "sendingTips": ["1 tip"]
   }]
@@ -304,7 +304,7 @@ ${proof ? `Customer proof: ${proof}` : ''}
 ${objections ? `Common objections to address: ${objections}` : ''}
 
 Email structure: Day 0 pattern-interrupt opener, Day 3 customer story, Day 10 value/insight, Day 21 break-up.
-Rules: No "just following up". Subjects must be curiosity-driven. Bodies 60-80 words each. Use {{first_name}}.
+Rules: No "just following up". Subjects must be curiosity-driven. Bodies 60-80 words each. Use {{first_name}} and {{company_name}} placeholders.
 
 Return ONLY this JSON (4 emails, 1 sendingTip each).
 ${workspaceContext ? `\nWORKSPACE INTEL (use to name competitors, reference real wins, address known objections):\n${workspaceContext}` : ''}

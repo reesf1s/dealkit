@@ -52,6 +52,59 @@ export async function GET() {
       for (const kw of kws) if (nl.includes(kw)) objectionMap.set(kw, (objectionMap.get(kw) ?? 0) + 1)
     }
     const topObjections = Array.from(objectionMap.entries()).map(([objection, count]) => ({ objection, count })).sort((a, b) => b.count - a.count).slice(0, 5)
-    return NextResponse.json({ data: { totalDeals, wonDeals, lostDeals, winRate, dealsByProduct, dealsByCompetitor, dealsByRole, topObjections, topLossReasons } })
+
+    // Cross-deal pattern alerts
+    const openDeals = deals.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+    const crossDealAlerts: Array<{ type: string; message: string; count: number; dealIds: string[] }> = []
+
+    // Competitor momentum: same competitor in 2+ active deals
+    const openCompMap = new Map<string, string[]>()
+    for (const deal of openDeals) {
+      for (const comp of ((deal.competitors as string[]) ?? [])) {
+        if (!comp) continue
+        const arr = openCompMap.get(comp) ?? []
+        openCompMap.set(comp, [...arr, deal.id])
+      }
+    }
+    for (const [comp, ids] of openCompMap.entries()) {
+      if (ids.length >= 2) {
+        const stats = competitorMap.get(comp)
+        const wr = stats && (stats.wins + stats.losses) > 0 ? Math.round((stats.wins / (stats.wins + stats.losses)) * 100) : null
+        crossDealAlerts.push({ type: 'competitor_momentum', message: `${comp} is in ${ids.length} active deals${wr !== null ? ` — ${wr}% win rate vs them` : ''}. Refresh your battlecard.`, count: ids.length, dealIds: ids })
+      }
+    }
+
+    // Recurring risks: same risk string in 2+ active deals
+    const riskMap2 = new Map<string, string[]>()
+    for (const deal of openDeals) {
+      for (const risk of ((deal.dealRisks as string[]) ?? [])) {
+        if (!risk) continue
+        const key = risk.toLowerCase().trim()
+        const arr = riskMap2.get(key) ?? []
+        riskMap2.set(key, [...arr, deal.id])
+      }
+    }
+    for (const [risk, ids] of riskMap2.entries()) {
+      if (ids.length >= 2) {
+        crossDealAlerts.push({ type: 'recurring_risk', message: `"${risk}" is a flagged risk across ${ids.length} active deals — address it in your collateral.`, count: ids.length, dealIds: ids })
+      }
+    }
+
+    // Losing streak: lost to same competitor 2+ times recently
+    const recentLost = deals.filter(d => d.stage === 'closed_lost').slice(-15)
+    const lossStreakMap = new Map<string, number>()
+    for (const deal of recentLost) {
+      for (const comp of ((deal.competitors as string[]) ?? [])) {
+        if (!comp) continue
+        lossStreakMap.set(comp, (lossStreakMap.get(comp) ?? 0) + 1)
+      }
+    }
+    for (const [comp, count] of lossStreakMap.entries()) {
+      if (count >= 2 && !crossDealAlerts.some(a => a.type === 'competitor_momentum' && a.message.startsWith(comp))) {
+        crossDealAlerts.push({ type: 'losing_streak', message: `Lost ${count} recent deals where ${comp} was involved — update your battlecard positioning.`, count, dealIds: [] })
+      }
+    }
+
+    return NextResponse.json({ data: { totalDeals, wonDeals, lostDeals, winRate, dealsByProduct, dealsByCompetitor, dealsByRole, topObjections, topLossReasons, crossDealAlerts } })
   } catch (err) { return dbErrResponse(err) }
 }

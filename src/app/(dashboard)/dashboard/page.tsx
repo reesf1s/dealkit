@@ -129,7 +129,7 @@ export default function DashboardPage() {
   const dealList: { id: string; stage: string; dealName: string; prospectCompany: string; dealValue?: number | null; dealType?: string | null; recurringInterval?: string | null; competitors?: string[]; todos: { id: string; text: string; done: boolean }[] }[] = deals?.data ?? []
   const collateralList: { id: string; title: string; type: string; status: string }[] = collateral?.data ?? []
   const insightsData = insights?.data
-  const gapList: { id: string; title: string; description?: string; priority: string; status: string; requestCount?: number }[] = productGapsData?.data ?? []
+  const gapList: { id: string; title: string; description?: string; priority: string; status: string; requestCount?: number; blockedRevenue?: number }[] = productGapsData?.data ?? []
   const roadmapNow = gapList.filter(g => g.status === 'on_roadmap')
   const roadmapNext = gapList.filter(g => g.status === 'in_review')
   const roadmapLater = gapList.filter(g => g.status === 'open').slice(0, 6)
@@ -264,6 +264,27 @@ export default function DashboardPage() {
           </Link>
         </div>
       )}
+
+      {/* Cross-deal pattern alerts */}
+      {(insightsData?.crossDealAlerts ?? []).slice(0, 3).map((alert: { type: string; message: string; count: number }, i: number) => {
+        const isRed = alert.type === 'losing_streak'
+        const color = isRed ? '#EF4444' : alert.type === 'recurring_risk' ? '#A855F7' : '#F59E0B'
+        const bg = isRed ? 'rgba(239,68,68,0.05)' : alert.type === 'recurring_risk' ? 'rgba(168,85,247,0.05)' : 'rgba(234,179,8,0.05)'
+        const border = isRed ? 'rgba(239,68,68,0.15)' : alert.type === 'recurring_risk' ? 'rgba(168,85,247,0.15)' : 'rgba(234,179,8,0.15)'
+        const href = alert.type === 'recurring_risk' ? '/product-gaps' : '/collateral'
+        const cta = alert.type === 'recurring_risk' ? 'View gaps' : 'Update battlecard'
+        return (
+          <div key={i} style={{ background: bg, border: `1px solid ${border}`, borderRadius: '10px', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+              <AlertTriangle size={13} color={color} style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: '13px', color: '#F0EEFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{alert.message}</span>
+            </div>
+            <Link href={href} style={{ fontSize: '12px', color, textDecoration: 'none', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+              {cta} <ArrowUpRight size={11} />
+            </Link>
+          </div>
+        )
+      })}
 
       {/* KPI stats — outcome-focused, shown first */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
@@ -435,7 +456,14 @@ export default function DashboardPage() {
                         {items.slice(0, 4).map(gap => (
                           <div key={gap.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
                             <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: dot, flexShrink: 0, marginTop: '5px' }} />
-                            <span style={{ fontSize: '12px', color: '#EBEBEB', lineHeight: '1.4' }}>{gap.title}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <span style={{ fontSize: '12px', color: '#EBEBEB', lineHeight: '1.4' }}>{gap.title}</span>
+                              {(gap.blockedRevenue ?? 0) > 0 && (
+                                <div style={{ fontSize: '10px', color: '#EF4444', fontWeight: '600', marginTop: '1px' }}>
+                                  £{gap.blockedRevenue!.toLocaleString()} blocked
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ))}
                         {items.length > 4 && (
