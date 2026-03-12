@@ -70,10 +70,21 @@ const CASE_STUDY_PATTERNS = [
   /success story/i, /customer success/i, /closed.*deal with/i,
 ]
 
+// Matches any deal modification request: todos (with/without hyphen), tasks,
+// stage changes, value updates, deal field edits, etc.
 const DEAL_ACTION_PATTERNS = [
-  /remove.*todo/i, /delete.*todo/i, /clear.*todo/i, /mark.*done/i, /complete.*todo/i,
-  /outdated.*todo/i, /stale.*todo/i, /clean.*up.*todo/i, /todo.*deal/i, /deal.*todo/i,
-  /remove.*task/i, /clear.*task/i,
+  // to-do / todo / to do variants (hyphen, apostrophe, space)
+  /remove.*to[\s-]?do/i, /delete.*to[\s-]?do/i, /clear.*to[\s-]?do/i,
+  /mark.*to[\s-]?do/i, /complete.*to[\s-]?do/i, /tick.*to[\s-]?do/i,
+  /outdated.*to[\s-]?do/i, /stale.*to[\s-]?do/i, /clean.*up.*to[\s-]?do/i,
+  /to[\s-]?do.*deal/i, /deal.*to[\s-]?do/i,
+  // tasks
+  /remove.*task/i, /clear.*task/i, /delete.*task/i, /complete.*task/i,
+  // deal field updates via chat (stage, value, notes on a named deal)
+  /update.*deal/i, /change.*stage/i, /move.*deal/i, /mark.*deal/i,
+  /deal.*stage/i, /set.*stage/i,
+  // generic "in the X deal" action phrases
+  /in the .+ deal/i, /for the .+ deal/i, /on the .+ deal/i,
 ]
 
 type Intent = 'meeting_notes' | 'competitor_battlecard' | 'company_update' |
@@ -678,7 +689,7 @@ async function handleDealAction(
 
   // Step 1: identify target deal + action type
   const identifyMsg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001', max_tokens: 256,
+    model: 'claude-haiku-4-5-20251001', max_tokens: 300,
     messages: [{
       role: 'user',
       content: `User request: "${text}"
@@ -689,13 +700,21 @@ ${dealList}
 Return ONLY JSON:
 {
   "dealId": "matching deal id or null",
-  "action": "remove_outdated|complete_todos|remove_specific|qa",
-  "description": "brief description of what to do"
-}`,
+  "action": "remove_outdated_todos|complete_todos|remove_specific_todos|update_stage|update_value|update_notes|qa",
+  "description": "brief description of what to do",
+  "stageValue": "new stage if action=update_stage, else null — one of: prospecting|qualification|discovery|proposal|negotiation|closed_won|closed_lost",
+  "valueInCents": "integer if action=update_value, else null",
+  "notesText": "text to append if action=update_notes, else null"
+}
+
+Match the deal by name/company. If no clear deal match, return dealId: null.`,
     }],
   })
 
-  interface ActionIdentified { dealId: string | null; action: string; description: string }
+  interface ActionIdentified {
+    dealId: string | null; action: string; description: string
+    stageValue?: string | null; valueInCents?: number | null; notesText?: string | null
+  }
   let identified: ActionIdentified = { dealId: null, action: 'qa', description: '' }
   try { identified = JSON.parse(stripJson((identifyMsg.content[0] as { type: string; text: string }).text)) } catch { /* use defaults */ }
 
@@ -710,6 +729,35 @@ Return ONLY JSON:
 
   const deal = dealRows.find(d => d.id === identified.dealId)
   if (!deal) return { reply: "Couldn't find that deal.", actions: [] }
+
+  // Handle non-todo deal field updates
+  if (identified.action === 'update_stage' && identified.stageValue) {
+    await db.update(dealLogs).set({ stage: identified.stageValue as 'prospecting' | 'qualification' | 'discovery' | 'proposal' | 'negotiation' | 'closed_won' | 'closed_lost', updatedAt: new Date() }).where(eq(dealLogs.id, deal.id))
+    await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'stage', value: identified.stageValue, source: 'ai_chat' }, createdAt: new Date() })
+    return {
+      reply: `Updated **${deal.dealName}** stage to **${identified.stageValue}**.`,
+      actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: [`stage → ${identified.stageValue}`] }],
+    }
+  }
+
+  if (identified.action === 'update_value' && identified.valueInCents != null) {
+    await db.update(dealLogs).set({ dealValue: identified.valueInCents, updatedAt: new Date() }).where(eq(dealLogs.id, deal.id))
+    await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'dealValue', value: identified.valueInCents, source: 'ai_chat' }, createdAt: new Date() })
+    return {
+      reply: `Updated **${deal.dealName}** deal value to **$${(identified.valueInCents / 100).toLocaleString()}**.`,
+      actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: [`value → $${(identified.valueInCents / 100).toLocaleString()}`] }],
+    }
+  }
+
+  if (identified.action === 'update_notes' && identified.notesText) {
+    const newNotes = ((deal.notes ?? '') + '\n\n' + identified.notesText).trim()
+    await db.update(dealLogs).set({ notes: newNotes, updatedAt: new Date() }).where(eq(dealLogs.id, deal.id))
+    await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'notes', source: 'ai_chat' }, createdAt: new Date() })
+    return {
+      reply: `Added notes to **${deal.dealName}**.`,
+      actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: ['notes updated'] }],
+    }
+  }
 
   const allTodos = (deal.todos as { id: string; text: string; done: boolean; createdAt: string }[]) ?? []
   const pendingTodos = allTodos.filter(t => !t.done)
