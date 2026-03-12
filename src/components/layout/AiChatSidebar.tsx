@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Sparkles, User, Bot, RotateCcw, Square, MessageSquare, ChevronRight, ChevronLeft, FileText, Sword, Building2, Zap, CheckCircle2, PlusCircle, RefreshCw, BookOpen, AlertTriangle } from 'lucide-react'
+import { Send, Sparkles, User, Bot, RotateCcw, Square, MessageSquare, ChevronRight, ChevronLeft, FileText, Sword, Building2, Zap, CheckCircle2, PlusCircle, RefreshCw, BookOpen, AlertTriangle, BarChart2 } from 'lucide-react'
 import { mutate as globalMutate } from 'swr'
 import { useSidebar } from './SidebarContext'
 import type { ActionCard } from '@/app/api/chat/route'
@@ -79,6 +79,15 @@ const CAPABILITIES = [
     title: 'Generate Collateral',
     desc: 'Create battlecards, one-pagers, email sequences',
     prompt: 'Generate a ',
+  },
+  {
+    icon: BarChart2,
+    color: '#22C55E',
+    bg: 'rgba(34,197,94,0.1)',
+    border: 'rgba(34,197,94,0.2)',
+    title: 'Top 5 Deals & Risks',
+    desc: 'Ranked pipeline with key risks per deal',
+    prompt: 'Show me my top 5 deals ranked by priority, with the biggest risk for each.',
   },
 ]
 
