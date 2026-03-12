@@ -67,6 +67,7 @@ function CollateralPageInner() {
   const [buyerRole, setBuyerRole] = useState('')
   const [customPrompt, setCustomPrompt] = useState('')
   const [specificObjections, setSpecificObjections] = useState('')
+  const [selectedDealId, setSelectedDealId] = useState('')
 
   const searchParams = useSearchParams()
   const dealIdParam = searchParams.get('dealId')
@@ -75,12 +76,15 @@ function CollateralPageInner() {
   const { data: compRes } = useSWR<{ data: Competitor[] }>('/api/competitors', fetcher)
   const { data: csRes } = useSWR<{ data: CaseStudy[] }>('/api/case-studies', fetcher)
   const { data: profileRes } = useSWR<{ data: CompanyProfile }>('/api/company', fetcher)
-  const { data: dealCtxRes } = useSWR(dealIdParam ? `/api/deals/${dealIdParam}` : null, fetcher)
+  const { data: dealsRes } = useSWR<{ data: any[] }>('/api/deals', fetcher)
+  const effectiveDealId = dealIdParam || selectedDealId
+  const { data: dealCtxRes } = useSWR(effectiveDealId ? `/api/deals/${effectiveDealId}` : null, fetcher)
 
   const collateral = collRes?.data ?? []
   const competitors = compRes?.data ?? []
   const caseStudies = csRes?.data ?? []
   const products = profileRes?.data?.products ?? []
+  const deals: any[] = dealsRes?.data ?? []
   const contextDeal = dealCtxRes?.data ?? dealCtxRes
 
   // Auto-poll every 4s while any item is generating
@@ -134,8 +138,8 @@ function CollateralPageInner() {
       } else if (customPrompt.trim()) {
         body.customPrompt = customPrompt.trim()
       }
-      if (dealIdParam) {
-        body.dealId = dealIdParam
+      if (effectiveDealId) {
+        body.dealId = effectiveDealId
       }
 
       const res = await fetch('/api/collateral/generate', {
@@ -310,7 +314,7 @@ function CollateralPageInner() {
       )}
 
       {/* Generate modal */}
-      <Dialog.Root open={generateOpen} onOpenChange={(open) => { setGenerateOpen(open); if (!open) { setSelectedProduct(''); setBuyerRole(''); setCustomPrompt(''); setSpecificObjections('') } }}>
+      <Dialog.Root open={generateOpen} onOpenChange={(open) => { setGenerateOpen(open); if (!open) { setSelectedProduct(''); setBuyerRole(''); setCustomPrompt(''); setSpecificObjections(''); setSelectedDealId('') } }}>
         <Dialog.Portal>
           <Dialog.Overlay style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 500 }} />
           <Dialog.Content style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 501, width: '100%', maxWidth: '520px', backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px', boxShadow: '0 16px 48px rgba(0,0,0,0.8)', outline: 'none' }}>
@@ -455,15 +459,39 @@ function CollateralPageInner() {
                 </div>
               )}
 
+              {/* Deal selector */}
+              {!dealIdParam && deals.length > 0 && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    Tailor for a deal <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                  </label>
+                  <select
+                    value={selectedDealId}
+                    onChange={(e) => setSelectedDealId(e.target.value)}
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', backgroundColor: '#0A0A0A', border: `1px solid ${selectedDealId ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.1)'}`, color: selectedDealId ? '#EBEBEB' : '#666', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="">No deal — generic output</option>
+                    {deals.map((d: any) => (
+                      <option key={d.id} value={d.id}>{d.dealName} — {d.prospectCompany}</option>
+                    ))}
+                  </select>
+                  {selectedDealId && (
+                    <p style={{ fontSize: '11px', color: '#6366F1', margin: '4px 0 0' }}>
+                      AI will use this deal's context, risks, and competitors to tailor the output.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Custom prompt */}
               <div>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
-                  Additional context <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                  Instructions for the AI <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
                 </label>
                 <textarea
                   value={customPrompt}
                   onChange={(e) => setCustomPrompt(e.target.value)}
-                  placeholder="e.g. Focus on enterprise deals, highlight our integration capabilities, tone should be formal…"
+                  placeholder="e.g. Focus on security and compliance angle, use a formal tone, include NHS reference, emphasise ROI…"
                   rows={3}
                   style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', backgroundColor: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5', boxSizing: 'border-box' }}
                 />

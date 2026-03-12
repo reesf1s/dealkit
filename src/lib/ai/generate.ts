@@ -132,6 +132,15 @@ async function generateAndValidate<T>(
   return { validated: retryResult.data, raw: retryRaw }
 }
 
+// Insert additional context BEFORE the JSON schema block so the AI incorporates it
+// when filling in the schema, rather than seeing it after having already "committed"
+// to a generic output.
+function insertBeforeSchema(content: string, insertion: string): string {
+  // The JSON schema starts at the last top-level { on its own line
+  const idx = content.lastIndexOf('\n{')
+  return idx === -1 ? content + insertion : content.slice(0, idx) + insertion + content.slice(idx)
+}
+
 function appendDealContext(
   messages: Array<{ role: 'user'; content: string }>,
   dealContext?: string,
@@ -147,15 +156,13 @@ function appendDealContext(
     talk_track: 'Open the script referencing this prospect\'s specific situation. Name their evaluated competitors. Frame the pitch around the deal\'s active risks.',
   }
   const guidance = type ? typeGuidance[type] : undefined
+  const insertion =
+    `\n\nDEAL CONTEXT — tailor specifically for this live deal:\n${dealContext.trim()}` +
+    (guidance ? `\n\nHow to use this context (${type}): ${guidance}` : '')
   const last = messages[messages.length - 1]
   return [
     ...messages.slice(0, -1),
-    {
-      ...last,
-      content: last.content +
-        `\n\nDEAL CONTEXT — tailor specifically for this live deal:\n${dealContext.trim()}` +
-        (guidance ? `\n\nHow to use this context (${type}): ${guidance}` : ''),
-    },
+    { ...last, content: insertBeforeSchema(last.content, insertion) },
   ]
 }
 
@@ -164,10 +171,11 @@ function appendCustomPrompt(
   customPrompt?: string,
 ): Array<{ role: 'user'; content: string }> {
   if (!customPrompt?.trim()) return messages
+  const insertion = `\n\nSPECIFIC INSTRUCTIONS — follow these exactly when generating the JSON:\n${customPrompt.trim()}`
   const last = messages[messages.length - 1]
   return [
     ...messages.slice(0, -1),
-    { ...last, content: last.content + `\n\nADDITIONAL CONTEXT FROM USER:\n${customPrompt.trim()}` },
+    { ...last, content: insertBeforeSchema(last.content, insertion) },
   ]
 }
 
