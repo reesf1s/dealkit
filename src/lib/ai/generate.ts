@@ -51,15 +51,13 @@ async function callClaude(
   messages: Array<{ role: 'user'; content: string }>,
   temperature: number,
 ): Promise<string> {
-  const stream = anthropic.messages.stream({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 4096,
+  const message = await anthropic.messages.create({
+    model: 'claude-3-5-haiku-20241022',
+    max_tokens: 2048,
     temperature,
     system,
     messages,
   })
-
-  const message = await stream.finalMessage()
   const block = message.content.find((b) => b.type === 'text')
   if (!block || block.type !== 'text') {
     throw new Error('No text content in Claude response')

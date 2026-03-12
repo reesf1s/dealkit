@@ -24,7 +24,7 @@ const Ctx = createContext<SidebarCtx>({
   sidebarWidth: 220,
   aiCollapsed: false,
   toggleAiCollapsed: () => {},
-  aiSidebarWidth: 280,
+  aiSidebarWidth: 340,
 })
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
@@ -62,7 +62,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   }
 
   const sidebarWidth = isMobile ? 0 : collapsed ? 64 : 220
-  const aiSidebarWidth = isMobile ? 0 : aiCollapsed ? 48 : 280
+  const aiSidebarWidth = isMobile ? 0 : aiCollapsed ? 48 : 340
 
   return (
     <Ctx.Provider value={{

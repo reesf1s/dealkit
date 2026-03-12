@@ -15,7 +15,6 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #07050F 0%, #0B0716 40%, #080512 100%)',
       position: 'relative',
-      overflow: 'hidden',
     }}>
       <div style={{
         position: 'fixed', top: '-120px', left: '-80px',

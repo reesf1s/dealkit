@@ -7,7 +7,7 @@ import { useState, useRef } from 'react'
 import {
   Plus, TrendingUp, DollarSign, ChevronRight, Sparkles,
   CheckSquare, Square, MoreHorizontal, Target, Zap, ArrowUpRight,
-  AlertCircle, Star, GripVertical
+  AlertCircle, Star, GripVertical, AlertTriangle, Clock
 } from 'lucide-react'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
@@ -285,31 +285,72 @@ export default function PipelinePage() {
             <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>AI Top Picks to Close</span>
             <span style={{ fontSize: '11px', color: '#9CA3AF' }}>Highest conversion probability</span>
           </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            {topDeals.map((deal: any) => (
-              <Link key={deal.id} href={`/deals/${deal.id}`} style={{
-                flex: 1, display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '10px 12px',
-                background: 'rgba(124,58,237,0.06)',
-                border: '1px solid rgba(124,58,237,0.15)',
-                borderRadius: '9px', textDecoration: 'none',
-                transition: 'border-color 0.1s',
-              }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.35)'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,58,237,0.15)'}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#F0EEFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.prospectCompany}</div>
-                  <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '1px' }}>
-                    {STAGES.find(s => s.id === deal.stage)?.label}
-                    {deal.dealValue && ` · $${deal.dealValue.toLocaleString()}`}
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            {topDeals.map((deal: any) => {
+              const pendingTodos: any[] = (deal.todos ?? []).filter((t: any) => !t.done)
+              const urgentTodo = pendingTodos[0]
+              // Detect risk signals from insights (look for negative/warning language)
+              const riskInsight = (deal.conversionInsights ?? []).find((ins: string) =>
+                /risk|danger|concern|warn|block|stall|compet|objection|overdue|miss|lost|slow|churn|cancel|threat/i.test(ins)
+              )
+              const scoreColor = deal.conversionScore >= 70 ? '#22C55E' : deal.conversionScore >= 40 ? '#F59E0B' : '#EF4444'
+
+              return (
+                <Link key={deal.id} href={`/deals/${deal.id}`} style={{
+                  flex: '1 1 220px', display: 'flex', flexDirection: 'column', gap: '8px',
+                  padding: '12px 14px',
+                  background: 'rgba(124,58,237,0.06)',
+                  border: '1px solid rgba(124,58,237,0.15)',
+                  borderRadius: '10px', textDecoration: 'none',
+                  transition: 'border-color 0.1s',
+                  minWidth: '200px',
+                }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.35)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,58,237,0.15)'}
+                >
+                  {/* Top: name + score */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.prospectCompany}</div>
+                      <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
+                        {STAGES.find(s => s.id === deal.stage)?.label}
+                        {deal.dealValue && ` · $${deal.dealValue.toLocaleString()}`}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '17px', fontWeight: '800', color: scoreColor, flexShrink: 0 }}>
+                      {deal.conversionScore}%
+                    </div>
                   </div>
-                </div>
-                <div style={{ fontSize: '16px', fontWeight: '800', color: deal.conversionScore >= 70 ? '#22C55E' : '#F59E0B' }}>
-                  {deal.conversionScore}%
-                </div>
-              </Link>
-            ))}
+
+                  {/* Risk signal */}
+                  {riskInsight && (
+                    <div style={{
+                      display: 'flex', gap: '5px', alignItems: 'flex-start',
+                      padding: '6px 8px', borderRadius: '7px',
+                      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)',
+                    }}>
+                      <AlertTriangle size={10} color="#EF4444" style={{ marginTop: '1px', flexShrink: 0 }} />
+                      <span style={{ fontSize: '10px', color: '#FCA5A5', lineHeight: '1.4' }}>{riskInsight}</span>
+                    </div>
+                  )}
+
+                  {/* Urgent to-do */}
+                  {urgentTodo && (
+                    <div style={{
+                      display: 'flex', gap: '5px', alignItems: 'flex-start',
+                      padding: '6px 8px', borderRadius: '7px',
+                      background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.18)',
+                    }}>
+                      <Clock size={10} color="#F59E0B" style={{ marginTop: '1px', flexShrink: 0 }} />
+                      <span style={{ fontSize: '10px', color: '#FDE68A', lineHeight: '1.4' }}>
+                        {urgentTodo.text}
+                        {pendingTodos.length > 1 && <span style={{ color: '#92400E', marginLeft: '4px' }}>+{pendingTodos.length - 1} more</span>}
+                      </span>
+                    </div>
+                  )}
+                </Link>
+              )
+            })}
           </div>
         </div>
       )}
