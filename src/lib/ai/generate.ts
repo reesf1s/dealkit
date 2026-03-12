@@ -34,6 +34,7 @@ export interface GenerateCollateralInput {
   productName?: string
   buyerRole?: string
   customPrompt?: string
+  dealContext?: string   // injected from a specific deal — risks, objections, competitor, summary
   context?: Record<string, unknown>
 }
 
@@ -131,6 +132,18 @@ async function generateAndValidate<T>(
   return { validated: retryResult.data, raw: retryRaw }
 }
 
+function appendDealContext(
+  messages: Array<{ role: 'user'; content: string }>,
+  dealContext?: string,
+): Array<{ role: 'user'; content: string }> {
+  if (!dealContext?.trim()) return messages
+  const last = messages[messages.length - 1]
+  return [
+    ...messages.slice(0, -1),
+    { ...last, content: last.content + `\n\nDEAL CONTEXT — tailor specifically for this live deal:\n${dealContext.trim()}` },
+  ]
+}
+
 function appendCustomPrompt(
   messages: Array<{ role: 'user'; content: string }>,
   customPrompt?: string,
@@ -175,7 +188,7 @@ function buildTitle(type: CollateralType, context: {
 export async function generateCollateral(
   input: GenerateCollateralInput,
 ): Promise<GenerateResult> {
-  const { workspaceId, type, competitorId, caseStudyId, productName, buyerRole, customPrompt } = input
+  const { workspaceId, type, competitorId, caseStudyId, productName, buyerRole, customPrompt, dealContext } = input
 
   // 1. Fetch company profile (required)
   const [profileRow] = await db
@@ -251,7 +264,7 @@ export async function generateCollateral(
     )
 
     const { system, messages: bcMsgs } = battlecardPrompt(company, competitor, competitorDeals as unknown as DealLog[], allCaseStudies as unknown as CaseStudy[], workspaceContext)
-    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(bcMsgs, customPrompt), BattlecardSchema, 0.4)
+    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(appendDealContext(bcMsgs, dealContext), customPrompt), BattlecardSchema, 0.4)
 
     return {
       content: validated as CollateralContent,
@@ -289,7 +302,7 @@ export async function generateCollateral(
     }
 
     const { system, messages: csMsgs } = caseStudyDocPrompt(company, caseStudy as unknown as CaseStudy, workspaceContext)
-    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(csMsgs, customPrompt), CaseStudyDocSchema, 0.6)
+    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(appendDealContext(csMsgs, dealContext), customPrompt), CaseStudyDocSchema, 0.6)
 
     return {
       content: validated as CollateralContent,
@@ -321,7 +334,7 @@ export async function generateCollateral(
         }
 
     const { system, messages: opMsgs } = onePagerPrompt(company, product, allCaseStudies as unknown as CaseStudy[], workspaceContext)
-    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(opMsgs, customPrompt), OnePagerSchema, 0.6)
+    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(appendDealContext(opMsgs, dealContext), customPrompt), OnePagerSchema, 0.6)
 
     return {
       content: validated as CollateralContent,
@@ -333,7 +346,7 @@ export async function generateCollateral(
   // ─── OBJECTION HANDLER ──────────────────────────────────────────────────────
   if (type === 'objection_handler') {
     const { system, messages: ohMsgs } = objectionHandlerPrompt(company, allDeals as unknown as DealLog[], workspaceContext)
-    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(ohMsgs, customPrompt), ObjectionHandlerSchema, 0.4)
+    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(appendDealContext(ohMsgs, dealContext), customPrompt), ObjectionHandlerSchema, 0.4)
 
     return {
       content: validated as CollateralContent,
@@ -346,7 +359,7 @@ export async function generateCollateral(
   if (type === 'talk_track') {
     const role = buyerRole ?? 'Decision Maker'
     const { system, messages: ttMsgs } = talkTrackPrompt(company, role, allDeals as unknown as DealLog[], workspaceContext)
-    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(ttMsgs, customPrompt), TalkTrackSchema, 0.6)
+    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(appendDealContext(ttMsgs, dealContext), customPrompt), TalkTrackSchema, 0.6)
 
     return {
       content: validated as CollateralContent,
@@ -359,7 +372,7 @@ export async function generateCollateral(
   if (type === 'email_sequence') {
     const persona = buyerRole ?? 'Decision Maker'
     const { system, messages: esMsgs } = emailSequencePrompt(company, persona, allCaseStudies as unknown as CaseStudy[], workspaceContext)
-    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(esMsgs, customPrompt), EmailSequenceSchema, 0.6)
+    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(appendDealContext(esMsgs, dealContext), customPrompt), EmailSequenceSchema, 0.6)
 
     return {
       content: validated as CollateralContent,

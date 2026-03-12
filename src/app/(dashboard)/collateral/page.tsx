@@ -3,8 +3,9 @@ export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
 import useSWR from 'swr'
+import { useSearchParams } from 'next/navigation'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Plus, X, RefreshCw } from 'lucide-react'
+import { Plus, X, RefreshCw, Target } from 'lucide-react'
 import { CollateralGrid } from '@/components/collateral/CollateralGrid'
 import { CollateralTypeBadge } from '@/components/collateral/CollateralTypeBadge'
 import { SkeletonGrid } from '@/components/shared/SkeletonCard'
@@ -66,15 +67,20 @@ export default function CollateralPage() {
   const [buyerRole, setBuyerRole] = useState('')
   const [customPrompt, setCustomPrompt] = useState('')
 
+  const searchParams = useSearchParams()
+  const dealIdParam = searchParams.get('dealId')
+
   const { data: collRes, isLoading, mutate } = useSWR<{ data: Collateral[] }>('/api/collateral', fetcher)
   const { data: compRes } = useSWR<{ data: Competitor[] }>('/api/competitors', fetcher)
   const { data: csRes } = useSWR<{ data: CaseStudy[] }>('/api/case-studies', fetcher)
   const { data: profileRes } = useSWR<{ data: CompanyProfile }>('/api/company', fetcher)
+  const { data: dealCtxRes } = useSWR(dealIdParam ? `/api/deals/${dealIdParam}` : null, fetcher)
 
   const collateral = collRes?.data ?? []
   const competitors = compRes?.data ?? []
   const caseStudies = csRes?.data ?? []
   const products = profileRes?.data?.products ?? []
+  const contextDeal = dealCtxRes?.data ?? dealCtxRes
 
   // Auto-poll every 4s while any item is generating
   const hasGenerating = collateral.some(c => c.status === 'generating')
@@ -83,6 +89,20 @@ export default function CollateralPage() {
     const t = setInterval(() => mutate(), 4000)
     return () => clearInterval(t)
   }, [hasGenerating, mutate])
+
+  // Auto-select competitor from deal context when modal opens on battlecard
+  useEffect(() => {
+    if (!contextDeal || !generateOpen || selectedType !== 'battlecard' || selectedCompetitor) return
+    const dealCompNames: string[] = (contextDeal.competitors as string[]) ?? []
+    if (!dealCompNames.length) return
+    const match = competitors.find(c =>
+      dealCompNames.some(n =>
+        c.name.toLowerCase().includes(n.toLowerCase()) ||
+        n.toLowerCase().includes(c.name.toLowerCase()),
+      ),
+    )
+    if (match) setSelectedCompetitor(match.id)
+  }, [contextDeal, generateOpen, selectedType, competitors, selectedCompetitor])
 
   const staleCount = collateral.filter(c => c.status === 'stale').length
 
@@ -110,6 +130,9 @@ export default function CollateralPage() {
       }
       if (customPrompt.trim()) {
         body.customPrompt = customPrompt.trim()
+      }
+      if (dealIdParam) {
+        body.dealId = dealIdParam
       }
 
       const res = await fetch('/api/collateral/generate', {
@@ -215,6 +238,26 @@ export default function CollateralPage() {
           </button>
         </div>
       </div>
+
+      {/* Deal context banner */}
+      {dealIdParam && contextDeal && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', marginBottom: '4px', background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: '10px' }}>
+          <Target size={14} color="#818CF8" strokeWidth={2.5} style={{ flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#818CF8' }}>Tailoring for deal: </span>
+            <span style={{ fontSize: '13px', color: '#EBEBEB' }}>{contextDeal.dealName ?? contextDeal.prospectCompany}</span>
+            <span style={{ fontSize: '12px', color: '#555', marginLeft: '8px' }}>
+              — collateral will be customised to this deal&apos;s context, risks, and competitors
+            </span>
+          </div>
+          <button
+            onClick={() => { setSelectedType('battlecard'); setGenerateOpen(true) }}
+            style={{ flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#818CF8', backgroundColor: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            Quick Generate
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>

@@ -141,12 +141,74 @@ function MeetingNotesTab({ dealId, deal, onUpdate }: { dealId: string; deal: any
   )
 }
 
-function MeetingPrepTab({ dealId }: { dealId: string }) {
+const STAGE_PLAYBOOK: Record<string, string[]> = {
+  prospecting: [
+    'Research recent news, funding rounds, and pain signals for this prospect',
+    'Personalise your opening to their specific role and company context',
+    'Focus on creating curiosity — avoid feature-dumping',
+    'Goal: qualify fit and book a discovery call',
+  ],
+  qualification: [
+    'Validate BANT: Budget, Authority, Need, and Timeline',
+    'Ask who else is involved in the decision',
+    'Identify current solution and what\'s driving them to look now',
+    'Disqualify early and gracefully if not a genuine fit',
+  ],
+  discovery: [
+    'Lead with open-ended questions — let them talk 70% of the time',
+    'Map stakeholders, champions, and blockers',
+    'Uncover the emotional cost of their problem, not just the functional one',
+    'Confirm budget range and decision timeline before closing the call',
+  ],
+  proposal: [
+    'Open by recapping their stated pains — show you were listening',
+    'Lead with outcomes and ROI, then features as proof points',
+    'Pre-handle likely objections before they surface',
+    'Include a relevant win story or case study as social proof',
+    'End with a clear mutual success plan and next step',
+  ],
+  negotiation: [
+    'Know your walk-away point before entering',
+    'Anchor on business value, not product features',
+    'Lead concessions with non-monetary value (onboarding, success hours)',
+    'Create urgency with a mutual close plan tied to their deadline',
+    'Never discount without getting something in return',
+  ],
+  closed_won: [
+    'Kick off with a success handoff to CS / implementation',
+    'Confirm agreed outcomes and success metrics in writing',
+    'Set a 30/60/90 day check-in cadence',
+    'Ask for a referral or case study while goodwill is high',
+  ],
+}
+
+function MeetingPrepTab({ dealId, deal }: { dealId: string; deal: any }) {
   const [prep, setPrep] = useState('')
   const [loading, setLoading] = useState(false)
-  const [generated, setGenerated] = useState(false)
+  const [fullBriefShown, setFullBriefShown] = useState(false)
 
-  const generate = async () => {
+  const { data: compRes } = useSWR('/api/competitors', fetcher)
+  const { data: csRes } = useSWR('/api/case-studies', fetcher)
+  const { data: profileRes } = useSWR('/api/company', fetcher)
+
+  const allCompetitors: any[] = compRes?.data ?? []
+  const allCaseStudies: any[] = csRes?.data ?? []
+  const profile: any = profileRes?.data
+
+  const dealCompNames: string[] = deal?.competitors ?? []
+  const matchedCompetitors = allCompetitors.filter(c =>
+    dealCompNames.some((n: string) =>
+      c.name.toLowerCase().includes(n.toLowerCase()) ||
+      n.toLowerCase().includes(c.name.toLowerCase()),
+    ),
+  )
+
+  const dealRisks: string[] = deal?.dealRisks ?? []
+  const commonObjections: string[] = profile?.commonObjections ?? []
+  const stage: string = deal?.stage ?? 'discovery'
+  const playbook = STAGE_PLAYBOOK[stage] ?? STAGE_PLAYBOOK.discovery
+
+  const generateFullBrief = async () => {
     setLoading(true)
     try {
       const res = await fetch(`/api/deals/${dealId}/meeting-prep`, {
@@ -154,43 +216,148 @@ function MeetingPrepTab({ dealId }: { dealId: string }) {
       })
       const data = await res.json()
       setPrep(data.data?.prep ?? '')
-      setGenerated(true)
+      setFullBriefShown(true)
     } finally {
       setLoading(false)
     }
   }
 
+  const cardStyle: React.CSSProperties = {
+    background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', padding: '16px',
+  }
+  const sectionTitle = (label: string, color = '#888') => (
+    <div style={{ fontSize: '11px', fontWeight: 700, color, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: '10px' }}>
+      {label}
+    </div>
+  )
+
   return (
-    <div>
-      {!generated ? (
-        <div style={{ textAlign: 'center', padding: '48px 24px' }}>
-          <div style={{ width: '52px', height: '52px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', boxShadow: '0 0 24px rgba(99,102,241,0.15)' }}>
-            <Sparkles size={22} color="#6366F1" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+      {/* Stage playbook */}
+      <div style={cardStyle}>
+        {sectionTitle(`${stage.replace('_', ' ')} Playbook`, '#6366F1')}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+          {playbook.map((tip, i) => (
+            <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+              <div style={{ width: '18px', height: '18px', borderRadius: '5px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '10px', fontWeight: 700, color: '#6366F1', marginTop: '1px' }}>
+                {i + 1}
+              </div>
+              <span style={{ fontSize: '13px', color: '#B0B0B8', lineHeight: 1.5 }}>{tip}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Competitive intel */}
+      {matchedCompetitors.length > 0 && (
+        <div style={cardStyle}>
+          {sectionTitle('Competitive Intel', '#F59E0B')}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {matchedCompetitors.map(comp => (
+              <div key={comp.id}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB', marginBottom: '6px' }}>
+                  vs {comp.name}
+                </div>
+                {(comp.weaknesses as string[])?.length > 0 && (
+                  <div style={{ marginBottom: '5px' }}>
+                    <span style={{ fontSize: '11px', color: '#22C55E', fontWeight: 600 }}>Their weaknesses: </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '4px' }}>
+                      {(comp.weaknesses as string[]).slice(0, 3).map((w: string, i: number) => (
+                        <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: '#888' }}>
+                          <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#22C55E', flexShrink: 0, marginTop: '5px' }} />
+                          {w}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {(comp.differentiators as string[])?.length > 0 && (
+                  <div>
+                    <span style={{ fontSize: '11px', color: '#818CF8', fontWeight: 600 }}>Your differentiators: </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '4px' }}>
+                      {(comp.differentiators as string[]).slice(0, 3).map((d: string, i: number) => (
+                        <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: '#888' }}>
+                          <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#6366F1', flexShrink: 0, marginTop: '5px' }} />
+                          {d}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-          <div style={{ fontSize: '15px', fontWeight: '600', color: '#EBEBEB', marginBottom: '6px' }}>Meeting Prep</div>
-          <div style={{ fontSize: '13px', color: '#555', lineHeight: '1.6', marginBottom: '20px', maxWidth: '320px', margin: '0 auto 20px' }}>
-            Generate a personalized prep brief with talking points, objection handlers, competitive intel, and questions to ask.
+        </div>
+      )}
+
+      {/* Expected objections */}
+      {(dealRisks.length > 0 || commonObjections.length > 0) && (
+        <div style={cardStyle}>
+          {sectionTitle('Likely Objections to Address', '#EF4444')}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            {dealRisks.map((risk, i) => (
+              <div key={`risk-${i}`} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', padding: '8px 10px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: '7px' }}>
+                <span style={{ fontSize: '11px' }}>⚠</span>
+                <span style={{ fontSize: '12px', color: '#C9820A', lineHeight: 1.5 }}>{risk}</span>
+              </div>
+            ))}
+            {commonObjections.slice(0, 3).map((obj, i) => (
+              <div key={`obj-${i}`} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: '#888' }}>
+                <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#EF4444', flexShrink: 0, marginTop: '5px' }} />
+                {obj}
+              </div>
+            ))}
           </div>
-          <button onClick={generate} disabled={loading} style={{
+        </div>
+      )}
+
+      {/* Relevant win stories */}
+      {allCaseStudies.length > 0 && (
+        <div style={cardStyle}>
+          {sectionTitle('Win Stories to Reference', '#22C55E')}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {allCaseStudies.slice(0, 2).map((cs: any) => (
+              <div key={cs.id} style={{ padding: '10px 12px', background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)', borderRadius: '8px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB', marginBottom: '3px' }}>{cs.customerName}</div>
+                {cs.customerIndustry && <div style={{ fontSize: '11px', color: '#555', marginBottom: '4px' }}>{cs.customerIndustry}{cs.customerSize ? ` · ${cs.customerSize}` : ''}</div>}
+                <div style={{ fontSize: '12px', color: '#888', lineHeight: 1.5 }}>{cs.results?.slice(0, 120)}{cs.results?.length > 120 ? '…' : ''}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* AI full brief */}
+      {!fullBriefShown ? (
+        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '4px' }}>
+          <button onClick={generateFullBrief} disabled={loading} style={{
             display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 24px',
-            background: 'linear-gradient(135deg, #6366F1, #7C3AED)', boxShadow: '0 0 20px rgba(99,102,241,0.3)',
-            border: 'none', borderRadius: '9px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+            background: loading ? 'rgba(99,102,241,0.15)' : 'linear-gradient(135deg, #6366F1, #7C3AED)',
+            boxShadow: loading ? 'none' : '0 0 20px rgba(99,102,241,0.25)',
+            border: loading ? '1px solid rgba(99,102,241,0.3)' : 'none',
+            borderRadius: '9px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer',
           }}>
-            {loading ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Generating...</> : <><Sparkles size={14} /> Generate Meeting Prep</>}
+            {loading
+              ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Generating full brief…</>
+              : <><Sparkles size={14} /> Generate AI Full Brief</>}
           </button>
         </div>
       ) : (
-        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '12px', padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Sparkles size={14} color="#818CF8" />
-              <span style={{ fontSize: '13px', fontWeight: '600', color: '#EBEBEB' }}>Meeting Prep Brief</span>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#EBEBEB' }}>AI Full Brief</span>
             </div>
-            <button onClick={generate} style={{ fontSize: '12px', color: '#555', background: 'none', border: 'none', cursor: 'pointer' }}>Regenerate</button>
+            <button onClick={generateFullBrief} disabled={loading} style={{ fontSize: '12px', color: '#555', background: 'none', border: 'none', cursor: 'pointer' }}>
+              {loading ? 'Regenerating…' : 'Regenerate'}
+            </button>
           </div>
           <div style={{ fontSize: '13px', color: '#888', lineHeight: '1.8', whiteSpace: 'pre-wrap' }}>{prep}</div>
         </div>
       )}
+
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
@@ -279,8 +446,8 @@ function TodosTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpd
 
 const STAGES_OPTS = ['prospecting','qualification','discovery','proposal','negotiation','closed_won','closed_lost'] as const
 
-function EditDealModal({ deal, dealId, open, onOpenChange, onSaved }: {
-  deal: any; dealId: string; open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void
+function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
+  deal: any; dealId: string; open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void; onWon?: (deal: any) => void
 }) {
   const [form, setForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -319,6 +486,7 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved }: {
   const save = async () => {
     setSaving(true)
     try {
+      const wasWon = deal?.stage !== 'closed_won' && form.stage === 'closed_won'
       await fetch(`/api/deals/${dealId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -339,6 +507,7 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved }: {
       })
       onSaved()
       onOpenChange(false)
+      if (wasWon) onWon?.({ ...form, dealId })
     } finally {
       setSaving(false)
     }
@@ -481,6 +650,164 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved }: {
   )
 }
 
+function WinStoryPromptModal({ wonDeal, open, onOpenChange }: {
+  wonDeal: any; open: boolean; onOpenChange: (v: boolean) => void
+}) {
+  const [form, setForm] = useState({ customerName: '', customerIndustry: '', customerSize: '', challenge: '', solution: '', results: '' })
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (open && wonDeal) {
+      setForm({
+        customerName: wonDeal.prospectCompany ?? '',
+        customerIndustry: '',
+        customerSize: '',
+        challenge: wonDeal.notes ? `${wonDeal.notes.slice(0, 300)}` : '',
+        solution: '',
+        results: wonDeal.dealValue ? `Closed at $${Number(wonDeal.dealValue).toLocaleString()}` : '',
+      })
+      setSaved(false)
+    }
+  }, [open, wonDeal])
+
+  const u = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px',
+    background: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)',
+    color: '#EBEBEB', fontSize: '13px', outline: 'none', boxSizing: 'border-box',
+  }
+  const labelStyle: React.CSSProperties = {
+    display: 'block', fontSize: '11px', fontWeight: 600, color: '#666',
+    textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '5px',
+  }
+  const textareaStyle: React.CSSProperties = {
+    ...inputStyle, height: 'auto', padding: '8px 10px', resize: 'vertical',
+    fontFamily: 'inherit', lineHeight: '1.5',
+  }
+
+  const submit = async () => {
+    if (!form.customerName || !form.challenge || !form.solution || !form.results) return
+    setSaving(true)
+    try {
+      const res = await fetch('/api/case-studies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, metrics: [] }),
+      })
+      if (res.ok) {
+        setSaved(true)
+        setTimeout(() => onOpenChange(false), 1400)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', zIndex: 600 }} />
+        <Dialog.Content style={{
+          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+          zIndex: 601, width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto',
+          background: 'rgba(12,10,28,0.99)', border: '1px solid rgba(99,102,241,0.3)',
+          borderRadius: '14px', padding: '24px', outline: 'none',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.9), 0 0 32px rgba(99,102,241,0.15)',
+        }}>
+          {saved ? (
+            <div style={{ textAlign: 'center', padding: '24px 0' }}>
+              <div style={{ fontSize: '32px', marginBottom: '10px' }}>🏆</div>
+              <div style={{ fontSize: '15px', fontWeight: 700, color: '#22C55E', marginBottom: '4px' }}>Win story saved!</div>
+              <div style={{ fontSize: '13px', color: '#555' }}>Added to your case study library for future collateral.</div>
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '18px' }}>🏆</span>
+                    <Dialog.Title style={{ fontSize: '15px', fontWeight: 700, color: '#F1F1F3', margin: 0 }}>
+                      Turn this win into a case study
+                    </Dialog.Title>
+                  </div>
+                  <p style={{ fontSize: '12px', color: '#555', margin: 0 }}>
+                    Capture the story now — it&apos;ll strengthen every future proposal and collateral piece.
+                  </p>
+                </div>
+                <Dialog.Close asChild>
+                  <button style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', display: 'flex', padding: '4px', flexShrink: 0 }}>
+                    <X size={15} />
+                  </button>
+                </Dialog.Close>
+              </div>
+
+              <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '14px 0' }} />
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div>
+                    <label style={labelStyle}>Customer name *</label>
+                    <input style={inputStyle} value={form.customerName} onChange={e => u('customerName', e.target.value)}
+                      onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Industry</label>
+                    <input style={inputStyle} value={form.customerIndustry} onChange={e => u('customerIndustry', e.target.value)} placeholder="e.g. SaaS, Retail"
+                      onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+                  </div>
+                </div>
+                <div>
+                  <label style={labelStyle}>Company size</label>
+                  <input style={inputStyle} value={form.customerSize} onChange={e => u('customerSize', e.target.value)} placeholder="e.g. 50-200 employees, Series B"
+                    onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Their challenge *</label>
+                  <textarea style={textareaStyle} rows={3} value={form.challenge} onChange={e => u('challenge', e.target.value)}
+                    placeholder="What problem were they trying to solve?"
+                    onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+                </div>
+                <div>
+                  <label style={labelStyle}>How you solved it *</label>
+                  <textarea style={textareaStyle} rows={2} value={form.solution} onChange={e => u('solution', e.target.value)}
+                    placeholder="What did you implement or deliver?"
+                    onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Measurable results *</label>
+                  <textarea style={textareaStyle} rows={2} value={form.results} onChange={e => u('results', e.target.value)}
+                    placeholder="e.g. Reduced onboarding time by 40%, saved 10h/week"
+                    onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '4px' }}>
+                  <Dialog.Close asChild>
+                    <button style={{ height: '34px', padding: '0 14px', borderRadius: '7px', fontSize: '13px', fontWeight: 500, color: '#555', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
+                      Skip for now
+                    </button>
+                  </Dialog.Close>
+                  <button
+                    onClick={submit}
+                    disabled={saving || !form.customerName || !form.challenge || !form.solution || !form.results}
+                    style={{
+                      height: '34px', padding: '0 18px', borderRadius: '7px', fontSize: '13px', fontWeight: 600,
+                      color: '#fff', background: saving ? '#333' : 'linear-gradient(135deg, #22C55E, #16A34A)',
+                      border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {saving ? 'Saving…' : 'Save Win Story'}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  )
+}
+
 function ActivityLog({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
   const [entry, setEntry] = useState('')
   const [saving, setSaving] = useState(false)
@@ -584,6 +911,8 @@ export default function DealDetailPage() {
 
   const [activeTab, setActiveTab] = useState<'overview' | 'meeting-notes' | 'prep' | 'todos'>('overview')
   const [editOpen, setEditOpen] = useState(false)
+  const [winStoryOpen, setWinStoryOpen] = useState(false)
+  const [wonDeal, setWonDeal] = useState<any>(null)
 
   if (!deal && data !== undefined) {
     return (
@@ -680,7 +1009,13 @@ export default function DealDetailPage() {
       </div>
 
       {/* Edit deal modal */}
-      <EditDealModal deal={deal} dealId={id} open={editOpen} onOpenChange={setEditOpen} onSaved={() => mutate()} />
+      <EditDealModal
+        deal={deal} dealId={id} open={editOpen} onOpenChange={setEditOpen}
+        onSaved={() => mutate()}
+        onWon={(data) => { setWonDeal(data); setWinStoryOpen(true) }}
+      />
+      {/* Win story capture */}
+      <WinStoryPromptModal wonDeal={wonDeal} open={winStoryOpen} onOpenChange={setWinStoryOpen} />
 
       {/* Tab content */}
       {!deal ? (
@@ -735,7 +1070,7 @@ export default function DealDetailPage() {
           {activeTab === 'meeting-notes' && (
             <MeetingNotesTab dealId={id} deal={deal} onUpdate={() => mutate()} />
           )}
-          {activeTab === 'prep' && <MeetingPrepTab dealId={id} />}
+          {activeTab === 'prep' && <MeetingPrepTab dealId={id} deal={deal} />}
           {activeTab === 'todos' && (
             <TodosTab dealId={id} deal={deal} onUpdate={() => mutate()} />
           )}

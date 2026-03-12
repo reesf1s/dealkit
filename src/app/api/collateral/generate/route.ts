@@ -2,9 +2,9 @@ export const maxDuration = 60
 
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { and, count, eq, isNull, or } from 'drizzle-orm'
+import { and, count, eq, ilike, isNull, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { collateral, companyProfiles, events } from '@/lib/db/schema'
+import { collateral, companyProfiles, competitors, dealLogs, events } from '@/lib/db/schema'
 import { PLAN_LIMITS, isWithinLimit } from '@/lib/stripe/plans'
 import { generateCollateral } from '@/lib/ai/generate'
 import type { CollateralType } from '@/types'
@@ -42,10 +42,11 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { type, competitorId, caseStudyId, productName, buyerRole, customPrompt }: {
+    const { type, competitorId: rawCompetitorId, caseStudyId, productName, buyerRole, customPrompt, dealId }: {
       type: CollateralType; competitorId?: string; caseStudyId?: string
-      productName?: string; buyerRole?: string; customPrompt?: string
+      productName?: string; buyerRole?: string; customPrompt?: string; dealId?: string
     } = body
+    let competitorId = rawCompetitorId
 
     const validTypes: CollateralType[] = ['battlecard','case_study_doc','one_pager','objection_handler','talk_track','email_sequence']
     if (!type || !validTypes.includes(type))
@@ -54,6 +55,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'competitorId is required for battlecard generation' }, { status: 400 })
     if (type === 'case_study_doc' && !caseStudyId)
       return NextResponse.json({ error: 'caseStudyId is required for case study doc generation' }, { status: 400 })
+
+    // ── Build deal context if a dealId was provided ──────────────────────────
+    let dealContext: string | undefined
+    let sourceDealLogId: string | null = null
+
+    if (dealId) {
+      const [dealRow] = await db.select().from(dealLogs)
+        .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId))).limit(1)
+
+      if (dealRow) {
+        sourceDealLogId = dealId
+
+        // Auto-resolve competitor from deal's competitor names if not explicitly passed
+        if (!competitorId && type === 'battlecard') {
+          const dealCompNames = (dealRow.competitors as string[]) ?? []
+          for (const name of dealCompNames) {
+            const [comp] = await db.select({ id: competitors.id }).from(competitors)
+              .where(and(eq(competitors.workspaceId, workspaceId), ilike(competitors.name, `%${name}%`))).limit(1)
+            if (comp) { competitorId = comp.id; break }
+          }
+        }
+
+        const risks = (dealRow.dealRisks as string[]) ?? []
+        const dealComps = (dealRow.competitors as string[]) ?? []
+        dealContext = [
+          `Prospect: ${dealRow.prospectCompany}${dealRow.prospectName ? ` — ${dealRow.prospectName}` : ''}${dealRow.prospectTitle ? ` (${dealRow.prospectTitle})` : ''}`,
+          `Stage: ${dealRow.stage?.replace(/_/g, ' ')}`,
+          dealComps.length ? `Competing against: ${dealComps.join(', ')}` : '',
+          dealRow.aiSummary ? `Deal summary: ${dealRow.aiSummary}` : '',
+          risks.length ? `Active deal risks: ${risks.join('; ')}` : '',
+          dealRow.dealValue ? `Deal value: $${dealRow.dealValue.toLocaleString()}` : '',
+        ].filter(Boolean).join('\n')
+      }
+    }
 
     const now = new Date()
 
@@ -77,7 +112,7 @@ export async function POST(req: NextRequest) {
     if (existing) {
       // Overwrite the stuck/stale record in-place — no new row created
       const [updated] = await db.update(collateral)
-        .set({ userId, title: `Generating ${type.replace(/_/g, ' ')}…`, status: 'generating', content: null, rawResponse: null, generatedAt: null, updatedAt: now })
+        .set({ userId, title: `Generating ${type.replace(/_/g, ' ')}…`, status: 'generating', content: null, rawResponse: null, generatedAt: null, sourceDealLogId, updatedAt: now })
         .where(eq(collateral.id, existing.id))
         .returning({ id: collateral.id })
       record = updated
@@ -85,14 +120,14 @@ export async function POST(req: NextRequest) {
       const [inserted] = await db.insert(collateral).values({
         workspaceId, userId, type, title: `Generating ${type.replace(/_/g, ' ')}…`, status: 'generating',
         sourceCompetitorId: competitorId ?? null, sourceCaseStudyId: caseStudyId ?? null,
-        sourceDealLogId: null, content: null, rawResponse: null, generatedAt: null, createdAt: now, updatedAt: now,
+        sourceDealLogId, content: null, rawResponse: null, generatedAt: null, createdAt: now, updatedAt: now,
       }).returning({ id: collateral.id })
       record = inserted
     }
 
     // Run synchronously — Haiku at 1024 tokens typically completes in 3-8s, well within maxDuration=60
     try {
-      const result = await generateCollateral({ workspaceId, type, competitorId, caseStudyId, productName, buyerRole, customPrompt })
+      const result = await generateCollateral({ workspaceId, type, competitorId, caseStudyId, productName, buyerRole, customPrompt, dealContext })
       const generatedAt = new Date()
       const [updated] = await db.update(collateral)
         .set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt })
