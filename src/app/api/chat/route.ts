@@ -214,9 +214,15 @@ async function handleMeetingNotes(
     .where(and(eq(dealLogs.workspaceId, workspaceId), sql`${dealLogs.stage} NOT IN ('closed_won', 'closed_lost')`))
     .limit(20)
 
-  // Include last 150 chars of accumulated notes so Claude has prior meeting context for each deal
+  // Include last 3 date-stamped entries from accumulated notes so Claude has clean prior context per deal
+  function recentNoteEntries(notes: string | null, n = 3): string {
+    if (!notes) return ''
+    const entries = notes.split('\n').filter(l => l.startsWith('['))
+    return entries.slice(-n).join(' | ')
+  }
+
   const dealList = openDeals.map(d =>
-    `id:${d.id} | "${d.dealName}" — ${d.prospectCompany} (${d.stage})${d.notes ? ` | Prior context: ${d.notes.slice(-150)}` : ''}`
+    `id:${d.id} | "${d.dealName}" — ${d.prospectCompany} (${d.stage})${d.notes ? ` | Prior context: ${recentNoteEntries(d.notes)}` : ''}`
   ).join('\n')
 
   const analysisMsg = await anthropic.messages.create({
@@ -921,7 +927,8 @@ export async function POST(req: NextRequest) {
         const todoText = pending.length > 0
           ? `Todos: ${pending.map(t => `• ${t.text}`).join(', ')}`
           : 'No pending todos'
-        const notesCtx = d.notes ? ` Context: ${d.notes.slice(-200)}` : ''
+        const notesEntries = d.notes ? d.notes.split('\n').filter((l: string) => l.startsWith('[')).slice(-3).join(' | ') : ''
+        const notesCtx = notesEntries ? ` History: ${notesEntries}` : ''
         kbParts.push(`- "${d.dealName}" at ${d.prospectCompany} (${d.stage}): $${d.dealValue ? (d.dealValue / 100).toLocaleString() : '?'}. ${todoText}.${notesCtx}`)
       })
     }
