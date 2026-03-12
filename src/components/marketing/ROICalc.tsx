@@ -12,7 +12,7 @@ function formatCurrency(value: number): string {
   return `£${value.toFixed(0)}`
 }
 
-const DEALKIT_COST = 49 // GBP/month (Starter plan)
+const DEALKIT_COST = 79 // GBP/month (Starter plan)
 
 export default function ROICalc() {
   const [monthlyDeals, setMonthlyDeals] = useState(20)

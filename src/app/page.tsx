@@ -28,12 +28,12 @@ const PRICING = [
     cta: 'Get started', highlight: false,
   },
   {
-    name: 'Starter', price: '£49', period: '/mo',
+    name: 'Starter', price: '£79', period: '/mo',
     features: ['3 products', '10 competitors', 'Unlimited case studies', 'Unlimited deals', 'Unlimited collateral', '.docx export', 'No watermark'],
     cta: 'Start free trial', highlight: true,
   },
   {
-    name: 'Pro', price: '£99', period: '/mo',
+    name: 'Pro', price: '£149', period: '/mo',
     features: ['Everything in Starter', 'Unlimited products', 'Batch regenerate', 'Email sequences', 'AI meeting prep', 'Team features'],
     cta: 'Start free trial', highlight: false,
   },
