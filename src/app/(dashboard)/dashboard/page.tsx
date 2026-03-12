@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { TrendingUp, Users, BookOpen, ClipboardList, FileText, Plus, RefreshCw, AlertTriangle, CheckCircle, Circle, ArrowUpRight, Zap, Target, BarChart3, Sparkles, Copy, Check, Map } from 'lucide-react'
 import ROIWidget from '@/components/dashboard/ROIWidget'
+import AIOverviewCard from '@/components/dashboard/AIOverviewCard'
 import { SetupAlert } from '@/components/shared/SetupBanner'
 import { useUser } from '@clerk/nextjs'
 import { fetcher, isDbNotConfigured } from '@/lib/fetcher'
@@ -272,6 +273,9 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* AI Overview — refreshes daily, summarises pipeline + key actions */}
+      <AIOverviewCard />
 
       {/* Setup progress banner — shown until all steps complete */}
       {healthPct < 100 && !dbNotConnected && (

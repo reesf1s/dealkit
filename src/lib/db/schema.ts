@@ -77,6 +77,8 @@ export const workspaces = pgTable('workspaces', {
     .references(() => users.id, { onDelete: 'cascade' }),
   plan: planEnum('plan').notNull().default('free'),
   stripeCustomerId: text('stripe_customer_id'),
+  aiOverview: jsonb('ai_overview'),                        // cached daily AI overview
+  aiOverviewGeneratedAt: timestamp('ai_overview_generated_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
