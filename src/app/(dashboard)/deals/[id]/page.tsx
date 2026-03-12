@@ -9,7 +9,7 @@ import * as Dialog from '@radix-ui/react-dialog'
 import {
   ArrowLeft, Sparkles, CheckSquare, Square, Plus, Target, Loader2,
   FileText, Clipboard, ChevronDown, TrendingUp, DollarSign, Calendar,
-  Building2, User, Edit, Trash2, MoreHorizontal, CheckCircle, X
+  Building2, User, Edit, Trash2, MoreHorizontal, CheckCircle, X, Link2, Check
 } from 'lucide-react'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
@@ -1023,6 +1023,10 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate }: { dealId: string; deal: 
   const [extractError, setExtractError] = useState<string | null>(null)
   const [editingNote, setEditingNote] = useState<string | null>(null)
   const [noteText, setNoteText] = useState('')
+  const [shareLoading, setShareLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const isShared: boolean = deal?.successCriteriaIsShared ?? false
+  const shareToken: string | null = deal?.successCriteriaShareToken ?? null
   const criteria: any[] = deal?.successCriteriaTodos ?? []
 
   const categories = [...new Set(criteria.map((c: any) => c.category ?? 'General'))]
@@ -1072,6 +1076,24 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate }: { dealId: string; deal: 
     onUpdate()
   }
 
+  const toggleShare = async () => {
+    setShareLoading(true)
+    try {
+      await fetch(`/api/deals/${dealId}/success-criteria/share`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enable: !isShared }),
+      })
+      onUpdate()
+    } finally { setShareLoading(false) }
+  }
+
+  const copyLink = async () => {
+    if (!shareToken) return
+    await navigator.clipboard.writeText(`${window.location.origin}/share/criteria/${shareToken}`)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
       {/* Progress bar */}
@@ -1086,6 +1108,29 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate }: { dealId: string; deal: 
           <div style={{ height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${criteria.length ? (achieved / criteria.length) * 100 : 0}%`, background: 'linear-gradient(90deg, #6366F1, #22C55E)', borderRadius: '3px', transition: 'width 0.3s' }} />
           </div>
+        </div>
+      )}
+
+      {/* Share controls */}
+      {criteria.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={toggleShare}
+            disabled={shareLoading}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: isShared ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${isShared ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '7px', color: isShared ? '#818CF8' : '#888', fontSize: '12px', fontWeight: 600, cursor: shareLoading ? 'not-allowed' : 'pointer' }}
+          >
+            {shareLoading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Link2 size={12} />}
+            {isShared ? 'Shared' : 'Share'}
+          </button>
+          {isShared && shareToken && (
+            <button
+              onClick={copyLink}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: copied ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.04)', border: `1px solid ${copied ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '7px', color: copied ? '#22C55E' : '#888', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+            >
+              {copied ? <Check size={12} /> : <Clipboard size={12} />}
+              {copied ? 'Copied!' : 'Copy link'}
+            </button>
+          )}
         </div>
       )}
 

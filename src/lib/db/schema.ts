@@ -202,6 +202,8 @@ export const dealLogs = pgTable('deal_logs', {
   todos: jsonb('todos').notNull().default([]),
   successCriteria: text('success_criteria'),
   successCriteriaTodos: jsonb('success_criteria_todos').notNull().default([]),
+  successCriteriaShareToken: text('success_criteria_share_token').unique(),
+  successCriteriaIsShared: boolean('success_criteria_is_shared').default(false).notNull(),
   nextSteps: text('next_steps'),
   closeDate: timestamp('close_date', { withTimezone: true }),
   wonDate: timestamp('won_date', { withTimezone: true }),
