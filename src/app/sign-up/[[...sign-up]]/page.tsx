@@ -51,14 +51,14 @@ export default function SignUpPage() {
           ))}
         </div>
 
-        {/* Social proof */}
-        <div style={{ marginTop: '48px', padding: '16px 20px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', maxWidth: '360px' }}>
+        {/* Founder note */}
+        <div style={{ marginTop: '48px', padding: '16px 20px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '10px', maxWidth: '360px' }}>
           <div style={{ fontSize: '13px', color: '#888', fontStyle: 'italic', lineHeight: '1.6', marginBottom: '10px' }}>
-            "DealKit cut our battlecard update time from hours to minutes."
+            &ldquo;I built DealKit because we kept losing deals to competitors we couldn&apos;t track. Two hours of prep per call. I wanted that time back.&rdquo;
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff' }}>S</div>
-            <span style={{ fontSize: '12px', color: '#555' }}>Sarah K. · Head of Sales</span>
+            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', border: '1px solid rgba(139,92,246,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff' }}>R</div>
+            <span style={{ fontSize: '12px', color: '#555' }}>Rees Foulkes · Founder, DealKit</span>
           </div>
         </div>
       </div>

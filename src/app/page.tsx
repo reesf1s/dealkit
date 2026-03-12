@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ArrowRight, Zap, Shield, TrendingUp, CheckCircle, FileText, Users, Target, BookOpen, Mail, ChevronRight } from 'lucide-react'
 import ROICalc from '@/components/marketing/ROICalc'
+import FeaturesTab from '@/components/marketing/FeaturesTab'
 
 const NAV: React.CSSProperties = {
   position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
@@ -22,17 +23,17 @@ const COLLATERAL_TYPES = [
 
 const PRICING = [
   {
-    name: 'Free', price: '$0', period: '',
+    name: 'Free', price: '£0', period: '',
     features: ['1 product', '2 competitors', '5 case studies', '10 deal logs', '5 collateral items'],
     cta: 'Get started', highlight: false,
   },
   {
-    name: 'Starter', price: '$79', period: '/mo',
+    name: 'Starter', price: '£49', period: '/mo',
     features: ['3 products', '10 competitors', 'Unlimited case studies', 'Unlimited deals', 'Unlimited collateral', '.docx export', 'No watermark'],
     cta: 'Start free trial', highlight: true,
   },
   {
-    name: 'Pro', price: '$149', period: '/mo',
+    name: 'Pro', price: '£99', period: '/mo',
     features: ['Everything in Starter', 'Unlimited products', 'Batch regenerate', 'Email sequences', 'AI meeting prep', 'Team features'],
     cta: 'Start free trial', highlight: false,
   },
@@ -61,6 +62,8 @@ export default function LandingPage() {
           <span style={{ fontWeight: '700', fontSize: '15px', letterSpacing: '-0.02em', color: '#F0EEFF' }}>DealKit</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <a href="#features" style={{ padding: '6px 14px', borderRadius: '6px', color: '#888', fontSize: '13px', textDecoration: 'none' }}>Features</a>
+          <a href="#pricing" style={{ padding: '6px 14px', borderRadius: '6px', color: '#888', fontSize: '13px', textDecoration: 'none' }}>Pricing</a>
           <Link href="/sign-in" style={{ padding: '6px 14px', borderRadius: '6px', color: '#888', fontSize: '13px', textDecoration: 'none' }}>Sign in</Link>
           <Link href="/sign-up" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 16px', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', boxShadow: '0 0 14px rgba(99,102,241,0.35)', borderRadius: '7px', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>
             Start Free <ArrowRight size={13} />
@@ -100,47 +103,96 @@ export default function LandingPage() {
             <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
             <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
           </div>
-          {/* Fake dashboard */}
-          <div style={{ display: 'flex', height: '400px' }}>
+          {/* Real dashboard UI mockup */}
+          <div style={{ display: 'flex', height: '460px' }}>
             {/* Sidebar */}
-            <div style={{ width: '200px', padding: '16px 8px', borderRight: '1px solid rgba(255,255,255,0.05)', flexShrink: 0, background: 'rgba(255,255,255,0.01)' }}>
-              <div style={{ padding: '6px 8px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '24px', height: '24px', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', borderRadius: '6px', flexShrink: 0 }} />
-                <span style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF' }}>DealKit</span>
+            <div style={{ width: '188px', padding: '12px 8px', borderRight: '1px solid rgba(255,255,255,0.05)', flexShrink: 0, background: 'rgba(255,255,255,0.01)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <div style={{ padding: '6px 10px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '22px', height: '22px', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', borderRadius: '6px', flexShrink: 0 }} />
+                <span style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF', letterSpacing: '-0.02em' }}>DealKit</span>
               </div>
-              {['Dashboard', 'Company Profile', 'Competitors', 'Case Studies', 'Deal Log', 'Collateral'].map((item, i) => (
-                <div key={item} style={{ padding: '7px 10px', borderRadius: '7px', fontSize: '12.5px', color: i === 0 ? '#C4B5FD' : '#555', background: i === 0 ? 'rgba(99,102,241,0.12)' : 'transparent', border: i === 0 ? '1px solid rgba(99,102,241,0.2)' : '1px solid transparent', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '2px' }}>
-                  <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: i === 0 ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.06)', flexShrink: 0 }} />
-                  {item}
+              {[
+                ['Dashboard', true], ['Pipeline', false], ['Deals', false], ['AI Chat', false],
+                ['Case Studies', false], ['Competitors', false], ['Collateral', false], ['Product Gaps', false],
+              ].map(([label, active]) => (
+                <div key={String(label)} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '12px', color: active ? '#C4B5FD' : '#4A4A5A', background: active ? 'rgba(99,102,241,0.12)' : 'transparent', border: active ? '1px solid rgba(99,102,241,0.2)' : '1px solid transparent', display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: active ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.07)', flexShrink: 0 }} />
+                  {String(label)}
                 </div>
               ))}
             </div>
+
             {/* Main content */}
-            <div style={{ flex: 1, padding: '20px 24px', overflow: 'hidden' }}>
-              <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '16px', color: '#F0EEFF', letterSpacing: '-0.02em' }}>Knowledge Base Health</div>
-              <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '14px', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '12px', color: '#888' }}>75% complete</span>
-                  <span style={{ fontSize: '12px', color: '#818CF8' }}>3 items to go</span>
+            <div style={{ flex: 1, padding: '16px 18px', overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* Header row */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: '#F0EEFF', letterSpacing: '-0.03em', background: 'linear-gradient(135deg, #F0EEFF, #A78BFA)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Good morning, Rees</div>
+                  <div style={{ fontSize: '10px', color: '#555', marginTop: '1px' }}>AI-powered deal conversion · 6 open deals in pipeline</div>
                 </div>
-                <div style={{ height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px' }}>
-                  <div style={{ width: '75%', height: '100%', background: 'linear-gradient(90deg, #6366F1, #818CF8)', borderRadius: '2px', boxShadow: '0 0 8px rgba(99,102,241,0.5)' }} />
+                <div style={{ display: 'flex', gap: '5px' }}>
+                  {['Pipeline', 'Log Deal'].map(btn => (
+                    <div key={btn} style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '10px', fontWeight: '500', color: '#888', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>{btn}</div>
+                  ))}
+                  <div style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '10px', fontWeight: '600', color: '#fff', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', boxShadow: '0 0 10px rgba(99,102,241,0.3)' }}>✦ Generate</div>
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                {[['Competitors', '4', '#818CF8'], ['Case Studies', '7', '#22C55E'], ['Win Rate', '68%', '#A78BFA']].map(([label, val, color]) => (
-                  <div key={label} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '12px' }}>
-                    <div style={{ fontSize: '11px', color: '#555', marginBottom: '6px' }}>{label}</div>
-                    <div style={{ fontSize: '22px', fontWeight: '700', color, letterSpacing: '-0.03em' }}>{val}</div>
+
+              {/* AI Overview card */}
+              <div style={{ background: 'linear-gradient(135deg, rgba(18,12,38,0.95), rgba(22,12,44,0.95))', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '10px', padding: '10px 12px', boxShadow: '0 0 20px rgba(99,102,241,0.1)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '7px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '18px', height: '18px', borderRadius: '5px', background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px' }}>✦</div>
+                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#F0EEFF' }}>AI Overview</span>
+                    <span style={{ fontSize: '9px', color: '#6366F1', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', padding: '1px 6px', borderRadius: '100px' }}>refreshes daily</span>
+                  </div>
+                  <div style={{ fontSize: '9px', color: '#555' }}>Updated just now</div>
+                </div>
+                <div style={{ fontSize: '10.5px', color: '#C4B5FD', lineHeight: '1.55', marginBottom: '7px' }}>
+                  Pipeline is healthy — £148k across 6 active deals with 2 in late stage. Win rate at 68%. Acme Corp and Notion are stalled; follow up this week.
+                </div>
+                <div style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.12)', borderRadius: '7px', padding: '7px 10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ fontSize: '9px', color: '#818CF8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>⚡ Actions for today</div>
+                  {['Send proposal to Acme Corp (£32k, Negotiation)', 'Refresh Salesforce battlecard before Thursday call', 'Chase Notion follow-up — 12 days since last contact'].map((a, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '5px' }}>
+                      <div style={{ width: '9px', height: '9px', borderRadius: '50%', border: '1px solid rgba(99,102,241,0.5)', flexShrink: 0, marginTop: '1px' }} />
+                      <span style={{ fontSize: '10px', color: '#D4CCFF', lineHeight: '1.4' }}>{a}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* KPI row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px' }}>
+                {[['Open Deals', '6', '#8B5CF6', true], ['Deals Won', '11', '#22C55E', false], ['Win Rate', '68%', '#6366F1', false], ['Collateral', '14', '#F59E0B', false]].map(([label, val, color, feat]) => (
+                  <div key={String(label)} style={{ background: feat ? 'rgba(18,12,32,0.8)' : 'rgba(255,255,255,0.025)', border: `1px solid ${feat ? 'rgba(139,92,246,0.4)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '8px', padding: '10px 11px', boxShadow: feat ? '0 0 16px rgba(99,102,241,0.15)' : 'none' }}>
+                    <div style={{ fontSize: '9px', color: '#555', marginBottom: '5px' }}>{String(label)}</div>
+                    <div style={{ fontSize: '20px', fontWeight: '700', color: String(color), letterSpacing: '-0.03em', lineHeight: 1 }}>{String(val)}</div>
                   </div>
                 ))}
               </div>
-              <div style={{ marginTop: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '12px' }}>
-                <div style={{ fontSize: '11px', color: '#444', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Recent Collateral</div>
-                {['Battlecard: vs Salesforce', 'Talk Track — VP of Sales', 'Objection Handler'].map((item, i) => (
-                  <div key={item} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderTop: i > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
-                    <span style={{ fontSize: '12px', color: '#C4B5FD' }}>{item}</span>
-                    <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '100px', background: 'rgba(34,197,94,0.1)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.2)' }}>Ready</span>
+
+              {/* Priority Actions */}
+              <div style={{ background: 'rgba(18,12,32,0.7)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: '8px', overflow: 'hidden', flex: 1 }}>
+                <div style={{ padding: '7px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ width: '16px', height: '16px', background: 'rgba(99,102,241,0.12)', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: '7px', height: '7px', borderRadius: '1px', background: '#818CF8' }} />
+                  </div>
+                  <span style={{ fontSize: '11px', fontWeight: '600', color: '#F0EEFF' }}>Priority Actions</span>
+                  <span style={{ fontSize: '9px', color: '#818CF8', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', padding: '1px 5px', borderRadius: '100px' }}>5</span>
+                </div>
+                {[
+                  ['Send Acme pricing deck', 'Acme Corp', '#EF4444', 'Negotiation'],
+                  ['Schedule discovery — Stripe', 'Stripe', '#8B5CF6', 'Discovery'],
+                  ['Follow up after demo', 'Linear', '#F59E0B', 'Proposal'],
+                ].map(([todo, company, color, stage], i) => (
+                  <div key={String(todo)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 12px', borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
+                    <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: String(color), flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '10px', color: '#EBEBEB', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{String(todo)}</div>
+                      <div style={{ fontSize: '9px', color: '#444' }}>{String(company)}</div>
+                    </div>
+                    <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '100px', color: String(color), background: `${String(color)}14`, border: `1px solid ${String(color)}30`, flexShrink: 0 }}>{String(stage)}</span>
                   </div>
                 ))}
               </div>
@@ -169,6 +221,9 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
+
+      {/* Features tab */}
+      <FeaturesTab />
 
       {/* ROI Calculator */}
       <ROICalc />
@@ -218,7 +273,7 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 100px' }}>
+      <section id="pricing" style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 100px' }}>
         <div style={{ textAlign: 'center', marginBottom: '48px' }}>
           <h2 style={{ fontSize: '32px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '12px', color: '#F0EEFF' }}>Simple pricing</h2>
           <p style={{ color: '#7E7A9A', fontSize: '15px' }}>Start free. Upgrade when your team is ready.</p>
@@ -253,11 +308,11 @@ export default function LandingPage() {
         <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: '16px', padding: '40px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
           <div style={{ fontSize: '36px', color: 'rgba(139,92,246,0.4)', marginBottom: '12px', lineHeight: 1 }}>&ldquo;</div>
           <p style={{ fontSize: '16px', lineHeight: '1.7', color: '#C4B5FD', fontStyle: 'italic', marginBottom: '20px' }}>
-            Built by a product leader who collapsed a 12-month enterprise sales cycle to under 30 days.
+            I built DealKit after watching our team lose deals we should have won — because our battlecards were outdated and our case studies lived in a shared drive no one opened. We collapsed a 12-month sales cycle to under 30 days once the knowledge was actually usable.
           </p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-            <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', border: '2px solid rgba(139,92,246,0.3)' }} />
-            <span style={{ fontSize: '12px', color: '#7E7A9A' }}>Founder, DealKit</span>
+            <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', border: '2px solid rgba(139,92,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: '#fff' }}>R</div>
+            <span style={{ fontSize: '12px', color: '#7E7A9A' }}>Rees Foulkes, Founder · DealKit</span>
           </div>
         </div>
       </section>

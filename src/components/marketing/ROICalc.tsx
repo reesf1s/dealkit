@@ -4,15 +4,15 @@ import { useState } from 'react'
 
 function formatCurrency(value: number): string {
   if (value >= 1_000_000) {
-    return `$${(value / 1_000_000).toFixed(1)}m`
+    return `££{(value / 1_000_000).toFixed(1)}m`
   }
   if (value >= 1_000) {
-    return `$${(value / 1_000).toFixed(1)}k`
+    return `££{(value / 1_000).toFixed(1)}k`
   }
-  return `$${value.toFixed(0)}`
+  return `££{value.toFixed(0)}`
 }
 
-const DEALKIT_COST = 49 // USD/month
+const DEALKIT_COST = 49 // GBP/month (Starter plan)
 
 export default function ROICalc() {
   const [monthlyDeals, setMonthlyDeals] = useState(20)
@@ -135,7 +135,7 @@ export default function ROICalc() {
                 pointerEvents: 'none',
                 lineHeight: 1,
               }}>
-                $
+                £
               </span>
               <input
                 type="number"
@@ -226,7 +226,7 @@ export default function ROICalc() {
             marginBottom: '6px',
             lineHeight: 1,
           }}>
-            {roi > 0 ? `${roi}x` : '—'}
+            {roi > 0 ? `£{roi}x` : '—'}
           </div>
           <div style={{ fontSize: '12px', color: '#888' }}>ROI</div>
         </div>
@@ -241,7 +241,7 @@ export default function ROICalc() {
             marginBottom: '6px',
             lineHeight: 1,
           }}>
-            {paybackDays > 0 ? `${paybackDays}d` : '—'}
+            {paybackDays > 0 ? `£{paybackDays}d` : '—'}
           </div>
           <div style={{ fontSize: '12px', color: '#888' }}>Pays for itself in</div>
         </div>
@@ -255,7 +255,7 @@ export default function ROICalc() {
         color: '#444',
         lineHeight: 1.5,
       }}>
-        Based on DealKit Starter at ${DEALKIT_COST}/mo. Assumes a 10% win rate improvement.
+        Based on DealKit Starter at £{DEALKIT_COST}/mo. Assumes a 10% win rate improvement from better collateral.
       </p>
     </section>
   )
