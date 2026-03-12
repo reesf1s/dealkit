@@ -33,6 +33,7 @@ export function battlecardPrompt(
   competitor: Competitor,
   deals: DealLog[],
   _caseStudies: CaseStudy[],
+  workspaceContext = '',
 ): { system: string; messages: Array<{ role: 'user'; content: string }> } {
   const wonAgainst = deals.filter(d => d.stage === 'closed_won' && (d.competitors as string[]).some(c => c.toLowerCase().includes(competitor.name.toLowerCase()))).length
   const lostTo = deals.filter(d => d.stage === 'closed_lost' && (d.competitors as string[]).some(c => c.toLowerCase().includes(competitor.name.toLowerCase()))).length
@@ -72,7 +73,7 @@ CONTEXT:
 ${context}
 
 Return ONLY this JSON (3 ourStrengths, 2 theirStrengths, 1 ourWeakness, 3 winThemes, 3 objectionResponses, 3 landmines, 3 discoveryQuestions, 3 proofPoints). Keep all strings concise — max 1-2 sentences each.
-
+${workspaceContext ? `\nWORKSPACE INTEL (use to sharpen positioning):\n${workspaceContext}` : ''}
 ${schema}`,
     }],
   }
@@ -85,6 +86,7 @@ ${schema}`,
 export function caseStudyDocPrompt(
   company: CompanyProfile,
   caseStudy: CaseStudy,
+  workspaceContext = '',
 ): { system: string; messages: Array<{ role: 'user'; content: string }> } {
   const metricsText = (caseStudy.metrics ?? []).map(m => `${m.value} ${m.label}`).join(', ')
 
@@ -117,7 +119,7 @@ Results: ${caseStudy.results}
 ${metricsText ? `Metrics: ${metricsText}` : ''}
 
 Return ONLY this JSON (2-3 metrics). Keep body sections to 2-3 sentences each.
-
+${workspaceContext ? `\nWORKSPACE INTEL (use to add relevant context):\n${workspaceContext}` : ''}
 ${schema}`,
     }],
   }
@@ -131,6 +133,7 @@ export function onePagerPrompt(
   company: CompanyProfile,
   product: { name: string; description: string; keyFeatures: string[] },
   caseStudies: CaseStudy[],
+  workspaceContext = '',
 ): { system: string; messages: Array<{ role: 'user'; content: string }> } {
   const proof = caseStudies.slice(0, 2).map(cs => `${cs.customerName}: ${cs.results}`).join(' | ')
 
@@ -160,7 +163,7 @@ Key features: ${product.keyFeatures.slice(0, 4).join(', ')}
 ${proof ? `Customer proof: ${proof}` : ''}
 
 Return ONLY this JSON (3 keyBenefits, 3 howItWorks steps, 2-3 socialProof items). Keep all strings concise.
-
+${workspaceContext ? `\nWORKSPACE INTEL (use to sharpen positioning vs competitors, ground proof points):\n${workspaceContext}` : ''}
 ${schema}`,
     }],
   }
@@ -173,6 +176,7 @@ ${schema}`,
 export function objectionHandlerPrompt(
   company: CompanyProfile,
   deals: DealLog[],
+  workspaceContext = '',
 ): { system: string; messages: Array<{ role: 'user'; content: string }> } {
   const lostReasons = deals
     .filter(d => d.stage === 'closed_lost' && d.lostReason)
@@ -206,7 +210,7 @@ ${knownObjections ? `Known objections: ${knownObjections}` : ''}
 ${lostReasons ? `Lost deal reasons: ${lostReasons}` : ''}
 
 Return ONLY this JSON (6 objections covering price, competitor, timing, need, trust + 1 other; 3 closingTips). Keep responses to 2-3 sentences each.
-
+${workspaceContext ? `\nWORKSPACE INTEL (use to add specific proof points and competitor-aware responses):\n${workspaceContext}` : ''}
 ${schema}`,
     }],
   }
@@ -220,6 +224,7 @@ export function talkTrackPrompt(
   company: CompanyProfile,
   buyerRole: string,
   deals: DealLog[],
+  workspaceContext = '',
 ): { system: string; messages: Array<{ role: 'user'; content: string }> } {
   const relevantNotes = deals
     .filter(d => d.prospectTitle?.toLowerCase().includes(buyerRole.toLowerCase()))
@@ -253,7 +258,7 @@ ${objections ? `Known objections from this persona: ${objections}` : ''}
 ${relevantNotes ? `Notes from similar deals: ${relevantNotes}` : ''}
 
 Return ONLY this JSON (3 keyPoints per section, 3 tipsAndNotes). Keep scripts concise and natural — not robotic.
-
+${workspaceContext ? `\nWORKSPACE INTEL (use to reference real competitors, wins, and proof points in the script):\n${workspaceContext}` : ''}
 ${schema}`,
     }],
   }
@@ -267,6 +272,7 @@ export function emailSequencePrompt(
   company: CompanyProfile,
   targetPersona: string,
   caseStudies: CaseStudy[],
+  workspaceContext = '',
 ): { system: string; messages: Array<{ role: 'user'; content: string }> } {
   const proof = caseStudies.slice(0, 2).map(cs => `${cs.customerName}: ${cs.results}`).join(' | ')
   const objections = (company.commonObjections ?? []).slice(0, 3).join('; ')
@@ -301,7 +307,7 @@ Email structure: Day 0 pattern-interrupt opener, Day 3 customer story, Day 10 va
 Rules: No "just following up". Subjects must be curiosity-driven. Bodies 80-120 words each. Use {{first_name}}.
 
 Return ONLY this JSON (4 emails, 1 sendingTip each).
-
+${workspaceContext ? `\nWORKSPACE INTEL (use to name competitors, reference real wins, address known objections):\n${workspaceContext}` : ''}
 ${schema}`,
     }],
   }

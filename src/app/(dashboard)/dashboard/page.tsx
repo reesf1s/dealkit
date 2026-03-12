@@ -126,7 +126,7 @@ export default function DashboardPage() {
   const companyData = company?.data
   const competitorList: { id: string }[] = competitors?.data ?? []
   const caseStudyList: { id: string }[] = caseStudies?.data ?? []
-  const dealList: { id: string; stage: string; dealName: string; prospectCompany: string; todos: { id: string; text: string; done: boolean }[] }[] = deals?.data ?? []
+  const dealList: { id: string; stage: string; dealName: string; prospectCompany: string; dealValue?: number | null; competitors?: string[]; todos: { id: string; text: string; done: boolean }[] }[] = deals?.data ?? []
   const collateralList: { id: string; title: string; type: string; status: string }[] = collateral?.data ?? []
   const insightsData = insights?.data
   const gapList: { id: string; title: string; description?: string; priority: string; status: string; requestCount?: number }[] = productGapsData?.data ?? []

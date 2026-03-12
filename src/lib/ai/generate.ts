@@ -18,6 +18,7 @@ import {
   talkTrackPrompt,
   emailSequencePrompt,
 } from './prompts'
+import { buildWorkspaceContext } from './context'
 import type { CollateralType, CollateralContent, CompanyProfile, Product, DealLog, CaseStudy } from '@/types'
 import type { ZodSchema } from 'zod'
 
@@ -206,16 +207,12 @@ export async function generateCollateral(
     updatedAt: profileRow.updatedAt,
   }
 
-  // 2. Fetch additional data based on type
-  const allDeals = await db
-    .select()
-    .from(dealLogs)
-    .where(eq(dealLogs.workspaceId, workspaceId))
-
-  const allCaseStudies = await db
-    .select()
-    .from(caseStudies)
-    .where(eq(caseStudies.workspaceId, workspaceId))
+  // 2. Fetch all entity data + workspace context in parallel
+  const [allDeals, allCaseStudies, workspaceContext] = await Promise.all([
+    db.select().from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)),
+    db.select().from(caseStudies).where(eq(caseStudies.workspaceId, workspaceId)),
+    buildWorkspaceContext(workspaceId),
+  ])
 
   // ─── BATTLECARD ─────────────────────────────────────────────────────────────
   if (type === 'battlecard') {
@@ -253,7 +250,7 @@ export async function generateCollateral(
       ),
     )
 
-    const { system, messages: bcMsgs } = battlecardPrompt(company, competitor, competitorDeals as unknown as DealLog[], allCaseStudies as unknown as CaseStudy[])
+    const { system, messages: bcMsgs } = battlecardPrompt(company, competitor, competitorDeals as unknown as DealLog[], allCaseStudies as unknown as CaseStudy[], workspaceContext)
     const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(bcMsgs, customPrompt), BattlecardSchema, 0.4)
 
     return {
@@ -291,7 +288,7 @@ export async function generateCollateral(
       updatedAt: csRow.updatedAt,
     }
 
-    const { system, messages: csMsgs } = caseStudyDocPrompt(company, caseStudy as unknown as CaseStudy)
+    const { system, messages: csMsgs } = caseStudyDocPrompt(company, caseStudy as unknown as CaseStudy, workspaceContext)
     const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(csMsgs, customPrompt), CaseStudyDocSchema, 0.6)
 
     return {
@@ -323,7 +320,7 @@ export async function generateCollateral(
           pricingDetails: null,
         }
 
-    const { system, messages: opMsgs } = onePagerPrompt(company, product, allCaseStudies as unknown as CaseStudy[])
+    const { system, messages: opMsgs } = onePagerPrompt(company, product, allCaseStudies as unknown as CaseStudy[], workspaceContext)
     const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(opMsgs, customPrompt), OnePagerSchema, 0.6)
 
     return {
@@ -335,7 +332,7 @@ export async function generateCollateral(
 
   // ─── OBJECTION HANDLER ──────────────────────────────────────────────────────
   if (type === 'objection_handler') {
-    const { system, messages: ohMsgs } = objectionHandlerPrompt(company, allDeals as unknown as DealLog[])
+    const { system, messages: ohMsgs } = objectionHandlerPrompt(company, allDeals as unknown as DealLog[], workspaceContext)
     const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(ohMsgs, customPrompt), ObjectionHandlerSchema, 0.4)
 
     return {
@@ -348,7 +345,7 @@ export async function generateCollateral(
   // ─── TALK TRACK ─────────────────────────────────────────────────────────────
   if (type === 'talk_track') {
     const role = buyerRole ?? 'Decision Maker'
-    const { system, messages: ttMsgs } = talkTrackPrompt(company, role, allDeals as unknown as DealLog[])
+    const { system, messages: ttMsgs } = talkTrackPrompt(company, role, allDeals as unknown as DealLog[], workspaceContext)
     const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(ttMsgs, customPrompt), TalkTrackSchema, 0.6)
 
     return {
@@ -361,7 +358,7 @@ export async function generateCollateral(
   // ─── EMAIL SEQUENCE ─────────────────────────────────────────────────────────
   if (type === 'email_sequence') {
     const persona = buyerRole ?? 'Decision Maker'
-    const { system, messages: esMsgs } = emailSequencePrompt(company, persona, allCaseStudies as unknown as CaseStudy[])
+    const { system, messages: esMsgs } = emailSequencePrompt(company, persona, allCaseStudies as unknown as CaseStudy[], workspaceContext)
     const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(esMsgs, customPrompt), EmailSequenceSchema, 0.6)
 
     return {

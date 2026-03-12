@@ -209,12 +209,15 @@ async function handleMeetingNotes(
   workspaceId: string, userId: string, text: string,
 ): Promise<{ reply: string; actions: ActionCard[] }> {
   const openDeals = await db
-    .select({ id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany, stage: dealLogs.stage, todos: dealLogs.todos, dealValue: dealLogs.dealValue })
+    .select({ id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany, stage: dealLogs.stage, todos: dealLogs.todos, dealValue: dealLogs.dealValue, notes: dealLogs.notes })
     .from(dealLogs)
     .where(and(eq(dealLogs.workspaceId, workspaceId), sql`${dealLogs.stage} NOT IN ('closed_won', 'closed_lost')`))
     .limit(20)
 
-  const dealList = openDeals.map(d => `id:${d.id} | "${d.dealName}" — ${d.prospectCompany} (${d.stage})`).join('\n')
+  // Include last 150 chars of accumulated notes so Claude has prior meeting context for each deal
+  const dealList = openDeals.map(d =>
+    `id:${d.id} | "${d.dealName}" — ${d.prospectCompany} (${d.stage})${d.notes ? ` | Prior context: ${d.notes.slice(-150)}` : ''}`
+  ).join('\n')
 
   const analysisMsg = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001', max_tokens: 1500,
@@ -308,10 +311,14 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
       const newTodos = todoAdd.map(text => ({ id: crypto.randomUUID(), text, done: false, createdAt: new Date().toISOString() }))
       const mergedTodos = [...updatedTodos, ...newTodos]
 
-      const updatePayload: Record<string, unknown> = { todos: mergedTodos, meetingNotes: text, updatedAt: new Date() }
+      // Accumulate meeting notes as a running log — each entry stamped with date
+      const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      const newEntry = `[${dateStr}] ${parsed.summary}`
+      const accumulatedNotes = existingDeal.notes ? `${existingDeal.notes}\n${newEntry}` : newEntry
+
+      const updatePayload: Record<string, unknown> = { todos: mergedTodos, meetingNotes: text, notes: accumulatedNotes, updatedAt: new Date() }
       if (parsed.dealUpdate?.stage) { updatePayload.stage = parsed.dealUpdate.stage; dealChanges.push(`stage → **${parsed.dealUpdate.stage}**`) }
       if (parsed.dealUpdate?.dealValue) { updatePayload.dealValue = parsed.dealUpdate.dealValue; dealChanges.push(`value → **$${(parsed.dealUpdate.dealValue / 100).toLocaleString()}**`) }
-      if (parsed.dealUpdate?.notes) updatePayload.notes = (existingDeal.notes ?? '') + '\n\n' + parsed.dealUpdate.notes
 
       await db.update(dealLogs).set(updatePayload).where(eq(dealLogs.id, parsed.matchedDealId))
 
@@ -914,7 +921,8 @@ export async function POST(req: NextRequest) {
         const todoText = pending.length > 0
           ? `Todos: ${pending.map(t => `• ${t.text}`).join(', ')}`
           : 'No pending todos'
-        kbParts.push(`- "${d.dealName}" at ${d.prospectCompany} (${d.stage}): $${d.dealValue ? (d.dealValue / 100).toLocaleString() : '?'}. ${todoText}`)
+        const notesCtx = d.notes ? ` Context: ${d.notes.slice(-200)}` : ''
+        kbParts.push(`- "${d.dealName}" at ${d.prospectCompany} (${d.stage}): $${d.dealValue ? (d.dealValue / 100).toLocaleString() : '?'}. ${todoText}.${notesCtx}`)
       })
     }
     if (gapRows.length > 0) {

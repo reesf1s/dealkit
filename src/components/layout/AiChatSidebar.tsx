@@ -21,9 +21,6 @@ function invalidateCaches(actions: ActionCard[]) {
       globalMutate('/api/company')
       globalMutate('/api/company-profile')
       globalMutate('/api/onboarding/parse')
-      // Auto-regenerate stale collateral after company profile update
-      fetch('/api/collateral/regenerate-stale', { method: 'POST' }).catch(() => {})
-      setTimeout(() => globalMutate('/api/collateral'), 15000)
     }
     if (action.type === 'collateral_generating') {
       globalMutate('/api/collateral')
