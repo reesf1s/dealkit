@@ -96,7 +96,7 @@ const CAPABILITIES = [
     border: 'rgba(6,182,212,0.2)',
     title: 'Risk Outreach Emails',
     desc: 'Write emails addressing the top risk per deal',
-    prompt: 'For my top 3 priority deals, write a personalised outreach email for each one that directly addresses the biggest risk or blocker in that deal. Include a subject line and keep each email concise.',
+    prompt: 'My top 3 open deals by priority — for each, identify the biggest risk or blocker and draft a short personalised follow-up email (with subject line) that addresses it directly.',
   },
 ]
 
