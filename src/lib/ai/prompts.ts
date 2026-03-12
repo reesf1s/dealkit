@@ -111,12 +111,15 @@ export function caseStudyDocPrompt(
       role: 'user',
       content: `Write a case study doc JSON for ${company.companyName}.
 
-IMPORTANT RULES:
-- Base ALL content strictly on the customer data provided below — do not invent facts
-- Do NOT fabricate quotes (set quote to null always)
-- If DEAL CONTEXT or SPECIFIC INSTRUCTIONS appear at the start of this message, use them to: reframe the headline to emphasise aspects most relevant to that prospect's situation, angle the challenge/solution/results bodies to highlight themes matching their context, and write a CTA specific to their stage/scenario
+RULES:
+- Do NOT fabricate quotes — set quote to null always
+- Keep metrics, customer name, and industry accurate to the source data
+- Write all section bodies as FRESH narrative sentences — do not copy source text word for word
+- If SPECIFIC INSTRUCTIONS or DEAL CONTEXT appear at the top of this message, they are your PRIMARY directive. The headline and every section body must tell the story through that angle. The source data below is your factual foundation — reframe it around those instructions.
+
 ${companyBrief(company)}
 
+SOURCE DATA:
 Customer: ${caseStudy.customerName}${caseStudy.customerIndustry ? ` (${caseStudy.customerIndustry})` : ''}
 Challenge: ${caseStudy.challenge}
 Solution: ${caseStudy.solution}
