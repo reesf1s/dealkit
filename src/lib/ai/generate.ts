@@ -132,16 +132,11 @@ async function generateAndValidate<T>(
   return { validated: retryResult.data, raw: retryRaw }
 }
 
-// Insert additional context BEFORE the JSON schema block so the AI incorporates it
-// when filling in the schema, rather than seeing it after having already "committed"
-// to a generic output.
-function insertBeforeSchema(content: string, insertion: string): string {
-  // The JSON schema starts at the last top-level { on its own line
-  const idx = content.lastIndexOf('\n{')
-  return idx === -1 ? content + insertion : content.slice(0, idx) + insertion + content.slice(idx)
-}
+// Prepend deal context and custom instructions to the START of the user message
+// so the AI reads them before any other content. This is the most reliable way to
+// ensure they are incorporated — no fragile schema-position detection needed.
 
-function appendDealContext(
+function withDealContext(
   messages: Array<{ role: 'user'; content: string }>,
   dealContext?: string,
   type?: CollateralType,
@@ -156,26 +151,26 @@ function appendDealContext(
     talk_track: 'Open the script referencing this prospect\'s specific situation. Name their evaluated competitors. Frame the pitch around the deal\'s active risks.',
   }
   const guidance = type ? typeGuidance[type] : undefined
-  const insertion =
-    `\n\nDEAL CONTEXT — tailor specifically for this live deal:\n${dealContext.trim()}` +
-    (guidance ? `\n\nHow to use this context (${type}): ${guidance}` : '')
+  const prefix =
+    `DEAL CONTEXT — tailor ALL content specifically for this live deal:\n${dealContext.trim()}` +
+    (guidance ? `\n\nTailoring guidance for ${type}: ${guidance}` : '')
   const last = messages[messages.length - 1]
   return [
     ...messages.slice(0, -1),
-    { ...last, content: insertBeforeSchema(last.content, insertion) },
+    { ...last, content: prefix + '\n\n---\n\n' + last.content },
   ]
 }
 
-function appendCustomPrompt(
+function withCustomPrompt(
   messages: Array<{ role: 'user'; content: string }>,
   customPrompt?: string,
 ): Array<{ role: 'user'; content: string }> {
   if (!customPrompt?.trim()) return messages
-  const insertion = `\n\nSPECIFIC INSTRUCTIONS — follow these exactly when generating the JSON:\n${customPrompt.trim()}`
+  const prefix = `SPECIFIC INSTRUCTIONS — follow these exactly, they override defaults:\n${customPrompt.trim()}`
   const last = messages[messages.length - 1]
   return [
     ...messages.slice(0, -1),
-    { ...last, content: insertBeforeSchema(last.content, insertion) },
+    { ...last, content: prefix + '\n\n---\n\n' + last.content },
   ]
 }
 
@@ -287,7 +282,7 @@ export async function generateCollateral(
     )
 
     const { system, messages: bcMsgs } = battlecardPrompt(company, competitor, competitorDeals as unknown as DealLog[], allCaseStudies as unknown as CaseStudy[], workspaceContext)
-    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(appendDealContext(bcMsgs, dealContext, type), customPrompt), BattlecardSchema, 0.4)
+    const { validated, raw } = await generateAndValidate(system, withCustomPrompt(withDealContext(bcMsgs, dealContext, type), customPrompt), BattlecardSchema, 0.4)
 
     return {
       content: validated as CollateralContent,
@@ -325,7 +320,7 @@ export async function generateCollateral(
     }
 
     const { system, messages: csMsgs } = caseStudyDocPrompt(company, caseStudy as unknown as CaseStudy, workspaceContext)
-    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(appendDealContext(csMsgs, dealContext, type), customPrompt), CaseStudyDocSchema, 0.6)
+    const { validated, raw } = await generateAndValidate(system, withCustomPrompt(withDealContext(csMsgs, dealContext, type), customPrompt), CaseStudyDocSchema, 0.6)
 
     return {
       content: validated as CollateralContent,
@@ -357,7 +352,7 @@ export async function generateCollateral(
         }
 
     const { system, messages: opMsgs } = onePagerPrompt(company, product, allCaseStudies as unknown as CaseStudy[], workspaceContext)
-    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(appendDealContext(opMsgs, dealContext, type), customPrompt), OnePagerSchema, 0.6)
+    const { validated, raw } = await generateAndValidate(system, withCustomPrompt(withDealContext(opMsgs, dealContext, type), customPrompt), OnePagerSchema, 0.6)
 
     return {
       content: validated as CollateralContent,
@@ -369,7 +364,7 @@ export async function generateCollateral(
   // ─── OBJECTION HANDLER ──────────────────────────────────────────────────────
   if (type === 'objection_handler') {
     const { system, messages: ohMsgs } = objectionHandlerPrompt(company, allDeals as unknown as DealLog[], workspaceContext)
-    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(appendDealContext(ohMsgs, dealContext, type), customPrompt), ObjectionHandlerSchema, 0.4)
+    const { validated, raw } = await generateAndValidate(system, withCustomPrompt(withDealContext(ohMsgs, dealContext, type), customPrompt), ObjectionHandlerSchema, 0.4)
 
     return {
       content: validated as CollateralContent,
@@ -382,7 +377,7 @@ export async function generateCollateral(
   if (type === 'talk_track') {
     const role = buyerRole ?? 'Decision Maker'
     const { system, messages: ttMsgs } = talkTrackPrompt(company, role, allDeals as unknown as DealLog[], workspaceContext)
-    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(appendDealContext(ttMsgs, dealContext, type), customPrompt), TalkTrackSchema, 0.6)
+    const { validated, raw } = await generateAndValidate(system, withCustomPrompt(withDealContext(ttMsgs, dealContext, type), customPrompt), TalkTrackSchema, 0.6)
 
     return {
       content: validated as CollateralContent,
@@ -395,7 +390,7 @@ export async function generateCollateral(
   if (type === 'email_sequence') {
     const persona = buyerRole ?? 'Decision Maker'
     const { system, messages: esMsgs } = emailSequencePrompt(company, persona, allCaseStudies as unknown as CaseStudy[], workspaceContext)
-    const { validated, raw } = await generateAndValidate(system, appendCustomPrompt(appendDealContext(esMsgs, dealContext, type), customPrompt), EmailSequenceSchema, 0.6)
+    const { validated, raw } = await generateAndValidate(system, withCustomPrompt(withDealContext(esMsgs, dealContext, type), customPrompt), EmailSequenceSchema, 0.6)
 
     return {
       content: validated as CollateralContent,
