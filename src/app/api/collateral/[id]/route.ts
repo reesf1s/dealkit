@@ -2,7 +2,6 @@ export const maxDuration = 60
 
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { after } from 'next/server'
 import { and, eq, ilike } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { collateral, competitors, events } from '@/lib/db/schema'
@@ -86,23 +85,24 @@ export async function PATCH(_req: NextRequest, { params }: Params) {
       }
     }
 
-    // Run generation after the response is sent — avoids Vercel timeout
-    after(async () => {
-      try {
-        const result = await generateCollateral({ workspaceId, type: collateralType, competitorId, caseStudyId })
-        const generatedAt = new Date()
-        await db
-          .update(collateral)
-          .set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt })
-          .where(eq(collateral.id, id))
-        await logEvent(workspaceId, userId, 'collateral.generated', { collateralId: id, collateralType, title: result.title, regenerated: true })
-      } catch (err) {
-        console.error('[collateral/regenerate] AI generation failed:', err)
-        await db.update(collateral).set({ status: 'stale', updatedAt: new Date() }).where(eq(collateral.id, id))
-      }
-    })
-
-    return NextResponse.json({ data: { id, status: 'generating' } })
+    // Run synchronously within maxDuration=60 — eliminates after() uncertainty
+    try {
+      const result = await generateCollateral({ workspaceId, type: collateralType, competitorId, caseStudyId })
+      const generatedAt = new Date()
+      await db
+        .update(collateral)
+        .set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt })
+        .where(eq(collateral.id, id))
+      await logEvent(workspaceId, userId, 'collateral.generated', { collateralId: id, collateralType, title: result.title, regenerated: true })
+      return NextResponse.json({ data: { id, status: 'ready', title: result.title } })
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      console.error('[collateral/regenerate] AI generation failed:', errMsg)
+      await db.update(collateral)
+        .set({ status: 'stale', rawResponse: { error: errMsg }, updatedAt: new Date() })
+        .where(eq(collateral.id, id))
+      return NextResponse.json({ error: `Generation failed: ${errMsg}`, code: 'GENERATION_FAILED' }, { status: 500 })
+    }
   } catch (err) {
     return dbErrResponse(err)
   }

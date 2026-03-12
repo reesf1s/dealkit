@@ -57,11 +57,22 @@ export default function CompetitorDetailPage() {
   }
 
   async function handleGenerateBattlecard() {
-    const res = await fetch('/api/collateral/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'battlecard', competitorId: id }),
-    })
+    // If a battlecard already exists for this competitor (stale or generating), PATCH it
+    // instead of creating a duplicate. Only POST if none exists yet.
+    const existingBattlecard = collateral.find(
+      c => c.type === 'battlecard' && c.sourceCompetitorId === id
+    )
+
+    let res: Response
+    if (existingBattlecard) {
+      res = await fetch(`/api/collateral/${existingBattlecard.id}`, { method: 'PATCH' })
+    } else {
+      res = await fetch('/api/collateral/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'battlecard', competitorId: id }),
+      })
+    }
     if (!res.ok) throw new Error('Failed to start generation')
     await mutateColl()
   }

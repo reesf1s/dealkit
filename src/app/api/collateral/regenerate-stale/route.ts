@@ -59,30 +59,30 @@ export async function POST() {
     )
   )
 
-  // Run all generations in parallel after the response is sent
+  // Run sequentially with a gap to avoid rate limits
   after(async () => {
-    await Promise.allSettled(
-      staleItems.map(async (item) => {
-        const competitorId = await resolveCompetitorId(workspaceId, item)
-        const caseStudyId = item.sourceCaseStudyId ?? undefined
-        try {
-          const result = await generateCollateral({
-            workspaceId,
-            type: item.type as CollateralType,
-            competitorId,
-            caseStudyId,
-          })
-          const generatedAt = new Date()
-          await db.update(collateral)
-            .set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt })
-            .where(eq(collateral.id, item.id))
-          await logEvent(workspaceId, userId, 'collateral.generated', { collateralId: item.id, collateralType: item.type, title: result.title, bulkRegen: true })
-        } catch (err) {
-          console.error(`[regenerate-stale] Failed for ${item.id}:`, err)
-          await db.update(collateral).set({ status: 'stale', updatedAt: new Date() }).where(eq(collateral.id, item.id))
-        }
-      })
-    )
+    for (const item of staleItems) {
+      const competitorId = await resolveCompetitorId(workspaceId, item)
+      const caseStudyId = item.sourceCaseStudyId ?? undefined
+      try {
+        const result = await generateCollateral({
+          workspaceId,
+          type: item.type as CollateralType,
+          competitorId,
+          caseStudyId,
+        })
+        const generatedAt = new Date()
+        await db.update(collateral)
+          .set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt })
+          .where(eq(collateral.id, item.id))
+        await logEvent(workspaceId, userId, 'collateral.generated', { collateralId: item.id, collateralType: item.type, title: result.title, bulkRegen: true })
+      } catch (err) {
+        console.error(`[regenerate-stale] Failed for ${item.id}:`, err)
+        await db.update(collateral).set({ status: 'stale', updatedAt: new Date() }).where(eq(collateral.id, item.id))
+      }
+      // Small gap between requests to avoid rate limits
+      await new Promise(r => setTimeout(r, 1500))
+    }
   })
 
   return NextResponse.json({ data: { queued: staleItems.length } })

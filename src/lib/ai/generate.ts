@@ -51,18 +51,30 @@ async function callClaude(
   messages: Array<{ role: 'user'; content: string }>,
   temperature: number,
 ): Promise<string> {
-  const message = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 2048,
-    temperature,
-    system,
-    messages,
-  })
-  const block = message.content.find((b) => b.type === 'text')
-  if (!block || block.type !== 'text') {
-    throw new Error('No text content in Claude response')
+  const attempt = async () => {
+    const message = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      temperature,
+      system,
+      messages,
+    })
+    const block = message.content.find((b) => b.type === 'text')
+    if (!block || block.type !== 'text') throw new Error('No text content in Claude response')
+    return block.text
   }
-  return block.text
+
+  try {
+    return await attempt()
+  } catch (err: unknown) {
+    // Retry once on rate limit (429) after a short backoff
+    const status = (err as { status?: number })?.status
+    if (status === 429) {
+      await new Promise(r => setTimeout(r, 8000))
+      return attempt()
+    }
+    throw err
+  }
 }
 
 function extractJson(raw: string): unknown {

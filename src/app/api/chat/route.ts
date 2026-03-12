@@ -70,8 +70,14 @@ const CASE_STUDY_PATTERNS = [
   /success story/i, /customer success/i, /closed.*deal with/i,
 ]
 
+const DEAL_ACTION_PATTERNS = [
+  /remove.*todo/i, /delete.*todo/i, /clear.*todo/i, /mark.*done/i, /complete.*todo/i,
+  /outdated.*todo/i, /stale.*todo/i, /clean.*up.*todo/i, /todo.*deal/i, /deal.*todo/i,
+  /remove.*task/i, /clear.*task/i,
+]
+
 type Intent = 'meeting_notes' | 'competitor_battlecard' | 'company_update' |
-  'collateral_generate' | 'deal_create' | 'case_study_create' | 'qa'
+  'collateral_generate' | 'deal_create' | 'case_study_create' | 'deal_action' | 'qa'
 
 function detectIntent(text: string): Intent {
   const lower = text.toLowerCase()
@@ -80,6 +86,7 @@ function detectIntent(text: string): Intent {
   const hasGenerateVerb = /\b(generate|create|make|write|build)\b/.test(lower)
   if (hasGenerateVerb && COLLATERAL_TYPES.some(c => lower.includes(c.keyword))) return 'collateral_generate'
   if (COMPANY_UPDATE_PATTERNS.some(p => p.test(text))) return 'company_update'
+  if (DEAL_ACTION_PATTERNS.some(p => p.test(text))) return 'deal_action'
   if (DEAL_CREATE_PATTERNS.some(p => p.test(text))) return 'deal_create'
   if (CASE_STUDY_PATTERNS.some(p => p.test(text))) return 'case_study_create'
   return 'qa'
@@ -658,6 +665,115 @@ Text: ${text.slice(0, 4000)}`,
   }
 }
 
+// ── Handler: deal action (manage todos) ───────────────────────────────────────
+async function handleDealAction(
+  workspaceId: string, userId: string, text: string,
+): Promise<{ reply: string; actions: ActionCard[] }> {
+  const dealRows = await db.select().from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId))
+  if (dealRows.length === 0) {
+    return { reply: 'No deals found in your workspace.', actions: [] }
+  }
+
+  const dealList = dealRows.map(d => `id:${d.id} | "${d.dealName}" — ${d.prospectCompany}`).join('\n')
+
+  // Step 1: identify target deal + action type
+  const identifyMsg = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001', max_tokens: 256,
+    messages: [{
+      role: 'user',
+      content: `User request: "${text}"
+
+Available deals:
+${dealList}
+
+Return ONLY JSON:
+{
+  "dealId": "matching deal id or null",
+  "action": "remove_outdated|complete_todos|remove_specific|qa",
+  "description": "brief description of what to do"
+}`,
+    }],
+  })
+
+  interface ActionIdentified { dealId: string | null; action: string; description: string }
+  let identified: ActionIdentified = { dealId: null, action: 'qa', description: '' }
+  try { identified = JSON.parse(stripJson((identifyMsg.content[0] as { type: string; text: string }).text)) } catch { /* use defaults */ }
+
+  if (!identified.dealId) {
+    // Couldn't match a deal — show full todos for all deals
+    const allTodoSummaries = dealRows.slice(0, 10).map(d => {
+      const pending = ((d.todos as { text: string; done: boolean }[]) ?? []).filter(t => !t.done)
+      return `**${d.dealName}**: ${pending.length === 0 ? 'no pending todos' : pending.map(t => `• ${t.text}`).join(', ')}`
+    }).join('\n')
+    return { reply: `I couldn't identify a specific deal from your message. Here are current todos:\n\n${allTodoSummaries}`, actions: [] }
+  }
+
+  const deal = dealRows.find(d => d.id === identified.dealId)
+  if (!deal) return { reply: "Couldn't find that deal.", actions: [] }
+
+  const allTodos = (deal.todos as { id: string; text: string; done: boolean; createdAt: string }[]) ?? []
+  const pendingTodos = allTodos.filter(t => !t.done)
+
+  if (pendingTodos.length === 0) {
+    return { reply: `**${deal.dealName}** has no pending todos.`, actions: [] }
+  }
+
+  // Step 2: decide which todos to remove/complete
+  const decideMsg = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001', max_tokens: 512,
+    messages: [{
+      role: 'user',
+      content: `User request: "${text}"
+Goal: ${identified.description}
+
+Pending todos for deal "${deal.dealName}":
+${pendingTodos.map(t => `id:${t.id} | "${t.text}"`).join('\n')}
+
+Return ONLY JSON:
+{
+  "remove": ["id-to-remove"],
+  "complete": ["id-to-mark-done"],
+  "reason": "brief explanation of changes made"
+}
+
+Be conservative — only touch todos clearly relevant to the request. If asked to "remove outdated", judge which are truly stale/irrelevant. Never remove todos that are still clearly needed.`,
+    }],
+  })
+
+  interface TodoDecision { remove: string[]; complete: string[]; reason: string }
+  let decisions: TodoDecision = { remove: [], complete: [], reason: '' }
+  try { decisions = JSON.parse(stripJson((decideMsg.content[0] as { type: string; text: string }).text)) } catch { /* no changes */ }
+
+  const updatedTodos = allTodos
+    .filter(t => !decisions.remove.includes(t.id))
+    .map(t => decisions.complete.includes(t.id) ? { ...t, done: true } : t)
+
+  await db.update(dealLogs).set({ todos: updatedTodos, updatedAt: new Date() }).where(eq(dealLogs.id, deal.id))
+  await db.insert(events).values({
+    workspaceId, userId, type: 'deal_log.todos_updated',
+    metadata: { dealId: deal.id, removed: decisions.remove.length, completed: decisions.complete.length, source: 'ai_chat' },
+    createdAt: new Date(),
+  })
+
+  const removed = decisions.remove.length
+  const completed = decisions.complete.length
+
+  let reply: string
+  if (removed === 0 && completed === 0) {
+    reply = `No todos were changed for **${deal.dealName}**. ${decisions.reason || 'All todos appear current.'}`
+  } else {
+    reply = `Updated todos for **${deal.dealName}**:`
+    if (removed > 0) reply += `\n- Removed ${removed} outdated todo${removed > 1 ? 's' : ''}`
+    if (completed > 0) reply += `\n- Marked ${completed} todo${completed > 1 ? 's' : ''} as done`
+    if (decisions.reason) reply += `\n\n_${decisions.reason}_`
+  }
+
+  return {
+    reply,
+    actions: [{ type: 'todos_updated', added: 0, removed, completed, dealName: deal.dealName }],
+  }
+}
+
 // ── Main POST handler ─────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
@@ -702,6 +818,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result)
     }
 
+    if (intent === 'deal_action') {
+      const result = await handleDealAction(workspaceId, userId, lastText)
+      return NextResponse.json(result)
+    }
+
     // ── Q&A: load full workspace context ─────────────────────────────────────
     const [profileRows, competitorRows, caseStudyRows, dealRows, gapRows] = await Promise.all([
       db.select().from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)).limit(1),
@@ -731,8 +852,11 @@ export async function POST(req: NextRequest) {
       const open = dealRows.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
       kbParts.push(`## Deals — ${won} won, ${lost} lost, ${open.length} open`)
       open.slice(0, 10).forEach(d => {
-        const pending = ((d.todos as { done: boolean }[]) ?? []).filter(t => !t.done).length
-        kbParts.push(`- ${d.prospectCompany} (${d.stage}): $${d.dealValue ? (d.dealValue / 100).toLocaleString() : '?'}. ${pending} pending todos.`)
+        const pending = ((d.todos as { text: string; done: boolean }[]) ?? []).filter(t => !t.done)
+        const todoText = pending.length > 0
+          ? `Todos: ${pending.map(t => `• ${t.text}`).join(', ')}`
+          : 'No pending todos'
+        kbParts.push(`- "${d.dealName}" at ${d.prospectCompany} (${d.stage}): $${d.dealValue ? (d.dealValue / 100).toLocaleString() : '?'}. ${todoText}`)
       })
     }
     if (gapRows.length > 0) {
