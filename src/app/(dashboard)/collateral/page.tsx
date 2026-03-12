@@ -66,6 +66,7 @@ function CollateralPageInner() {
   const [selectedProduct, setSelectedProduct] = useState('')
   const [buyerRole, setBuyerRole] = useState('')
   const [customPrompt, setCustomPrompt] = useState('')
+  const [specificObjections, setSpecificObjections] = useState('')
 
   const searchParams = useSearchParams()
   const dealIdParam = searchParams.get('dealId')
@@ -128,7 +129,9 @@ function CollateralPageInner() {
       if ((selectedType === 'talk_track' || selectedType === 'email_sequence') && buyerRole.trim()) {
         body.buyerRole = buyerRole.trim()
       }
-      if (customPrompt.trim()) {
+      if (specificObjections.trim()) {
+        body.customPrompt = `Must include responses to these specific objections: ${specificObjections.trim()}${customPrompt.trim() ? `\n\n${customPrompt.trim()}` : ''}`
+      } else if (customPrompt.trim()) {
         body.customPrompt = customPrompt.trim()
       }
       if (dealIdParam) {
@@ -307,7 +310,7 @@ function CollateralPageInner() {
       )}
 
       {/* Generate modal */}
-      <Dialog.Root open={generateOpen} onOpenChange={(open) => { setGenerateOpen(open); if (!open) { setSelectedProduct(''); setBuyerRole(''); setCustomPrompt('') } }}>
+      <Dialog.Root open={generateOpen} onOpenChange={(open) => { setGenerateOpen(open); if (!open) { setSelectedProduct(''); setBuyerRole(''); setCustomPrompt(''); setSpecificObjections('') } }}>
         <Dialog.Portal>
           <Dialog.Overlay style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 500 }} />
           <Dialog.Content style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 501, width: '100%', maxWidth: '520px', backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px', boxShadow: '0 16px 48px rgba(0,0,0,0.8)', outline: 'none' }}>
@@ -432,6 +435,23 @@ function CollateralPageInner() {
                     placeholder="e.g. VP of Operations, CTO, Head of Finance"
                     style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', backgroundColor: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
                   />
+                </div>
+              )}
+
+              {/* Specific objections for objection handler */}
+              {selectedType === 'objection_handler' && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                    Objections to include <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                  </label>
+                  <textarea
+                    value={specificObjections}
+                    onChange={(e) => setSpecificObjections(e.target.value)}
+                    placeholder={`e.g. "Your price is 3x what we pay today"\n"We already use Salesforce for this"\n"We need SSO before we can consider you"`}
+                    rows={3}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', backgroundColor: '#0A0A0A', border: '1px solid rgba(99,102,241,0.25)', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5', boxSizing: 'border-box' }}
+                  />
+                  <p style={{ fontSize: '11px', color: '#555', margin: '4px 0 0' }}>One objection per line — the AI will write scripted responses for each.</p>
                 </div>
               )}
 
