@@ -11,6 +11,19 @@ async function logEvent(workspaceId: string, userId: string, type: string, metad
   await db.insert(events).values({ workspaceId, userId, type, metadata, createdAt: new Date() })
 }
 
+let dealColsMigrated = false
+async function ensureDealColumns() {
+  if (dealColsMigrated) return
+  try {
+    await db.execute(sql`
+      ALTER TABLE deal_logs
+      ADD COLUMN IF NOT EXISTS contacts jsonb NOT NULL DEFAULT '[]'::jsonb,
+      ADD COLUMN IF NOT EXISTS description text
+    `)
+  } catch { /* columns may already exist */ }
+  dealColsMigrated = true
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { userId } = await auth()
@@ -44,13 +57,16 @@ export async function POST(req: NextRequest) {
       if (!isWithinLimit(Number(currentCount), limits.dealLogs))
         return NextResponse.json({ error: `Deal log limit reached. Your ${plan} plan allows up to ${limits.dealLogs} deals. Please upgrade.`, code: 'PLAN_LIMIT_REACHED' }, { status: 403 })
     }
+    await ensureDealColumns()
     const body = await req.json()
-    const { dealName, prospectCompany, prospectName, prospectTitle, dealValue, stage, dealType, recurringInterval, competitors: dealCompetitors, notes, nextSteps, closeDate, wonDate, lostDate, lostReason } = body
+    const { dealName, prospectCompany, prospectName, prospectTitle, contacts, description, dealValue, stage, dealType, recurringInterval, competitors: dealCompetitors, notes, nextSteps, closeDate, wonDate, lostDate, lostReason } = body
     if (!dealName || !prospectCompany) return NextResponse.json({ error: 'dealName and prospectCompany are required' }, { status: 400 })
     const now = new Date()
     const [deal] = await db.insert(dealLogs).values({
       workspaceId, userId, dealName, prospectCompany,
-      prospectName: prospectName ?? null, prospectTitle: prospectTitle ?? null, dealValue: dealValue ?? null,
+      prospectName: prospectName ?? null, prospectTitle: prospectTitle ?? null,
+      contacts: contacts ?? [], description: description ?? null,
+      dealValue: dealValue ?? null,
       stage: stage ?? 'prospecting', dealType: dealType ?? 'one_off', recurringInterval: recurringInterval ?? null,
       competitors: dealCompetitors ?? [], notes: notes ?? null,
       nextSteps: nextSteps ?? null, closeDate: closeDate ? new Date(closeDate) : null,

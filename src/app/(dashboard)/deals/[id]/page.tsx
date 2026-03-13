@@ -11,6 +11,7 @@ import {
   FileText, Clipboard, ChevronDown, TrendingUp, DollarSign, Calendar,
   Building2, User, Edit, Trash2, MoreHorizontal, CheckCircle, X, Link2, Check
 } from 'lucide-react'
+import type { DealContact } from '@/types'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -564,6 +565,7 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
   deal: any; dealId: string; open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void; onWon?: (deal: any) => void
 }) {
   const [form, setForm] = useState<Record<string, string>>({})
+  const [contacts, setContacts] = useState<DealContact[]>([{ name: '', title: '', email: '' }])
   const [saving, setSaving] = useState(false)
 
   // sync form state when deal or open changes
@@ -572,8 +574,7 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
       setForm({
         dealName: deal.dealName ?? '',
         prospectCompany: deal.prospectCompany ?? '',
-        prospectName: deal.prospectName ?? '',
-        prospectTitle: deal.prospectTitle ?? '',
+        description: deal.description ?? '',
         dealValue: deal.dealValue != null ? String(deal.dealValue) : '',
         stage: deal.stage ?? 'proposal',
         dealType: deal.dealType ?? 'one_off',
@@ -583,8 +584,18 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
         nextSteps: deal.nextSteps ?? '',
         lostReason: deal.lostReason ?? '',
       })
+      // Initialise contacts from saved array, fall back to legacy prospectName/Title
+      const existing: DealContact[] = Array.isArray(deal.contacts) && deal.contacts.length > 0
+        ? deal.contacts
+        : deal.prospectName ? [{ name: deal.prospectName, title: deal.prospectTitle ?? '', email: '' }] : [{ name: '', title: '', email: '' }]
+      setContacts(existing.map(c => ({ name: c.name ?? '', title: c.title ?? '', email: c.email ?? '' })))
     }
   }, [open, deal])
+
+  const updateContact = (i: number, field: keyof DealContact, value: string) =>
+    setContacts(prev => prev.map((c, idx) => idx === i ? { ...c, [field]: value } : c))
+  const addContact = () => setContacts(prev => [...prev, { name: '', title: '', email: '' }])
+  const removeContact = (i: number) => setContacts(prev => prev.filter((_, idx) => idx !== i))
 
   const u = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
   const inputStyle: React.CSSProperties = {
@@ -601,14 +612,19 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
     setSaving(true)
     try {
       const wasWon = deal?.stage !== 'closed_won' && form.stage === 'closed_won'
+      const cleanContacts = contacts
+        .map(c => ({ name: c.name.trim(), title: c.title?.trim() || undefined, email: c.email?.trim() || undefined }))
+        .filter(c => c.name)
       await fetch(`/api/deals/${dealId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           dealName: form.dealName,
           prospectCompany: form.prospectCompany,
-          prospectName: form.prospectName || null,
-          prospectTitle: form.prospectTitle || null,
+          description: form.description || null,
+          prospectName: cleanContacts[0]?.name ?? null,
+          prospectTitle: cleanContacts[0]?.title ?? null,
+          contacts: cleanContacts,
           dealValue: form.dealValue ? Number(form.dealValue) : null,
           stage: form.stage,
           dealType: form.dealType ?? 'one_off',
@@ -660,16 +676,66 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
                   onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={labelStyle}>Contact name</label>
-                <input style={inputStyle} value={form.prospectName ?? ''} onChange={e => u('prospectName', e.target.value)} placeholder="Jane Smith"
-                  onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+            {/* Description */}
+            <div>
+              <label style={labelStyle}>Description</label>
+              <textarea
+                style={{ ...inputStyle, height: 'auto', padding: '8px 10px', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5' }}
+                rows={2}
+                value={form.description ?? ''}
+                onChange={e => u('description', e.target.value)}
+                placeholder="Overview of the opportunity, context, or key details…"
+                onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')}
+              />
+            </div>
+
+            {/* Contacts */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <label style={labelStyle}>Contacts</label>
+                <button
+                  type="button"
+                  onClick={addContact}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#6366F1', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#818CF8' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#6366F1' }}
+                >
+                  <Plus size={11} /> Add contact
+                </button>
               </div>
-              <div>
-                <label style={labelStyle}>Contact title</label>
-                <input style={inputStyle} value={form.prospectTitle ?? ''} onChange={e => u('prospectTitle', e.target.value)} placeholder="VP of Engineering"
-                  onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {contacts.map((contact, i) => (
+                  <div key={i} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px', padding: '10px', position: 'relative' }}>
+                    {contacts.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeContact(i)}
+                        style={{ position: 'absolute', top: '8px', right: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#444', display: 'flex', padding: '2px', borderRadius: '4px' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#EF4444' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#444' }}
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                      <div>
+                        <label style={{ ...labelStyle, fontSize: '10px' }}>Name</label>
+                        <input style={inputStyle} value={contact.name} onChange={e => updateContact(i, 'name', e.target.value)} placeholder="Jane Smith"
+                          onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+                      </div>
+                      <div>
+                        <label style={{ ...labelStyle, fontSize: '10px' }}>Title</label>
+                        <input style={inputStyle} value={contact.title ?? ''} onChange={e => updateContact(i, 'title', e.target.value)} placeholder="VP of Engineering"
+                          onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, fontSize: '10px' }}>Email</label>
+                      <input style={inputStyle} type="email" value={contact.email ?? ''} onChange={e => updateContact(i, 'email', e.target.value)} placeholder="jane@acme.com"
+                        onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.6)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.1)')} />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
             <div>

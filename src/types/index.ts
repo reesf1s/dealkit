@@ -95,6 +95,12 @@ export interface CaseStudyMetric {
   unit?: string
 }
 
+export interface DealContact {
+  name: string
+  title?: string
+  email?: string
+}
+
 export interface DealLog {
   id: string
   userId: string
@@ -102,6 +108,8 @@ export interface DealLog {
   prospectCompany: string
   prospectName: string | null
   prospectTitle: string | null
+  contacts: DealContact[]
+  description: string | null
   dealValue: number | null
   stage: DealStage
   competitors: string[]

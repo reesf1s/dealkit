@@ -192,6 +192,8 @@ export const dealLogs = pgTable('deal_logs', {
   prospectCompany: text('prospect_company').notNull(),
   prospectName: text('prospect_name'),
   prospectTitle: text('prospect_title'),
+  contacts: jsonb('contacts').notNull().default([]),   // DealContact[]
+  description: text('description'),
   dealValue: integer('deal_value'),
   stage: dealStageEnum('stage').notNull().default('prospecting'),
   competitors: jsonb('competitors').notNull().default([]),
