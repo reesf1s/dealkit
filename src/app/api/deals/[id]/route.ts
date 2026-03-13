@@ -28,6 +28,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    await ensureDealColumns()
     const { workspaceId } = await getWorkspaceContext(userId)
     const { id } = await params
     const [deal] = await db.select().from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)

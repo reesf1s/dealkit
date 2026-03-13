@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    await ensureDealColumns()
     const { workspaceId } = await getWorkspaceContext(userId)
     const { searchParams } = new URL(req.url)
     const outcome = searchParams.get('outcome')
