@@ -6,6 +6,7 @@ import { dealLogs, workspaces, companyProfiles, competitors } from '@/lib/db/sch
 import { dbErrResponse } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { anthropic } from '@/lib/ai/client'
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 export type AIOverview = {
   summary: string
@@ -178,6 +179,8 @@ export async function POST() {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const rl = await checkRateLimit(userId, 'ai-overview', 3)
+    if (!rl.allowed) return rateLimitResponse(rl.resetAt)
 
     await ensureColumns()
 

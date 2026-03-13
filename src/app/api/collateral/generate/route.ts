@@ -10,6 +10,7 @@ import { generateCollateral } from '@/lib/ai/generate'
 import type { CollateralType } from '@/types'
 import { dbErrResponse } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 async function logEvent(workspaceId: string, userId: string, type: string, metadata: Record<string, unknown>) {
   await db.insert(events).values({ workspaceId, userId, type, metadata, createdAt: new Date() })
@@ -19,6 +20,8 @@ export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const rl = await checkRateLimit(userId, 'collateral:generate', 5)
+    if (!rl.allowed) return rateLimitResponse(rl.resetAt)
     const { workspaceId, plan } = await getWorkspaceContext(userId)
 
     // Check company profile exists BEFORE doing anything — if missing, fail immediately with a clear error

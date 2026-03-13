@@ -5,10 +5,14 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic()
 
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
+
 export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const rl = await checkRateLimit(userId, 'onboarding:parse', 5)
+    if (!rl.allowed) return rateLimitResponse(rl.resetAt)
     const { text } = await req.json()
     if (!text?.trim()) return NextResponse.json({ error: 'No text provided' }, { status: 400 })
 

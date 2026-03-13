@@ -13,6 +13,7 @@ import { getWorkspaceContext } from '@/lib/workspace'
 import { generateCollateral } from '@/lib/ai/generate'
 import { PLAN_LIMITS, isWithinLimit } from '@/lib/stripe/plans'
 import type { CollateralType } from '@/types'
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -948,6 +949,8 @@ export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const rl = await checkRateLimit(userId, 'chat', 20)
+    if (!rl.allowed) return rateLimitResponse(rl.resetAt)
     const { workspaceId, plan } = await getWorkspaceContext(userId)
     const { messages } = await req.json()
     if (!messages?.length) return NextResponse.json({ error: 'messages required' }, { status: 400 })
