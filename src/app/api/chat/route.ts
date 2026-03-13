@@ -73,7 +73,7 @@ const PRODUCT_GAP_PATTERNS = [
 
 const COMPANY_UPDATE_PATTERNS = [
   /update.*compan/i, /update.*profile/i, /update our/i,
-  /add.*product(?!\s+gap)/i, /new product(?!\s+gap)/i, /we(('re| are) a| offer| provide| do| help)/i,
+  /add.*product(?!\s+gap)/i, /new product(?!\s+gap)/i, /we(('re| are) a\b| offer| provide| do\b| help)/i,
   /company description/i, /value prop/i, /our differentiator/i,
 ]
 
@@ -91,10 +91,13 @@ const CASE_STUDY_PATTERNS = [
 // stage changes, value updates, deal field edits, etc.
 const DEAL_ACTION_PATTERNS = [
   // to-do / todo / to do variants (hyphen, apostrophe, space)
-  /remove.*to[\s-]?do/i, /delete.*to[\s-]?do/i, /clear.*to[\s-]?do/i,
-  /mark.*to[\s-]?do/i, /complete.*to[\s-]?do/i, /tick.*to[\s-]?do/i,
-  /outdated.*to[\s-]?do/i, /stale.*to[\s-]?do/i, /clean.*up.*to[\s-]?do/i,
-  /to[\s-]?do.*deal/i, /deal.*to[\s-]?do/i,
+  /remove.*to[\s-']?do/i, /delete.*to[\s-']?do/i, /clear.*to[\s-']?do/i,
+  /mark.*to[\s-']?do/i, /complete.*to[\s-']?do/i, /tick.*to[\s-']?do/i,
+  /outdated.*to[\s-']?do/i, /stale.*to[\s-']?do/i, /clean.*up.*to[\s-']?do/i,
+  /to[\s-']?do.*deal/i, /deal.*to[\s-']?do/i,
+  // review / check / audit todos on a deal
+  /review.*to[\s-']?do/i, /check.*to[\s-']?do/i, /audit.*to[\s-']?do/i,
+  /review.*task/i, /check.*task/i,
   // tasks
   /remove.*task/i, /clear.*task/i, /delete.*task/i, /complete.*task/i,
   // deal field updates via chat (stage, value, notes on a named deal)
@@ -889,6 +892,14 @@ Match the deal by name/company. If no clear deal match, return dealId: null.`,
   }
 
   // Step 2: decide which todos to remove/complete
+  // Include meeting notes so Claude can cross-reference todos against history
+  const recentNotes = (() => {
+    const notes = deal.notes as string | null
+    if (!notes) return 'No meeting history recorded.'
+    const lines = notes.split('\n').filter(l => l.trim())
+    return lines.slice(-40).join('\n') // last ~40 lines of accumulated notes
+  })()
+
   const decideMsg = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001', max_tokens: 512,
     messages: [{
@@ -896,7 +907,12 @@ Match the deal by name/company. If no clear deal match, return dealId: null.`,
       content: `User request: "${text}"
 Goal: ${identified.description}
 
-Pending todos for deal "${deal.dealName}":
+Deal: "${deal.dealName}" — ${deal.prospectCompany} (stage: ${deal.stage})
+
+Meeting history / notes:
+${recentNotes}
+
+Pending todos:
 ${pendingTodos.map(t => `id:${t.id} | "${t.text}"`).join('\n')}
 
 Return ONLY JSON:
@@ -906,7 +922,8 @@ Return ONLY JSON:
   "reason": "brief explanation of changes made"
 }
 
-Be conservative — only touch todos clearly relevant to the request. If asked to "remove outdated", judge which are truly stale/irrelevant. Never remove todos that are still clearly needed.`,
+Cross-reference the meeting history to judge which todos are still relevant.
+Be conservative — only remove todos that are clearly stale, already handled, or made irrelevant by what happened in meetings. Never remove todos that are still clearly needed.`,
     }],
   })
 
