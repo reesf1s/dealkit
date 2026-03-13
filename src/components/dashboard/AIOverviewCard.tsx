@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import useSWR from 'swr'
-import { Sparkles, RefreshCw, TrendingUp, AlertTriangle, Zap, CheckCircle2 } from 'lucide-react'
+import { Sparkles, RefreshCw, TrendingUp, AlertTriangle, Zap } from 'lucide-react'
 import { fetcher, isDbNotConfigured } from '@/lib/fetcher'
 import type { AIOverview } from '@/app/api/dashboard/ai-overview/route'
 
@@ -16,14 +16,43 @@ function formatAge(iso: string): string {
   return 'today'
 }
 
+function getStorageKey(generatedAt: string) {
+  return `dealkit_actions_done_${generatedAt}`
+}
+
 export default function AIOverviewCard() {
   const [refreshing, setRefreshing] = useState(false)
+  const [doneActions, setDoneActions] = useState<Record<number, boolean>>({})
 
   const { data, error, mutate } = useSWR<{ data: AIOverview; cached: boolean }>(
     '/api/dashboard/ai-overview',
     fetcher,
     { revalidateOnFocus: false, revalidateOnReconnect: false }
   )
+
+  const overview: AIOverview | null = data?.data ?? null
+
+  // Load persisted tick state from localStorage when overview changes
+  useEffect(() => {
+    if (!overview?.generatedAt) return
+    try {
+      const stored = localStorage.getItem(getStorageKey(overview.generatedAt))
+      setDoneActions(stored ? JSON.parse(stored) : {})
+    } catch {
+      setDoneActions({})
+    }
+  }, [overview?.generatedAt])
+
+  const toggleAction = useCallback((index: number) => {
+    if (!overview?.generatedAt) return
+    setDoneActions(prev => {
+      const next = { ...prev, [index]: !prev[index] }
+      try {
+        localStorage.setItem(getStorageKey(overview.generatedAt), JSON.stringify(next))
+      } catch { /* storage full */ }
+      return next
+    })
+  }, [overview?.generatedAt])
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -38,12 +67,11 @@ export default function AIOverviewCard() {
   }, [mutate])
 
   const dbNotConnected = isDbNotConfigured(error)
-
-  // Don't render if DB not set up
   if (dbNotConnected) return null
 
-  const overview: AIOverview | null = data?.data ?? null
   const isLoading = !data && !error
+  const allDone = overview && overview.keyActions.length > 0 &&
+    overview.keyActions.every((_, i) => doneActions[i])
 
   return (
     <div
@@ -58,7 +86,7 @@ export default function AIOverviewCard() {
         boxShadow: '0 0 40px rgba(99,102,241,0.12), inset 0 1px 0 rgba(139,92,246,0.15)',
       }}
     >
-      {/* Ambient glow top-right */}
+      {/* Ambient glow */}
       <div style={{
         position: 'absolute', top: 0, right: 0,
         width: '300px', height: '200px',
@@ -85,14 +113,14 @@ export default function AIOverviewCard() {
           <span style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF', letterSpacing: '-0.01em' }}>
             AI Overview
           </span>
-          {overview && (
+          {allDone && (
             <span style={{
-              fontSize: '10px', color: '#6366F1',
-              background: 'rgba(99,102,241,0.1)',
-              border: '1px solid rgba(99,102,241,0.2)',
+              fontSize: '10px', color: '#22C55E',
+              background: 'rgba(34,197,94,0.1)',
+              border: '1px solid rgba(34,197,94,0.2)',
               padding: '2px 8px', borderRadius: '100px', fontWeight: '600',
             }}>
-              refreshes daily
+              All done ✓
             </span>
           )}
         </div>
@@ -155,7 +183,6 @@ export default function AIOverviewCard() {
           <>
             {/* Summary + Pipeline Health row */}
             <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-              {/* Summary text */}
               <div style={{ flex: 1 }}>
                 <p style={{
                   fontSize: '13px', color: '#C4B5FD', lineHeight: '1.65',
@@ -165,7 +192,6 @@ export default function AIOverviewCard() {
                 </p>
               </div>
 
-              {/* Pipeline health chip — right side */}
               <div style={{
                 flexShrink: 0,
                 background: 'rgba(99,102,241,0.08)',
@@ -183,7 +209,7 @@ export default function AIOverviewCard() {
               </div>
             </div>
 
-            {/* Key Actions */}
+            {/* Key Actions — tickable */}
             {overview.keyActions.length > 0 && (
               <div style={{
                 background: 'rgba(99,102,241,0.05)',
@@ -198,15 +224,54 @@ export default function AIOverviewCard() {
                 }}>
                   <Zap size={10} color="#818CF8" /> Actions for today
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  {overview.keyActions.map((action, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                      <CheckCircle2 size={12} color="#6366F1" style={{ marginTop: '2px', flexShrink: 0 }} />
-                      <span style={{ fontSize: '12px', color: '#E0D9FF', lineHeight: '1.5' }}>
-                        {action}
-                      </span>
-                    </div>
-                  ))}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {overview.keyActions.map((action, i) => {
+                    const done = !!doneActions[i]
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => toggleAction(i)}
+                        style={{
+                          display: 'flex', alignItems: 'flex-start', gap: '9px',
+                          background: 'none', border: 'none', padding: '3px 2px',
+                          cursor: 'pointer', textAlign: 'left', width: '100%',
+                          borderRadius: '6px',
+                          transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={e => {
+                          (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.07)'
+                        }}
+                        onMouseLeave={e => {
+                          (e.currentTarget as HTMLElement).style.background = 'none'
+                        }}
+                      >
+                        {/* Custom checkbox */}
+                        <div style={{
+                          width: '15px', height: '15px', borderRadius: '4px', flexShrink: 0,
+                          marginTop: '1px',
+                          border: done ? '1.5px solid #6366F1' : '1.5px solid rgba(99,102,241,0.35)',
+                          background: done ? 'rgba(99,102,241,0.25)' : 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'all 0.15s',
+                        }}>
+                          {done && (
+                            <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                              <path d="M1 3.5L3.5 6L8 1" stroke="#818CF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                        </div>
+                        <span style={{
+                          fontSize: '12px',
+                          color: done ? '#4B5563' : '#E0D9FF',
+                          lineHeight: '1.5',
+                          textDecoration: done ? 'line-through' : 'none',
+                          transition: 'all 0.15s',
+                        }}>
+                          {action}
+                        </span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             )}

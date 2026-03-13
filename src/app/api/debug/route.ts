@@ -2,9 +2,12 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { sql } from 'drizzle-orm'
 
-// GET /api/debug — no auth, returns DB connection status and table list
-// Used to diagnose which database Vercel is connected to
+// GET /api/debug — dev-only, returns DB connection status and table list
+// Blocked in production to prevent schema/count exposure
 export async function GET() {
+  if (process.env.NODE_ENV !== 'development') {
+    return new Response('Not found', { status: 404 })
+  }
   const dbUrl = process.env.DATABASE_URL ?? '(not set)'
   const safeUrl = dbUrl.replace(/:([^:@]+)@/, ':***@') // redact password
 
