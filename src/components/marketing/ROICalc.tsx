@@ -255,7 +255,7 @@ export default function ROICalc() {
         color: '#444',
         lineHeight: 1.5,
       }}>
-        Based on DealKit Starter at £{DEALKIT_COST}/mo. Assumes a 10% win rate improvement from better collateral.
+        {`Based on DealKit Starter at £${DEALKIT_COST}/mo. Assumes a 10% win rate improvement from better collateral.`}
       </p>
     </section>
   )
