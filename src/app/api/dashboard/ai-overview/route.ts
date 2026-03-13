@@ -144,32 +144,18 @@ export async function GET() {
 
     const { workspaceId } = await getWorkspaceContext(userId)
 
-    // Read cached overview directly via raw query to avoid type issues with new columns
+    // Return cached overview only — generation happens via POST (refresh button)
     const rows = await db.execute<{
       ai_overview: AIOverview | null
       ai_overview_generated_at: Date | null
     }>(sql`SELECT ai_overview, ai_overview_generated_at FROM workspaces WHERE id = ${workspaceId} LIMIT 1`)
 
     const row = rows[0]
-    const now = new Date()
-    const generatedAt = row?.ai_overview_generated_at ? new Date(row.ai_overview_generated_at) : null
-    const isToday = generatedAt && generatedAt.toDateString() === now.toDateString()
-
-    if (isToday && row?.ai_overview) {
+    if (row?.ai_overview) {
       return NextResponse.json({ data: row.ai_overview, cached: true })
     }
 
-    // Generate fresh overview
-    const overview = await generateOverview(workspaceId)
-
-    await db.execute(sql`
-      UPDATE workspaces
-      SET ai_overview = ${JSON.stringify(overview)}::jsonb,
-          ai_overview_generated_at = NOW()
-      WHERE id = ${workspaceId}
-    `)
-
-    return NextResponse.json({ data: overview, cached: false })
+    return NextResponse.json({ data: null, cached: false })
   } catch (err) {
     return dbErrResponse(err)
   }

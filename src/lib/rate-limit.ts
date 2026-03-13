@@ -1,8 +1,6 @@
 /**
  * Postgres-backed sliding window rate limiter.
- * No Redis needed — uses the existing DB connection.
- *
- * Creates the `api_rate_limits` table lazily on first use.
+ * Degrades gracefully — if anything fails, requests are allowed through.
  */
 import { db } from '@/lib/db'
 import { sql } from 'drizzle-orm'
@@ -12,18 +10,15 @@ let tableReady = false
 
 async function ensureTable() {
   if (tableReady) return
+  // "window" is a reserved word in Postgres — use "window_start" instead
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS api_rate_limits (
-      user_id   TEXT        NOT NULL,
-      endpoint  TEXT        NOT NULL,
-      window    TIMESTAMPTZ NOT NULL,
-      count     INTEGER     NOT NULL DEFAULT 1,
-      PRIMARY KEY (user_id, endpoint, window)
+      user_id      TEXT        NOT NULL,
+      endpoint     TEXT        NOT NULL,
+      window_start TIMESTAMPTZ NOT NULL,
+      count        INTEGER     NOT NULL DEFAULT 1,
+      PRIMARY KEY (user_id, endpoint, window_start)
     )
-  `)
-  await db.execute(sql`
-    CREATE INDEX IF NOT EXISTS idx_api_rate_limits
-    ON api_rate_limits (user_id, endpoint, window)
   `)
   tableReady = true
 }
@@ -34,52 +29,42 @@ export interface RateLimitResult {
   resetAt: Date
 }
 
-/**
- * Check & increment the rate limit counter for a user+endpoint.
- *
- * @param userId   Clerk user ID
- * @param endpoint Short string key, e.g. "collateral:generate"
- * @param limit    Max requests per window
- * @param windowSecs  Window length in seconds (default 60)
- */
 export async function checkRateLimit(
   userId: string,
   endpoint: string,
   limit: number,
   windowSecs = 60,
 ): Promise<RateLimitResult> {
-  await ensureTable()
-
   const windowMs = windowSecs * 1000
   const now = Date.now()
-  // Bucket into fixed windows (floor to nearest window)
   const windowStart = new Date(Math.floor(now / windowMs) * windowMs)
   const resetAt = new Date(windowStart.getTime() + windowMs)
 
-  // Occasionally clean up windows older than 2 hours
-  if (Math.random() < 0.05) {
-    db.execute(sql`DELETE FROM api_rate_limits WHERE window < NOW() - INTERVAL '2 hours'`).catch(() => {})
-  }
+  try {
+    await ensureTable()
 
-  // Upsert: insert row or increment existing count atomically
-  const rows = await db.execute(sql`
-    INSERT INTO api_rate_limits (user_id, endpoint, window, count)
-    VALUES (${userId}, ${endpoint}, ${windowStart.toISOString()}::timestamptz, 1)
-    ON CONFLICT (user_id, endpoint, window)
-    DO UPDATE SET count = api_rate_limits.count + 1
-    RETURNING count
-  `)
+    // Occasionally prune old rows
+    if (Math.random() < 0.05) {
+      db.execute(sql`DELETE FROM api_rate_limits WHERE window_start < NOW() - INTERVAL '2 hours'`).catch(() => {})
+    }
 
-  const count = (rows as unknown as { count: number }[])[0]?.count ?? 1
+    const rows = await db.execute(sql`
+      INSERT INTO api_rate_limits (user_id, endpoint, window_start, count)
+      VALUES (${userId}, ${endpoint}, ${windowStart.toISOString()}::timestamptz, 1)
+      ON CONFLICT (user_id, endpoint, window_start)
+      DO UPDATE SET count = api_rate_limits.count + 1
+      RETURNING count
+    `)
 
-  return {
-    allowed: count <= limit,
-    remaining: Math.max(0, limit - count),
-    resetAt,
+    const count = (rows as unknown as { count: number }[])[0]?.count ?? 1
+    return { allowed: count <= limit, remaining: Math.max(0, limit - count), resetAt }
+  } catch {
+    // If rate limiting fails for any reason, allow the request through
+    // rather than breaking the feature. Errors here are non-fatal.
+    return { allowed: true, remaining: limit, resetAt }
   }
 }
 
-/** Returns a standard 429 NextResponse with Retry-After header. */
 export function rateLimitResponse(resetAt: Date): NextResponse {
   const retryAfter = Math.ceil((resetAt.getTime() - Date.now()) / 1000)
   return NextResponse.json(
