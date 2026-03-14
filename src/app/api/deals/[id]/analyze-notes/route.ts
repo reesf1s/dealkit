@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic'
+import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
@@ -7,6 +8,7 @@ import { db } from '@/lib/db'
 import { dealLogs, productGaps, companyProfiles } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
 
 const anthropic = new Anthropic()
 
@@ -34,10 +36,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       ? `\n\nCONFIRMED PRODUCT CAPABILITIES (do NOT flag these as product gaps under any circumstances):\n${knownCapabilities.map(c => `- ${c}`).join('\n')}`
       : ''
 
+    // Compress meeting history to last 5 structured [date] entries only — skip raw email blobs
+    // This prevents unbounded context growth while preserving recent trajectory
+    function compressMeetingHistory(raw: string | null): string {
+      if (!raw) return ''
+      const entries = raw.split('\n').reduce<string[]>((acc, line) => {
+        if (/^\[\d/.test(line)) acc.push(line)        // start of a new [date] entry
+        else if (acc.length > 0) acc[acc.length - 1] += ' ' + line.trim() // continuation
+        return acc
+      }, [])
+      const recent = entries.slice(-5) // keep only last 5 structured entries
+      return recent.join('\n')
+    }
+
+    const compressedHistory = compressMeetingHistory(deal.meetingNotes as string | null)
+
     const previousContext = [
-      deal.meetingNotes ? `PREVIOUS MEETING HISTORY (all prior meetings for this deal):\n${deal.meetingNotes}` : '',
+      compressedHistory ? `MEETING HISTORY (last 5 updates for this deal):\n${compressedHistory}` : '',
       deal.aiSummary ? `CURRENT DEAL SUMMARY: ${deal.aiSummary}` : '',
-      (deal.dealRisks as string[])?.length ? `KNOWN DEAL RISKS SO FAR: ${(deal.dealRisks as string[]).join('; ')}` : '',
+      (deal.dealRisks as string[])?.length ? `KNOWN RISKS: ${(deal.dealRisks as string[]).join('; ')}` : '',
     ].filter(Boolean).join('\n\n')
 
     const existingTodos = (deal.todos as any[]) ?? []
@@ -47,7 +64,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       : ''
 
     const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001', max_tokens: 1000,
+      // Sonnet for deeper analysis + larger output budget — handles complex multi-field extraction reliably
+      model: 'claude-sonnet-4-5-20251022', max_tokens: 3000,
       messages: [{ role: 'user', content: `You are analyzing B2B sales meeting notes. Extract structured information and return ONLY valid JSON, no markdown.
 
 ${previousContext ? `${previousContext}\n\n---\n\n` : ''}NEW MEETING NOTES TO ANALYZE:
@@ -145,6 +163,11 @@ IMPORTANT — productGaps rules:
         createdGaps.push(created)
       }
     }
+    // Rebuild workspace brain in background so chat/overview always have fresh context
+    after(async () => {
+      try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ }
+    })
+
     return NextResponse.json({ data: { deal: updatedDeal, productGaps: createdGaps, parsed } })
   } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
 }

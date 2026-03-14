@@ -7,6 +7,7 @@ import { dbErrResponse } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { anthropic } from '@/lib/ai/client'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { getWorkspaceBrain, formatBrainContext } from '@/lib/workspace-brain'
 
 export type AIOverview = {
   summary: string
@@ -108,16 +109,20 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
     activeCompetitors.join(', ') || 'None',
   ].join('\n')
 
+  // Enrich context with workspace brain if available (includes per-deal summaries + risks from analyze-notes)
+  const brain = await getWorkspaceBrain(workspaceId)
+  const brainContext = brain ? `\n\nDEAL INTELLIGENCE (from meeting analysis):\n${formatBrainContext(brain)}` : ''
+
   const msg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 800,
+    model: 'claude-sonnet-4-5-20251022',
+    max_tokens: 1200,
     system: `You are a senior sales strategist reviewing a sales team's pipeline. Analyse the data and respond with ONLY a JSON object — no markdown, no explanation — with these exact keys:
 - "summary": string — 2–3 sentences summarising pipeline health and outlook, using specific numbers (deals, values, win rate). Be direct and honest.
 - "keyActions": string[] — exactly 3–5 specific, actionable items the rep should do TODAY. Each must start with a verb and be under 15 words. Prioritise by urgency/value.
 - "pipelineHealth": string — a short phrase rating overall health (e.g. "Strong — 3 deals in late stage", "Caution — pipeline stagnating", "Healthy — £120k in negotiation").
 - "momentum": string | null — one short positive signal or win to note, or null if there is none.
 - "topRisk": string | null — the single biggest risk or blocker across the pipeline, or null if pipeline is empty or risk-free.`,
-    messages: [{ role: 'user', content: `Pipeline data for ${today}:\n\n${contextStr}` }],
+    messages: [{ role: 'user', content: `Pipeline data for ${today}:\n\n${contextStr}${brainContext}` }],
   })
 
   const rawText = (msg.content[0] as { type: string; text: string }).text.trim()

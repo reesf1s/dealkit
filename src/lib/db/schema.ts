@@ -79,6 +79,7 @@ export const workspaces = pgTable('workspaces', {
   stripeCustomerId: text('stripe_customer_id'),
   aiOverview: jsonb('ai_overview'),                        // cached daily AI overview
   aiOverviewGeneratedAt: timestamp('ai_overview_generated_at', { withTimezone: true }),
+  workspaceBrain: jsonb('workspace_brain'),                // compressed org knowledge — updated after every deal analysis
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

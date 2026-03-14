@@ -14,6 +14,7 @@ import { generateCollateral } from '@/lib/ai/generate'
 import { PLAN_LIMITS, isWithinLimit } from '@/lib/stripe/plans'
 import type { CollateralType } from '@/types'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { getWorkspaceBrain, formatBrainContext, rebuildWorkspaceBrain } from '@/lib/workspace-brain'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -118,8 +119,9 @@ function detectIntent(text: string): Intent {
   if (PRODUCT_GAP_PATTERNS.some(p => p.test(text))) return 'product_gap'
   const hasGenerateVerb = /\b(generate|create|make|write|build)\b/.test(lower)
   if (hasGenerateVerb && COLLATERAL_TYPES.some(c => lower.includes(c.keyword))) return 'collateral_generate'
-  if (COMPANY_UPDATE_PATTERNS.some(p => p.test(text))) return 'company_update'
+  // deal_action BEFORE company_update — "review BOE to-do's" must not be mistaken for a profile update
   if (DEAL_ACTION_PATTERNS.some(p => p.test(text))) return 'deal_action'
+  if (COMPANY_UPDATE_PATTERNS.some(p => p.test(text))) return 'company_update'
   if (DEAL_CREATE_PATTERNS.some(p => p.test(text))) return 'deal_create'
   if (CASE_STUDY_PATTERNS.some(p => p.test(text))) return 'case_study_create'
   return 'qa'
@@ -892,16 +894,25 @@ Match the deal by name/company. If no clear deal match, return dealId: null.`,
   }
 
   // Step 2: decide which todos to remove/complete
-  // Include meeting notes so Claude can cross-reference todos against history
+  // Use meetingNotes (structured [date] entries from analyze-notes) as primary history
+  // Fall back to notes (chat-accumulated) if meetingNotes is empty
   const recentNotes = (() => {
-    const notes = deal.notes as string | null
-    if (!notes) return 'No meeting history recorded.'
-    const lines = notes.split('\n').filter(l => l.trim())
-    return lines.slice(-40).join('\n') // last ~40 lines of accumulated notes
+    const history = (deal.meetingNotes as string | null) || (deal.notes as string | null)
+    if (!history) return 'No meeting history recorded.'
+    // Extract last 5 structured [date] entries to keep context focused
+    const entries = history.split('\n').reduce<string[]>((acc, line) => {
+      if (/^\[\d/.test(line)) acc.push(line)
+      else if (acc.length > 0) acc[acc.length - 1] += ' ' + line.trim()
+      return acc
+    }, [])
+    if (entries.length > 0) return entries.slice(-5).join('\n')
+    // Fallback: last 40 lines of raw history
+    return history.split('\n').filter(l => l.trim()).slice(-40).join('\n')
   })()
 
   const decideMsg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001', max_tokens: 512,
+    // Sonnet for todo review — needs to reason across full meeting history
+    model: 'claude-sonnet-4-5-20251022', max_tokens: 1000,
     messages: [{
       role: 'user',
       content: `User request: "${text}"
@@ -1018,12 +1029,13 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Q&A: load full workspace context ─────────────────────────────────────
-    const [profileRows, competitorRows, caseStudyRows, dealRows, gapRows] = await Promise.all([
+    const [profileRows, competitorRows, caseStudyRows, dealRows, gapRows, brain] = await Promise.all([
       db.select().from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)).limit(1),
       db.select().from(competitors).where(eq(competitors.workspaceId, workspaceId)),
       db.select().from(caseStudies).where(eq(caseStudies.workspaceId, workspaceId)),
       db.select().from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)).limit(20),
       db.select().from(productGaps).where(eq(productGaps.workspaceId, workspaceId)).limit(20),
+      getWorkspaceBrain(workspaceId),
     ])
 
     const profile = profileRows[0]
@@ -1062,12 +1074,16 @@ export async function POST(req: NextRequest) {
       gapRows.forEach(g => kbParts.push(`- ${g.title} [${g.priority}/${g.status}] freq:${g.frequency}: ${g.description.slice(0, 80)}`))
     }
 
-    const systemPrompt = `You are DealKit AI — a sharp, concise sales intelligence assistant. You have full context of the workspace below. Answer questions directly and give actionable advice. Use UK English.
+    // Add workspace brain as rich pipeline intelligence on top of the per-feature KB
+    const brainSection = brain ? `\n\n## Live Pipeline Intelligence (Workspace Brain)\n${formatBrainContext(brain)}` : ''
+
+    const systemPrompt = `You are DealKit AI — the single brain for this sales organisation. You know everything about every deal, risk, contact, and action item. Answer questions directly and give actionable, specific advice. Use UK English.
 
 RESPONSE RULES (always follow):
 - Be concise — no filler, no preamble, no summaries of what you just said
 - Use markdown formatting: **bold** for deal names/key terms, bullet lists for multiple items, headings (##) only for multi-section answers
 - Never repeat the user's question back to them
+- Reference specific deal names, contacts, and pending actions from context
 - Omit any sentence that doesn't add value
 
 What I can do automatically (just tell me):
@@ -1077,8 +1093,9 @@ What I can do automatically (just tell me):
 • "Generate an objection handler / one-pager / talk track / email sequence" → generates collateral
 • "New deal: [Company], [value], [contact]" → logs a new deal
 • "Case study: [Customer] [story]" → creates a case study
+• "Review [Deal] todos vs meeting history" → cleans up stale actions
 
-${kbParts.join('\n\n') || 'No workspace data yet. Help the user set up their profile.'}`
+${kbParts.join('\n\n') || 'No workspace data yet. Help the user set up their profile.'}${brainSection}`
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001', max_tokens: 1024,
