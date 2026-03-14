@@ -86,12 +86,22 @@ IMPORTANT — productGaps rules:
 - DO NOT create product gaps from: scheduling tasks, follow-up emails, admin work, attendance tracking requests (unless the prospect said the product lacks it), general to-dos, deal risks, or anything that is a sales/process action rather than a product capability complaint.
 - If no explicit product gaps are mentioned, return an empty array: "productGaps": []` }],
     })
+    // Strip markdown fences and any leading/trailing text before the JSON object
+    function stripToJson(raw: string): string {
+      const fenceStripped = raw.replace(/^```json?\n?/i, '').replace(/\n?```$/i, '').trim()
+      // If there's text before the opening brace, trim it
+      const braceIdx = fenceStripped.indexOf('{')
+      return braceIdx > 0 ? fenceStripped.slice(braceIdx) : fenceStripped
+    }
     let parsed: any = {}
+    let parseOk = false
     try {
       const raw = (msg.content[0] as any).text.trim()
-      parsed = JSON.parse(raw.replace(/^```json?\n?/, '').replace(/\n?```$/, ''))
+      parsed = JSON.parse(stripToJson(raw))
+      parseOk = true
     } catch {
-      parsed = { summary: meetingNotes.slice(0, 200), conversionScore: 50, conversionInsights: [], risks: [], todos: [], productGaps: [] }
+      // JSON parsing failed — don't corrupt existing fields with raw text
+      parsed = { summary: null, conversionScore: null, conversionInsights: null, risks: [], todos: [], productGaps: [] }
     }
     const newTodos = (parsed.todos ?? []).map((t: any) => ({ id: crypto.randomUUID(), text: t.text, done: false, createdAt: new Date().toISOString() }))
     const obsoleteIds = new Set<string>(parsed.obsoleteTodoIds ?? [])
@@ -99,7 +109,9 @@ IMPORTANT — productGaps rules:
     // Store compact takeaways (not raw notes) to keep history token-efficient across many meetings
     const risksLine = (parsed.risks ?? []).length > 0 ? ` Risks: ${(parsed.risks as string[]).join('; ')}.` : ''
     const actionLine = newTodos.length > 0 ? ` Actions: ${newTodos.map((t: any) => t.text).join('; ')}.` : ''
-    const compactEntry = `[${dateStamp}] ${parsed.summary ?? meetingNotes.slice(0, 150)}${risksLine}${actionLine}`
+    const compactEntry = parsed.summary
+      ? `[${dateStamp}] ${parsed.summary}${risksLine}${actionLine}`
+      : `[${dateStamp}] Meeting notes processed (analysis unavailable)${actionLine}`
     const appendedNotes = deal.meetingNotes
       ? `${deal.meetingNotes}\n${compactEntry}`
       : compactEntry
@@ -109,12 +121,18 @@ IMPORTANT — productGaps rules:
     const existingKeys = new Set(existingKept.map((t: any) => normalize(t.text)))
     const dedupedNew = newTodos.filter((t: any) => !existingKeys.has(normalize(t.text)))
     const mergedTodos = [...existingKept, ...dedupedNew]
-    const [updatedDeal] = await db.update(dealLogs).set({
-      meetingNotes: appendedNotes, aiSummary: parsed.summary, conversionScore: parsed.conversionScore,
-      conversionInsights: parsed.conversionInsights ?? [],
+    // Only overwrite aiSummary/conversionScore/insights if parse succeeded — never corrupt with raw text or nulls
+    const updateFields: Record<string, unknown> = {
+      meetingNotes: appendedNotes,
       dealRisks: parsed.risks ?? [],
-      todos: mergedTodos, updatedAt: new Date(),
-    }).where(eq(dealLogs.id, id)).returning()
+      todos: mergedTodos,
+      updatedAt: new Date(),
+    }
+    if (parseOk && parsed.summary) updateFields.aiSummary = parsed.summary
+    if (parseOk && parsed.conversionScore != null) updateFields.conversionScore = parsed.conversionScore
+    if (parseOk && parsed.conversionInsights != null) updateFields.conversionInsights = parsed.conversionInsights
+
+    const [updatedDeal] = await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, id)).returning()
     const createdGaps = []
     for (const gap of (parsed.productGaps ?? [])) {
       if (!gap.title) continue
