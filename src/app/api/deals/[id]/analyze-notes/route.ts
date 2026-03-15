@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
@@ -22,7 +23,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params
     const { meetingNotes } = await req.json()
     if (!meetingNotes?.trim()) return NextResponse.json({ error: 'No meeting notes provided' }, { status: 400 })
-    const [deal] = await db.select().from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
+    // Selective columns only — avoids SELECT * failing on any schema col that hasn't been migrated yet
+    const [deal] = await db.select({
+      id: dealLogs.id,
+      dealName: dealLogs.dealName,
+      prospectCompany: dealLogs.prospectCompany,
+      dealValue: dealLogs.dealValue,
+      stage: dealLogs.stage,
+      todos: dealLogs.todos,
+      aiSummary: dealLogs.aiSummary,
+      dealRisks: dealLogs.dealRisks,
+      meetingNotes: dealLogs.meetingNotes,
+    }).from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     // Fetch known capabilities so AI doesn't re-flag confirmed product features as gaps
@@ -169,5 +181,8 @@ IMPORTANT — productGaps rules:
     })
 
     return NextResponse.json({ data: { deal: updatedDeal, productGaps: createdGaps, parsed } })
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+  } catch (e: any) {
+    console.error('[analyze-notes] 500:', e?.message, e?.stack?.split('\n')[1])
+    return NextResponse.json({ error: e?.message ?? 'Unknown error' }, { status: 500 })
+  }
 }

@@ -1,3 +1,4 @@
+import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { and, eq, sql } from 'drizzle-orm'
@@ -5,6 +6,7 @@ import { db } from '@/lib/db'
 import { dealLogs, events } from '@/lib/db/schema'
 import { dbErrResponse } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
+import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
 
 async function logEvent(workspaceId: string, userId: string, type: string, metadata: Record<string, unknown>) {
   await db.insert(events).values({ workspaceId, userId, type, metadata, createdAt: new Date() })
@@ -52,6 +54,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     for (const f of fields) if (body[f] !== undefined) updateData[f] = body[f]
     const [updated] = await db.update(dealLogs).set(updateData).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).returning()
     await logEvent(workspaceId, userId, 'deal_log.updated', { dealLogId: id, dealName: updated.dealName })
+    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     return NextResponse.json({ data: updated })
   } catch (err) { return dbErrResponse(err) }
 }
@@ -66,6 +69,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     await db.delete(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId)))
     await logEvent(workspaceId, userId, 'deal_log.updated', { dealLogId: id, dealName: existing.dealName, action: 'deleted' })
+    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     return NextResponse.json({ data: { deleted: true } })
   } catch (err) { return dbErrResponse(err) }
 }

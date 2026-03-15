@@ -284,7 +284,11 @@ matchedDealId must be one of the IDs above (or null). Stage values: prospecting|
   const dealChanges: string[] = []
 
   if (parsed.matchedDealId) {
-    const [existingDeal] = await db.select().from(dealLogs)
+    const [existingDeal] = await db.select({
+      id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
+      stage: dealLogs.stage, todos: dealLogs.todos, notes: dealLogs.notes,
+      dealValue: dealLogs.dealValue,
+    }).from(dealLogs)
       .where(and(eq(dealLogs.id, parsed.matchedDealId), eq(dealLogs.workspaceId, workspaceId))).limit(1)
 
     if (existingDeal) {
@@ -390,7 +394,8 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
   if (!parsed.matchedDealId && openDeals.length > 0) reply += `\n\n_Tip: I couldn't match these notes to a deal. Paste notes on the deal page for a precise match._`
   else if (!parsed.matchedDealId) reply += `\n\n_No open deals found. Log a deal first, then I can link meeting notes to it._`
 
-  // Background: extract Q&A to knowledge base
+  // Background: rebuild workspace brain + extract Q&A to knowledge base
+  after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
   after(async () => {
     try {
       const qaMsg = await anthropic.messages.create({
@@ -738,6 +743,7 @@ Text: ${text.slice(0, 3000)}`,
   }).returning()
 
   await db.insert(events).values({ workspaceId, userId, type: 'deal_log.created', metadata: { dealId: deal.id, dealName: deal.dealName, source: 'ai_chat' }, createdAt: now })
+  after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
 
   return {
     reply: `Created deal **${deal.dealName}** at **${deal.prospectCompany}**${deal.dealValue ? ` ($${deal.dealValue.toLocaleString()})` : ''}. Stage: **${deal.stage}**.\n\nView and edit it in [Deal Log](/deals/${deal.id}).`,
@@ -807,7 +813,12 @@ Text: ${text.slice(0, 4000)}`,
 async function handleDealAction(
   workspaceId: string, userId: string, text: string,
 ): Promise<{ reply: string; actions: ActionCard[] }> {
-  const dealRows = await db.select().from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId))
+  // Selective columns — avoids SELECT * failing if any new schema col hasn't been DB-migrated yet
+  const dealRows = await db.select({
+    id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
+    stage: dealLogs.stage, todos: dealLogs.todos, notes: dealLogs.notes, meetingNotes: dealLogs.meetingNotes,
+    dealValue: dealLogs.dealValue,
+  }).from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId))
   if (dealRows.length === 0) {
     return { reply: 'No deals found in your workspace.', actions: [] }
   }
@@ -861,6 +872,7 @@ Match the deal by name/company. If no clear deal match, return dealId: null.`,
   if (identified.action === 'update_stage' && identified.stageValue) {
     await db.update(dealLogs).set({ stage: identified.stageValue as 'prospecting' | 'qualification' | 'discovery' | 'proposal' | 'negotiation' | 'closed_won' | 'closed_lost', updatedAt: new Date() }).where(eq(dealLogs.id, deal.id))
     await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'stage', value: identified.stageValue, source: 'ai_chat' }, createdAt: new Date() })
+    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     return {
       reply: `Updated **${deal.dealName}** stage to **${identified.stageValue}**.`,
       actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: [`stage → ${identified.stageValue}`] }],
@@ -870,6 +882,7 @@ Match the deal by name/company. If no clear deal match, return dealId: null.`,
   if (identified.action === 'update_value' && identified.valueInDollars != null) {
     await db.update(dealLogs).set({ dealValue: identified.valueInDollars, updatedAt: new Date() }).where(eq(dealLogs.id, deal.id))
     await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'dealValue', value: identified.valueInDollars, source: 'ai_chat' }, createdAt: new Date() })
+    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     return {
       reply: `Updated **${deal.dealName}** deal value to **$${identified.valueInDollars.toLocaleString()}**.`,
       actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: [`value → $${identified.valueInDollars.toLocaleString()}`] }],
@@ -880,6 +893,7 @@ Match the deal by name/company. If no clear deal match, return dealId: null.`,
     const newNotes = ((deal.notes ?? '') + '\n\n' + identified.notesText).trim()
     await db.update(dealLogs).set({ notes: newNotes, updatedAt: new Date() }).where(eq(dealLogs.id, deal.id))
     await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'notes', source: 'ai_chat' }, createdAt: new Date() })
+    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     return {
       reply: `Added notes to **${deal.dealName}**.`,
       actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: ['notes updated'] }],
@@ -911,8 +925,8 @@ Match the deal by name/company. If no clear deal match, return dealId: null.`,
   })()
 
   const decideMsg = await anthropic.messages.create({
-    // Sonnet for todo review — needs to reason across full meeting history
-    model: 'claude-sonnet-4-5-20251022', max_tokens: 1000,
+    // Haiku with 1000 tokens handles todo review fine — structured input, small JSON output
+    model: 'claude-haiku-4-5-20251001', max_tokens: 1000,
     messages: [{
       role: 'user',
       content: `User request: "${text}"
@@ -952,6 +966,7 @@ Be conservative — only remove todos that are clearly stale, already handled, o
     metadata: { dealId: deal.id, removed: decisions.remove.length, completed: decisions.complete.length, source: 'ai_chat' },
     createdAt: new Date(),
   })
+  after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
 
   const removed = decisions.remove.length
   const completed = decisions.complete.length
@@ -1033,7 +1048,11 @@ export async function POST(req: NextRequest) {
       db.select().from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)).limit(1),
       db.select().from(competitors).where(eq(competitors.workspaceId, workspaceId)),
       db.select().from(caseStudies).where(eq(caseStudies.workspaceId, workspaceId)),
-      db.select().from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)).limit(20),
+      db.select({
+        id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
+        stage: dealLogs.stage, todos: dealLogs.todos, notes: dealLogs.notes, meetingNotes: dealLogs.meetingNotes,
+        dealValue: dealLogs.dealValue,
+      }).from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)).limit(20),
       db.select().from(productGaps).where(eq(productGaps.workspaceId, workspaceId)).limit(20),
       getWorkspaceBrain(workspaceId),
     ])

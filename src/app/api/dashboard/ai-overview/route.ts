@@ -114,7 +114,8 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
   const brainContext = brain ? `\n\nDEAL INTELLIGENCE (from meeting analysis):\n${formatBrainContext(brain)}` : ''
 
   const msg = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5-20251022',
+    // Haiku is sufficient here — input is well-structured pipeline data, output is a small JSON object
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 1200,
     system: `You are a senior sales strategist reviewing a sales team's pipeline. Analyse the data and respond with ONLY a JSON object — no markdown, no explanation — with these exact keys:
 - "summary": string — 2–3 sentences summarising pipeline health and outlook, using specific numbers (deals, values, win rate). Be direct and honest.
