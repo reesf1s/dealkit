@@ -60,6 +60,9 @@ const COLLATERAL_TYPES: { keyword: string; type: CollateralType }[] = [
   { keyword: 'talk track', type: 'talk_track' },
   { keyword: 'email sequence', type: 'email_sequence' },
   { keyword: 'email follow-up', type: 'email_sequence' },
+  { keyword: 'follow-up email', type: 'email_sequence' },
+  { keyword: 'followup email', type: 'email_sequence' },
+  { keyword: 'follow up email', type: 'email_sequence' },
   { keyword: 'case study doc', type: 'case_study_doc' },
 ]
 
@@ -119,8 +122,10 @@ const DEAL_ACTION_PATTERNS = [
   // deal field updates via chat (stage, value, notes on a named deal)
   /update.*deal/i, /change.*stage/i, /move.*deal/i, /mark.*deal/i,
   /deal.*stage/i, /set.*stage/i,
-  // generic "in the X deal" action phrases
+  // generic "in/for/on the/this X deal" action phrases
   /in the .+ deal/i, /for the .+ deal/i, /on the .+ deal/i,
+  /in this .+ deal/i, /for this .+ deal/i, /on this .+ deal/i,
+  /in this deal/i, /for this deal/i, /on this deal/i,
 ]
 
 type Intent = 'meeting_notes' | 'competitor_battlecard' | 'company_update' |
@@ -132,7 +137,7 @@ function detectIntent(text: string): Intent {
   if (BATTLECARD_PATTERNS.some(p => p.test(text))) return 'competitor_battlecard'
   // Product gap must be checked BEFORE company_update (pattern overlap)
   if (PRODUCT_GAP_PATTERNS.some(p => p.test(text))) return 'product_gap'
-  const hasGenerateVerb = /\b(generate|create|make|write|build)\b/.test(lower)
+  const hasGenerateVerb = /\b(generate|create|make|write|build|draft)\b/.test(lower)
   if (hasGenerateVerb && COLLATERAL_TYPES.some(c => lower.includes(c.keyword))) return 'collateral_generate'
   // deal_action BEFORE company_update — "review BOE to-do's" must not be mistaken for a profile update
   if (DEAL_ACTION_PATTERNS.some(p => p.test(text))) return 'deal_action'
@@ -715,24 +720,55 @@ async function handleCollateralGeneration(
     if (roleMatch) buyerRole = roleMatch[2].trim()
   }
 
+  // Try to match a deal by name/company so we can inject deal context
+  let dealContext: string | undefined
+  let sourceDealLogId: string | null = null
+  const dealRows = await db.select({
+    id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
+    stage: dealLogs.stage, dealRisks: dealLogs.dealRisks, aiSummary: dealLogs.aiSummary,
+    dealValue: dealLogs.dealValue, competitors: dealLogs.competitors,
+  }).from(dealLogs).where(and(eq(dealLogs.workspaceId, workspaceId), sql`${dealLogs.stage} NOT IN ('closed_won', 'closed_lost')`)).limit(20)
+
+  const lowerText = text.toLowerCase()
+  const matchedDeal = dealRows.find(d =>
+    lowerText.includes(d.dealName.toLowerCase()) || lowerText.includes(d.prospectCompany.toLowerCase())
+  )
+  if (matchedDeal) {
+    sourceDealLogId = matchedDeal.id
+    const risks = (matchedDeal.dealRisks as string[]) ?? []
+    const comps = (matchedDeal.competitors as string[]) ?? []
+    dealContext = [
+      `Prospect: ${matchedDeal.prospectCompany}`,
+      `Stage: ${matchedDeal.stage?.replace(/_/g, ' ')}`,
+      comps.length ? `Competitors: ${comps.join(', ')}` : '',
+      matchedDeal.aiSummary ? `Deal summary: ${matchedDeal.aiSummary}` : '',
+      risks.length ? `Active risks: ${risks.join('; ')}` : '',
+      matchedDeal.dealValue ? `Deal value: $${matchedDeal.dealValue.toLocaleString()}` : '',
+    ].filter(Boolean).join('\n')
+  }
+
+  // Include custom prompt from user text
+  const customPrompt = text.length > 30 ? text : undefined
+
   const typeLabel: Record<CollateralType, string> = {
     battlecard: 'Battlecard', case_study_doc: 'Case Study Doc', one_pager: 'One-Pager',
     objection_handler: 'Objection Handler', talk_track: 'Talk Track', email_sequence: 'Email Sequence',
   }
-  const title = buyerRole ? `${typeLabel[match.type]} — ${buyerRole}` : typeLabel[match.type]
+  const dealSuffix = matchedDeal ? ` — ${matchedDeal.prospectCompany}` : ''
+  const title = buyerRole ? `${typeLabel[match.type]} — ${buyerRole}${dealSuffix}` : `${typeLabel[match.type]}${dealSuffix}`
   const now = new Date()
 
   const [record] = await db.insert(collateral).values({
     workspaceId, userId, type: match.type,
     title: `Generating ${title}…`, status: 'generating',
-    sourceCompetitorId: null, sourceCaseStudyId: null, sourceDealLogId: null,
+    sourceCompetitorId: null, sourceCaseStudyId: null, sourceDealLogId,
     content: null, rawResponse: null, generatedAt: null, createdAt: now, updatedAt: now,
   }).returning()
 
   const colId = record.id
   const colType = match.type
   try {
-    const result = await generateCollateral({ workspaceId, type: colType, buyerRole })
+    const result = await generateCollateral({ workspaceId, type: colType, buyerRole, dealContext, customPrompt })
     const generatedAt = new Date()
     await db.update(collateral)
       .set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt })
