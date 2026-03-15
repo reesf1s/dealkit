@@ -57,7 +57,7 @@ async function callClaude(
   const attempt = async () => {
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2048,
+      max_tokens: 4096,
       temperature,
       system,
       messages,
@@ -81,12 +81,40 @@ async function callClaude(
 }
 
 function extractJson(raw: string): unknown {
-  // Strip markdown code fences if present
-  const cleaned = raw
-    .replace(/^```(?:json)?\s*/i, '')
-    .replace(/\s*```$/i, '')
-    .trim()
-  return JSON.parse(cleaned)
+  // Strip markdown code fences if present (handles partial/truncated responses too)
+  let cleaned = raw.trim()
+  // Remove opening fence
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '')
+  // Remove closing fence (may be absent if response was truncated)
+  cleaned = cleaned.replace(/\s*```\s*$/i, '')
+  cleaned = cleaned.trim()
+
+  // If JSON is incomplete (truncated by max_tokens), try to repair by closing open braces/brackets
+  try {
+    return JSON.parse(cleaned)
+  } catch {
+    // Attempt repair: count open vs close braces and brackets
+    let openBraces = 0, openBrackets = 0
+    let inString = false, escaped = false
+    for (const ch of cleaned) {
+      if (escaped) { escaped = false; continue }
+      if (ch === '\\' && inString) { escaped = true; continue }
+      if (ch === '"') { inString = !inString; continue }
+      if (inString) continue
+      if (ch === '{') openBraces++
+      if (ch === '}') openBraces--
+      if (ch === '[') openBrackets++
+      if (ch === ']') openBrackets--
+    }
+    // Close any unclosed strings, then brackets/braces
+    let repaired = cleaned
+    if (inString) repaired += '"'
+    // Trim trailing comma
+    repaired = repaired.replace(/,\s*$/, '')
+    for (let i = 0; i < openBrackets; i++) repaired += ']'
+    for (let i = 0; i < openBraces; i++) repaired += '}'
+    return JSON.parse(repaired)
+  }
 }
 
 async function generateAndValidate<T>(
@@ -248,7 +276,11 @@ export async function generateCollateral(
     buildWorkspaceContext(workspaceId),
   ])
   // Brain gives conversion scores, AI summaries, risks, patterns, urgency — much richer than lightContext
-  const workspaceContext = brain ? formatBrainContext(brain) : lightContext
+  let workspaceContext = lightContext
+  if (brain) {
+    try { workspaceContext = formatBrainContext(brain) }
+    catch { /* non-fatal: use light context as fallback */ }
+  }
 
   // ─── BATTLECARD ─────────────────────────────────────────────────────────────
   if (type === 'battlecard') {
