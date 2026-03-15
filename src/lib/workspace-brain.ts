@@ -281,9 +281,7 @@ export function formatBrainContext(brain: WorkspaceBrain): string {
   if (brain.keyPatterns.length > 0) {
     lines.push(`\nRECURRING PATTERNS:`)
     for (const p of brain.keyPatterns) {
-      const label = typeof p === 'string' ? p : p.label
-      const companies = typeof p === 'string' ? [] : p.companies
-      lines.push(`• ${label}${companies.length > 0 ? ` — ${companies.slice(0, 3).join(', ')}${companies.length > 3 ? ` +${companies.length - 3} more` : ''}` : ''}`)
+      lines.push(`• ${p.label}${p.companies.length > 0 ? ` — ${p.companies.slice(0, 3).join(', ')}${p.companies.length > 3 ? ` +${p.companies.length - 3} more` : ''}` : ''}`)
     }
   }
 
