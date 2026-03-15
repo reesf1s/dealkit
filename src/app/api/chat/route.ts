@@ -995,7 +995,7 @@ export async function POST(req: NextRequest) {
     const rl = await checkRateLimit(userId, 'chat', 20)
     if (!rl.allowed) return rateLimitResponse(rl.resetAt)
     const { workspaceId, plan } = await getWorkspaceContext(userId)
-    const { messages, activeDealId } = await req.json()
+    const { messages, activeDealId, currentPage } = await req.json()
     if (!messages?.length) return NextResponse.json({ error: 'messages required' }, { status: 400 })
 
     const lastUserMsg = [...messages].reverse().find((m: { role: string }) => m.role === 'user')
@@ -1109,9 +1109,10 @@ export async function POST(req: NextRequest) {
         ? `\n\n## CURRENTLY VIEWING: ${activeDealRow.prospectCompany}\nDeal: "${activeDealRow.dealName}" | Stage: ${activeDealRow.stage}\nWhen "this deal" / "this company" = ${activeDealRow.prospectCompany}.`
         : ''
 
+    const pageContext = currentPage ? `\nUser is currently on: ${currentPage}` : ''
     const systemPrompt = `You are DealKit AI — the single brain for this sales team. Be direct, specific, concise. UK English.
 
-RULES: Short answers. No filler. Bold deal names. Bullet lists. Max 3–5 sentences for simple questions. Reference specific deals/contacts.
+RULES: Short answers. No filler. Bold deal names. Bullet lists. Max 3–5 sentences for simple questions. Reference specific deals/contacts.${pageContext}
 
 Actions I can take (just tell me):
 • Paste meeting notes → update todos & deals

@@ -11,6 +11,10 @@ export async function GET() {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    // Export all workspace data (not just user's own rows) for full data portability
+    const { getWorkspaceContext } = await import('@/lib/workspace')
+    const { workspaceId } = await getWorkspaceContext(userId)
+
     const [
       userRows,
       profileRows,
@@ -22,13 +26,13 @@ export async function GET() {
       gapRows,
     ] = await Promise.all([
       db.select().from(users).where(eq(users.id, userId)).limit(1),
-      db.select().from(companyProfiles).where(eq(companyProfiles.userId, userId)),
-      db.select().from(competitors).where(eq(competitors.userId, userId)),
-      db.select().from(caseStudies).where(eq(caseStudies.userId, userId)),
-      db.select().from(dealLogs).where(eq(dealLogs.userId, userId)),
-      db.select().from(collateral).where(eq(collateral.userId, userId)),
+      db.select().from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)),
+      db.select().from(competitors).where(eq(competitors.workspaceId, workspaceId)),
+      db.select().from(caseStudies).where(eq(caseStudies.workspaceId, workspaceId)),
+      db.select().from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)),
+      db.select().from(collateral).where(eq(collateral.workspaceId, workspaceId)),
       db.select().from(events).where(eq(events.userId, userId)),
-      db.select().from(productGaps).where(eq(productGaps.userId, userId)),
+      db.select().from(productGaps).where(eq(productGaps.workspaceId, workspaceId)),
     ])
 
     const exportData = {
