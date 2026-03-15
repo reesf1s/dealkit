@@ -19,6 +19,7 @@ import {
   emailSequencePrompt,
 } from './prompts'
 import { buildWorkspaceContext } from './context'
+import { getWorkspaceBrain, formatBrainContext } from '../workspace-brain'
 import type { CollateralType, CollateralContent, CompanyProfile, Product, DealLog, CaseStudy } from '@/types'
 import type { ZodSchema } from 'zod'
 
@@ -239,11 +240,15 @@ export async function generateCollateral(
   }
 
   // 2. Fetch all entity data + workspace context in parallel
-  const [allDeals, allCaseStudies, workspaceContext] = await Promise.all([
+  // Prefer the pre-built brain (rich intelligence) — fall back to lightweight buildWorkspaceContext
+  const [allDeals, allCaseStudies, brain, lightContext] = await Promise.all([
     db.select().from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)),
     db.select().from(caseStudies).where(eq(caseStudies.workspaceId, workspaceId)),
+    getWorkspaceBrain(workspaceId),
     buildWorkspaceContext(workspaceId),
   ])
+  // Brain gives conversion scores, AI summaries, risks, patterns, urgency — much richer than lightContext
+  const workspaceContext = brain ? formatBrainContext(brain) : lightContext
 
   // ─── BATTLECARD ─────────────────────────────────────────────────────────────
   if (type === 'battlecard') {
