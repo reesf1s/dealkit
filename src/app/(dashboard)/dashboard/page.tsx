@@ -200,14 +200,14 @@ export default function DashboardPage() {
           >
             <Plus size={11} /> Log Deal
           </Link>
-          <Link href="/collateral" style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', background: '#6366F1', border: '1px solid rgba(99,102,241,0.6)', borderRadius: '7px', color: '#fff', fontSize: '12px', fontWeight: '600', textDecoration: 'none' }}>
+          <Link href="/collateral" style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', border: '1px solid rgba(99,102,241,0.4)', borderRadius: '7px', color: '#fff', fontSize: '12px', fontWeight: '600', textDecoration: 'none', boxShadow: '0 0 16px rgba(99,102,241,0.3)' }}>
             <Sparkles size={11} /> Generate
           </Link>
         </div>
       </div>
 
       {/* Stats strip */}
-      <div style={{ display: 'flex', background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
         {[
           { label: 'Open Deals', value: openDeals },
           { label: 'Deals Won', value: wonDeals },
@@ -319,7 +319,7 @@ export default function DashboardPage() {
 
       {/* Setup progress banner — shown until all steps complete */}
       {healthPct < 100 && !dbNotConnected && (
-        <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+        <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1' }} />
             <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Setup</span>
@@ -355,7 +355,7 @@ export default function DashboardPage() {
       {smartNudges.length > 0 && !dbNotConnected && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {smartNudges.slice(0, 2).map((nudge, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderLeft: `2px solid ${nudge.color}`, borderRadius: '8px' }}>
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderLeft: `2px solid ${nudge.color}`, borderRadius: '8px' }}>
               <span style={{ fontSize: '14px', flexShrink: 0 }}>{nudge.icon}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ fontSize: '12px', color: '#D1D5DB', lineHeight: '1.5' }}>{nudge.message}</span>
@@ -371,7 +371,7 @@ export default function DashboardPage() {
       {/* Alerts */}
       {dbNotConnected && <SetupAlert />}
       {staleItems.length > 0 && (
-        <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderLeft: '2px solid #EAB308', borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderLeft: '2px solid #EAB308', borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <AlertTriangle size={13} color="#EAB308" />
             <span style={{ fontSize: '13px', color: '#F0EEFF' }}>
@@ -391,7 +391,7 @@ export default function DashboardPage() {
         const href = alert.type === 'recurring_risk' ? '/product-gaps' : '/collateral'
         const cta = alert.type === 'recurring_risk' ? 'View gaps' : 'Update battlecard'
         return (
-          <div key={i} style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderLeft: `2px solid ${color}`, borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <div key={i} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderLeft: `2px solid ${color}`, borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
               <AlertTriangle size={13} color={color} style={{ flexShrink: 0 }} />
               <span style={{ fontSize: '13px', color: '#F0EEFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{alert.message}</span>
@@ -417,7 +417,7 @@ export default function DashboardPage() {
 
       {/* Priority actions — sorted by deal stage */}
       {urgentTodos.length > 0 && (
-        <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+        <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1' }} />
             <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Priority Actions</span>
@@ -459,7 +459,7 @@ export default function DashboardPage() {
 
         {/* Left: Collateral Library + Roadmap */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1' }} />
               <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Recent Collateral</span>
@@ -515,7 +515,7 @@ export default function DashboardPage() {
 
           {/* Roadmap — Now / Next / Later */}
           {(roadmapNow.length > 0 || roadmapNext.length > 0 || roadmapLater.length > 0) && (
-            <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1' }} />
                 <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Product Roadmap</span>
@@ -569,7 +569,7 @@ export default function DashboardPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
           {/* AI Setup health */}
-          <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: healthPct === 100 ? '#22C55E' : '#6366F1' }} />
               <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>AI Setup</span>
@@ -592,7 +592,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Sales Brain */}
-          <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#8B5CF6' }} />
               <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Knowledge Base</span>
@@ -621,7 +621,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Team */}
-          <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '14px' }}>
+          <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
               <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em', flex: 1 }}>Team</span>
               <Link href="/settings" style={{ fontSize: '11px', color: '#374151', textDecoration: 'none' }}>Settings →</Link>
@@ -652,7 +652,7 @@ export default function DashboardPage() {
 
       {/* Value chain explainer — shown for early-stage users */}
       {dealCount < 5 && !dbNotConnected && (
-        <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+        <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
             <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1' }} />
             <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>How DealKit Works</span>

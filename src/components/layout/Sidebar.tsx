@@ -32,7 +32,7 @@ export default function Sidebar() {
   const { signOut } = useClerk()
   const { user } = useUser()
   const { collapsed, mobileOpen, toggleCollapsed, closeMobile } = useSidebar()
-  const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false, revalidateOnReconnect: false, dedupingInterval: 120000 })
+  const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false, dedupingInterval: 30000 })
   const brain = brainRes?.data
   const urgentCount = brain?.urgentDeals?.length ?? 0
   const staleCount = brain?.staleDeals?.length ?? 0

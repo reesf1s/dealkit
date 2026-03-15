@@ -8,10 +8,13 @@ import { useSidebar } from './SidebarContext'
 import type { ActionCard } from '@/app/api/chat/route'
 
 function invalidateCaches(actions: ActionCard[]) {
+  // Every action rebuilds the brain in the background — revalidate brain cache after a short delay
+  // so sidebar badges and dashboard Pipeline Focus update
+  setTimeout(() => globalMutate('/api/brain'), 2000)
+
   for (const action of actions) {
     if (action.type === 'todos_updated' || action.type === 'deal_updated' || action.type === 'deal_created') {
       globalMutate('/api/deals')
-      // Revalidate any individual deal SWR keys (e.g. /api/deals/uuid)
       globalMutate((key: unknown) => typeof key === 'string' && key.startsWith('/api/deals/'), undefined, { revalidate: true })
     }
     if (action.type === 'competitor_created') {

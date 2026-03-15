@@ -1043,96 +1043,90 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result)
     }
 
-    // ── Q&A: load full workspace context ─────────────────────────────────────
-    const [profileRows, competitorRows, caseStudyRows, dealRows, gapRows, brain] = await Promise.all([
+    // ── Q&A: brain-first context (lean queries, no duplication) ────────────────
+    // The brain already contains deal snapshots, risks, todos, patterns.
+    // We only need: company profile, competitors (compact), case studies (compact), and gaps (compact).
+    // If brain exists, skip the heavy per-deal DB fan-out.
+    const [profileRows, competitorRows, caseStudyRows, brain] = await Promise.all([
       db.select().from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)).limit(1),
-      db.select().from(competitors).where(eq(competitors.workspaceId, workspaceId)),
-      db.select().from(caseStudies).where(eq(caseStudies.workspaceId, workspaceId)),
-      db.select({
-        id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
-        stage: dealLogs.stage, todos: dealLogs.todos, notes: dealLogs.notes, meetingNotes: dealLogs.meetingNotes,
-        dealValue: dealLogs.dealValue,
-      }).from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)).limit(20),
-      db.select().from(productGaps).where(eq(productGaps.workspaceId, workspaceId)).limit(20),
+      db.select({ name: competitors.name, strengths: competitors.strengths, weaknesses: competitors.weaknesses })
+        .from(competitors).where(eq(competitors.workspaceId, workspaceId)).limit(8),
+      db.select({ customerName: caseStudies.customerName, challenge: caseStudies.challenge, results: caseStudies.results })
+        .from(caseStudies).where(eq(caseStudies.workspaceId, workspaceId)).limit(5),
       getWorkspaceBrain(workspaceId),
     ])
+
+    // Only fetch deal rows + gaps if brain is missing (cold start fallback)
+    const needDealFallback = !brain
+    const [dealRows, gapRows] = needDealFallback
+      ? await Promise.all([
+          db.select({
+            id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
+            stage: dealLogs.stage, todos: dealLogs.todos, dealValue: dealLogs.dealValue,
+          }).from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)).limit(12),
+          db.select({ title: productGaps.title, priority: productGaps.priority, status: productGaps.status })
+            .from(productGaps).where(eq(productGaps.workspaceId, workspaceId)).limit(10),
+        ])
+      : [[], []]
 
     const profile = profileRows[0]
     const kbParts: string[] = []
     if (profile) {
-      const knownCaps = (profile.knownCapabilities as string[]) ?? []
-      kbParts.push(`## Company: ${profile.companyName}\nIndustry: ${profile.industry ?? 'unknown'}\nDescription: ${profile.description ?? 'none'}\nTarget market: ${profile.targetMarket ?? 'none'}\nValue props: ${(profile.valuePropositions as string[]).join(', ')}\nDifferentiators: ${(profile.differentiators as string[]).join(', ')}\nCommon objections: ${(profile.commonObjections as string[]).join('; ')}${knownCaps.length > 0 ? `\nConfirmed capabilities: ${knownCaps.join('; ')}` : ''}`)
+      kbParts.push(`## Company: ${profile.companyName}\nValue props: ${((profile.valuePropositions as string[]) ?? []).slice(0, 4).join(', ')}\nDifferentiators: ${((profile.differentiators as string[]) ?? []).slice(0, 3).join(', ')}\nObjections: ${((profile.commonObjections as string[]) ?? []).slice(0, 3).join('; ')}`)
     }
     if (competitorRows.length > 0) {
-      kbParts.push(`## Competitors (${competitorRows.length})`)
-      competitorRows.forEach(c => kbParts.push(`- ${c.name}: ${c.description ?? ''}. Strengths: ${(c.strengths as string[]).join(', ')}. Weaknesses: ${(c.weaknesses as string[]).join(', ')}`))
+      kbParts.push(`## Competitors: ${competitorRows.map(c => `${c.name} (weaknesses: ${((c.weaknesses as string[]) ?? []).slice(0, 2).join(', ')})`).join(' | ')}`)
     }
     if (caseStudyRows.length > 0) {
-      kbParts.push(`## Case Studies`)
-      caseStudyRows.forEach(cs => kbParts.push(`- ${cs.customerName}: ${cs.challenge.slice(0, 80)} → ${cs.results.slice(0, 80)}`))
-    }
-    if (dealRows.length > 0) {
-      const won = dealRows.filter(d => d.stage === 'closed_won').length
-      const lost = dealRows.filter(d => d.stage === 'closed_lost').length
-      const open = dealRows.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
-      kbParts.push(`## Deals — ${won} won, ${lost} lost, ${open.length} open`)
-      open.slice(0, 10).forEach(d => {
-        const pending = ((d.todos as { text: string; done: boolean }[]) ?? []).filter(t => !t.done)
-        const todoText = pending.length > 0
-          ? `Todos: ${pending.map(t => `• ${t.text}`).join(', ')}`
-          : 'No pending todos'
-        // Use compact meeting history (takeaways) if available, else fall back to notes
-        const historySource = d.meetingNotes || d.notes || ''
-        const notesEntries = historySource.split('\n').filter((l: string) => l.startsWith('[')).slice(-3).join(' | ')
-        const notesCtx = notesEntries ? ` History: ${notesEntries}` : ''
-        kbParts.push(`- "${d.dealName}" at ${d.prospectCompany} (${d.stage}): $${d.dealValue ? d.dealValue.toLocaleString() : '?'}. ${todoText}.${notesCtx}`)
-      })
-    }
-    if (gapRows.length > 0) {
-      kbParts.push(`## Product Gaps`)
-      gapRows.forEach(g => kbParts.push(`- ${g.title} [${g.priority}/${g.status}] freq:${g.frequency}: ${g.description.slice(0, 80)}`))
+      kbParts.push(`## Case Studies: ${caseStudyRows.map(cs => `${cs.customerName}: ${(cs.challenge ?? '').slice(0, 50)}`).join(' | ')}`)
     }
 
-    // Add workspace brain as rich pipeline intelligence on top of the per-feature KB
+    // Brain-first: if brain exists, it IS the deal/pipeline context (no duplication)
     let brainSection = ''
     if (brain) {
-      try { brainSection = `\n\n## Live Pipeline Intelligence (Workspace Brain)\n${formatBrainContext(brain)}` }
-      catch { /* non-fatal: stale/corrupt brain snapshot — skip intelligence section */ }
+      try { brainSection = `\n\n## Pipeline Intelligence\n${formatBrainContext(brain)}` }
+      catch { /* non-fatal */ }
+    } else if (dealRows.length > 0) {
+      // Fallback: no brain yet, use raw deal data (compact)
+      const open = dealRows.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+      kbParts.push(`## ${open.length} open deals`)
+      open.slice(0, 8).forEach(d => {
+        const pending = ((d.todos as { text: string; done: boolean }[]) ?? []).filter(t => !t.done)
+        kbParts.push(`- ${d.dealName} (${d.prospectCompany}) ${d.stage}${d.dealValue ? ` £${d.dealValue.toLocaleString()}` : ''}${pending.length > 0 ? ` — ${pending.length} todos` : ''}`)
+      })
+    }
+    if (!brain && gapRows.length > 0) {
+      kbParts.push(`## Gaps: ${gapRows.map(g => `${g.title} [${g.priority}]`).join(', ')}`)
     }
 
-    // If the user is viewing a specific deal, surface it as focused context at the top of the prompt
-    const activeDeal = activeDealId ? dealRows.find(d => d.id === activeDealId) : null
-    const activeDealSection = activeDeal ? (() => {
-      const pending = ((activeDeal.todos as { text: string; done: boolean }[]) ?? []).filter(t => !t.done)
-      const historySource = activeDeal.meetingNotes || activeDeal.notes || ''
-      const recentHistory = historySource.split('\n').filter((l: string) => l.startsWith('[')).slice(-5).join('\n')
-      return `\n\n## CURRENTLY VIEWING: ${activeDeal.prospectCompany}\nDeal: "${activeDeal.dealName}" | Stage: ${activeDeal.stage} | Value: $${activeDeal.dealValue?.toLocaleString() ?? '?'}\nPending actions: ${pending.length > 0 ? pending.map(t => `• ${t.text}`).join(', ') : 'none'}\n${recentHistory ? `Recent history:\n${recentHistory}` : ''}\nWhen the user asks about "this deal", "this company", or similar — they mean ${activeDeal.prospectCompany}.`
-    })() : ''
+    // Active deal focus — pull from brain snapshot if available, else from dealRows
+    const brainDeals = brain?.deals ?? []
+    const activeBrainDeal = activeDealId ? brainDeals.find(d => d.id === activeDealId) : null
+    const activeDealRow = activeDealId && !activeBrainDeal ? dealRows.find(d => d.id === activeDealId) : null
+    const activeDealSection = activeBrainDeal
+      ? `\n\n## CURRENTLY VIEWING: ${activeBrainDeal.company}\nDeal: "${activeBrainDeal.name}" | Stage: ${activeBrainDeal.stage}${activeBrainDeal.dealValue ? ` | £${activeBrainDeal.dealValue.toLocaleString()}` : ''}${activeBrainDeal.conversionScore != null ? ` | ${activeBrainDeal.conversionScore}%` : ''}\n${(activeBrainDeal.risks ?? []).length > 0 ? `Risks: ${activeBrainDeal.risks.join(', ')}\n` : ''}${(activeBrainDeal.pendingTodos ?? []).length > 0 ? `Todos: ${activeBrainDeal.pendingTodos.join(', ')}\n` : ''}When "this deal" / "this company" = ${activeBrainDeal.company}.`
+      : activeDealRow
+        ? `\n\n## CURRENTLY VIEWING: ${activeDealRow.prospectCompany}\nDeal: "${activeDealRow.dealName}" | Stage: ${activeDealRow.stage}\nWhen "this deal" / "this company" = ${activeDealRow.prospectCompany}.`
+        : ''
 
-    const systemPrompt = `You are DealKit AI — the single brain for this sales organisation. You know everything about every deal, risk, contact, and action item. Answer questions directly and give actionable, specific advice. Use UK English.
+    const systemPrompt = `You are DealKit AI — the single brain for this sales team. Be direct, specific, concise. UK English.
 
-RESPONSE RULES (always follow):
-- Be concise — no filler, no preamble, no summaries of what you just said
-- Use markdown formatting: **bold** for deal names/key terms, bullet lists for multiple items, headings (##) only for multi-section answers
-- Never repeat the user's question back to them
-- Reference specific deal names, contacts, and pending actions from context
-- Omit any sentence that doesn't add value
+RULES: Short answers. No filler. Bold deal names. Bullet lists. Max 3–5 sentences for simple questions. Reference specific deals/contacts.
 
-What I can do automatically (just tell me):
-• Paste meeting notes → I'll update todos, product gaps and deals
-• "Create battlecard for [Competitor]" → adds competitor + generates battlecard
-• "Update our company profile: [info]" → updates your company data
-• "Generate an objection handler / one-pager / talk track / email sequence" → generates collateral
-• "New deal: [Company], [value], [contact]" → logs a new deal
-• "Case study: [Customer] [story]" → creates a case study
-• "Review [Deal] todos vs meeting history" → cleans up stale actions
+Actions I can take (just tell me):
+• Paste meeting notes → update todos & deals
+• "Battlecard for [X]" → competitor + battlecard
+• "Generate [type]" → collateral (objection handler / one-pager / talk track / email sequence)
+• "New deal: [Company]" → log deal
+• "Case study: [Customer]" → create study
+• "Review [Deal] todos" → clean up stale actions
 ${activeDealSection}
-${kbParts.join('\n\n') || 'No workspace data yet. Help the user set up their profile.'}${brainSection}`
+${kbParts.join('\n') || 'No workspace data yet.'}${brainSection}`
 
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001', max_tokens: 1024,
+      model: 'claude-haiku-4-5-20251001', max_tokens: 600,
       system: systemPrompt,
-      messages: messages.map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })),
+      messages: messages.slice(-6).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })),
     })
 
     const reply = response.content[0].type === 'text' ? response.content[0].text : ''
