@@ -1,16 +1,14 @@
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60
+
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { workspaces, events } from '@/lib/db/schema'
 import { planFromPriceId } from '@/lib/stripe/plans'
+import { getStripe } from '@/lib/stripe/client'
 import type { Plan } from '@/types'
-
-function getStripe(): Stripe {
-  const key = process.env.STRIPE_SECRET_KEY
-  if (!key) throw new Error('STRIPE_SECRET_KEY is not set')
-  return new Stripe(key, { apiVersion: '2026-02-25.clover' })
-}
 
 async function logEvent(workspaceId: string, userId: string | null, type: string, metadata: Record<string, unknown>) {
   await db.insert(events).values({ workspaceId, userId, type, metadata, createdAt: new Date() })
