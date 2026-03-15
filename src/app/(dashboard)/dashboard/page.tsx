@@ -228,10 +228,10 @@ export default function DashboardPage() {
         if (!brain) return null
         const urgent: { dealId: string; dealName: string; company: string; reason: string }[] = brain.urgentDeals ?? []
         const stale: { dealId: string; dealName: string; company: string; daysSinceUpdate: number }[] = (brain.staleDeals ?? []).slice(0, 3)
-        const patterns: { label: string; dealIds: string[]; companies: string[] }[] = (brain.keyPatterns ?? []).map((p: unknown) =>
+        const patterns: { label: string; dealIds: string[]; companies: string[]; dealNames: string[] }[] = (brain.keyPatterns ?? []).map((p: unknown) =>
           typeof p === 'string'
-            ? { label: p, dealIds: [] as string[], companies: [] as string[] }
-            : p as { label: string; dealIds: string[]; companies: string[] }
+            ? { label: p, dealIds: [] as string[], companies: [] as string[], dealNames: [] as string[] }
+            : { ...(p as { label: string; dealIds: string[]; companies: string[]; dealNames?: string[] }), dealNames: (p as any).dealNames ?? [] }
         )
         if (urgent.length === 0 && stale.length === 0 && patterns.length === 0) return null
         return (
@@ -289,19 +289,27 @@ export default function DashboardPage() {
                           <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#818CF8', flexShrink: 0 }} />
                           <span style={{ fontSize: '12px', color: '#A78BFA', fontWeight: 500 }}>{p.label}</span>
                         </div>
-                        {p.companies.length > 0 && (
+                        {p.dealIds.length > 0 && (
                           <div style={{ display: 'flex', gap: '4px', paddingLeft: '10px', flexWrap: 'wrap' }}>
-                            {p.dealIds.slice(0, 3).map((dealId, di) => (
-                              <Link key={dealId} href={`/deals/${dealId}`} style={{
-                                fontSize: '11px', color: '#6B7280',
-                                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-                                borderRadius: '4px', padding: '1px 7px', textDecoration: 'none',
-                                transition: 'color 0.1s',
-                              }}
-                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#A78BFA'}
-                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#6B7280'}
-                              >{p.companies[di]}</Link>
-                            ))}
+                            {p.dealIds.slice(0, 3).map((dealId, di) => {
+                              const displayName = p.dealNames[di] || p.companies[di] || 'Deal'
+                              const company = p.companies[di]
+                              return (
+                                <Link key={dealId} href={`/deals/${dealId}`} style={{
+                                  fontSize: '11px', color: '#6B7280',
+                                  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                                  borderRadius: '4px', padding: '1px 7px', textDecoration: 'none',
+                                  transition: 'color 0.1s',
+                                }}
+                                onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#A78BFA'}
+                                onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#6B7280'}
+                                title={company ? `${displayName} — ${company}` : displayName}
+                                >{displayName}</Link>
+                              )
+                            })}
+                            {p.dealIds.length > 3 && (
+                              <span style={{ fontSize: '10px', color: '#4B5563', padding: '1px 4px' }}>+{p.dealIds.length - 3} more</span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -317,58 +325,7 @@ export default function DashboardPage() {
       {/* AI Overview — refreshes daily, summarises pipeline + key actions */}
       <AIOverviewCard />
 
-      {/* Setup progress banner — shown until all steps complete */}
-      {healthPct < 100 && !dbNotConnected && (
-        <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1' }} />
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Setup</span>
-            <span style={{ fontSize: '11px', color: '#333', marginLeft: 'auto' }}>{completedSteps}/{steps.length}</span>
-            <div style={{ width: '60px', height: '2px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
-              <div style={{ width: `${healthPct}%`, height: '100%', background: '#6366F1', borderRadius: '2px' }} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {steps.map((step, i) => (
-              step.done ? (
-                <div key={step.href} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 14px', borderBottom: i < steps.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', opacity: 0.4 }}>
-                  <CheckCircle size={12} color="#22C55E" />
-                  <span style={{ fontSize: '12px', color: '#666', textDecoration: 'line-through' }}>{step.label}</span>
-                </div>
-              ) : (
-                <Link key={step.href} href={step.href} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 14px', borderBottom: i < steps.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', textDecoration: 'none', transition: 'background 120ms' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-                >
-                  <Circle size={12} color="#333" />
-                  <span style={{ fontSize: '12px', color: '#E5E7EB', flex: 1 }}>{step.label}</span>
-                  <span style={{ fontSize: '11px', color: '#4B5563' }}>{step.unlock}</span>
-                  <ArrowUpRight size={11} color="#333" />
-                </Link>
-              )
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Smart AI nudges — contextual suggestions based on current data */}
-      {smartNudges.length > 0 && !dbNotConnected && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {smartNudges.slice(0, 2).map((nudge, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderLeft: `2px solid ${nudge.color}`, borderRadius: '8px' }}>
-              <span style={{ fontSize: '14px', flexShrink: 0 }}>{nudge.icon}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ fontSize: '12px', color: '#D1D5DB', lineHeight: '1.5' }}>{nudge.message}</span>
-              </div>
-              <Link href={nudge.href} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', color: nudge.color, background: `${nudge.color}10`, border: `1px solid ${nudge.color}25`, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-                {nudge.cta} <ArrowUpRight size={10} />
-              </Link>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Alerts */}
+      {/* Alerts — show immediately below AI Overview */}
       {dbNotConnected && <SetupAlert />}
       {staleItems.length > 0 && (
         <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderLeft: '2px solid #EAB308', borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -403,19 +360,7 @@ export default function DashboardPage() {
         )
       })}
 
-      {/* ROI strip */}
-      <ROIWidget
-        deals={dealList.map(d => ({
-          outcome: d.stage === 'closed_won' ? 'won' : d.stage === 'closed_lost' ? 'lost' : 'open',
-          dealValue: d.dealValue,
-          dealType: d.dealType,
-          recurringInterval: d.recurringInterval,
-          competitors: d.competitors ?? [],
-        }))}
-        collateralCount={collateralList.length}
-      />
-
-      {/* Priority actions — sorted by deal stage */}
+      {/* Priority actions — sorted by deal stage (most urgent first) */}
       {urgentTodos.length > 0 && (
         <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -451,6 +396,35 @@ export default function DashboardPage() {
               )
             })}
           </div>
+        </div>
+      )}
+
+      {/* ROI strip */}
+      <ROIWidget
+        deals={dealList.map(d => ({
+          outcome: d.stage === 'closed_won' ? 'won' : d.stage === 'closed_lost' ? 'lost' : 'open',
+          dealValue: d.dealValue,
+          dealType: d.dealType,
+          recurringInterval: d.recurringInterval,
+          competitors: d.competitors ?? [],
+        }))}
+        collateralCount={collateralList.length}
+      />
+
+      {/* Smart AI nudges — contextual suggestions based on current data */}
+      {smartNudges.length > 0 && !dbNotConnected && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {smartNudges.slice(0, 2).map((nudge, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderLeft: `2px solid ${nudge.color}`, borderRadius: '8px' }}>
+              <span style={{ fontSize: '14px', flexShrink: 0 }}>{nudge.icon}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ fontSize: '12px', color: '#D1D5DB', lineHeight: '1.5' }}>{nudge.message}</span>
+              </div>
+              <Link href={nudge.href} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', color: nudge.color, background: `${nudge.color}10`, border: `1px solid ${nudge.color}25`, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                {nudge.cta} <ArrowUpRight size={10} />
+              </Link>
+            </div>
+          ))}
         </div>
       )}
 

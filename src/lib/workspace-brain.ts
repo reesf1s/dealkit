@@ -41,7 +41,7 @@ export interface WorkspaceBrain {
     stageBreakdown: Record<string, number>
   }
   topRisks: string[]            // deduplicated across all active deals
-  keyPatterns: { label: string; dealIds: string[]; companies: string[] }[]         // recurring themes detected automatically
+  keyPatterns: { label: string; dealIds: string[]; companies: string[]; dealNames: string[] }[]         // recurring themes detected automatically
   urgentDeals: {                // deals needing attention soon
     dealId: string
     dealName: string
@@ -215,6 +215,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
         label: theme.label,
         dealIds: matchingDeals.map(d => d.id),
         companies: matchingDeals.map(d => d.prospectCompany),
+        dealNames: matchingDeals.map(d => d.dealName),
       })
     }
   }

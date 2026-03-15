@@ -66,10 +66,18 @@ export default function AIOverviewCard() {
     }
   }, [mutate])
 
+  // Auto-generate on first visit if no cached overview exists
+  useEffect(() => {
+    if (data && !data.data && !refreshing) {
+      handleRefresh()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data])
+
   const dbNotConnected = isDbNotConfigured(error)
   if (dbNotConnected) return null
 
-  const isLoading = !data && !error
+  const isLoading = (!data && !error) || (refreshing && !overview)
   const allDone = overview && overview.keyActions.length > 0 &&
     overview.keyActions.every((_, i) => doneActions[i])
 
