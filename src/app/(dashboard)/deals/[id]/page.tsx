@@ -10,7 +10,7 @@ import {
   ArrowLeft, Sparkles, CheckSquare, Square, Plus, Target, Loader2,
   FileText, Clipboard, ChevronDown, TrendingUp, DollarSign, Calendar,
   Building2, User, Edit, Trash2, MoreHorizontal, CheckCircle, X, Link2, Check,
-  Mail, Sword, FileText as FileTextIcon, Zap
+  Mail, Sword, Zap
 } from 'lucide-react'
 import type { DealContact } from '@/types'
 import { useSidebar } from '@/components/layout/SidebarContext'
@@ -22,7 +22,7 @@ const STAGE_COLORS: Record<string, string> = {
   proposal: '#F59E0B', negotiation: '#EF4444', closed_won: '#22C55E', closed_lost: '#6B7280',
 }
 
-function MeetingNotesTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
+function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: string; deal: any; onUpdate: () => void; onSwitchToPrep?: () => void }) {
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
@@ -154,10 +154,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate }: { dealId: string; deal: any
             ) : null
           ))}
           <button
-            onClick={() => {
-              const el = document.getElementById(`prep-tab-${dealId}`)
-              el?.click()
-            }}
+            onClick={() => onSwitchToPrep?.()}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
               borderRadius: '6px', fontSize: '12px', fontWeight: 500,
@@ -1528,7 +1525,7 @@ export default function DealDetailPage() {
             </div>
           )}
           {activeTab === 'meeting-notes' && (
-            <MeetingNotesTab dealId={id} deal={deal} onUpdate={() => mutate()} />
+            <MeetingNotesTab dealId={id} deal={deal} onUpdate={() => mutate()} onSwitchToPrep={() => setActiveTab('prep')} />
           )}
           {activeTab === 'prep' && <MeetingPrepTab dealId={id} deal={deal} />}
           {activeTab === 'todos' && (

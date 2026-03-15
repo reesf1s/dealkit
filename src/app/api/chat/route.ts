@@ -995,7 +995,7 @@ export async function POST(req: NextRequest) {
     const rl = await checkRateLimit(userId, 'chat', 20)
     if (!rl.allowed) return rateLimitResponse(rl.resetAt)
     const { workspaceId, plan } = await getWorkspaceContext(userId)
-    const { messages } = await req.json()
+    const { messages, activeDealId } = await req.json()
     if (!messages?.length) return NextResponse.json({ error: 'messages required' }, { status: 400 })
 
     const lastUserMsg = [...messages].reverse().find((m: { role: string }) => m.role === 'user')
@@ -1096,6 +1096,15 @@ export async function POST(req: NextRequest) {
     // Add workspace brain as rich pipeline intelligence on top of the per-feature KB
     const brainSection = brain ? `\n\n## Live Pipeline Intelligence (Workspace Brain)\n${formatBrainContext(brain)}` : ''
 
+    // If the user is viewing a specific deal, surface it as focused context at the top of the prompt
+    const activeDeal = activeDealId ? dealRows.find(d => d.id === activeDealId) : null
+    const activeDealSection = activeDeal ? (() => {
+      const pending = ((activeDeal.todos as { text: string; done: boolean }[]) ?? []).filter(t => !t.done)
+      const historySource = activeDeal.meetingNotes || activeDeal.notes || ''
+      const recentHistory = historySource.split('\n').filter((l: string) => l.startsWith('[')).slice(-5).join('\n')
+      return `\n\n## CURRENTLY VIEWING: ${activeDeal.prospectCompany}\nDeal: "${activeDeal.dealName}" | Stage: ${activeDeal.stage} | Value: $${activeDeal.dealValue?.toLocaleString() ?? '?'}\nPending actions: ${pending.length > 0 ? pending.map(t => `• ${t.text}`).join(', ') : 'none'}\n${recentHistory ? `Recent history:\n${recentHistory}` : ''}\nWhen the user asks about "this deal", "this company", or similar — they mean ${activeDeal.prospectCompany}.`
+    })() : ''
+
     const systemPrompt = `You are DealKit AI — the single brain for this sales organisation. You know everything about every deal, risk, contact, and action item. Answer questions directly and give actionable, specific advice. Use UK English.
 
 RESPONSE RULES (always follow):
@@ -1113,7 +1122,7 @@ What I can do automatically (just tell me):
 • "New deal: [Company], [value], [contact]" → logs a new deal
 • "Case study: [Customer] [story]" → creates a case study
 • "Review [Deal] todos vs meeting history" → cleans up stale actions
-
+${activeDealSection}
 ${kbParts.join('\n\n') || 'No workspace data yet. Help the user set up their profile.'}${brainSection}`
 
     const response = await anthropic.messages.create({
