@@ -400,16 +400,51 @@ export default function AiChatSidebar() {
         signal: abortRef.current.signal,
       })
       clearTimeout(timeoutId)
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: data.reply,
-        actions: data.actions ?? [],
-      }])
-      // Revalidate SWR caches for any pages affected by the AI actions
-      if (data.actions?.length) {
-        invalidateCaches(data.actions)
+
+      const contentType = res.headers.get('content-type') ?? ''
+
+      if (contentType.includes('text/event-stream')) {
+        // Streaming Q&A response — show tokens as they arrive
+        const reader = res.body?.getReader()
+        if (!reader) throw new Error('No stream body')
+        const decoder = new TextDecoder()
+        let accumulated = ''
+        // Add placeholder assistant message that we'll update progressively
+        setMessages(prev => [...prev, { role: 'assistant', content: '' }])
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          const chunk = decoder.decode(value, { stream: true })
+          // Parse SSE lines: data: {...}\n\n
+          for (const line of chunk.split('\n')) {
+            if (!line.startsWith('data: ')) continue
+            try {
+              const payload = JSON.parse(line.slice(6))
+              if (payload.t) {
+                accumulated += payload.t
+                setMessages(prev => {
+                  const copy = [...prev]
+                  copy[copy.length - 1] = { ...copy[copy.length - 1], content: accumulated }
+                  return copy
+                })
+              }
+            } catch { /* skip malformed lines */ }
+          }
+        }
+      } else {
+        // Non-streaming response (intent handlers with actions)
+        const data = await res.json()
+        if (data.error) throw new Error(data.error)
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: data.reply,
+          actions: data.actions ?? [],
+        }])
+        // Revalidate SWR caches for any pages affected by the AI actions
+        if (data.actions?.length) {
+          invalidateCaches(data.actions)
+        }
       }
     } catch (e: unknown) {
       clearTimeout(timeoutId)

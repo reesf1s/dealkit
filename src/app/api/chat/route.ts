@@ -1124,14 +1124,34 @@ Actions I can take (just tell me):
 ${activeDealSection}
 ${kbParts.join('\n') || 'No workspace data yet.'}${brainSection}`
 
-    const response = await anthropic.messages.create({
+    // Stream the Q&A response for instant perceived speed
+    const stream = anthropic.messages.stream({
       model: 'claude-haiku-4-5-20251001', max_tokens: 600,
       system: systemPrompt,
       messages: messages.slice(-6).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })),
     })
 
-    const reply = response.content[0].type === 'text' ? response.content[0].text : ''
-    return NextResponse.json({ reply, actions: [] })
+    const encoder = new TextEncoder()
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const event of stream) {
+            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ t: event.delta.text })}\n\n`))
+            }
+          }
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`))
+          controller.close()
+        } catch {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`))
+          controller.close()
+        }
+      },
+    })
+
+    return new Response(readable, {
+      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' },
+    })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error'
     return NextResponse.json({ error: msg }, { status: 500 })

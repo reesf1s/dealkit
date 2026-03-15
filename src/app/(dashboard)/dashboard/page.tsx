@@ -240,11 +240,16 @@ export default function DashboardPage() {
         if (!brain) return null
         const urgent: { dealId: string; dealName: string; company: string; reason: string }[] = brain.urgentDeals ?? []
         const stale: { dealId: string; dealName: string; company: string; daysSinceUpdate: number }[] = (brain.staleDeals ?? []).slice(0, 3)
-        const patterns: { label: string; dealIds: string[]; companies: string[]; dealNames: string[] }[] = (brain.keyPatterns ?? []).map((p: unknown) =>
-          typeof p === 'string'
-            ? { label: p, dealIds: [] as string[], companies: [] as string[], dealNames: [] as string[] }
-            : { ...(p as { label: string; dealIds: string[]; companies: string[]; dealNames?: string[] }), dealNames: (p as any).dealNames ?? [] }
-        )
+        const patterns: { label: string; dealIds: string[]; companies: string[]; dealNames: string[] }[] = (brain.keyPatterns ?? []).map((raw: unknown) => {
+          if (typeof raw === 'string') return { label: raw, dealIds: [], companies: [], dealNames: [] }
+          const p = raw as Record<string, unknown>
+          return {
+            label: String(p.label ?? ''),
+            dealIds: Array.isArray(p.dealIds) ? p.dealIds : [],
+            companies: Array.isArray(p.companies) ? p.companies : [],
+            dealNames: Array.isArray(p.dealNames) ? p.dealNames : [],
+          }
+        })
         if (urgent.length === 0 && stale.length === 0 && patterns.length === 0) return null
         return (
           <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>

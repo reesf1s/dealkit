@@ -22,7 +22,7 @@ function companyBrief(c: CompanyProfile): string {
   ].filter(Boolean).join('\n')
 }
 
-const SYSTEM = `You are a sales strategist. Generate concise, actionable sales collateral as valid JSON only — no markdown, no explanation. UK English. Be specific, not generic.`
+const SYSTEM = `You are a JSON-only API that generates sales collateral. CRITICAL: Return ONLY raw JSON starting with { — never use markdown fences (\`\`\`), never add explanation, never wrap in code blocks. UK English. Be concise, specific, not generic.`
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Battlecard

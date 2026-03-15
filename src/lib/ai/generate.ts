@@ -267,19 +267,21 @@ export async function generateCollateral(
     updatedAt: profileRow.updatedAt,
   }
 
-  // 2. Fetch all entity data + workspace context in parallel
-  // Prefer the pre-built brain (rich intelligence) — fall back to lightweight buildWorkspaceContext
-  const [allDeals, allCaseStudies, brain, lightContext] = await Promise.all([
+  // 2. Fetch all entity data + brain in parallel
+  // Brain-first: only fall back to lightweight buildWorkspaceContext if brain is missing
+  const [allDeals, allCaseStudies, brain] = await Promise.all([
     db.select().from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)),
     db.select().from(caseStudies).where(eq(caseStudies.workspaceId, workspaceId)),
     getWorkspaceBrain(workspaceId),
-    buildWorkspaceContext(workspaceId),
   ])
-  // Brain gives conversion scores, AI summaries, risks, patterns, urgency — much richer than lightContext
-  let workspaceContext = lightContext
+
+  let workspaceContext = ''
   if (brain) {
     try { workspaceContext = formatBrainContext(brain) }
-    catch { /* non-fatal: use light context as fallback */ }
+    catch { /* non-fatal */ }
+  }
+  if (!workspaceContext) {
+    workspaceContext = await buildWorkspaceContext(workspaceId)
   }
 
   // ─── BATTLECARD ─────────────────────────────────────────────────────────────
