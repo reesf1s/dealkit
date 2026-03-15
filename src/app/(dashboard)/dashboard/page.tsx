@@ -526,10 +526,10 @@ export default function DashboardPage() {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0', borderBottom: 'none' }}>
                 {[
-                  { label: 'Now', items: roadmapNow, color: '#22C55E', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.15)', dot: '#22C55E' },
-                  { label: 'Next', items: roadmapNext, color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.15)', dot: '#F59E0B' },
-                  { label: 'Later', items: roadmapLater, color: '#6366F1', bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.15)', dot: '#818CF8' },
-                ].map(({ label, items, color, bg, border, dot }, colIdx) => (
+                  { label: 'Now', items: roadmapNow, color: '#22C55E', bg: 'rgba(34,197,94,0.08)', dot: '#22C55E' },
+                  { label: 'Next', items: roadmapNext, color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', dot: '#F59E0B' },
+                  { label: 'Later', items: roadmapLater, color: '#6366F1', bg: 'rgba(99,102,241,0.08)', dot: '#818CF8' },
+                ].map(({ label, items, color, bg, dot }, colIdx) => (
                   <div key={label} style={{ padding: '14px 16px', borderRight: colIdx < 2 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
                       <span style={{ fontSize: '10px', fontWeight: '700', color: '#555', letterSpacing: '0.07em', textTransform: 'uppercase' }}>{label}</span>
