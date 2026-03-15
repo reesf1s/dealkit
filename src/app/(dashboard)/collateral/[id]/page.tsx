@@ -220,13 +220,13 @@ export default function CollateralDetailPage() {
 
                 {sharePopoverOpen && item.isShared && (
                   <div
-                    style={{ position: 'absolute', top: '40px', right: 0, width: '320px', zIndex: 100, backgroundColor: '#1A1A1A', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '14px', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}
+                    style={{ position: 'absolute', top: '40px', right: 0, width: '320px', zIndex: 100, background: 'rgba(20,20,20,0.85)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '14px', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <p style={{ fontSize: '12px', fontWeight: 600, color: '#EBEBEB', margin: '0 0 8px' }}>Share link</p>
                     <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
                       <code
-                        style={{ flex: 1, fontSize: '11px', color: '#888', backgroundColor: '#0A0A0A', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px', padding: '6px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}
+                        style={{ flex: 1, fontSize: '11px', color: '#888', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px', padding: '6px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}
                       >
                         {shareUrl}
                       </code>
@@ -268,7 +268,7 @@ export default function CollateralDetailPage() {
 
           {/* Generating state */}
           {item.status === 'generating' && (
-            <div style={{ padding: '32px', textAlign: 'center', backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', marginBottom: '16px' }}>
+            <div style={{ padding: '32px', textAlign: 'center', background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '8px' }}>
                 <RefreshCw size={16} style={{ color: '#6366F1', animation: 'spin 1s linear infinite' }} />
                 <span style={{ fontSize: '14px', fontWeight: 600, color: '#EBEBEB' }}>Generating content…</span>

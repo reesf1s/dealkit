@@ -36,7 +36,7 @@ export default function ROICalc() {
   const inputStyle: React.CSSProperties = {
     height: '36px',
     borderRadius: '6px',
-    backgroundColor: '#1A1A1A',
+    background: 'rgba(255,255,255,0.04)',
     border: '1px solid rgba(255,255,255,0.1)',
     color: '#EBEBEB',
     fontSize: '14px',
@@ -59,7 +59,7 @@ export default function ROICalc() {
   }
 
   const outputCardStyle: React.CSSProperties = {
-    backgroundColor: '#141414',
+    background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)',
     border: '1px solid rgba(255,255,255,0.06)',
     borderRadius: '8px',
     padding: '20px',
@@ -102,7 +102,7 @@ export default function ROICalc() {
 
       {/* Calculator card */}
       <div style={{
-        backgroundColor: '#141414',
+        background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)',
         border: '1px solid rgba(255,255,255,0.06)',
         borderRadius: '12px',
         padding: '28px',

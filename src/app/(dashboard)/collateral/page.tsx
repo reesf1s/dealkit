@@ -389,7 +389,7 @@ function CollateralPageInner() {
                   <select
                     value={selectedCompetitor}
                     onChange={(e) => setSelectedCompetitor(e.target.value)}
-                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', backgroundColor: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
                   >
                     <option value="">Select a competitor…</option>
                     {competitors.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -406,7 +406,7 @@ function CollateralPageInner() {
                   <select
                     value={selectedCaseStudy}
                     onChange={(e) => setSelectedCaseStudy(e.target.value)}
-                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', backgroundColor: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
                   >
                     <option value="">Select a case study…</option>
                     {caseStudies.map((cs) => <option key={cs.id} value={cs.id}>{cs.customerName}</option>)}
@@ -423,7 +423,7 @@ function CollateralPageInner() {
                   <select
                     value={selectedProduct}
                     onChange={(e) => setSelectedProduct(e.target.value)}
-                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', backgroundColor: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
                   >
                     <option value="">Use first product ({products[0]?.name ?? '—'})</option>
                     {products.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
@@ -442,7 +442,7 @@ function CollateralPageInner() {
                     value={buyerRole}
                     onChange={(e) => setBuyerRole(e.target.value)}
                     placeholder="e.g. VP of Operations, CTO, Head of Finance"
-                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', backgroundColor: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
                   />
                 </div>
               )}
@@ -458,7 +458,7 @@ function CollateralPageInner() {
                     onChange={(e) => setSpecificObjections(e.target.value)}
                     placeholder={`e.g. "Your price is 3x what we pay today"\n"We already use Salesforce for this"\n"We need SSO before we can consider you"`}
                     rows={3}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', backgroundColor: '#0A0A0A', border: '1px solid rgba(99,102,241,0.25)', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(99,102,241,0.25)', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5', boxSizing: 'border-box' }}
                   />
                   <p style={{ fontSize: '11px', color: '#555', margin: '4px 0 0' }}>One objection per line — the AI will write scripted responses for each.</p>
                 </div>
@@ -473,7 +473,7 @@ function CollateralPageInner() {
                   <select
                     value={selectedDealId}
                     onChange={(e) => setSelectedDealId(e.target.value)}
-                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', backgroundColor: '#0A0A0A', border: `1px solid ${selectedDealId ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.1)'}`, color: selectedDealId ? '#EBEBEB' : '#666', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: `1px solid ${selectedDealId ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.1)'}`, color: selectedDealId ? '#EBEBEB' : '#666', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
                   >
                     <option value="">No deal — generic output</option>
                     {deals.map((d: any) => (
@@ -498,7 +498,7 @@ function CollateralPageInner() {
                   onChange={(e) => setCustomPrompt(e.target.value)}
                   placeholder="e.g. Focus on security and compliance angle, use a formal tone, include NHS reference, emphasise ROI…"
                   rows={3}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', backgroundColor: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5', boxSizing: 'border-box' }}
                 />
               </div>
 

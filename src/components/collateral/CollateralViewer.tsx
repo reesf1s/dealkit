@@ -30,7 +30,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div style={{ backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '16px', ...style }}>
+    <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '16px', ...style }}>
       {children}
     </div>
   )
@@ -316,7 +316,7 @@ function ObjectionHandlerViewer({ content }: { content: ObjectionHandlerContent 
           const catConfig = CATEGORY_COLORS[obj.category]
           const isOpen = openIdx === i
           return (
-            <div key={i} style={{ backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+            <div key={i} style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
               <button
                 onClick={() => setOpenIdx(isOpen ? null : i)}
                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
@@ -371,7 +371,7 @@ function TalkTrackSectionCard({ section, title }: { section: TalkTrackSection; t
   const [open, setOpen] = useState(true)
 
   return (
-    <div style={{ backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+    <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
       <button
         onClick={() => setOpen((o) => !o)}
         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}
@@ -463,7 +463,7 @@ function EmailSequenceViewer({ content }: { content: EmailSequenceContent }) {
       </Card>
 
       {content.emails.map((email) => (
-        <div key={email.stepNumber} style={{ backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+        <div key={email.stepNumber} style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
             <span style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: 'rgba(139,92,246,0.2)', color: '#8B5CF6', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               {email.stepNumber}

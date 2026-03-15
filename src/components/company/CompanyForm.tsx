@@ -52,7 +52,7 @@ function Input({
         height: '34px',
         padding: '0 10px',
         borderRadius: '6px',
-        backgroundColor: '#0A0A0A',
+        background: 'rgba(0,0,0,0.3)',
         border: '1px solid rgba(255,255,255,0.1)',
         color: '#EBEBEB',
         fontSize: '13px',
@@ -91,7 +91,7 @@ function Textarea({
         width: '100%',
         padding: '8px 10px',
         borderRadius: '6px',
-        backgroundColor: '#0A0A0A',
+        background: 'rgba(0,0,0,0.3)',
         border: '1px solid rgba(255,255,255,0.1)',
         color: '#EBEBEB',
         fontSize: '13px',
@@ -126,7 +126,7 @@ function SectionCard({
   return (
     <div
       style={{
-        backgroundColor: '#141414',
+        background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)',
         border: '1px solid rgba(255,255,255,0.06)',
         borderRadius: '8px',
         overflow: 'hidden',
@@ -261,7 +261,7 @@ function ProductEditor({
   return (
     <div
       style={{
-        backgroundColor: '#0A0A0A',
+        background: 'rgba(0,0,0,0.3)',
         border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: '8px',
         padding: '14px',

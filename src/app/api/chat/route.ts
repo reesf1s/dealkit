@@ -344,6 +344,7 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
       const accumulatedNotes = existingDeal.notes ? `${existingDeal.notes}\n${newEntry}` : newEntry
 
       const updatePayload: Record<string, unknown> = { todos: mergedTodos, meetingNotes: text, notes: accumulatedNotes, updatedAt: new Date() }
+      if (parsed.risks?.length) { updatePayload.dealRisks = parsed.risks; dealChanges.push(`${parsed.risks.length} risk${parsed.risks.length > 1 ? 's' : ''} identified`) }
       if (parsed.dealUpdate?.stage) { updatePayload.stage = parsed.dealUpdate.stage; dealChanges.push(`stage → **${parsed.dealUpdate.stage}**`) }
       if (parsed.dealUpdate?.dealValue) { updatePayload.dealValue = parsed.dealUpdate.dealValue; dealChanges.push(`value → **$${parsed.dealUpdate.dealValue.toLocaleString()}**`) }
 
@@ -393,6 +394,53 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
   if (parsed.risks?.length) reply += `\n\n⚠️ **Risks:** ${parsed.risks.join(' · ')}`
   if (!parsed.matchedDealId && openDeals.length > 0) reply += `\n\n_Tip: I couldn't match these notes to a deal. Paste notes on the deal page for a precise match._`
   else if (!parsed.matchedDealId) reply += `\n\n_No open deals found. Log a deal first, then I can link meeting notes to it._`
+
+  // ── Auto-generate risk-based objection handler when risks found on a matched deal ──
+  if (parsed.risks?.length >= 1 && parsed.matchedDealId) {
+    const matchedDeal = openDeals.find(d => d.id === parsed.matchedDealId)
+    const riskContext = [
+      `Prospect: ${matchedDeal?.prospectCompany ?? 'Unknown'}`,
+      `Stage: ${matchedDeal?.stage ?? 'unknown'}`,
+      `Active risks from latest meeting: ${parsed.risks.join('; ')}`,
+      parsed.summary ? `Meeting summary: ${parsed.summary}` : '',
+    ].filter(Boolean).join('\n')
+
+    reply += `\n\n🎯 **Auto-generating objection handler** tailored to these risks — check [Collateral](/collateral) shortly.`
+    actions.push({ type: 'collateral_generating', colType: 'objection_handler', title: `Risk Response: ${matchedDeal?.dealName ?? 'Deal'}` })
+
+    after(async () => {
+      try {
+        const [profileRow] = await db.select({ id: companyProfiles.id }).from(companyProfiles)
+          .where(eq(companyProfiles.workspaceId, workspaceId)).limit(1)
+        if (!profileRow) return
+
+        const now = new Date()
+        const [colRecord] = await db.insert(collateral).values({
+          workspaceId, userId, type: 'objection_handler',
+          title: `Risk Response: ${matchedDeal?.dealName ?? 'Deal'}`,
+          status: 'generating', sourceCompetitorId: null, sourceCaseStudyId: null,
+          sourceDealLogId: parsed.matchedDealId, content: null, rawResponse: null,
+          generatedAt: null, createdAt: now, updatedAt: now,
+        }).returning()
+
+        const result = await generateCollateral({
+          workspaceId, type: 'objection_handler',
+          dealContext: riskContext,
+          customPrompt: `Focus specifically on handling these deal risks from the latest meeting: ${parsed.risks.join('; ')}. Make responses tactical and immediately usable by the sales rep.`,
+        })
+        const generatedAt = new Date()
+        await db.update(collateral).set({
+          title: result.title, status: 'ready', content: result.content,
+          rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt,
+        }).where(eq(collateral.id, colRecord.id))
+        await db.insert(events).values({
+          workspaceId, userId, type: 'collateral.generated',
+          metadata: { collateralId: colRecord.id, collateralType: 'objection_handler', title: result.title, source: 'auto_risk' },
+          createdAt: new Date(),
+        })
+      } catch { /* best effort — don't block meeting notes response */ }
+    })
+  }
 
   // Background: rebuild workspace brain + extract Q&A to knowledge base
   after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })

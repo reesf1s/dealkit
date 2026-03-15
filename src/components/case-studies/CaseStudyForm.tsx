@@ -27,7 +27,7 @@ function Input({ value, onChange, placeholder }: { value: string; onChange: (v: 
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', backgroundColor: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', boxSizing: 'border-box', transition: 'border-color 150ms ease' }}
+      style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', boxSizing: 'border-box', transition: 'border-color 150ms ease' }}
       onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.6)' }}
       onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
     />
@@ -41,7 +41,7 @@ function Textarea({ value, onChange, placeholder, rows = 4 }: { value: string; o
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       rows={rows}
-      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', backgroundColor: '#0A0A0A', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, transition: 'border-color 150ms ease', fontFamily: 'inherit' }}
+      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, transition: 'border-color 150ms ease', fontFamily: 'inherit' }}
       onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.6)' }}
       onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
     />
@@ -50,7 +50,7 @@ function Textarea({ value, onChange, placeholder, rows = 4 }: { value: string; o
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+    <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
       <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <span style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB' }}>{title}</span>
       </div>

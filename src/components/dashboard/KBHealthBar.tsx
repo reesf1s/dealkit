@@ -59,9 +59,10 @@ export function KBHealthBar({
   return (
     <div
       style={{
-        backgroundColor: '#141414',
-        border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: '8px',
+        background: 'rgba(255,255,255,0.03)',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        borderRadius: '10px',
         padding: '16px',
       }}
     >
