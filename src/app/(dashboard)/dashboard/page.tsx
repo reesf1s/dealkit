@@ -63,9 +63,21 @@ export default function DashboardPage() {
   const { data: collateral } = useSWR('/api/collateral', fetcher)
   const { data: insights } = useSWR('/api/insights', fetcher)
   const { data: productGapsData } = useSWR('/api/product-gaps', fetcher)
-  const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
+  const { data: brainRes, mutate: mutateBrain } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
 
   const dbNotConnected = isDbNotConfigured(companyErr)
+
+  // Auto-rebuild brain if stored snapshot is missing new fields (e.g. dealNames in patterns)
+  useEffect(() => {
+    const brain = brainRes?.data
+    if (!brain) return
+    const patterns = brain.keyPatterns ?? []
+    const needsRebuild = patterns.length > 0 && patterns.some((p: any) => typeof p !== 'string' && !p.dealNames)
+    if (needsRebuild) {
+      fetch('/api/brain', { method: 'POST' }).then(() => mutateBrain()).catch(() => {})
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brainRes])
 
   // Redirect new users to onboarding if they haven't set up a company profile
   useEffect(() => {
@@ -284,31 +296,32 @@ export default function DashboardPage() {
                   <div style={{ fontSize: '10px', color: '#374151', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>Recurring Patterns</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {patterns.slice(0, 3).map((p, i) => (
-                      <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#818CF8', flexShrink: 0 }} />
                           <span style={{ fontSize: '12px', color: '#A78BFA', fontWeight: 500 }}>{p.label}</span>
+                          <span style={{ fontSize: '10px', color: '#4B5563' }}>· {p.dealIds.length} deal{p.dealIds.length !== 1 ? 's' : ''}</span>
                         </div>
                         {p.dealIds.length > 0 && (
-                          <div style={{ display: 'flex', gap: '4px', paddingLeft: '10px', flexWrap: 'wrap' }}>
-                            {p.dealIds.slice(0, 3).map((dealId, di) => {
-                              const displayName = p.dealNames[di] || p.companies[di] || 'Deal'
-                              const company = p.companies[di]
+                          <div style={{ display: 'flex', gap: '5px', paddingLeft: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            {p.dealIds.slice(0, 4).map((dealId, di) => {
+                              const dealName = p.dealNames[di] || ''
+                              const company = p.companies[di] || 'Deal'
                               return (
                                 <Link key={dealId} href={`/deals/${dealId}`} style={{
-                                  fontSize: '11px', color: '#6B7280',
-                                  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-                                  borderRadius: '4px', padding: '1px 7px', textDecoration: 'none',
-                                  transition: 'color 0.1s',
+                                  fontSize: '11px', color: '#9CA3AF',
+                                  background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)',
+                                  borderRadius: '5px', padding: '2px 8px', textDecoration: 'none',
+                                  transition: 'all 0.12s', lineHeight: '1.4',
                                 }}
-                                onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#A78BFA'}
-                                onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#6B7280'}
-                                title={company ? `${displayName} — ${company}` : displayName}
-                                >{displayName}</Link>
+                                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#C4B5FD'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.3)' }}
+                                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#9CA3AF'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.12)' }}
+                                title={dealName ? `${dealName} — ${company}` : company}
+                                >{dealName || company}</Link>
                               )
                             })}
-                            {p.dealIds.length > 3 && (
-                              <span style={{ fontSize: '10px', color: '#4B5563', padding: '1px 4px' }}>+{p.dealIds.length - 3} more</span>
+                            {p.dealIds.length > 4 && (
+                              <span style={{ fontSize: '10px', color: '#4B5563' }}>+{p.dealIds.length - 4} more</span>
                             )}
                           </div>
                         )}
