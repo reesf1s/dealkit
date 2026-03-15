@@ -129,8 +129,9 @@ export default function Sidebar() {
   const SidebarContent = (
     <aside style={{
       position: 'fixed', left: 0, top: 0, bottom: 0, width: w,
-      background: '#0C0C0E',
-      borderRight: '1px solid rgba(255,255,255,0.06)',
+      background: 'rgba(12,12,14,0.85)',
+      backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+      borderRight: '1px solid rgba(255,255,255,0.07)',
       display: 'flex', flexDirection: 'column', zIndex: 40,
       transition: 'width 0.2s cubic-bezier(0.4,0,0.2,1)',
       overflow: 'hidden',

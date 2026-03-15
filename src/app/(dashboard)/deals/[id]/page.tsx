@@ -468,6 +468,8 @@ function TodosTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpd
   const [newTodo, setNewTodo] = useState('')
   const [doneExpanded, setDoneExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
   const todos: any[] = deal?.todos ?? []
   const pending = todos.filter((t: any) => !t.done)
   const done = todos.filter((t: any) => t.done)
@@ -487,6 +489,23 @@ function TodosTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpd
 
   const toggleTodo = (id: string) => {
     saveTodos(todos.map((t: any) => t.id === id ? { ...t, done: !t.done } : t))
+  }
+
+  const startEdit = (todo: any) => {
+    setEditingId(todo.id)
+    setEditText(todo.text)
+  }
+
+  const saveEdit = () => {
+    if (!editingId || !editText.trim()) return
+    saveTodos(todos.map((t: any) => t.id === editingId ? { ...t, text: editText.trim() } : t))
+    setEditingId(null)
+    setEditText('')
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditText('')
   }
 
   const addTodo = async (e: React.FormEvent) => {
@@ -545,16 +564,49 @@ function TodosTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpd
                   display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
                   background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px',
                 }}>
-                  <button onClick={() => toggleTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}>
+                  <button onClick={() => toggleTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}>
                     <Square size={15} color="#444" />
                   </button>
-                  <span style={{ flex: 1, fontSize: '13px', color: '#EBEBEB' }}>{todo.text}</span>
-                  <button onClick={() => deleteTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#333', padding: '2px', display: 'flex', borderRadius: '4px' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#EF4444'}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#333'}
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                  {editingId === todo.id ? (
+                    <form onSubmit={e => { e.preventDefault(); saveEdit() }} style={{ flex: 1, display: 'flex', gap: '6px' }}>
+                      <input
+                        autoFocus
+                        value={editText}
+                        onChange={e => setEditText(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Escape') cancelEdit() }}
+                        style={{
+                          flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(99,102,241,0.4)',
+                          borderRadius: '6px', padding: '4px 8px', color: '#EBEBEB', fontSize: '13px', outline: 'none',
+                        }}
+                      />
+                      <button type="submit" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', color: '#22C55E' }}>
+                        <Check size={14} />
+                      </button>
+                      <button type="button" onClick={cancelEdit} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', color: '#666' }}>
+                        <X size={14} />
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      <span
+                        onDoubleClick={() => startEdit(todo)}
+                        style={{ flex: 1, fontSize: '13px', color: '#EBEBEB', cursor: 'text' }}
+                        title="Double-click to edit"
+                      >{todo.text}</span>
+                      <button onClick={() => startEdit(todo)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2A2A2A', padding: '2px', display: 'flex', borderRadius: '4px', flexShrink: 0 }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#818CF8'}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#2A2A2A'}
+                      >
+                        <Edit size={11} />
+                      </button>
+                      <button onClick={() => deleteTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2A2A2A', padding: '2px', display: 'flex', borderRadius: '4px', flexShrink: 0 }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#EF4444'}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#2A2A2A'}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </>
+                  )}
                 </div>
               ))}
             </div>

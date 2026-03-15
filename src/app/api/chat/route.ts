@@ -96,11 +96,26 @@ const DEAL_ACTION_PATTERNS = [
   /mark.*to[\s-']?do/i, /complete.*to[\s-']?do/i, /tick.*to[\s-']?do/i,
   /outdated.*to[\s-']?do/i, /stale.*to[\s-']?do/i, /clean.*up.*to[\s-']?do/i,
   /to[\s-']?do.*deal/i, /deal.*to[\s-']?do/i,
-  // review / check / audit todos on a deal
+  // review / check / scan / audit / look at / tidy / organize todos
   /review.*to[\s-']?do/i, /check.*to[\s-']?do/i, /audit.*to[\s-']?do/i,
-  /review.*task/i, /check.*task/i,
+  /scan.*to[\s-']?do/i, /look\s+at.*to[\s-']?do/i, /tidy.*to[\s-']?do/i,
+  /organiz.*to[\s-']?do/i, /organis.*to[\s-']?do/i,
+  // "scan/review/audit [company/deal] to-do's" (word between verb and todo)
+  /scan\s+(?:all\s+)?[\w\s]+to[\s-']?do/i,
+  /review\s+(?:all\s+)?[\w\s]+to[\s-']?do/i,
+  /audit\s+(?:all\s+)?[\w\s]+to[\s-']?do/i,
+  /check\s+(?:all\s+)?[\w\s]+to[\s-']?do/i,
+  /clean\s+(?:up\s+)?(?:all\s+)?[\w\s]+to[\s-']?do/i,
+  /look\s+(?:at|for|through)\s+(?:all\s+)?[\w\s]+to[\s-']?do/i,
+  // "to-do's" / "todos" mentioned with action verbs (delete/remove them, etc.)
+  /to[\s-']?do'?s?\b.*\b(?:delete|remove|clear|clean|tidy|scan|audit|review)\b/i,
+  // review / check tasks
+  /review.*task/i, /check.*task/i, /scan.*task/i,
   // tasks
   /remove.*task/i, /clear.*task/i, /delete.*task/i, /complete.*task/i,
+  // "duplicates" near "todo" or "action"
+  /duplicat.*to[\s-']?do/i, /to[\s-']?do.*duplicat/i,
+  /duplicat.*action/i, /action.*duplicat/i,
   // deal field updates via chat (stage, value, notes on a named deal)
   /update.*deal/i, /change.*stage/i, /move.*deal/i, /mark.*deal/i,
   /deal.*stage/i, /set.*stage/i,
@@ -1019,14 +1034,29 @@ Be conservative — only remove todos that are clearly stale, already handled, o
   const removed = decisions.remove.length
   const completed = decisions.complete.length
 
+  // Look up which todo texts were removed/completed for transparency
+  const removedTexts = allTodos.filter(t => decisions.remove.includes(t.id)).map(t => t.text)
+  const completedTexts = allTodos.filter(t => decisions.complete.includes(t.id)).map(t => t.text)
+  const remainingPending = updatedTodos.filter(t => !t.done)
+
   let reply: string
   if (removed === 0 && completed === 0) {
     reply = `No todos were changed for **${deal.dealName}**. ${decisions.reason || 'All todos appear current.'}`
   } else {
-    reply = `Updated todos for **${deal.dealName}**:`
-    if (removed > 0) reply += `\n- Removed ${removed} outdated todo${removed > 1 ? 's' : ''}`
-    if (completed > 0) reply += `\n- Marked ${completed} todo${completed > 1 ? 's' : ''} as done`
+    reply = `✅ **${deal.dealName}** — Todos Updated`
+    if (removed > 0) {
+      reply += `\n\n**Removed (${removed}):**`
+      removedTexts.forEach(t => { reply += `\n- ~~${t}~~` })
+    }
+    if (completed > 0) {
+      reply += `\n\n**Marked Done (${completed}):**`
+      completedTexts.forEach(t => { reply += `\n- ✓ ${t}` })
+    }
     if (decisions.reason) reply += `\n\n_${decisions.reason}_`
+    if (remainingPending.length > 0) {
+      reply += `\n\n**Remaining (${remainingPending.length}):**`
+      remainingPending.forEach(t => { reply += `\n- ${t.text}` })
+    }
   }
 
   return {
@@ -1162,13 +1192,16 @@ export async function POST(req: NextRequest) {
 
 RULES: Short answers. No filler. Bold deal names. Bullet lists. Max 3–5 sentences for simple questions. Reference specific deals/contacts.${pageContext}
 
-Actions I can take (just tell me):
-• Paste meeting notes → update todos & deals
-• "Battlecard for [X]" → competitor + battlecard
+Actions I can take (use these phrases to trigger them):
+• Paste meeting notes → auto-update deal, todos, risks
+• "Battlecard for [X]" → create competitor + battlecard
 • "Generate [type]" → collateral (objection handler / one-pager / talk track / email sequence)
 • "New deal: [Company]" → log deal
 • "Case study: [Customer]" → create study
-• "Review [Deal] todos" → clean up stale actions
+• "Scan [Deal] todos" / "Review [Deal] todos" → clean up stale actions
+• "Update [Deal] stage to X" → change deal stage
+
+IMPORTANT: If someone asks you to modify data (delete todos, update deals, etc.) and you're unsure whether the action system handled it, suggest they use a direct command like "scan [deal name] todos and delete duplicates". Do NOT pretend to execute changes — only describe what you observe in the data.
 ${activeDealSection}
 ${kbParts.join('\n') || 'No workspace data yet.'}${brainSection}`
 
