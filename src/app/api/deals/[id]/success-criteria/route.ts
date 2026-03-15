@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic'
+import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
@@ -7,6 +8,7 @@ import { db } from '@/lib/db'
 import { dealLogs, companyProfiles } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { getWorkspaceBrain, formatBrainContext, rebuildWorkspaceBrain } from '@/lib/workspace-brain'
 
 const anthropic = new Anthropic()
 
@@ -22,12 +24,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { text } = await req.json()
     if (!text?.trim()) return NextResponse.json({ error: 'No text provided' }, { status: 400 })
 
-    const [[deal], [profile]] = await Promise.all([
+    const [[deal], [profile], brain] = await Promise.all([
       db.select().from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1),
       db.select({ companyName: companyProfiles.companyName, knownCapabilities: companyProfiles.knownCapabilities })
         .from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)).limit(1),
+      getWorkspaceBrain(workspaceId),
     ])
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    let brainContext = ''
+    if (brain) {
+      try { brainContext = `\n\nPIPELINE INTELLIGENCE:\n${formatBrainContext(brain)}` }
+      catch { /* non-fatal */ }
+    }
 
     const dealContext = [
       `Deal: ${deal.dealName} with ${deal.prospectCompany}`,
@@ -37,6 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         ? `Confirmed capabilities (already supported — do NOT flag as missing): ${(profile.knownCapabilities as string[]).join(', ')}`
         : '',
       deal.aiSummary ? `Deal summary: ${deal.aiSummary}` : '',
+      brainContext,
     ].filter(Boolean).join('\n')
 
     const msg = await anthropic.messages.create({
@@ -84,6 +94,7 @@ Return a JSON array of criteria objects. Each object: {"text": "concise requirem
       .set({ successCriteria: text.trim(), successCriteriaTodos: merged, updatedAt: new Date() })
       .where(eq(dealLogs.id, id)).returning()
 
+    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     return NextResponse.json({ data: { successCriteriaTodos: updated.successCriteriaTodos } })
   } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
 }
