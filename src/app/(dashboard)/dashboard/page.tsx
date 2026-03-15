@@ -228,7 +228,11 @@ export default function DashboardPage() {
         if (!brain) return null
         const urgent: { dealId: string; dealName: string; company: string; reason: string }[] = brain.urgentDeals ?? []
         const stale: { dealId: string; dealName: string; company: string; daysSinceUpdate: number }[] = (brain.staleDeals ?? []).slice(0, 3)
-        const patterns: { label: string; dealIds: string[]; companies: string[] }[] = brain.keyPatterns ?? []
+        const patterns: { label: string; dealIds: string[]; companies: string[] }[] = (brain.keyPatterns ?? []).map((p: unknown) =>
+          typeof p === 'string'
+            ? { label: p, dealIds: [] as string[], companies: [] as string[] }
+            : p as { label: string; dealIds: string[]; companies: string[] }
+        )
         if (urgent.length === 0 && stale.length === 0 && patterns.length === 0) return null
         return (
           <div style={{ background: '#0E0E0E', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
