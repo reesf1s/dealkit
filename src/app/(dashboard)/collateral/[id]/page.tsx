@@ -165,7 +165,7 @@ export default function CollateralDetailPage() {
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '24px', gap: '16px' }}>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                <CollateralTypeBadge type={item.type} />
+                <CollateralTypeBadge type={item.type} customTypeName={item.customTypeName} />
                 <StatusBadge status={item.status as 'ready' | 'stale' | 'generating' | 'archived'} />
               </div>
               <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', margin: 0, marginBottom: '4px' }}>

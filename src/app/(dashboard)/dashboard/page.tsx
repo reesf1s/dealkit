@@ -305,28 +305,32 @@ export default function DashboardPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#818CF8', flexShrink: 0 }} />
                           <span style={{ fontSize: '12px', color: '#A78BFA', fontWeight: 500 }}>{p.label}</span>
-                          <span style={{ fontSize: '10px', color: '#4B5563' }}>· {p.dealIds.length} deal{p.dealIds.length !== 1 ? 's' : ''}</span>
                         </div>
-                        {p.dealIds.length > 0 && (
+                        {(p.dealIds.length > 0 || p.companies.length > 0) && (
                           <div style={{ display: 'flex', gap: '5px', paddingLeft: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                            {p.dealIds.slice(0, 4).map((dealId, di) => {
-                              const dealName = p.dealNames[di] || ''
+                            {(p.dealIds.length > 0 ? p.dealIds : p.companies).slice(0, 4).map((idOrCompany, di) => {
+                              const dealId = p.dealIds[di] || ''
+                              const dealName = p.dealNames?.[di] || ''
                               const company = p.companies[di] || 'Deal'
-                              return (
-                                <Link key={dealId} href={`/deals/${dealId}`} style={{
-                                  fontSize: '11px', color: '#9CA3AF',
-                                  background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)',
+                              const displayText = dealName || company
+                              const inner = (
+                                <span key={di} style={{
+                                  fontSize: '11px', color: '#C4B5FD', fontWeight: 500,
+                                  background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)',
                                   borderRadius: '5px', padding: '2px 8px', textDecoration: 'none',
-                                  transition: 'all 0.12s', lineHeight: '1.4',
-                                }}
-                                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#C4B5FD'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.3)' }}
-                                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#9CA3AF'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.12)' }}
-                                title={dealName ? `${dealName} — ${company}` : company}
-                                >{dealName || company}</Link>
+                                  transition: 'all 0.12s', lineHeight: '1.4', cursor: dealId ? 'pointer' : 'default',
+                                }}>{displayText}</span>
                               )
+                              return dealId ? (
+                                <Link key={dealId} href={`/deals/${dealId}`} style={{ textDecoration: 'none' }}
+                                  onMouseEnter={e => { const s = e.currentTarget.firstElementChild as HTMLElement; if(s) { s.style.color = '#E9DDFF'; s.style.borderColor = 'rgba(139,92,246,0.35)' }}}
+                                  onMouseLeave={e => { const s = e.currentTarget.firstElementChild as HTMLElement; if(s) { s.style.color = '#C4B5FD'; s.style.borderColor = 'rgba(139,92,246,0.15)' }}}
+                                  title={dealName ? `${dealName} — ${company}` : company}
+                                >{inner}</Link>
+                              ) : inner
                             })}
-                            {p.dealIds.length > 4 && (
-                              <span style={{ fontSize: '10px', color: '#4B5563' }}>+{p.dealIds.length - 4} more</span>
+                            {Math.max(p.dealIds.length, p.companies.length) > 4 && (
+                              <span style={{ fontSize: '10px', color: '#4B5563' }}>+{Math.max(p.dealIds.length, p.companies.length) - 4} more</span>
                             )}
                           </div>
                         )}
@@ -335,6 +339,52 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Suggested Collateral — brain-powered, proactive recommendations */}
+      {(() => {
+        const brain = brainRes?.data
+        const suggestions: { dealId: string; dealName: string; company: string; suggestion: string; type: string; reason: string }[] = brain?.suggestedCollateral ?? []
+        if (suggestions.length === 0) return null
+        return (
+          <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <Sparkles size={11} color="#818CF8" />
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Suggested for You</span>
+              <span style={{ fontSize: '10px', color: '#374151', marginLeft: 'auto' }}>Based on your pipeline</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {suggestions.slice(0, 4).map((s, i) => (
+                <div key={`${s.dealId}-${i}`} style={{
+                  display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px',
+                  borderBottom: i < Math.min(suggestions.length, 4) - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                }}>
+                  <Zap size={11} color="#F59E0B" style={{ flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', color: '#E5E7EB', fontWeight: 500 }}>{s.suggestion}</div>
+                    <div style={{ fontSize: '11px', color: '#555', marginTop: '1px' }}>
+                      <Link href={`/deals/${s.dealId}`} style={{ color: '#818CF8', textDecoration: 'none' }}>{s.company}</Link>
+                      <span style={{ color: '#333' }}> · </span>{s.reason}
+                    </div>
+                  </div>
+                  <Link
+                    href={`/collateral?generate=${s.type}&dealId=${s.dealId}`}
+                    style={{
+                      flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
+                      padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
+                      color: '#818CF8', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)',
+                      textDecoration: 'none', transition: 'all 0.12s',
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.15)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.3)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.08)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.15)' }}
+                  >
+                    <Sparkles size={10} /> Generate
+                  </Link>
+                </div>
+              ))}
             </div>
           </div>
         )

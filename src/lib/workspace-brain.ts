@@ -54,6 +54,14 @@ export interface WorkspaceBrain {
     company: string
     daysSinceUpdate: number
   }[]
+  suggestedCollateral: {        // proactive collateral suggestions based on deal data
+    dealId: string
+    dealName: string
+    company: string
+    suggestion: string          // e.g. "Objection handler for budget concerns"
+    type: string                // collateral type or 'custom'
+    reason: string              // why this is suggested
+  }[]
 }
 
 let schemaMigrated = false
@@ -220,6 +228,98 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     }
   }
 
+  // ── Proactive: suggested collateral ───────────────────────────────────────
+  const suggestedCollateral: WorkspaceBrain['suggestedCollateral'] = []
+
+  for (const snap of snapshots) {
+    if (snap.stage === 'closed_won' || snap.stage === 'closed_lost') continue
+    if (suggestedCollateral.length >= 5) break
+
+    // Deal in negotiation/proposal with risks → objection handler
+    if ((snap.stage === 'negotiation' || snap.stage === 'proposal') && snap.risks.length > 0) {
+      const topRisk = snap.risks[0]
+      suggestedCollateral.push({
+        dealId: snap.id,
+        dealName: snap.name,
+        company: snap.company,
+        suggestion: `Objection handler for ${topRisk.toLowerCase()}`,
+        type: 'objection_handler',
+        reason: `Deal is in ${snap.stage} stage with identified risk: "${topRisk}"`,
+      })
+      if (suggestedCollateral.length >= 5) break
+    }
+
+    // Deal has competitor-related risks → battlecard
+    const riskText = snap.risks.join(' ').toLowerCase()
+    const hasCompetitorMention = ['competitor', 'competing', 'alternative', 'rival', 'vs '].some(kw => riskText.includes(kw))
+    if (hasCompetitorMention) {
+      suggestedCollateral.push({
+        dealId: snap.id,
+        dealName: snap.name,
+        company: snap.company,
+        suggestion: `Competitive battlecard for ${snap.company}`,
+        type: 'battlecard',
+        reason: 'Competitor mentions detected in deal risks',
+      })
+      if (suggestedCollateral.length >= 5) break
+    }
+
+    // Deal in discovery with no summary → talk track
+    if (snap.stage === 'discovery' && !snap.summary) {
+      suggestedCollateral.push({
+        dealId: snap.id,
+        dealName: snap.name,
+        company: snap.company,
+        suggestion: 'Discovery call talk track',
+        type: 'talk_track',
+        reason: 'Deal is in discovery stage with no summary yet — a structured talk track can guide the conversation',
+      })
+      if (suggestedCollateral.length >= 5) break
+    }
+  }
+
+  // Stale deals → re-engagement email sequence
+  for (const s of staleDeals) {
+    if (suggestedCollateral.length >= 5) break
+    suggestedCollateral.push({
+      dealId: s.dealId,
+      dealName: s.dealName,
+      company: s.company,
+      suggestion: `Re-engagement email sequence for ${s.company}`,
+      type: 'email_sequence',
+      reason: `Deal has had no update in ${s.daysSinceUpdate} days — a re-engagement sequence can restart the conversation`,
+    })
+  }
+
+  // Pattern-based suggestions (across multiple deals)
+  for (const pattern of keyPatterns) {
+    if (suggestedCollateral.length >= 5) break
+    if (pattern.label === 'budget concerns' && pattern.dealIds.length >= 2) {
+      suggestedCollateral.push({
+        dealId: pattern.dealIds[0],
+        dealName: pattern.dealNames?.[0] ?? 'Multiple deals',
+        company: pattern.companies?.[0] ?? 'Multiple',
+        suggestion: 'Cost-benefit analysis template',
+        type: 'custom',
+        reason: `Budget concerns detected across ${pattern.dealIds.length} deals (${pattern.companies.slice(0, 3).join(', ')})`,
+      })
+    }
+    if (suggestedCollateral.length >= 5) break
+    if (pattern.label === 'competitor pressure' && pattern.dealIds.length >= 2) {
+      suggestedCollateral.push({
+        dealId: pattern.dealIds[0],
+        dealName: pattern.dealNames?.[0] ?? 'Multiple deals',
+        company: pattern.companies?.[0] ?? 'Multiple',
+        suggestion: 'Competitive positioning guide',
+        type: 'custom',
+        reason: `Competitor pressure detected across ${pattern.dealIds.length} deals (${pattern.companies.slice(0, 3).join(', ')})`,
+      })
+    }
+  }
+
+  // Trim to max 5
+  suggestedCollateral.splice(5)
+
   const brain: WorkspaceBrain = {
     updatedAt: now.toISOString(),
     deals: snapshots,
@@ -228,6 +328,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     keyPatterns,
     urgentDeals,
     staleDeals,
+    suggestedCollateral,
   }
 
   await db.execute(sql`
@@ -298,6 +399,15 @@ export function formatBrainContext(brain: WorkspaceBrain): string {
         const companies = p.companies ?? []
         lines.push(`• ${p.label ?? 'unknown'}${companies.length > 0 ? ` — ${companies.slice(0, 3).join(', ')}${companies.length > 3 ? ` +${companies.length - 3} more` : ''}` : ''}`)
       }
+    }
+  }
+
+  const suggestedCollateral = brain.suggestedCollateral ?? []
+  if (suggestedCollateral.length > 0) {
+    lines.push(`\nSUGGESTED COLLATERAL:`)
+    for (const sc of suggestedCollateral) {
+      lines.push(`• [${sc.type}] ${sc.suggestion} — for ${sc.dealName} (${sc.company})`)
+      lines.push(`  Reason: ${sc.reason}`)
     }
   }
 

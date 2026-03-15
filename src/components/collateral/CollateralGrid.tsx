@@ -53,7 +53,7 @@ function CollateralCard({
     >
       {/* Top row: type badge + status */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-        <CollateralTypeBadge type={item.type} />
+        <CollateralTypeBadge type={item.type} customTypeName={item.customTypeName} />
         <StatusBadge status={item.status as CollateralStatus & ('ready' | 'stale' | 'generating' | 'archived')} />
       </div>
 

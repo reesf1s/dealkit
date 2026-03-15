@@ -444,5 +444,139 @@ export async function generateCollateral(
     }
   }
 
+  // ─── CUSTOM (freeform) ────────────────────────────────────────────────────
+  if (type === 'custom') {
+    // Custom types use the freeform generator directly
+    throw new Error('Use generateFreeformCollateral() for custom collateral types')
+  }
+
   throw new Error(`Unknown collateral type: ${type}`)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Freeform collateral generation (for custom / dynamic types)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface GenerateFreeformInput {
+  workspaceId: string
+  title: string
+  description: string
+  dealContext?: string
+  customPrompt?: string
+}
+
+interface FreeformResult {
+  title: string
+  content: {
+    format: 'markdown'
+    title: string
+    sections: { heading: string; content: string }[]
+  }
+  rawResponse: unknown
+}
+
+export async function generateFreeformCollateral(
+  input: GenerateFreeformInput,
+): Promise<FreeformResult> {
+  const { workspaceId, title, description, dealContext, customPrompt } = input
+
+  // 1. Fetch company profile
+  const [profileRow] = await db
+    .select()
+    .from(companyProfiles)
+    .where(eq(companyProfiles.workspaceId, workspaceId))
+    .limit(1)
+
+  if (!profileRow) {
+    throw new Error('No company profile found. Please complete your company profile before generating collateral.')
+  }
+
+  // 2. Fetch workspace brain for grounding
+  const brain = await getWorkspaceBrain(workspaceId)
+  let workspaceContext = ''
+  if (brain) {
+    try { workspaceContext = formatBrainContext(brain) }
+    catch { /* non-fatal */ }
+  }
+  if (!workspaceContext) {
+    workspaceContext = await buildWorkspaceContext(workspaceId)
+  }
+
+  // 3. Build company summary for personalisation
+  const companySummary = [
+    `Company: ${profileRow.companyName}`,
+    profileRow.industry ? `Industry: ${profileRow.industry}` : null,
+    profileRow.description ? `Description: ${profileRow.description}` : null,
+    profileRow.competitiveAdvantage ? `Competitive Advantage: ${profileRow.competitiveAdvantage}` : null,
+    profileRow.targetMarket ? `Target Market: ${profileRow.targetMarket}` : null,
+    (profileRow.valuePropositions as string[])?.length
+      ? `Value Propositions: ${(profileRow.valuePropositions as string[]).join('; ')}`
+      : null,
+    (profileRow.differentiators as string[])?.length
+      ? `Differentiators: ${(profileRow.differentiators as string[]).join('; ')}`
+      : null,
+  ].filter(Boolean).join('\n')
+
+  // 4. Build system + user prompts
+  const system = `You are a professional sales content writer. You produce polished, actionable sales documents grounded in real company data and deal intelligence.
+
+Your output MUST be a single JSON object with this exact structure — no markdown fences, no preamble:
+{
+  "title": "<document title>",
+  "sections": [
+    { "heading": "<section heading>", "content": "<markdown content for this section>" }
+  ]
+}
+
+Rules:
+- Each section's "content" field should contain well-formatted markdown (headings within sections use ### or ####, bullet points, bold, etc.)
+- Produce 3–8 sections depending on the document scope
+- Ground every claim in the company data and workspace intelligence provided — do not fabricate metrics or customer names
+- Write in a professional but conversational sales tone
+- If deal context is provided, tailor the document specifically for that deal`
+
+  let userContent = `COMPANY PROFILE:\n${companySummary}`
+
+  if (workspaceContext) {
+    userContent += `\n\nWORKSPACE INTELLIGENCE:\n${workspaceContext}`
+  }
+
+  if (dealContext?.trim()) {
+    userContent += `\n\nDEAL CONTEXT:\n${dealContext.trim()}`
+  }
+
+  if (customPrompt?.trim()) {
+    userContent += `\n\nADDITIONAL INSTRUCTIONS:\n${customPrompt.trim()}`
+  }
+
+  userContent += `\n\nGENERATE THE FOLLOWING DOCUMENT:\nTitle: ${title}\nDescription: ${description}\n\nReturn ONLY the JSON object.`
+
+  const messages: Array<{ role: 'user'; content: string }> = [
+    { role: 'user', content: userContent },
+  ]
+
+  // 5. Call Claude
+  const raw = await callClaude(system, messages, 0.5)
+
+  // 6. Parse response
+  let parsed: { title: string; sections: { heading: string; content: string }[] }
+  try {
+    parsed = extractJson(raw) as typeof parsed
+  } catch {
+    throw new Error(`Claude returned non-JSON response: ${raw.slice(0, 200)}`)
+  }
+
+  if (!parsed.sections || !Array.isArray(parsed.sections)) {
+    throw new Error('Response missing required "sections" array')
+  }
+
+  return {
+    title: parsed.title || title,
+    content: {
+      format: 'markdown' as const,
+      title: parsed.title || title,
+      sections: parsed.sections,
+    },
+    rawResponse: raw,
+  }
 }

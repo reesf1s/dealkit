@@ -10,7 +10,7 @@ import {
 } from '@/lib/db/schema'
 import Anthropic from '@anthropic-ai/sdk'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { generateCollateral } from '@/lib/ai/generate'
+import { generateCollateral, generateFreeformCollateral } from '@/lib/ai/generate'
 import { PLAN_LIMITS, isWithinLimit } from '@/lib/stripe/plans'
 import type { CollateralType } from '@/types'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
@@ -129,7 +129,7 @@ const DEAL_ACTION_PATTERNS = [
 ]
 
 type Intent = 'meeting_notes' | 'competitor_battlecard' | 'company_update' |
-  'collateral_generate' | 'deal_create' | 'case_study_create' | 'deal_action' | 'product_gap' | 'qa'
+  'collateral_generate' | 'freeform_collateral' | 'deal_create' | 'case_study_create' | 'deal_action' | 'product_gap' | 'qa'
 
 function detectIntent(text: string): Intent {
   const lower = text.toLowerCase()
@@ -138,10 +138,20 @@ function detectIntent(text: string): Intent {
   // Product gap must be checked BEFORE company_update (pattern overlap)
   if (PRODUCT_GAP_PATTERNS.some(p => p.test(text))) return 'product_gap'
   // Collateral generation: only trigger for SHORT, focused requests (not complex multi-part analytical prompts)
-  // "draft" is too conversational — "draft me an email about X" = Q&A, not formal collateral doc
   const hasGenerateVerb = /\b(generate|create|make|write|build)\b/.test(lower)
   const isShortFocused = text.length < 200 && !/\b(for each|identify|analyze|analyse|top \d|biggest|priority|summarize|summarise)\b/i.test(text)
   if (hasGenerateVerb && isShortFocused && COLLATERAL_TYPES.some(c => lower.includes(c.keyword))) return 'collateral_generate'
+  // Freeform collateral: "generate a pricing justification", "create a competitive analysis", etc.
+  // Must match a generate verb + short focused + NOT a standard type
+  if (hasGenerateVerb && isShortFocused && !COLLATERAL_TYPES.some(c => lower.includes(c.keyword))) {
+    // Only if it looks like a document/material request (not "create a deal", "generate a report" etc.)
+    const isMaterialRequest = /\b(generate|create|make|build)\b.*\b(document|doc|analysis|justification|comparison|brief|playbook|cheat\s?sheet|guide|handbook|framework|matrix|scorecard|assessment|audit|plan|strategy|deck|pitch|presentation|overview|summary|profile|report|template|proposal|recommendation)\b/i.test(text)
+    if (isMaterialRequest) return 'freeform_collateral'
+  }
+  // Content creation requests (draft/write an email/letter/message) → Q&A so AI writes inline
+  // Must be checked BEFORE deal_action to prevent "in this deal" from hijacking content requests
+  const isContentRequest = /\b(draft|write|compose|prepare|create|send)\b.*\b(email|letter|message|response|reply|note|memo)\b/i.test(text)
+  if (isContentRequest) return 'qa'
   // deal_action BEFORE company_update — "review BOE to-do's" must not be mistaken for a profile update
   if (DEAL_ACTION_PATTERNS.some(p => p.test(text))) return 'deal_action'
   if (COMPANY_UPDATE_PATTERNS.some(p => p.test(text))) return 'company_update'
@@ -792,6 +802,113 @@ async function handleCollateralGeneration(
   }
 }
 
+// ── Handler: freeform collateral generation ────────────────────────────────────
+async function handleFreeformCollateral(
+  workspaceId: string, userId: string, text: string, plan: string,
+): Promise<{ reply: string; actions: ActionCard[] }> {
+  // Check company profile exists
+  const [profileRow] = await db.select({ id: companyProfiles.id }).from(companyProfiles)
+    .where(eq(companyProfiles.workspaceId, workspaceId)).limit(1)
+  if (!profileRow) {
+    return { reply: "I need your **Company Profile** before I can generate collateral. Complete it at [Company](/company) first.", actions: [] }
+  }
+
+  // Check plan limits
+  const limits = PLAN_LIMITS[plan as 'free' | 'starter' | 'pro']
+  if (limits.collateral !== null) {
+    const [{ value: cc }] = await db.select({ value: count() }).from(collateral).where(eq(collateral.workspaceId, workspaceId))
+    if (!isWithinLimit(Number(cc), limits.collateral)) {
+      return { reply: `Collateral limit reached on your ${plan} plan. [Upgrade](/settings) to generate more.`, actions: [] }
+    }
+  }
+
+  // Use AI to extract title + description from user request
+  const extractMsg = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001', max_tokens: 300,
+    messages: [{
+      role: 'user',
+      content: `Extract the document title and description from this request. Return ONLY JSON:
+{"title": "short document title", "description": "what the document should contain", "customTypeName": "short type label e.g. Pricing Justification, Competitive Analysis, Strategy Brief"}
+Request: ${text.slice(0, 500)}`,
+    }],
+  })
+
+  let extracted: { title: string; description: string; customTypeName: string } = {
+    title: 'Custom Document', description: text, customTypeName: 'Custom',
+  }
+  try {
+    extracted = JSON.parse(stripJson((extractMsg.content[0] as { type: string; text: string }).text))
+  } catch { /* use defaults */ }
+
+  // Try to match a deal by name/company for context
+  let dealContext: string | undefined
+  let sourceDealLogId: string | null = null
+  const dealRows = await db.select({
+    id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
+    stage: dealLogs.stage, dealRisks: dealLogs.dealRisks, aiSummary: dealLogs.aiSummary,
+    dealValue: dealLogs.dealValue, competitors: dealLogs.competitors,
+  }).from(dealLogs).where(and(eq(dealLogs.workspaceId, workspaceId), sql`${dealLogs.stage} NOT IN ('closed_won', 'closed_lost')`)).limit(20)
+
+  const lowerText = text.toLowerCase()
+  const matchedDeal = dealRows.find(d =>
+    lowerText.includes(d.dealName.toLowerCase()) || lowerText.includes(d.prospectCompany.toLowerCase())
+  )
+  if (matchedDeal) {
+    sourceDealLogId = matchedDeal.id
+    const risks = (matchedDeal.dealRisks as string[]) ?? []
+    const comps = (matchedDeal.competitors as string[]) ?? []
+    dealContext = [
+      `Prospect: ${matchedDeal.prospectCompany}`,
+      `Stage: ${matchedDeal.stage?.replace(/_/g, ' ')}`,
+      comps.length ? `Competitors: ${comps.join(', ')}` : '',
+      matchedDeal.aiSummary ? `Deal summary: ${matchedDeal.aiSummary}` : '',
+      risks.length ? `Active risks: ${risks.join('; ')}` : '',
+      matchedDeal.dealValue ? `Deal value: $${matchedDeal.dealValue.toLocaleString()}` : '',
+    ].filter(Boolean).join('\n')
+  }
+
+  const dealSuffix = matchedDeal ? ` — ${matchedDeal.prospectCompany}` : ''
+  const title = `${extracted.title}${dealSuffix}`
+  const now = new Date()
+
+  const [record] = await db.insert(collateral).values({
+    workspaceId, userId, type: 'custom' as CollateralType,
+    title: `Generating ${title}…`, status: 'generating',
+    customTypeName: extracted.customTypeName,
+    generationSource: 'chat',
+    sourceCompetitorId: null, sourceCaseStudyId: null, sourceDealLogId,
+    content: null, rawResponse: null, generatedAt: null, createdAt: now, updatedAt: now,
+  }).returning()
+
+  const colId = record.id
+  try {
+    const result = await generateFreeformCollateral({
+      workspaceId,
+      title: extracted.title,
+      description: extracted.description,
+      dealContext,
+      customPrompt: text,
+    })
+    const generatedAt = new Date()
+    await db.update(collateral)
+      .set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt })
+      .where(eq(collateral.id, colId))
+    await db.insert(events).values({ workspaceId, userId, type: 'collateral.generated', metadata: { collateralId: colId, collateralType: 'custom', customTypeName: extracted.customTypeName, title: result.title, source: 'chat' }, createdAt: new Date() })
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err)
+    await db.update(collateral).set({ status: 'stale', rawResponse: { error: errMsg }, updatedAt: new Date() }).where(eq(collateral.id, colId))
+    return {
+      reply: `❌ Failed to generate **${title}**: ${errMsg}`,
+      actions: [],
+    }
+  }
+
+  return {
+    reply: `Your **${extracted.customTypeName}** is ready: [View in Collateral](/collateral/${colId})`,
+    actions: [{ type: 'collateral_generating', colType: 'custom', title }],
+  }
+}
+
 // ── Handler: create deal ───────────────────────────────────────────────────────
 async function handleDealCreate(
   workspaceId: string, userId: string, text: string,
@@ -1144,6 +1261,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result)
     }
 
+    if (intent === 'freeform_collateral') {
+      const result = await handleFreeformCollateral(workspaceId, userId, lastText, plan)
+      return NextResponse.json(result)
+    }
+
     if (intent === 'deal_create') {
       const result = await handleDealCreate(workspaceId, userId, lastText)
       return NextResponse.json(result)
@@ -1226,26 +1348,30 @@ export async function POST(req: NextRequest) {
         : ''
 
     const pageContext = currentPage ? `\nUser is currently on: ${currentPage}` : ''
+    // Detect if user wants content drafted (email, message, etc.) — allow longer output
+    const wantsContent = /\b(draft|write|compose|prepare|create|send)\b.*\b(email|letter|message|response|reply|memo|proposal|brief|summary)\b/i.test(lastText)
+    const qaMaxTokens = wantsContent ? 1500 : 600
+
     const systemPrompt = `You are DealKit AI — the single brain for this sales team. Be direct, specific, concise. UK English.
 
 RULES: Short answers. No filler. Bold deal names. Bullet lists. Max 3–5 sentences for simple questions. Reference specific deals/contacts.${pageContext}
 
+${wantsContent ? `CONTENT MODE: The user wants you to write/draft content. Produce a COMPLETE, polished, ready-to-use piece. Include subject line if it's an email. Use the deal data (risks, stage, summary, contacts) to personalise it — don't be generic. Format with markdown.` : ''}
 Actions I can take (use these phrases to trigger them):
 • Paste meeting notes → auto-update deal, todos, risks
-• "Battlecard for [X]" → create competitor + battlecard
-• "Generate [type]" → collateral (objection handler / one-pager / talk track / email sequence)
+• "Battlecard for [X]" → competitor + battlecard
+• "Generate [type]" → collateral (objection handler / one-pager / talk track / email)
 • "New deal: [Company]" → log deal
-• "Case study: [Customer]" → create study
-• "Scan [Deal] todos" / "Review [Deal] todos" → clean up stale actions
+• "Scan [Deal] todos" → clean up stale actions
 • "Update [Deal] stage to X" → change deal stage
 
-IMPORTANT: If someone asks you to modify data (delete todos, update deals, etc.) and you're unsure whether the action system handled it, suggest they use a direct command like "scan [deal name] todos and delete duplicates". Do NOT pretend to execute changes — only describe what you observe in the data.
+If asked to draft an email, write a message, or create content — DO IT directly in your response. Use deal context to make it specific and personalised.
 ${activeDealSection}
 ${kbParts.join('\n') || 'No workspace data yet.'}${brainSection}`
 
     // Stream the Q&A response for instant perceived speed
     const stream = anthropic.messages.stream({
-      model: 'claude-haiku-4-5-20251001', max_tokens: 600,
+      model: 'claude-haiku-4-5-20251001', max_tokens: qaMaxTokens,
       system: systemPrompt,
       messages: messages.slice(-6).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })),
     })

@@ -10,6 +10,7 @@ import type {
   ObjectionHandlerContent,
   TalkTrackContent,
   EmailSequenceContent,
+  FreeformCollateralContent,
   TalkTrackSection,
   ObjectionCategory,
 } from '@/types'
@@ -499,22 +500,59 @@ function EmailSequenceViewer({ content }: { content: EmailSequenceContent }) {
   )
 }
 
+// ─── Freeform / Markdown viewer ─────────────────────────────────────────────
+
+function FreeformViewer({ content }: { content: FreeformCollateralContent }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {content.sections.map((section, i) => (
+        <Card key={i}>
+          <SectionHeading>{section.heading}</SectionHeading>
+          <div
+            style={{ fontSize: '13px', color: '#EBEBEB', lineHeight: 1.7 }}
+            dangerouslySetInnerHTML={{ __html: markdownToHtml(section.content) }}
+          />
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+/** Lightweight markdown → HTML for section content (bold, italic, bullets, headings) */
+function markdownToHtml(md: string): string {
+  return md
+    .replace(/^#### (.+)$/gm, '<h4 style="font-size:13px;font-weight:700;color:#C4B5FD;margin:12px 0 6px">$1</h4>')
+    .replace(/^### (.+)$/gm, '<h3 style="font-size:14px;font-weight:700;color:#A78BFA;margin:14px 0 6px">$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#EBEBEB">$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^[-•] (.+)$/gm, '<div style="display:flex;gap:8px;margin:3px 0"><span style="color:#6366F1;flex-shrink:0">•</span><span>$1</span></div>')
+    .replace(/\n{2,}/g, '<br/><br/>')
+    .replace(/\n/g, '<br/>')
+}
+
 // ─── Router ────────────────────────────────────────────────────────────────────
 
+function isFreeform(content: CollateralContent): content is FreeformCollateralContent {
+  return 'format' in content && (content as FreeformCollateralContent).format === 'markdown'
+}
+
 export function CollateralViewer({ content }: CollateralViewerProps) {
-  switch (content.type) {
+  // Check freeform first (custom type uses format: 'markdown')
+  if (isFreeform(content)) return <FreeformViewer content={content} />
+
+  switch ((content as { type?: string }).type) {
     case 'battlecard':
-      return <BattlecardViewer content={content} />
+      return <BattlecardViewer content={content as BattlecardContent} />
     case 'case_study_doc':
-      return <CaseStudyDocViewer content={content} />
+      return <CaseStudyDocViewer content={content as CaseStudyDocContent} />
     case 'one_pager':
-      return <OnePagerViewer content={content} />
+      return <OnePagerViewer content={content as OnePagerContent} />
     case 'objection_handler':
-      return <ObjectionHandlerViewer content={content} />
+      return <ObjectionHandlerViewer content={content as ObjectionHandlerContent} />
     case 'talk_track':
-      return <TalkTrackViewer content={content} />
+      return <TalkTrackViewer content={content as TalkTrackContent} />
     case 'email_sequence':
-      return <EmailSequenceViewer content={content} />
+      return <EmailSequenceViewer content={content as EmailSequenceContent} />
     default:
       return (
         <div style={{ padding: '24px', textAlign: 'center', color: '#555', fontSize: '13px' }}>

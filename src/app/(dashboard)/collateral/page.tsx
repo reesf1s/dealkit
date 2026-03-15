@@ -25,6 +25,7 @@ const ALL_TYPES: CollateralType[] = [
   'objection_handler',
   'talk_track',
   'email_sequence',
+  'custom',
 ]
 
 const TYPE_META: Record<CollateralType, { label: string; description: string }> = {
@@ -51,6 +52,10 @@ const TYPE_META: Record<CollateralType, { label: string; description: string }> 
   email_sequence: {
     label: 'Email Sequence',
     description: 'Multi-touch follow-up emails for prospects post-meeting',
+  },
+  custom: {
+    label: 'Custom',
+    description: 'AI-generated freeform document — ask for anything via chat',
   },
 }
 

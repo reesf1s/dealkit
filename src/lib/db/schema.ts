@@ -26,6 +26,7 @@ export const collateralTypeEnum = pgEnum('collateral_type', [
   'objection_handler',
   'talk_track',
   'email_sequence',
+  'custom',
 ])
 
 export const collateralStatusEnum = pgEnum('collateral_status', [
@@ -268,6 +269,8 @@ export const collateral = pgTable('collateral', {
   sourceDealLogId: uuid('source_deal_log_id').references(() => dealLogs.id, {
     onDelete: 'set null',
   }),
+  customTypeName: text('custom_type_name'),
+  generationSource: text('generation_source'),
   content: jsonb('content'),
   rawResponse: jsonb('raw_response'),
   generatedAt: timestamp('generated_at', { withTimezone: true }),

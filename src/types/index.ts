@@ -9,6 +9,7 @@ export type CollateralType =
   | 'objection_handler'
   | 'talk_track'
   | 'email_sequence'
+  | 'custom'
 
 export type CollateralStatus = 'generating' | 'ready' | 'stale' | 'archived'
 
@@ -144,6 +145,8 @@ export interface Collateral {
   sourceCompetitorId: string | null
   sourceCaseStudyId: string | null
   sourceDealLogId: string | null
+  customTypeName?: string | null
+  generationSource?: string | null
   // Generated content — shape depends on type
   content: CollateralContent | null
   // Raw LLM response stored for debugging / regeneration
@@ -162,6 +165,13 @@ export type CollateralContent =
   | ObjectionHandlerContent
   | TalkTrackContent
   | EmailSequenceContent
+  | FreeformCollateralContent
+
+export interface FreeformCollateralContent {
+  format: 'markdown'
+  title: string
+  sections: { heading: string; content: string }[]
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Collateral content types

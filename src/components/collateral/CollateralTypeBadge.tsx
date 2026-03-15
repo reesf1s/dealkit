@@ -4,6 +4,7 @@ import type { CollateralType } from '@/types'
 
 interface CollateralTypeBadgeProps {
   type: CollateralType
+  customTypeName?: string | null
 }
 
 const TYPE_CONFIG: Record<CollateralType, { label: string; color: string; bg: string }> = {
@@ -39,12 +40,10 @@ const TYPE_CONFIG: Record<CollateralType, { label: string; color: string; bg: st
   },
 }
 
-export function CollateralTypeBadge({ type }: CollateralTypeBadgeProps) {
-  const config = TYPE_CONFIG[type] ?? {
-    label: type,
-    color: '#888888',
-    bg: 'rgba(136, 136, 136, 0.12)',
-  }
+export function CollateralTypeBadge({ type, customTypeName }: CollateralTypeBadgeProps) {
+  const config = type === 'custom'
+    ? { label: customTypeName || 'Custom', color: '#C4B5FD', bg: 'rgba(196, 181, 253, 0.12)' }
+    : (TYPE_CONFIG[type] ?? { label: type, color: '#888888', bg: 'rgba(136, 136, 136, 0.12)' })
 
   return (
     <span
