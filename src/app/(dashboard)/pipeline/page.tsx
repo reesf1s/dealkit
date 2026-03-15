@@ -13,6 +13,18 @@ import {
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
+// ── Brain-powered urgency/stale lookup ─────────────────────────────────────
+function useDealFlags(deals: any[]) {
+  const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
+  const brain = brainRes?.data
+  if (!brain) return { urgentMap: {} as Record<string, string>, staleMap: {} as Record<string, number> }
+  const urgentMap: Record<string, string> = {}
+  const staleMap: Record<string, number> = {}
+  for (const u of (brain.urgentDeals ?? [])) urgentMap[u.dealId] = u.reason
+  for (const s of (brain.staleDeals ?? [])) staleMap[s.dealId] = s.daysSinceUpdate
+  return { urgentMap, staleMap }
+}
+
 // Annualise a deal's stored value so one-off and recurring are comparable
 function annualizedValue(value: number, dealType?: string | null, recurringInterval?: string | null): number {
   if (!value) return 0
@@ -61,12 +73,16 @@ function DealCard({
   onDragStart,
   onDragEnd,
   isDragging,
+  urgentReason,
+  staleDays,
 }: {
   deal: any
   onMoveStage: (id: string, stage: string) => void
   onDragStart: (id: string) => void
   onDragEnd: () => void
   isDragging: boolean
+  urgentReason?: string
+  staleDays?: number
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const nextStages = STAGES.filter(s => s.id !== deal.stage && s.id !== 'closed_won' && s.id !== 'closed_lost')
@@ -178,6 +194,20 @@ function DealCard({
         </div>
       </div>
 
+      {/* Urgency / stale signals from brain */}
+      {urgentReason && (
+        <div style={{ display: 'flex', gap: '5px', alignItems: 'center', padding: '5px 8px', borderRadius: '6px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', marginBottom: '8px' }}>
+          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#EF4444', flexShrink: 0 }} />
+          <span style={{ fontSize: '10px', color: '#FCA5A5', lineHeight: 1.4 }}>{urgentReason}</span>
+        </div>
+      )}
+      {!urgentReason && staleDays !== undefined && staleDays >= 14 && (
+        <div style={{ display: 'flex', gap: '5px', alignItems: 'center', padding: '5px 8px', borderRadius: '6px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.12)', marginBottom: '8px' }}>
+          <Clock size={9} color="#F59E0B" />
+          <span style={{ fontSize: '10px', color: '#FDE68A' }}>{staleDays}d since last update</span>
+        </div>
+      )}
+
       {/* AI Insights */}
       {deal.conversionInsights?.[0] && (
         <div style={{
@@ -224,6 +254,7 @@ export default function PipelinePage() {
   const { sidebarWidth, aiSidebarWidth } = useSidebar()
   const { data: dealsData, isLoading } = useSWR('/api/deals', fetcher)
   const deals: any[] = dealsData?.data ?? []
+  const { urgentMap, staleMap } = useDealFlags(deals)
 
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
@@ -268,8 +299,35 @@ export default function PipelinePage() {
     .sort((a: any, b: any) => (b.conversionScore ?? 0) - (a.conversionScore ?? 0))
     .slice(0, 3)
 
+  const urgentCount = Object.keys(urgentMap).length
+  const staleCount = Object.keys(staleMap).length
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', minWidth: 0, width: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0, width: '100%' }}>
+
+      {/* Brain focus bar */}
+      {(urgentCount > 0 || staleCount > 0) && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px',
+          background: '#0F0F0F', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px',
+          flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: '11px', color: '#444', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: '4px' }}>Focus</span>
+          {urgentCount > 0 && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#FCA5A5', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '4px', padding: '2px 8px' }}>
+              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#EF4444' }} />
+              {urgentCount} urgent
+            </span>
+          )}
+          {staleCount > 0 && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#FDE68A', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.12)', borderRadius: '4px', padding: '2px 8px' }}>
+              <Clock size={9} color="#F59E0B" />
+              {staleCount} stale
+            </span>
+          )}
+          <span style={{ fontSize: '11px', color: '#333', marginLeft: 'auto' }}>Flagged by AI · hover cards for detail</span>
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -455,6 +513,8 @@ export default function PipelinePage() {
                       onDragStart={setDraggedId}
                       onDragEnd={() => { setDraggedId(null); setDragOverStage(null) }}
                       isDragging={draggedId === deal.id}
+                      urgentReason={urgentMap[deal.id]}
+                      staleDays={staleMap[deal.id]}
                     />
                   ))
                 )}

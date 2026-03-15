@@ -5,7 +5,7 @@ import useSWR from 'swr'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { TrendingUp, Users, BookOpen, ClipboardList, FileText, Plus, RefreshCw, AlertTriangle, CheckCircle, Circle, ArrowUpRight, Zap, Target, BarChart3, Sparkles, Copy, Check, Map } from 'lucide-react'
+import { TrendingUp, Users, BookOpen, ClipboardList, FileText, Plus, RefreshCw, AlertTriangle, CheckCircle, Circle, ArrowUpRight, Zap, Target, BarChart3, Sparkles, Copy, Check, Map, Clock } from 'lucide-react'
 import ROIWidget from '@/components/dashboard/ROIWidget'
 import AIOverviewCard from '@/components/dashboard/AIOverviewCard'
 import { SetupAlert } from '@/components/shared/SetupBanner'
@@ -122,6 +122,7 @@ export default function DashboardPage() {
   const { data: collateral } = useSWR('/api/collateral', fetcher)
   const { data: insights } = useSWR('/api/insights', fetcher)
   const { data: productGapsData } = useSWR('/api/product-gaps', fetcher)
+  const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
 
   const dbNotConnected = isDbNotConfigured(companyErr)
 
@@ -273,6 +274,72 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* Pipeline Focus — brain-sourced, proactive, no AI cost */}
+      {(() => {
+        const brain = brainRes?.data
+        if (!brain) return null
+        const urgent: { dealId: string; dealName: string; company: string; reason: string }[] = brain.urgentDeals ?? []
+        const stale: { dealId: string; dealName: string; company: string; daysSinceUpdate: number }[] = (brain.staleDeals ?? []).slice(0, 3)
+        const patterns: string[] = brain.keyPatterns ?? []
+        if (urgent.length === 0 && stale.length === 0 && patterns.length === 0) return null
+        return (
+          <div style={{ background: '#0E0E0E', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
+            {/* Header row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1' }} />
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Pipeline Focus</span>
+              <span style={{ fontSize: '11px', color: '#333', marginLeft: 'auto' }}>
+                {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+              </span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {urgent.map((u, i) => (
+                <Link key={u.dealId} href={`/deals/${u.dealId}`} style={{
+                  display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px',
+                  borderBottom: (i < urgent.length - 1 || stale.length > 0 || patterns.length > 0) ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                  textDecoration: 'none', transition: 'background 120ms',
+                }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                >
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#EF4444', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: '13px', color: '#E5E7EB', fontWeight: 500 }}>{u.company}</span>
+                    <span style={{ fontSize: '12px', color: '#555', marginLeft: '8px' }}>{u.reason}</span>
+                  </div>
+                  <ArrowUpRight size={12} color="#333" />
+                </Link>
+              ))}
+              {stale.map((s, i) => (
+                <Link key={s.dealId} href={`/deals/${s.dealId}`} style={{
+                  display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px',
+                  borderBottom: (i < stale.length - 1 || patterns.length > 0) ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                  textDecoration: 'none', transition: 'background 120ms',
+                }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                >
+                  <Clock size={10} color="#F59E0B" style={{ flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: '13px', color: '#D1D5DB', fontWeight: 500 }}>{s.company}</span>
+                    <span style={{ fontSize: '12px', color: '#555', marginLeft: '8px' }}>{s.daysSinceUpdate}d since last update</span>
+                  </div>
+                  <ArrowUpRight size={12} color="#333" />
+                </Link>
+              ))}
+              {patterns.length > 0 && (
+                <div style={{ padding: '9px 14px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '10px', color: '#444', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: '2px' }}>Pattern</span>
+                  {patterns.slice(0, 2).map((p, i) => (
+                    <span key={i} style={{ fontSize: '11px', color: '#818CF8', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '4px', padding: '2px 8px' }}>{p}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* AI Overview — refreshes daily, summarises pipeline + key actions */}
       <AIOverviewCard />

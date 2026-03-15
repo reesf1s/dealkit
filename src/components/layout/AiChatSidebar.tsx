@@ -335,7 +335,7 @@ function MarkdownContent({ content }: { content: string }) {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function AiChatSidebar() {
-  const { aiCollapsed, toggleAiCollapsed } = useSidebar()
+  const { aiCollapsed, toggleAiCollapsed, activeDeal } = useSidebar()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -378,7 +378,7 @@ export default function AiChatSidebar() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: updated }),
+        body: JSON.stringify({ messages: updated, activeDealId: activeDeal?.id ?? null }),
         signal: abortRef.current.signal,
       })
       clearTimeout(timeoutId)
@@ -481,7 +481,17 @@ export default function AiChatSidebar() {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '13px', fontWeight: 600, color: '#F0EEFF', lineHeight: 1.2 }}>AI Assistant</div>
-          <div style={{ fontSize: '10px', color: '#555', marginTop: '1px' }}>Powered by Claude</div>
+          {activeDeal ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px' }}>
+              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
+              <span style={{ fontSize: '10px', color: '#6EE7B7', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {activeDeal.company}
+              </span>
+              <span style={{ fontSize: '10px', color: '#333', flexShrink: 0 }}>· {activeDeal.stage.replace('_', ' ')}</span>
+            </div>
+          ) : (
+            <div style={{ fontSize: '10px', color: '#444', marginTop: '1px' }}>Powered by Claude</div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
           {loading && (
@@ -525,38 +535,61 @@ export default function AiChatSidebar() {
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-        {/* Empty state: 2×2 capability grid */}
+        {/* Empty state */}
         {messages.length === 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '4px' }}>
-            <p style={{ fontSize: '11px', color: '#444', margin: 0, textAlign: 'center', lineHeight: 1.5 }}>
-              I can update your CRM from natural language.<br />What do you want to do?
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {CAPABILITIES.map(cap => {
-                const Icon = cap.icon
-                return (
-                  <button
-                    key={cap.title}
-                    onClick={() => {
-                      setInput(cap.prompt)
-                      inputRef.current?.focus()
-                    }}
-                    style={{
-                      padding: '10px', borderRadius: '10px', textAlign: 'left',
-                      background: cap.bg, border: `1px solid ${cap.border}`,
-                      cursor: 'pointer', transition: 'all 150ms',
-                      display: 'flex', flexDirection: 'column', gap: '5px',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.opacity = '0.75' }}
-                    onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
-                  >
-                    <Icon size={14} color={cap.color} />
-                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#E5E7EB', lineHeight: 1.2 }}>{cap.title}</div>
-                    <div style={{ fontSize: '10px', color: '#6B7280', lineHeight: 1.4 }}>{cap.desc}</div>
-                  </button>
-                )
-              })}
-            </div>
+            {activeDeal ? (
+              <>
+                <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.12)', borderRadius: '8px', padding: '10px 12px' }}>
+                  <div style={{ fontSize: '10px', color: '#4ADE80', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '4px' }}>Deal context active</div>
+                  <div style={{ fontSize: '12px', color: '#E5E7EB', fontWeight: 600 }}>{activeDeal.company}</div>
+                  <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '2px' }}>{activeDeal.name} · {activeDeal.stage.replace('_', ' ')}</div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                  {[
+                    { icon: FileText, color: '#6366F1', bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.15)', title: 'Analyse notes', desc: 'Paste notes for this deal', prompt: `Analyse these meeting notes for ${activeDeal.company}:\n\n` },
+                    { icon: Mail, color: '#06B6D4', bg: 'rgba(6,182,212,0.08)', border: 'rgba(6,182,212,0.15)', title: 'Draft follow-up', desc: 'Address top risk with an email', prompt: `Draft a follow-up email for ${activeDeal.company} addressing the biggest risk in this deal.` },
+                    { icon: Zap, color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.15)', title: 'Generate collateral', desc: 'Email sequence, battlecard…', prompt: `Generate an email sequence for ${activeDeal.company} based on where we are in the deal.` },
+                    { icon: BarChart2, color: '#22C55E', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.15)', title: 'Deal assessment', desc: 'What\'s the status & next step', prompt: `Give me a brief assessment of the ${activeDeal.company} deal — current status, top risk, and recommended next action.` },
+                  ].map(cap => {
+                    const Icon = cap.icon
+                    return (
+                      <button key={cap.title} onClick={() => { setInput(cap.prompt); inputRef.current?.focus() }}
+                        style={{ padding: '9px 10px', borderRadius: '8px', textAlign: 'left', background: cap.bg, border: `1px solid ${cap.border}`, cursor: 'pointer', transition: 'opacity 150ms', display: 'flex', flexDirection: 'column', gap: '4px' }}
+                        onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
+                        onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+                      >
+                        <Icon size={13} color={cap.color} />
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#E5E7EB', lineHeight: 1.2 }}>{cap.title}</div>
+                        <div style={{ fontSize: '10px', color: '#6B7280', lineHeight: 1.3 }}>{cap.desc}</div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            ) : (
+              <>
+                <p style={{ fontSize: '11px', color: '#444', margin: 0, textAlign: 'center', lineHeight: 1.5 }}>
+                  Paste notes, ask about your pipeline,<br />or generate collateral.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                  {CAPABILITIES.map(cap => {
+                    const Icon = cap.icon
+                    return (
+                      <button key={cap.title} onClick={() => { setInput(cap.prompt); inputRef.current?.focus() }}
+                        style={{ padding: '9px 10px', borderRadius: '8px', textAlign: 'left', background: cap.bg, border: `1px solid ${cap.border}`, cursor: 'pointer', transition: 'opacity 150ms', display: 'flex', flexDirection: 'column', gap: '4px' }}
+                        onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
+                        onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+                      >
+                        <Icon size={13} color={cap.color} />
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#E5E7EB', lineHeight: 1.2 }}>{cap.title}</div>
+                        <div style={{ fontSize: '10px', color: '#6B7280', lineHeight: 1.3 }}>{cap.desc}</div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -639,7 +672,7 @@ export default function AiChatSidebar() {
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKey}
-            placeholder="Ask anything or paste meeting notes..."
+            placeholder={activeDeal ? `Ask about ${activeDeal.company}, paste notes…` : 'Ask anything or paste meeting notes…'}
             rows={1}
             style={{
               flex: 1, background: 'none', border: 'none', outline: 'none',

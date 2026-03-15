@@ -9,9 +9,11 @@ import * as Dialog from '@radix-ui/react-dialog'
 import {
   ArrowLeft, Sparkles, CheckSquare, Square, Plus, Target, Loader2,
   FileText, Clipboard, ChevronDown, TrendingUp, DollarSign, Calendar,
-  Building2, User, Edit, Trash2, MoreHorizontal, CheckCircle, X, Link2, Check
+  Building2, User, Edit, Trash2, MoreHorizontal, CheckCircle, X, Link2, Check,
+  Mail, Sword, FileText as FileTextIcon, Zap
 } from 'lucide-react'
 import type { DealContact } from '@/types'
+import { useSidebar } from '@/components/layout/SidebarContext'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -127,6 +129,48 @@ function MeetingNotesTab({ dealId, deal, onUpdate }: { dealId: string; deal: any
           onBlur={e => (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'}
         />
       </div>
+
+      {/* Quick-generate bar — shown after first analysis */}
+      {result && (
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {[
+            { label: 'Email sequence', icon: Mail, href: `/collateral?dealId=${dealId}&type=email_sequence` },
+            { label: 'Battlecard', icon: Sword, href: `/collateral?dealId=${dealId}&type=battlecard` },
+            { label: 'Meeting prep', icon: Zap, onClick: () => {} },
+          ].map(({ label, icon: Icon, href, onClick }) => (
+            href ? (
+              <Link key={label} href={href} style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 500,
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                color: '#9CA3AF', textDecoration: 'none', transition: 'all 120ms',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.3)'; (e.currentTarget as HTMLElement).style.color = '#E5E7EB' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color = '#9CA3AF' }}
+              >
+                <Icon size={12} />
+                {label}
+              </Link>
+            ) : null
+          ))}
+          <button
+            onClick={() => {
+              const el = document.getElementById(`prep-tab-${dealId}`)
+              el?.click()
+            }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
+              borderRadius: '6px', fontSize: '12px', fontWeight: 500,
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+              color: '#9CA3AF', cursor: 'pointer', transition: 'all 120ms',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'; e.currentTarget.style.color = '#E5E7EB' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#9CA3AF' }}
+          >
+            <Zap size={12} />Meeting prep
+          </button>
+        </div>
+      )}
 
       {/* AI Results */}
       {(result || deal?.aiSummary) && (
@@ -1287,11 +1331,27 @@ export default function DealDetailPage() {
   const deal = data?.data ?? data
   const { data: gapsData } = useSWR('/api/product-gaps', fetcher)
   const dealGaps: any[] = (gapsData?.data ?? []).filter((g: any) => (g.sourceDeals as string[] ?? []).includes(id))
+  const { setActiveDeal } = useSidebar()
 
   const [activeTab, setActiveTab] = useState<'overview' | 'meeting-notes' | 'prep' | 'todos' | 'success'>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [winStoryOpen, setWinStoryOpen] = useState(false)
   const [wonDeal, setWonDeal] = useState<any>(null)
+
+  // Register this deal as active context for the AI chat sidebar
+  useEffect(() => {
+    if (deal) {
+      setActiveDeal({ id: deal.id, name: deal.dealName, company: deal.prospectCompany, stage: deal.stage })
+    }
+    return () => setActiveDeal(null)
+  }, [deal?.id, deal?.dealName, deal?.prospectCompany, deal?.stage])
+
+  // Auto-switch to Meeting Notes tab when deal has no prior notes (first visit)
+  useEffect(() => {
+    if (deal && !deal.meetingNotes && !deal.aiSummary) {
+      setActiveTab('meeting-notes')
+    }
+  }, [deal?.id])
 
   if (!deal && data !== undefined) {
     return (

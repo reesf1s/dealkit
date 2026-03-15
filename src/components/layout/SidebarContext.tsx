@@ -2,6 +2,13 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
+export interface ActiveDeal {
+  id: string
+  name: string
+  company: string
+  stage: string
+}
+
 interface SidebarCtx {
   collapsed: boolean
   mobileOpen: boolean
@@ -13,6 +20,9 @@ interface SidebarCtx {
   aiCollapsed: boolean
   toggleAiCollapsed: () => void
   aiSidebarWidth: number
+  // Active deal context — set by deal detail page so AI chat knows what you're looking at
+  activeDeal: ActiveDeal | null
+  setActiveDeal: (deal: ActiveDeal | null) => void
 }
 
 const Ctx = createContext<SidebarCtx>({
@@ -25,6 +35,8 @@ const Ctx = createContext<SidebarCtx>({
   aiCollapsed: false,
   toggleAiCollapsed: () => {},
   aiSidebarWidth: 340,
+  activeDeal: null,
+  setActiveDeal: () => {},
 })
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
@@ -32,6 +44,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [aiCollapsed, setAiCollapsed] = useState(false)
+  const [activeDeal, setActiveDeal] = useState<ActiveDeal | null>(null)
 
   useEffect(() => {
     const stored = localStorage.getItem('sidebar-collapsed')
@@ -75,6 +88,8 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
       aiCollapsed,
       toggleAiCollapsed,
       aiSidebarWidth,
+      activeDeal,
+      setActiveDeal,
     }}>
       {children}
     </Ctx.Provider>
