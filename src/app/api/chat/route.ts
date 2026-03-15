@@ -766,6 +766,7 @@ async function handleCollateralGeneration(
   const typeLabel: Record<CollateralType, string> = {
     battlecard: 'Battlecard', case_study_doc: 'Case Study Doc', one_pager: 'One-Pager',
     objection_handler: 'Objection Handler', talk_track: 'Talk Track', email_sequence: 'Email Sequence',
+    custom: 'Custom',
   }
   const dealSuffix = matchedDeal ? ` — ${matchedDeal.prospectCompany}` : ''
   const title = buyerRole ? `${typeLabel[match.type]} — ${buyerRole}${dealSuffix}` : `${typeLabel[match.type]}${dealSuffix}`

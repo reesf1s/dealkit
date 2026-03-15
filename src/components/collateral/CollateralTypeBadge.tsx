@@ -7,7 +7,7 @@ interface CollateralTypeBadgeProps {
   customTypeName?: string | null
 }
 
-const TYPE_CONFIG: Record<CollateralType, { label: string; color: string; bg: string }> = {
+const TYPE_CONFIG: Partial<Record<CollateralType, { label: string; color: string; bg: string }>> = {
   battlecard: {
     label: 'Battlecard',
     color: '#F59E0B',
