@@ -280,8 +280,14 @@ export function formatBrainContext(brain: WorkspaceBrain): string {
 
   if (brain.keyPatterns.length > 0) {
     lines.push(`\nRECURRING PATTERNS:`)
-    for (const p of brain.keyPatterns) {
-      lines.push(`• ${p.label}${p.companies.length > 0 ? ` — ${p.companies.slice(0, 3).join(', ')}${p.companies.length > 3 ? ` +${p.companies.length - 3} more` : ''}` : ''}`)
+    for (const raw of brain.keyPatterns as unknown[]) {
+      if (typeof raw === 'string') {
+        // backward-compat: old DB snapshots store keyPatterns as string[]
+        lines.push(`• ${raw}`)
+      } else {
+        const p = raw as { label: string; dealIds: string[]; companies: string[] }
+        lines.push(`• ${p.label}${p.companies.length > 0 ? ` — ${p.companies.slice(0, 3).join(', ')}${p.companies.length > 3 ? ` +${p.companies.length - 3} more` : ''}` : ''}`)
+      }
     }
   }
 
