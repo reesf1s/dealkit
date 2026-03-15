@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Building2, Swords, BookOpen,
   ClipboardList, FileText, Settings, LogOut, Search,
   Kanban, AlertTriangle, Sparkles, ChevronLeft, ChevronRight,
-  X, Zap, Brain,
+  X, Brain,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 
