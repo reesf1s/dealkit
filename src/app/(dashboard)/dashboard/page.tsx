@@ -235,7 +235,7 @@ export default function DashboardPage() {
         )
         if (urgent.length === 0 && stale.length === 0 && patterns.length === 0) return null
         return (
-          <div style={{ background: '#0E0E0E', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
+          <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
             {/* Header row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1' }} />

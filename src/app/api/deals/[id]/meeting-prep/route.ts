@@ -29,7 +29,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     ])
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     const dealComps = comps.filter(c => (deal.competitors as string[])?.includes(c.name))
-    const brainContext = brain ? formatBrainContext(brain) : null
+    let brainContext: string | null = null
+    if (brain) {
+      try { brainContext = formatBrainContext(brain) }
+      catch { /* non-fatal: stale/corrupt brain snapshot */ }
+    }
     const prompt = `You are a B2B sales coach. Generate a focused meeting prep brief — only the most critical points a rep needs. Be concise.
 
 DEAL: ${deal.dealName} | ${deal.prospectName ?? 'Unknown'} at ${deal.prospectCompany} | Stage: ${deal.stage}${deal.dealValue ? ` | Value: £${deal.dealValue.toLocaleString()}` : ''}

@@ -240,53 +240,62 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
 
 /** Format the brain as a compact context string for LLM prompts. */
 export function formatBrainContext(brain: WorkspaceBrain): string {
+  // Defensive: old DB snapshots may have missing/null fields — guard every access
   const lines: string[] = []
   const fmt = (v: number) => v >= 1000 ? `£${(v / 1000).toFixed(0)}k` : `£${v}`
 
-  lines.push(`PIPELINE OVERVIEW (brain updated ${new Date(brain.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })})`)
-  lines.push(`Active deals: ${brain.pipeline.totalActive} | Total pipeline: ${fmt(brain.pipeline.totalValue)} | Avg conversion: ${brain.pipeline.avgConversionScore ?? 'N/A'}%`)
+  const pipeline = brain.pipeline ?? { totalActive: 0, totalValue: 0, avgConversionScore: null, stageBreakdown: {} }
+  const deals = brain.deals ?? []
+  const urgentDeals = brain.urgentDeals ?? []
+  const staleDeals = brain.staleDeals ?? []
+  const topRisks = brain.topRisks ?? []
+  const keyPatterns = brain.keyPatterns ?? []
 
-  if (brain.deals.length > 0) {
+  lines.push(`PIPELINE OVERVIEW (brain updated ${brain.updatedAt ? new Date(brain.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'unknown'})`)
+  lines.push(`Active deals: ${pipeline.totalActive} | Total pipeline: ${fmt(pipeline.totalValue)} | Avg conversion: ${pipeline.avgConversionScore ?? 'N/A'}%`)
+
+  if (deals.length > 0) {
     lines.push('\nDEALS:')
-    for (const d of brain.deals) {
+    for (const d of deals) {
       const isClosed = d.stage === 'closed_won' || d.stage === 'closed_lost'
       const scoreStr = d.conversionScore != null ? ` | ${d.conversionScore}%` : ''
       const valueStr = d.dealValue ? ` | ${fmt(d.dealValue)}` : ''
       const closeDateStr = d.closeDate ? ` | Close: ${new Date(d.closeDate).toLocaleDateString('en-GB')}` : ''
       lines.push(`• ${d.name} (${d.company}) — ${d.stage}${valueStr}${scoreStr}${closeDateStr}`)
       if (d.summary) lines.push(`  Summary: ${d.summary}`)
-      if (!isClosed && d.risks.length > 0) lines.push(`  Risks: ${d.risks.slice(0, 2).join(' | ')}`)
-      if (!isClosed && d.pendingTodos.length > 0) lines.push(`  Todos (${d.pendingTodos.length}): ${d.pendingTodos.slice(0, 3).join(' | ')}${d.pendingTodos.length > 3 ? ` +${d.pendingTodos.length - 3} more` : ''}`)
+      if (!isClosed && (d.risks ?? []).length > 0) lines.push(`  Risks: ${d.risks.slice(0, 2).join(' | ')}`)
+      if (!isClosed && (d.pendingTodos ?? []).length > 0) lines.push(`  Todos (${d.pendingTodos.length}): ${d.pendingTodos.slice(0, 3).join(' | ')}${d.pendingTodos.length > 3 ? ` +${d.pendingTodos.length - 3} more` : ''}`)
     }
   }
 
-  if (brain.urgentDeals.length > 0) {
+  if (urgentDeals.length > 0) {
     lines.push('\nURGENT — NEEDS ATTENTION:')
-    for (const u of brain.urgentDeals) {
+    for (const u of urgentDeals) {
       lines.push(`⚠️ ${u.dealName} (${u.company}): ${u.reason}`)
     }
   }
 
-  if (brain.staleDeals.length > 0) {
+  if (staleDeals.length > 0) {
     lines.push('\nSTALE DEALS (no update 14+ days):')
-    for (const s of brain.staleDeals.slice(0, 4)) {
+    for (const s of staleDeals.slice(0, 4)) {
       lines.push(`• ${s.dealName} (${s.company}) — ${s.daysSinceUpdate} days since last update`)
     }
   }
 
-  if (brain.topRisks.length > 0) {
-    lines.push(`\nTOP RISKS ACROSS PIPELINE:\n${brain.topRisks.slice(0, 4).map(r => `• ${r}`).join('\n')}`)
+  if (topRisks.length > 0) {
+    lines.push(`\nTOP RISKS ACROSS PIPELINE:\n${topRisks.slice(0, 4).map(r => `• ${r}`).join('\n')}`)
   }
 
-  if (brain.keyPatterns.length > 0) {
+  if (keyPatterns.length > 0) {
     lines.push(`\nRECURRING PATTERNS:`)
-    for (const raw of brain.keyPatterns as unknown[]) {
+    for (const raw of keyPatterns as unknown[]) {
       if (typeof raw === 'string') {
         // backward-compat: old DB snapshots store keyPatterns as string[]
         lines.push(`• ${raw}`)
       } else {
         const p = raw as { label: string; dealIds: string[]; companies: string[] }
-        lines.push(`• ${p.label}${p.companies.length > 0 ? ` — ${p.companies.slice(0, 3).join(', ')}${p.companies.length > 3 ? ` +${p.companies.length - 3} more` : ''}` : ''}`)
+        const companies = p.companies ?? []
+        lines.push(`• ${p.label ?? 'unknown'}${companies.length > 0 ? ` — ${companies.slice(0, 3).join(', ')}${companies.length > 3 ? ` +${companies.length - 3} more` : ''}` : ''}`)
       }
     }
   }

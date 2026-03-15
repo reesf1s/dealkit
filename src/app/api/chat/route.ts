@@ -1094,7 +1094,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Add workspace brain as rich pipeline intelligence on top of the per-feature KB
-    const brainSection = brain ? `\n\n## Live Pipeline Intelligence (Workspace Brain)\n${formatBrainContext(brain)}` : ''
+    let brainSection = ''
+    if (brain) {
+      try { brainSection = `\n\n## Live Pipeline Intelligence (Workspace Brain)\n${formatBrainContext(brain)}` }
+      catch { /* non-fatal: stale/corrupt brain snapshot — skip intelligence section */ }
+    }
 
     // If the user is viewing a specific deal, surface it as focused context at the top of the prompt
     const activeDeal = activeDealId ? dealRows.find(d => d.id === activeDealId) : null

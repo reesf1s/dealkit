@@ -111,7 +111,11 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
 
   // Enrich context with workspace brain if available (includes per-deal summaries + risks from analyze-notes)
   const brain = await getWorkspaceBrain(workspaceId)
-  const brainContext = brain ? `\n\nDEAL INTELLIGENCE (from meeting analysis):\n${formatBrainContext(brain)}` : ''
+  let brainContext = ''
+  if (brain) {
+    try { brainContext = `\n\nDEAL INTELLIGENCE (from meeting analysis):\n${formatBrainContext(brain)}` }
+    catch { /* non-fatal: stale/corrupt brain snapshot */ }
+  }
 
   const msg = await anthropic.messages.create({
     // Haiku is sufficient here — input is well-structured pipeline data, output is a small JSON object
