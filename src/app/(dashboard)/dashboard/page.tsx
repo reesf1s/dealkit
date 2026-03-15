@@ -5,7 +5,7 @@ import useSWR from 'swr'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { TrendingUp, Users, BookOpen, FileText, Plus, AlertTriangle, CheckCircle, Circle, ArrowUpRight, Zap, Target, Sparkles, Copy, Check, Map, Clock } from 'lucide-react'
+import { TrendingUp, Users, BookOpen, FileText, Plus, AlertTriangle, CheckCircle, Circle, ArrowUpRight, Zap, Target, Sparkles, Copy, Check, Clock } from 'lucide-react'
 import ROIWidget from '@/components/dashboard/ROIWidget'
 import AIOverviewCard from '@/components/dashboard/AIOverviewCard'
 import { SetupAlert } from '@/components/shared/SetupBanner'
@@ -118,10 +118,6 @@ export default function DashboardPage() {
     })))
     .sort((a, b) => b.stagePriority - a.stagePriority)
     .slice(0, 8)
-
-  // KB intelligence counters
-  const meetingsLogged = dealList.filter(d => d.todos && (d.todos as unknown[]).length > 0).length
-  const totalObjections = (companyData?.commonObjections as string[] | null)?.length ?? 0
 
   const steps = [
     { done: hasCompany, label: 'Complete company profile', unlock: 'Personalises every AI output', href: '/company' },
@@ -393,8 +389,6 @@ export default function DashboardPage() {
       {(insightsData?.crossDealAlerts ?? []).slice(0, 3).map((alert: { type: string; message: string; count: number }, i: number) => {
         const isRed = alert.type === 'losing_streak'
         const color = isRed ? '#EF4444' : alert.type === 'recurring_risk' ? '#A855F7' : '#F59E0B'
-        const bg = isRed ? 'rgba(239,68,68,0.05)' : alert.type === 'recurring_risk' ? 'rgba(168,85,247,0.05)' : 'rgba(234,179,8,0.05)'
-        const border = isRed ? 'rgba(239,68,68,0.15)' : alert.type === 'recurring_risk' ? 'rgba(168,85,247,0.15)' : 'rgba(234,179,8,0.15)'
         const href = alert.type === 'recurring_risk' ? '/product-gaps' : '/collateral'
         const cta = alert.type === 'recurring_risk' ? 'View gaps' : 'Update battlecard'
         return (
