@@ -77,7 +77,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const msg = await anthropic.messages.create({
       // Sonnet for deeper analysis + larger output budget — handles complex multi-field extraction reliably
-      model: 'claude-sonnet-4-5-20251022', max_tokens: 3000,
+      model: 'claude-3-5-sonnet-20241022', max_tokens: 3000,
       messages: [{ role: 'user', content: `You are analyzing B2B sales meeting notes. Extract structured information and return ONLY valid JSON, no markdown.
 
 ${previousContext ? `${previousContext}\n\n---\n\n` : ''}NEW MEETING NOTES TO ANALYZE:
