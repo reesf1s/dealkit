@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useState } from 'react'
 import useSWR from 'swr'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Plus, X } from 'lucide-react'
+import { Plus, X, ClipboardList } from 'lucide-react'
 import { DealTable } from '@/components/deals/DealTable'
 import { DealForm } from '@/components/deals/DealForm'
 import { DealInsights } from '@/components/deals/DealInsights'
@@ -60,23 +60,17 @@ export default function DealsPage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
         <div>
-          <h1 style={{
-            fontSize: '24px',
-            fontWeight: 800,
-            color: '#F1F1F3',
-            letterSpacing: '-0.04em',
-            margin: 0,
-            marginBottom: '5px',
-            background: 'linear-gradient(135deg, #F1F1F3 0%, #A5A5C0 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-          }}>
-            Deal Log
-          </h1>
-          <p style={{ fontSize: '13px', color: '#888', margin: 0 }}>
-            <span style={{ color: '#6366F1', fontWeight: 600 }}>{deals.length}</span>
-            {' '}logged{deals.length !== 1 ? '' : ''} · Track wins and losses to improve closing
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+            <div style={{ width: '32px', height: '32px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <ClipboardList size={15} color="#818CF8" />
+            </div>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', margin: 0 }}>
+              Deal Log
+            </h1>
+          </div>
+          <p style={{ fontSize: '13px', color: '#555', margin: 0, paddingLeft: '42px' }}>
+            <span style={{ color: '#818CF8', fontWeight: 600 }}>{deals.length}</span>
+            {' '}deals · Track wins and losses to improve closing
           </p>
         </div>
 

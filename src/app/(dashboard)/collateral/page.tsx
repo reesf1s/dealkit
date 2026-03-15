@@ -5,7 +5,7 @@ import { useState, useEffect, Suspense } from 'react'
 import useSWR from 'swr'
 import { useSearchParams } from 'next/navigation'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Plus, X, RefreshCw, Target } from 'lucide-react'
+import { Plus, X, RefreshCw, Target, FileText } from 'lucide-react'
 import { CollateralGrid } from '@/components/collateral/CollateralGrid'
 import { CollateralTypeBadge } from '@/components/collateral/CollateralTypeBadge'
 import { SkeletonGrid } from '@/components/shared/SkeletonCard'
@@ -214,10 +214,15 @@ function CollateralPageInner() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', margin: 0, marginBottom: '4px' }}>
-            Collateral
-          </h1>
-          <p style={{ fontSize: '13px', color: '#888', margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+            <div style={{ width: '32px', height: '32px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <FileText size={15} color="#FCD34D" />
+            </div>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', margin: 0 }}>
+              Collateral
+            </h1>
+          </div>
+          <p style={{ fontSize: '13px', color: '#555', margin: 0, paddingLeft: '42px' }}>
             {collateral.length} pieces • AI-generated sales materials
           </p>
         </div>
@@ -236,9 +241,9 @@ function CollateralPageInner() {
           )}
           <button
             onClick={() => setGenerateOpen(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: '#6366F1', border: 'none', cursor: 'pointer', transition: 'background-color 150ms ease' }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4F46E5' }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#6366F1' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', border: 'none', cursor: 'pointer', boxShadow: '0 0 16px rgba(99,102,241,0.3)', transition: 'opacity 150ms ease' }}
+            onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9' }}
+            onMouseLeave={(e) => { e.currentTarget.style.opacity = '1' }}
           >
             <Plus size={14} strokeWidth={2.5} />
             Generate New
@@ -317,7 +322,7 @@ function CollateralPageInner() {
       <Dialog.Root open={generateOpen} onOpenChange={(open) => { setGenerateOpen(open); if (!open) { setSelectedProduct(''); setBuyerRole(''); setCustomPrompt(''); setSpecificObjections(''); setSelectedDealId('') } }}>
         <Dialog.Portal>
           <Dialog.Overlay style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 500 }} />
-          <Dialog.Content style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 501, width: '100%', maxWidth: '520px', backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px', boxShadow: '0 16px 48px rgba(0,0,0,0.8)', outline: 'none' }}>
+          <Dialog.Content style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 501, width: '100%', maxWidth: '520px', background: 'rgba(12,10,24,0.97)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '24px', boxShadow: '0 24px 64px rgba(0,0,0,0.9)', outline: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <Dialog.Title style={{ fontSize: '16px', fontWeight: 600, color: '#EBEBEB', margin: 0 }}>
                 Generate collateral

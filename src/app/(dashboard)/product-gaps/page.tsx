@@ -88,11 +88,16 @@ export default function ProductGapsPage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: '700', letterSpacing: '-0.03em', color: '#F1F1F3', marginBottom: '4px' }}>
-            Product Gaps
-          </h1>
-          <p style={{ fontSize: '13px', color: '#555' }}>
-            Feature gaps identified from sales calls — share with your product team
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+            <div style={{ width: '32px', height: '32px', background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.2)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <AlertTriangle size={15} color="#FBBF24" />
+            </div>
+            <h1 style={{ fontSize: '22px', fontWeight: '700', letterSpacing: '-0.03em', color: '#F1F1F3', margin: 0 }}>
+              Feature Gaps
+            </h1>
+          </div>
+          <p style={{ fontSize: '13px', color: '#555', paddingLeft: '42px' }}>
+            From sales calls — share patterns with your product team
           </p>
         </div>
         <Link href="/deals" style={{

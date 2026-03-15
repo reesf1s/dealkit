@@ -124,7 +124,7 @@ export function DealTable({ deals, onAdd, onDelete }: DealTableProps) {
         </span>
       </div>
 
-      <div style={{ backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+      <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflow: 'hidden' }}>
         {/* Header row */}
         <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 120px 32px', padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           {[

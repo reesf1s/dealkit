@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useState } from 'react'
 import useSWR from 'swr'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Plus, X } from 'lucide-react'
+import { Plus, X, BookOpen } from 'lucide-react'
 import { CaseStudyGrid } from '@/components/case-studies/CaseStudyGrid'
 import { CaseStudyForm } from '@/components/case-studies/CaseStudyForm'
 import { SkeletonGrid } from '@/components/shared/SkeletonCard'
@@ -51,19 +51,24 @@ export default function CaseStudiesPage() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', margin: 0, marginBottom: '4px' }}>
-            Case studies
-          </h1>
-          <p style={{ fontSize: '13px', color: '#888', margin: 0 }}>
-            {caseStudies.length} stories • Used in AI-generated collateral
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+            <div style={{ width: '32px', height: '32px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <BookOpen size={15} color="#4ADE80" />
+            </div>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', margin: 0 }}>
+              Case Studies
+            </h1>
+          </div>
+          <p style={{ fontSize: '13px', color: '#555', margin: 0, paddingLeft: '42px' }}>
+            {caseStudies.length} stories • Fuel AI-generated collateral
           </p>
         </div>
 
         <button
           onClick={() => setAddOpen(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: '#6366F1', border: 'none', cursor: 'pointer', transition: 'background-color 150ms ease' }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4F46E5' }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#6366F1' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', border: 'none', cursor: 'pointer', boxShadow: '0 0 16px rgba(99,102,241,0.3)', transition: 'opacity 150ms ease' }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9' }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = '1' }}
         >
           <Plus size={14} strokeWidth={2.5} />
           Add Case Study
@@ -80,7 +85,7 @@ export default function CaseStudiesPage() {
       <Dialog.Root open={addOpen} onOpenChange={setAddOpen}>
         <Dialog.Portal>
           <Dialog.Overlay style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 500 }} />
-          <Dialog.Content style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 501, width: '100%', maxWidth: '680px', maxHeight: '92vh', overflowY: 'auto', backgroundColor: '#141414', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '24px', boxShadow: '0 16px 48px rgba(0,0,0,0.8)', outline: 'none' }}>
+          <Dialog.Content style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 501, width: '100%', maxWidth: '680px', maxHeight: '92vh', overflowY: 'auto', background: 'rgba(12,10,24,0.97)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '24px', boxShadow: '0 24px 64px rgba(0,0,0,0.9)', outline: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
               <Dialog.Title style={{ fontSize: '16px', fontWeight: 600, color: '#EBEBEB', margin: 0 }}>
                 Add case study

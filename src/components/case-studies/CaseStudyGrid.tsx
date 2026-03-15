@@ -20,24 +20,26 @@ function CaseStudyCard({ caseStudy }: { caseStudy: CaseStudy }) {
     >
       <div
         style={{
-          backgroundColor: '#141414',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: '8px',
+          background: 'rgba(255,255,255,0.03)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: '12px',
           padding: '16px',
           display: 'flex',
           flexDirection: 'column',
           gap: '12px',
           cursor: 'pointer',
-          transition: 'border-color 150ms ease, background-color 150ms ease',
+          transition: 'border-color 150ms ease, background 150ms ease',
           height: '100%',
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'
-          e.currentTarget.style.backgroundColor = '#181818'
+          e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'
-          e.currentTarget.style.backgroundColor = '#141414'
+          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'
+          e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
         }}
       >
         {/* Icon + generated badge */}
