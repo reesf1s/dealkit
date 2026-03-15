@@ -836,8 +836,7 @@ Text: ${text.slice(0, 3000)}`,
     stage: (extracted.stage as 'prospecting' | 'qualification' | 'discovery' | 'proposal' | 'negotiation') ?? 'prospecting',
     competitors: extracted.competitors ?? [],
     notes: extracted.notes ?? null,
-    todos: [], meetingNotes: null, aiSummary: null, conversionScore: null,
-    conversionInsights: null, dealRisks: [],
+    // Let notNull columns with defaults use their schema defaults (don't pass null)
     createdAt: now, updatedAt: now,
   }).returning()
 
