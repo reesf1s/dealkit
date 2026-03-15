@@ -41,7 +41,7 @@ export interface WorkspaceBrain {
     stageBreakdown: Record<string, number>
   }
   topRisks: string[]            // deduplicated across all active deals
-  keyPatterns: string[]         // recurring themes detected automatically
+  keyPatterns: { label: string; dealIds: string[]; companies: string[] }[]         // recurring themes detected automatically
   urgentDeals: {                // deals needing attention soon
     dealId: string
     dealName: string
@@ -204,14 +204,18 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     { label: 'internal competing priorities', keywords: ['priority', 'bandwidth', 'internal', 'resource', 'capacity'] },
   ]
 
-  const keyPatterns: string[] = []
+  const keyPatterns: WorkspaceBrain['keyPatterns'] = []
   for (const theme of riskWords) {
     const matchingDeals = activeDeals.filter(d => {
       const allText = ((d.dealRisks as string[]) ?? []).join(' ').toLowerCase()
       return theme.keywords.some(kw => allText.includes(kw))
     })
     if (matchingDeals.length >= 2) {
-      keyPatterns.push(`"${theme.label}" flagged in ${matchingDeals.length} active deals`)
+      keyPatterns.push({
+        label: theme.label,
+        dealIds: matchingDeals.map(d => d.id),
+        companies: matchingDeals.map(d => d.prospectCompany),
+      })
     }
   }
 
@@ -275,7 +279,12 @@ export function formatBrainContext(brain: WorkspaceBrain): string {
   }
 
   if (brain.keyPatterns.length > 0) {
-    lines.push(`\nRECURRING PATTERNS:\n${brain.keyPatterns.map(p => `• ${p}`).join('\n')}`)
+    lines.push(`\nRECURRING PATTERNS:`)
+    for (const p of brain.keyPatterns) {
+      const label = typeof p === 'string' ? p : p.label
+      const companies = typeof p === 'string' ? [] : p.companies
+      lines.push(`• ${label}${companies.length > 0 ? ` — ${companies.slice(0, 3).join(', ')}${companies.length > 3 ? ` +${companies.length - 3} more` : ''}` : ''}`)
+    }
   }
 
   return lines.join('\n')

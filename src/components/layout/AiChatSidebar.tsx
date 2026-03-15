@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { usePathname } from 'next/navigation'
 import { Send, Sparkles, User, Bot, RotateCcw, Square, MessageSquare, ChevronRight, ChevronLeft, FileText, Sword, Building2, Zap, CheckCircle2, PlusCircle, RefreshCw, BookOpen, AlertTriangle, BarChart2, Mail } from 'lucide-react'
 import { mutate as globalMutate } from 'swr'
 import { useSidebar } from './SidebarContext'
@@ -336,6 +337,20 @@ function MarkdownContent({ content }: { content: string }) {
 
 export default function AiChatSidebar() {
   const { aiCollapsed, toggleAiCollapsed, activeDeal } = useSidebar()
+  const pathname = usePathname()
+  const pageLabel = (() => {
+    if (pathname.startsWith('/deals/') && pathname !== '/deals') return null // deal badge handles this
+    if (pathname === '/dashboard') return 'Dashboard'
+    if (pathname === '/pipeline') return 'Pipeline'
+    if (pathname === '/deals') return 'All Deals'
+    if (pathname === '/collateral') return 'Collateral'
+    if (pathname === '/competitors') return 'Competitors'
+    if (pathname === '/case-studies') return 'Case Studies'
+    if (pathname === '/product-gaps') return 'Feature Gaps'
+    if (pathname === '/company') return 'Company Profile'
+    if (pathname === '/settings') return 'Settings'
+    return null
+  })()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -378,7 +393,7 @@ export default function AiChatSidebar() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: updated, activeDealId: activeDeal?.id ?? null }),
+        body: JSON.stringify({ messages: updated, activeDealId: activeDeal?.id ?? null, currentPage: pageLabel }),
         signal: abortRef.current.signal,
       })
       clearTimeout(timeoutId)
@@ -488,6 +503,11 @@ export default function AiChatSidebar() {
                 {activeDeal.company}
               </span>
               <span style={{ fontSize: '10px', color: '#333', flexShrink: 0 }}>· {activeDeal.stage.replace('_', ' ')}</span>
+            </div>
+          ) : pageLabel ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px' }}>
+              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1', flexShrink: 0 }} />
+              <span style={{ fontSize: '10px', color: '#818CF8', fontWeight: 500 }}>{pageLabel}</span>
             </div>
           ) : (
             <div style={{ fontSize: '10px', color: '#444', marginTop: '1px' }}>Powered by Claude</div>

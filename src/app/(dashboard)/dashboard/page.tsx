@@ -5,72 +5,13 @@ import useSWR from 'swr'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { TrendingUp, Users, BookOpen, ClipboardList, FileText, Plus, RefreshCw, AlertTriangle, CheckCircle, Circle, ArrowUpRight, Zap, Target, BarChart3, Sparkles, Copy, Check, Map, Clock } from 'lucide-react'
+import { TrendingUp, Users, BookOpen, FileText, Plus, AlertTriangle, CheckCircle, Circle, ArrowUpRight, Zap, Target, Sparkles, Copy, Check, Map, Clock } from 'lucide-react'
 import ROIWidget from '@/components/dashboard/ROIWidget'
 import AIOverviewCard from '@/components/dashboard/AIOverviewCard'
 import { SetupAlert } from '@/components/shared/SetupBanner'
 import { useUser } from '@clerk/nextjs'
 import { fetcher, isDbNotConfigured } from '@/lib/fetcher'
 import { useToast } from '@/components/shared/Toast'
-
-function StatCard({ label, value, icon: Icon, color, trend, featured }: { label: string; value: string | number; icon: React.ElementType; color: string; trend?: string; featured?: boolean }) {
-  return (
-    <div
-      style={{
-        position: 'relative',
-        background: 'rgba(18,12,32,0.7)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        border: featured
-          ? '1px solid rgba(139,92,246,0.45)'
-          : '1px solid rgba(124,58,237,0.18)',
-        borderRadius: '14px',
-        padding: '20px',
-        overflow: 'hidden',
-        transition: 'border-color 0.2s, transform 0.15s',
-        cursor: 'default',
-        boxShadow: featured
-          ? '0 0 30px rgba(99,102,241,0.2), inset 0 1px 0 rgba(139,92,246,0.2)'
-          : 'none',
-      }}
-      onMouseEnter={e => {
-        (e.currentTarget as HTMLElement).style.borderColor = featured ? 'rgba(139,92,246,0.65)' : `${color}55`
-        ;(e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'
-      }}
-      onMouseLeave={e => {
-        (e.currentTarget as HTMLElement).style.borderColor = featured ? 'rgba(139,92,246,0.45)' : 'rgba(124,58,237,0.18)'
-        ;(e.currentTarget as HTMLElement).style.transform = 'translateY(0)'
-      }}
-    >
-      {/* Corner radial gradient */}
-      <div style={{ position: 'absolute', top: 0, right: 0, width: '120px', height: '120px', background: `radial-gradient(circle at top right, ${color}18, transparent 65%)`, pointerEvents: 'none' }} />
-
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '18px' }}>
-        {/* Icon in glass container */}
-        <div style={{
-          width: '36px', height: '36px', borderRadius: '10px',
-          background: `rgba(18,12,32,0.8)`,
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-          border: `1px solid ${color}30`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: `0 0 12px ${color}18`,
-        }}>
-          <Icon size={16} color={color} />
-        </div>
-        {trend && (
-          <span style={{ fontSize: '11px', color: '#22C55E', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.18)', padding: '2px 8px', borderRadius: '100px', fontWeight: '600' }}>
-            {trend}
-          </span>
-        )}
-      </div>
-      {/* Large number value */}
-      <div style={{ fontSize: '32px', fontWeight: '700', letterSpacing: '-0.04em', color: '#F0EEFF', lineHeight: 1, marginBottom: '6px' }}>{value}</div>
-      {/* Small label */}
-      <div style={{ fontSize: '12px', color: '#9CA3AF', fontWeight: '500', letterSpacing: '0.01em' }}>{label}</div>
-    </div>
-  )
-}
 
 function HealthItem({ done, label, href }: { done: boolean; label: string; href: string }) {
   return (
@@ -237,42 +178,52 @@ export default function DashboardPage() {
   const greeting = firstName ? `${timeGreeting}, ${firstName}` : 'Dashboard'
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', paddingBottom: '4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h1 style={{ fontSize: '24px', fontWeight: '700', letterSpacing: '-0.04em', color: '#F0EEFF', marginBottom: '4px', background: 'linear-gradient(135deg, #F0EEFF, #A78BFA)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          <h1 style={{ fontSize: '20px', fontWeight: '600', letterSpacing: '-0.03em', color: '#F1F1F3', marginBottom: '2px' }}>
             {greeting}
           </h1>
-          <p style={{ fontSize: '13px', color: '#9CA3AF' }}>AI-powered deal conversion · {openDeals} open deal{openDeals !== 1 ? 's' : ''} in pipeline</p>
+          <p style={{ fontSize: '12px', color: '#4B5563' }}>
+            {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+            {openDeals > 0 && <span style={{ color: '#374151' }}> · {openDeals} deal{openDeals !== 1 ? 's' : ''} in pipeline</span>}
+          </p>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <Link href="/pipeline" style={{
-            display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-            background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(124,58,237,0.18)',
-            borderRadius: '9px', color: '#F0EEFF', fontSize: '13px', fontWeight: '500', textDecoration: 'none',
-          }}>
-            <Target size={13} /> Pipeline
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <Link href="/pipeline" style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '7px', color: '#9CA3AF', fontSize: '12px', fontWeight: '500', textDecoration: 'none', transition: 'color 0.1s, border-color 0.1s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#F1F1F3'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.14)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#9CA3AF'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)' }}
+          >
+            <Target size={11} /> Pipeline
           </Link>
-          <Link href="/deals" style={{
-            display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-            background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)',
-            border: '1px solid rgba(124,58,237,0.18)',
-            borderRadius: '9px', color: '#F0EEFF', fontSize: '13px', fontWeight: '500', textDecoration: 'none',
-          }}>
-            <Plus size={13} /> Log Deal
+          <Link href="/deals" style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '7px', color: '#9CA3AF', fontSize: '12px', fontWeight: '500', textDecoration: 'none', transition: 'color 0.1s, border-color 0.1s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#F1F1F3'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.14)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#9CA3AF'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)' }}
+          >
+            <Plus size={11} /> Log Deal
           </Link>
-          <Link href="/collateral" style={{
-            display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-            background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
-            boxShadow: '0 0 24px rgba(99,102,241,0.35)',
-            borderRadius: '9px', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none',
-          }}>
-            <Sparkles size={13} /> Generate
+          <Link href="/collateral" style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', background: '#6366F1', border: '1px solid rgba(99,102,241,0.6)', borderRadius: '7px', color: '#fff', fontSize: '12px', fontWeight: '600', textDecoration: 'none' }}>
+            <Sparkles size={11} /> Generate
           </Link>
         </div>
+      </div>
+
+      {/* Stats strip */}
+      <div style={{ display: 'flex', background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+        {[
+          { label: 'Open Deals', value: openDeals },
+          { label: 'Deals Won', value: wonDeals },
+          { label: 'Win Rate', value: `${winRate}%` },
+          { label: 'Collateral', value: collateralList.length },
+          { label: 'Competitors', value: competitorCount },
+        ].map((stat, i, arr) => (
+          <div key={stat.label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '14px 8px', borderRight: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+            <div style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '-0.03em', color: '#F1F1F3', lineHeight: 1 }}>{stat.value}</div>
+            <div style={{ fontSize: '10px', color: '#555', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '600' }}>{stat.label}</div>
+          </div>
+        ))}
       </div>
 
       {/* Pipeline Focus — brain-sourced, proactive, no AI cost */}
@@ -281,7 +232,12 @@ export default function DashboardPage() {
         if (!brain) return null
         const urgent: { dealId: string; dealName: string; company: string; reason: string }[] = brain.urgentDeals ?? []
         const stale: { dealId: string; dealName: string; company: string; daysSinceUpdate: number }[] = (brain.staleDeals ?? []).slice(0, 3)
-        const patterns: string[] = brain.keyPatterns ?? []
+        const rawPatterns = brain.keyPatterns ?? []
+        const patterns = rawPatterns.map((p: any) =>
+          typeof p === 'string'
+            ? { label: p, dealIds: [] as string[], companies: [] as string[] }
+            : p as { label: string; dealIds: string[]; companies: string[] }
+        )
         if (urgent.length === 0 && stale.length === 0 && patterns.length === 0) return null
         return (
           <div style={{ background: '#0E0E0E', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
@@ -329,11 +285,33 @@ export default function DashboardPage() {
                 </Link>
               ))}
               {patterns.length > 0 && (
-                <div style={{ padding: '9px 14px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center' }}>
-                  <span style={{ fontSize: '10px', color: '#444', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: '2px' }}>Pattern</span>
-                  {patterns.slice(0, 2).map((p, i) => (
-                    <span key={i} style={{ fontSize: '11px', color: '#818CF8', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '4px', padding: '2px 8px' }}>{p}</span>
-                  ))}
+                <div style={{ borderTop: (urgent.length > 0 || stale.length > 0) ? '1px solid rgba(255,255,255,0.04)' : 'none', padding: '10px 14px' }}>
+                  <div style={{ fontSize: '10px', color: '#374151', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>Recurring Patterns</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {patterns.slice(0, 3).map((p, i) => (
+                      <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: '#818CF8', flexShrink: 0 }} />
+                          <span style={{ fontSize: '12px', color: '#A78BFA', fontWeight: 500 }}>{p.label}</span>
+                        </div>
+                        {p.companies.length > 0 && (
+                          <div style={{ display: 'flex', gap: '4px', paddingLeft: '10px', flexWrap: 'wrap' }}>
+                            {p.dealIds.slice(0, 3).map((dealId, di) => (
+                              <Link key={dealId} href={`/deals/${dealId}`} style={{
+                                fontSize: '11px', color: '#6B7280',
+                                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                                borderRadius: '4px', padding: '1px 7px', textDecoration: 'none',
+                                transition: 'color 0.1s',
+                              }}
+                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#A78BFA'}
+                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#6B7280'}
+                              >{p.companies[di]}</Link>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -346,33 +324,31 @@ export default function DashboardPage() {
 
       {/* Setup progress banner — shown until all steps complete */}
       {healthPct < 100 && !dbNotConnected && (
-        <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '12px', padding: '14px 18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Sparkles size={13} color="#818CF8" />
-              <span style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF' }}>Get DealKit set up</span>
-              <span style={{ fontSize: '11px', color: '#6366F1', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', padding: '1px 7px', borderRadius: '100px', fontWeight: '600' }}>{completedSteps}/{steps.length} done</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '80px', height: '3px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
-                <div style={{ width: `${healthPct}%`, height: '100%', background: 'linear-gradient(90deg, #6366F1, #818CF8)', borderRadius: '2px' }} />
-              </div>
-              <span style={{ fontSize: '11px', color: '#555', fontWeight: '600' }}>{healthPct}%</span>
+        <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1' }} />
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Setup</span>
+            <span style={{ fontSize: '11px', color: '#333', marginLeft: 'auto' }}>{completedSteps}/{steps.length}</span>
+            <div style={{ width: '60px', height: '2px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{ width: `${healthPct}%`, height: '100%', background: '#6366F1', borderRadius: '2px' }} />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             {steps.map((step, i) => (
               step.done ? (
-                <div key={step.href} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '5px 10px', borderRadius: '7px', fontSize: '12px', background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', color: '#22C55E', opacity: 0.6 }}>
-                  <CheckCircle size={11} /> {step.label}
+                <div key={step.href} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 14px', borderBottom: i < steps.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', opacity: 0.4 }}>
+                  <CheckCircle size={12} color="#22C55E" />
+                  <span style={{ fontSize: '12px', color: '#666', textDecoration: 'line-through' }}>{step.label}</span>
                 </div>
               ) : (
-                <Link key={step.href} href={step.href} style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '7px 11px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(99,102,241,0.3)', color: '#EBEBEB', textDecoration: 'none' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '600' }}>
-                    <span style={{ width: '16px', height: '16px', borderRadius: '50%', background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: '#818CF8', fontWeight: '700', flexShrink: 0 }}>{i + 1}</span>
-                    {step.label} →
-                  </div>
-                  <div style={{ fontSize: '10px', color: '#818CF8', paddingLeft: '22px', lineHeight: '1.3' }}>{step.unlock}</div>
+                <Link key={step.href} href={step.href} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 14px', borderBottom: i < steps.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', textDecoration: 'none', transition: 'background 120ms' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                >
+                  <Circle size={12} color="#333" />
+                  <span style={{ fontSize: '12px', color: '#E5E7EB', flex: 1 }}>{step.label}</span>
+                  <span style={{ fontSize: '11px', color: '#4B5563' }}>{step.unlock}</span>
+                  <ArrowUpRight size={11} color="#333" />
                 </Link>
               )
             ))}
@@ -382,15 +358,15 @@ export default function DashboardPage() {
 
       {/* Smart AI nudges — contextual suggestions based on current data */}
       {smartNudges.length > 0 && !dbNotConnected && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {smartNudges.slice(0, 2).map((nudge, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 16px', background: 'rgba(18,12,32,0.6)', border: `1px solid ${nudge.color}22`, borderRadius: '10px', borderLeft: `3px solid ${nudge.color}` }}>
-              <span style={{ fontSize: '18px', flexShrink: 0 }}>{nudge.icon}</span>
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderLeft: `2px solid ${nudge.color}`, borderRadius: '8px' }}>
+              <span style={{ fontSize: '14px', flexShrink: 0 }}>{nudge.icon}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ fontSize: '13px', color: '#EBEBEB', lineHeight: '1.5' }}>{nudge.message}</span>
+                <span style={{ fontSize: '12px', color: '#D1D5DB', lineHeight: '1.5' }}>{nudge.message}</span>
               </div>
-              <Link href={nudge.href} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: '600', color: nudge.color, background: `${nudge.color}14`, border: `1px solid ${nudge.color}30`, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-                {nudge.cta} <ArrowUpRight size={11} />
+              <Link href={nudge.href} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px', padding: '5px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '600', color: nudge.color, background: `${nudge.color}10`, border: `1px solid ${nudge.color}25`, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                {nudge.cta} <ArrowUpRight size={10} />
               </Link>
             </div>
           ))}
@@ -400,7 +376,7 @@ export default function DashboardPage() {
       {/* Alerts */}
       {dbNotConnected && <SetupAlert />}
       {staleItems.length > 0 && (
-        <div style={{ background: 'rgba(234,179,8,0.05)', border: '1px solid rgba(234,179,8,0.15)', borderRadius: '10px', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderLeft: '2px solid #EAB308', borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <AlertTriangle size={13} color="#EAB308" />
             <span style={{ fontSize: '13px', color: '#F0EEFF' }}>
@@ -422,7 +398,7 @@ export default function DashboardPage() {
         const href = alert.type === 'recurring_risk' ? '/product-gaps' : '/collateral'
         const cta = alert.type === 'recurring_risk' ? 'View gaps' : 'Update battlecard'
         return (
-          <div key={i} style={{ background: bg, border: `1px solid ${border}`, borderRadius: '10px', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <div key={i} style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderLeft: `2px solid ${color}`, borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
               <AlertTriangle size={13} color={color} style={{ flexShrink: 0 }} />
               <span style={{ fontSize: '13px', color: '#F0EEFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{alert.message}</span>
@@ -434,15 +410,7 @@ export default function DashboardPage() {
         )
       })}
 
-      {/* KPI stats — outcome-focused, shown first */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-        <StatCard label="Open deals" value={openDeals} icon={Target} color="#8B5CF6" featured />
-        <StatCard label="Deals won" value={wonDeals} icon={TrendingUp} color="#22C55E" />
-        <StatCard label="Win rate" value={`${winRate}%`} icon={BarChart3} color="#6366F1" />
-        <StatCard label="AI collateral" value={collateralList.length} icon={FileText} color="#F59E0B" />
-      </div>
-
-      {/* ROI strip — full width, right below KPIs */}
+      {/* ROI strip */}
       <ROIWidget
         deals={dealList.map(d => ({
           outcome: d.stage === 'closed_won' ? 'won' : d.stage === 'closed_lost' ? 'lost' : 'open',
@@ -456,18 +424,13 @@ export default function DashboardPage() {
 
       {/* Priority actions — sorted by deal stage */}
       {urgentTodos.length > 0 && (
-        <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: '14px', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 18px', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '24px', height: '24px', background: 'rgba(99,102,241,0.12)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ClipboardList size={12} color="#818CF8" />
-              </div>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Priority Actions</span>
-              <span style={{ fontSize: '11px', color: '#818CF8', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', padding: '1px 7px', borderRadius: '100px', fontWeight: '600' }}>{urgentTodos.length}</span>
-              <span style={{ fontSize: '11px', color: '#444' }}>· sorted by deal stage</span>
-            </div>
-            <Link href="/pipeline" style={{ fontSize: '12px', color: '#6366F1', textDecoration: 'none', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '3px' }}>
-              View pipeline <ArrowUpRight size={11} />
+        <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1' }} />
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Priority Actions</span>
+            <span style={{ fontSize: '11px', color: '#333', marginLeft: 'auto' }}>{urgentTodos.length}</span>
+            <Link href="/pipeline" style={{ fontSize: '11px', color: '#4B5563', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}>
+              Pipeline <ArrowUpRight size={10} />
             </Link>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -475,22 +438,19 @@ export default function DashboardPage() {
               const stageInfo = STAGE_STYLE[todo.stage] ?? { color: '#6B7280', label: todo.stage }
               return (
                 <Link key={todo.id} href={`/deals/${todo.dealId}`} style={{
-                  display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 18px',
-                  borderBottom: i < urgentTodos.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none',
-                  textDecoration: 'none', transition: 'background 0.1s',
+                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 14px',
+                  borderBottom: i < urgentTodos.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                  textDecoration: 'none', transition: 'background 120ms',
                 }}
                 onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'}
                 onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
                 >
-                  <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: stageInfo.color, flexShrink: 0, boxShadow: `0 0 6px ${stageInfo.color}80` }} />
+                  <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: stageInfo.color, flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', color: '#EBEBEB', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{todo.text}</div>
-                    <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>{todo.company}</div>
+                    <div style={{ fontSize: '12px', color: '#E5E7EB', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{todo.text}</div>
+                    <div style={{ fontSize: '11px', color: '#555', marginTop: '1px' }}>{todo.company}</div>
                   </div>
-                  <span style={{
-                    fontSize: '10px', padding: '2px 7px', borderRadius: '100px', fontWeight: '600', flexShrink: 0,
-                    color: stageInfo.color, background: `${stageInfo.color}14`, border: `1px solid ${stageInfo.color}30`,
-                  }}>
+                  <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '4px', fontWeight: '600', flexShrink: 0, color: stageInfo.color, background: `${stageInfo.color}12` }}>
                     {stageInfo.label}
                   </span>
                   <ArrowUpRight size={11} color="#333" style={{ flexShrink: 0 }} />
@@ -502,36 +462,28 @@ export default function DashboardPage() {
       )}
 
       {/* Main content grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 288px', gap: '14px', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 272px', gap: '12px', alignItems: 'start' }}>
 
         {/* Left: Collateral Library + Roadmap */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(124,58,237,0.18)', borderRadius: '14px', overflow: 'hidden' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid rgba(124,58,237,0.1)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '24px', height: '24px', background: 'rgba(99,102,241,0.1)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <FileText size={12} color="#818CF8" />
-                </div>
-                <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Recent Collateral</span>
-                {collateralList.length > 0 && (
-                  <span style={{ fontSize: '11px', color: '#555', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '100px', border: '1px solid rgba(255,255,255,0.06)' }}>{collateralList.length}</span>
-                )}
-              </div>
-              <Link href="/collateral" style={{ fontSize: '12px', color: '#6366F1', textDecoration: 'none', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                View all <ArrowUpRight size={11} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1' }} />
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Recent Collateral</span>
+              {collateralList.length > 0 && (
+                <span style={{ fontSize: '11px', color: '#333' }}>{collateralList.length}</span>
+              )}
+              <Link href="/collateral" style={{ fontSize: '11px', color: '#4B5563', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px', marginLeft: 'auto' }}>
+                View all <ArrowUpRight size={10} />
               </Link>
             </div>
 
             {recentCollateral.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px 24px' }}>
-                <div style={{ width: '44px', height: '44px', background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
-                  <Sparkles size={18} color="#6366F1" />
-                </div>
-                <div style={{ fontSize: '13px', color: '#888', marginBottom: '4px', fontWeight: '600' }}>No collateral yet</div>
-                <div style={{ fontSize: '12px', color: '#444', marginBottom: '4px', lineHeight: '1.6' }}>Battlecards, one-pagers, email sequences — personalised to your deals</div>
-                <div style={{ fontSize: '11px', color: '#6366F1', marginBottom: '16px' }}>Takes 30 seconds vs. 2+ hours manually</div>
-                <Link href="/collateral" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '8px', color: '#818CF8', fontSize: '13px', fontWeight: '500', textDecoration: 'none' }}>
-                  <Plus size={13} /> Generate first
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '36px 24px', gap: '8px' }}>
+                <div style={{ fontSize: '12px', color: '#555', fontWeight: '500' }}>No collateral yet</div>
+                <div style={{ fontSize: '11px', color: '#374151', textAlign: 'center', lineHeight: '1.5' }}>Battlecards, one-pagers, email sequences — 30 seconds each</div>
+                <Link href="/collateral" style={{ marginTop: '4px', display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 12px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '6px', color: '#818CF8', fontSize: '12px', fontWeight: '500', textDecoration: 'none' }}>
+                  <Plus size={11} /> Generate first
                 </Link>
               </div>
             ) : (
@@ -540,30 +492,27 @@ export default function DashboardPage() {
                   const typeStyle = TYPE_COLORS[item.type] ?? TYPE_COLORS['battlecard']
                   return (
                     <Link key={item.id} href={`/collateral/${item.id}`} style={{
-                      display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 20px',
-                      borderBottom: i < recentCollateral.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none',
-                      textDecoration: 'none', transition: 'background 0.1s',
+                      display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 14px',
+                      borderBottom: i < recentCollateral.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                      textDecoration: 'none', transition: 'background 120ms',
                     }}
                     onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'}
                     onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
                     >
-                      <div style={{ width: '32px', height: '32px', borderRadius: '9px', flexShrink: 0, background: typeStyle.bg, border: `1px solid ${typeStyle.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <FileText size={13} color={typeStyle.color} />
-                      </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '13px', fontWeight: '500', color: '#F0EEFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '2px' }}>{item.title}</div>
-                        <span style={{ fontSize: '11px', color: typeStyle.color, background: typeStyle.bg, border: `1px solid ${typeStyle.border}`, padding: '1px 6px', borderRadius: '100px', fontWeight: '500' }}>
+                        <div style={{ fontSize: '12px', fontWeight: '500', color: '#E5E7EB', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+                        <span style={{ fontSize: '10px', color: typeStyle.color, fontWeight: '500' }}>
                           {TYPE_LABELS[item.type] ?? item.type.replace('_', ' ')}
                         </span>
                       </div>
                       <span style={{
-                        fontSize: '11px', padding: '3px 9px', borderRadius: '100px', fontWeight: '500', flexShrink: 0,
-                        background: item.status === 'ready' ? 'rgba(34,197,94,0.08)' : item.status === 'stale' ? 'rgba(234,179,8,0.08)' : 'rgba(99,102,241,0.08)',
+                        fontSize: '10px', padding: '2px 7px', borderRadius: '4px', fontWeight: '500', flexShrink: 0,
                         color: item.status === 'ready' ? '#22C55E' : item.status === 'stale' ? '#EAB308' : '#818CF8',
-                        border: `1px solid ${item.status === 'ready' ? 'rgba(34,197,94,0.18)' : item.status === 'stale' ? 'rgba(234,179,8,0.18)' : 'rgba(99,102,241,0.18)'}`,
+                        background: item.status === 'ready' ? 'rgba(34,197,94,0.08)' : item.status === 'stale' ? 'rgba(234,179,8,0.08)' : 'rgba(99,102,241,0.08)',
                       }}>
-                        {item.status === 'generating' ? '⟳ generating' : item.status}
+                        {item.status === 'generating' ? '⟳' : item.status}
                       </span>
+                      <ArrowUpRight size={11} color="#333" style={{ flexShrink: 0 }} />
                     </Link>
                   )
                 })}
@@ -573,16 +522,12 @@ export default function DashboardPage() {
 
           {/* Roadmap — Now / Next / Later */}
           {(roadmapNow.length > 0 || roadmapNext.length > 0 || roadmapLater.length > 0) && (
-            <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(124,58,237,0.18)', borderRadius: '14px', overflow: 'hidden' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid rgba(124,58,237,0.1)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '24px', height: '24px', background: 'rgba(99,102,241,0.1)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Map size={12} color="#818CF8" />
-                  </div>
-                  <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Product Roadmap</span>
-                </div>
-                <Link href="/product-gaps" style={{ fontSize: '12px', color: '#6366F1', textDecoration: 'none', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  Manage <ArrowUpRight size={11} />
+            <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1' }} />
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Product Roadmap</span>
+                <Link href="/product-gaps" style={{ fontSize: '11px', color: '#4B5563', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px', marginLeft: 'auto' }}>
+                  Manage <ArrowUpRight size={10} />
                 </Link>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0', borderBottom: 'none' }}>
@@ -593,9 +538,9 @@ export default function DashboardPage() {
                 ].map(({ label, items, color, bg, border, dot }, colIdx) => (
                   <div key={label} style={{ padding: '14px 16px', borderRight: colIdx < 2 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: '700', color, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{label}</span>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#555', letterSpacing: '0.07em', textTransform: 'uppercase' }}>{label}</span>
                       {items.length > 0 && (
-                        <span style={{ fontSize: '10px', color, background: bg, border: `1px solid ${border}`, padding: '1px 6px', borderRadius: '100px', fontWeight: '600' }}>{items.length}</span>
+                        <span style={{ fontSize: '10px', color, background: bg, padding: '1px 5px', borderRadius: '3px', fontWeight: '600' }}>{items.length}</span>
                       )}
                     </div>
                     {items.length === 0 ? (
@@ -628,99 +573,85 @@ export default function DashboardPage() {
         </div>
 
         {/* Right column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-          {/* KB Health */}
-          <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(124,58,237,0.18)', borderRadius: '14px', padding: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <div style={{ width: '24px', height: '24px', background: 'rgba(99,102,241,0.1)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Target size={12} color="#818CF8" />
-              </div>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>AI Setup</span>
-              <span style={{ marginLeft: 'auto', fontSize: '11px', color: healthPct === 100 ? '#22C55E' : '#555', fontWeight: '600', background: healthPct === 100 ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${healthPct === 100 ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.06)'}`, padding: '1px 7px', borderRadius: '100px' }}>{healthPct}%</span>
+          {/* AI Setup health */}
+          <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: healthPct === 100 ? '#22C55E' : '#6366F1' }} />
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>AI Setup</span>
+              <span style={{ fontSize: '11px', color: healthPct === 100 ? '#22C55E' : '#374151', marginLeft: 'auto' }}>{healthPct}%</span>
             </div>
-            <div style={{ height: '3px', background: '#1A1A1A', borderRadius: '2px', marginBottom: '12px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${healthPct}%`, background: healthPct === 100 ? 'linear-gradient(90deg, #22C55E, #16A34A)' : 'linear-gradient(90deg, #6366F1, #818CF8)', borderRadius: '2px', transition: 'width 1s cubic-bezier(0.4,0,0.2,1)', boxShadow: healthPct > 0 ? `0 0 8px ${healthPct === 100 ? 'rgba(34,197,94,0.4)' : 'rgba(99,102,241,0.4)'}` : 'none' }} />
+            <div style={{ height: '2px', background: 'rgba(255,255,255,0.04)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${healthPct}%`, background: healthPct === 100 ? '#22C55E' : '#6366F1', transition: 'width 1s ease' }} />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
               {steps.map(s => <HealthItem key={s.href} {...s} />)}
             </div>
             {completedSteps < steps.length && (
-              <div style={{ marginTop: '10px', padding: '8px 10px', background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.1)', borderRadius: '7px', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                <Zap size={10} color="#818CF8" style={{ marginTop: '2px', flexShrink: 0 }} />
-                <span style={{ fontSize: '11px', color: '#818CF8', lineHeight: '1.5' }}>
-                  {steps.find(s => !s.done)?.unlock ?? 'Complete your setup for the best AI outputs'}
+              <div style={{ margin: '0 10px 10px', padding: '7px 10px', background: 'rgba(99,102,241,0.05)', borderRadius: '6px', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                <Zap size={10} color="#6366F1" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <span style={{ fontSize: '11px', color: '#6366F1', lineHeight: '1.5' }}>
+                  {steps.find(s => !s.done)?.unlock ?? 'Complete setup for best AI outputs'}
                 </span>
               </div>
             )}
           </div>
 
-          {/* Team card */}
-          <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '14px', padding: '14px 16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-              <div style={{ width: '24px', height: '24px', background: 'rgba(99,102,241,0.1)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Users size={12} color="#818CF8" />
-              </div>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF', flex: 1 }}>Team</span>
-              <Link href="/settings" style={{ fontSize: '11px', color: '#555', textDecoration: 'none' }}>Settings →</Link>
+          {/* Sales Brain */}
+          <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#8B5CF6' }} />
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Knowledge Base</span>
             </div>
-            <div style={{ marginBottom: '10px' }}>
-              <p style={{ fontSize: '10px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 5px' }}>Your invite code</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <code style={{ flex: 1, fontSize: '12px', fontWeight: 700, color: '#818CF8', background: 'rgba(99,102,241,0.1)', padding: '5px 9px', borderRadius: '7px', border: '1px solid rgba(99,102,241,0.25)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {dbUser?.workspaceSlug ?? '…'}
-                </code>
-                <button onClick={handleCopyCode} title="Copy code" style={{ flexShrink: 0, width: '28px', height: '28px', borderRadius: '7px', background: codeCopied ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.06)', border: codeCopied ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: codeCopied ? '#22C55E' : '#888', transition: 'all 150ms' }}>
-                  {codeCopied ? <Check size={11} /> : <Copy size={11} />}
-                </button>
-              </div>
-              <p style={{ fontSize: '10px', color: '#444', margin: '4px 0 0', lineHeight: 1.5 }}>Share with teammates to invite them</p>
-            </div>
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px' }}>
-              <p style={{ fontSize: '10px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 5px' }}>Join a workspace</p>
-              <form onSubmit={handleJoinWorkspace} style={{ display: 'flex', gap: '6px' }}>
-                <input value={joinCode} onChange={e => setJoinCode(e.target.value)} placeholder="Enter code (e.g. crane-47)" style={{ flex: 1, height: '28px', padding: '0 9px', borderRadius: '7px', fontSize: '11px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: '#F1F1F3', outline: 'none', fontFamily: 'inherit', minWidth: 0 }} onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.4)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.09)')} />
-                <button type="submit" disabled={joining || !joinCode.trim()} style={{ height: '28px', padding: '0 10px', borderRadius: '7px', fontSize: '11px', fontWeight: 600, color: '#fff', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', border: 'none', cursor: joining || !joinCode.trim() ? 'not-allowed' : 'pointer', opacity: joining || !joinCode.trim() ? 0.5 : 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  {joining ? '…' : 'Join'}
-                </button>
-              </form>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {[
+                { href: '/competitors', label: 'Competitors', value: competitorCount, color: '#6366F1', icon: Users, hint: 'Powers battlecards' },
+                { href: '/deals', label: 'Pipeline deals', value: dealCount, color: '#8B5CF6', icon: TrendingUp, hint: 'Tracks win rate' },
+                { href: '/case-studies', label: 'Win stories', value: caseStudyCount, color: '#22C55E', icon: BookOpen, hint: 'Strengthens pitches' },
+                { href: '/collateral', label: 'Sales docs', value: collateralList.length, color: '#F59E0B', icon: FileText, hint: 'Generated collateral' },
+                { href: '/product-gaps', label: 'Feature gaps', value: gapList.length, color: '#EF4444', icon: AlertTriangle, hint: 'Blocked revenue' },
+              ].map(({ href, label, value, color, icon: Icon, hint }, i, arr) => (
+                <Link key={href} href={href} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 14px', borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', textDecoration: 'none', transition: 'background 120ms' }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                >
+                  <Icon size={11} color={value > 0 ? color : '#374151'} style={{ flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', color: '#9CA3AF' }}>{label}</div>
+                    <div style={{ fontSize: '10px', color: '#374151' }}>{hint}</div>
+                  </div>
+                  <span style={{ fontSize: '13px', fontWeight: '700', color: value > 0 ? color : '#333', letterSpacing: '-0.02em' }}>{value}</span>
+                </Link>
+              ))}
             </div>
           </div>
 
-          {/* Sales Brain — KB intelligence */}
-          <div style={{ background: 'rgba(18,12,32,0.7)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(124,58,237,0.18)', borderRadius: '14px', padding: '14px 16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <div style={{ width: '24px', height: '24px', background: 'rgba(99,102,241,0.1)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <BookOpen size={12} color="#818CF8" />
-              </div>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Sales Brain</span>
-              <span style={{ fontSize: '10px', color: '#444', marginLeft: '2px' }}>what the KB knows</span>
+          {/* Team */}
+          <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em', flex: 1 }}>Team</span>
+              <Link href="/settings" style={{ fontSize: '11px', color: '#374151', textDecoration: 'none' }}>Settings →</Link>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              {[
-                { href: '/competitors', label: 'Competitors mapped', value: competitorCount, color: '#6366F1', icon: Users, empty: 'Add competitor →', hint: 'Powers battlecards' },
-                { href: '/deals', label: 'Deals in pipeline', value: dealCount, color: '#8B5CF6', icon: TrendingUp, empty: 'Log first deal →', hint: 'Tracks win rate' },
-                { href: '/case-studies', label: 'Win stories', value: caseStudyCount, color: '#22C55E', icon: BookOpen, empty: 'Add case study →', hint: 'Strengthens pitches' },
-                { href: '/collateral', label: 'Collateral generated', value: collateralList.length, color: '#F59E0B', icon: FileText, empty: 'Generate first →', hint: 'AI sales docs' },
-                { href: '/product-gaps', label: 'Feature gaps tracked', value: gapList.length, color: '#EF4444', icon: AlertTriangle, empty: 'None logged yet', hint: 'Blocked revenue' },
-              ].map(({ href, label, value, color, icon: Icon, empty, hint }) => (
-                <Link key={href} href={href} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '7px', textDecoration: 'none', transition: 'background 0.1s' }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'}
-                >
-                  <div style={{ width: '24px', height: '24px', background: `${color}12`, border: `1px solid ${color}20`, borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Icon size={11} color={color} />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', color: '#888' }}>{label}</div>
-                    <div style={{ fontSize: '10px', color: '#444', marginTop: '1px' }}>{hint}</div>
-                  </div>
-                  {value > 0
-                    ? <span style={{ fontSize: '14px', fontWeight: '700', color, letterSpacing: '-0.02em' }}>{value}</span>
-                    : <span style={{ fontSize: '11px', color: '#444' }}>{empty}</span>
-                  }
-                </Link>
-              ))}
+            <div style={{ marginBottom: '10px' }}>
+              <p style={{ fontSize: '10px', color: '#4B5563', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 5px', fontWeight: 600 }}>Invite code</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <code style={{ flex: 1, fontSize: '12px', fontWeight: 700, color: '#818CF8', background: 'rgba(99,102,241,0.08)', padding: '5px 9px', borderRadius: '6px', border: '1px solid rgba(99,102,241,0.15)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {dbUser?.workspaceSlug ?? '…'}
+                </code>
+                <button onClick={handleCopyCode} title="Copy code" style={{ flexShrink: 0, width: '28px', height: '28px', borderRadius: '6px', background: codeCopied ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.05)', border: codeCopied ? '1px solid rgba(34,197,94,0.25)' : '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: codeCopied ? '#22C55E' : '#555', transition: 'all 150ms' }}>
+                  {codeCopied ? <Check size={11} /> : <Copy size={11} />}
+                </button>
+              </div>
+            </div>
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
+              <p style={{ fontSize: '10px', color: '#4B5563', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 5px', fontWeight: 600 }}>Join a workspace</p>
+              <form onSubmit={handleJoinWorkspace} style={{ display: 'flex', gap: '5px' }}>
+                <input value={joinCode} onChange={e => setJoinCode(e.target.value)} placeholder="code (e.g. crane-47)" style={{ flex: 1, height: '28px', padding: '0 9px', borderRadius: '6px', fontSize: '11px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#F1F1F3', outline: 'none', fontFamily: 'inherit', minWidth: 0 }} onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.4)')} onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')} />
+                <button type="submit" disabled={joining || !joinCode.trim()} style={{ height: '28px', padding: '0 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, color: '#fff', background: '#6366F1', border: 'none', cursor: joining || !joinCode.trim() ? 'not-allowed' : 'pointer', opacity: joining || !joinCode.trim() ? 0.4 : 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {joining ? '…' : 'Join'}
+                </button>
+              </form>
             </div>
           </div>
         </div>
@@ -728,51 +659,26 @@ export default function DashboardPage() {
 
       {/* Value chain explainer — shown for early-stage users */}
       {dealCount < 5 && !dbNotConnected && (
-        <div style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(124,58,237,0.09) 100%)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '14px', padding: '14px 18px', position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '150px', height: '150px', background: 'radial-gradient(circle, rgba(124,58,237,0.12), transparent 70%)', pointerEvents: 'none' }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-            <div style={{ width: '26px', height: '26px', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 10px rgba(99,102,241,0.3)' }}>
-              <Zap size={12} color="#fff" />
-            </div>
-            <span style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF', letterSpacing: '-0.01em' }}>How DealKit saves you time</span>
-            <span style={{ fontSize: '11px', color: '#A78BFA', background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', padding: '2px 8px', borderRadius: '100px', fontWeight: '600' }}>fastest path to ROI</span>
+        <div style={{ background: '#111', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1' }} />
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>How DealKit Works</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)' }}>
             {[
-              {
-                icon: '⚔️',
-                title: 'Competitive call comes up',
-                body: 'Pull up a battlecard in seconds. Exact talk tracks, objection responses, and win angles — all AI-generated from your competitor data.',
-                href: '/competitors',
-                cta: 'Add a competitor',
-                color: '#6366F1',
-              },
-              {
-                icon: '📋',
-                title: 'Just finished a sales call',
-                body: 'Paste your notes into any deal. AI extracts action items, updates the deal score, and flags risks — no manual logging required.',
-                href: '/deals',
-                cta: 'Open a deal',
-                color: '#F59E0B',
-              },
-              {
-                icon: '📄',
-                title: 'Prospect wants a one-pager',
-                body: 'Generate a personalised, branded sales doc in 30 seconds. Pulls in your case studies, product strengths, and competitive position automatically.',
-                href: '/collateral',
-                cta: 'Generate collateral',
-                color: '#22C55E',
-              },
-            ].map(item => (
-              <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
-                <div style={{ background: 'rgba(9,6,18,0.4)', border: '1px solid rgba(124,58,237,0.12)', borderRadius: '10px', padding: '14px', transition: 'border-color 0.15s', height: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: '8px' }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = `${item.color}33`}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,58,237,0.12)'}
+              { icon: '⚔️', title: 'Competitive call comes up', body: 'Pull up a battlecard in seconds. Exact talk tracks, objection responses, and win angles — generated from your competitor data.', href: '/competitors', cta: 'Add a competitor', color: '#6366F1' },
+              { icon: '📋', title: 'Just finished a sales call', body: 'Paste your notes into any deal. AI extracts action items, updates the deal score, and flags risks.', href: '/deals', cta: 'Open a deal', color: '#F59E0B' },
+              { icon: '📄', title: 'Prospect wants a one-pager', body: 'Generate a personalised sales doc in 30 seconds. Pulls in your case studies, product strengths, and competitive position.', href: '/collateral', cta: 'Generate collateral', color: '#22C55E' },
+            ].map((item, i, arr) => (
+              <Link key={item.href} href={item.href} style={{ textDecoration: 'none', borderRight: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '6px', height: '100%', boxSizing: 'border-box', transition: 'background 120ms' }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
                 >
-                  <div style={{ fontSize: '18px' }}>{item.icon}</div>
-                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#F0EEFF', lineHeight: '1.4' }}>{item.title}</div>
-                  <div style={{ fontSize: '11px', color: '#9CA3AF', lineHeight: '1.6', flex: 1 }}>{item.body}</div>
-                  <div style={{ fontSize: '11px', color: item.color, fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>{item.cta} <ArrowUpRight size={10} /></div>
+                  <div style={{ fontSize: '16px' }}>{item.icon}</div>
+                  <div style={{ fontSize: '12px', fontWeight: '600', color: '#E5E7EB', lineHeight: '1.4' }}>{item.title}</div>
+                  <div style={{ fontSize: '11px', color: '#6B7280', lineHeight: '1.6', flex: 1 }}>{item.body}</div>
+                  <div style={{ fontSize: '11px', color: item.color, fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}>{item.cta} <ArrowUpRight size={10} /></div>
                 </div>
               </Link>
             ))}
