@@ -83,11 +83,17 @@ async function callClaude(
 function extractJson(raw: string): unknown {
   // Strip markdown code fences if present (handles partial/truncated responses too)
   let cleaned = raw.trim()
-  // Remove opening fence
-  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '')
+  // Remove opening fence (may have newline or space after)
+  cleaned = cleaned.replace(/^```(?:json)?[\s\n]*/i, '')
   // Remove closing fence (may be absent if response was truncated)
-  cleaned = cleaned.replace(/\s*```\s*$/i, '')
+  cleaned = cleaned.replace(/[\s\n]*```\s*$/i, '')
   cleaned = cleaned.trim()
+  // If there's text before the first { or [, strip it (LLM sometimes adds preamble)
+  const firstBrace = cleaned.indexOf('{')
+  const firstBracket = cleaned.indexOf('[')
+  const jsonStart = firstBrace >= 0 && firstBracket >= 0 ? Math.min(firstBrace, firstBracket)
+    : firstBrace >= 0 ? firstBrace : firstBracket
+  if (jsonStart > 0) cleaned = cleaned.slice(jsonStart)
 
   // If JSON is incomplete (truncated by max_tokens), try to repair by closing open braces/brackets
   try {

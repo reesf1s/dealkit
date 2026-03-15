@@ -137,8 +137,11 @@ function detectIntent(text: string): Intent {
   if (BATTLECARD_PATTERNS.some(p => p.test(text))) return 'competitor_battlecard'
   // Product gap must be checked BEFORE company_update (pattern overlap)
   if (PRODUCT_GAP_PATTERNS.some(p => p.test(text))) return 'product_gap'
-  const hasGenerateVerb = /\b(generate|create|make|write|build|draft)\b/.test(lower)
-  if (hasGenerateVerb && COLLATERAL_TYPES.some(c => lower.includes(c.keyword))) return 'collateral_generate'
+  // Collateral generation: only trigger for SHORT, focused requests (not complex multi-part analytical prompts)
+  // "draft" is too conversational — "draft me an email about X" = Q&A, not formal collateral doc
+  const hasGenerateVerb = /\b(generate|create|make|write|build)\b/.test(lower)
+  const isShortFocused = text.length < 200 && !/\b(for each|identify|analyze|analyse|top \d|biggest|priority|summarize|summarise)\b/i.test(text)
+  if (hasGenerateVerb && isShortFocused && COLLATERAL_TYPES.some(c => lower.includes(c.keyword))) return 'collateral_generate'
   // deal_action BEFORE company_update — "review BOE to-do's" must not be mistaken for a profile update
   if (DEAL_ACTION_PATTERNS.some(p => p.test(text))) return 'deal_action'
   if (COMPANY_UPDATE_PATTERNS.some(p => p.test(text))) return 'company_update'
