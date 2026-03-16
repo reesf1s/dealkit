@@ -2,16 +2,19 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
-import { Send, Sparkles, User, Bot, RotateCcw, Square, MessageSquare, ChevronRight, ChevronLeft, FileText, Sword, Building2, Zap, CheckCircle2, PlusCircle, RefreshCw, BookOpen, AlertTriangle, BarChart2, Mail } from 'lucide-react'
+import Link from 'next/link'
+import {
+  Send, Sparkles, Bot, RotateCcw, Square,
+  FileText, Sword, Building2, Zap, CheckCircle2,
+  PlusCircle, RefreshCw, BookOpen, AlertTriangle,
+  BarChart2, Mail, ChevronDown, ChevronUp, X,
+} from 'lucide-react'
 import { mutate as globalMutate } from 'swr'
 import { useSidebar } from './SidebarContext'
 import type { ActionCard } from '@/app/api/chat/route'
 
 function invalidateCaches(actions: ActionCard[]) {
-  // Every action rebuilds the brain in the background — revalidate brain cache after a short delay
-  // so sidebar badges and dashboard Pipeline Focus update
   setTimeout(() => globalMutate('/api/brain'), 2000)
-
   for (const action of actions) {
     if (action.type === 'todos_updated' || action.type === 'deal_updated' || action.type === 'deal_created') {
       globalMutate('/api/deals')
@@ -19,19 +22,16 @@ function invalidateCaches(actions: ActionCard[]) {
     }
     if (action.type === 'competitor_created') {
       globalMutate('/api/competitors')
-      globalMutate((key: unknown) => typeof key === 'string' && key.startsWith('/api/competitors/'), undefined, { revalidate: true })
     }
     if (action.type === 'company_updated') {
       globalMutate('/api/company')
       globalMutate('/api/company-profile')
-      globalMutate('/api/onboarding/parse')
     }
     if (action.type === 'collateral_generating') {
       globalMutate('/api/collateral')
     }
     if (action.type === 'case_study_created') {
       globalMutate('/api/case-studies')
-      globalMutate((key: unknown) => typeof key === 'string' && key.startsWith('/api/case-studies/'), undefined, { revalidate: true })
     }
     if (action.type === 'gaps_logged') {
       globalMutate('/api/product-gaps')
@@ -45,763 +45,500 @@ interface Message {
   actions?: ActionCard[]
 }
 
-// ── Capability cards shown in empty state ──────────────────────────────────────
-
-const CAPABILITIES = [
-  {
-    icon: FileText,
-    color: '#6366F1',
-    bg: 'rgba(99,102,241,0.1)',
-    border: 'rgba(99,102,241,0.2)',
-    title: 'Meeting Notes',
-    desc: 'Paste notes → auto-update todos & deals',
-    prompt: 'Here are my meeting notes from today:\n\n[Paste your meeting notes here]',
-  },
-  {
-    icon: Sword,
-    color: '#EC4899',
-    bg: 'rgba(236,72,153,0.1)',
-    border: 'rgba(236,72,153,0.2)',
-    title: 'Competitor Intel',
-    desc: 'Add competitor → auto-generate battlecard',
-    prompt: 'Create a battlecard for competitor: ',
-  },
-  {
-    icon: Building2,
-    color: '#10B981',
-    bg: 'rgba(16,185,129,0.1)',
-    border: 'rgba(16,185,129,0.2)',
-    title: 'Company Profile',
-    desc: 'Update products, value props & more',
-    prompt: 'Update our company profile: ',
-  },
-  {
-    icon: Zap,
-    color: '#F59E0B',
-    bg: 'rgba(245,158,11,0.1)',
-    border: 'rgba(245,158,11,0.2)',
-    title: 'Generate Collateral',
-    desc: 'Create battlecards, one-pagers, email sequences',
-    prompt: 'Generate a ',
-  },
-  {
-    icon: BarChart2,
-    color: '#22C55E',
-    bg: 'rgba(34,197,94,0.1)',
-    border: 'rgba(34,197,94,0.2)',
-    title: 'Top 5 Deals & Risks',
-    desc: 'Ranked pipeline with key risks per deal',
-    prompt: 'Show me my top 5 deals ranked by priority, with the biggest risk for each.',
-  },
-  {
-    icon: Mail,
-    color: '#06B6D4',
-    bg: 'rgba(6,182,212,0.1)',
-    border: 'rgba(6,182,212,0.2)',
-    title: 'Risk Outreach Emails',
-    desc: 'Write emails addressing the top risk per deal',
-    prompt: 'My top 3 open deals by priority — for each, identify the biggest risk or blocker and draft a short personalised follow-up email (with subject line) that addresses it directly.',
-  },
+const QUICK_PROMPTS = [
+  { icon: BarChart2, color: '#22C55E', label: "What's my pipeline?", prompt: "What's my pipeline looking like? Give me a full overview." },
+  { icon: FileText, color: '#6366F1', label: 'Paste meeting notes', prompt: 'Here are my meeting notes from today:\n\n' },
+  { icon: Sword, color: '#EC4899', label: 'Competitor battlecard', prompt: 'Create a battlecard for competitor: ' },
+  { icon: Mail, color: '#06B6D4', label: 'Risk follow-up emails', prompt: 'For my top 3 open deals, identify the biggest risk per deal and draft a short personalised follow-up email with subject line addressing it directly.' },
+  { icon: Zap, color: '#F59E0B', label: 'Generate collateral', prompt: 'Generate a ' },
+  { icon: BookOpen, color: '#A855F7', label: 'Focus today', prompt: 'What should I focus on today across my pipeline? Give me the top 3 actions.' },
 ]
-
-// ── Typing indicator ───────────────────────────────────────────────────────────
 
 function TypingDots() {
   return (
-    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', padding: '2px 0' }}>
+    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', padding: '4px 0' }}>
       {[0, 1, 2].map(i => (
-        <div
-          key={i}
-          style={{
-            width: '5px', height: '5px', borderRadius: '50%',
-            background: '#6366F1',
-            animation: `typingBounce 1.2s ease-in-out ${i * 0.16}s infinite`,
-          }}
-        />
+        <div key={i} style={{
+          width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1',
+          animation: `typingBounce 1.2s ease-in-out ${i * 0.16}s infinite`,
+        }} />
       ))}
     </div>
   )
 }
 
-// ── Action cards rendered below assistant messages ─────────────────────────────
-
 function ActionCards({ actions }: { actions: ActionCard[] }) {
   if (!actions.length) return null
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '6px' }}>
       {actions.map((action, i) => {
-        if (action.type === 'todos_updated') {
-          return (
-            <div key={i} style={{
-              padding: '8px 10px', borderRadius: '8px',
-              background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
-              display: 'flex', flexDirection: 'column', gap: '4px',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <CheckCircle2 size={11} color="#10B981" />
-                <span style={{ fontSize: '11px', fontWeight: 600, color: '#10B981' }}>Todos updated — {action.dealName}</span>
-              </div>
-              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                {action.added > 0 && <span style={{ fontSize: '10px', color: '#6EE7B7' }}>+{action.added} added</span>}
-                {action.completed > 0 && <span style={{ fontSize: '10px', color: '#6EE7B7' }}>✓ {action.completed} done</span>}
-                {action.removed > 0 && <span style={{ fontSize: '10px', color: '#6EE7B7' }}>✕ {action.removed} removed</span>}
-              </div>
+        const base: React.CSSProperties = { padding: '7px 10px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '3px' }
+        if (action.type === 'todos_updated') return (
+          <div key={i} style={{ ...base, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <CheckCircle2 size={11} color="#10B981" />
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#10B981' }}>Todos updated — {action.dealName}</span>
             </div>
-          )
-        }
-        if (action.type === 'deal_updated') {
-          return (
-            <div key={i} style={{
-              padding: '8px 10px', borderRadius: '8px',
-              background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
-              display: 'flex', flexDirection: 'column', gap: '4px',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <CheckCircle2 size={11} color="#10B981" />
-                <span style={{ fontSize: '11px', fontWeight: 600, color: '#10B981' }}>Deal updated — {action.dealName}</span>
-              </div>
-              {action.changes.slice(0, 3).map((c, ci) => (
-                <div key={ci} style={{ fontSize: '10px', color: '#6EE7B7', paddingLeft: '17px' }}>• {c}</div>
-              ))}
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' as const, paddingLeft: '17px' }}>
+              {action.added > 0 && <span style={{ fontSize: '10px', color: '#6EE7B7' }}>+{action.added} added</span>}
+              {action.completed > 0 && <span style={{ fontSize: '10px', color: '#6EE7B7' }}>✓ {action.completed} done</span>}
+              {action.removed > 0 && <span style={{ fontSize: '10px', color: '#6EE7B7' }}>✕ {action.removed} removed</span>}
             </div>
-          )
-        }
-        if (action.type === 'deal_created') {
-          return (
-            <div key={i} style={{
-              padding: '8px 10px', borderRadius: '8px',
-              background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
-              display: 'flex', alignItems: 'center', gap: '6px',
-            }}>
-              <PlusCircle size={11} color="#10B981" />
-              <span style={{ fontSize: '11px', fontWeight: 600, color: '#10B981' }}>Deal created — {action.dealName}</span>
-              {action.company && <span style={{ fontSize: '10px', color: '#6EE7B7' }}>({action.company})</span>}
+          </div>
+        )
+        if (action.type === 'deal_updated') return (
+          <div key={i} style={{ ...base, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <CheckCircle2 size={11} color="#10B981" />
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#10B981' }}>Updated — {action.dealName}</span>
             </div>
-          )
-        }
-        if (action.type === 'competitor_created') {
-          return (
-            <div key={i} style={{
-              padding: '8px 10px', borderRadius: '8px',
-              background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.2)',
-              display: 'flex', flexDirection: 'column', gap: '4px',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Sword size={11} color="#EC4899" />
-                <span style={{ fontSize: '11px', fontWeight: 600, color: '#EC4899' }}>
-                  {action.names.length === 1 ? action.names[0] : `${action.names.length} competitors`} added
-                </span>
-              </div>
-              {action.battlecardsStarted && (
-                <div style={{ fontSize: '10px', color: '#F9A8D4', paddingLeft: '17px' }}>↳ Battlecard generation started</div>
-              )}
+            {action.changes.slice(0, 3).map((c, ci) => (
+              <div key={ci} style={{ fontSize: '10px', color: '#6EE7B7', paddingLeft: '17px' }}>• {c}</div>
+            ))}
+          </div>
+        )
+        if (action.type === 'deal_created') return (
+          <div key={i} style={{ ...base, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', flexDirection: 'row', alignItems: 'center' }}>
+            <PlusCircle size={11} color="#10B981" />
+            <span style={{ fontSize: '11px', fontWeight: 600, color: '#10B981', marginLeft: '6px' }}>Deal created — {action.dealName}</span>
+          </div>
+        )
+        if (action.type === 'competitor_created') return (
+          <div key={i} style={{ ...base, background: 'rgba(236,72,153,0.08)', border: '1px solid rgba(236,72,153,0.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Sword size={11} color="#EC4899" />
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#EC4899' }}>{action.names.join(', ')} added</span>
             </div>
-          )
-        }
-        if (action.type === 'company_updated') {
-          return (
-            <div key={i} style={{
-              padding: '8px 10px', borderRadius: '8px',
-              background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
-              display: 'flex', flexDirection: 'column', gap: '4px',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Building2 size={11} color="#818CF8" />
-                <span style={{ fontSize: '11px', fontWeight: 600, color: '#818CF8' }}>Company profile updated</span>
-              </div>
-              {action.fields.slice(0, 4).map((f, fi) => (
-                <div key={fi} style={{ fontSize: '10px', color: '#A5B4FC', paddingLeft: '17px' }}>• {f}</div>
-              ))}
+            {action.battlecardsStarted && <div style={{ fontSize: '10px', color: '#F9A8D4', paddingLeft: '17px' }}>↳ Battlecard started</div>}
+          </div>
+        )
+        if (action.type === 'company_updated') return (
+          <div key={i} style={{ ...base, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Building2 size={11} color="#818CF8" />
+              <span style={{ fontSize: '11px', fontWeight: 600, color: '#818CF8' }}>Company profile updated</span>
             </div>
-          )
-        }
-        if (action.type === 'collateral_generating') {
-          return (
-            <div key={i} style={{
-              padding: '8px 10px', borderRadius: '8px',
-              background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)',
-              display: 'flex', alignItems: 'center', gap: '6px',
-            }}>
-              <RefreshCw size={11} color="#F59E0B" style={{ animation: 'spin 1.5s linear infinite' }} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: '#F59E0B' }}>Generating {action.colType}</span>
-                <span style={{ fontSize: '10px', color: '#FCD34D' }}>{action.title}</span>
-              </div>
+            {action.fields.slice(0, 3).map((f, fi) => (
+              <div key={fi} style={{ fontSize: '10px', color: '#A5B4FC', paddingLeft: '17px' }}>• {f}</div>
+            ))}
+          </div>
+        )
+        if (action.type === 'collateral_generating') return (
+          <div key={i} style={{ ...base, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', flexDirection: 'row', alignItems: 'center', gap: '8px' }}>
+            <RefreshCw size={11} color="#F59E0B" style={{ animation: 'spin 1.5s linear infinite', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: '#F59E0B' }}>Generating {action.colType}</div>
+              <div style={{ fontSize: '10px', color: '#FCD34D' }}>{action.title}</div>
             </div>
-          )
-        }
-        if (action.type === 'case_study_created') {
-          return (
-            <div key={i} style={{
-              padding: '8px 10px', borderRadius: '8px',
-              background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
-              display: 'flex', alignItems: 'center', gap: '6px',
-            }}>
-              <BookOpen size={11} color="#10B981" />
-              <span style={{ fontSize: '11px', fontWeight: 600, color: '#10B981' }}>Case study created — {action.customerName}</span>
-            </div>
-          )
-        }
-        if (action.type === 'gaps_logged') {
-          return (
-            <div key={i} style={{
-              padding: '8px 10px', borderRadius: '8px',
-              background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)',
-              display: 'flex', flexDirection: 'column', gap: '4px',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <AlertTriangle size={11} color="#FBBF24" />
-                <span style={{ fontSize: '11px', fontWeight: 600, color: '#FBBF24' }}>{action.count} product gap{action.count > 1 ? 's' : ''} logged</span>
-              </div>
-              {action.gaps.slice(0, 2).map((g, gi) => (
-                <div key={gi} style={{ fontSize: '10px', color: '#FDE68A', paddingLeft: '17px' }}>• {g}</div>
-              ))}
-            </div>
-          )
-        }
+          </div>
+        )
+        if (action.type === 'case_study_created') return (
+          <div key={i} style={{ ...base, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', flexDirection: 'row', alignItems: 'center', gap: '6px' }}>
+            <BookOpen size={11} color="#22C55E" />
+            <span style={{ fontSize: '11px', fontWeight: 600, color: '#22C55E' }}>Case study saved — {action.customerName}</span>
+          </div>
+        )
+        if (action.type === 'gaps_logged') return (
+          <div key={i} style={{ ...base, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', flexDirection: 'row', alignItems: 'center', gap: '6px' }}>
+            <AlertTriangle size={11} color="#EF4444" />
+            <span style={{ fontSize: '11px', fontWeight: 600, color: '#EF4444' }}>{action.count} gap{action.count !== 1 ? 's' : ''} logged</span>
+          </div>
+        )
         return null
       })}
     </div>
   )
 }
 
-// ── Simple markdown renderer ───────────────────────────────────────────────────
-
-function renderInline(text: string): React.ReactNode[] {
-  const parts = text.split(/(\*\*[^*]+\*\*|__[^_]+__|_[^_]+_|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g)
-  return parts.map((part, i) => {
-    if ((part.startsWith('**') && part.endsWith('**')) || (part.startsWith('__') && part.endsWith('__'))) {
-      return <strong key={i} style={{ color: '#F0EEFF', fontWeight: 700 }}>{part.slice(2, -2)}</strong>
-    }
-    if ((part.startsWith('_') && part.endsWith('_') && part.length > 2) || (part.startsWith('*') && part.endsWith('*') && part.length > 2 && !part.startsWith('**'))) {
-      return <em key={i}>{part.slice(1, -1)}</em>
-    }
-    if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
-      return <code key={i} style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 5px', borderRadius: '3px', fontSize: '10px', fontFamily: 'monospace', color: '#A5B4FC' }}>{part.slice(1, -1)}</code>
-    }
-    const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
-    if (linkMatch) {
-      return <a key={i} href={linkMatch[2]} style={{ color: '#818CF8', textDecoration: 'underline' }} target="_blank" rel="noopener noreferrer">{linkMatch[1]}</a>
-    }
-    return <span key={i}>{part}</span>
-  })
-}
-
-function MarkdownLine({ text }: { text: string }) {
-  return <>{renderInline(text)}</>
-}
-
-function MarkdownContent({ content }: { content: string }) {
-  const blocks = content.split(/\n{2,}/)
+// Simple markdown renderer
+function MsgContent({ content }: { content: string }) {
+  const lines = content.split('\n')
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      {blocks.map((block, bi) => {
-        const trimmed = block.trim()
-        if (!trimmed) return null
-        if (trimmed.startsWith('### ')) return <p key={bi} style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#F0EEFF' }}><MarkdownLine text={trimmed.slice(4)} /></p>
-        if (trimmed.startsWith('## ')) return <p key={bi} style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#F0EEFF' }}><MarkdownLine text={trimmed.slice(3)} /></p>
-        if (trimmed.startsWith('# ')) return <p key={bi} style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: '#F0EEFF' }}><MarkdownLine text={trimmed.slice(2)} /></p>
-        const lines = trimmed.split('\n')
-        const isList = lines.some(l => /^[-•*+]\s/.test(l) || /^\d+\.\s/.test(l))
-        if (isList) {
-          return (
-            <div key={bi} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              {lines.map((line, li) => {
-                const bulletMatch = line.match(/^[-•*+]\s(.+)/)
-                const numMatch = line.match(/^\d+\.\s(.+)/)
-                if (bulletMatch || numMatch) {
-                  const text = bulletMatch ? bulletMatch[1] : numMatch![1]
-                  return (
-                    <div key={li} style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
-                      <span style={{ color: '#6366F1', flexShrink: 0, marginTop: '1px', fontSize: '10px' }}>•</span>
-                      <span style={{ fontSize: '12px', color: '#D1D5DB', lineHeight: '1.5' }}><MarkdownLine text={text} /></span>
-                    </div>
-                  )
-                }
-                if (line.trim()) return <p key={li} style={{ margin: 0, fontSize: '12px', color: '#D1D5DB', lineHeight: '1.6' }}><MarkdownLine text={line} /></p>
-                return null
-              })}
-            </div>
-          )
+    <div style={{ fontSize: '13px', color: '#D1D5DB', lineHeight: '1.65', wordBreak: 'break-word' }}>
+      {lines.map((line, i) => {
+        if (line.startsWith('### ')) return <div key={i} style={{ fontSize: '12px', fontWeight: 700, color: '#EBEBEB', marginTop: i > 0 ? '10px' : 0, marginBottom: '4px' }}>{line.slice(4)}</div>
+        if (line.startsWith('## ')) return <div key={i} style={{ fontSize: '13px', fontWeight: 700, color: '#EBEBEB', marginTop: i > 0 ? '12px' : 0, marginBottom: '4px' }}>{line.slice(3)}</div>
+        if (line.startsWith('# ')) return <div key={i} style={{ fontSize: '14px', fontWeight: 700, color: '#F1F1F3', marginTop: i > 0 ? '14px' : 0, marginBottom: '6px' }}>{line.slice(2)}</div>
+        if (line.startsWith('- ') || line.startsWith('• ')) {
+          const text = line.slice(2)
+          return <div key={i} style={{ display: 'flex', gap: '6px', marginBottom: '2px' }}><span style={{ color: '#6366F1', flexShrink: 0, marginTop: '1px' }}>·</span><span>{renderInline(text)}</span></div>
         }
-        return (
-          <p key={bi} style={{ margin: 0, fontSize: '12px', color: '#D1D5DB', lineHeight: '1.6' }}>
-            {lines.map((line, li) => (
-              <span key={li}><MarkdownLine text={line} />{li < lines.length - 1 && <br />}</span>
-            ))}
-          </p>
-        )
+        if (/^\d+\.\s/.test(line)) {
+          const num = line.match(/^(\d+)\.\s/)?.[1]
+          const text = line.replace(/^\d+\.\s/, '')
+          return <div key={i} style={{ display: 'flex', gap: '6px', marginBottom: '2px' }}><span style={{ color: '#6366F1', flexShrink: 0, fontSize: '11px', fontWeight: 700, marginTop: '2px' }}>{num}.</span><span>{renderInline(text)}</span></div>
+        }
+        if (line.trim() === '') return <div key={i} style={{ height: '6px' }} />
+        return <div key={i} style={{ marginBottom: '2px' }}>{renderInline(line)}</div>
       })}
     </div>
   )
 }
 
-// ── Main component ─────────────────────────────────────────────────────────────
+function renderInline(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\[([^\]]+)\]\(([^)]+)\))/)
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) return <strong key={i} style={{ color: '#EBEBEB', fontWeight: 600 }}>{part.slice(2, -2)}</strong>
+    if (part.startsWith('`') && part.endsWith('`')) return <code key={i} style={{ background: 'rgba(99,102,241,0.15)', padding: '1px 5px', borderRadius: '3px', fontSize: '12px', color: '#A5B4FC' }}>{part.slice(1, -1)}</code>
+    const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
+    if (linkMatch) return <Link key={i} href={linkMatch[2]} style={{ color: '#818CF8', textDecoration: 'underline' }}>{linkMatch[1]}</Link>
+    return part
+  })
+}
 
-export default function AiChatSidebar() {
-  const { aiCollapsed, toggleAiCollapsed, activeDeal } = useSidebar()
+export default function AiChatBar() {
   const pathname = usePathname()
-  const pageLabel = (() => {
-    if (pathname.startsWith('/deals/') && pathname !== '/deals') return null // deal badge handles this
-    if (pathname === '/dashboard') return 'Dashboard'
-    if (pathname === '/pipeline') return 'Pipeline'
-    if (pathname === '/deals') return 'All Deals'
-    if (pathname === '/collateral') return 'Collateral'
-    if (pathname === '/competitors') return 'Competitors'
-    if (pathname === '/case-studies') return 'Case Studies'
-    if (pathname === '/product-gaps') return 'Feature Gaps'
-    if (pathname === '/company') return 'Company Profile'
-    if (pathname === '/settings') return 'Settings'
-    return null
-  })()
+  const { sidebarWidth, aiCollapsed, toggleAiCollapsed, activeDeal } = useSidebar()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const [streaming, setStreaming] = useState(false)
+  const [streamingText, setStreamingText] = useState('')
   const abortRef = useRef<AbortController | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const isExpanded = !aiCollapsed
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading])
-
-  // Auto-grow textarea
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const el = e.target
-    setInput(el.value)
-    el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
-  const stop = () => {
-    abortRef.current?.abort()
-    setLoading(false)
+  useEffect(() => {
+    if (isExpanded) scrollToBottom()
+  }, [messages, streamingText, isExpanded, scrollToBottom])
+
+  // Auto-expand when user focuses the input
+  const handleInputFocus = () => {
+    if (aiCollapsed) toggleAiCollapsed()
   }
 
-  const send = async (text: string) => {
-    if (!text.trim() || loading) return
-    const userMsg: Message = { role: 'user', content: text.trim() }
-    const updated = [...messages, userMsg]
-    setMessages(updated)
-    setInput('')
-    // Reset textarea height
-    if (inputRef.current) {
-      inputRef.current.style.height = 'auto'
-    }
+  const sendMessage = useCallback(async (overrideText?: string) => {
+    const text = (overrideText ?? input).trim()
+    if (!text || loading) return
+    if (!overrideText) setInput('')
+
+    // Expand if collapsed
+    if (aiCollapsed) toggleAiCollapsed()
+
+    const userMsg: Message = { role: 'user', content: text }
+    const newMessages = [...messages, userMsg]
+    setMessages(newMessages)
     setLoading(true)
-    abortRef.current = new AbortController()
-    const timeoutId = setTimeout(() => abortRef.current?.abort(), 55000)
+    setStreaming(false)
+    setStreamingText('')
+
+    const currentPage = pathname || '/'
+
     try {
+      const ctrl = new AbortController()
+      abortRef.current = ctrl
+
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: updated, activeDealId: activeDeal?.id ?? null, currentPage: pageLabel }),
-        signal: abortRef.current.signal,
+        body: JSON.stringify({ messages: newMessages, activeDealId: activeDeal?.id ?? null, currentPage }),
+        signal: ctrl.signal,
       })
-      clearTimeout(timeoutId)
 
-      const contentType = res.headers.get('content-type') ?? ''
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${(err as { error?: string }).error ?? res.statusText}` }])
+        return
+      }
 
-      if (contentType.includes('text/event-stream')) {
-        // Streaming Q&A response — show tokens as they arrive
-        const reader = res.body?.getReader()
-        if (!reader) throw new Error('No stream body')
-        const decoder = new TextDecoder()
+      const ct = res.headers.get('content-type') ?? ''
+      if (ct.includes('text/event-stream')) {
+        // Streaming response
+        setStreaming(true)
+        const reader = res.body!.getReader()
+        const dec = new TextDecoder()
         let accumulated = ''
-        // Add placeholder assistant message that we'll update progressively
-        setMessages(prev => [...prev, { role: 'assistant', content: '' }])
-
         while (true) {
           const { done, value } = await reader.read()
           if (done) break
-          const chunk = decoder.decode(value, { stream: true })
-          // Parse SSE lines: data: {...}\n\n
+          const chunk = dec.decode(value)
           for (const line of chunk.split('\n')) {
             if (!line.startsWith('data: ')) continue
             try {
-              const payload = JSON.parse(line.slice(6))
-              if (payload.t) {
-                accumulated += payload.t
-                setMessages(prev => {
-                  const copy = [...prev]
-                  copy[copy.length - 1] = { ...copy[copy.length - 1], content: accumulated }
-                  return copy
-                })
-              }
-            } catch { /* skip malformed lines */ }
+              const parsed = JSON.parse(line.slice(6))
+              if (parsed.t) { accumulated += parsed.t; setStreamingText(accumulated) }
+              if (parsed.done) break
+            } catch { /* skip */ }
           }
         }
+        setMessages(prev => [...prev, { role: 'assistant', content: accumulated }])
+        setStreamingText('')
+        setStreaming(false)
       } else {
-        // Non-streaming response (intent handlers with actions)
+        // JSON response with action cards
         const data = await res.json()
-        if (data.error) throw new Error(data.error)
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: data.reply,
-          actions: data.actions ?? [],
-        }])
-        // Revalidate SWR caches for any pages affected by the AI actions
-        if (data.actions?.length) {
-          invalidateCaches(data.actions)
-        }
+        const assistantMsg: Message = { role: 'assistant', content: data.reply ?? '', actions: data.actions ?? [] }
+        setMessages(prev => [...prev, assistantMsg])
+        if (data.actions?.length) invalidateCaches(data.actions)
       }
     } catch (e: unknown) {
-      clearTimeout(timeoutId)
-      if (e instanceof Error && e.name === 'AbortError') {
-        setMessages(prev => [...prev, { role: 'assistant', content: 'Stopped.' }])
-      } else {
-        const msg = e instanceof Error ? e.message : 'Unknown error'
-        setMessages(prev => [...prev, { role: 'assistant', content: 'Error: ' + msg }])
+      if (e instanceof Error && e.name !== 'AbortError') {
+        setMessages(prev => [...prev, { role: 'assistant', content: 'Something went wrong. Please try again.' }])
       }
     } finally {
       setLoading(false)
-      inputRef.current?.focus()
+      setStreaming(false)
+      abortRef.current = null
+    }
+  }, [input, messages, loading, activeDeal, pathname, aiCollapsed, toggleAiCollapsed])
+
+  const stopStreaming = () => {
+    abortRef.current?.abort()
+    setLoading(false)
+    setStreaming(false)
+    if (streamingText) {
+      setMessages(prev => [...prev, { role: 'assistant', content: streamingText }])
+      setStreamingText('')
     }
   }
 
-  const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      send(input)
-    }
+  const clearChat = () => {
+    setMessages([])
+    setInput('')
+    setStreamingText('')
   }
 
-  const collapsedStrip = (
-    <div style={{
-      width: '48px', minWidth: '48px', height: '100vh',
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      borderLeft: '1px solid rgba(255,255,255,0.07)',
-      background: 'rgba(10,8,18,0.97)',
-      backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-      paddingTop: '14px', gap: '10px',
-    }}>
-      <button onClick={toggleAiCollapsed} title="Expand AI assistant" style={{
-        width: '32px', height: '32px', borderRadius: '8px',
-        background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2))',
-        border: '1px solid rgba(99,102,241,0.3)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', color: '#818CF8', transition: 'all 150ms ease',
-      }}
-      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(99,102,241,0.3)' }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2))' }}
-      >
-        <ChevronLeft size={14} />
-      </button>
-      <div style={{
-        width: '28px', height: '28px', borderRadius: '8px',
-        background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <Sparkles size={13} color="#818CF8" />
-      </div>
-      {messages.length > 0 && (
-        <div style={{
-          width: '20px', height: '20px', borderRadius: '50%',
-          background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '10px', color: '#818CF8', fontWeight: 700,
-        }}>
-          {messages.filter(m => m.role === 'assistant').length}
-        </div>
-      )}
-    </div>
-  )
+  const EXPANDED_HEIGHT = 460
+  const COLLAPSED_HEIGHT = 56
 
-  const expandedPanel = (
-    <div style={{
-      width: '340px', minWidth: '340px', height: '100vh',
-      display: 'flex', flexDirection: 'column',
-      borderLeft: '1px solid rgba(255,255,255,0.07)',
-      background: 'rgba(10,8,18,0.98)',
-      backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-    }}>
-      {/* Header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '9px',
-        padding: '13px 14px 11px',
-        borderBottom: '1px solid rgba(255,255,255,0.07)',
-        flexShrink: 0,
-      }}>
-        <div style={{
-          width: '28px', height: '28px', borderRadius: '8px',
-          background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 0 14px rgba(99,102,241,0.35)',
-          flexShrink: 0,
-        }}>
-          <Sparkles size={14} color="#fff" />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: '#F0EEFF', lineHeight: 1.2 }}>AI Assistant</div>
-          {activeDeal ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px' }}>
-              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
-              <span style={{ fontSize: '10px', color: '#6EE7B7', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {activeDeal.company}
-              </span>
-              <span style={{ fontSize: '10px', color: '#333', flexShrink: 0 }}>· {activeDeal.stage.replace('_', ' ')}</span>
-            </div>
-          ) : pageLabel ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px' }}>
-              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1', flexShrink: 0 }} />
-              <span style={{ fontSize: '10px', color: '#818CF8', fontWeight: 500 }}>{pageLabel}</span>
-            </div>
-          ) : (
-            <div style={{ fontSize: '10px', color: '#444', marginTop: '1px' }}>Powered by Claude</div>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-          {loading && (
-            <button onClick={stop} title="Stop" style={{
-              background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
-              cursor: 'pointer', color: '#EF4444', padding: '3px 8px', borderRadius: '6px',
-              display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 500,
-              transition: 'background 150ms',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.18)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)' }}
-            >
-              <Square size={9} fill="#EF4444" /> Stop
-            </button>
-          )}
-          {!loading && messages.length > 0 && (
-            <button onClick={() => setMessages([])} title="New chat" style={{
-              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)',
-              cursor: 'pointer', color: '#666', padding: '5px 7px', borderRadius: '6px',
-              display: 'flex', alignItems: 'center', transition: 'all 150ms',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = '#666'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)' }}
-            >
-              <RotateCcw size={12} />
-            </button>
-          )}
-          <button onClick={toggleAiCollapsed} title="Collapse" style={{
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)',
-            cursor: 'pointer', color: '#888', padding: '5px 7px', borderRadius: '6px',
-            display: 'flex', alignItems: 'center', transition: 'all 150ms',
-          }}
-          onMouseEnter={e => { e.currentTarget.style.color = '#EBEBEB'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)' }}
-          onMouseLeave={e => { e.currentTarget.style.color = '#888'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)' }}
-          >
-            <ChevronRight size={13} />
-          </button>
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-
-        {/* Empty state */}
-        {messages.length === 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '4px' }}>
-            {activeDeal ? (
-              <>
-                <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.12)', borderRadius: '8px', padding: '10px 12px' }}>
-                  <div style={{ fontSize: '10px', color: '#4ADE80', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '4px' }}>Deal context active</div>
-                  <div style={{ fontSize: '12px', color: '#E5E7EB', fontWeight: 600 }}>{activeDeal.company}</div>
-                  <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '2px' }}>{activeDeal.name} · {activeDeal.stage.replace('_', ' ')}</div>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                  {[
-                    { icon: FileText, color: '#6366F1', bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.15)', title: 'Analyse notes', desc: 'Paste notes for this deal', prompt: `Analyse these meeting notes for ${activeDeal.company}:\n\n` },
-                    { icon: Mail, color: '#06B6D4', bg: 'rgba(6,182,212,0.08)', border: 'rgba(6,182,212,0.15)', title: 'Draft follow-up', desc: 'Address top risk with an email', prompt: `Draft a follow-up email for ${activeDeal.company} addressing the biggest risk in this deal.` },
-                    { icon: Zap, color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.15)', title: 'Generate collateral', desc: 'Email sequence, battlecard…', prompt: `Generate an email sequence for ${activeDeal.company} based on where we are in the deal.` },
-                    { icon: BarChart2, color: '#22C55E', bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.15)', title: 'Deal assessment', desc: 'What\'s the status & next step', prompt: `Give me a brief assessment of the ${activeDeal.company} deal — current status, top risk, and recommended next action.` },
-                  ].map(cap => {
-                    const Icon = cap.icon
-                    return (
-                      <button key={cap.title} onClick={() => { setInput(cap.prompt); inputRef.current?.focus() }}
-                        style={{ padding: '9px 10px', borderRadius: '8px', textAlign: 'left', background: cap.bg, border: `1px solid ${cap.border}`, cursor: 'pointer', transition: 'opacity 150ms', display: 'flex', flexDirection: 'column', gap: '4px' }}
-                        onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
-                        onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
-                      >
-                        <Icon size={13} color={cap.color} />
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#E5E7EB', lineHeight: 1.2 }}>{cap.title}</div>
-                        <div style={{ fontSize: '10px', color: '#6B7280', lineHeight: 1.3 }}>{cap.desc}</div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </>
-            ) : (
-              <>
-                <p style={{ fontSize: '11px', color: '#444', margin: 0, textAlign: 'center', lineHeight: 1.5 }}>
-                  Paste notes, ask about your pipeline,<br />or generate collateral.
-                </p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                  {CAPABILITIES.map(cap => {
-                    const Icon = cap.icon
-                    return (
-                      <button key={cap.title} onClick={() => { setInput(cap.prompt); inputRef.current?.focus() }}
-                        style={{ padding: '9px 10px', borderRadius: '8px', textAlign: 'left', background: cap.bg, border: `1px solid ${cap.border}`, cursor: 'pointer', transition: 'opacity 150ms', display: 'flex', flexDirection: 'column', gap: '4px' }}
-                        onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
-                        onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
-                      >
-                        <Icon size={13} color={cap.color} />
-                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#E5E7EB', lineHeight: 1.2 }}>{cap.title}</div>
-                        <div style={{ fontSize: '10px', color: '#6B7280', lineHeight: 1.3 }}>{cap.desc}</div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Message list */}
-        {messages.map((msg, i) => (
-          <div key={i} style={{
-            display: 'flex', gap: '8px', alignItems: 'flex-start',
-            flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
-          }}>
-            <div style={{
-              width: '24px', height: '24px', borderRadius: '50%', flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: msg.role === 'user'
-                ? 'linear-gradient(135deg, #4F46E5, #7C3AED)'
-                : 'rgba(99,102,241,0.12)',
-              border: msg.role === 'assistant' ? '1px solid rgba(99,102,241,0.2)' : 'none',
-              boxShadow: msg.role === 'user' ? '0 0 8px rgba(99,102,241,0.3)' : 'none',
-            }}>
-              {msg.role === 'user'
-                ? <User size={11} color="#fff" />
-                : <Bot size={11} color="#818CF8" />}
-            </div>
-            <div style={{ maxWidth: '88%', display: 'flex', flexDirection: 'column', gap: '0' }}>
-              <div style={{
-                padding: '8px 11px',
-                borderRadius: msg.role === 'user' ? '12px 3px 12px 12px' : '3px 12px 12px 12px',
-                background: msg.role === 'user'
-                  ? 'linear-gradient(135deg, rgba(79,70,229,0.22), rgba(124,58,237,0.22))'
-                  : 'rgba(255,255,255,0.04)',
-                border: msg.role === 'user'
-                  ? '1px solid rgba(99,102,241,0.3)'
-                  : '1px solid rgba(255,255,255,0.07)',
-              }}>
-                {msg.role === 'assistant'
-                  ? <MarkdownContent content={msg.content} />
-                  : <p style={{ margin: 0, fontSize: '12px', color: '#D1D5DB', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{msg.content}</p>
-                }
-              </div>
-              {msg.role === 'assistant' && msg.actions && msg.actions.length > 0 && (
-                <ActionCards actions={msg.actions} />
-              )}
-            </div>
-          </div>
-        ))}
-
-        {/* Typing indicator */}
-        {loading && (
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-            <div style={{
-              width: '24px', height: '24px', borderRadius: '50%', flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)',
-            }}>
-              <Bot size={11} color="#818CF8" />
-            </div>
-            <div style={{
-              padding: '10px 12px', borderRadius: '3px 12px 12px 12px',
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
-            }}>
-              <TypingDots />
-            </div>
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Input area */}
-      <div style={{ flexShrink: 0, padding: '10px 12px 14px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-        <div style={{
-          display: 'flex', gap: '8px', alignItems: 'flex-end',
-          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)',
-          borderRadius: '12px', padding: '9px 10px',
-          transition: 'border-color 150ms ease',
-        }}
-        onFocusCapture={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.45)'}
-        onBlurCapture={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.09)'}
-        >
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={handleInputChange}
-            onKeyDown={handleKey}
-            placeholder={activeDeal ? `Ask about ${activeDeal.company}, paste notes…` : 'Ask anything or paste meeting notes…'}
-            rows={1}
-            style={{
-              flex: 1, background: 'none', border: 'none', outline: 'none',
-              color: '#E5E7EB', fontSize: '12px', lineHeight: '1.55',
-              resize: 'none', fontFamily: 'inherit',
-              minHeight: '20px', maxHeight: '120px', overflowY: 'auto',
-            }}
-          />
-          <button
-            onClick={() => send(input)}
-            disabled={!input.trim() || loading}
-            style={{
-              width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0,
-              background: input.trim() && !loading
-                ? 'linear-gradient(135deg, #4F46E5, #7C3AED)'
-                : 'rgba(255,255,255,0.06)',
-              boxShadow: input.trim() && !loading ? '0 0 12px rgba(99,102,241,0.45)' : 'none',
-              border: 'none', cursor: input.trim() && !loading ? 'pointer' : 'not-allowed',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.15s',
-            }}
-          >
-            <Send size={12} color={input.trim() && !loading ? '#fff' : '#333'} />
-          </button>
-        </div>
-        <p style={{ margin: '5px 0 0', fontSize: '10px', color: '#333', textAlign: 'center' }}>
-          Enter to send · Shift+Enter for new line
-        </p>
-      </div>
-    </div>
-  )
+  const barHeight = isExpanded ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT
 
   return (
     <>
-      <div className="ai-sidebar-desktop" style={{
-        position: 'fixed', right: 0, top: 0, zIndex: 40,
-        width: aiCollapsed ? '48px' : '340px',
-        transition: 'width 0.22s cubic-bezier(0.4,0,0.2,1)',
-        overflow: 'hidden',
+      <style>{`
+        @keyframes typingBounce { 0%,60%,100% { transform: translateY(0) } 30% { transform: translateY(-4px) } }
+        @keyframes spin { to { transform: rotate(360deg) } }
+        .ai-bar-messages::-webkit-scrollbar { width: 4px }
+        .ai-bar-messages::-webkit-scrollbar-track { background: transparent }
+        .ai-bar-messages::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 2px }
+        .ai-msg-user { background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2); }
+        .ai-msg-assistant { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); }
+      `}</style>
+
+      <div style={{
+        position: 'fixed',
+        bottom: 0,
+        left: `${sidebarWidth}px`,
+        right: 0,
+        height: `${barHeight}px`,
+        transition: 'height 0.25s cubic-bezier(0.4,0,0.2,1)',
+        zIndex: 200,
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'rgba(7,5,15,0.95)',
+        backdropFilter: 'blur(20px)',
+        borderTop: '1px solid rgba(99,102,241,0.2)',
+        boxShadow: isExpanded ? '0 -8px 40px rgba(0,0,0,0.6), 0 -1px 0 rgba(99,102,241,0.1)' : '0 -4px 20px rgba(0,0,0,0.4)',
       }}>
-        {aiCollapsed ? collapsedStrip : expandedPanel}
-      </div>
-      <div className="ai-sidebar-mobile">
-        {!mobileOpen && (
-          <button onClick={() => setMobileOpen(true)} style={{
-            position: 'fixed', bottom: '20px', right: '20px', zIndex: 50,
-            width: '48px', height: '48px', borderRadius: '50%',
-            background: 'linear-gradient(135deg, #4F46E5, #7C3AED)',
-            boxShadow: '0 0 24px rgba(99,102,241,0.5)',
-            border: 'none', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <MessageSquare size={20} color="#fff" />
+
+        {/* ── Header bar — always visible ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '0 16px',
+          height: `${COLLAPSED_HEIGHT}px`,
+          flexShrink: 0,
+          borderBottom: isExpanded ? '1px solid rgba(255,255,255,0.06)' : 'none',
+        }}>
+          {/* Icon + label */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+            <div style={{
+              width: '26px', height: '26px', borderRadius: '7px',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.3))',
+              border: '1px solid rgba(99,102,241,0.4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Sparkles size={13} color="#818CF8" />
+            </div>
+            {isExpanded && (
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#818CF8', letterSpacing: '0.02em' }}>
+                DealKit AI
+              </span>
+            )}
+          </div>
+
+          {/* Active deal badge */}
+          {activeDeal && isExpanded && (
+            <div style={{
+              fontSize: '10px', color: '#6366F1', background: 'rgba(99,102,241,0.1)',
+              border: '1px solid rgba(99,102,241,0.2)', borderRadius: '100px',
+              padding: '2px 8px', flexShrink: 0,
+            }}>
+              📋 {activeDeal.company}
+            </div>
+          )}
+
+          {/* Input — shown in both collapsed and expanded */}
+          <div style={{ flex: 1, position: 'relative' }}>
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onFocus={handleInputFocus}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
+              }}
+              placeholder={activeDeal ? `Ask about ${activeDeal.company}, or anything…` : 'Ask DealKit AI anything… (Enter to send, Shift+Enter for newline)'}
+              rows={1}
+              style={{
+                width: '100%', resize: 'none', background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px',
+                color: '#EBEBEB', fontSize: '13px', lineHeight: '1.5',
+                padding: '8px 12px', outline: 'none', fontFamily: 'inherit',
+                boxSizing: 'border-box', maxHeight: '80px', overflowY: 'auto',
+              }}
+              onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.5)')}
+              onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
+            />
+          </div>
+
+          {/* Send / Stop */}
+          {(loading || streaming) ? (
+            <button onClick={stopStreaming} style={{
+              width: '34px', height: '34px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
+              borderRadius: '8px', cursor: 'pointer',
+            }}>
+              <Square size={13} color="#EF4444" fill="#EF4444" />
+            </button>
+          ) : (
+            <button onClick={() => sendMessage()} disabled={!input.trim()} style={{
+              width: '34px', height: '34px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: input.trim() ? 'linear-gradient(135deg, #6366F1, #7C3AED)' : 'rgba(255,255,255,0.04)',
+              border: input.trim() ? 'none' : '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '8px', cursor: input.trim() ? 'pointer' : 'default',
+              boxShadow: input.trim() ? '0 0 12px rgba(99,102,241,0.4)' : 'none',
+              transition: 'all 150ms',
+            }}>
+              <Send size={13} color={input.trim() ? '#fff' : '#555'} />
+            </button>
+          )}
+
+          {/* Expand/collapse toggle */}
+          <button
+            onClick={toggleAiCollapsed}
+            style={{
+              width: '30px', height: '30px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'none', border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '7px', cursor: 'pointer', color: '#555', transition: 'all 120ms',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'; e.currentTarget.style.color = '#818CF8' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#555' }}
+            title={isExpanded ? 'Collapse' : 'Expand chat'}
+          >
+            {isExpanded ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
           </button>
-        )}
-        {mobileOpen && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', justifyContent: 'flex-end' }}>
-            <div onClick={() => setMobileOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }} />
-            <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: '340px' }}>{expandedPanel}</div>
+
+          {/* Clear — only shown in expanded with messages */}
+          {isExpanded && messages.length > 0 && (
+            <button onClick={clearChat} style={{
+              width: '26px', height: '26px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'none', border: 'none', cursor: 'pointer', color: '#374151',
+            }}
+              title="Clear conversation"
+              onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#374151')}
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+
+        {/* ── Conversation area — only visible when expanded ── */}
+        {isExpanded && (
+          <div
+            className="ai-bar-messages"
+            style={{
+              flex: 1, overflowY: 'auto', padding: '12px 16px',
+              display: 'flex', flexDirection: 'column', gap: '10px',
+            }}
+          >
+            {messages.length === 0 && !streaming && (
+              <div>
+                <div style={{ fontSize: '11px', color: '#374151', marginBottom: '10px', textAlign: 'center' }}>
+                  Your AI sales command centre — ask anything or pick a quick action:
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center' }}>
+                  {QUICK_PROMPTS.map(qp => (
+                    <button
+                      key={qp.label}
+                      onClick={() => {
+                        setInput(qp.prompt)
+                        inputRef.current?.focus()
+                        if (qp.prompt.endsWith('\n\n') || qp.prompt.endsWith(': ') || qp.prompt.endsWith('a ')) return
+                        sendMessage(qp.prompt)
+                      }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '5px',
+                        padding: '5px 10px', borderRadius: '100px', cursor: 'pointer',
+                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                        color: '#9CA3AF', fontSize: '11px', fontWeight: 500, transition: 'all 120ms',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = `${qp.color}40`; e.currentTarget.style.color = qp.color }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#9CA3AF' }}
+                    >
+                      <qp.icon size={10} color="currentColor" />
+                      {qp.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {messages.map((msg, i) => (
+              <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                {msg.role === 'assistant' && (
+                  <div style={{
+                    width: '22px', height: '22px', flexShrink: 0, marginTop: '2px',
+                    background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.3))',
+                    border: '1px solid rgba(99,102,241,0.3)', borderRadius: '6px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Sparkles size={11} color="#818CF8" />
+                  </div>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className={msg.role === 'user' ? 'ai-msg-user' : 'ai-msg-assistant'} style={{
+                    borderRadius: '10px', padding: '8px 12px',
+                    ...(msg.role === 'user' ? { marginLeft: '24px' } : {}),
+                  }}>
+                    {msg.role === 'user'
+                      ? <p style={{ fontSize: '13px', color: '#C7D2FE', margin: 0, lineHeight: 1.5 }}>{msg.content}</p>
+                      : <MsgContent content={msg.content} />
+                    }
+                  </div>
+                  {msg.actions && msg.actions.length > 0 && <ActionCards actions={msg.actions} />}
+                </div>
+              </div>
+            ))}
+
+            {/* Streaming in progress */}
+            {(loading || streaming) && (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                <div style={{
+                  width: '22px', height: '22px', flexShrink: 0, marginTop: '2px',
+                  background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.3))',
+                  border: '1px solid rgba(99,102,241,0.3)', borderRadius: '6px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Sparkles size={11} color="#818CF8" />
+                </div>
+                <div className="ai-msg-assistant" style={{ flex: 1, borderRadius: '10px', padding: '8px 12px' }}>
+                  {streamingText ? <MsgContent content={streamingText} /> : <TypingDots />}
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
         )}
       </div>
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg) } }
-        @keyframes typingBounce {
-          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-          30% { transform: translateY(-5px); opacity: 1; }
-        }
-        @media (min-width: 901px) { .ai-sidebar-mobile { display: none !important; } }
-        @media (max-width: 900px) { .ai-sidebar-desktop { display: none !important; } }
-      `}</style>
+
+      {/* Spacer so page content isn't hidden behind the bar */}
+      <div style={{ height: `${barHeight}px`, transition: 'height 0.25s cubic-bezier(0.4,0,0.2,1)', flexShrink: 0 }} />
     </>
   )
 }
