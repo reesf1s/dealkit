@@ -2,12 +2,15 @@
 
 import { usePathname } from 'next/navigation'
 import { useUser } from '@clerk/nextjs'
+import useSWR from 'swr'
 import {
   LayoutDashboard, Kanban, ClipboardList, FileText,
   AlertTriangle, Building2, Swords, BookOpen, Settings,
-  Search, Bell, Sparkles, Menu, MessageSquare,
+  Search, Sparkles, Menu, MessageSquare, Brain,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
+
+const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 const PAGE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   '/dashboard':    { label: 'Dashboard',    Icon: LayoutDashboard },
@@ -37,6 +40,18 @@ export default function TopNav() {
   const pathname = usePathname()
   const { user } = useUser()
   const { sidebarWidth, aiSidebarWidth, openMobile } = useSidebar()
+
+  const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
+  const brain = brainRes?.data
+  const urgentCount = (brain?.urgentDeals?.length ?? 0) + (brain?.staleDeals?.length ?? 0)
+  const brainAge = brain?.updatedAt
+    ? (() => {
+        const mins = Math.floor((Date.now() - new Date(brain.updatedAt).getTime()) / 60000)
+        if (mins < 2) return 'live'
+        if (mins < 60) return `${mins}m`
+        return `${Math.floor(mins / 60)}h`
+      })()
+    : null
 
   const { label, Icon } = getPageInfo(pathname)
   const avatarLetter =
@@ -128,20 +143,28 @@ export default function TopNav() {
         }}>⌘K</span>
       </button>
 
-      {/* Right: Bell + Avatar */}
+      {/* Right: Brain status + Avatar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <button style={{
-          width: '34px', height: '34px', borderRadius: '9px',
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', transition: 'background 0.15s',
-        }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.12)'}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'}
-        >
-          <Bell size={15} color="#9CA3AF" strokeWidth={2} />
-        </button>
+
+        {/* Brain status pill */}
+        {brainAge && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '6px',
+            padding: '5px 11px', borderRadius: '100px',
+            background: urgentCount > 0 ? 'rgba(239,68,68,0.06)' : 'rgba(99,102,241,0.07)',
+            border: `1px solid ${urgentCount > 0 ? 'rgba(239,68,68,0.18)' : 'rgba(99,102,241,0.18)'}`,
+          }}>
+            <Brain size={11} color={urgentCount > 0 ? '#F87171' : '#818CF8'} />
+            <span style={{ fontSize: '11px', color: urgentCount > 0 ? '#F87171' : '#818CF8', fontWeight: '600', whiteSpace: 'nowrap' }}>
+              Brain · {brainAge}
+            </span>
+            {urgentCount > 0 && (
+              <span style={{ fontSize: '11px', color: '#EF4444', fontWeight: '700' }}>
+                · {urgentCount} flagged
+              </span>
+            )}
+          </div>
+        )}
 
         <div style={{
           width: '34px', height: '34px', borderRadius: '50%',

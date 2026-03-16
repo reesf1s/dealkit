@@ -59,12 +59,16 @@ const STAGES = [
 function ScoreBadge({ score }: { score?: number | null }) {
   if (!score && score !== 0) return null
   const color = score >= 70 ? '#22C55E' : score >= 40 ? '#F59E0B' : '#EF4444'
+  const bg = score >= 70 ? 'rgba(34,197,94,0.1)' : score >= 40 ? 'rgba(245,158,11,0.1)' : 'rgba(239,68,68,0.1)'
+  const border = score >= 70 ? 'rgba(34,197,94,0.25)' : score >= 40 ? 'rgba(245,158,11,0.25)' : 'rgba(239,68,68,0.25)'
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: '4px',
+      display: 'flex', alignItems: 'center', gap: '3px',
+      padding: '3px 7px', borderRadius: '100px',
+      background: bg, border: `1px solid ${border}`,
       fontSize: '11px', fontWeight: '700', color,
     }}>
-      <Target size={10} />
+      <Target size={9} />
       {score}%
     </div>
   )
@@ -512,7 +516,7 @@ export default function PipelinePage() {
               {staleCount} stale
             </span>
           )}
-          <span style={{ fontSize: '11px', color: '#333', marginLeft: 'auto' }}>Flagged by AI · hover cards for detail</span>
+          <span style={{ fontSize: '11px', color: '#333', marginLeft: 'auto' }}>Flagged by Sales Brain · hover for detail</span>
         </div>
       )}
 
@@ -561,8 +565,8 @@ export default function PipelinePage() {
             <div style={{ width: '26px', height: '26px', background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Star size={12} color="#A78BFA" />
             </div>
-            <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>AI Top Picks to Close</span>
-            <span style={{ fontSize: '11px', color: '#9CA3AF' }}>Highest conversion probability</span>
+            <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Brain&apos;s Top Picks</span>
+            <span style={{ fontSize: '11px', color: '#9CA3AF' }}>Highest ML win probability</span>
           </div>
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             {topDeals.map((deal: any) => {

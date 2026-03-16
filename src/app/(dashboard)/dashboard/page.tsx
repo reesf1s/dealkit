@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Plus, AlertTriangle, CheckCircle, Circle, ArrowUpRight,
-  Sparkles, Zap, FileText, TrendingUp, Activity, RefreshCw, Users,
+  Sparkles, Zap, FileText, TrendingUp, Activity, RefreshCw,
 } from 'lucide-react'
 import AIOverviewCard from '@/components/dashboard/AIOverviewCard'
 import { SetupAlert } from '@/components/shared/SetupBanner'
@@ -160,14 +160,8 @@ export default function DashboardPage() {
 
   const staleCollateral = collateralList.filter(c => c.status === 'stale')
 
-  // ── New Rep Kit ──────────────────────────────────────────────────────────
-  const competitorList: any[] = competitors?.data ?? []
-  const caseStudyList: any[] = caseStudies?.data ?? []
-  const readyBattlecards       = collateralList.filter(c => c.type === 'battlecard'         && c.status === 'ready')
-  const readyObjectionHandlers = collateralList.filter(c => c.type === 'objection_handler'  && c.status === 'ready')
-  const readyTalkTracks        = collateralList.filter(c => c.type === 'talk_track'         && c.status === 'ready')
-  const hasRepKit = readyBattlecards.length > 0 || readyObjectionHandlers.length > 0 ||
-    readyTalkTracks.length > 0 || caseStudyList.length > 0 || competitorList.length > 0 || wonDeals.length > 0
+  // collateral counts for KPI strip
+  const readyBattlecards = collateralList.filter(c => c.type === 'battlecard' && c.status === 'ready')
 
   // ── Setup health ──────────────────────────────────────────────────────────
   const hasCompany = !!companyData?.id
@@ -327,7 +321,7 @@ export default function DashboardPage() {
           <div style={card}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <Activity size={12} color="#A855F7" />
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Deal Patterns</span>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Deal Signals</span>
               <span style={{ fontSize: '11px', color: '#374151', marginLeft: 'auto' }}>{brain?.keyPatterns?.length ?? 0} trend{(brain?.keyPatterns?.length ?? 0) !== 1 ? 's' : ''}</span>
               <button onClick={rebuildBrain} disabled={refreshingBrain} style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: refreshingBrain ? 'default' : 'pointer', padding: '2px 4px', borderRadius: '4px', color: '#374151' }}
                 title="Refresh intelligence">
@@ -416,7 +410,7 @@ export default function DashboardPage() {
           <div style={card}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <TrendingUp size={12} color="#10B981" />
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Recommendations</span>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Brain Recommendations</span>
               <span style={{ fontSize: '11px', color: '#374151', marginLeft: 'auto' }}>
                 {(brain?.pipelineRecommendations ?? []).filter((r: any) => r.priority === 'high').length} high priority
               </span>
@@ -473,8 +467,8 @@ export default function DashboardPage() {
             {/* Section label */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <Sparkles size={11} color="#6366F1" />
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Pipeline Intelligence</span>
-              <span style={{ fontSize: '10px', color: '#2A2A2A', marginLeft: '4px' }}>compounding with every closed deal</span>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Brain Output</span>
+              <span style={{ fontSize: '10px', color: '#2A2A2A', marginLeft: '4px' }}>models trained on your closed deals</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
 
@@ -657,141 +651,7 @@ export default function DashboardPage() {
         )
       })()}
 
-      {/* ── Zone 3: Pipeline by stage ────────────────────────────────────── */}
-      {openDeals.length > 0 && (
-        <div style={card}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <SectionHeaderInline label="Pipeline" />
-            <Link href="/pipeline" style={{ fontSize: '11px', color: '#4B5563', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}>
-              View board <ArrowUpRight size={10} />
-            </Link>
-          </div>
-          <div style={{ display: 'flex', padding: '12px 14px', gap: '8px', flexWrap: 'wrap' }}>
-            {STAGE_ORDER.filter(s => (stageMap[s] ?? 0) > 0).map(stage => {
-              const count = stageMap[stage] ?? 0
-              const color = STAGE_COLOR[stage]
-              const stageDeals = openDeals.filter(d => d.stage === stage)
-              const stagePipeline = stageDeals.reduce((s: number, d: any) => s + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
-              return (
-                <Link key={stage} href="/pipeline" style={{ textDecoration: 'none', display: 'flex', flexDirection: 'column', gap: '4px', padding: '10px 14px', borderRadius: '9px', background: `${color}0d`, border: `1px solid ${color}20`, minWidth: '100px', flex: 1, transition: 'border-color 0.1s' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = `${color}40`}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = `${color}20`}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: color }} />
-                    <span style={{ fontSize: '11px', color: '#555', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{STAGE_LABELS[stage]}</span>
-                  </div>
-                  <div style={{ fontSize: '20px', fontWeight: 700, color: '#F1F1F3', letterSpacing: '-0.03em' }}>{count}</div>
-                  {stagePipeline > 0 && <div style={{ fontSize: '11px', color: color }}>{fmt(stagePipeline)}</div>}
-                </Link>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ── New Rep Kit ──────────────────────────────────────────────────── */}
-      {hasRepKit && (
-        <div style={card}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{ width: '20px', height: '20px', borderRadius: '6px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Users size={11} color="#818CF8" />
-              </div>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>New Rep Kit</span>
-              <span style={{ fontSize: '11px', color: '#374151' }}>Everything a new rep needs from day one</span>
-            </div>
-            <Link href="/collateral" style={{ fontSize: '11px', color: '#4B5563', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}>
-              View all <ArrowUpRight size={10} />
-            </Link>
-          </div>
-
-          <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-
-            {/* Resource count chips */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-              {([
-                { label: 'Battlecards',        count: readyBattlecards.length,       color: '#EF4444', href: '/collateral' },
-                { label: 'Objection Handlers', count: readyObjectionHandlers.length,  color: '#8B5CF6', href: '/collateral' },
-                { label: 'Talk Tracks',        count: readyTalkTracks.length,         color: '#F59E0B', href: '/collateral' },
-                { label: 'Case Studies',       count: caseStudyList.length,           color: '#22C55E', href: '/case-studies' },
-              ] as { label: string; count: number; color: string; href: string }[]).map(({ label, count, color, href }) => (
-                <Link key={label} href={href}
-                  style={{ display: 'flex', flexDirection: 'column', gap: '3px', padding: '10px 12px', borderRadius: '9px', background: count > 0 ? `${color}0d` : 'rgba(255,255,255,0.02)', border: `1px solid ${count > 0 ? color + '1f' : 'rgba(255,255,255,0.05)'}`, textDecoration: 'none', transition: 'border-color 0.1s' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = count > 0 ? `${color}40` : 'rgba(255,255,255,0.1)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = count > 0 ? `${color}1f` : 'rgba(255,255,255,0.05)'}
-                >
-                  <div style={{ fontSize: '22px', fontWeight: 800, color: count > 0 ? color : '#374151', letterSpacing: '-0.04em', lineHeight: 1 }}>{count}</div>
-                  <div style={{ fontSize: '10px', color: count > 0 ? '#6B7280' : '#374151', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', lineHeight: 1.3 }}>{label}</div>
-                  {count === 0 && <div style={{ fontSize: '10px', color: '#374151', marginTop: '1px' }}>Generate</div>}
-                </Link>
-              ))}
-            </div>
-
-            {/* Competitors to know */}
-            {competitorList.length > 0 && (
-              <div>
-                <div style={{ fontSize: '10px', color: '#4B5563', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>Competitors to know</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px' }}>
-                  {competitorList.slice(0, 3).map((comp: any) => {
-                    const diffs: string[] = Array.isArray(comp.differentiators) ? comp.differentiators : []
-                    const winAngle = diffs[0] ?? comp.notes ?? 'Open battlecard for details'
-                    return (
-                      <Link key={comp.id} href="/competitors"
-                        style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '9px 10px', borderRadius: '8px', background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.1)', textDecoration: 'none', transition: 'background 0.1s' }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.07)'}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.04)'}
-                      >
-                        <div style={{ width: '22px', height: '22px', borderRadius: '5px', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <span style={{ fontSize: '10px', fontWeight: 700, color: '#EF4444' }}>{String(comp.name ?? '?')[0].toUpperCase()}</span>
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '12px', color: '#E5E7EB', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{comp.name}</div>
-                          <div style={{ fontSize: '10px', color: '#6B7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>{winAngle}</div>
-                        </div>
-                      </Link>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Proof stories — recent wins */}
-            {wonDeals.length > 0 && (
-              <div>
-                <div style={{ fontSize: '10px', color: '#4B5563', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>Proof stories (recent wins)</div>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {wonDeals.slice(-4).reverse().map((deal: any) => (
-                    <Link key={deal.id} href={`/deals/${deal.id}`}
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '7px', background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.12)', textDecoration: 'none', transition: 'background 0.1s', flexShrink: 0 }}
-                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(34,197,94,0.09)'}
-                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(34,197,94,0.05)'}
-                    >
-                      <CheckCircle size={11} color="#22C55E" style={{ flexShrink: 0 }} />
-                      <span style={{ fontSize: '12px', color: '#E5E7EB', fontWeight: 500 }}>{deal.prospectCompany || deal.dealName}</span>
-                      {deal.dealValue && <span style={{ fontSize: '11px', color: '#22C55E' }}>{fmt(deal.dealValue)}</span>}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Prompt when nothing generated yet */}
-            {readyBattlecards.length === 0 && readyObjectionHandlers.length === 0 && (
-              <div style={{ padding: '8px 10px', background: 'rgba(99,102,241,0.05)', borderRadius: '8px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <Zap size={11} color="#6366F1" style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: '11px', color: '#6366F1', lineHeight: 1.5, flex: 1 }}>Generate battlecards and objection handlers to complete the rep kit</span>
-                <Link href="/collateral" style={{ fontSize: '11px', color: '#818CF8', textDecoration: 'none', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
-                  Generate <ArrowUpRight size={10} />
-                </Link>
-              </div>
-            )}
-
-          </div>
-        </div>
-      )}
-
-      {/* ── Zone 4: Recent Collateral + Setup health ──────────────────────── */}
+      {/* ── Zone 3: Recent Collateral + Setup health ──────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: healthPct < 100 ? '1fr 280px' : '1fr', gap: '12px', alignItems: 'start' }}>
 
         {/* Recent Collateral */}
