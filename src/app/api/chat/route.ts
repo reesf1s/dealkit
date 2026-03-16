@@ -967,7 +967,7 @@ async function handleProjectPlan(
     : ''
 
   const extractMsg = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5-20250514', max_tokens: 4000,
+    model: 'claude-haiku-4-5-20251001', max_tokens: 4000,
     system: `You are a project plan extractor for a sales deal management tool.
 Convert ANY format of input (tables, emails, spreadsheet data, meeting notes, free text) into structured project plan JSON.
 Respond with ONLY a valid JSON object — no explanation, no preamble, no markdown fences.`,
