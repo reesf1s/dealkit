@@ -3,8 +3,8 @@ export const dynamic = 'force-dynamic'
 
 import { useUser } from '@clerk/nextjs'
 import useSWR from 'swr'
-import { useState } from 'react'
-import { CheckCircle, AlertTriangle, ExternalLink, Download, Trash2, Copy, LogOut } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { CheckCircle, AlertTriangle, ExternalLink, Download, Trash2, Copy, LogOut, RefreshCw, Plug, Unplug } from 'lucide-react'
 import { SkeletonCard } from '@/components/shared/SkeletonCard'
 import { ConfirmModal } from '@/components/shared/ConfirmModal'
 import { useToast } from '@/components/shared/Toast'
@@ -75,6 +75,15 @@ function FieldRow({ label, value }: { label: string; value: string }) {
   )
 }
 
+type HubspotStatus = {
+  connected: boolean
+  portalId?: string
+  lastSyncAt?: string | null
+  dealsImported?: number
+  syncError?: string | null
+  configured?: boolean
+}
+
 export default function SettingsPage() {
   const { user, isLoaded } = useUser()
   const { toast } = useToast()
@@ -82,11 +91,60 @@ export default function SettingsPage() {
   const [exportLoading, setExportLoading] = useState(false)
   const [billingLoading, setBillingLoading] = useState<Plan | 'portal' | 'sync' | null>(null)
   const [leaveOpen, setLeaveOpen] = useState(false)
+  const [hubspotSyncing, setHubspotSyncing] = useState(false)
+  const [hubspotDisconnecting, setHubspotDisconnecting] = useState(false)
 
   const { data: userRes, isLoading: loadingUser } = useSWR<{ data: DbUser }>('/api/user', fetcher)
   const { data: membersRes, isLoading: loadingMembers, mutate: mutateMembers } = useSWR<{ data: Member[] }>('/api/workspaces/members', fetcher)
+  const { data: hubspotRes, mutate: mutateHubspot } = useSWR<{ data: HubspotStatus }>('/api/integrations/hubspot/status', fetcher, { revalidateOnFocus: false })
+  const hubspot = hubspotRes?.data
   const dbUser = userRes?.data
   const members = membersRes?.data ?? []
+
+  // Show toast when redirected back from HubSpot OAuth
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const hs = params.get('hubspot')
+    if (hs === 'connected') {
+      toast('HubSpot connected! Click "Sync deals" to import your pipeline.', 'success')
+      mutateHubspot()
+      window.history.replaceState({}, '', window.location.pathname)
+    } else if (hs === 'error') {
+      const reason = params.get('reason') ?? 'Unknown error'
+      toast(`HubSpot connection failed: ${reason}`, 'error')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function handleHubspotSync() {
+    setHubspotSyncing(true)
+    try {
+      const res = await fetch('/api/integrations/hubspot/sync', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Sync failed')
+      toast(`Synced ${json.data.dealsImported} deals from HubSpot`, 'success')
+      mutateHubspot()
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : 'Sync failed', 'error')
+    } finally {
+      setHubspotSyncing(false)
+    }
+  }
+
+  async function handleHubspotDisconnect() {
+    setHubspotDisconnecting(true)
+    try {
+      const res = await fetch('/api/integrations/hubspot/disconnect', { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to disconnect')
+      toast('HubSpot disconnected. Your imported deals remain in DealKit.', 'success')
+      mutateHubspot()
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : 'Failed to disconnect', 'error')
+    } finally {
+      setHubspotDisconnecting(false)
+    }
+  }
 
   async function handleExportData() {
     setExportLoading(true)
@@ -188,6 +246,7 @@ export default function SettingsPage() {
 
   return (
     <div style={{ padding: '24px 24px 24px 24px', maxWidth: '700px', margin: '0 auto' }}>
+      <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
       <div style={{ marginBottom: '20px' }}>
         <h1 style={{
           fontSize: '20px', fontWeight: 800, letterSpacing: '-0.04em', margin: 0, marginBottom: '4px',
@@ -394,6 +453,81 @@ export default function SettingsPage() {
               </p>
             </div>
           )}
+        </SectionCard>
+
+        {/* Integrations */}
+        <SectionCard title="Integrations" description="Connect external CRMs to import your pipeline">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+            {/* HubSpot */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', padding: '14px', borderRadius: '10px', background: hubspot?.connected ? 'rgba(255,160,50,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${hubspot?.connected ? 'rgba(255,160,50,0.25)' : 'rgba(255,255,255,0.08)'}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {/* HubSpot orange sprocket logo mark */}
+                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(255,122,0,0.12)', border: '1px solid rgba(255,122,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="#FF7A00">
+                    <path d="M18.164 7.932V5.4a2.297 2.297 0 0 0 1.326-2.067A2.297 2.297 0 0 0 17.194 1.04a2.297 2.297 0 0 0-2.297 2.294c0 .899.52 1.682 1.277 2.065v2.533a6.52 6.52 0 0 0-3.094 1.358L5.547 4.074a2.553 2.553 0 0 0 .086-.651 2.566 2.566 0 1 0-2.566 2.566c.463 0 .895-.126 1.267-.344l7.43 5.14a6.515 6.515 0 0 0 0 3.428L5.322 19.29a2.55 2.55 0 0 0-1.255-.33 2.566 2.566 0 1 0 2.566 2.566 2.554 2.554 0 0 0-.417-1.418l6.584-4.999a6.524 6.524 0 0 0 8.763-2.415 6.525 6.525 0 0 0-3.399-9.762zm-.97 9.634a3.31 3.31 0 1 1 0-6.62 3.31 3.31 0 0 1 0 6.62z"/>
+                  </svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#F1F1F3', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    HubSpot CRM
+                    {hubspot?.connected && (
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#22C55E', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '100px', padding: '1px 7px' }}>Connected</span>
+                    )}
+                  </div>
+                  {hubspot?.connected ? (
+                    <div style={{ fontSize: '11px', color: '#666', lineHeight: 1.5 }}>
+                      Portal {hubspot.portalId} ·{' '}
+                      {hubspot.lastSyncAt
+                        ? `Last synced ${new Date(hubspot.lastSyncAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · ${hubspot.dealsImported} deals imported`
+                        : 'Never synced — click "Sync deals" to import your pipeline'}
+                      {hubspot.syncError && (
+                        <div style={{ color: '#EF4444', marginTop: '4px' }}>⚠ Last sync error: {hubspot.syncError}</div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '11px', color: '#666' }}>
+                      Import your entire HubSpot pipeline — deals, stages, contacts, and values — directly into DealKit.
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                {hubspot?.connected ? (
+                  <>
+                    <button
+                      onClick={handleHubspotSync}
+                      disabled={hubspotSyncing}
+                      style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#F1F1F3', backgroundColor: 'rgba(255,122,0,0.15)', border: '1px solid rgba(255,122,0,0.3)', cursor: hubspotSyncing ? 'not-allowed' : 'pointer', opacity: hubspotSyncing ? 0.6 : 1 }}
+                    >
+                      <RefreshCw size={11} style={{ animation: hubspotSyncing ? 'spin 1s linear infinite' : 'none' }} />
+                      {hubspotSyncing ? 'Syncing…' : 'Sync deals'}
+                    </button>
+                    <button
+                      onClick={handleHubspotDisconnect}
+                      disabled={hubspotDisconnecting}
+                      style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#9CA3AF', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', cursor: hubspotDisconnecting ? 'not-allowed' : 'pointer', opacity: hubspotDisconnecting ? 0.6 : 1 }}
+                    >
+                      <Unplug size={11} />
+                      Disconnect
+                    </button>
+                  </>
+                ) : (
+                  <a
+                    href="/api/integrations/hubspot/auth"
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#fff', backgroundColor: 'rgba(255,122,0,0.8)', border: '1px solid rgba(255,122,0,0.5)', textDecoration: 'none' }}
+                  >
+                    <Plug size={11} />
+                    Connect HubSpot
+                  </a>
+                )}
+              </div>
+            </div>
+
+            <p style={{ fontSize: '11px', color: '#444', margin: 0, lineHeight: 1.5 }}>
+              More integrations coming — Salesforce, Pipedrive, and Close are on the roadmap.
+            </p>
+          </div>
         </SectionCard>
 
         {/* Data */}

@@ -283,6 +283,27 @@ export const collateral = pgTable('collateral', {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// hubspot_integrations  (OAuth credentials + sync state, one per workspace)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const hubspotIntegrations = pgTable('hubspot_integrations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id')
+    .notNull()
+    .references(() => workspaces.id, { onDelete: 'cascade' })
+    .unique(),                                               // one integration per workspace
+  accessToken: text('access_token').notNull(),
+  refreshToken: text('refresh_token').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  portalId: text('portal_id').notNull(),                    // HubSpot account identifier
+  lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
+  dealsImported: integer('deals_imported').notNull().default(0),
+  syncError: text('sync_error'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 // events (activity feed)
 // ─────────────────────────────────────────────────────────────────────────────
 
