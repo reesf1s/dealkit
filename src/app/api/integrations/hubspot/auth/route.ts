@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     await ensureHubspotSchema()
     const { workspaceId } = await getWorkspaceContext(userId)
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin).trim().replace(/\/$/, '')
     const redirectUri = `${appUrl}/api/integrations/hubspot/callback`
 
     // State encodes workspaceId — verified in callback by checking workspace ownership

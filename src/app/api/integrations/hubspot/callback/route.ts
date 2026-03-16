@@ -13,7 +13,7 @@ import { exchangeCode, ensureHubspotSchema } from '@/lib/hubspot'
 import { eq } from 'drizzle-orm'
 
 export async function GET(req: NextRequest) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin).trim().replace(/\/$/, '')
   const redirectUri = `${appUrl}/api/integrations/hubspot/callback`
 
   try {
