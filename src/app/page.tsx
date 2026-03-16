@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight, Zap, Shield, CheckCircle, FileText, Users, Target, BookOpen, Mail, ChevronRight } from 'lucide-react'
+import { ArrowRight, Zap, Shield, CheckCircle, FileText, Users, Target, BookOpen, Mail, ChevronRight, TrendingUp, Lock, Brain, BarChart3 } from 'lucide-react'
 import ROICalc from '@/components/marketing/ROICalc'
 import FeaturesTab from '@/components/marketing/FeaturesTab'
 
@@ -39,6 +39,13 @@ const PRICING = [
   },
 ]
 
+const MOAT_STATS = [
+  { label: 'Win rate tracked', value: '68%', sub: 'Real win/loss from your deals', color: '#22C55E' },
+  { label: 'Weighted forecast', value: '£148k', sub: 'Probability-adjusted pipeline', color: '#8B5CF6' },
+  { label: 'Score calibration', value: '91%', sub: 'AI scores predict outcomes', color: '#6366F1' },
+  { label: 'Days faster close', value: '3.2×', sub: 'vs. teams without intel', color: '#F59E0B' },
+]
+
 export default function LandingPage() {
   return (
     <div style={{
@@ -63,6 +70,7 @@ export default function LandingPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <a href="#features" style={{ padding: '6px 14px', borderRadius: '6px', color: '#888', fontSize: '13px', textDecoration: 'none' }}>Features</a>
+          <a href="#intelligence" style={{ padding: '6px 14px', borderRadius: '6px', color: '#888', fontSize: '13px', textDecoration: 'none' }}>Intelligence</a>
           <a href="#pricing" style={{ padding: '6px 14px', borderRadius: '6px', color: '#888', fontSize: '13px', textDecoration: 'none' }}>Pricing</a>
           <Link href="/sign-in" style={{ padding: '6px 14px', borderRadius: '6px', color: '#888', fontSize: '13px', textDecoration: 'none' }}>Sign in</Link>
           <Link href="/sign-up" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 16px', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', boxShadow: '0 0 14px rgba(99,102,241,0.35)', borderRadius: '7px', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>
@@ -75,20 +83,20 @@ export default function LandingPage() {
       <section style={{ position: 'relative', zIndex: 1, paddingTop: '160px', paddingBottom: '100px', textAlign: 'center', maxWidth: '720px', margin: '0 auto', padding: '160px 32px 100px' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 12px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: '100px', fontSize: '12px', color: '#A78BFA', fontWeight: '600', marginBottom: '28px' }}>
           <Zap size={11} />
-          AI-powered sales collateral
+          AI that gets smarter with every deal you close
         </div>
         <h1 style={{ fontSize: '54px', fontWeight: '800', letterSpacing: '-0.05em', lineHeight: '1.08', marginBottom: '20px', background: 'linear-gradient(180deg, #F0EEFF 50%, #8B6FD4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
           Your sales team&apos;s<br />unfair advantage
         </h1>
         <p style={{ fontSize: '17px', color: '#7E7A9A', lineHeight: '1.7', marginBottom: '36px', maxWidth: '520px', margin: '0 auto 36px' }}>
-          A living knowledge base that turns every deal outcome into better collateral. Battlecards, case studies, objection handlers — always accurate, always up to date.
+          A living knowledge base that turns every deal outcome into better collateral — and builds institutional intelligence no competitor can replicate.
         </p>
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/sign-up" style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '11px 22px', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', boxShadow: '0 0 24px rgba(99,102,241,0.4), 0 4px 16px rgba(0,0,0,0.3)', borderRadius: '9px', color: '#fff', fontSize: '14px', fontWeight: '700', textDecoration: 'none' }}>
             Start Free <ArrowRight size={14} />
           </Link>
-          <a href="#how-it-works" style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '11px 22px', background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '9px', color: '#C4B5FD', fontSize: '14px', fontWeight: '500', textDecoration: 'none' }}>
-            See how it works
+          <a href="#intelligence" style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '11px 22px', background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '9px', color: '#C4B5FD', fontSize: '14px', fontWeight: '500', textDecoration: 'none' }}>
+            See the intelligence engine
           </a>
         </div>
         <p style={{ marginTop: '20px', fontSize: '12px', color: '#4B4565' }}>Free forever • No credit card required</p>
@@ -222,6 +230,184 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* === COMPOUNDING INTELLIGENCE / DATA MOAT SECTION === */}
+      <section id="intelligence" style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 120px' }}>
+
+        {/* Section header */}
+        <div style={{ textAlign: 'center', marginBottom: '64px' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 12px', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', borderRadius: '100px', fontSize: '12px', color: '#C4B5FD', fontWeight: '600', marginBottom: '20px' }}>
+            <Brain size={11} />
+            The intelligence no competitor can copy
+          </div>
+          <h2 style={{ fontSize: '36px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '16px', color: '#F0EEFF' }}>
+            DealKit gets smarter<br />every time you close a deal
+          </h2>
+          <p style={{ color: '#7E7A9A', fontSize: '16px', lineHeight: '1.7', maxWidth: '560px', margin: '0 auto' }}>
+            Unlike generic AI tools, DealKit builds a compounding data advantage unique to your business. Every win and loss trains the system to score deals more accurately, forecast more honestly, and generate collateral that actually reflects how you sell.
+          </p>
+        </div>
+
+        {/* The flywheel diagram */}
+        <div style={{ background: 'linear-gradient(135deg, rgba(18,10,40,0.95), rgba(12,8,28,0.98))', border: '1px solid rgba(139,92,246,0.3)', borderRadius: '20px', padding: '48px', marginBottom: '48px', boxShadow: '0 0 60px rgba(99,102,241,0.08), inset 0 1px 0 rgba(255,255,255,0.06)', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: '-60px', right: '-60px', width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(139,92,246,0.12) 0%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+            {/* Left: flywheel steps */}
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#818CF8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '24px' }}>The compounding flywheel</div>
+              {[
+                { icon: '📊', title: 'Log every deal outcome', desc: 'Win, lose, value, timeline, competitors faced — all captured automatically.' },
+                { icon: '🧠', title: 'AI learns your patterns', desc: 'Win rate by deal size, competitor W/L record, average days to close — computed fresh from your real data.' },
+                { icon: '📈', title: 'Forecasts get more accurate', desc: 'Weighted pipeline forecast uses probability-adjusted conversion scores, not gut feel.' },
+                { icon: '🎯', title: 'Collateral gets sharper', desc: 'Every battlecard, case study, and objection handler pulls from real deals you\'ve won.' },
+                { icon: '🔒', title: 'Data moat widens', desc: 'After 50 deals, no new tool can replicate what DealKit knows about your sales motion.' },
+              ].map(({ icon, title, desc }, i) => (
+                <div key={i} style={{ display: 'flex', gap: '14px', marginBottom: i < 4 ? '20px' : 0 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0' }}>
+                    <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0 }}>{icon}</div>
+                    {i < 4 && <div style={{ width: '1px', flex: 1, background: 'rgba(99,102,241,0.15)', marginTop: '4px', minHeight: '16px' }} />}
+                  </div>
+                  <div style={{ paddingBottom: i < 4 ? '4px' : 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF', marginBottom: '3px', letterSpacing: '-0.01em' }}>{title}</div>
+                    <div style={{ fontSize: '12px', color: '#7E7A9A', lineHeight: '1.5' }}>{desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Right: live intelligence dashboard mockup */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#818CF8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>Live intelligence dashboard</div>
+
+              {/* Weighted forecast */}
+              <div style={{ background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.25)', borderRadius: '10px', padding: '14px 16px' }}>
+                <div style={{ fontSize: '9px', color: '#A78BFA', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Weighted Pipeline Forecast</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '26px', fontWeight: '800', color: '#C4B5FD', letterSpacing: '-0.04em' }}>£91,200</span>
+                  <span style={{ fontSize: '11px', color: '#7E7A9A' }}>probability-adjusted</span>
+                </div>
+                <div style={{ fontSize: '10px', color: '#555' }}>vs £148k raw pipeline — accounts for real win probability per deal</div>
+              </div>
+
+              {/* Win rate */}
+              <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '10px', padding: '14px 16px' }}>
+                <div style={{ fontSize: '9px', color: '#4ADE80', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Win/Loss Intelligence</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                  {[['Win Rate', '68%', '#22C55E'], ['Avg Deal', '£14.8k', '#A78BFA'], ['Avg Close', '38 days', '#6366F1']].map(([label, val, color]) => (
+                    <div key={String(label)}>
+                      <div style={{ fontSize: '17px', fontWeight: '800', color: String(color), letterSpacing: '-0.03em' }}>{String(val)}</div>
+                      <div style={{ fontSize: '9px', color: '#555', marginTop: '2px' }}>{String(label)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Score calibration */}
+              <div style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.18)', borderRadius: '10px', padding: '14px 16px' }}>
+                <div style={{ fontSize: '9px', color: '#818CF8', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>AI Score Calibration</div>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '6px' }}>
+                  <div style={{ flex: 1, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: '7px', padding: '8px 10px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#4ADE80' }}>74</div>
+                    <div style={{ fontSize: '9px', color: '#555', marginTop: '2px' }}>Avg score on wins</div>
+                  </div>
+                  <div style={{ flex: 1, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '7px', padding: '8px 10px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#F87171' }}>41</div>
+                    <div style={{ fontSize: '9px', color: '#555', marginTop: '2px' }}>Avg score on losses</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: '10px', color: '#7E7A9A' }}>High-confidence deals (70%+) converted at <span style={{ color: '#A78BFA', fontWeight: '700' }}>89%</span> — your scores predict reality</div>
+              </div>
+
+              {/* Competitor record */}
+              <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '14px 16px' }}>
+                <div style={{ fontSize: '9px', color: '#888', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Competitor W/L Record</div>
+                {[['Salesforce', 7, 3, '#22C55E'], ['HubSpot', 4, 4, '#F59E0B'], ['Pipedrive', 5, 1, '#22C55E']].map(([name, w, l, color]) => (
+                  <div key={String(name)} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                    <div style={{ fontSize: '11px', color: '#EBEBEB', flex: 1 }}>{String(name)}</div>
+                    <div style={{ fontSize: '10px', color: '#4ADE80', fontWeight: '700', fontFamily: 'monospace', minWidth: '24px', textAlign: 'right' }}>{String(w)}W</div>
+                    <div style={{ width: '1px', height: '10px', background: 'rgba(255,255,255,0.1)' }} />
+                    <div style={{ fontSize: '10px', color: '#F87171', fontWeight: '700', fontFamily: 'monospace', minWidth: '24px' }}>{String(l)}L</div>
+                    <div style={{ fontSize: '9px', color: String(color), fontWeight: '700', minWidth: '32px', textAlign: 'right' }}>{Math.round((Number(w) / (Number(w) + Number(l))) * 100)}%</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 4 moat pillars */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '48px' }}>
+          {[
+            {
+              icon: Lock,
+              color: '#6366F1',
+              title: 'Data that can\'t be copied',
+              desc: 'Your win/loss history, competitor record, and deal patterns are unique to your business. A competitor can build the same software tomorrow — but they cannot replicate 200 deals of institutional knowledge.',
+            },
+            {
+              icon: TrendingUp,
+              color: '#22C55E',
+              title: 'Forecasts that get more accurate over time',
+              desc: 'The weighted pipeline forecast uses your actual historical conversion rates per deal stage. After 20+ deals, it\'s provably more accurate than any static multiplier or gut estimate.',
+            },
+            {
+              icon: BarChart3,
+              color: '#8B5CF6',
+              title: 'AI that learns your scoring',
+              desc: 'Score calibration tracks whether high-confidence deals actually win. If your 80% deals are closing at 40%, the system surfaces that — and the AI adjusts how it interprets your context.',
+            },
+            {
+              icon: Brain,
+              color: '#F59E0B',
+              title: 'Collateral grounded in reality',
+              desc: 'Case studies are generated from actual closed-won deals. Objection handlers reference real pushbacks from your pipeline. Battlecards update when you record new competitive intel. Nothing is generic.',
+            },
+          ].map(({ icon: Icon, color, title, desc }) => (
+            <div key={title} style={{ background: 'rgba(255,255,255,0.025)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '24px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+              <div style={{ width: '38px', height: '38px', borderRadius: '11px', background: `${color}18`, border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
+                <Icon size={17} color={color} />
+              </div>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: '#F0EEFF', marginBottom: '8px', letterSpacing: '-0.02em' }}>{title}</div>
+              <div style={{ fontSize: '13px', color: '#7E7A9A', lineHeight: '1.65' }}>{desc}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* The moat timeline */}
+        <div style={{ background: 'rgba(255,255,255,0.025)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '36px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>
+          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#818CF8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>How the moat grows</div>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: '#F0EEFF', letterSpacing: '-0.03em' }}>The longer you use DealKit, the harder you are to beat</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0' }}>
+            {[
+              { milestone: 'Day 1', deals: '0 deals', desc: 'Knowledge base set up. AI collateral is good — grounded in your product and competitors.', color: '#4B4565', borderColor: 'rgba(255,255,255,0.08)' },
+              { milestone: '1 month', deals: '10–20 deals', desc: 'First win/loss patterns emerge. Weighted forecast starts. Competitor record begins.', color: '#6366F1', borderColor: 'rgba(99,102,241,0.25)' },
+              { milestone: '3 months', deals: '30–50 deals', desc: 'Score calibration kicks in. Forecasts measurably accurate. Top loss reasons surface automatically.', color: '#8B5CF6', borderColor: 'rgba(139,92,246,0.35)' },
+              { milestone: '6 months', deals: '50+ deals', desc: 'Institutional moat is real. No new tool can replicate this data. AI accuracy compounds daily.', color: '#A78BFA', borderColor: 'rgba(167,139,250,0.4)' },
+            ].map(({ milestone, deals, desc, color, borderColor }, i) => (
+              <div key={milestone} style={{ padding: '20px', borderLeft: i > 0 ? `1px solid rgba(255,255,255,0.06)` : 'none', position: 'relative' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, border: `2px solid ${borderColor}`, marginBottom: '12px', boxShadow: `0 0 8px ${color}60` }} />
+                <div style={{ fontSize: '13px', fontWeight: '800', color, marginBottom: '2px', letterSpacing: '-0.02em' }}>{milestone}</div>
+                <div style={{ fontSize: '11px', color: '#555', marginBottom: '8px' }}>{deals}</div>
+                <div style={{ fontSize: '12px', color: '#7E7A9A', lineHeight: '1.55' }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Moat stat bar */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginTop: '16px' }}>
+          {MOAT_STATS.map(({ label, value, sub, color }) => (
+            <div key={label} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', padding: '18px', textAlign: 'center' }}>
+              <div style={{ fontSize: '28px', fontWeight: '800', color, letterSpacing: '-0.04em', marginBottom: '4px' }}>{value}</div>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#EBEBEB', marginBottom: '3px' }}>{label}</div>
+              <div style={{ fontSize: '11px', color: '#555' }}>{sub}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Features tab */}
       <FeaturesTab />
 
@@ -255,7 +441,7 @@ export default function LandingPage() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div style={{ background: 'rgba(239,68,68,0.04)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '12px', padding: '24px' }}>
             <div style={{ fontSize: '12px', fontWeight: '700', color: '#EF4444', marginBottom: '18px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Before DealKit</div>
-            {['Outdated Google Docs no one updates', 'Battlecards that contradict your pitch', 'Objections caught cold in demos', 'New reps take 6 months to ramp', 'Win/loss data lives in sales calls'].map(p => (
+            {['Outdated Google Docs no one updates', 'Battlecards that contradict your pitch', 'Objections caught cold in demos', 'New reps take 6 months to ramp', 'Win/loss data lives in sales calls', 'Pipeline forecast based on gut feel', 'No idea which competitors you beat or lose to'].map(p => (
               <div key={p} style={{ display: 'flex', gap: '8px', marginBottom: '11px', fontSize: '13px', color: '#7E7A9A', alignItems: 'flex-start' }}>
                 <span style={{ color: '#EF4444', flexShrink: 0, marginTop: '1px', fontWeight: '700' }}>×</span> {p}
               </div>
@@ -263,7 +449,7 @@ export default function LandingPage() {
           </div>
           <div style={{ background: 'rgba(34,197,94,0.04)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '12px', padding: '24px' }}>
             <div style={{ fontSize: '12px', fontWeight: '700', color: '#22C55E', marginBottom: '18px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>After DealKit</div>
-            {['One source of truth, always current', 'Battlecards that regenerate on new intel', 'Every objection mapped with a tested response', 'New reps productive in week one', 'Every deal outcome compounds your knowledge'].map(p => (
+            {['One source of truth, always current', 'Battlecards that regenerate on new intel', 'Every objection mapped with a tested response', 'New reps productive in week one', 'Every deal outcome compounds your knowledge', 'Probability-adjusted forecast from real conversion data', 'Live competitor W/L record updated per deal'].map(p => (
               <div key={p} style={{ display: 'flex', gap: '8px', marginBottom: '11px', fontSize: '13px', color: '#7E7A9A', alignItems: 'flex-start' }}>
                 <CheckCircle size={13} color="#22C55E" style={{ flexShrink: 0, marginTop: '2px' }} /> {p}
               </div>
@@ -308,7 +494,7 @@ export default function LandingPage() {
         <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: '16px', padding: '40px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
           <div style={{ fontSize: '36px', color: 'rgba(139,92,246,0.4)', marginBottom: '12px', lineHeight: 1 }}>&ldquo;</div>
           <p style={{ fontSize: '16px', lineHeight: '1.7', color: '#C4B5FD', fontStyle: 'italic', marginBottom: '20px' }}>
-            I built DealKit after watching our team lose deals we should have won — because our battlecards were outdated and our case studies lived in a shared drive no one opened. We collapsed a 12-month sales cycle to under 30 days once the knowledge was actually usable.
+            I built DealKit after watching our team lose deals we should have won — because our battlecards were outdated and our case studies lived in a shared drive no one opened. The insight was that our institutional knowledge was the asset, not the documents. DealKit makes that knowledge work.
           </p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
             <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', border: '2px solid rgba(139,92,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: '#fff' }}>R</div>
@@ -319,11 +505,16 @@ export default function LandingPage() {
 
       {/* Final CTA */}
       <section style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '0 32px 120px' }}>
-        <h2 style={{ fontSize: '36px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '16px', color: '#F0EEFF' }}>Ready to close more deals?</h2>
-        <p style={{ color: '#7E7A9A', marginBottom: '32px', fontSize: '15px' }}>Join sales teams who use DealKit to turn every loss into a future win.</p>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 12px', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', borderRadius: '100px', fontSize: '12px', color: '#C4B5FD', fontWeight: '600', marginBottom: '20px' }}>
+          <Brain size={11} />
+          The longer you use it, the smarter it gets
+        </div>
+        <h2 style={{ fontSize: '36px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '16px', color: '#F0EEFF' }}>Start building your data moat today</h2>
+        <p style={{ color: '#7E7A9A', marginBottom: '32px', fontSize: '15px', maxWidth: '480px', margin: '0 auto 32px' }}>Every deal you log makes DealKit more valuable to your team — and harder for competitors to replicate.</p>
         <Link href="/sign-up" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '13px 28px', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', boxShadow: '0 0 32px rgba(99,102,241,0.4), 0 8px 24px rgba(0,0,0,0.4)', borderRadius: '10px', color: '#fff', fontSize: '15px', fontWeight: '700', textDecoration: 'none' }}>
           Start for free <ArrowRight size={15} />
         </Link>
+        <p style={{ marginTop: '14px', fontSize: '12px', color: '#4B4565' }}>Free forever • No credit card required</p>
       </section>
 
       {/* Footer */}
@@ -335,7 +526,7 @@ export default function LandingPage() {
           <span style={{ fontWeight: '700', fontSize: '13px', color: '#F0EEFF' }}>DealKit</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <span style={{ fontSize: '12px', color: '#4B4565' }}>© 2025 DealKit. All rights reserved.</span>
+          <span style={{ fontSize: '12px', color: '#4B4565' }}>© 2026 DealKit. All rights reserved.</span>
           <a href="/privacy" style={{ fontSize: '12px', color: '#4B4565', textDecoration: 'none' }}>Privacy Policy</a>
           <a href="/terms" style={{ fontSize: '12px', color: '#4B4565', textDecoration: 'none' }}>Terms of Service</a>
         </div>
