@@ -229,13 +229,13 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
   // ── Proactive: key patterns — recurring risk themes ────────────────────────
   // Count keyword frequency across all risk strings; surface themes seen in 2+ deals
   const riskWords = [
-    { label: 'budget concerns', keywords: ['budget', 'cost', 'price', 'expensive', 'pricing'] },
-    { label: 'slow responses / disengagement', keywords: ['slow', 'unresponsive', 'ghost', 'disengaged', 'no reply', 'silent'] },
-    { label: 'competitor pressure', keywords: ['competitor', 'competing', 'alternative', 'rival', 'vs '] },
-    { label: 'unclear decision-maker', keywords: ['decision', 'authority', 'champion', 'sponsor', 'approver'] },
-    { label: 'timeline slippage', keywords: ['delay', 'postpone', 'pushed back', 'timeline', 'deadline'] },
-    { label: 'procurement / legal blockers', keywords: ['procurement', 'legal', 'contract', 'compliance', 'security review'] },
-    { label: 'internal competing priorities', keywords: ['priority', 'bandwidth', 'internal', 'resource', 'capacity'] },
+    { label: 'budget concerns', keywords: ['budget', 'expensive', 'pricing', 'cost concern', 'cost is', 'price is', 'too expensive', 'affordab'] },
+    { label: 'slow responses / disengagement', keywords: ['unresponsive', 'ghosted', 'disengaged', 'no reply', 'not responding', 'gone quiet', 'delayed response', 'slow to respond'] },
+    { label: 'competitor pressure', keywords: ['competitor', 'competing solution', 'rival', 'switching from', 'already using', 'evaluating others', 'other vendors', 'shortlist'] },
+    { label: 'unclear decision-maker', keywords: ['unclear who', 'decision maker', 'no champion', 'no sponsor', 'approver unknown', 'committee approval', 'board approval', 'needs sign-off', 'unclear authority'] },
+    { label: 'timeline slippage', keywords: ['delayed', 'postponed', 'pushed back', 'slipped', 'no deadline', 'timeline unclear', 'timeline at risk'] },
+    { label: 'procurement / legal blockers', keywords: ['procurement', 'legal review', 'compliance review', 'security review', 'contract review', 'legal blocker', 'legal hold'] },
+    { label: 'internal competing priorities', keywords: ['competing priorities', 'bandwidth issue', 'deprioritised', 'deprioritized', 'resource constrained', 'internal blocker', 'other projects'] },
   ]
 
   const keyPatterns: WorkspaceBrain['keyPatterns'] = []
