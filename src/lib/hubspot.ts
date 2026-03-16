@@ -48,6 +48,9 @@ export async function ensureHubspotSchema() {
     await db.execute(sql`
       ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS hubspot_deal_id TEXT UNIQUE
     `)
+    await db.execute(sql`
+      ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS hubspot_stage_label TEXT
+    `)
   } catch { /* already exists */ }
   schemaMigrated = true
 }
@@ -103,6 +106,7 @@ export interface MappedDeal {
   contacts: { name: string; email?: string; title?: string }[]
   dealValue: number | null
   stage: string
+  hubspotStageLabel: string | null  // real display name from HubSpot pipeline, e.g. "Proposal Sent"
   description: string | null
   closeDate: Date | null
   updatedAt: Date
@@ -232,6 +236,24 @@ export async function fetchCompanies(token: string, companyIds: string[]): Promi
   return (data.results ?? []).map(c => ({ id: c.id, name: c.properties.name ?? 'Unknown Company' }))
 }
 
+/** Fetch all deal pipeline stages and return a map of stageId → display label. */
+export async function fetchPipelineStages(token: string): Promise<Map<string, string>> {
+  try {
+    const data = await hsGet('/crm/v3/pipelines/deals', token) as {
+      results: { stages: { id: string; label: string }[] }[]
+    }
+    const map = new Map<string, string>()
+    for (const pipeline of data.results ?? []) {
+      for (const stage of pipeline.stages ?? []) {
+        map.set(stage.id, stage.label)
+      }
+    }
+    return map
+  } catch {
+    return new Map() // non-fatal — fall back to mapped stage names
+  }
+}
+
 // ─── Field mapping ────────────────────────────────────────────────────────────
 
 export function mapHubspotStage(hubspotStage: string | undefined): string {
@@ -243,9 +265,11 @@ export function mapHubspotDeal(
   raw: HubspotDealRaw,
   contacts: { id: string; name: string; email?: string; title?: string }[],
   companyName: string,
+  stageLabels: Map<string, string> = new Map(),
 ): MappedDeal {
   const p = raw.properties
   const primaryContact = contacts[0]
+  const rawStageId = p.dealstage ?? ''
   return {
     hubspotDealId: raw.id,
     dealName:      p.dealname?.trim() || `HubSpot Deal #${raw.id}`,
@@ -254,7 +278,8 @@ export function mapHubspotDeal(
     prospectTitle: primaryContact?.title ?? null,
     contacts: contacts.map(c => ({ name: c.name, email: c.email, title: c.title })),
     dealValue:     p.amount ? Math.round(parseFloat(p.amount)) : null,
-    stage:         mapHubspotStage(p.dealstage),
+    stage:         mapHubspotStage(rawStageId),
+    hubspotStageLabel: stageLabels.get(rawStageId) ?? null,
     description:   p.description?.trim() || null,
     closeDate:     p.closedate ? new Date(p.closedate) : null,
     updatedAt:     p.hs_lastmodifieddate ? new Date(p.hs_lastmodifieddate) : new Date(),
