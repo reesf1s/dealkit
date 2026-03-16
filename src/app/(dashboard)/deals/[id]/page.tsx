@@ -29,6 +29,44 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
   const [historyExpanded, setHistoryExpanded] = useState(false)
   const [clearConfirm, setClearConfirm] = useState(false)
   const [clearing, setClearing] = useState(false)
+  // AI memory correction
+  const [editingSummary, setEditingSummary] = useState(false)
+  const [summaryDraft, setSummaryDraft] = useState('')
+  const [resetAIConfirm, setResetAIConfirm] = useState(false)
+  const [savingAI, setSavingAI] = useState(false)
+
+  const patchDeal = async (payload: Record<string, unknown>) => {
+    setSavingAI(true)
+    try {
+      await fetch(`/api/deals/${dealId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      onUpdate()
+    } finally {
+      setSavingAI(false)
+    }
+  }
+
+  const deleteRisk = (index: number) => {
+    const current: string[] = deal?.dealRisks ?? []
+    patchDeal({ dealRisks: current.filter((_: string, i: number) => i !== index) })
+  }
+
+  const deleteInsight = (index: number) => {
+    const current: string[] = deal?.conversionInsights ?? []
+    patchDeal({ conversionInsights: current.filter((_: string, i: number) => i !== index) })
+  }
+
+  const saveSummary = () => {
+    patchDeal({ aiSummary: summaryDraft.trim() || null })
+    setEditingSummary(false)
+  }
+
+  const resetAllAI = async () => {
+    await patchDeal({ aiSummary: null, conversionScore: null, conversionInsights: [], dealRisks: [] })
+    setResetAIConfirm(false)
+  }
 
   const clearNotes = async () => {
     setClearing(true)
@@ -235,44 +273,95 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
       )}
 
       {/* AI Results */}
-      {(result || deal?.aiSummary) && (
+      {(result || deal?.aiSummary || (deal?.dealRisks as string[])?.length > 0) && (
         <div style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '12px', padding: '16px' }}>
+          {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
             <Sparkles size={14} color="#818CF8" />
             <span style={{ fontSize: '13px', fontWeight: '600', color: '#818CF8' }}>AI Analysis</span>
+            {/* Conversion score — with clear button */}
             {deal?.conversionScore != null && (
-              <span style={{ marginLeft: 'auto', fontSize: '20px', fontWeight: '800', color: deal.conversionScore >= 70 ? '#22C55E' : deal.conversionScore >= 40 ? '#F59E0B' : '#EF4444' }}>
-                {deal.conversionScore}%
-              </span>
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ fontSize: '20px', fontWeight: '800', color: deal.conversionScore >= 70 ? '#22C55E' : deal.conversionScore >= 40 ? '#F59E0B' : '#EF4444' }}>
+                  {deal.conversionScore}%
+                </span>
+                <button
+                  onClick={() => patchDeal({ conversionScore: null })}
+                  title="Clear conversion score"
+                  style={{ fontSize: '10px', color: '#555', background: 'none', border: 'none', cursor: 'pointer', padding: '2px', lineHeight: 1 }}
+                >✕</button>
+              </div>
             )}
           </div>
-          {deal?.aiSummary && (
-            <p style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', margin: '0 0 12px' }}>{deal.aiSummary}</p>
-          )}
+
+          {/* Summary — inline editable */}
+          {editingSummary ? (
+            <div style={{ marginBottom: '12px' }}>
+              <textarea
+                value={summaryDraft}
+                onChange={e => setSummaryDraft(e.target.value)}
+                rows={4}
+                style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '8px', color: '#EBEBEB', fontSize: '13px', lineHeight: '1.6', padding: '10px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+                autoFocus
+              />
+              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                <button onClick={saveSummary} disabled={savingAI} style={{ fontSize: '11px', padding: '4px 10px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '5px', color: '#818CF8', cursor: 'pointer' }}>
+                  {savingAI ? 'Saving…' : 'Save'}
+                </button>
+                <button onClick={() => setEditingSummary(false)} style={{ fontSize: '11px', padding: '4px 10px', background: 'none', border: 'none', color: '#555', cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : deal?.aiSummary ? (
+            <div style={{ marginBottom: '12px', position: 'relative' }}
+              onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.edit-summary') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
+              onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.edit-summary') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
+            >
+              <p style={{ fontSize: '13px', color: '#888', lineHeight: '1.6', margin: 0, paddingRight: '28px' }}>{deal.aiSummary}</p>
+              <button
+                className="edit-summary"
+                onClick={() => { setSummaryDraft(deal.aiSummary); setEditingSummary(true) }}
+                title="Edit AI summary"
+                style={{ opacity: 0, position: 'absolute', top: 0, right: 0, fontSize: '10px', color: '#555', background: 'none', border: 'none', cursor: 'pointer', transition: 'opacity 0.15s', padding: '2px 4px' }}
+              >✎ edit</button>
+            </div>
+          ) : null}
+
+          {/* Insights — per-item delete */}
           {deal?.conversionInsights?.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '10px' }}>
               {(deal.conversionInsights as string[]).map((insight: string, i: number) => (
-                <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: '#888' }}>
+                <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: '#888' }}
+                  onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-insight') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
+                  onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-insight') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
+                >
                   <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1', flexShrink: 0, marginTop: '5px' }} />
-                  {insight}
+                  <span style={{ flex: 1 }}>{insight}</span>
+                  <button className="del-insight" onClick={() => deleteInsight(i)} style={{ opacity: 0, fontSize: '10px', color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s', padding: '0 2px' }}>✕</button>
                 </div>
               ))}
             </div>
           )}
-          {/* Deal Risks — use freshest source: result.deal first, fall back to SWR deal */}
+
+          {/* Risks — per-item delete */}
           {(() => {
             const risks: string[] = result?.deal?.dealRisks ?? deal?.dealRisks ?? []
             if (!risks.length) return null
             return (
-              <div style={{ marginTop: '12px', padding: '12px 14px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '8px' }}>
+              <div style={{ padding: '12px 14px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '8px' }}>
                 <div style={{ fontSize: '11px', color: '#F59E0B', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                   ⚠ Deal Risks
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   {risks.map((risk: string, i: number) => (
-                    <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: '#C9820A' }}>
+                    <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: '#C9820A' }}
+                      onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-risk') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
+                      onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-risk') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
+                    >
                       <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#F59E0B', flexShrink: 0, marginTop: '5px' }} />
-                      {risk}
+                      <span style={{ flex: 1 }}>{risk}</span>
+                      <button className="del-risk" onClick={() => deleteRisk(i)} style={{ opacity: 0, fontSize: '10px', color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s', padding: '0 2px' }}>✕</button>
                     </div>
                   ))}
                 </div>
@@ -280,6 +369,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
             )
           })()}
 
+          {/* Product gaps (read-only) */}
           {result?.productGaps?.length > 0 && (
             <div style={{ marginTop: '12px', padding: '10px 12px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '8px' }}>
               <div style={{ fontSize: '11px', color: '#EF4444', fontWeight: '600', marginBottom: '4px' }}>
@@ -293,6 +383,23 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
               </Link>
             </div>
           )}
+
+          {/* Reset all AI — nuclear option */}
+          <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+            {resetAIConfirm ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '11px', color: '#EF4444' }}>Reset all AI memory for this deal?</span>
+                <button onClick={resetAllAI} disabled={savingAI} style={{ fontSize: '11px', color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '2px 8px', borderRadius: '5px', cursor: 'pointer' }}>
+                  {savingAI ? 'Resetting…' : 'Yes, reset'}
+                </button>
+                <button onClick={() => setResetAIConfirm(false)} style={{ fontSize: '11px', color: '#555', background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
+              </div>
+            ) : (
+              <button onClick={() => setResetAIConfirm(true)} style={{ fontSize: '11px', color: '#374151', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                Reset all AI inferences
+              </button>
+            )}
+          </div>
         </div>
       )}
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
