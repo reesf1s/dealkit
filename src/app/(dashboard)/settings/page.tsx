@@ -100,9 +100,12 @@ export default function SettingsPage() {
   const { data: userRes, isLoading: loadingUser } = useSWR<{ data: DbUser }>('/api/user', fetcher)
   const { data: membersRes, isLoading: loadingMembers, mutate: mutateMembers } = useSWR<{ data: Member[] }>('/api/workspaces/members', fetcher)
   const { data: hubspotRes, mutate: mutateHubspot } = useSWR<{ data: HubspotStatus }>('/api/integrations/hubspot/status', fetcher, { revalidateOnFocus: false })
+  const { data: configData, mutate: mutateConfig } = useSWR('/api/pipeline-config', fetcher, { revalidateOnFocus: false })
   const hubspot = hubspotRes?.data
   const dbUser = userRes?.data
   const members = membersRes?.data ?? []
+  const [savingCurrency, setSavingCurrency] = useState(false)
+  const currentCurrency: string = configData?.data?.currency ?? '$'
 
   // Show toast when redirected back from HubSpot OAuth
   useEffect(() => {
@@ -226,6 +229,21 @@ export default function SettingsPage() {
       }
     } catch { toast('Sync failed', 'error') }
     finally { setBillingLoading(null) }
+  }
+
+  async function handleCurrencyChange(symbol: string) {
+    setSavingCurrency(true)
+    try {
+      const res = await fetch('/api/pipeline-config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currency: symbol }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      await mutateConfig()
+      toast(`Currency updated to ${symbol}`, 'success')
+    } catch { toast('Failed to save currency', 'error') }
+    finally { setSavingCurrency(false) }
   }
 
   async function handleDeleteAccount() {
@@ -401,6 +419,46 @@ export default function SettingsPage() {
               )}
             </div>
           )}
+        </SectionCard>
+
+        {/* Workspace preferences */}
+        <SectionCard title="Preferences" description="Currency and display settings for your workspace">
+          <div>
+            <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>
+              Currency symbol used across deal values, KPIs, and reports
+            </div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {[
+                { symbol: '$', label: 'USD $' },
+                { symbol: '£', label: 'GBP £' },
+                { symbol: '€', label: 'EUR €' },
+                { symbol: '¥', label: 'JPY ¥' },
+                { symbol: 'A$', label: 'AUD A$' },
+                { symbol: 'C$', label: 'CAD C$' },
+                { symbol: '₹', label: 'INR ₹' },
+                { symbol: 'kr', label: 'SEK/NOK kr' },
+              ].map(({ symbol, label }) => {
+                const isActive = currentCurrency === symbol
+                return (
+                  <button
+                    key={symbol}
+                    onClick={() => handleCurrencyChange(symbol)}
+                    disabled={savingCurrency}
+                    style={{
+                      height: '32px', padding: '0 14px', borderRadius: '7px', fontSize: '12px', fontWeight: isActive ? '600' : '400',
+                      background: isActive ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
+                      border: isActive ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                      color: isActive ? '#818CF8' : '#9CA3AF',
+                      cursor: savingCurrency ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.1s',
+                    }}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         </SectionCard>
 
         {/* Plan & billing */}

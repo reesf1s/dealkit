@@ -126,7 +126,7 @@ export async function PATCH(req: NextRequest) {
     await ensurePipelineConfigCol()
 
     const body = await req.json()
-    const { stages, applyPreset, renameStage, addStage, removeStage, reorderStages, hideStage, showStage, updateStageColor } = body
+    const { stages, applyPreset, renameStage, addStage, removeStage, reorderStages, hideStage, showStage, updateStageColor, currency } = body
 
     // Get current config
     const [ws] = await db.select({ pipelineConfig: workspaces.pipelineConfig })
@@ -214,6 +214,12 @@ export async function PATCH(req: NextRequest) {
       config.stages = config.stages
         .map((s: any) => ({ ...s, order: orderMap.get(s.id) ?? s.order }))
         .sort((a: any, b: any) => a.order - b.order)
+      config.updatedAt = new Date().toISOString()
+    }
+
+    // Update currency symbol
+    else if (currency !== undefined) {
+      config.currency = currency
       config.updatedAt = new Date().toISOString()
     }
 

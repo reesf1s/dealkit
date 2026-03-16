@@ -17,10 +17,10 @@ import { annualizedValue } from '@/components/dashboard/ROIWidget'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function fmt(v: number) {
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}m`
-  if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}k`
-  return `$${v}`
+function fmt(v: number, sym = '$') {
+  if (v >= 1_000_000) return `${sym}${(v / 1_000_000).toFixed(1)}m`
+  if (v >= 1_000) return `${sym}${(v / 1_000).toFixed(0)}k`
+  return `${sym}${Math.round(v)}`
 }
 
 const STAGE_ORDER = ['prospecting', 'qualification', 'discovery', 'proposal', 'negotiation']
@@ -61,6 +61,7 @@ export default function DashboardPage() {
   const { data: collateral } = useSWR('/api/collateral', fetcher)
   const { data: insights } = useSWR('/api/insights', fetcher)
   const { data: brainRes, mutate: mutateBrain } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
+  const { data: configData } = useSWR('/api/pipeline-config', fetcher, { revalidateOnFocus: false })
 
   const dbNotConnected = isDbNotConfigured(companyErr)
   const [refreshingBrain, setRefreshingBrain] = useState(false)
@@ -98,7 +99,11 @@ export default function DashboardPage() {
     // Missing ML model when enough training data exists
     const closedCount = (deals?.data ?? []).filter((d: any) => d.stage === 'closed_won' || d.stage === 'closed_lost').length
     const missingMl = closedCount >= 6 && !brain.mlModel
-    if (hasOldSchema || hasOldPatterns || missingSnippets || missingIntel || missingMl) {
+    // Stale brain: flagged deals are actually closed in fresh deals data → brain needs rebuild
+    const closedIds = new Set((deals?.data ?? []).filter((d: any) => d.stage === 'closed_won' || d.stage === 'closed_lost').map((d: any) => d.id))
+    const brainHasStaleClosedDeals = deals?.data &&
+      ([...(brain.urgentDeals ?? []), ...(brain.staleDeals ?? [])].some((u: any) => closedIds.has(u.dealId)))
+    if (hasOldSchema || hasOldPatterns || missingSnippets || missingIntel || missingMl || brainHasStaleClosedDeals) {
       brainRebuildAttempted.current = true
       rebuildBrain()
     }
@@ -113,6 +118,7 @@ export default function DashboardPage() {
   }, [company, dbNotConnected, router])
 
   // ── Unwrap data ────────────────────────────────────────────────────────────
+  const currencySymbol: string = configData?.data?.currency ?? '$'
   const companyData = company?.data
   const dealList: any[] = deals?.data ?? []
   const collateralList: any[] = collateral?.data ?? []
@@ -218,10 +224,10 @@ export default function DashboardPage() {
       {/* ── KPI strip ───────────────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
         {[
-          { label: 'Active Pipeline', value: pipeline > 0 ? fmt(pipeline) : '—', sub: `${openDeals.length} deal${openDeals.length !== 1 ? 's' : ''}`, color: '#6366F1', glow: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.15)' },
-          { label: 'Revenue Won',     value: wonRevenue > 0 ? fmt(wonRevenue) : '—', sub: `${wonDeals.length} closed`, color: '#22C55E', glow: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.15)' },
+          { label: 'Active Pipeline', value: pipeline > 0 ? fmt(pipeline, currencySymbol) : '—', sub: `${openDeals.length} deal${openDeals.length !== 1 ? 's' : ''}`, color: '#6366F1', glow: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.15)' },
+          { label: 'Revenue Won',     value: wonRevenue > 0 ? fmt(wonRevenue, currencySymbol) : '—', sub: wonRevenue === 0 && wonDeals.length > 0 ? 'Add values to won deals →' : `${wonDeals.length} closed`, color: '#22C55E', glow: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.15)' },
           { label: 'Win Rate',        value: dealList.length > 0 ? `${winRate}%` : '—', sub: `${dealList.length} tracked`, color: '#10B981', glow: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.15)' },
-          { label: 'Avg Deal Size',   value: avgDeal > 0 ? fmt(avgDeal) : '—', sub: allWithVal.length > 0 ? `${allWithVal.length} deals` : 'Log deal values', color: '#F59E0B', glow: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.15)' },
+          { label: 'Avg Deal Size',   value: avgDeal > 0 ? fmt(avgDeal, currencySymbol) : '—', sub: allWithVal.length > 0 ? `${allWithVal.length} deals` : 'Log deal values', color: '#F59E0B', glow: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.15)' },
         ].map(kpi => (
           <div key={kpi.label} style={{ background: kpi.glow, border: `1px solid ${kpi.border}`, borderRadius: '12px', padding: '14px 16px' }}>
             <div style={{ fontSize: '11px', color: '#555', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>{kpi.label}</div>

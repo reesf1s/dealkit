@@ -10,6 +10,7 @@ interface Deal {
 interface ROIWidgetProps {
   deals: Deal[]
   collateralCount: number
+  currencySymbol?: string
 }
 
 // Convert a deal's stored value to its annual equivalent
@@ -21,13 +22,13 @@ export function annualizedValue(value: number, dealType?: string | null, recurri
   return value // annual
 }
 
-function formatCurrency(value: number): string {
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}m`
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}k`
-  return `$${value.toFixed(0)}`
+function formatCurrency(value: number, sym = '$'): string {
+  if (value >= 1_000_000) return `${sym}${(value / 1_000_000).toFixed(1)}m`
+  if (value >= 1_000) return `${sym}${(value / 1_000).toFixed(1)}k`
+  return `${sym}${Math.round(value)}`
 }
 
-export default function ROIWidget({ deals, collateralCount }: ROIWidgetProps) {
+export default function ROIWidget({ deals, collateralCount, currencySymbol = '$' }: ROIWidgetProps) {
   const wonDeals = deals.filter(d => d.outcome === 'won')
   const openDeals = deals.filter(d => d.outcome === 'open')
 
@@ -60,7 +61,7 @@ export default function ROIWidget({ deals, collateralCount }: ROIWidgetProps) {
     {
       label: 'Won Revenue',
       sublabel: 'one-off',
-      value: !hasDeals ? '—' : wonOneOff > 0 ? formatCurrency(wonOneOff) : '—',
+      value: !hasDeals ? '—' : wonOneOff > 0 ? formatCurrency(wonOneOff, currencySymbol) : '—',
       hint: !hasDeals ? 'No deals yet' : wonOneOff > 0
         ? `${wonDeals.filter(d => d.dealType !== 'recurring').length} deal${wonDeals.filter(d => d.dealType !== 'recurring').length !== 1 ? 's' : ''}`
         : 'No won one-off deals',
@@ -71,7 +72,7 @@ export default function ROIWidget({ deals, collateralCount }: ROIWidgetProps) {
     {
       label: 'Won ARR',
       sublabel: 'recurring',
-      value: !hasDeals ? '—' : wonARR > 0 ? formatCurrency(wonARR) : '—',
+      value: !hasDeals ? '—' : wonARR > 0 ? formatCurrency(wonARR, currencySymbol) : '—',
       hint: !hasDeals ? 'Log deals' : wonARR > 0
         ? `${wonDeals.filter(d => d.dealType === 'recurring').length} recurring deal${wonDeals.filter(d => d.dealType === 'recurring').length !== 1 ? 's' : ''}`
         : 'No recurring wins yet',
@@ -82,7 +83,7 @@ export default function ROIWidget({ deals, collateralCount }: ROIWidgetProps) {
     {
       label: 'Pipeline',
       sublabel: 'annualised',
-      value: !hasDeals ? '—' : openPipeline > 0 ? formatCurrency(openPipeline) : '—',
+      value: !hasDeals ? '—' : openPipeline > 0 ? formatCurrency(openPipeline, currencySymbol) : '—',
       hint: !hasDeals ? 'Log a deal' : `${openDeals.length} open deal${openDeals.length !== 1 ? 's' : ''}`,
       color: '#6366F1',
       glow: 'rgba(99,102,241,0.12)',
@@ -91,7 +92,7 @@ export default function ROIWidget({ deals, collateralCount }: ROIWidgetProps) {
     {
       label: 'Avg Deal',
       sublabel: 'annualised',
-      value: avgDealSize > 0 ? formatCurrency(avgDealSize) : '—',
+      value: avgDealSize > 0 ? formatCurrency(avgDealSize, currencySymbol) : '—',
       hint: avgDealSize > 0 ? `${allWithValue.length} deal${allWithValue.length !== 1 ? 's' : ''}` : 'Add deal values',
       color: '#F59E0B',
       glow: 'rgba(245,158,11,0.12)',

@@ -2006,7 +2006,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate }: { dealId: string; dea
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
         {[
           { label: 'Stage', value: deal.stage?.replace(/_/g, ' ') },
-          { label: 'Deal Value', value: deal.dealValue ? `$${Number(deal.dealValue).toLocaleString()}` : null },
+          { label: 'Deal Value', value: deal.dealValue ? `${currencySymbol}${Number(deal.dealValue).toLocaleString()}` : null },
           { label: 'Close Date', value: deal.closeDate ? new Date(deal.closeDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null },
           { label: 'Deal Type', value: deal.dealType === 'recurring' ? `Recurring (${deal.recurringInterval ?? ''})`.trim() : deal.dealType === 'one_off' ? 'One-off' : null },
           { label: 'Competitors', value: (deal.competitors as string[])?.join(', ') || null },
@@ -2050,6 +2050,8 @@ export default function DealDetailPage() {
   const deal = data?.data ?? data
   const { data: gapsData } = useSWR('/api/product-gaps', fetcher)
   const dealGaps: any[] = (gapsData?.data ?? []).filter((g: any) => (g.sourceDeals as string[] ?? []).includes(id))
+  const { data: configData } = useSWR('/api/pipeline-config', fetcher, { revalidateOnFocus: false })
+  const currencySymbol: string = configData?.data?.currency ?? '$'
   const { setActiveDeal } = useSidebar()
 
   const [activeTab, setActiveTab] = useState<'overview' | 'meeting-notes' | 'prep' | 'todos' | 'project-plan' | 'success'>('overview')
@@ -2121,7 +2123,7 @@ export default function DealDetailPage() {
               </div>
               <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#555' }}>
                 {deal.prospectName && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><User size={11} />{deal.prospectName}</span>}
-                {deal.dealValue && <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#22C55E', fontWeight: '600' }}><DollarSign size={11} />${deal.dealValue.toLocaleString()}</span>}
+                {deal.dealValue && <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#22C55E', fontWeight: '600' }}><DollarSign size={11} />{currencySymbol}{Number(deal.dealValue).toLocaleString()}</span>}
                 {deal.closeDate && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} />Close {new Date(deal.closeDate).toLocaleDateString()}</span>}
               </div>
             </div>

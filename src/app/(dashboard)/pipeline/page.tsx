@@ -37,9 +37,9 @@ function annualizedValue(value: number, dealType?: string | null, recurringInter
   return value
 }
 
-// Short label for a deal's value (e.g. "$5k/mo", "$60k ARR", "$30k")
-function dealValueLabel(value: number, dealType?: string | null, recurringInterval?: string | null): string {
-  const fmt = (v: number) => v >= 1_000_000 ? `$${(v/1_000_000).toFixed(1)}m` : v >= 1_000 ? `$${(v/1_000).toFixed(0)}k` : `$${v}`
+// Short label for a deal's value (e.g. "£5k/mo", "£60k ARR", "£30k")
+function dealValueLabel(value: number, dealType?: string | null, recurringInterval?: string | null, sym = '$'): string {
+  const fmt = (v: number) => v >= 1_000_000 ? `${sym}${(v/1_000_000).toFixed(1)}m` : v >= 1_000 ? `${sym}${(v/1_000).toFixed(0)}k` : `${sym}${Math.round(v)}`
   if (dealType !== 'recurring') return fmt(value)
   if (recurringInterval === 'monthly') return `${fmt(value)}/mo`
   if (recurringInterval === 'quarterly') return `${fmt(value)}/qtr`
@@ -82,6 +82,7 @@ function DealCard({
   isDragging,
   urgentReason,
   staleDays,
+  currencySymbol = '$',
 }: {
   deal: any
   onMoveStage: (id: string, stage: string) => void
@@ -90,6 +91,7 @@ function DealCard({
   isDragging: boolean
   urgentReason?: string
   staleDays?: number
+  currencySymbol?: string
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const nextStages = STAGES.filter(s => s.id !== deal.stage && s.id !== 'closed_won' && s.id !== 'closed_lost')
@@ -235,7 +237,7 @@ function DealCard({
         {deal.dealValue ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: '700', color: '#22C55E' }}>
             <DollarSign size={11} />
-            {dealValueLabel(deal.dealValue, deal.dealType, deal.recurringInterval)}
+            {dealValueLabel(deal.dealValue, deal.dealType, deal.recurringInterval, currencySymbol)}
           </div>
         ) : <div />}
         {todos.length > 0 && (
@@ -472,6 +474,9 @@ export default function PipelinePage() {
     setDragOverStage(null)
   }
 
+  // Currency symbol from workspace config (default '$')
+  const currencySymbol: string = pipelineConfig?.currency ?? '$'
+
   // Use custom pipeline config if available, otherwise use defaults
   const configStages = pipelineConfig?.stages ?? STAGES
   const activeStages = configStages.filter((s: any) => s.id !== 'closed_won' && s.id !== 'closed_lost' && !s.isHidden)
@@ -479,8 +484,9 @@ export default function PipelinePage() {
   const totalPipeline = deals
     .filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
     .reduce((sum: number, d: any) => sum + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
+  // Only show active (non-closed) deals in Brain's Top Picks
   const topDeals = deals
-    .filter((d: any) => d.conversionScore)
+    .filter((d: any) => d.conversionScore && d.stage !== 'closed_won' && d.stage !== 'closed_lost')
     .sort((a: any, b: any) => (b.conversionScore ?? 0) - (a.conversionScore ?? 0))
     .slice(0, 3)
 
@@ -528,7 +534,7 @@ export default function PipelinePage() {
           </h1>
           <p style={{ fontSize: '13px', color: '#9CA3AF' }}>
             {deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost').length} active deals
-            {totalPipeline > 0 && ` · $${totalPipeline.toLocaleString()} pipeline value`}
+            {totalPipeline > 0 && ` · ${dealValueLabel(totalPipeline, undefined, undefined, currencySymbol)} pipeline`}
             {' · '}
             <span style={{ color: '#6B7280' }}>Drag cards to move stages</span>
           </p>
@@ -597,7 +603,7 @@ export default function PipelinePage() {
                       <div style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.prospectCompany}</div>
                       <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
                         {STAGES.find(s => s.id === deal.stage)?.label}
-                        {deal.dealValue && ` · ${dealValueLabel(deal.dealValue, deal.dealType, deal.recurringInterval)}`}
+                        {deal.dealValue && ` · ${dealValueLabel(deal.dealValue, deal.dealType, deal.recurringInterval, currencySymbol)}`}
                       </div>
                     </div>
                     <div style={{ fontSize: '17px', fontWeight: '800', color: scoreColor, flexShrink: 0 }}>
@@ -768,6 +774,7 @@ export default function PipelinePage() {
                       isDragging={draggedId === deal.id}
                       urgentReason={urgentMap[deal.id]}
                       staleDays={staleMap[deal.id]}
+                      currencySymbol={currencySymbol}
                     />
                   ))
                 )}
