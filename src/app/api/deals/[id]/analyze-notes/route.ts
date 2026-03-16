@@ -9,7 +9,8 @@ import { db } from '@/lib/db'
 import { dealLogs, productGaps, companyProfiles } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
-import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
+import { rebuildWorkspaceBrain, getWorkspaceBrain } from '@/lib/workspace-brain'
+import { computeCompositeScore } from '@/lib/deal-ml'
 
 const anthropic = new Anthropic()
 
@@ -159,8 +160,35 @@ IMPORTANT — productGaps rules:
       updatedAt: new Date(),
     }
     if (parseOk && parsed.summary) updateFields.aiSummary = parsed.summary
-    if (parseOk && parsed.conversionScore != null) updateFields.conversionScore = parsed.conversionScore
-    if (parseOk && parsed.conversionInsights != null) updateFields.conversionInsights = parsed.conversionInsights
+
+    // ── Score reconciliation: blend LLM score with ML model prediction ─────────
+    // If the workspace brain has an ML prediction for this deal, compute a composite
+    // score that weights LLM (dominant early on) → ML (dominant once 10+ closed deals).
+    if (parseOk && parsed.conversionScore != null) {
+      let finalScore = parsed.conversionScore
+      let finalInsights = parsed.conversionInsights ?? null
+      try {
+        const brain = await getWorkspaceBrain(workspaceId)
+        const mlPred = brain?.mlPredictions?.find(p => p.dealId === id)
+        if (mlPred && brain?.mlModel) {
+          const { composite, insight } = computeCompositeScore(
+            parsed.conversionScore,
+            mlPred.winProbability,
+            brain.mlModel.trainingSize,
+          )
+          finalScore = composite
+          if (insight) {
+            finalInsights = Array.isArray(finalInsights)
+              ? [insight, ...finalInsights]
+              : [insight]
+          }
+        }
+      } catch { /* non-fatal — fall back to LLM score */ }
+      updateFields.conversionScore = finalScore
+      if (finalInsights != null) updateFields.conversionInsights = finalInsights
+    } else if (parseOk && parsed.conversionInsights != null) {
+      updateFields.conversionInsights = parsed.conversionInsights
+    }
 
     const [updatedDeal] = await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, id)).returning()
     const createdGaps = []

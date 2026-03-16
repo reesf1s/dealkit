@@ -15,7 +15,7 @@
 import { db } from '@/lib/db'
 import { dealLogs, competitors as competitorRecords } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
-import { runMLEngine, type TrainedMLModel, type DealMLPrediction, type MLTrends, ML_MIN_TRAINING_DEALS } from '@/lib/deal-ml'
+import { runMLEngine, computeCompositeScore, type TrainedMLModel, type DealMLPrediction, type MLTrends, type DealArchetype, type StageVelocityIntel, type CompetitivePattern, type ScoreCalibrationPoint, ML_MIN_TRAINING_DEALS } from '@/lib/deal-ml'
 
 export interface DealSnapshot {
   id: string
@@ -102,6 +102,10 @@ export interface WorkspaceBrain {
   mlModel?: TrainedMLModel            // logistic regression weights (workspace IP)
   mlPredictions?: DealMLPrediction[]  // win probability per open deal
   mlTrends?: MLTrends                 // trend analysis: win rate, velocity, competitor threats
+  dealArchetypes?: DealArchetype[]                // k-means deal segments
+  stageVelocityIntel?: StageVelocityIntel         // quantile-based stall detection
+  competitivePatterns?: CompetitivePattern[]      // per-competitor mini-LR insights
+  calibrationTimeline?: ScoreCalibrationPoint[]   // monthly ML discrimination tracking
 }
 
 let schemaMigrated = false
@@ -683,9 +687,13 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
   }
 
   // ── ML engine — train on closed deal history ────────────────────────────────
-  let mlModel: WorkspaceBrain['mlModel']         = undefined
-  let mlPredictions: WorkspaceBrain['mlPredictions'] = undefined
-  let mlTrends: WorkspaceBrain['mlTrends']       = undefined
+  let mlModel: WorkspaceBrain['mlModel']                   = undefined
+  let mlPredictions: WorkspaceBrain['mlPredictions']       = undefined
+  let mlTrends: WorkspaceBrain['mlTrends']                 = undefined
+  let dealArchetypes: WorkspaceBrain['dealArchetypes']     = undefined
+  let stageVelocityIntel: WorkspaceBrain['stageVelocityIntel'] = undefined
+  let competitivePatterns: WorkspaceBrain['competitivePatterns'] = undefined
+  let calibrationTimeline: WorkspaceBrain['calibrationTimeline'] = undefined
 
   if ((wonDeals.length + lostDeals.length) >= ML_MIN_TRAINING_DEALS) {
     const mlInputs = deals.map(d => ({
@@ -705,9 +713,22 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
 
     const mlResult = runMLEngine(mlInputs, now)
     if (mlResult.model) {
-      mlModel       = mlResult.model
-      mlPredictions = mlResult.predictions
-      mlTrends      = mlResult.trends ?? undefined
+      mlModel              = mlResult.model
+      mlTrends             = mlResult.trends ?? undefined
+      dealArchetypes       = mlResult.archetypes.length > 0 ? mlResult.archetypes : undefined
+      stageVelocityIntel   = mlResult.stageVelocity ?? undefined
+      competitivePatterns  = mlResult.competitivePatterns.length > 0 ? mlResult.competitivePatterns : undefined
+      calibrationTimeline  = mlResult.calibrationTimeline.length > 0 ? mlResult.calibrationTimeline : undefined
+
+      // Embed composite scores into predictions — blends LLM+ML so stored conversionScore reflects both
+      mlPredictions = mlResult.predictions.map(pred => {
+        const snap = snapshots.find(s => s.id === pred.dealId)
+        if (snap?.conversionScore != null) {
+          const { composite } = computeCompositeScore(snap.conversionScore, pred.winProbability, mlResult.model!.trainingSize)
+          return { ...pred, compositeScore: composite }
+        }
+        return pred
+      })
     }
   }
 
@@ -726,6 +747,10 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     mlModel,
     mlPredictions,
     mlTrends,
+    dealArchetypes,
+    stageVelocityIntel,
+    competitivePatterns,
+    calibrationTimeline,
   }
 
   await db.execute(sql`
@@ -873,6 +898,51 @@ export function formatBrainContext(brain: WorkspaceBrain): string {
     const threats = tr.competitorThreats.filter(c => c.direction === 'more_competitive')
     if (threats.length > 0) {
       lines.push(`COMPETITIVE THREAT: ${threats.map(c => `${c.name} win rate dropping ${c.allTimeWinRatePct}% → ${c.recentWinRatePct}%`).join(' | ')}`)
+    }
+  }
+
+  // Deal archetypes — k-means segments
+  const archetypes = brain.dealArchetypes ?? []
+  if (archetypes.length > 0) {
+    lines.push(`\nDEAL ARCHETYPES (k-means clusters):`)
+    for (const a of archetypes) {
+      lines.push(`• ${a.label}: ${a.dealCount} deals | ${a.winRate}% win rate | avg £${Math.round(a.avgDealValue / 1000)}k | ${a.winningCharacteristic}`)
+      if (a.openDealIds.length > 0) {
+        const names = a.openDealIds.slice(0, 3).map(id => {
+          const d = (brain.deals ?? []).find(x => x.id === id)
+          return d ? d.name : id
+        })
+        lines.push(`  Open deals in archetype: ${names.join(', ')}${a.openDealIds.length > 3 ? ` +${a.openDealIds.length - 3} more` : ''}`)
+      }
+    }
+  }
+
+  // Stage velocity stall alerts
+  const sv = brain.stageVelocityIntel
+  if (sv && sv.stageAlerts.length > 0) {
+    lines.push(`\nSTAGE VELOCITY ALERTS (stalled vs historical ${sv.medianDaysToClose}d median):`)
+    for (const alert of sv.stageAlerts.slice(0, 4)) {
+      lines.push(`• [${alert.severity.toUpperCase()}] ${alert.company} in ${alert.stage}: ${alert.currentAgeDays}d (expected max ${alert.expectedMaxDays}d)`)
+    }
+  }
+
+  // Per-competitor ML patterns
+  const compPats = brain.competitivePatterns ?? []
+  if (compPats.length > 0) {
+    lines.push(`\nCOMPETITIVE INTELLIGENCE (per-competitor ML patterns):`)
+    for (const cp of compPats.slice(0, 4)) {
+      lines.push(`• vs ${cp.competitor}: ${cp.winRate}% win rate over ${cp.totalDeals} deals | win when: ${cp.topWinCondition} | lose when: ${cp.topLossRisk}`)
+    }
+  }
+
+  // Score calibration (latest month)
+  const cal = brain.calibrationTimeline ?? []
+  if (cal.length > 0) {
+    const latest = cal[cal.length - 1]
+    if (latest.discrimination > 0) {
+      lines.push(`\nML CALIBRATION (${latest.month}): discrimination +${Math.round(latest.discrimination)}pp (${Math.round(latest.avgMlOnWins)}% on wins vs ${Math.round(latest.avgMlOnLoss)}% on losses — model is predictive)`)
+    } else {
+      lines.push(`\nML CALIBRATION (${latest.month}): discrimination ${Math.round(latest.discrimination)}pp — model needs more data`)
     }
   }
 

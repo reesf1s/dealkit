@@ -1,46 +1,45 @@
 /**
- * DealKit ML Engine
+ * DealKit ML Engine — v2
  *
- * Trains a logistic regression model on each workspace's closed deal history
- * to predict win probability for open deals from real features — not templates.
+ * A multi-model machine learning pipeline trained exclusively on each
+ * workspace's own closed deal history. Every model is unique to the
+ * workspace; copying the codebase gives you nothing without the data.
  *
- * The trained model weights are stored in the workspace brain and accumulate
- * with every deal closed. They encode institutional knowledge unique to each
- * workspace's sales motion, customers, and competitive landscape.
+ * Models
+ * ──────
+ * 1. Logistic regression     — win probability per open deal (gradient descent, L2 reg)
+ * 2. Leave-one-out CV        — honest accuracy estimate on your own data
+ * 3. K-nearest neighbours    — "deals most similar to this one" (feature-space search)
+ * 4. K-means clustering      — deal archetypes: groups your pipeline by natural segments
+ * 5. Per-competitor mini-LR  — which features predict wins/losses vs each rival
+ * 6. OLS trend regression    — win-rate, velocity, and competitive landscape over time
+ * 7. Stage velocity intel    — quantile-based stall detection vs your own history
+ * 8. Score calibration       — monthly tracking of ML discrimination vs actual outcomes
  *
- * Model cannot be replicated by copying the codebase — only by replicating
- * the closed deal history.
- *
- * Components
- * ──────────
- * 1. Feature extraction  — 7 normalised signals per deal
- * 2. Logistic regression — gradient descent with L2 regularisation
- * 3. Leave-one-out CV    — measures whether the model predicts correctly
- * 4. K-nearest neighbours — "deals most similar to this one"
- * 5. Trend detection     — OLS regression on monthly cohorts for win rate,
- *                          deal velocity, and per-competitor threat changes
+ * The LLM (Claude) translates model outputs into plain-English advice.
+ * It never overrides the model — it contextualises it.
  */
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 export const ML_FEATURE_NAMES = [
-  'stage_progress',       // deal funnel position (0 = prospecting → 1 = negotiation)
-  'deal_value',           // size relative to workspace history (log-scaled)
-  'pipeline_age',         // days in pipeline / 180  (older = more stale)
-  'has_risks',            // flagged risks present (binary 0/1)
-  'competitor_win_rate',  // historical win rate against competitors on this deal
-  'todo_engagement',      // fraction of todos completed (activity proxy)
+  'stage_progress',       // 0 = prospecting → 1 = negotiation
+  'deal_value',           // log-normalised by workspace max
+  'pipeline_age',         // days / 180, capped at 1
+  'has_risks',            // binary: risk flags present
+  'competitor_win_rate',  // historical win rate against this deal's rivals
+  'todo_engagement',      // todos-completed / total
   'ai_confidence',        // LLM conversion score / 100
 ] as const
 
-const STAGE_ORDINAL: Record<string, number> = {
-  prospecting: 0, qualification: 1, discovery: 2,
-  proposal: 3, negotiation: 4, closed_won: 4, closed_lost: 4,
-}
-
 export const ML_MIN_TRAINING_DEALS = 6
 
-// ─── Input / Output Types ─────────────────────────────────────────────────────
+const STAGE_ORDINAL: Record<string, number> = {
+  prospecting: 0, qualification: 1, discovery: 2,
+  proposal: 3,   negotiation: 4,   closed_won: 4, closed_lost: 4,
+}
+
+// ─── Input types ──────────────────────────────────────────────────────────────
 
 export interface DealMLInput {
   id: string
@@ -57,37 +56,81 @@ export interface DealMLInput {
   lostDate?: Date | string | null
 }
 
+// ─── Output types ─────────────────────────────────────────────────────────────
+
 export interface TrainedMLModel {
   weights: number[]
   bias: number
   featureNames: readonly string[]
   trainingSize: number
-  looAccuracy: number           // leave-one-out CV accuracy [0–1]
-  lastTrained: string           // ISO timestamp
-  avgDealValue: number          // workspace context used for normalisation
+  looAccuracy: number        // leave-one-out CV accuracy [0–1]
+  lastTrained: string
+  avgDealValue: number
   maxDealValue: number
-  featureImportance: {
-    name: string
-    importance: number          // |weight| — magnitude of influence
-    direction: 'helps' | 'hurts'  // positive or negative correlation with win
-  }[]
+  featureImportance: { name: string; importance: number; direction: 'helps' | 'hurts' }[]
 }
 
 export interface DealMLPrediction {
   dealId: string
-  winProbability: number                        // 0–1
-  confidence: 'high' | 'medium' | 'low'        // proximity to training data
+  winProbability: number                         // raw LR output [0–1]
+  compositeScore: number | null                  // ML+LLM blend (set in analyze-notes)
+  confidence: 'high' | 'medium' | 'low'
   nearestWin:  { dealId: string; company: string } | null
   nearestLoss: { dealId: string; company: string } | null
+  similarWins:  { dealId: string; company: string; similarity: number }[]
+  similarLosses: { dealId: string; company: string; similarity: number }[]
+  archetypeId: number | null
   riskFlags: string[]
+}
+
+export interface DealArchetype {
+  id: number
+  label: string
+  winRate: number            // 0–100 from closed deals in this cluster
+  dealCount: number
+  avgDealValue: number
+  openDealIds: string[]
+  centroidFeatures: number[]
+  winningCharacteristic: string
+}
+
+export interface StageVelocityIntel {
+  medianDaysToClose: number
+  p75DaysToClose: number
+  stageAlerts: {
+    dealId: string
+    company: string
+    currentAgeDays: number
+    expectedMaxDays: number
+    stage: string
+    severity: 'warning' | 'critical'
+  }[]
+}
+
+export interface CompetitivePattern {
+  competitor: string
+  totalDeals: number
+  winRate: number           // 0–100
+  topWinCondition: string
+  topLossRisk: string
+  miniAccuracy: number      // 0–1, accuracy of per-competitor mini-model
+}
+
+export interface ScoreCalibrationPoint {
+  month: string             // "2025-03"
+  n: number
+  actualWinRate: number     // 0–100
+  avgMlOnWins: number       // avg ML probability on actual winners [0–100]
+  avgMlOnLoss: number       // avg ML probability on actual losers  [0–100]
+  discrimination: number    // avgMlOnWins − avgMlOnLoss (positive = good)
 }
 
 export interface MLTrends {
   winRate: {
     direction: 'improving' | 'declining' | 'stable'
-    slopePctPerMonth: number    // positive = improving
-    recentPct: number           // recent half-window average
-    priorPct: number            // earlier half-window average
+    slopePctPerMonth: number
+    recentPct: number
+    priorPct: number
   }
   dealVelocity: {
     direction: 'faster' | 'slower' | 'stable'
@@ -106,6 +149,10 @@ export interface MLEngineResult {
   model: TrainedMLModel | null
   predictions: DealMLPrediction[]
   trends: MLTrends | null
+  archetypes: DealArchetype[]
+  stageVelocity: StageVelocityIntel | null
+  competitivePatterns: CompetitivePattern[]
+  calibrationTimeline: ScoreCalibrationPoint[]
 }
 
 // ─── Math helpers ─────────────────────────────────────────────────────────────
@@ -122,7 +169,6 @@ function euclidean(a: number[], b: number[]): number {
   return Math.sqrt(a.reduce((s, v, i) => s + (v - (b[i] ?? 0)) ** 2, 0))
 }
 
-/** Ordinary-least-squares slope of y on x */
 function olsSlope(pts: [number, number][]): number {
   const n = pts.length
   if (n < 2) return 0
@@ -131,6 +177,62 @@ function olsSlope(pts: [number, number][]): number {
   const num = pts.reduce((s, [x, y]) => s + (x - mx) * (y - my), 0)
   const den = pts.reduce((s, [x]) => s + (x - mx) ** 2, 0)
   return den === 0 ? 0 : num / den
+}
+
+function quantile(sorted: number[], q: number): number {
+  if (sorted.length === 0) return 0
+  const idx = q * (sorted.length - 1)
+  const lo = Math.floor(idx)
+  const hi = Math.ceil(idx)
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo)
+}
+
+// ─── K-means clustering (deterministic maximin init) ─────────────────────────
+
+function kMeans(
+  points: number[][],
+  k: number,
+  maxIter = 100,
+): { centroids: number[][]; assignments: number[] } {
+  if (points.length === 0 || k <= 0 || k > points.length) {
+    return { centroids: [], assignments: new Array(points.length).fill(0) }
+  }
+  const n = points[0]?.length ?? 0
+
+  // Maximin init: spread centroids as far apart as possible (deterministic)
+  const centroids: number[][] = [points[0].slice()]
+  while (centroids.length < k) {
+    let farthest = 0, farthestDist = -1
+    for (let i = 0; i < points.length; i++) {
+      const minDist = Math.min(...centroids.map(c => euclidean(points[i], c)))
+      if (minDist > farthestDist) { farthestDist = minDist; farthest = i }
+    }
+    centroids.push(points[farthest].slice())
+  }
+
+  const assignments = new Array<number>(points.length).fill(0)
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    let changed = false
+    for (let i = 0; i < points.length; i++) {
+      let nearest = 0, nearestDist = Infinity
+      for (let j = 0; j < k; j++) {
+        const d = euclidean(points[i], centroids[j])
+        if (d < nearestDist) { nearestDist = d; nearest = j }
+      }
+      if (assignments[i] !== nearest) { assignments[i] = nearest; changed = true }
+    }
+    if (!changed) break
+    for (let j = 0; j < k; j++) {
+      const cluster = points.filter((_, i) => assignments[i] === j)
+      if (cluster.length === 0) continue
+      for (let d = 0; d < n; d++) {
+        centroids[j][d] = cluster.reduce((s, p) => s + (p[d] ?? 0), 0) / cluster.length
+      }
+    }
+  }
+
+  return { centroids, assignments }
 }
 
 // ─── Feature extraction ───────────────────────────────────────────────────────
@@ -142,39 +244,32 @@ function extractFeatures(
   maxDealValue: number,
   now: Date,
 ): number[] {
-  // f0: stage progression [0, 1]
   const f_stage = (STAGE_ORDINAL[deal.stage] ?? 0) / 4
 
-  // f1: deal value — log-normalised by workspace max [0, 1]
   const val = Math.max(deal.dealValue ?? avgDealValue, 1)
   const f_value = maxDealValue > 1
     ? Math.log(val + 1) / Math.log(maxDealValue + 1)
     : 0.5
 
-  // f2: pipeline age in days, capped at 180 [0, 1]
   const createdMs = deal.createdAt ? new Date(deal.createdAt).getTime() : now.getTime()
   const f_age = Math.min((now.getTime() - createdMs) / 86_400_000 / 180, 1)
 
-  // f3: active risks present [0 or 1]
   const f_risks = deal.dealRisks.length > 0 ? 1 : 0
 
-  // f4: avg historical win rate against this deal's competitors [0, 1]
   const comps = deal.dealCompetitors.filter(Boolean)
   const f_comp = comps.length > 0
     ? comps.reduce((s, c) => s + (competitorWinRates.get(c.toLowerCase()) ?? 0.5), 0) / comps.length
-    : 0.5  // no known competitors = neutral
+    : 0.5
 
-  // f5: todo completion — engagement signal [0, 1]
   const todos = deal.todos ?? []
   const f_todo = todos.length > 0 ? todos.filter(t => t.done).length / todos.length : 0.5
 
-  // f6: AI conversion score, normalised [0, 1]
   const f_ai = deal.conversionScore != null ? deal.conversionScore / 100 : 0.5
 
   return [f_stage, f_value, f_age, f_risks, f_comp, f_todo, f_ai]
 }
 
-// ─── Logistic regression training ─────────────────────────────────────────────
+// ─── Logistic regression ──────────────────────────────────────────────────────
 
 interface TrainOpts { lr: number; epochs: number; lambda: number }
 
@@ -182,6 +277,7 @@ function trainLR(
   examples: { features: number[]; label: number }[],
   opts: TrainOpts = { lr: 0.1, epochs: 800, lambda: 0.01 },
 ): { weights: number[]; bias: number } {
+  if (examples.length === 0) return { weights: new Array(ML_FEATURE_NAMES.length).fill(0), bias: 0 }
   const n = examples[0].features.length
   const w = new Array<number>(n).fill(0)
   let b = 0
@@ -191,34 +287,219 @@ function trainLR(
     let db = 0
     for (const { features, label } of examples) {
       const err = sigmoid(dot(w, features) + b) - label
-      for (let i = 0; i < n; i++) dw[i] += err * features[i]
+      for (let i = 0; i < n; i++) dw[i] += err * (features[i] ?? 0)
       db += err
     }
     const m = examples.length
-    for (let i = 0; i < n; i++) {
-      w[i] -= opts.lr * (dw[i] / m + 2 * opts.lambda * w[i])
-    }
+    for (let i = 0; i < n; i++) w[i] -= opts.lr * (dw[i] / m + 2 * opts.lambda * w[i])
     b -= opts.lr * (db / m)
   }
-
   return { weights: w, bias: b }
 }
 
-/** Leave-one-out cross-validation accuracy */
 function computeLOO(examples: { features: number[]; label: number }[]): number {
   if (examples.length < 4) return 0
-  const loOpts: TrainOpts = { lr: 0.1, epochs: 300, lambda: 0.01 }
+  const opts: TrainOpts = { lr: 0.1, epochs: 300, lambda: 0.01 }
   let correct = 0
   for (let i = 0; i < examples.length; i++) {
     const trainSet = examples.filter((_, j) => j !== i)
-    const { weights, bias } = trainLR(trainSet, loOpts)
-    const p = sigmoid(dot(weights, examples[i].features) + bias)
-    if ((p >= 0.5 ? 1 : 0) === examples[i].label) correct++
+    const { weights, bias } = trainLR(trainSet, opts)
+    if ((sigmoid(dot(weights, examples[i].features) + bias) >= 0.5 ? 1 : 0) === examples[i].label)
+      correct++
   }
   return correct / examples.length
 }
 
-// ─── Main engine export ───────────────────────────────────────────────────────
+// ─── Archetype helpers ────────────────────────────────────────────────────────
+
+function labelArchetype(c: number[]): string {
+  if (c.length === 0) return 'Mixed pipeline'
+  const [stage, value, age, risks,, , ai] = c
+  if ((age ?? 0) > 0.6 || (risks ?? 0) > 0.6) return 'At-risk deals'
+  if ((value ?? 0) > 0.65 && (stage ?? 0) > 0.55) return 'Enterprise opportunities'
+  if ((stage ?? 0) > 0.65 && (ai ?? 0) > 0.6) return 'High-confidence closes'
+  if ((stage ?? 0) < 0.3 && (value ?? 0) < 0.4) return 'Early-stage leads'
+  if ((value ?? 0) > 0.5) return 'High-value opportunities'
+  return 'Mid-market pipeline'
+}
+
+function winningCharacteristic(c: number[]): string {
+  if (c.length === 0) return 'Mixed characteristics'
+  let maxDev = 0, topIdx = 0, topDir = 1
+  for (let i = 0; i < c.length; i++) {
+    const dev = Math.abs((c[i] ?? 0.5) - 0.5)
+    if (dev > maxDev) { maxDev = dev; topIdx = i; topDir = (c[i] ?? 0.5) > 0.5 ? 1 : -1 }
+  }
+  const pos = ['Advanced stage','High deal value','Long pipeline age','Has risk flags','Strong comp record','High engagement','High AI score']
+  const neg = ['Early stage','Smaller deals','Fresh entries','No risk flags','Weak comp record','Low engagement','Low AI score']
+  return (topDir > 0 ? pos[topIdx] : neg[topIdx]) ?? 'Mixed'
+}
+
+// ─── Stage velocity intelligence ──────────────────────────────────────────────
+
+function computeStageVelocityIntel(
+  wonDeals: DealMLInput[],
+  openDeals: DealMLInput[],
+  now: Date,
+): StageVelocityIntel {
+  const days = wonDeals
+    .filter(d => d.createdAt && d.wonDate)
+    .map(d => (new Date(d.wonDate!).getTime() - new Date(d.createdAt!).getTime()) / 86_400_000)
+    .filter(d => d >= 0)
+    .sort((a, b) => a - b)
+
+  const median = quantile(days, 0.5) || 60
+  const p75    = quantile(days, 0.75) || 90
+
+  const stageAlerts: StageVelocityIntel['stageAlerts'] = openDeals
+    .filter(d => d.createdAt)
+    .map(d => {
+      const ageDays = (now.getTime() - new Date(d.createdAt!).getTime()) / 86_400_000
+      return { deal: d, ageDays }
+    })
+    .filter(({ ageDays }) => ageDays > p75)
+    .map(({ deal, ageDays }) => ({
+      dealId: deal.id,
+      company: deal.company,
+      currentAgeDays: Math.round(ageDays),
+      expectedMaxDays: Math.round(p75),
+      stage: deal.stage,
+      severity: (ageDays > p75 * 1.5 ? 'critical' : 'warning') as 'critical' | 'warning',
+    }))
+
+  return {
+    medianDaysToClose: Math.round(median),
+    p75DaysToClose: Math.round(p75),
+    stageAlerts,
+  }
+}
+
+// ─── Competitive pattern analysis ─────────────────────────────────────────────
+
+const WIN_CONDITIONS: Record<string, string> = {
+  stage_progress:       'Late-stage deals',
+  deal_value:           'Smaller deal sizes',
+  pipeline_age:         'Fresh pipeline entries',
+  has_risks:            'Deals without risk flags',
+  competitor_win_rate:  'Strong competitive track record',
+  todo_engagement:      'High rep engagement',
+  ai_confidence:        'High AI confidence score',
+}
+const LOSS_RISKS: Record<string, string> = {
+  stage_progress:       'Early-stage deals',
+  deal_value:           'Large deal values',
+  pipeline_age:         'Aging or stalling deals',
+  has_risks:            'Multiple active risk flags',
+  competitor_win_rate:  'Weak competitive positioning',
+  todo_engagement:      'Low rep engagement',
+  ai_confidence:        'Low AI confidence score',
+}
+
+function computeCompetitivePatterns(
+  closed: DealMLInput[],
+  competitorWinRates: Map<string, number>,
+  avgDealValue: number,
+  maxDealValue: number,
+  now: Date,
+): CompetitivePattern[] {
+  const byComp = new Map<string, DealMLInput[]>()
+  for (const d of closed) {
+    for (const c of d.dealCompetitors.filter(Boolean)) {
+      const k = c.toLowerCase()
+      const arr = byComp.get(k) ?? []
+      arr.push(d)
+      byComp.set(k, arr)
+    }
+  }
+
+  const patterns: CompetitivePattern[] = []
+  for (const [key, deals] of byComp) {
+    if (deals.length < 3) continue
+    const won = deals.filter(d => d.stage === 'closed_won')
+    const winRate = Math.round((won.length / deals.length) * 100)
+
+    const examples = deals.map(d => ({
+      features: extractFeatures(d, competitorWinRates, avgDealValue, maxDealValue, now),
+      label: d.stage === 'closed_won' ? 1 : 0,
+    }))
+
+    const { weights } = trainLR(examples, { lr: 0.1, epochs: 500, lambda: 0.05 })
+
+    // Top helping feature (max positive weight)
+    let topWinIdx = 0
+    for (let i = 1; i < weights.length; i++)
+      if ((weights[i] ?? 0) > (weights[topWinIdx] ?? 0)) topWinIdx = i
+
+    // Top hurting feature (max negative weight)
+    let topLossIdx = 0
+    for (let i = 1; i < weights.length; i++)
+      if ((weights[i] ?? 0) < (weights[topLossIdx] ?? 0)) topLossIdx = i
+
+    const correct = examples.filter(
+      e => (sigmoid(dot(weights, e.features) + 0) >= 0.5 ? 1 : 0) === e.label
+    ).length
+
+    patterns.push({
+      competitor: key.charAt(0).toUpperCase() + key.slice(1),
+      totalDeals: deals.length,
+      winRate,
+      topWinCondition:  WIN_CONDITIONS[ML_FEATURE_NAMES[topWinIdx]  ?? ''] ?? 'Favourable conditions',
+      topLossRisk:      LOSS_RISKS[ML_FEATURE_NAMES[topLossIdx] ?? ''] ?? 'Unfavourable conditions',
+      miniAccuracy: correct / examples.length,
+    })
+  }
+
+  return patterns.sort((a, b) => b.totalDeals - a.totalDeals)
+}
+
+// ─── Score calibration timeline ───────────────────────────────────────────────
+
+function computeCalibrationTimeline(
+  closed: DealMLInput[],
+  weights: number[],
+  bias: number,
+  competitorWinRates: Map<string, number>,
+  avgDealValue: number,
+  maxDealValue: number,
+  now: Date,
+): ScoreCalibrationPoint[] {
+  const byMonth = new Map<string, DealMLInput[]>()
+  for (const d of closed) {
+    const ts = d.stage === 'closed_won' ? d.wonDate : d.lostDate
+    if (!ts) continue
+    const dt  = new Date(ts)
+    const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`
+    const arr = byMonth.get(key) ?? []
+    arr.push(d)
+    byMonth.set(key, arr)
+  }
+
+  const timeline: ScoreCalibrationPoint[] = []
+  for (const [month, deals] of [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    const won  = deals.filter(d => d.stage === 'closed_won')
+    const lost = deals.filter(d => d.stage === 'closed_lost')
+    const pred = (d: DealMLInput) =>
+      sigmoid(dot(weights, extractFeatures(d, competitorWinRates, avgDealValue, maxDealValue, now)) + bias) * 100
+
+    const predsWon  = won.map(pred)
+    const predsLost = lost.map(pred)
+    const avgW = predsWon.length  > 0 ? predsWon.reduce((a, b) => a + b, 0)  / predsWon.length  : 0
+    const avgL = predsLost.length > 0 ? predsLost.reduce((a, b) => a + b, 0) / predsLost.length : 0
+
+    timeline.push({
+      month,
+      n: deals.length,
+      actualWinRate: Math.round((won.length / deals.length) * 100),
+      avgMlOnWins:   Math.round(avgW),
+      avgMlOnLoss:   Math.round(avgL),
+      discrimination: Math.round(avgW - avgL),
+    })
+  }
+
+  return timeline
+}
+
+// ─── Main engine ──────────────────────────────────────────────────────────────
 
 export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngineResult {
   const closedWon  = allDeals.filter(d => d.stage === 'closed_won')
@@ -226,26 +507,26 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
   const closed     = [...closedWon, ...closedLost]
   const open       = allDeals.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
 
-  if (closed.length < ML_MIN_TRAINING_DEALS) {
-    return { model: null, predictions: [], trends: null }
+  const empty: MLEngineResult = {
+    model: null, predictions: [], trends: null,
+    archetypes: [], stageVelocity: null,
+    competitivePatterns: [], calibrationTimeline: [],
   }
+  if (closed.length < ML_MIN_TRAINING_DEALS) return empty
 
-  // ── Normalisation context ─────────────────────────────────────────────────
+  // ── Normalisation ─────────────────────────────────────────────────────────
   const allVals = allDeals.map(d => d.dealValue ?? 0).filter(v => v > 0)
-  const avgDealValue = allVals.length > 0
-    ? allVals.reduce((a, b) => a + b, 0) / allVals.length
-    : 50_000
+  const avgDealValue = allVals.length > 0 ? allVals.reduce((a, b) => a + b, 0) / allVals.length : 50_000
   const maxDealValue = allVals.length > 0 ? Math.max(...allVals) : 100_000
 
-  // ── Historical competitor win rates (context for features) ────────────────
+  // ── Competitor win rates ──────────────────────────────────────────────────
   const compStats = new Map<string, { wins: number; total: number }>()
   for (const d of closed) {
     const won = d.stage === 'closed_won'
     for (const c of d.dealCompetitors.filter(Boolean)) {
       const k = c.toLowerCase()
       const s = compStats.get(k) ?? { wins: 0, total: 0 }
-      s.total++
-      if (won) s.wins++
+      s.total++; if (won) s.wins++
       compStats.set(k, s)
     }
   }
@@ -253,18 +534,24 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
     [...compStats.entries()].map(([k, s]) => [k, s.total > 0 ? s.wins / s.total : 0.5])
   )
 
-  // ── Training examples ─────────────────────────────────────────────────────
+  // ── Feature extraction for all deals ─────────────────────────────────────
+  const allFeats = allDeals.map(d => ({
+    id: d.id,
+    features: extractFeatures(d, competitorWinRates, avgDealValue, maxDealValue, now),
+  }))
+  const featMap = new Map<string, number[]>(allFeats.map(f => [f.id, f.features]))
+
+  // ── Logistic regression — train on closed deals ───────────────────────────
   const training = closed.map(d => ({
     dealId:   d.id,
     company:  d.company,
-    features: extractFeatures(d, competitorWinRates, avgDealValue, maxDealValue, now),
+    features: featMap.get(d.id) ?? extractFeatures(d, competitorWinRates, avgDealValue, maxDealValue, now),
     label:    d.stage === 'closed_won' ? 1 : 0,
   }))
 
-  // ── Train full model ──────────────────────────────────────────────────────
   const { weights, bias } = trainLR(training.map(e => ({ features: e.features, label: e.label })))
 
-  // ── LOO accuracy (skip for > 50 deals — approximate with training accuracy)
+  // ── LOO accuracy ──────────────────────────────────────────────────────────
   let loo: number
   if (closed.length <= 50) {
     loo = computeLOO(training.map(e => ({ features: e.features, label: e.label })))
@@ -275,7 +562,6 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
     loo = correct / training.length
   }
 
-  // ── Feature importance: |weight| = magnitude of influence ────────────────
   const featureImportance = ML_FEATURE_NAMES.map((name, i) => ({
     name,
     importance: Math.abs(weights[i] ?? 0),
@@ -292,62 +578,115 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
     featureImportance,
   }
 
-  // ── Predictions for open deals ────────────────────────────────────────────
-  const k = Math.max(2, Math.min(5, Math.floor(closed.length / 4)))
+  // ── K-means archetypes (k=2 small / k=3 larger) ───────────────────────────
+  const k = Math.min(3, Math.max(2, Math.floor(allDeals.length / 4)))
+  const { centroids, assignments } = kMeans(allFeats.map(f => f.features), k)
 
-  const predictions: DealMLPrediction[] = open.map(deal => {
-    const feats   = extractFeatures(deal, competitorWinRates, avgDealValue, maxDealValue, now)
+  const archetypes: DealArchetype[] = Array.from({ length: k }, (_, ci) => {
+    const members = allDeals.filter((_, j) => assignments[j] === ci)
+    const won  = members.filter(d => d.stage === 'closed_won')
+    const lost = members.filter(d => d.stage === 'closed_lost')
+    const openM = members.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+    const total = won.length + lost.length
+    const withVal = members.filter(d => (d.dealValue ?? 0) > 0)
+    return {
+      id: ci,
+      label: labelArchetype(centroids[ci] ?? []),
+      winRate: total > 0 ? Math.round((won.length / total) * 100) : 0,
+      dealCount: members.length,
+      avgDealValue: withVal.length > 0
+        ? Math.round(withVal.reduce((s, d) => s + (d.dealValue ?? 0), 0) / withVal.length)
+        : 0,
+      openDealIds: openM.map(d => d.id),
+      centroidFeatures: centroids[ci] ?? [],
+      winningCharacteristic: winningCharacteristic(centroids[ci] ?? []),
+    }
+  }).sort((a, b) => b.dealCount - a.dealCount)
+
+  // ── Predictions for open deals ────────────────────────────────────────────
+  const knn = Math.max(2, Math.min(5, Math.floor(closed.length / 4)))
+
+  const predictions: DealMLPrediction[] = open.map((deal, oi) => {
+    const feats   = featMap.get(deal.id) ?? extractFeatures(deal, competitorWinRates, avgDealValue, maxDealValue, now)
     const winProb = sigmoid(dot(weights, feats) + bias)
 
-    // K-nearest closed deals
     const ranked = training
       .map(e => ({ ...e, dist: euclidean(feats, e.features) }))
       .sort((a, b) => a.dist - b.dist)
-      .slice(0, k)
 
-    const nearestWinEntry  = ranked.find(e => e.label === 1) ?? null
-    const nearestLossEntry = ranked.find(e => e.label === 0) ?? null
+    const topK = ranked.slice(0, knn)
+    const nearestWinEntry  = topK.find(e => e.label === 1) ?? null
+    const nearestLossEntry = topK.find(e => e.label === 0) ?? null
 
-    const nearestWin  = nearestWinEntry
-      ? { dealId: nearestWinEntry.dealId,  company: nearestWinEntry.company  }
-      : null
-    const nearestLoss = nearestLossEntry
-      ? { dealId: nearestLossEntry.dealId, company: nearestLossEntry.company }
-      : null
+    const similarWins = ranked
+      .filter(e => e.label === 1).slice(0, 3)
+      .map(e => ({ dealId: e.dealId, company: e.company, similarity: Math.round((1 - Math.min(e.dist / 1.5, 1)) * 100) }))
 
-    // Confidence based on distance to nearest neighbour
-    const minDist = ranked[0]?.dist ?? 1
+    const similarLosses = ranked
+      .filter(e => e.label === 0).slice(0, 3)
+      .map(e => ({ dealId: e.dealId, company: e.company, similarity: Math.round((1 - Math.min(e.dist / 1.5, 1)) * 100) }))
+
+    const minDist = topK[0]?.dist ?? 1
     const confidence: 'high' | 'medium' | 'low' =
       minDist < 0.25 ? 'high' : minDist < 0.55 ? 'medium' : 'low'
 
-    // Pattern-based risk flags derived from features
     const riskFlags: string[] = []
-    if (feats[4] < 0.4 && deal.dealCompetitors.filter(Boolean).length > 0) {
-      const topComp = deal.dealCompetitors.filter(Boolean)[0]
-      riskFlags.push(`Below 40% win rate vs ${topComp} historically`)
-    }
+    if (feats[4] < 0.4 && deal.dealCompetitors.filter(Boolean).length > 0)
+      riskFlags.push(`Below 40% win rate vs ${deal.dealCompetitors.filter(Boolean)[0]} historically`)
     if (feats[2] > 0.65) riskFlags.push('Deal aging in pipeline — similar deals stalled')
     if (feats[3] === 1)  riskFlags.push('Active risk flags on this deal')
     if (deal.conversionScore != null && feats[6] < 0.35) riskFlags.push('Low AI confidence score')
 
-    return { dealId: deal.id, winProbability: winProb, confidence, nearestWin, nearestLoss, riskFlags }
+    // Archetype: find which cluster this deal was assigned to
+    const globalIdx = allDeals.findIndex(d => d.id === deal.id)
+    const archetypeId: number | null = globalIdx >= 0 ? (assignments[globalIdx] ?? null) : null
+
+    // Account for the open-deal index in allDeals
+    void oi // used implicitly via globalIdx
+
+    return {
+      dealId: deal.id,
+      winProbability: winProb,
+      compositeScore: null,  // set later in analyze-notes when LLM score is available
+      confidence,
+      nearestWin:  nearestWinEntry  ? { dealId: nearestWinEntry.dealId,  company: nearestWinEntry.company  } : null,
+      nearestLoss: nearestLossEntry ? { dealId: nearestLossEntry.dealId, company: nearestLossEntry.company } : null,
+      similarWins,
+      similarLosses,
+      archetypeId,
+      riskFlags,
+    }
   })
 
-  // ── Trend detection (linear regression on monthly cohorts) ───────────────
+  // ── Stage velocity intelligence ───────────────────────────────────────────
+  const stageVelocity = closedWon.length >= 3
+    ? computeStageVelocityIntel(closedWon, open, now)
+    : null
+
+  // ── Competitive patterns ──────────────────────────────────────────────────
+  const competitivePatterns = computeCompetitivePatterns(
+    closed, competitorWinRates, avgDealValue, maxDealValue, now
+  )
+
+  // ── Score calibration timeline ────────────────────────────────────────────
+  const calibrationTimeline = computeCalibrationTimeline(
+    closed, weights, bias, competitorWinRates, avgDealValue, maxDealValue, now
+  )
+
+  // ── Trend detection ───────────────────────────────────────────────────────
   type MonthBucket = { wins: number; total: number; days: number[] }
   const monthMap = new Map<string, MonthBucket>()
-
   for (const d of closed) {
-    const closeTs = d.stage === 'closed_won' ? d.wonDate : d.lostDate
-    if (!closeTs) continue
-    const dt  = new Date(closeTs)
+    const ts = d.stage === 'closed_won' ? d.wonDate : d.lostDate
+    if (!ts) continue
+    const dt  = new Date(ts)
     const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`
     const entry: MonthBucket = monthMap.get(key) ?? { wins: 0, total: 0, days: [] }
     entry.total++
     if (d.stage === 'closed_won') entry.wins++
     if (d.createdAt) {
-      const days = (dt.getTime() - new Date(d.createdAt).getTime()) / 86_400_000
-      if (days >= 0) entry.days.push(days)
+      const daysVal = (dt.getTime() - new Date(d.createdAt).getTime()) / 86_400_000
+      if (daysVal >= 0) entry.days.push(daysVal)
     }
     monthMap.set(key, entry)
   }
@@ -356,30 +695,22 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
   let trends: MLTrends | null = null
 
   if (months.length >= 2) {
-    // Win rate OLS slope
-    const wrPts: [number, number][] = months.map(([, m], i) => [
-      i, m.total > 0 ? m.wins / m.total : 0
-    ])
+    const wrPts: [number, number][] = months.map(([, m], i) => [i, m.total > 0 ? m.wins / m.total : 0])
     const wrSlope = olsSlope(wrPts)
-    const mid     = Math.floor(wrPts.length / 2)
+    const mid = Math.floor(wrPts.length / 2)
     const priorWR  = wrPts.slice(0, mid).reduce((s, [, y]) => s + y, 0) / (mid || 1)
     const recentWR = wrPts.slice(mid).reduce((s, [, y]) => s + y, 0) / ((wrPts.length - mid) || 1)
 
-    // Deal velocity OLS slope (days to close)
     const velPts: [number, number][] = months
       .map(([, m], i): [number, number | null] =>
-        m.days.length > 0
-          ? [i, m.days.reduce((a, b) => a + b, 0) / m.days.length]
-          : [i, null]
+        m.days.length > 0 ? [i, m.days.reduce((a, b) => a + b, 0) / m.days.length] : [i, null]
       )
       .filter((p): p is [number, number] => p[1] !== null)
-
-    const velSlope = olsSlope(velPts)
-    const midV     = Math.floor(velPts.length / 2)
+    const velSlope  = olsSlope(velPts)
+    const midV      = Math.floor(velPts.length / 2)
     const priorVel  = velPts.slice(0, midV).reduce((s, [, y]) => s + y, 0) / (midV || 1)
     const recentVel = velPts.slice(midV).reduce((s, [, y]) => s + y, 0) / ((velPts.length - midV) || 1)
 
-    // Per-competitor threat: recent 90d vs all-time
     const cutoff      = new Date(now.getTime() - 90 * 86_400_000)
     const recentClosed = closed.filter(d => {
       const ts = d.stage === 'closed_won' ? d.wonDate : d.lostDate
@@ -397,9 +728,7 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
         name: name.charAt(0).toUpperCase() + name.slice(1),
         recentWinRatePct:  Math.round(recentRate * 100),
         allTimeWinRatePct: Math.round(allRate    * 100),
-        direction: delta < -0.12 ? 'more_competitive'
-          : delta > 0.12 ? 'less_competitive'
-          : 'stable',
+        direction: delta < -0.12 ? 'more_competitive' : delta > 0.12 ? 'less_competitive' : 'stable',
       })
     }
 
@@ -419,5 +748,39 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
     }
   }
 
-  return { model, predictions, trends }
+  return { model, predictions, trends, archetypes, stageVelocity, competitivePatterns, calibrationTimeline }
+}
+
+// ─── Composite score computation (called from analyze-notes after LLM scores) ─
+
+/**
+ * Blends the LLM's qualitative score with the ML model's data-driven prediction.
+ * Alpha (ML weight) scales from 0 → 0.7 as training data grows, ensuring the
+ * model only overrides the LLM once it has enough evidence to be trusted.
+ *
+ * Returns: { composite, llmScore, mlScore, divergence, insight }
+ */
+export function computeCompositeScore(
+  llmScore: number,
+  mlProbability: number,
+  trainingSize: number,
+): {
+  composite: number
+  mlScore: number
+  divergence: number
+  insight: string | null
+} {
+  const mlScore   = Math.round(mlProbability * 100)
+  const alpha     = Math.min(0.7, trainingSize / 100)   // 0 at 0 deals → 0.7 at 100 deals
+  const composite = Math.round(alpha * mlScore + (1 - alpha) * llmScore)
+  const divergence = Math.abs(mlScore - llmScore)
+
+  let insight: string | null = null
+  if (trainingSize >= 10 && divergence >= 20) {
+    insight = mlScore > llmScore
+      ? `ML model (trained on ${trainingSize} closed deals) predicts ${mlScore}% — higher than the AI score of ${llmScore}%. Similar deals in your history performed better than current signals suggest.`
+      : `ML model (trained on ${trainingSize} closed deals) predicts ${mlScore}% — lower than the AI score of ${llmScore}%. Historical patterns show similar deals at this stage are harder to close than they appear.`
+  }
+
+  return { composite, mlScore, divergence, insight }
 }

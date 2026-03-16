@@ -257,11 +257,11 @@ export default function LandingPage() {
             <div>
               <div style={{ fontSize: '11px', fontWeight: '700', color: '#818CF8', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '24px' }}>The compounding flywheel</div>
               {[
-                { icon: '📊', title: 'Log every deal outcome', desc: 'Win, lose, value, timeline, competitors faced — all captured automatically.' },
-                { icon: '🧠', title: 'AI learns your patterns', desc: 'Win rate by deal size, competitor W/L record, average days to close — computed fresh from your real data.' },
-                { icon: '📈', title: 'Forecasts get more accurate', desc: 'Weighted pipeline forecast uses probability-adjusted conversion scores, not gut feel.' },
-                { icon: '🎯', title: 'Collateral gets sharper', desc: 'Every battlecard, case study, and objection handler pulls from real deals you\'ve won.' },
-                { icon: '🔒', title: 'Data moat widens', desc: 'After 50 deals, no new tool can replicate what DealKit knows about your sales motion.' },
+                { icon: '📊', title: 'Log every deal outcome', desc: 'Win, lose, value, timeline, competitors faced — all captured automatically as you work.' },
+                { icon: '🧠', title: 'ML models train on your data', desc: 'Logistic regression learns which signals predict wins. K-means clusters your deals into archetypes. OLS regression detects win-rate trends. All trained on your closed deals, nobody else\'s.' },
+                { icon: '📈', title: 'Predictions get sharper every cycle', desc: 'Composite scores blend Claude\'s meeting analysis with your ML model — the ML weight grows from 0% to 70% as training data accumulates.' },
+                { icon: '🎯', title: 'Collateral grounds itself in outcomes', desc: 'Every battlecard, case study, and objection handler pulls from real deals you\'ve won and the competitive patterns your models detected.' },
+                { icon: '🔒', title: 'A model no one can replicate', desc: 'After 50+ deals, you have logistic regression weights, k-means centroids, per-competitor mini-models, and stage velocity baselines — all unique to your sales motion.' },
               ].map(({ icon, title, desc }, i) => (
                 <div key={i} style={{ display: 'flex', gap: '14px', marginBottom: i < 4 ? '20px' : 0 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0' }}>
@@ -354,14 +354,14 @@ export default function LandingPage() {
             {
               icon: BarChart3,
               color: '#8B5CF6',
-              title: 'AI that learns your scoring',
-              desc: 'Score calibration tracks whether high-confidence deals actually win. If your 80% deals are closing at 40%, the system surfaces that — and the AI adjusts how it interprets your context.',
+              title: 'ML models, not just AI prompts',
+              desc: 'Eight distinct models run on your closed deal history: logistic regression for win probability, k-nearest neighbours for deal similarity, k-means for pipeline archetypes, OLS regression for trend detection, per-competitor mini-models, stage velocity quantiles, LOO cross-validation, and monthly score calibration. All computed in your workspace.',
             },
             {
               icon: Brain,
               color: '#F59E0B',
-              title: 'Collateral grounded in reality',
-              desc: 'Case studies are generated from actual closed-won deals. Objection handlers reference real pushbacks from your pipeline. Battlecards update when you record new competitive intel. Nothing is generic.',
+              title: 'Collateral grounded in outcomes',
+              desc: 'Case studies are generated from actual closed-won deals. Objection handlers reference real pushbacks from your pipeline. Battlecards update as competitive patterns shift. Nothing generic — everything trained on what has actually worked for you.',
             },
           ].map(({ icon: Icon, color, title, desc }) => (
             <div key={title} style={{ background: 'rgba(255,255,255,0.025)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '24px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
@@ -382,10 +382,10 @@ export default function LandingPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0' }}>
             {[
-              { milestone: 'Day 1', deals: '0 deals', desc: 'Knowledge base set up. AI collateral is good — grounded in your product and competitors.', color: '#4B4565', borderColor: 'rgba(255,255,255,0.08)' },
-              { milestone: '1 month', deals: '10–20 deals', desc: 'First win/loss patterns emerge. Weighted forecast starts. Competitor record begins.', color: '#6366F1', borderColor: 'rgba(99,102,241,0.25)' },
-              { milestone: '3 months', deals: '30–50 deals', desc: 'Score calibration kicks in. Forecasts measurably accurate. Top loss reasons surface automatically.', color: '#8B5CF6', borderColor: 'rgba(139,92,246,0.35)' },
-              { milestone: '6 months', deals: '50+ deals', desc: 'Institutional moat is real. No new tool can replicate this data. AI accuracy compounds daily.', color: '#A78BFA', borderColor: 'rgba(167,139,250,0.4)' },
+              { milestone: 'Day 1', deals: '0 deals', desc: 'Knowledge base live. Claude generates collateral grounded in your product, competitors, and case studies from day one.', color: '#4B4565', borderColor: 'rgba(255,255,255,0.08)' },
+              { milestone: '1 month', deals: '6–20 deals', desc: 'ML training begins. Logistic regression activates on 6+ closed deals. Win/loss record, weighted forecast, and competitor patterns all start accumulating.', color: '#6366F1', borderColor: 'rgba(99,102,241,0.25)' },
+              { milestone: '3 months', deals: '20–50 deals', desc: 'K-means archetypes form. Per-competitor mini-models emerge. Stage velocity baselines are set. Composite scores now blend Claude + your model at up to 70% ML weight.', color: '#8B5CF6', borderColor: 'rgba(139,92,246,0.35)' },
+              { milestone: '6 months', deals: '50+ deals', desc: 'Your model has trained LOO cross-validation accuracy, calibration timelines, KNN similarity search, and OLS trend slopes. No tool launched today can replicate this.', color: '#A78BFA', borderColor: 'rgba(167,139,250,0.4)' },
             ].map(({ milestone, deals, desc, color, borderColor }, i) => (
               <div key={milestone} style={{ padding: '20px', borderLeft: i > 0 ? `1px solid rgba(255,255,255,0.06)` : 'none', position: 'relative' }}>
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, border: `2px solid ${borderColor}`, marginBottom: '12px', boxShadow: `0 0 8px ${color}60` }} />
@@ -406,6 +406,41 @@ export default function LandingPage() {
               <div style={{ fontSize: '11px', color: '#555' }}>{sub}</div>
             </div>
           ))}
+        </div>
+
+        {/* ML model breakdown — the real IP */}
+        <div style={{ marginTop: '48px', background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.18)', borderRadius: '16px', padding: '36px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: '20px', padding: '4px 12px', marginBottom: '14px' }}>
+              <Brain size={11} color="#818CF8" />
+              <span style={{ fontSize: '11px', fontWeight: '700', color: '#818CF8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Proprietary ML engine</span>
+            </div>
+            <div style={{ fontSize: '20px', fontWeight: '800', color: '#F0EEFF', letterSpacing: '-0.03em', marginBottom: '8px' }}>Eight models. All trained on your data. None replicable.</div>
+            <div style={{ fontSize: '13px', color: '#7E7A9A', maxWidth: '520px', margin: '0 auto' }}>No external ML infrastructure. Every model runs in your workspace, trained exclusively on your closed deal history.</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            {[
+              { num: '01', title: 'Logistic regression', detail: 'Gradient descent with L2 regularisation on 7 deal features. Outputs win probability [0–1] per open deal.' },
+              { num: '02', title: 'Leave-one-out cross-validation', detail: 'Honest accuracy estimate — trains N times, leaving one deal out each pass. Shows you exactly how predictive your model is.' },
+              { num: '03', title: 'K-nearest neighbours', detail: 'Finds the most similar historical deals by Euclidean distance in feature space. Shows what deals like this one actually resulted in.' },
+              { num: '04', title: 'K-means clustering', detail: 'Deterministic maximin initialisation groups your pipeline into deal archetypes with distinct win rates, values, and characteristics.' },
+              { num: '05', title: 'Per-competitor mini-LR', detail: 'A separate logistic regression per competitor identifies which signals predict wins and losses specifically against each rival.' },
+              { num: '06', title: 'OLS trend regression', detail: 'Ordinary least-squares slope estimation on monthly cohorts detects whether win rate, deal velocity, and competitive threats are improving or declining.' },
+              { num: '07', title: 'Stage velocity quantiles', detail: 'Computes P50/P75 days-to-close from your own won deals, then flags deals that have exceeded normal stage duration for your team.' },
+              { num: '08', title: 'Score calibration timeline', detail: 'Monthly tracking of ML discrimination — the gap between average ML score on winners vs. losers. Measures how predictive your model is becoming.' },
+            ].map(({ num, title, detail }) => (
+              <div key={num} style={{ display: 'flex', gap: '12px', padding: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px' }}>
+                <div style={{ fontSize: '11px', fontWeight: '800', color: '#4B4565', fontVariantNumeric: 'tabular-nums', flexShrink: 0, paddingTop: '2px' }}>{num}</div>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#C4B5FD', marginBottom: '4px', letterSpacing: '-0.01em' }}>{title}</div>
+                  <div style={{ fontSize: '12px', color: '#7E7A9A', lineHeight: '1.55' }}>{detail}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: '20px', padding: '14px 18px', background: 'rgba(139,92,246,0.07)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '10px', fontSize: '12px', color: '#A78BFA', textAlign: 'center' }}>
+            <strong>LLM + ML composite scoring:</strong> Claude scores each meeting independently. The ML model weights the prediction. As your training set grows, ML weight scales from 0% → 70% automatically — the system becomes more accurate as you use it.
+          </div>
         </div>
       </section>
 
