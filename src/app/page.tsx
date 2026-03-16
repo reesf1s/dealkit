@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ArrowRight, Zap, Shield, TrendingUp, CheckCircle, FileText, Users, Target, BookOpen, Mail, ChevronRight } from 'lucide-react'
+import { ArrowRight, Zap, Shield, CheckCircle, FileText, Users, Target, BookOpen, Mail, ChevronRight } from 'lucide-react'
 import ROICalc from '@/components/marketing/ROICalc'
 import FeaturesTab from '@/components/marketing/FeaturesTab'
 

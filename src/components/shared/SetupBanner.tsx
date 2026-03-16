@@ -1,7 +1,6 @@
 'use client'
 
-import { Database, ExternalLink, Copy, Check } from 'lucide-react'
-import { useState } from 'react'
+import { Database, ExternalLink } from 'lucide-react'
 
 interface SetupBannerProps {
   /** If true shows only the compact inline variant (for cards), not the full-page overlay */
@@ -10,15 +9,7 @@ interface SetupBannerProps {
 }
 
 export default function SetupBanner({ inline, context }: SetupBannerProps) {
-  const [copied, setCopied] = useState(false)
-
   const neonUrl = 'https://neon.tech'
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText('DATABASE_URL')
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
 
   if (inline) {
     return (

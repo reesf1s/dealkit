@@ -70,7 +70,6 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
   )
 
   // Active competitors in pipeline
-  const activeComps = [...new Set(openDeals.flatMap(d => (d.dealRisks as string[]) ?? []))]
   const activeCompetitors = [...new Set(openDeals.flatMap(d => (d.competitors as string[]) ?? []))]
 
   const fmt = (v: number) => v >= 1000 ? `£${(v / 1000).toFixed(0)}k` : `£${v}`

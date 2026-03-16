@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Shield, TrendingUp, BookOpen, Target, Sparkles, Brain } from 'lucide-react'
+import { Shield, TrendingUp, Sparkles, Brain } from 'lucide-react'
 
 const TABS = [
   {

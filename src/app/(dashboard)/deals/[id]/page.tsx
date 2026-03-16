@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 
 import useSWR from 'swr'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import * as Dialog from '@radix-ui/react-dialog'
@@ -1613,7 +1613,6 @@ function ProjectPlanTab({ dealId, deal, onUpdate }: { dealId: string; deal: any;
 
 export default function DealDetailPage() {
   const { id } = useParams() as { id: string }
-  const router = useRouter()
   const { data, mutate } = useSWR(id ? `/api/deals/${id}` : null, fetcher)
   const deal = data?.data ?? data
   const { data: gapsData } = useSWR('/api/product-gaps', fetcher)

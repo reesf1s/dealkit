@@ -1,7 +1,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import useSWR from 'swr'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
@@ -18,7 +18,6 @@ const fetcher = (url: string) =>
 
 export default function CompetitorDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const router = useRouter()
   const { toast } = useToast()
 
   const { data: compRes, isLoading: loadingComp, mutate: mutateComp } = useSWR<{ data: Competitor }>(

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ExternalLink, Trash2, Sparkles, MoreHorizontal } from 'lucide-react'
+import { ExternalLink, Trash2, Sparkles } from 'lucide-react'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { ConfirmModal } from '@/components/shared/ConfirmModal'
 import { EmptyState } from '@/components/shared/EmptyState'

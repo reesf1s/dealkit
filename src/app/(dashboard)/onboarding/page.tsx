@@ -103,7 +103,7 @@ export default function OnboardingPage() {
       } else {
         router.push('/dashboard?onboarded=1')
       }
-    } catch (e) {
+    } catch {
       setStep('review')
       setError('Failed to save. Please try again.')
     }

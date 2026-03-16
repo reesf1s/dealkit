@@ -29,7 +29,6 @@ function formatCurrency(value: number): string {
 
 export default function ROIWidget({ deals, collateralCount }: ROIWidgetProps) {
   const wonDeals = deals.filter(d => d.outcome === 'won')
-  const lostDeals = deals.filter(d => d.outcome === 'lost')
   const openDeals = deals.filter(d => d.outcome === 'open')
 
   // Separate one-off won revenue from recurring ARR

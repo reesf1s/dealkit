@@ -6,7 +6,6 @@ import {
   TableRow,
   TableCell,
   HeadingLevel,
-  AlignmentType,
   BorderStyle,
   Packer,
   WidthType,
@@ -32,13 +31,6 @@ const BODY_SIZE = 22 // half-points (11pt)
 const H1_SIZE = 32 // 16pt
 const H2_SIZE = 26 // 13pt
 const MARGIN = convertInchesToTwip(1)
-
-const BORDER_NONE = {
-  top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-  bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-  left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-  right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-}
 
 const BORDER_THIN = {
   top: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' },
