@@ -553,13 +553,36 @@ export default function SettingsPage() {
             {/* Token input — shown when user clicks Connect HubSpot */}
             {showTokenInput && !hubspot?.connected && (
               <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(255,122,0,0.04)', border: '1px solid rgba(255,122,0,0.2)' }}>
-                <p style={{ fontSize: '12px', fontWeight: 600, color: '#F1F1F3', margin: '0 0 6px' }}>Paste your HubSpot Private App token</p>
-                <ol style={{ margin: '0 0 12px', padding: '0 0 0 16px', fontSize: '11px', color: '#888', lineHeight: 1.8 }}>
-                  <li>In HubSpot, go to <strong style={{ color: '#aaa' }}>Settings → Integrations → Private Apps</strong></li>
-                  <li>Click <strong style={{ color: '#aaa' }}>Create a private app</strong></li>
-                  <li>Under Scopes, add: <code style={{ color: '#FF7A00', fontSize: '10px' }}>crm.objects.deals.read</code>, <code style={{ color: '#FF7A00', fontSize: '10px' }}>crm.objects.contacts.read</code>, <code style={{ color: '#FF7A00', fontSize: '10px' }}>crm.objects.companies.read</code></li>
-                  <li>Click <strong style={{ color: '#aaa' }}>Create app</strong> then copy the access token</li>
-                </ol>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <p style={{ fontSize: '12px', fontWeight: 600, color: '#F1F1F3', margin: 0 }}>Connect via Private App token</p>
+                  <a
+                    href="https://app.hubspot.com/private-apps"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 500, color: '#FF7A00', textDecoration: 'none', padding: '3px 8px', borderRadius: '6px', background: 'rgba(255,122,0,0.1)', border: '1px solid rgba(255,122,0,0.25)' }}
+                  >
+                    <ExternalLink size={10} />
+                    Open HubSpot Private Apps
+                  </a>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+                  {[
+                    { n: '1', text: 'Click the link above to open HubSpot Private Apps (or go to Settings → Integrations → Private Apps)' },
+                    { n: '2', text: 'Click Create a private app, give it a name like "DealKit"' },
+                    { n: '3', text: 'On the Scopes tab, enable these 3 read scopes:' },
+                    { n: '4', text: 'Click Create app, then copy the access token and paste it below' },
+                  ].map(({ n, text }) => (
+                    <div key={n} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                      <span style={{ flexShrink: 0, width: '18px', height: '18px', borderRadius: '50%', background: 'rgba(255,122,0,0.15)', border: '1px solid rgba(255,122,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, color: '#FF7A00', marginTop: '1px' }}>{n}</span>
+                      <span style={{ fontSize: '11px', color: '#888', lineHeight: 1.6 }}>{text}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', marginLeft: '26px', flexWrap: 'wrap' }}>
+                  {['crm.objects.deals.read', 'crm.objects.contacts.read', 'crm.objects.companies.read'].map(scope => (
+                    <code key={scope} style={{ fontSize: '10px', color: '#FF7A00', background: 'rgba(255,122,0,0.1)', border: '1px solid rgba(255,122,0,0.25)', borderRadius: '5px', padding: '2px 7px', fontFamily: 'monospace' }}>{scope}</code>
+                  ))}
+                </div>
                 <form onSubmit={handleHubspotConnect} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input
                     type="password"
