@@ -677,7 +677,7 @@ export default function PipelinePage() {
       {/* Kanban board */}
       <div style={{ overflowX: 'auto', paddingBottom: '8px', maxWidth: `calc(100vw - ${sidebarWidth}px - ${aiSidebarWidth}px - 48px)` }}>
         <div style={{ display: 'flex', gap: '12px', minWidth: 'max-content' }}>
-          {activeStages.map(stage => {
+          {activeStages.map((stage: any) => {
             const stageDeals = deals.filter((d: any) => d.stage === stage.id)
             const stageValue = stageDeals.reduce((s: number, d: any) => s + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
             const isDropTarget = dragOverStage === stage.id && draggedId !== null
