@@ -313,13 +313,14 @@ export default function AiChatBar() {
   return (
     <>
       <style>{`
-        @keyframes typingBounce { 0%,60%,100% { transform: translateY(0) } 30% { transform: translateY(-4px) } }
+        @keyframes typingBounce { 0%,60%,100% { transform: translateY(0) } 30% { transform: translateY(-5px) } }
         @keyframes spin { to { transform: rotate(360deg) } }
-        .ai-bar-messages::-webkit-scrollbar { width: 4px }
+        .ai-bar-messages::-webkit-scrollbar { width: 3px }
         .ai-bar-messages::-webkit-scrollbar-track { background: transparent }
-        .ai-bar-messages::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 2px }
-        .ai-msg-user { background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2); }
-        .ai-msg-assistant { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); }
+        .ai-bar-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px }
+        .ai-msg-user { background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.22); }
+        .ai-msg-assistant { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
+        .ai-quick-chip:hover { background: rgba(255,255,255,0.07) !important; border-color: rgba(255,255,255,0.15) !important; color: #E5E7EB !important; }
       `}</style>
 
       <div style={{
@@ -328,36 +329,41 @@ export default function AiChatBar() {
         left: `${sidebarWidth}px`,
         right: 0,
         height: `${barHeight}px`,
-        transition: 'height 0.25s cubic-bezier(0.4,0,0.2,1)',
+        transition: 'height 0.28s cubic-bezier(0.4,0,0.2,1), left 0.22s cubic-bezier(0.4,0,0.2,1)',
         zIndex: 200,
         display: 'flex',
         flexDirection: 'column',
-        background: 'rgba(7,5,15,0.95)',
-        backdropFilter: 'blur(20px)',
-        borderTop: '1px solid rgba(99,102,241,0.2)',
-        boxShadow: isExpanded ? '0 -8px 40px rgba(0,0,0,0.6), 0 -1px 0 rgba(99,102,241,0.1)' : '0 -4px 20px rgba(0,0,0,0.4)',
+        /* Apple glass */
+        background: 'rgba(10, 8, 20, 0.78)',
+        backdropFilter: 'blur(28px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(28px) saturate(160%)',
+        borderTop: '1px solid rgba(255,255,255,0.09)',
+        boxShadow: isExpanded
+          ? '0 -1px 0 rgba(255,255,255,0.04) inset, 0 -20px 60px rgba(0,0,0,0.55), 0 -1px 12px rgba(99,102,241,0.12)'
+          : '0 -1px 0 rgba(255,255,255,0.04) inset, 0 -8px 24px rgba(0,0,0,0.35)',
       }}>
 
         {/* ── Header bar — always visible ── */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          padding: '0 16px',
+          display: 'flex', alignItems: 'center', gap: '8px',
+          padding: '0 14px',
           height: `${COLLAPSED_HEIGHT}px`,
           flexShrink: 0,
           borderBottom: isExpanded ? '1px solid rgba(255,255,255,0.06)' : 'none',
         }}>
-          {/* Icon + label */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          {/* Glass icon pill */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
             <div style={{
-              width: '26px', height: '26px', borderRadius: '7px',
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.3))',
-              border: '1px solid rgba(99,102,241,0.4)',
+              width: '28px', height: '28px', borderRadius: '8px',
+              background: 'linear-gradient(145deg, rgba(120,110,255,0.22), rgba(100,80,220,0.14))',
+              border: '1px solid rgba(255,255,255,0.12)',
+              boxShadow: '0 1px 6px rgba(99,102,241,0.15), inset 0 1px 0 rgba(255,255,255,0.1)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              <Sparkles size={13} color="#818CF8" />
+              <Sparkles size={12} color="#A5B4FC" />
             </div>
             {isExpanded && (
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#818CF8', letterSpacing: '0.02em' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(200,196,255,0.85)', letterSpacing: '0.01em' }}>
                 DealKit AI
               </span>
             )}
@@ -366,33 +372,38 @@ export default function AiChatBar() {
           {/* Active deal badge */}
           {activeDeal && isExpanded && (
             <div style={{
-              fontSize: '10px', color: '#6366F1', background: 'rgba(99,102,241,0.1)',
-              border: '1px solid rgba(99,102,241,0.2)', borderRadius: '100px',
-              padding: '2px 8px', flexShrink: 0,
+              fontSize: '10px', color: '#A5B4FC',
+              background: 'rgba(99,102,241,0.12)',
+              border: '1px solid rgba(99,102,241,0.2)',
+              borderRadius: '100px', padding: '2px 8px', flexShrink: 0,
+              backdropFilter: 'blur(8px)',
             }}>
-              📋 {activeDeal.company}
+              {activeDeal.company}
             </div>
           )}
 
-          {/* Input — shown in both collapsed and expanded */}
+          {/* Input */}
           <div style={{ flex: 1, position: 'relative' }}>
             <textarea
               ref={inputRef}
               value={input}
               onChange={e => setInput(e.target.value)}
-              onFocus={e => { handleInputFocus(); (e.target as HTMLTextAreaElement).style.borderColor = 'rgba(99,102,241,0.5)' }}
-              onBlur={e => ((e.target as HTMLTextAreaElement).style.borderColor = 'rgba(255,255,255,0.08)')}
+              onFocus={e => { handleInputFocus(); (e.target as HTMLTextAreaElement).style.borderColor = 'rgba(130,120,255,0.45)'; (e.target as HTMLTextAreaElement).style.background = 'rgba(255,255,255,0.06)' }}
+              onBlur={e => { (e.target as HTMLTextAreaElement).style.borderColor = 'rgba(255,255,255,0.07)'; (e.target as HTMLTextAreaElement).style.background = 'rgba(255,255,255,0.03)' }}
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
               }}
-              placeholder={activeDeal ? `Ask about ${activeDeal.company}, or anything…` : 'Ask DealKit AI anything… (Enter to send, Shift+Enter for newline)'}
+              placeholder={activeDeal ? `Ask about ${activeDeal.company}…` : 'Ask anything… (Enter to send)'}
               rows={1}
               style={{
-                width: '100%', resize: 'none', background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px',
-                color: '#EBEBEB', fontSize: '13px', lineHeight: '1.5',
-                padding: '8px 12px', outline: 'none', fontFamily: 'inherit',
+                width: '100%', resize: 'none',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.07)',
+                borderRadius: '10px',
+                color: '#E5E7EB', fontSize: '13px', lineHeight: '1.5',
+                padding: '7px 12px', outline: 'none', fontFamily: 'inherit',
                 boxSizing: 'border-box', maxHeight: '80px', overflowY: 'auto',
+                transition: 'border-color 0.15s, background 0.15s',
               }}
             />
           </div>
@@ -400,22 +411,24 @@ export default function AiChatBar() {
           {/* Send / Stop */}
           {(loading || streaming) ? (
             <button onClick={stopStreaming} style={{
-              width: '34px', height: '34px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)',
-              borderRadius: '8px', cursor: 'pointer',
+              width: '32px', height: '32px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
+              borderRadius: '9px', cursor: 'pointer',
             }}>
-              <Square size={13} color="#EF4444" fill="#EF4444" />
+              <Square size={11} color="#F87171" fill="#F87171" />
             </button>
           ) : (
             <button onClick={() => sendMessage()} disabled={!input.trim()} style={{
-              width: '34px', height: '34px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: input.trim() ? 'linear-gradient(135deg, #6366F1, #7C3AED)' : 'rgba(255,255,255,0.04)',
-              border: input.trim() ? 'none' : '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '8px', cursor: input.trim() ? 'pointer' : 'default',
-              boxShadow: input.trim() ? '0 0 12px rgba(99,102,241,0.4)' : 'none',
-              transition: 'all 150ms',
+              width: '32px', height: '32px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: input.trim()
+                ? 'linear-gradient(145deg, rgba(120,110,255,0.9), rgba(100,60,220,0.85))'
+                : 'rgba(255,255,255,0.04)',
+              border: input.trim() ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(255,255,255,0.06)',
+              borderRadius: '9px', cursor: input.trim() ? 'pointer' : 'default',
+              boxShadow: input.trim() ? '0 2px 12px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.18)' : 'none',
+              transition: 'all 180ms cubic-bezier(0.4,0,0.2,1)',
             }}>
-              <Send size={13} color={input.trim() ? '#fff' : '#555'} />
+              <Send size={12} color={input.trim() ? '#fff' : '#444'} />
             </button>
           )}
 
@@ -423,28 +436,28 @@ export default function AiChatBar() {
           <button
             onClick={toggleAiCollapsed}
             style={{
-              width: '30px', height: '30px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'none', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '7px', cursor: 'pointer', color: '#555', transition: 'all 120ms',
+              width: '28px', height: '28px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+              borderRadius: '8px', cursor: 'pointer', color: '#4B5563', transition: 'all 140ms',
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'; e.currentTarget.style.color = '#818CF8' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#555' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(130,120,255,0.3)'; e.currentTarget.style.color = '#A5B4FC'; e.currentTarget.style.background = 'rgba(99,102,241,0.08)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.color = '#4B5563'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
             title={isExpanded ? 'Collapse' : 'Expand chat'}
           >
-            {isExpanded ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+            {isExpanded ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
           </button>
 
-          {/* Clear — only shown in expanded with messages */}
+          {/* Clear */}
           {isExpanded && messages.length > 0 && (
             <button onClick={clearChat} style={{
-              width: '26px', height: '26px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'none', border: 'none', cursor: 'pointer', color: '#374151',
+              width: '24px', height: '24px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'none', border: 'none', cursor: 'pointer', color: '#374151', transition: 'color 140ms',
             }}
               title="Clear conversation"
-              onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
+              onMouseEnter={e => (e.currentTarget.style.color = '#F87171')}
               onMouseLeave={e => (e.currentTarget.style.color = '#374151')}
             >
-              <X size={12} />
+              <X size={11} />
             </button>
           )}
         </div>
@@ -454,19 +467,20 @@ export default function AiChatBar() {
           <div
             className="ai-bar-messages"
             style={{
-              flex: 1, overflowY: 'auto', padding: '12px 16px',
-              display: 'flex', flexDirection: 'column', gap: '10px',
+              flex: 1, overflowY: 'auto', padding: '10px 14px 4px',
+              display: 'flex', flexDirection: 'column', gap: '8px',
             }}
           >
             {messages.length === 0 && !streaming && (
-              <div>
-                <div style={{ fontSize: '11px', color: '#374151', marginBottom: '10px', textAlign: 'center' }}>
-                  Your AI sales command centre — ask anything or pick a quick action:
+              <div style={{ paddingTop: '2px' }}>
+                <div style={{ fontSize: '11px', color: '#4B5563', marginBottom: '8px', textAlign: 'center', letterSpacing: '0.01em' }}>
+                  Ask anything or pick a quick action
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', justifyContent: 'center' }}>
                   {QUICK_PROMPTS.map(qp => (
                     <button
                       key={qp.label}
+                      className="ai-quick-chip"
                       onClick={() => {
                         setInput(qp.prompt)
                         inputRef.current?.focus()
@@ -474,15 +488,15 @@ export default function AiChatBar() {
                         sendMessage(qp.prompt)
                       }}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: '5px',
-                        padding: '5px 10px', borderRadius: '100px', cursor: 'pointer',
-                        background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-                        color: '#9CA3AF', fontSize: '11px', fontWeight: 500, transition: 'all 120ms',
+                        display: 'flex', alignItems: 'center', gap: '4px',
+                        padding: '4px 9px', borderRadius: '100px', cursor: 'pointer',
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        color: '#6B7280', fontSize: '11px', fontWeight: 500,
+                        transition: 'all 140ms',
                       }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = `${qp.color}40`; e.currentTarget.style.color = qp.color }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#9CA3AF' }}
                     >
-                      <qp.icon size={10} color="currentColor" />
+                      <qp.icon size={9} color="currentColor" />
                       {qp.label}
                     </button>
                   ))}
@@ -490,25 +504,27 @@ export default function AiChatBar() {
               </div>
             )}
 
+            {/* AI avatar shared style */}
             {messages.map((msg, i) => (
-              <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+              <div key={i} style={{ display: 'flex', gap: '7px', alignItems: 'flex-start' }}>
                 {msg.role === 'assistant' && (
                   <div style={{
-                    width: '22px', height: '22px', flexShrink: 0, marginTop: '2px',
-                    background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.3))',
-                    border: '1px solid rgba(99,102,241,0.3)', borderRadius: '6px',
+                    width: '20px', height: '20px', flexShrink: 0, marginTop: '2px',
+                    background: 'linear-gradient(145deg, rgba(120,110,255,0.2), rgba(100,80,220,0.12))',
+                    border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px',
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <Sparkles size={11} color="#818CF8" />
+                    <Sparkles size={10} color="#A5B4FC" />
                   </div>
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className={msg.role === 'user' ? 'ai-msg-user' : 'ai-msg-assistant'} style={{
-                    borderRadius: '10px', padding: '8px 12px',
-                    ...(msg.role === 'user' ? { marginLeft: '24px' } : {}),
+                    borderRadius: '10px', padding: '7px 11px',
+                    ...(msg.role === 'user' ? { marginLeft: '20px' } : {}),
                   }}>
                     {msg.role === 'user'
-                      ? <p style={{ fontSize: '13px', color: '#C7D2FE', margin: 0, lineHeight: 1.5 }}>{msg.content}</p>
+                      ? <p style={{ fontSize: '13px', color: '#C7D2FE', margin: 0, lineHeight: 1.55 }}>{msg.content}</p>
                       : <MsgContent content={msg.content} />
                     }
                   </div>
@@ -519,16 +535,17 @@ export default function AiChatBar() {
 
             {/* Streaming in progress */}
             {(loading || streaming) && (
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', gap: '7px', alignItems: 'flex-start' }}>
                 <div style={{
-                  width: '22px', height: '22px', flexShrink: 0, marginTop: '2px',
-                  background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.3))',
-                  border: '1px solid rgba(99,102,241,0.3)', borderRadius: '6px',
+                  width: '20px', height: '20px', flexShrink: 0, marginTop: '2px',
+                  background: 'linear-gradient(145deg, rgba(120,110,255,0.2), rgba(100,80,220,0.12))',
+                  border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <Sparkles size={11} color="#818CF8" />
+                  <Sparkles size={10} color="#A5B4FC" />
                 </div>
-                <div className="ai-msg-assistant" style={{ flex: 1, borderRadius: '10px', padding: '8px 12px' }}>
+                <div className="ai-msg-assistant" style={{ flex: 1, borderRadius: '10px', padding: '7px 11px' }}>
                   {streamingText ? <MsgContent content={streamingText} /> : <TypingDots />}
                 </div>
               </div>
@@ -537,9 +554,6 @@ export default function AiChatBar() {
           </div>
         )}
       </div>
-
-      {/* Spacer so page content isn't hidden behind the bar */}
-      <div style={{ height: `${barHeight}px`, transition: 'height 0.25s cubic-bezier(0.4,0,0.2,1)', flexShrink: 0 }} />
     </>
   )
 }

@@ -7,7 +7,8 @@ import CommandPalette from '@/components/shared/CommandPalette'
 import { SidebarProvider, useSidebar } from '@/components/layout/SidebarContext'
 
 function LayoutShell({ children }: { children: React.ReactNode }) {
-  const { sidebarWidth } = useSidebar()
+  const { sidebarWidth, aiCollapsed } = useSidebar()
+  const bottomPad = aiCollapsed ? 72 : 476
 
   return (
     <div style={{
@@ -50,7 +51,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
         paddingTop: '56px',
         transition: 'margin-left 0.22s cubic-bezier(0.4,0,0.2,1)',
       }}>
-        <div style={{ flex: 1, padding: '24px', width: '100%', boxSizing: 'border-box' }}>
+        <div style={{ flex: 1, padding: '24px', width: '100%', boxSizing: 'border-box', paddingBottom: `${bottomPad}px`, transition: 'padding-bottom 0.25s cubic-bezier(0.4,0,0.2,1)' }}>
           {children}
         </div>
       </main>
