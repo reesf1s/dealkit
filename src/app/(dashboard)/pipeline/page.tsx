@@ -3,12 +3,12 @@ export const dynamic = 'force-dynamic'
 
 import useSWR, { mutate } from 'swr'
 import Link from 'next/link'
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useSidebar } from '@/components/layout/SidebarContext'
 import {
   Plus, TrendingUp, DollarSign, ChevronRight, Sparkles,
   CheckSquare, Square, MoreHorizontal, Target, Zap, ArrowUpRight,
-  AlertCircle, Star, GripVertical, AlertTriangle, Clock,
+  Star, AlertTriangle, Clock,
   Settings, Edit, X, Trash2, Check
 } from 'lucide-react'
 

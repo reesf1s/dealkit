@@ -927,7 +927,7 @@ async function handleProjectPlan(
   // Find which deal to associate this plan with
   const dealRows = await db.select({
     id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
-    stage: dealLogs.stage, projectPlan: dealLogs.projectPlan,
+    stage: dealLogs.stage, projectPlan: dealLogs.projectPlan, todos: dealLogs.todos,
   }).from(dealLogs).where(and(eq(dealLogs.workspaceId, workspaceId), sql`${dealLogs.stage} NOT IN ('closed_won', 'closed_lost')`)).limit(20)
 
   const lowerText = text.toLowerCase()

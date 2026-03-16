@@ -10,7 +10,7 @@ import {
   ArrowLeft, Sparkles, CheckSquare, Square, Plus, Target, Loader2,
   FileText, Clipboard, ChevronDown, TrendingUp, DollarSign, Calendar,
   Building2, User, Edit, Trash2, MoreHorizontal, CheckCircle, X, Link2, Check,
-  Mail, Sword, Zap, Layers, ClipboardList
+  Mail, Sword, Zap, Layers
 } from 'lucide-react'
 import type { DealContact } from '@/types'
 import { useSidebar } from '@/components/layout/SidebarContext'
