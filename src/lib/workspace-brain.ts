@@ -13,7 +13,7 @@
  * - keyPatterns: recurring risk/objection themes across the pipeline
  */
 import { db } from '@/lib/db'
-import { dealLogs } from '@/lib/db/schema'
+import { dealLogs, competitors as competitorRecords } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 
 export interface DealSnapshot {
@@ -42,7 +42,7 @@ export interface WorkspaceBrain {
     stageBreakdown: Record<string, number>
   }
   topRisks: string[]            // deduplicated across all active deals
-  keyPatterns: { label: string; dealIds: string[]; companies: string[]; dealNames: string[] }[]         // recurring themes detected automatically
+  keyPatterns: { label: string; dealIds: string[]; companies: string[]; dealNames: string[]; competitorNames?: string[] }[]  // recurring themes detected automatically
   urgentDeals: {                // deals needing attention soon
     dealId: string
     dealName: string
@@ -115,6 +115,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
       dealValue: dealLogs.dealValue,
       conversionScore: dealLogs.conversionScore,
       dealRisks: dealLogs.dealRisks,
+      dealCompetitors: dealLogs.competitors,
       todos: dealLogs.todos,
       aiSummary: dealLogs.aiSummary,
       updatedAt: dealLogs.updatedAt,
@@ -244,14 +245,52 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
       return theme.keywords.some(kw => allText.includes(kw))
     })
     if (matchingDeals.length >= 2) {
+      // For competitor pressure: surface the actual named competitors from those deals
+      const competitorNames = theme.label === 'competitor pressure'
+        ? [...new Set(matchingDeals.flatMap(d => (d.dealCompetitors as string[]) ?? []).filter(Boolean))]
+        : undefined
       keyPatterns.push({
         label: theme.label,
         dealIds: matchingDeals.map(d => d.id),
         companies: matchingDeals.map(d => d.prospectCompany),
         dealNames: matchingDeals.map(d => d.dealName),
+        ...(competitorNames && competitorNames.length > 0 ? { competitorNames } : {}),
       })
     }
   }
+
+  // ── Auto-create competitor stubs for any named competitors in active deals ─
+  // This ensures every competitor mentioned in a deal appears in the Intelligence hub.
+  try {
+    const allCompetitorNames = [
+      ...new Set(activeDeals.flatMap(d => (d.dealCompetitors as string[]) ?? []).filter(Boolean)),
+    ]
+    if (allCompetitorNames.length > 0) {
+      // Fetch existing competitor names for this workspace
+      const existingRows = await db
+        .select({ name: competitorRecords.name })
+        .from(competitorRecords)
+        .where(eq(competitorRecords.workspaceId, workspaceId))
+      const existingNames = new Set(existingRows.map(r => r.name.toLowerCase()))
+      const newNames = allCompetitorNames.filter(n => !existingNames.has(n.toLowerCase()))
+      if (newNames.length > 0) {
+        const nowTs = new Date()
+        await db.insert(competitorRecords).values(
+          newNames.map(name => ({
+            workspaceId,
+            name,
+            notes: 'Auto-added from deal tracking — add details to build a battlecard.',
+            strengths: [],
+            weaknesses: [],
+            keyFeatures: [],
+            differentiators: [],
+            createdAt: nowTs,
+            updatedAt: nowTs,
+          }))
+        )
+      }
+    }
+  } catch { /* non-fatal — competitor auto-create is best-effort */ }
 
   // ── Proactive: suggested collateral ───────────────────────────────────────
   const suggestedCollateral: WorkspaceBrain['suggestedCollateral'] = []

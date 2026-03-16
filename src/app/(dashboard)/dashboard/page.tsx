@@ -293,13 +293,29 @@ export default function DashboardPage() {
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 {(brain.keyPatterns as any[]).slice(0, 4).map((p: any, i: number) => {
                   const companies = p.companies ?? []
+                  const competitorNames: string[] = p.competitorNames ?? []
+                  const isCompetitor = p.label === 'competitor pressure'
                   const isLast = i === Math.min(brain.keyPatterns.length, 4) - 1
                   return (
                     <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '9px 14px', borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.04)' }}>
                       <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#A855F7', flexShrink: 0, marginTop: '4px' }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: '12px', color: '#E5E7EB', fontWeight: 500, textTransform: 'capitalize' }}>{p.label}</div>
-                        {companies.length > 0 && (
+                        {/* Competitor pressure — show actual competitor names */}
+                        {isCompetitor && competitorNames.length > 0 ? (
+                          <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
+                            {competitorNames.slice(0, 4).map((name: string) => (
+                              <Link key={name} href="/competitors" style={{
+                                fontSize: '10px', fontWeight: 600, color: '#F87171',
+                                background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.15)',
+                                padding: '1px 7px', borderRadius: '100px', textDecoration: 'none',
+                              }}>{name}</Link>
+                            ))}
+                            {competitorNames.length > 4 && (
+                              <span style={{ fontSize: '10px', color: '#555' }}>+{competitorNames.length - 4} more</span>
+                            )}
+                          </div>
+                        ) : companies.length > 0 && (
                           <div style={{ fontSize: '11px', color: '#555', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {companies.slice(0, 3).join(', ')}{companies.length > 3 ? ` +${companies.length - 3} more` : ''}
                           </div>

@@ -45,6 +45,21 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
     }
   }
 
+  // Delete a single entry from the structured history (lines starting with [date])
+  const deleteEntry = async (entryIndex: number) => {
+    if (!deal?.meetingNotes) return
+    const lines = (deal.meetingNotes as string).split('\n').filter((l: string) => l.trim())
+    const entries = lines.filter((l: string) => /^\[\d/.test(l))
+    const legacy = lines.filter((l: string) => !/^\[\d/.test(l))
+    const updatedEntries = entries.filter((_: string, i: number) => i !== entryIndex)
+    const updated = [...legacy, ...updatedEntries].join('\n') || null
+    await fetch(`/api/deals/${dealId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ meetingNotes: updated }),
+    })
+    onUpdate()
+  }
+
   const analyze = async () => {
     if (!notes.trim()) return
     setLoading(true)
@@ -116,8 +131,19 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
                   const date = dateMatch?.[1] ?? ''
                   const body = entry.slice(dateMatch?.[0].length ?? 0).trim()
                   return (
-                    <div key={i} style={{ padding: '9px 12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-                      <div style={{ fontSize: '10px', fontWeight: 700, color: '#555', letterSpacing: '0.04em', marginBottom: '4px', textTransform: 'uppercase' }}>{date}</div>
+                    <div key={i} style={{ padding: '9px 12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', position: 'relative' }}
+                      onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.entry-del') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
+                      onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.entry-del') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <div style={{ fontSize: '10px', fontWeight: 700, color: '#555', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{date}</div>
+                        <button
+                          className="entry-del"
+                          onClick={() => deleteEntry(i)}
+                          style={{ opacity: 0, fontSize: '10px', color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', padding: '1px 4px', borderRadius: '3px', transition: 'opacity 0.15s' }}
+                          title="Remove this entry"
+                        >✕ remove</button>
+                      </div>
                       <div style={{ fontSize: '12px', color: '#888', lineHeight: 1.6 }}>{body}</div>
                     </div>
                   )
