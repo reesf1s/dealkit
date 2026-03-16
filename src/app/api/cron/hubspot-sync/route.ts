@@ -11,7 +11,6 @@ export const maxDuration = 300 // 5 min — may sync many workspaces
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { hubspotIntegrations } from '@/lib/db/schema'
-import { workspaces } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import { syncHubspotDeals } from '@/lib/hubspot-sync'
 
@@ -26,13 +25,11 @@ export async function GET(req: NextRequest) {
   }
 
   // Find all connected integrations — join workspaces to get owner_id as the userId
-  const rows = await db.execute(sql`
+  const integrations = await db.execute(sql`
     SELECT hi.workspace_id, w.owner_id AS user_id
     FROM hubspot_integrations hi
     JOIN workspaces w ON w.id = hi.workspace_id
-  `) as { rows: { workspace_id: string; user_id: string }[] }
-
-  const integrations = rows.rows ?? []
+  `) as unknown as { workspace_id: string; user_id: string }[]
   const results: { workspaceId: string; ok: boolean; dealsImported?: number; error?: string }[] = []
 
   for (const { workspace_id, user_id } of integrations) {
