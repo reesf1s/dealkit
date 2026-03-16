@@ -176,8 +176,10 @@ function MsgContent({ content }: { content: string }) {
 }
 
 function renderInline(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\[([^\]]+)\]\(([^)]+)\))/)
+  // Use a single capture group (no nested groups) so split never produces undefined entries
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/)
   return parts.map((part, i) => {
+    if (!part) return null
     if (part.startsWith('**') && part.endsWith('**')) return <strong key={i} style={{ color: '#EBEBEB', fontWeight: 600 }}>{part.slice(2, -2)}</strong>
     if (part.startsWith('`') && part.endsWith('`')) return <code key={i} style={{ background: 'rgba(99,102,241,0.15)', padding: '1px 5px', borderRadius: '3px', fontSize: '12px', color: '#A5B4FC' }}>{part.slice(1, -1)}</code>
     const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
