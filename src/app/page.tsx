@@ -355,7 +355,7 @@ export default function LandingPage() {
               icon: BarChart3,
               color: '#8B5CF6',
               title: 'ML models, not just AI prompts',
-              desc: 'Eight distinct models run on your closed deal history: logistic regression for win probability, k-nearest neighbours for deal similarity, k-means for pipeline archetypes, OLS regression for trend detection, per-competitor mini-models, stage velocity quantiles, LOO cross-validation, and monthly score calibration. All computed in your workspace.',
+              desc: 'Nine distinct models run on your closed deal history: win probability scoring, deal similarity search, pipeline archetype clustering, trend detection, close-date prediction, per-competitor modelling, stage velocity profiling, cross-validation accuracy tracking, and monthly score calibration. All computed in your workspace.',
             },
             {
               icon: Brain,
@@ -415,12 +415,12 @@ export default function LandingPage() {
               <Brain size={11} color="#818CF8" />
               <span style={{ fontSize: '11px', fontWeight: '700', color: '#818CF8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Proprietary ML engine</span>
             </div>
-            <div style={{ fontSize: '20px', fontWeight: '800', color: '#F0EEFF', letterSpacing: '-0.03em', marginBottom: '8px' }}>Eight models. All trained on your data. None replicable.</div>
+            <div style={{ fontSize: '20px', fontWeight: '800', color: '#F0EEFF', letterSpacing: '-0.03em', marginBottom: '8px' }}>Nine models. All trained on your data. None replicable.</div>
             <div style={{ fontSize: '13px', color: '#7E7A9A', maxWidth: '520px', margin: '0 auto' }}>No external ML infrastructure. Every model runs in your workspace, trained exclusively on your closed deal history.</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             {[
-              { num: '01', title: 'Logistic regression', detail: 'Gradient descent with L2 regularisation on 7 deal features. Outputs win probability [0–1] per open deal.' },
+              { num: '01', title: 'Logistic regression', detail: 'Trained on 10 deal signals extracted from your pipeline. Outputs a win probability [0–1] per open deal, calibrated entirely against your own closed history.' },
               { num: '02', title: 'Leave-one-out cross-validation', detail: 'Honest accuracy estimate — trains N times, leaving one deal out each pass. Shows you exactly how predictive your model is.' },
               { num: '03', title: 'K-nearest neighbours', detail: 'Finds the most similar historical deals by Euclidean distance in feature space. Shows what deals like this one actually resulted in.' },
               { num: '04', title: 'K-means clustering', detail: 'Deterministic maximin initialisation groups your pipeline into deal archetypes with distinct win rates, values, and characteristics.' },
@@ -428,6 +428,7 @@ export default function LandingPage() {
               { num: '06', title: 'OLS trend regression', detail: 'Ordinary least-squares slope estimation on monthly cohorts detects whether win rate, deal velocity, and competitive threats are improving or declining.' },
               { num: '07', title: 'Stage velocity quantiles', detail: 'Computes P50/P75 days-to-close from your own won deals, then flags deals that have exceeded normal stage duration for your team.' },
               { num: '08', title: 'Score calibration timeline', detail: 'Monthly tracking of ML discrimination — the gap between average ML score on winners vs. losers. Measures how predictive your model is becoming.' },
+              { num: '09', title: 'Close-date regression', detail: 'OLS regression trained on your won deals, predicting days-to-close for every open deal. Drives probability-weighted monthly revenue forecasts automatically.' },
             ].map(({ num, title, detail }) => (
               <div key={num} style={{ display: 'flex', gap: '12px', padding: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px' }}>
                 <div style={{ fontSize: '11px', fontWeight: '800', color: '#4B4565', fontVariantNumeric: 'tabular-nums', flexShrink: 0, paddingTop: '2px' }}>{num}</div>
@@ -442,6 +443,121 @@ export default function LandingPage() {
             <strong>LLM + ML composite scoring:</strong> Claude scores each meeting independently. The ML model weights the prediction. As your training set grows, ML weight scales from 0% → 70% automatically — the system becomes more accurate as you use it.
           </div>
         </div>
+
+        {/* === WHAT THE INTELLIGENCE POWERS === */}
+        <div style={{ marginTop: '48px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '36px' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '20px', padding: '4px 12px', marginBottom: '14px' }}>
+              <Zap size={11} color="#4ADE80" />
+              <span style={{ fontSize: '11px', fontWeight: '700', color: '#4ADE80', textTransform: 'uppercase', letterSpacing: '0.08em' }}>ML-powered capabilities</span>
+            </div>
+            <div style={{ fontSize: '22px', fontWeight: '800', color: '#F0EEFF', letterSpacing: '-0.03em', marginBottom: '10px' }}>The brain does more than score deals</div>
+            <div style={{ fontSize: '14px', color: '#7E7A9A', maxWidth: '580px', margin: '0 auto', lineHeight: '1.6' }}>
+              Every layer of DealKit — from the daily briefing to your pipeline forecast — runs on models trained entirely on your data. Here&apos;s what the intelligence actively powers.
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+            {[
+              {
+                icon: '🎯',
+                title: 'Deal win probability',
+                desc: 'A continuously updated probability score for every open deal, trained against your own won and lost deals — not industry benchmarks. The signal grows stronger as your deal history accumulates.',
+                badge: 'Logistic regression',
+                badgeColor: '#6366F1',
+              },
+              {
+                icon: '📊',
+                title: 'Pipeline health index',
+                desc: 'A single 0–100 composite score for your entire pipeline, blending stage distribution, deal velocity, engagement signals from meeting notes, and deal momentum. Surfaced every morning in your AI briefing.',
+                badge: 'Composite model',
+                badgeColor: '#8B5CF6',
+              },
+              {
+                icon: '📆',
+                title: 'Revenue forecasting',
+                desc: 'Predicted close dates for every open deal feed a probability-weighted monthly revenue forecast. No manual date entries — the model infers expected timelines from patterns in your historical wins.',
+                badge: 'Close-date regression',
+                badgeColor: '#A78BFA',
+              },
+              {
+                icon: '📉',
+                title: 'Trend detection',
+                desc: 'Slope estimation on monthly cohorts automatically surfaces whether your win rate, average deal velocity, or competitive record is improving or deteriorating — before it shows up in quota.',
+                badge: 'OLS regression',
+                badgeColor: '#22C55E',
+              },
+              {
+                icon: '⚠️',
+                title: 'Deterioration alerts',
+                desc: 'The system reads the sentiment arc of your meeting notes over time. If recent notes on a deal have turned meaningfully more negative than earlier ones, it flags the deal before you miss the signal.',
+                badge: 'NLP signal analysis',
+                badgeColor: '#F59E0B',
+              },
+              {
+                icon: '🏆',
+                title: 'Competitive intelligence',
+                desc: 'Per-competitor models track which deal signals predict beating or losing to each rival. Battlecards automatically reflect the latest win/loss patterns — not static research from six months ago.',
+                badge: 'Per-rival modelling',
+                badgeColor: '#EF4444',
+              },
+            ].map(({ icon, title, desc, badge, badgeColor }) => (
+              <div key={title} style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ fontSize: '22px', lineHeight: 1 }}>{icon}</div>
+                  <div style={{ fontSize: '9px', fontWeight: '700', color: badgeColor, background: `${badgeColor}14`, border: `1px solid ${badgeColor}30`, padding: '2px 7px', borderRadius: '100px', whiteSpace: 'nowrap', letterSpacing: '0.02em' }}>{badge}</div>
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF', letterSpacing: '-0.02em' }}>{title}</div>
+                <div style={{ fontSize: '12px', color: '#7E7A9A', lineHeight: '1.6', flex: 1 }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            {[
+              {
+                icon: '🔍',
+                title: 'Deal archetypes & similarity',
+                desc: 'Your closed deals are clustered into distinct archetypes — high-velocity SMB, multi-stakeholder enterprise, competitive displacement, and so on. Every new deal is matched to its closest historical cluster, so you immediately know its typical conversion rate, deal size, and timeline. No generic benchmarks.',
+                badge: 'K-means + KNN',
+                badgeColor: '#6366F1',
+              },
+              {
+                icon: '📝',
+                title: 'Meeting note intelligence',
+                desc: 'Every note you log is analysed for engagement depth, next-step clarity, stakeholder coverage, champion signals, and objection patterns — without sending anything to an external AI model. This drives the engagement signals fed into every ML model, making note-keeping directly improve your score accuracy.',
+                badge: 'NLP signal extraction',
+                badgeColor: '#8B5CF6',
+              },
+            ].map(({ icon, title, desc, badge, badgeColor }) => (
+              <div key={title} style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ fontSize: '22px', lineHeight: 1 }}>{icon}</div>
+                  <div style={{ fontSize: '9px', fontWeight: '700', color: badgeColor, background: `${badgeColor}14`, border: `1px solid ${badgeColor}30`, padding: '2px 7px', borderRadius: '100px', whiteSpace: 'nowrap', letterSpacing: '0.02em' }}>{badge}</div>
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF', letterSpacing: '-0.02em' }}>{title}</div>
+                <div style={{ fontSize: '12px', color: '#7E7A9A', lineHeight: '1.6' }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* The AI / ML split — how Claude fits in */}
+          <div style={{ marginTop: '20px', background: 'linear-gradient(135deg, rgba(14,10,32,0.98), rgba(18,12,38,0.98))', border: '1px solid rgba(139,92,246,0.25)', borderRadius: '14px', padding: '28px 32px', display: 'flex', gap: '32px', alignItems: 'flex-start' }}>
+            <div style={{ flexShrink: 0, width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🧠</div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '800', color: '#F0EEFF', letterSpacing: '-0.02em', marginBottom: '8px' }}>How Claude fits in — and why it&apos;s just the wrapper</div>
+              <div style={{ fontSize: '13px', color: '#7E7A9A', lineHeight: '1.7', maxWidth: '680px' }}>
+                Claude (the LLM) never makes a prediction. It reads the structured output of every ML model — win probability, pipeline health index, deterioration flags, competitive patterns, predicted close dates — and writes 2–3 sentences narrating what the data says. All intelligence originates from models trained on your deals. Claude just translates that into language you can act on.
+              </div>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '14px', flexWrap: 'wrap' }}>
+                {['ML models decide the truth', 'Claude explains it clearly', 'Your data trains everything', 'No generic AI outputs'].map(tag => (
+                  <div key={tag} style={{ fontSize: '11px', color: '#A78BFA', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', padding: '3px 10px', borderRadius: '100px', fontWeight: '600' }}>{tag}</div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
       </section>
 
       {/* Features tab */}
