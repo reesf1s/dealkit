@@ -193,6 +193,8 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
       prospectCompany: dealLogs.prospectCompany,
       stage: dealLogs.stage,
       dealValue: dealLogs.dealValue,
+      dealType: dealLogs.dealType,
+      recurringInterval: dealLogs.recurringInterval,
       conversionScore: dealLogs.conversionScore,
       dealRisks: dealLogs.dealRisks,
       dealCompetitors: dealLogs.competitors,
@@ -669,10 +671,17 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     const lossCount = lostDeals.length
     const winRate   = totalClosed > 0 ? Math.round((winCount / totalClosed) * 100) : 0
 
-    // Average value of won deals
+    // Average annualised value of won deals (consistent with dashboard KPIs)
+    function annualiseWon(value: number, dealType: string | null, recurringInterval: string | null): number {
+      if (!value) return 0
+      if (dealType !== 'recurring') return value
+      if (recurringInterval === 'monthly') return value * 12
+      if (recurringInterval === 'quarterly') return value * 4
+      return value
+    }
     const wonWithVal = wonDeals.filter(d => d.dealValue != null && d.dealValue > 0)
     const avgWonValue = wonWithVal.length > 0
-      ? Math.round(wonWithVal.reduce((s, d) => s + (d.dealValue ?? 0), 0) / wonWithVal.length)
+      ? Math.round(wonWithVal.reduce((s, d) => s + annualiseWon(d.dealValue ?? 0, d.dealType ?? null, d.recurringInterval ?? null), 0) / wonWithVal.length)
       : 0
 
     // Average deal cycle: createdAt → wonDate
@@ -744,9 +753,17 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
   }
 
   // ── Deal Velocity: probability-adjusted forecast from active pipeline ────────
+  // Annualise recurring values so forecast is on the same scale as pipeline KPIs
+  function annualiseVal(value: number, dealType: string | null, recurringInterval: string | null): number {
+    if (!value) return 0
+    if (dealType !== 'recurring') return value
+    if (recurringInterval === 'monthly') return value * 12
+    if (recurringInterval === 'quarterly') return value * 4
+    return value
+  }
   const forecastDeals = activeDeals.filter(d => d.dealValue && d.dealValue > 0 && d.conversionScore != null)
   const weightedForecast = Math.round(
-    forecastDeals.reduce((s, d) => s + (d.dealValue! * (d.conversionScore! / 100)), 0)
+    forecastDeals.reduce((s, d) => s + (annualiseVal(d.dealValue!, d.dealType ?? null, d.recurringInterval ?? null) * (d.conversionScore! / 100)), 0)
   )
   const dealVelocity: WorkspaceBrain['dealVelocity'] = {
     weightedForecast,

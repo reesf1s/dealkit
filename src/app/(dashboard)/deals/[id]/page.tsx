@@ -1783,7 +1783,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate }: { dealId: string; deal: any;
   )
 }
 
-function OverviewTab({ dealId, deal, dealGaps, onUpdate }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void }) {
+function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$' }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void; currencySymbol?: string }) {
   const [editingSummary, setEditingSummary] = useState(false)
   const [summaryDraft, setSummaryDraft] = useState('')
   const [resetAIConfirm, setResetAIConfirm] = useState(false)
@@ -2185,7 +2185,7 @@ export default function DealDetailPage() {
       ) : (
         <div>
           {activeTab === 'overview' && (
-            <OverviewTab dealId={id} deal={deal} dealGaps={dealGaps} onUpdate={() => mutate()} />
+            <OverviewTab dealId={id} deal={deal} dealGaps={dealGaps} onUpdate={() => mutate()} currencySymbol={currencySymbol} />
           )}
           {activeTab === 'meeting-notes' && (
             <MeetingNotesTab dealId={id} deal={deal} onUpdate={() => mutate()} onSwitchToPrep={() => setActiveTab('prep')} />
