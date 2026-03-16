@@ -537,7 +537,7 @@ export default function DashboardPage() {
                 <div style={{ background: 'rgba(107,114,128,0.05)', border: '1px solid rgba(107,114,128,0.12)', borderRadius: '12px', padding: '14px 16px' }}>
                   <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>Loss Patterns</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {(wl!.topLossReasons ?? []).slice(0, 4).map((r, ri) => (
+                    {(wl!.topLossReasons ?? []).slice(0, 4).map((r: string, ri: number) => (
                       <div key={ri} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
                         <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#EF4444', flexShrink: 0, marginTop: '4px' }} />
                         <span style={{ fontSize: '11px', color: '#9CA3AF', lineHeight: 1.4 }}>{r}</span>
