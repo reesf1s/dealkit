@@ -229,13 +229,90 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
   // ── Proactive: key patterns — recurring risk themes ────────────────────────
   // Count keyword frequency across all risk strings; surface themes seen in 2+ deals
   const riskWords = [
-    { label: 'budget concerns', keywords: ['budget', 'expensive', 'pricing', 'cost concern', 'cost is', 'price is', 'too expensive', 'affordab'] },
-    { label: 'slow responses / disengagement', keywords: ['unresponsive', 'ghosted', 'disengaged', 'no reply', 'not responding', 'gone quiet', 'delayed response', 'slow to respond'] },
-    { label: 'competitor pressure', keywords: ['competitor', 'competing solution', 'rival', 'switching from', 'already using', 'evaluating others', 'other vendors', 'shortlist'] },
-    { label: 'unclear decision-maker', keywords: ['unclear who', 'decision maker', 'no champion', 'no sponsor', 'approver unknown', 'committee approval', 'board approval', 'needs sign-off', 'unclear authority'] },
-    { label: 'timeline slippage', keywords: ['delayed', 'postponed', 'pushed back', 'slipped', 'no deadline', 'timeline unclear', 'timeline at risk'] },
-    { label: 'procurement / legal blockers', keywords: ['procurement', 'legal review', 'compliance review', 'security review', 'contract review', 'legal blocker', 'legal hold'] },
-    { label: 'internal competing priorities', keywords: ['competing priorities', 'bandwidth issue', 'deprioritised', 'deprioritized', 'resource constrained', 'internal blocker', 'other projects'] },
+    {
+      label: 'budget concerns',
+      keywords: [
+        'budget', 'expensive', 'pricing', 'cost concern', 'cost is', 'price is',
+        'too expensive', 'affordab', 'no budget', 'limited budget', 'tight budget',
+        'budget freeze', 'budget cut', 'budget approval', 'finance team', 'cfo approval',
+        'justify the cost', 'commercial approval', 'value for money', 'cost-benefit',
+        'roi', 'return on investment', 'over budget', 'financial approval', 'spend approval',
+        'not approved', 'waiting on budget', 'budget not confirmed',
+      ],
+    },
+    {
+      label: 'slow responses / disengagement',
+      keywords: [
+        'unresponsive', 'ghosted', 'disengaged', 'no reply', 'not responding',
+        'gone quiet', 'delayed response', 'slow to respond', 'no show', 'missed meeting',
+        'cancelled meeting', 'rescheduled again', 'hard to reach', 'radio silence',
+        'lost momentum', 'cooling off', 'less engaged', 'not engaged',
+        'haven\'t heard back', 'waiting for response', 'no feedback', 'ignoring',
+        'no follow through', 'hard to get hold', 'hard to get hold of', 'difficult to reach',
+        'not returning', 'dropped off', 'fallen off', 'stopped responding',
+      ],
+    },
+    {
+      label: 'competitor pressure',
+      keywords: [
+        'competitor', 'competing solution', 'rival', 'switching from', 'already using',
+        'evaluating others', 'other vendors', 'shortlist', 'comparing with',
+        'also looking at', 'going with', 'incumbent', 'current provider', 'existing solution',
+        'selected another', 'chose competitor', 'other platform', 'alternative solution',
+        'rfp', 'rft', 'tender', 'benchmark', 'they use', 'they are using',
+        'current system', 'existing vendor', 'incumbent solution', 'looking at others',
+        'competitive bid', 'multiple vendors', 'vendor comparison',
+      ],
+    },
+    {
+      label: 'unclear decision-maker',
+      keywords: [
+        'unclear who', 'decision maker', 'no champion', 'no sponsor', 'approver unknown',
+        'committee approval', 'board approval', 'needs sign-off', 'unclear authority',
+        'multiple stakeholders', 'consensus required', 'steering committee',
+        'executive sign-off', 'waiting on approval', 'not the decision maker',
+        'need to involve', 'bring in their manager', 'no single owner', 'no clear owner',
+        'political', 'internal politics', 'sign off needed', 'approval chain',
+        'need buy-in', 'stakeholder alignment', 'no executive sponsor',
+        'champion is not', 'champion doesn\'t', 'can\'t approve', 'cannot approve',
+      ],
+    },
+    {
+      label: 'timeline slippage',
+      keywords: [
+        'delayed', 'postponed', 'pushed back', 'slipped', 'no deadline', 'timeline unclear',
+        'timeline at risk', 'not urgent', 'no urgency', 'next quarter', 'next year',
+        'after the holiday', 'after budget', 'on hold', 'paused', 'frozen',
+        'no fixed date', 'no go-live', 'no go live', 'go-live at risk',
+        'no target date', 'vague timeline', 'indefinite', 'when budget',
+        'deprioritised', 'deprioritized', 'not a priority right now', 'timing uncertain',
+        'start date unclear', 'no confirmed start',
+      ],
+    },
+    {
+      label: 'procurement / legal blockers',
+      keywords: [
+        'procurement', 'legal review', 'compliance review', 'security review',
+        'contract review', 'legal blocker', 'legal hold', 'data protection', 'gdpr',
+        'infosec', 'vendor assessment', 'due diligence', 'it approval', 'risk assessment',
+        'vendor registration', 'msa', 'nda', 'terms review', 'data processing',
+        'dpa', 'iso 27001', 'soc 2', 'pen test', 'penetration test', 'it security',
+        'compliance team', 'legal team', 'legal department', 'awaiting legal',
+        'legal sign off', 'contract negotiation', 'terms negotiation',
+      ],
+    },
+    {
+      label: 'internal competing priorities',
+      keywords: [
+        'competing priorities', 'bandwidth issue', 'deprioritised', 'deprioritized',
+        'resource constrained', 'internal blocker', 'other projects', 'too busy',
+        'no capacity', 'headcount', 'restructuring', 'reorganization', 'reorganisation',
+        'leadership change', 'team change', 'focus elsewhere', 'strategy change',
+        'new initiative', 'acquisition', 'merger', 'integration work', 'other initiative',
+        'stretched', 'overloaded', 'no bandwidth', 'team too small', 'not resourced',
+        'internal project', 'internal focus', 'change freeze', 'change moratorium',
+      ],
+    },
   ]
 
   const keyPatterns: WorkspaceBrain['keyPatterns'] = []

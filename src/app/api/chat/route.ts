@@ -126,10 +126,30 @@ const DEAL_ACTION_PATTERNS = [
   /in the .+ deal/i, /for the .+ deal/i, /on the .+ deal/i,
   /in this .+ deal/i, /for this .+ deal/i, /on this .+ deal/i,
   /in this deal/i, /for this deal/i, /on this deal/i,
+  // close date / next steps / competitor / contact updates
+  /close date/i, /closing date/i, /due date/i,
+  /next step/i, /set.*next/i, /update.*next/i,
+  /add.*competitor/i, /remove.*competitor/i,
+  /add.*contact/i, /add.*person/i, /add.*stakeholder/i,
 ]
 
 type Intent = 'meeting_notes' | 'competitor_battlecard' | 'company_update' |
-  'collateral_generate' | 'freeform_collateral' | 'project_plan' | 'deal_create' | 'case_study_create' | 'deal_action' | 'product_gap' | 'qa'
+  'collateral_generate' | 'freeform_collateral' | 'project_plan' | 'deal_create' | 'case_study_create' | 'deal_action' | 'product_gap' | 'pipeline_query' | 'qa'
+
+const PIPELINE_QUERY_PATTERNS = [
+  /what('s| is) (my |the )?(pipeline|deals?|forecast)/i,
+  /show (me )?(my |the )?(pipeline|deals?|overview)/i,
+  /pipeline (overview|summary|status|health)/i,
+  /deal (overview|summary|status|snapshot)/i,
+  /what should i (focus|work) on/i,
+  /where should i (focus|spend)/i,
+  /what('s| are) (my |the )?(top|priority|urgent) deals?/i,
+  /how('s| is) (my |the )?(pipeline|forecast) (looking|doing)/i,
+  /give me (a |an )?(pipeline|deal) (summary|overview|update|report)/i,
+  /which deals? (should|need|are)/i,
+  /at.?risk deals?/i,
+  /deals? (most likely|close|closing) (to |this )?/i,
+]
 
 function detectIntent(text: string): Intent {
   const lower = text.toLowerCase()
@@ -169,6 +189,7 @@ function detectIntent(text: string): Intent {
   if (DEAL_ACTION_PATTERNS.some(p => p.test(text))) return 'deal_action'
   if (COMPANY_UPDATE_PATTERNS.some(p => p.test(text))) return 'company_update'
   if (CASE_STUDY_PATTERNS.some(p => p.test(text))) return 'case_study_create'
+  if (PIPELINE_QUERY_PATTERNS.some(p => p.test(text))) return 'pipeline_query'
   return 'qa'
 }
 
@@ -1196,7 +1217,7 @@ async function handleDealAction(
   const dealRows = await db.select({
     id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
     stage: dealLogs.stage, todos: dealLogs.todos, notes: dealLogs.notes, meetingNotes: dealLogs.meetingNotes,
-    dealValue: dealLogs.dealValue,
+    dealValue: dealLogs.dealValue, competitors: dealLogs.competitors, contacts: dealLogs.contacts,
   }).from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId))
   if (dealRows.length === 0) {
     return { reply: 'No deals found in your workspace.', actions: [] }
@@ -1217,11 +1238,17 @@ ${dealList}
 Return ONLY JSON:
 {
   "dealId": "matching deal id or null",
-  "action": "remove_outdated_todos|complete_todos|remove_specific_todos|update_stage|update_value|update_notes|qa",
+  "action": "remove_outdated_todos|complete_todos|remove_specific_todos|update_stage|update_value|update_notes|update_close_date|update_next_steps|add_competitor|remove_competitor|add_contact|qa",
   "description": "brief description of what to do",
   "stageValue": "new stage if action=update_stage, else null — one of: prospecting|qualification|discovery|proposal|negotiation|closed_won|closed_lost",
   "valueInDollars": "integer in dollars if action=update_value, else null",
-  "notesText": "text to append if action=update_notes, else null"
+  "notesText": "text to append if action=update_notes, else null",
+  "closeDateISO": "ISO date string YYYY-MM-DD if action=update_close_date, else null",
+  "nextStepsText": "new next steps text if action=update_next_steps, else null",
+  "competitorName": "competitor name if action=add_competitor or remove_competitor, else null",
+  "contactName": "contact name if action=add_contact, else null",
+  "contactTitle": "contact title if action=add_contact, else null",
+  "contactEmail": "contact email if action=add_contact, else null"
 }
 
 Match the deal by name/company. If no clear deal match, return dealId: null.`,
@@ -1231,6 +1258,9 @@ Match the deal by name/company. If no clear deal match, return dealId: null.`,
   interface ActionIdentified {
     dealId: string | null; action: string; description: string
     stageValue?: string | null; valueInDollars?: number | null; notesText?: string | null
+    closeDateISO?: string | null; nextStepsText?: string | null
+    competitorName?: string | null; contactName?: string | null
+    contactTitle?: string | null; contactEmail?: string | null
   }
   let identified: ActionIdentified = { dealId: null, action: 'qa', description: '' }
   try { identified = JSON.parse(stripJson((identifyMsg.content[0] as { type: string; text: string }).text)) } catch { /* use defaults */ }
@@ -1276,6 +1306,67 @@ Match the deal by name/company. If no clear deal match, return dealId: null.`,
     return {
       reply: `Added notes to **${deal.dealName}**.`,
       actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: ['notes updated'] }],
+    }
+  }
+
+  if (identified.action === 'update_close_date' && identified.closeDateISO) {
+    const closeDate = new Date(identified.closeDateISO)
+    if (!isNaN(closeDate.getTime())) {
+      await db.update(dealLogs).set({ closeDate, updatedAt: new Date() } as any).where(eq(dealLogs.id, deal.id))
+      await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'closeDate', value: identified.closeDateISO, source: 'ai_chat' }, createdAt: new Date() })
+      after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+      return {
+        reply: `Set close date for **${deal.dealName}** to **${closeDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}**.`,
+        actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: [`close date → ${identified.closeDateISO}`] }],
+      }
+    }
+  }
+
+  if (identified.action === 'update_next_steps' && identified.nextStepsText) {
+    await db.update(dealLogs).set({ nextSteps: identified.nextStepsText, updatedAt: new Date() } as any).where(eq(dealLogs.id, deal.id))
+    await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'nextSteps', value: identified.nextStepsText, source: 'ai_chat' }, createdAt: new Date() })
+    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+    return {
+      reply: `Updated next steps for **${deal.dealName}**: "${identified.nextStepsText}"`,
+      actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: ['next steps updated'] }],
+    }
+  }
+
+  if (identified.action === 'add_competitor' && identified.competitorName) {
+    const currentComp: string[] = (deal as any).competitors ?? []
+    if (!currentComp.map((c: string) => c.toLowerCase()).includes(identified.competitorName.toLowerCase())) {
+      const updated = [...currentComp, identified.competitorName]
+      await db.update(dealLogs).set({ competitors: updated, updatedAt: new Date() } as any).where(eq(dealLogs.id, deal.id))
+      await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'competitors', value: identified.competitorName, source: 'ai_chat' }, createdAt: new Date() })
+      after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+    }
+    return {
+      reply: `Added **${identified.competitorName}** as a competitor on **${deal.dealName}**.`,
+      actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: [`competitor added: ${identified.competitorName}`] }],
+    }
+  }
+
+  if (identified.action === 'remove_competitor' && identified.competitorName) {
+    const currentComp: string[] = (deal as any).competitors ?? []
+    const updated = currentComp.filter((c: string) => c.toLowerCase() !== identified.competitorName!.toLowerCase())
+    await db.update(dealLogs).set({ competitors: updated, updatedAt: new Date() } as any).where(eq(dealLogs.id, deal.id))
+    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+    return {
+      reply: `Removed **${identified.competitorName}** from competitors on **${deal.dealName}**.`,
+      actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: [`competitor removed: ${identified.competitorName}`] }],
+    }
+  }
+
+  if (identified.action === 'add_contact' && identified.contactName) {
+    const existing: any = await db.select({ contacts: dealLogs.contacts }).from(dealLogs).where(eq(dealLogs.id, deal.id)).limit(1)
+    const currentContacts: any[] = (existing[0]?.contacts as any[]) ?? []
+    const newContact = { name: identified.contactName, title: identified.contactTitle ?? undefined, email: identified.contactEmail ?? undefined }
+    const updated = [...currentContacts, newContact]
+    await db.update(dealLogs).set({ contacts: updated, updatedAt: new Date() } as any).where(eq(dealLogs.id, deal.id))
+    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+    return {
+      reply: `Added **${identified.contactName}**${identified.contactTitle ? ` (${identified.contactTitle})` : ''} to **${deal.dealName}**.`,
+      actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: [`contact added: ${identified.contactName}`] }],
     }
   }
 
@@ -1381,6 +1472,74 @@ Be conservative — only remove todos that are clearly stale, already handled, o
   }
 }
 
+// ── Handler: pipeline query — structured overview using brain data ────────────
+async function handlePipelineQuery(
+  workspaceId: string, text: string,
+): Promise<{ reply: string; actions: ActionCard[] }> {
+  const brain = await getWorkspaceBrain(workspaceId)
+
+  if (!brain || !brain.deals || brain.deals.length === 0) {
+    return {
+      reply: "No pipeline data yet — add some deals first and I'll give you a full overview.",
+      actions: [],
+    }
+  }
+
+  const activeDeals = brain.deals.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+  const urgentDeals = brain.urgentDeals ?? []
+  const staleDeals = brain.staleDeals ?? []
+  const topRisks = brain.topRisks ?? []
+  const patterns = brain.keyPatterns ?? []
+  const recs = brain.pipelineRecommendations ?? []
+
+  const totalValue = activeDeals.reduce((sum, d) => sum + (d.dealValue ?? 0), 0)
+  const highScore = activeDeals.filter(d => (d.conversionScore ?? 0) >= 70)
+  const atRisk = activeDeals.filter(d => d.conversionScore != null && d.conversionScore < 40)
+
+  // Build a rich prompt for Claude to produce a CEO-level summary
+  const dealSummaries = activeDeals.slice(0, 15).map(d =>
+    `- ${d.company} "${d.name}" | ${d.stage} | ${d.dealValue ? `$${d.dealValue.toLocaleString()}` : 'no value'} | score: ${d.conversionScore != null ? `${d.conversionScore}%` : 'not scored'}${(d.risks ?? []).length > 0 ? ` | risks: ${d.risks.slice(0, 2).join('; ')}` : ''}${(d.pendingTodos ?? []).length > 0 ? ` | ${d.pendingTodos.length} open todos` : ''}`
+  ).join('\n')
+
+  const patternSummary = patterns.slice(0, 4).map(p => `• ${p.label} — ${p.companies?.slice(0, 3).join(', ')}`).join('\n')
+  const recSummary = recs.filter(r => r.priority === 'high').slice(0, 3).map(r => `• ${r.action} → ${r.dealName}`).join('\n')
+
+  const summaryMsg = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001', max_tokens: 800,
+    messages: [{
+      role: 'user',
+      content: `You are a B2B sales AI assistant. Produce a concise, direct pipeline summary for the CEO/sales leader.
+
+User asked: "${text}"
+
+Pipeline data:
+${dealSummaries}
+
+Stats: ${activeDeals.length} active deals | Total pipeline value: ${totalValue > 0 ? `$${totalValue.toLocaleString()}` : 'unknown'} | ${highScore.length} likely to close | ${atRisk.length} at risk
+
+Urgent deals: ${urgentDeals.slice(0, 3).map(d => d.company).join(', ') || 'none'}
+Stale deals: ${staleDeals.slice(0, 3).map(d => d.company).join(', ') || 'none'}
+
+Cross-deal patterns:
+${patternSummary || 'None detected'}
+
+High-priority recommendations:
+${recSummary || 'None yet'}
+
+Write a direct, scannable summary with:
+1. One-line overall health assessment
+2. Top 2-3 deals to focus on RIGHT NOW (with specific reason)
+3. Biggest risk across the pipeline
+4. One action the sales leader should take today
+
+Be specific. Reference deal names. UK English. Use markdown.`,
+    }],
+  })
+
+  const reply = (summaryMsg.content[0] as { type: string; text: string }).text
+  return { reply, actions: [] }
+}
+
 // ── Main POST handler ─────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
@@ -1444,6 +1603,11 @@ export async function POST(req: NextRequest) {
 
     if (intent === 'deal_action') {
       const result = await handleDealAction(workspaceId, userId, lastText)
+      return NextResponse.json(result)
+    }
+
+    if (intent === 'pipeline_query') {
+      const result = await handlePipelineQuery(workspaceId, lastText)
       return NextResponse.json(result)
     }
 
@@ -1518,21 +1682,27 @@ export async function POST(req: NextRequest) {
     const wantsContent = /\b(draft|write|compose|prepare|create|send)\b.*\b(email|letter|message|response|reply|memo|proposal|brief|summary)\b/i.test(lastText)
     const qaMaxTokens = wantsContent ? 1500 : 600
 
-    const systemPrompt = `You are DealKit AI — the single brain for this sales team. Be direct, specific, concise. UK English.
+    const systemPrompt = `You are DealKit AI — the central command for this sales team. You have full visibility across the pipeline, deals, risks, and collateral. Be direct, specific, concise. UK English.
 
-RULES: Short answers. No filler. Bold deal names. Bullet lists. Max 3–5 sentences for simple questions. Reference specific deals/contacts.${pageContext}
+RULES: Short answers. No filler. Bold deal names and numbers. Bullet lists over prose. Reference specific deals/contacts/risks. When asked what to do — be prescriptive, not vague.${pageContext}
 
-${wantsContent ? `CONTENT MODE: The user wants you to write/draft content. Produce a COMPLETE, polished, ready-to-use piece. Include subject line if it's an email. Use the deal data (risks, stage, summary, contacts) to personalise it — don't be generic. Format with markdown.` : ''}
-Actions I can take (use these phrases to trigger them):
-• Paste meeting notes → auto-update deal, todos, risks
-• "Battlecard for [X]" → competitor + battlecard
-• "Generate [type]" → collateral (objection handler / one-pager / talk track / email)
-• "New deal: [Company]" → log deal
-• "Project plan for [Company]: [paste text]" → create structured project plan with phases & tasks
-• "Scan [Deal] todos" → clean up stale actions
-• "Update [Deal] stage to X" → change deal stage
+WHAT I CAN DO:
+• **Meeting notes** → paste them and I'll update the deal, todos, risks, and generate an objection handler
+• **"New deal: [Company]"** → log a deal instantly
+• **"Move [Deal] to proposal"** → change stage
+• **"Set close date for [Deal] to [date]"** → update close date
+• **"Add next step to [Deal]: [action]"** → set next steps
+• **"Add [Name] as competitor on [Deal]"** → update competitors
+• **"Add [Name], [Title] to [Deal]"** → add a contact
+• **"Generate [objection handler / one-pager / talk track / email sequence]"** → create collateral
+• **"Battlecard for [Competitor]"** → competitor research + battlecard
+• **"Project plan for [Company]: [paste plan]"** → structured plan with phases & tasks
+• **"Scan [Deal] todos"** → clean up stale actions
+• **"What's my pipeline?"** → full pipeline overview
 
-If asked to draft an email, write a message, or create content — DO IT directly in your response. Use deal context to make it specific and personalised.
+CONTENT: If asked to draft an email, write a message, or create any content — produce it immediately, complete and ready to send. Use deal data to personalise.
+
+${wantsContent ? `CONTENT MODE: Write a COMPLETE, polished, ready-to-use piece. Include subject line for emails. Personalise using deal context — never be generic.` : ''}
 ${activeDealSection}
 ${kbParts.join('\n') || 'No workspace data yet.'}${brainSection}`
 
