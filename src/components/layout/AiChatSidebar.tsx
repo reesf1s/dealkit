@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import {
-  Send, Sparkles, Bot, RotateCcw, Square,
+  Send, Sparkles, Square,
   FileText, Sword, Building2, Zap, CheckCircle2,
   PlusCircle, RefreshCw, BookOpen, AlertTriangle,
   BarChart2, Mail, ChevronDown, ChevronUp, X,
