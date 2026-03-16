@@ -1,3 +1,4 @@
+import React from 'react'
 import Link from 'next/link'
 import { ArrowRight, Zap, Shield, CheckCircle, FileText, Users, Target, BookOpen, Mail, ChevronRight, TrendingUp, Lock, Brain, BarChart3 } from 'lucide-react'
 import ROICalc from '@/components/marketing/ROICalc'
