@@ -10,7 +10,7 @@ import {
   ArrowLeft, Sparkles, CheckSquare, Square, Plus, Target, Loader2,
   FileText, Clipboard, ChevronDown, TrendingUp, DollarSign, Calendar,
   Building2, User, Edit, Trash2, MoreHorizontal, CheckCircle, X, Link2, Check,
-  Mail, Sword, Zap
+  Mail, Sword, Zap, Layers, ClipboardList
 } from 'lucide-react'
 import type { DealContact } from '@/types'
 import { useSidebar } from '@/components/layout/SidebarContext'
@@ -1373,6 +1373,244 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate }: { dealId: string; deal: 
   )
 }
 
+function ProjectPlanTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
+  const [text, setText] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [newTaskText, setNewTaskText] = useState<Record<string, string>>({})
+  const plan = deal?.projectPlan as any
+  const phases = plan?.phases ?? []
+  const allTasks = phases.flatMap((p: any) => p.tasks ?? [])
+  const totalTasks = allTasks.length
+  const completeTasks = allTasks.filter((t: any) => t.status === 'complete').length
+  const inProgressTasks = allTasks.filter((t: any) => t.status === 'in_progress').length
+
+  const todos: any[] = deal?.todos ?? []
+
+  const extract = async () => {
+    if (!text.trim()) return
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/deals/${dealId}/project-plan`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setError(data.error ?? 'Failed to create project plan')
+        return
+      }
+      setText('')
+      onUpdate()
+    } finally { setLoading(false) }
+  }
+
+  const updateTask = async (taskId: string, updates: Record<string, any>) => {
+    await fetch(`/api/deals/${dealId}/project-plan`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId, ...updates }),
+    })
+    onUpdate()
+  }
+
+  const addTask = async (phaseId: string) => {
+    const taskText = newTaskText[phaseId]?.trim()
+    if (!taskText) return
+    await fetch(`/api/deals/${dealId}/project-plan`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phaseId, addTask: taskText }),
+    })
+    setNewTaskText(prev => ({ ...prev, [phaseId]: '' }))
+    onUpdate()
+  }
+
+  const deleteTask = async (taskId: string) => {
+    await fetch(`/api/deals/${dealId}/project-plan`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deleteTaskId: taskId }),
+    })
+    onUpdate()
+  }
+
+  const deletePhase = async (phaseId: string) => {
+    await fetch(`/api/deals/${dealId}/project-plan`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deletePhaseId: phaseId }),
+    })
+    onUpdate()
+  }
+
+  const statusColors: Record<string, { bg: string; border: string; text: string; label: string }> = {
+    not_started: { bg: 'rgba(107,114,128,0.08)', border: 'rgba(107,114,128,0.2)', text: '#9CA3AF', label: 'Not Started' },
+    in_progress: { bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.25)', text: '#818CF8', label: 'In Progress' },
+    complete: { bg: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.2)', text: '#22C55E', label: 'Complete' },
+  }
+
+  const cycleStatus = (current: string) => {
+    if (current === 'not_started') return 'in_progress'
+    if (current === 'in_progress') return 'complete'
+    return 'not_started'
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      {/* Progress bar */}
+      {totalTasks > 0 && (
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '12px', color: '#888' }}>Plan Progress</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '11px', color: '#9CA3AF' }}>{totalTasks - completeTasks - inProgressTasks} pending</span>
+              {inProgressTasks > 0 && <span style={{ fontSize: '11px', color: '#818CF8' }}>{inProgressTasks} in progress</span>}
+              <span style={{ fontSize: '12px', fontWeight: 600, color: completeTasks === totalTasks ? '#22C55E' : '#EBEBEB' }}>
+                {completeTasks}/{totalTasks} done
+              </span>
+            </div>
+          </div>
+          <div style={{ height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden', display: 'flex' }}>
+            <div style={{ height: '100%', width: `${totalTasks ? (completeTasks / totalTasks) * 100 : 0}%`, background: 'linear-gradient(90deg, #6366F1, #22C55E)', borderRadius: '3px 0 0 3px', transition: 'width 0.3s' }} />
+            <div style={{ height: '100%', width: `${totalTasks ? (inProgressTasks / totalTasks) * 100 : 0}%`, background: 'rgba(99,102,241,0.4)', transition: 'width 0.3s' }} />
+          </div>
+        </div>
+      )}
+
+      {/* Phases */}
+      {phases.sort((a: any, b: any) => a.order - b.order).map((phase: any) => {
+        const phaseTasks = phase.tasks ?? []
+        const phaseComplete = phaseTasks.filter((t: any) => t.status === 'complete').length
+        return (
+          <div key={phase.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', overflow: 'hidden' }}>
+            {/* Phase header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+              <Layers size={13} color="#818CF8" />
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#EBEBEB', flex: 1 }}>{phase.name}</span>
+              {phase.targetDate && (
+                <span style={{ fontSize: '10px', color: '#555' }}>{new Date(phase.targetDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+              )}
+              <span style={{ fontSize: '11px', color: '#555', background: 'rgba(255,255,255,0.04)', borderRadius: '4px', padding: '2px 8px' }}>
+                {phaseComplete}/{phaseTasks.length}
+              </span>
+              <button onClick={() => deletePhase(phase.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2A2A2A', padding: '2px', display: 'flex' }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#EF4444'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#2A2A2A'}
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+            {phase.description && (
+              <div style={{ padding: '8px 16px', fontSize: '11px', color: '#555', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>{phase.description}</div>
+            )}
+
+            {/* Tasks */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {phaseTasks.map((task: any) => {
+                const sc = statusColors[task.status] ?? statusColors.not_started
+                const linkedTodo = task.linkedTodoId ? todos.find((t: any) => t.id === task.linkedTodoId) : null
+                return (
+                  <div key={task.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px',
+                    borderBottom: '1px solid rgba(255,255,255,0.03)',
+                  }}>
+                    <button
+                      onClick={() => updateTask(task.id, { status: cycleStatus(task.status) })}
+                      style={{
+                        background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: '4px',
+                        width: '20px', height: '20px', cursor: 'pointer', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center', flexShrink: 0, padding: 0,
+                      }}
+                      title={`Click to change: ${sc.label}`}
+                    >
+                      {task.status === 'complete' && <Check size={12} color="#22C55E" />}
+                      {task.status === 'in_progress' && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#818CF8' }} />}
+                    </button>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: '13px', color: task.status === 'complete' ? '#555' : '#EBEBEB',
+                        textDecoration: task.status === 'complete' ? 'line-through' : 'none',
+                      }}>
+                        {task.text}
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px', marginTop: '3px' }}>
+                        {task.owner && <span style={{ fontSize: '10px', color: '#666' }}>👤 {task.owner}</span>}
+                        {task.dueDate && <span style={{ fontSize: '10px', color: '#666' }}>📅 {new Date(task.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>}
+                        {linkedTodo && (
+                          <span style={{ fontSize: '10px', color: '#818CF8', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <Link2 size={9} /> Linked to-do{linkedTodo.done ? ' ✓' : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span style={{
+                      fontSize: '10px', padding: '2px 8px', borderRadius: '4px',
+                      background: sc.bg, border: `1px solid ${sc.border}`, color: sc.text,
+                    }}>
+                      {sc.label}
+                    </span>
+                    <button onClick={() => deleteTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2A2A2A', padding: '2px', display: 'flex' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#EF4444'}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#2A2A2A'}
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                )
+              })}
+
+              {/* Add task to phase */}
+              <form onSubmit={e => { e.preventDefault(); addTask(phase.id) }} style={{ display: 'flex', gap: '8px', padding: '8px 16px' }}>
+                <input
+                  value={newTaskText[phase.id] ?? ''}
+                  onChange={e => setNewTaskText(prev => ({ ...prev, [phase.id]: e.target.value }))}
+                  placeholder="Add task..."
+                  style={{
+                    flex: 1, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+                    borderRadius: '6px', padding: '6px 10px', color: '#EBEBEB', fontSize: '12px', outline: 'none',
+                  }}
+                />
+                <button type="submit" disabled={!(newTaskText[phase.id]?.trim())} style={{
+                  padding: '0 10px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)',
+                  borderRadius: '6px', color: '#818CF8', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                }}>
+                  <Plus size={12} />
+                </button>
+              </form>
+            </div>
+          </div>
+        )
+      })}
+
+      {/* Paste new plan */}
+      <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '14px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: '#555', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '10px' }}>
+          {phases.length > 0 ? 'Add More Phases' : 'Create Project Plan'}
+        </div>
+        <div style={{ fontSize: '12px', color: '#555', marginBottom: '10px', lineHeight: 1.6 }}>
+          Paste a project plan, timeline, milestones table, or any structured text — AI will extract phases and tasks automatically.
+          {phases.length > 0 && ' New phases will be appended to the existing plan.'}
+        </div>
+        <textarea
+          value={text}
+          onChange={e => setText(e.target.value)}
+          placeholder="Paste your project plan, implementation timeline, POC milestones, or any structured task list..."
+          rows={6}
+          style={{ width: '100%', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', padding: '10px 12px', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, fontFamily: 'inherit' }}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '10px' }}>
+          <button
+            onClick={extract}
+            disabled={loading || !text.trim()}
+            style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', background: loading ? 'rgba(99,102,241,0.15)' : 'linear-gradient(135deg, #6366F1, #7C3AED)', border: loading ? '1px solid rgba(99,102,241,0.3)' : 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: loading || !text.trim() ? 'not-allowed' : 'pointer' }}
+          >
+            {loading ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Parsing…</> : <><Sparkles size={13} /> Create Plan</>}
+          </button>
+          {error && <span style={{ fontSize: '12px', color: '#EF4444' }}>{error}</span>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function DealDetailPage() {
   const { id } = useParams() as { id: string }
   const router = useRouter()
@@ -1382,7 +1620,7 @@ export default function DealDetailPage() {
   const dealGaps: any[] = (gapsData?.data ?? []).filter((g: any) => (g.sourceDeals as string[] ?? []).includes(id))
   const { setActiveDeal } = useSidebar()
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'meeting-notes' | 'prep' | 'todos' | 'success'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'meeting-notes' | 'prep' | 'todos' | 'project-plan' | 'success'>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [winStoryOpen, setWinStoryOpen] = useState(false)
   const [wonDeal, setWonDeal] = useState<any>(null)
@@ -1484,6 +1722,7 @@ export default function DealDetailPage() {
           { id: 'meeting-notes', label: 'Meeting Notes + AI' },
           { id: 'prep', label: 'Meeting Prep' },
           { id: 'todos', label: `To-Dos ${deal?.todos?.length > 0 ? `(${deal.todos.filter((t: any) => !t.done).length})` : ''}` },
+          { id: 'project-plan', label: `Project Plan${(deal?.projectPlan as any)?.phases?.length > 0 ? ` (${(deal.projectPlan as any).phases.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete').length} open)` : ''}` },
           { id: 'success', label: `Success Criteria${(deal?.successCriteriaTodos as any[])?.length > 0 ? ` (${(deal.successCriteriaTodos as any[]).filter((c: any) => !c.achieved).length} open)` : ''}` },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{
@@ -1582,6 +1821,9 @@ export default function DealDetailPage() {
           {activeTab === 'prep' && <MeetingPrepTab dealId={id} deal={deal} />}
           {activeTab === 'todos' && (
             <TodosTab dealId={id} deal={deal} onUpdate={() => mutate()} />
+          )}
+          {activeTab === 'project-plan' && (
+            <ProjectPlanTab dealId={id} deal={deal} onUpdate={() => mutate()} />
           )}
           {activeTab === 'success' && (
             <SuccessCriteriaTab dealId={id} deal={deal} onUpdate={() => mutate()} />

@@ -81,6 +81,7 @@ export const workspaces = pgTable('workspaces', {
   aiOverview: jsonb('ai_overview'),                        // cached daily AI overview
   aiOverviewGeneratedAt: timestamp('ai_overview_generated_at', { withTimezone: true }),
   workspaceBrain: jsonb('workspace_brain'),                // compressed org knowledge — updated after every deal analysis
+  pipelineConfig: jsonb('pipeline_config'),                    // PipelineConfig JSON — custom stages, labels, industry preset
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
@@ -218,6 +219,7 @@ export const dealLogs = pgTable('deal_logs', {
   dealType: text('deal_type').notNull().default('one_off'),       // 'one_off' | 'recurring'
   recurringInterval: text('recurring_interval'),                   // 'monthly' | 'quarterly' | 'annual'
   kanbanOrder: integer('kanban_order').notNull().default(0),
+  projectPlan: jsonb('project_plan'),                          // ProjectPlan JSON
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

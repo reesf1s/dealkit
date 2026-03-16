@@ -122,6 +122,7 @@ export interface DealLog {
   lostReason: string | null
   dealType: 'one_off' | 'recurring'
   recurringInterval: 'monthly' | 'quarterly' | 'annual' | null
+  projectPlan?: ProjectPlan | null
   createdAt: Date
   updatedAt: Date
 }
@@ -338,6 +339,66 @@ export interface EmailStep {
   body: string
   callToAction: string
   sendingTips: string[]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Project Plans
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ProjectPlan {
+  title: string
+  createdAt: string                     // ISO date
+  updatedAt: string
+  sourceText?: string                   // original pasted text
+  phases: ProjectPhase[]
+}
+
+export interface ProjectPhase {
+  id: string
+  name: string
+  description: string
+  order: number
+  targetDate?: string                   // ISO date
+  tasks: ProjectTask[]
+}
+
+export interface ProjectTask {
+  id: string
+  text: string
+  status: 'not_started' | 'in_progress' | 'complete'
+  owner?: string                        // responsible person
+  dueDate?: string                      // ISO date
+  linkedTodoId?: string                 // link to deal todo
+  notes?: string
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pipeline Configuration
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface PipelineConfig {
+  stages: PipelineStageConfig[]
+  industryPreset?: string               // e.g. 'saas', 'agency', 'consulting', 'ecommerce', 'real_estate', 'manufacturing'
+  updatedAt: string
+}
+
+export interface PipelineStageConfig {
+  id: string                            // matches dealStageEnum value OR custom slug
+  label: string                         // display name (user can rename)
+  color: string                         // hex color
+  order: number
+  isDefault: boolean                    // true for the 7 built-in stages
+  isHidden?: boolean                    // hide from pipeline view
+}
+
+export interface PipelineRecommendation {
+  dealId: string
+  dealName: string
+  company: string
+  recommendation: string
+  priority: 'high' | 'medium' | 'low'
+  action?: string                       // suggested action text
+  actionType?: 'stage_change' | 'follow_up' | 'collateral' | 'meeting' | 'custom'
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

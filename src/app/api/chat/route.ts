@@ -129,7 +129,7 @@ const DEAL_ACTION_PATTERNS = [
 ]
 
 type Intent = 'meeting_notes' | 'competitor_battlecard' | 'company_update' |
-  'collateral_generate' | 'freeform_collateral' | 'deal_create' | 'case_study_create' | 'deal_action' | 'product_gap' | 'qa'
+  'collateral_generate' | 'freeform_collateral' | 'project_plan' | 'deal_create' | 'case_study_create' | 'deal_action' | 'product_gap' | 'qa'
 
 function detectIntent(text: string): Intent {
   const lower = text.toLowerCase()
@@ -141,6 +141,16 @@ function detectIntent(text: string): Intent {
   const hasGenerateVerb = /\b(generate|create|make|write|build)\b/.test(lower)
   const isShortFocused = text.length < 200 && !/\b(for each|identify|analyze|analyse|top \d|biggest|priority|summarize|summarise)\b/i.test(text)
   if (hasGenerateVerb && isShortFocused && COLLATERAL_TYPES.some(c => lower.includes(c.keyword))) return 'collateral_generate'
+  // Project plan: user pastes text/table and wants a project plan created
+  const PROJECT_PLAN_PATTERNS = [
+    /project\s+plan/i, /implementation\s+plan/i, /rollout\s+plan/i,
+    /deployment\s+plan/i, /onboarding\s+plan/i, /go[\s-]live\s+plan/i,
+    /poc\s+plan/i, /proof\s+of\s+concept\s+plan/i, /trial\s+plan/i,
+    /create.*plan\s+for/i, /build.*plan\s+for/i, /make.*plan\s+for/i,
+    /plan.*for.*deal/i, /plan.*this\s+deal/i,
+    /here(?:'s| is).*(?:plan|timeline|schedule|milestones|phases)/i,
+  ]
+  if (PROJECT_PLAN_PATTERNS.some(p => p.test(text)) || (text.length > 300 && /\b(milestone|phase|timeline|deliverable|sprint|week\s+\d|month\s+\d|q[1-4])\b/i.test(lower) && hasGenerateVerb)) return 'project_plan'
   // Freeform collateral: "generate a pricing justification", "create a competitive analysis", etc.
   // Must match a generate verb + short focused + NOT a standard type
   if (hasGenerateVerb && isShortFocused && !COLLATERAL_TYPES.some(c => lower.includes(c.keyword))) {
@@ -910,6 +920,140 @@ Request: ${text.slice(0, 500)}`,
   }
 }
 
+// ── Handler: project plan creation ──────────────────────────────────────────
+async function handleProjectPlan(
+  workspaceId: string, userId: string, text: string,
+): Promise<{ reply: string; actions: ActionCard[] }> {
+  // Find which deal to associate this plan with
+  const dealRows = await db.select({
+    id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
+    stage: dealLogs.stage, projectPlan: dealLogs.projectPlan,
+  }).from(dealLogs).where(and(eq(dealLogs.workspaceId, workspaceId), sql`${dealLogs.stage} NOT IN ('closed_won', 'closed_lost')`)).limit(20)
+
+  const lowerText = text.toLowerCase()
+  let matchedDeal = dealRows.find(d =>
+    lowerText.includes(d.dealName.toLowerCase()) || lowerText.includes(d.prospectCompany.toLowerCase())
+  )
+
+  // If no deal matched by name, try to use AI to extract which deal
+  if (!matchedDeal && dealRows.length > 0) {
+    const dealList = dealRows.map(d => `${d.dealName} (${d.prospectCompany})`).join(', ')
+    const matchMsg = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001', max_tokens: 100,
+      messages: [{
+        role: 'user',
+        content: `Which of these deals does this project plan relate to? Return ONLY the exact deal name, or "none" if unclear.\nDeals: ${dealList}\nText: ${text.slice(0, 500)}`,
+      }],
+    })
+    const matchName = (matchMsg.content[0] as { type: string; text: string }).text.trim().toLowerCase()
+    if (matchName !== 'none') {
+      matchedDeal = dealRows.find(d =>
+        matchName.includes(d.dealName.toLowerCase()) || matchName.includes(d.prospectCompany.toLowerCase())
+      )
+    }
+  }
+
+  if (!matchedDeal) {
+    return {
+      reply: "I need to know which deal this project plan is for. Mention the deal or company name, or try: _\"Project plan for [Company Name]: [paste your plan]\"_",
+      actions: [],
+    }
+  }
+
+  // Parse the text into a structured project plan using AI
+  const existingTodos = ((matchedDeal as any).todos as any[]) ?? []
+  const todoContext = existingTodos.length > 0
+    ? `\n\nExisting deal to-dos (link relevant tasks using these IDs):\n${existingTodos.map((t: any) => `- ID: ${t.id} | "${t.text}" | Done: ${t.done}`).join('\n')}`
+    : ''
+
+  const extractMsg = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001', max_tokens: 2000,
+    messages: [{
+      role: 'user',
+      content: `Parse this into a structured project plan for a deal with "${matchedDeal.prospectCompany}".
+Extract phases and tasks. Infer owners, dates, and status from context.
+${todoContext}
+
+Return ONLY valid JSON:
+{
+  "title": "Project Plan — [descriptive title]",
+  "phases": [
+    {
+      "id": "uuid-format-string",
+      "name": "Phase name",
+      "description": "What this phase covers",
+      "order": 1,
+      "targetDate": "ISO date or null",
+      "tasks": [
+        {
+          "id": "uuid-format-string",
+          "text": "Task description",
+          "status": "not_started|in_progress|complete",
+          "owner": "person name or null",
+          "dueDate": "ISO date or null",
+          "linkedTodoId": "matching todo ID if relevant, or null",
+          "notes": null
+        }
+      ]
+    }
+  ]
+}
+
+Use random UUIDs for all IDs. If a task matches an existing to-do, set linkedTodoId.
+
+Text:
+${text.slice(0, 6000)}`,
+    }],
+  })
+
+  let parsed: any
+  try {
+    const raw = (extractMsg.content[0] as { type: string; text: string }).text
+    parsed = JSON.parse(raw.replace(/^```json?\n?/i, '').replace(/\n?```$/i, '').trim())
+  } catch {
+    return {
+      reply: "I couldn't parse that into a project plan. Try pasting a more structured list with phases, milestones, or tasks.",
+      actions: [],
+    }
+  }
+
+  const now = new Date().toISOString()
+  const existing = matchedDeal.projectPlan as any
+
+  const projectPlan = existing?.phases
+    ? {
+        title: parsed.title || existing.title,
+        createdAt: existing.createdAt,
+        updatedAt: now,
+        sourceText: (existing.sourceText ? existing.sourceText + '\n---\n' : '') + text.slice(0, 3000),
+        phases: [
+          ...existing.phases,
+          ...parsed.phases.map((p: any, i: number) => ({ ...p, order: existing.phases.length + i + 1 })),
+        ],
+      }
+    : {
+        title: parsed.title || `Project Plan — ${matchedDeal.prospectCompany}`,
+        createdAt: now,
+        updatedAt: now,
+        sourceText: text.slice(0, 3000),
+        phases: parsed.phases ?? [],
+      }
+
+  await db.update(dealLogs)
+    .set({ projectPlan, updatedAt: new Date() } as any)
+    .where(eq(dealLogs.id, matchedDeal.id))
+
+  after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch {} })
+
+  const totalTasks = parsed.phases?.reduce((sum: number, p: any) => sum + (p.tasks?.length ?? 0), 0) ?? 0
+  const linkedCount = parsed.phases?.reduce((sum: number, p: any) => sum + (p.tasks?.filter((t: any) => t.linkedTodoId).length ?? 0), 0) ?? 0
+
+  return {
+    reply: `Created **project plan** for **${matchedDeal.prospectCompany}** with ${parsed.phases?.length ?? 0} phases and ${totalTasks} tasks.${linkedCount > 0 ? ` ${linkedCount} task${linkedCount > 1 ? 's' : ''} linked to existing to-dos.` : ''}\n\nView and manage it in [Deal → Project Plan](/deals/${matchedDeal.id}).`,
+    actions: [{ type: 'deal_updated' as const, dealId: matchedDeal.id, dealName: matchedDeal.dealName, changes: ['Project plan created'] }],
+  }
+}
+
 // ── Handler: create deal ───────────────────────────────────────────────────────
 async function handleDealCreate(
   workspaceId: string, userId: string, text: string,
@@ -1262,6 +1406,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result)
     }
 
+    if (intent === 'project_plan') {
+      const result = await handleProjectPlan(workspaceId, userId, lastText)
+      return NextResponse.json(result)
+    }
+
     if (intent === 'freeform_collateral') {
       const result = await handleFreeformCollateral(workspaceId, userId, lastText, plan)
       return NextResponse.json(result)
@@ -1363,6 +1512,7 @@ Actions I can take (use these phrases to trigger them):
 • "Battlecard for [X]" → competitor + battlecard
 • "Generate [type]" → collateral (objection handler / one-pager / talk track / email)
 • "New deal: [Company]" → log deal
+• "Project plan for [Company]: [paste text]" → create structured project plan with phases & tasks
 • "Scan [Deal] todos" → clean up stale actions
 • "Update [Deal] stage to X" → change deal stage
 

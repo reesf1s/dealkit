@@ -29,6 +29,7 @@ export interface DealSnapshot {
   lastUpdated: string
   closeDate: string | null     // ISO string or null
   daysSinceUpdate: number
+  projectPlanProgress?: { total: number; complete: number } | null
 }
 
 export interface WorkspaceBrain {
@@ -61,6 +62,15 @@ export interface WorkspaceBrain {
     suggestion: string          // e.g. "Objection handler for budget concerns"
     type: string                // collateral type or 'custom'
     reason: string              // why this is suggested
+  }[]
+  pipelineRecommendations: {
+    dealId: string
+    dealName: string
+    company: string
+    recommendation: string
+    priority: 'high' | 'medium' | 'low'
+    action?: string
+    actionType?: 'stage_change' | 'follow_up' | 'collateral' | 'meeting' | 'custom'
   }[]
 }
 
@@ -102,6 +112,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
       aiSummary: dealLogs.aiSummary,
       updatedAt: dealLogs.updatedAt,
       closeDate: dealLogs.closeDate,
+      projectPlan: dealLogs.projectPlan,
     })
     .from(dealLogs)
     .where(eq(dealLogs.workspaceId, workspaceId))
@@ -129,6 +140,13 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
         : '',
       closeDate: d.closeDate ? new Date(d.closeDate).toISOString() : null,
       daysSinceUpdate: daysSince,
+      projectPlanProgress: (() => {
+        const plan = (d as any).projectPlan as any
+        if (!plan?.phases) return null
+        const tasks = plan.phases.flatMap((p: any) => p.tasks ?? [])
+        if (tasks.length === 0) return null
+        return { total: tasks.length, complete: tasks.filter((t: any) => t.status === 'complete').length }
+      })(),
     }
   })
 
@@ -320,6 +338,65 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
   // Trim to max 5
   suggestedCollateral.splice(5)
 
+  // ── Proactive: pipeline recommendations ──────────────────────────────────
+  const pipelineRecommendations: WorkspaceBrain['pipelineRecommendations'] = []
+
+  for (const snap of snapshots) {
+    if (snap.stage === 'closed_won' || snap.stage === 'closed_lost') continue
+    if (pipelineRecommendations.length >= 6) break
+
+    // Deal in prospecting for 7+ days with no score → suggest qualification
+    if (snap.stage === 'prospecting' && snap.daysSinceUpdate >= 7 && snap.conversionScore == null) {
+      pipelineRecommendations.push({
+        dealId: snap.id, dealName: snap.name, company: snap.company,
+        recommendation: 'No analysis yet — paste meeting notes to qualify this deal',
+        priority: 'medium', action: 'Analyze meeting notes', actionType: 'meeting',
+      })
+      continue
+    }
+
+    // High-scoring deal still in early stage → suggest advancing
+    if (snap.conversionScore != null && snap.conversionScore >= 70 && ['prospecting', 'qualification', 'discovery'].includes(snap.stage)) {
+      const nextStage = snap.stage === 'prospecting' ? 'qualification' : snap.stage === 'qualification' ? 'discovery' : 'proposal'
+      pipelineRecommendations.push({
+        dealId: snap.id, dealName: snap.name, company: snap.company,
+        recommendation: `High conversion score (${snap.conversionScore}%) — consider advancing to ${nextStage.replace('_', ' ')}`,
+        priority: 'high', action: `Move to ${nextStage.replace('_', ' ')}`, actionType: 'stage_change',
+      })
+      continue
+    }
+
+    // Deal in proposal/negotiation with risks but no objection handler → suggest collateral
+    if (['proposal', 'negotiation'].includes(snap.stage) && snap.risks.length >= 2) {
+      pipelineRecommendations.push({
+        dealId: snap.id, dealName: snap.name, company: snap.company,
+        recommendation: `${snap.risks.length} risks identified — generate an objection handler to prepare`,
+        priority: 'high', action: 'Generate objection handler', actionType: 'collateral',
+      })
+      continue
+    }
+
+    // Deal with incomplete project plan tasks overdue
+    if (snap.projectPlanProgress && snap.projectPlanProgress.complete < snap.projectPlanProgress.total) {
+      const remaining = snap.projectPlanProgress.total - snap.projectPlanProgress.complete
+      pipelineRecommendations.push({
+        dealId: snap.id, dealName: snap.name, company: snap.company,
+        recommendation: `${remaining} project plan task${remaining > 1 ? 's' : ''} still pending`,
+        priority: remaining > 3 ? 'high' : 'medium', action: 'Review project plan', actionType: 'custom',
+      })
+      continue
+    }
+
+    // Deal with many pending todos → suggest follow-up
+    if (snap.pendingTodos.length >= 4) {
+      pipelineRecommendations.push({
+        dealId: snap.id, dealName: snap.name, company: snap.company,
+        recommendation: `${snap.pendingTodos.length} pending to-dos — review and prioritise`,
+        priority: 'medium', action: 'Review to-dos', actionType: 'follow_up',
+      })
+    }
+  }
+
   const brain: WorkspaceBrain = {
     updatedAt: now.toISOString(),
     deals: snapshots,
@@ -329,6 +406,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     urgentDeals,
     staleDeals,
     suggestedCollateral,
+    pipelineRecommendations,
   }
 
   await db.execute(sql`
@@ -408,6 +486,24 @@ export function formatBrainContext(brain: WorkspaceBrain): string {
     for (const sc of suggestedCollateral) {
       lines.push(`• [${sc.type}] ${sc.suggestion} — for ${sc.dealName} (${sc.company})`)
       lines.push(`  Reason: ${sc.reason}`)
+    }
+  }
+
+  const recs = brain.pipelineRecommendations ?? []
+  if (recs.length > 0) {
+    lines.push(`\nPIPELINE RECOMMENDATIONS:`)
+    for (const r of recs) {
+      lines.push(`• [${r.priority}] ${r.dealName} (${r.company}): ${r.recommendation}`)
+    }
+  }
+
+  // Project plan summaries
+  const plansWithProgress = (brain.deals ?? []).filter(d => d.projectPlanProgress)
+  if (plansWithProgress.length > 0) {
+    lines.push(`\nPROJECT PLANS:`)
+    for (const d of plansWithProgress) {
+      const p = d.projectPlanProgress!
+      lines.push(`• ${d.name} (${d.company}): ${p.complete}/${p.total} tasks complete`)
     }
   }
 
