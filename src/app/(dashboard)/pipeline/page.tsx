@@ -6,8 +6,8 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useSidebar } from '@/components/layout/SidebarContext'
 import {
-  Plus, TrendingUp, DollarSign, ChevronRight, Sparkles,
-  CheckSquare, Square, MoreHorizontal, Target, Zap, ArrowUpRight,
+  Plus, TrendingUp, DollarSign, Sparkles,
+  CheckSquare, MoreHorizontal, Target, Zap, ArrowUpRight,
   Star, AlertTriangle, Clock,
   Settings, Edit, X, Trash2, Check
 } from 'lucide-react'

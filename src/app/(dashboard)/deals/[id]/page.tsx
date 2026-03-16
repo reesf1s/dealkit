@@ -1,15 +1,15 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import useSWR, { mutate as globalMutate } from 'swr'
+import useSWR from 'swr'
 import { useParams, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import * as Dialog from '@radix-ui/react-dialog'
 import {
-  ArrowLeft, Sparkles, CheckSquare, Square, Plus, Target, Loader2,
-  FileText, Clipboard, ChevronDown, TrendingUp, DollarSign, Calendar,
-  Building2, User, Edit, Trash2, MoreHorizontal, CheckCircle, X, Link2, Check,
+  ArrowLeft, Sparkles, Square, Plus, Target, Loader2,
+  Clipboard, DollarSign, Calendar,
+  User, Edit, Trash2, CheckCircle, X, Link2, Check,
   Mail, Sword, Zap, Layers
 } from 'lucide-react'
 import type { DealContact } from '@/types'

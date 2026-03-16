@@ -238,7 +238,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 }
 
 // DELETE: Remove entire project plan
-export async function DELETE(req: NextRequest, { params }: Params) {
+export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
