@@ -727,7 +727,7 @@ export async function generateDocx(
 ): Promise<Buffer> {
   let doc: Document
 
-  switch (content.type) {
+  switch ((content as { type: string }).type) {
     case 'battlecard':
       doc = generateBattlecardDocx(content as BattlecardContent)
       break
