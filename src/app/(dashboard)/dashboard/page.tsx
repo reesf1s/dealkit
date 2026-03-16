@@ -95,7 +95,10 @@ export default function DashboardPage() {
       !(brain.keyPatterns ?? []).some((p: any) => p.riskSnippets?.length > 0)
     // Missing win/loss intelligence or deal velocity — new feature
     const missingIntel = !brain.dealVelocity
-    if (hasOldSchema || hasOldPatterns || missingSnippets || missingIntel) {
+    // Missing ML model when enough training data exists
+    const closedCount = (deals?.data ?? []).filter((d: any) => d.stage === 'closed_won' || d.stage === 'closed_lost').length
+    const missingMl = closedCount >= 6 && !brain.mlModel
+    if (hasOldSchema || hasOldPatterns || missingSnippets || missingIntel || missingMl) {
       brainRebuildAttempted.current = true
       rebuildBrain()
     }
@@ -563,6 +566,92 @@ export default function DashboardPage() {
                   <div style={{ fontSize: '10px', color: '#374151' }}>Win rate · Avg deal cycle · AI score calibration · Competitor record</div>
                 </div>
               )}
+
+              {/* ML Predictive Model card */}
+              {brain?.mlModel && (() => {
+                const ml = brain.mlModel!
+                const topFeature = ml.featureImportance[0]
+                const accColor = ml.looAccuracy >= 0.7 ? '#22C55E' : ml.looAccuracy >= 0.55 ? '#F59E0B' : '#EF4444'
+                return (
+                  <div style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.14)', borderRadius: '12px', padding: '14px 16px', gridColumn: 'span 2' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                      <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Predictive Model</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: accColor }} />
+                        <span style={{ fontSize: '10px', color: accColor, fontWeight: 600 }}>{Math.round(ml.looAccuracy * 100)}% accurate</span>
+                        <span style={{ fontSize: '10px', color: '#374151', marginLeft: '4px' }}>trained on {ml.trainingSize} deals</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      {/* Feature importances */}
+                      <div>
+                        <div style={{ fontSize: '10px', color: '#4B5563', marginBottom: '6px', fontWeight: 500 }}>What drives wins at your company</div>
+                        {ml.featureImportance.slice(0, 4).map((f: { name: string; importance: number; direction: 'helps' | 'hurts' }, fi: number) => (
+                          <div key={fi} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                            <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.04)', borderRadius: '2px', overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${Math.min(100, Math.round(f.importance / (ml.featureImportance[0]?.importance || 1) * 100))}%`, background: f.direction === 'helps' ? '#22C55E' : '#EF4444', borderRadius: '2px' }} />
+                            </div>
+                            <span style={{ fontSize: '10px', color: f.direction === 'helps' ? '#22C55E' : '#EF4444', width: '8px', flexShrink: 0 }}>{f.direction === 'helps' ? '+' : '−'}</span>
+                            <span style={{ fontSize: '10px', color: '#9CA3AF', whiteSpace: 'nowrap' }}>{f.name.replace(/_/g, ' ')}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {/* ML win probabilities for open deals */}
+                      <div>
+                        <div style={{ fontSize: '10px', color: '#4B5563', marginBottom: '6px', fontWeight: 500 }}>ML win probability — open deals</div>
+                        {(brain.mlPredictions ?? []).slice(0, 4).map((p: { dealId: string; winProbability: number; confidence: string; riskFlags: string[] }, pi: number) => {
+                          const deal = (brain.deals ?? []).find((d: { id: string }) => d.id === p.dealId)
+                          if (!deal) return null
+                          const pct = Math.round(p.winProbability * 100)
+                          const pColor = pct >= 65 ? '#22C55E' : pct >= 45 ? '#F59E0B' : '#EF4444'
+                          return (
+                            <div key={pi} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                              <span style={{ fontSize: '11px', color: '#9CA3AF', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.company}</span>
+                              <div style={{ width: '32px', height: '4px', background: 'rgba(255,255,255,0.04)', borderRadius: '2px', overflow: 'hidden', flexShrink: 0 }}>
+                                <div style={{ height: '100%', width: `${pct}%`, background: pColor, borderRadius: '2px' }} />
+                              </div>
+                              <span style={{ fontSize: '11px', color: pColor, fontWeight: 600, width: '28px', textAlign: 'right', flexShrink: 0 }}>{pct}%</span>
+                            </div>
+                          )
+                        })}
+                        {topFeature && (
+                          <div style={{ fontSize: '10px', color: '#374151', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                            Biggest factor: {topFeature.name.replace(/_/g, ' ')} ({topFeature.direction === 'helps' ? 'positive' : 'negative'})
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* Trend alerts */}
+              {brain?.mlTrends && (() => {
+                const tr = brain.mlTrends!
+                const alerts: { text: string; color: string }[] = []
+                if (tr.winRate.direction === 'declining')
+                  alerts.push({ text: `Win rate declining — ${tr.winRate.priorPct}% → ${tr.winRate.recentPct}% (${tr.winRate.slopePctPerMonth}pp/mo)`, color: '#EF4444' })
+                if (tr.winRate.direction === 'improving')
+                  alerts.push({ text: `Win rate improving — ${tr.winRate.priorPct}% → ${tr.winRate.recentPct}% (+${tr.winRate.slopePctPerMonth}pp/mo)`, color: '#22C55E' })
+                if (tr.dealVelocity.direction === 'slower')
+                  alerts.push({ text: `Deals taking longer — ${tr.dealVelocity.priorAvgDays}d → ${tr.dealVelocity.recentAvgDays}d avg`, color: '#F59E0B' })
+                if (tr.dealVelocity.direction === 'faster')
+                  alerts.push({ text: `Deals closing faster — ${tr.dealVelocity.priorAvgDays}d → ${tr.dealVelocity.recentAvgDays}d avg`, color: '#22C55E' })
+                const threats = tr.competitorThreats.filter(c => c.direction === 'more_competitive')
+                threats.forEach(c => alerts.push({ text: `${c.name} more competitive recently — win rate ${c.allTimeWinRatePct}% → ${c.recentWinRatePct}%`, color: '#EF4444' }))
+                if (alerts.length === 0) return null
+                return (
+                  <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {alerts.map((a, ai) => (
+                      <div key={ai} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: `${a.color}08`, border: `1px solid ${a.color}20`, borderLeft: `2px solid ${a.color}`, borderRadius: '8px' }}>
+                        <TrendingUp size={11} color={a.color} style={{ flexShrink: 0 }} />
+                        <span style={{ fontSize: '11px', color: '#D1D5DB' }}>{a.text}</span>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+
             </div>
           </div>
         )

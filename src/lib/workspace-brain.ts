@@ -15,6 +15,7 @@
 import { db } from '@/lib/db'
 import { dealLogs, competitors as competitorRecords } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
+import { runMLEngine, type TrainedMLModel, type DealMLPrediction, type MLTrends, ML_MIN_TRAINING_DEALS } from '@/lib/deal-ml'
 
 export interface DealSnapshot {
   id: string
@@ -97,6 +98,10 @@ export interface WorkspaceBrain {
     forecastDealCount: number          // active deals contributing to forecast
     avgDaysToClose: number             // mirror from winLossIntel for quick access
   }
+  // ── Machine-learning layer — trained on closed deal history ────────────────
+  mlModel?: TrainedMLModel            // logistic regression weights (workspace IP)
+  mlPredictions?: DealMLPrediction[]  // win probability per open deal
+  mlTrends?: MLTrends                 // trend analysis: win rate, velocity, competitor threats
 }
 
 let schemaMigrated = false
@@ -677,6 +682,35 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     avgDaysToClose: winLossIntel?.avgDaysToClose ?? 0,
   }
 
+  // ── ML engine — train on closed deal history ────────────────────────────────
+  let mlModel: WorkspaceBrain['mlModel']         = undefined
+  let mlPredictions: WorkspaceBrain['mlPredictions'] = undefined
+  let mlTrends: WorkspaceBrain['mlTrends']       = undefined
+
+  if ((wonDeals.length + lostDeals.length) >= ML_MIN_TRAINING_DEALS) {
+    const mlInputs = deals.map(d => ({
+      id:               d.id,
+      company:          d.prospectCompany,
+      stage:            d.stage,
+      dealValue:        d.dealValue,
+      conversionScore:  d.conversionScore,
+      dealRisks:        (d.dealRisks as string[]) ?? [],
+      dealCompetitors:  (d.dealCompetitors as string[]) ?? [],
+      todos:            (d.todos as { done: boolean }[]) ?? [],
+      createdAt:        d.createdAt,
+      updatedAt:        d.updatedAt,
+      wonDate:          d.wonDate,
+      lostDate:         d.lostDate,
+    }))
+
+    const mlResult = runMLEngine(mlInputs, now)
+    if (mlResult.model) {
+      mlModel       = mlResult.model
+      mlPredictions = mlResult.predictions
+      mlTrends      = mlResult.trends ?? undefined
+    }
+  }
+
   const brain: WorkspaceBrain = {
     updatedAt: now.toISOString(),
     deals: snapshots,
@@ -689,6 +723,9 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     pipelineRecommendations,
     winLossIntel,
     dealVelocity,
+    mlModel,
+    mlPredictions,
+    mlTrends,
   }
 
   await db.execute(sql`
@@ -807,6 +844,36 @@ export function formatBrainContext(brain: WorkspaceBrain): string {
   const dv = brain.dealVelocity
   if (dv && dv.weightedForecast > 0) {
     lines.push(`\nWEIGHTED FORECAST (probability-adjusted): ${fmt(dv.weightedForecast)} across ${dv.forecastDealCount} scored deals`)
+  }
+
+  // ML model insights
+  const ml = brain.mlModel
+  if (ml) {
+    lines.push(`\nML MODEL (trained on ${ml.trainingSize} closed deals, ${Math.round(ml.looAccuracy * 100)}% LOO accuracy):`)
+    const top = ml.featureImportance.slice(0, 3)
+    lines.push(`Top win drivers: ${top.map(f => `${f.name} (${f.direction})`).join(' | ')}`)
+  }
+  const preds = brain.mlPredictions ?? []
+  if (preds.length > 0) {
+    lines.push(`\nML WIN PROBABILITIES (open deals):`)
+    for (const p of preds) {
+      const deal = (brain.deals ?? []).find(d => d.id === p.dealId)
+      const name = deal ? `${deal.name} (${deal.company})` : p.dealId
+      lines.push(`• ${name}: ${Math.round(p.winProbability * 100)}% win probability [${p.confidence} confidence]${p.riskFlags.length > 0 ? ` — ${p.riskFlags[0]}` : ''}`)
+    }
+  }
+  const tr = brain.mlTrends
+  if (tr) {
+    if (tr.winRate.direction !== 'stable') {
+      lines.push(`\nTREND: Win rate ${tr.winRate.direction} — ${tr.winRate.priorPct}% → ${tr.winRate.recentPct}% (${tr.winRate.slopePctPerMonth > 0 ? '+' : ''}${tr.winRate.slopePctPerMonth}pp/month)`)
+    }
+    if (tr.dealVelocity.direction !== 'stable') {
+      lines.push(`TREND: Deals closing ${tr.dealVelocity.direction} — ${tr.dealVelocity.priorAvgDays}d → ${tr.dealVelocity.recentAvgDays}d avg`)
+    }
+    const threats = tr.competitorThreats.filter(c => c.direction === 'more_competitive')
+    if (threats.length > 0) {
+      lines.push(`COMPETITIVE THREAT: ${threats.map(c => `${c.name} win rate dropping ${c.allTimeWinRatePct}% → ${c.recentWinRatePct}%`).join(' | ')}`)
+    }
   }
 
   return lines.join('\n')
