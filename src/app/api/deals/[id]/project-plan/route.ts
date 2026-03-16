@@ -64,7 +64,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       : ''
 
     const extractMsg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-sonnet-4-6',
       max_tokens: 4000,
       system: `You are a project plan extractor for a sales deal management tool.
 Your job is to convert ANY format of input (tables, emails, meeting notes, spreadsheet data, free text) into a structured project plan JSON.
