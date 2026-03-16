@@ -2,13 +2,29 @@ export const maxDuration = 60
 
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { and, eq, ilike } from 'drizzle-orm'
+import { and, eq, ilike, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { collateral, competitors, events } from '@/lib/db/schema'
 import { dbErrResponse } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { generateCollateral } from '@/lib/ai/generate'
 import type { CollateralType } from '@/types'
+
+let colsMigrated = false
+async function ensureCollateralColumns() {
+  if (colsMigrated) return
+  try {
+    await db.execute(sql`
+      ALTER TABLE collateral
+      ADD COLUMN IF NOT EXISTS title text NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS custom_type_name text,
+      ADD COLUMN IF NOT EXISTS generation_source text,
+      ADD COLUMN IF NOT EXISTS share_token text,
+      ADD COLUMN IF NOT EXISTS is_shared boolean NOT NULL DEFAULT false
+    `)
+  } catch { /* columns may already exist */ }
+  colsMigrated = true
+}
 
 async function logEvent(workspaceId: string, userId: string, type: string, metadata: Record<string, unknown>) {
   await db.insert(events).values({ workspaceId, userId, type, metadata, createdAt: new Date() })
@@ -23,6 +39,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { workspaceId } = await getWorkspaceContext(userId)
+    await ensureCollateralColumns()
     const { id } = await params
     const [item] = await db.select().from(collateral).where(and(eq(collateral.id, id), eq(collateral.workspaceId, workspaceId))).limit(1)
     if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })

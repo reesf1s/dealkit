@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { collateral } from '@/lib/db/schema'
 import { generateDocx } from '@/lib/export/docx'
 import type { CollateralContent } from '@/types'
+import { getWorkspaceContext } from '@/lib/workspace'
 
 interface Params {
   params: Promise<{ id: string }>
@@ -15,12 +16,13 @@ export async function POST(_req: NextRequest, { params }: Params) {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { workspaceId } = await getWorkspaceContext(userId)
   const { id } = await params
 
   const [item] = await db
     .select()
     .from(collateral)
-    .where(and(eq(collateral.id, id), eq(collateral.userId, userId)))
+    .where(and(eq(collateral.id, id), eq(collateral.workspaceId, workspaceId)))
     .limit(1)
 
   if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })

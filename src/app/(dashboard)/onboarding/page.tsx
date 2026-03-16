@@ -57,6 +57,19 @@ export default function OnboardingPage() {
     }
   }
 
+  /** Map AI-extracted industry text to a known pipeline preset key */
+  function inferPreset(industry: string | null | undefined): string | null {
+    if (!industry) return null
+    const s = industry.toLowerCase()
+    if (s.includes('saas') || s.includes('software') || s.includes('tech') || s.includes('app')) return 'saas'
+    if (s.includes('agency') || s.includes('creative') || s.includes('marketing') || s.includes('design')) return 'agency'
+    if (s.includes('consult')) return 'consulting'
+    if (s.includes('ecommerce') || s.includes('e-commerce') || s.includes('retail') || s.includes('wholesale') || s.includes('clothing') || s.includes('fashion')) return 'ecommerce'
+    if (s.includes('real estate') || s.includes('property') || s.includes('realty')) return 'real_estate'
+    if (s.includes('manufactur') || s.includes('industrial') || s.includes('factory') || s.includes('engineering')) return 'manufacturing'
+    return null
+  }
+
   const handleSave = async () => {
     setStep('saving')
     try {
@@ -66,6 +79,16 @@ export default function OnboardingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(parsed.company),
       })
+
+      // Auto-apply industry pipeline preset based on extracted company industry
+      const preset = inferPreset(parsed.company?.industry)
+      if (preset) {
+        await fetch('/api/pipeline-config', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ applyPreset: preset }),
+        }).catch(() => { /* best effort */ })
+      }
 
       // Save competitors + collect their IDs
       const createdCompetitors: { id: string; name: string }[] = []

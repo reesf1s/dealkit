@@ -3,7 +3,8 @@ import { db } from '@/lib/db'
 import { users, workspaces, workspaceMemberships } from '@/lib/db/schema'
 import type { Plan } from '@/types'
 
-// Generates a short human-friendly join code, e.g. "crane-47"
+// Generates a short human-friendly join code, e.g. "crane-4a2f"
+// Uses word + 4-char hex suffix for ~10M combinations (vs 2,340 previously)
 function generateSlug(): string {
   const words = [
     'atlas', 'bolt', 'crane', 'delta', 'echo', 'flux', 'gear',
@@ -12,8 +13,8 @@ function generateSlug(): string {
     'vale', 'wren', 'xero', 'yoke', 'zest',
   ]
   const word = words[Math.floor(Math.random() * words.length)]
-  const num = Math.floor(10 + Math.random() * 90)
-  return `${word}-${num}`
+  const suffix = Math.floor(Math.random() * 0x10000).toString(16).padStart(4, '0')
+  return `${word}-${suffix}`
 }
 
 export type WorkspaceContext = {

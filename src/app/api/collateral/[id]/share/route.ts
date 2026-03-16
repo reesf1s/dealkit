@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { eq, and } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { collateral } from '@/lib/db/schema'
+import { getWorkspaceContext } from '@/lib/workspace'
 
 // POST /api/collateral/[id]/share — toggle sharing, return { shareToken, isShared }
 export async function POST(
@@ -12,15 +13,16 @@ export async function POST(
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { workspaceId } = await getWorkspaceContext(userId)
   const { id } = await params
   const body = await req.json() as { enable: boolean }
   const { enable } = body
 
-  // Verify ownership
+  // Verify ownership AND workspace membership
   const [item] = await db
     .select({ id: collateral.id, isShared: collateral.isShared, shareToken: collateral.shareToken })
     .from(collateral)
-    .where(and(eq(collateral.id, id), eq(collateral.userId, userId)))
+    .where(and(eq(collateral.id, id), eq(collateral.workspaceId, workspaceId)))
     .limit(1)
 
   if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })

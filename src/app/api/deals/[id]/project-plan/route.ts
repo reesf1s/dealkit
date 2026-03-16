@@ -7,6 +7,7 @@ import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
 import Anthropic from '@anthropic-ai/sdk'
+import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -45,6 +46,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const rl = await checkRateLimit(userId, 'project-plan:parse', 5)
+    if (!rl.allowed) return rateLimitResponse(rl.resetAt)
     const { workspaceId } = await getWorkspaceContext(userId)
     const { id } = await params
     await ensureProjectPlanCol()
