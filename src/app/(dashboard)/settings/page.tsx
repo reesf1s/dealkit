@@ -93,6 +93,9 @@ export default function SettingsPage() {
   const [leaveOpen, setLeaveOpen] = useState(false)
   const [hubspotSyncing, setHubspotSyncing] = useState(false)
   const [hubspotDisconnecting, setHubspotDisconnecting] = useState(false)
+  const [hubspotConnecting, setHubspotConnecting] = useState(false)
+  const [hubspotToken, setHubspotToken] = useState('')
+  const [showTokenInput, setShowTokenInput] = useState(false)
 
   const { data: userRes, isLoading: loadingUser } = useSWR<{ data: DbUser }>('/api/user', fetcher)
   const { data: membersRes, isLoading: loadingMembers, mutate: mutateMembers } = useSWR<{ data: Member[] }>('/api/workspaces/members', fetcher)
@@ -116,6 +119,29 @@ export default function SettingsPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  async function handleHubspotConnect(e: React.FormEvent) {
+    e.preventDefault()
+    if (!hubspotToken.trim()) return
+    setHubspotConnecting(true)
+    try {
+      const res = await fetch('/api/integrations/hubspot/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: hubspotToken.trim() }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Connection failed')
+      toast('HubSpot connected! Click "Sync deals" to import your pipeline.', 'success')
+      setHubspotToken('')
+      setShowTokenInput(false)
+      mutateHubspot()
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : 'Connection failed', 'error')
+    } finally {
+      setHubspotConnecting(false)
+    }
+  }
 
   async function handleHubspotSync() {
     setHubspotSyncing(true)
@@ -513,16 +539,63 @@ export default function SettingsPage() {
                     </button>
                   </>
                 ) : (
-                  <a
-                    href="/api/integrations/hubspot/auth"
-                    style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#fff', backgroundColor: 'rgba(255,122,0,0.8)', border: '1px solid rgba(255,122,0,0.5)', textDecoration: 'none' }}
+                  <button
+                    onClick={() => setShowTokenInput(t => !t)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#fff', backgroundColor: 'rgba(255,122,0,0.8)', border: '1px solid rgba(255,122,0,0.5)', cursor: 'pointer' }}
                   >
                     <Plug size={11} />
                     Connect HubSpot
-                  </a>
+                  </button>
                 )}
               </div>
             </div>
+
+            {/* Token input — shown when user clicks Connect HubSpot */}
+            {showTokenInput && !hubspot?.connected && (
+              <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(255,122,0,0.04)', border: '1px solid rgba(255,122,0,0.2)' }}>
+                <p style={{ fontSize: '12px', fontWeight: 600, color: '#F1F1F3', margin: '0 0 6px' }}>Paste your HubSpot Private App token</p>
+                <ol style={{ margin: '0 0 12px', padding: '0 0 0 16px', fontSize: '11px', color: '#888', lineHeight: 1.8 }}>
+                  <li>In HubSpot, go to <strong style={{ color: '#aaa' }}>Settings → Integrations → Private Apps</strong></li>
+                  <li>Click <strong style={{ color: '#aaa' }}>Create a private app</strong></li>
+                  <li>Under Scopes, add: <code style={{ color: '#FF7A00', fontSize: '10px' }}>crm.objects.deals.read</code>, <code style={{ color: '#FF7A00', fontSize: '10px' }}>crm.objects.contacts.read</code>, <code style={{ color: '#FF7A00', fontSize: '10px' }}>crm.objects.companies.read</code></li>
+                  <li>Click <strong style={{ color: '#aaa' }}>Create app</strong> then copy the access token</li>
+                </ol>
+                <form onSubmit={handleHubspotConnect} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="password"
+                    value={hubspotToken}
+                    onChange={e => setHubspotToken(e.target.value)}
+                    placeholder="pat-na1-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    autoComplete="off"
+                    style={{
+                      flex: 1, height: '32px', padding: '0 10px', borderRadius: '7px', fontSize: '12px',
+                      background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,122,0,0.3)',
+                      color: '#F1F1F3', outline: 'none', fontFamily: 'monospace',
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={hubspotConnecting || !hubspotToken.trim()}
+                    style={{
+                      height: '32px', padding: '0 14px', borderRadius: '7px', fontSize: '12px', fontWeight: 600,
+                      color: '#fff', background: hubspotConnecting || !hubspotToken.trim() ? 'rgba(255,122,0,0.4)' : 'rgba(255,122,0,0.85)',
+                      border: '1px solid rgba(255,122,0,0.5)',
+                      cursor: hubspotConnecting || !hubspotToken.trim() ? 'not-allowed' : 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {hubspotConnecting ? 'Connecting…' : 'Save & connect'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowTokenInput(false); setHubspotToken('') }}
+                    style={{ height: '32px', padding: '0 10px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#666', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
+                  >
+                    Cancel
+                  </button>
+                </form>
+              </div>
+            )}
 
             <p style={{ fontSize: '11px', color: '#444', margin: 0, lineHeight: 1.5 }}>
               More integrations coming — Salesforce, Pipedrive, and Close are on the roadmap.
