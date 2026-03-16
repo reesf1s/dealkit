@@ -339,7 +339,7 @@ function ObjectionHandlerViewer({ content }: { content: ObjectionHandlerContent 
                     {obj.followUpQuestion && (
                       <div>
                         <p style={{ fontSize: '11px', fontWeight: 600, color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px' }}>Follow-up question</p>
-                        <p style={{ fontSize: '13px', color: '#888', fontStyle: 'italic', lineHeight: 1.6, margin: 0 }}>"{obj.followUpQuestion}"</p>
+                        <p style={{ fontSize: '13px', color: '#888', fontStyle: 'italic', lineHeight: 1.6, margin: 0 }}>&quot;{obj.followUpQuestion}&quot;</p>
                       </div>
                     )}
                     {obj.proofPoints.length > 0 && (
@@ -396,7 +396,7 @@ function TalkTrackSectionCard({ section, title }: { section: TalkTrackSection; t
             )}
             <div>
               <p style={{ fontSize: '11px', fontWeight: 600, color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>Transition</p>
-              <p style={{ fontSize: '13px', color: '#6366F1', fontStyle: 'italic', margin: 0 }}>"{section.transitionPhrase}"</p>
+              <p style={{ fontSize: '13px', color: '#6366F1', fontStyle: 'italic', margin: 0 }}>&quot;{section.transitionPhrase}&quot;</p>
             </div>
           </div>
         </div>

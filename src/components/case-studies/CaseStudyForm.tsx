@@ -184,7 +184,7 @@ export function CaseStudyForm({ initialData, onSubmit, onGenerateDocument, submi
 
           {form.metrics.length === 0 && (
             <p style={{ fontSize: '12px', color: '#555', margin: 0 }}>
-              Add quantifiable results (e.g. "50% reduction in onboarding time")
+              Add quantifiable results (e.g. &quot;50% reduction in onboarding time&quot;)
             </p>
           )}
 

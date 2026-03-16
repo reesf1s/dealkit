@@ -487,7 +487,7 @@ function CollateralPageInner() {
                   </select>
                   {selectedDealId && (
                     <p style={{ fontSize: '11px', color: '#6366F1', margin: '4px 0 0' }}>
-                      AI will use this deal's context, risks, and competitors to tailor the output.
+                      AI will use this deal&apos;s context, risks, and competitors to tailor the output.
                     </p>
                   )}
                 </div>

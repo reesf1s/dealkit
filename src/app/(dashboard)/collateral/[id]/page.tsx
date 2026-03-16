@@ -285,7 +285,7 @@ export default function CollateralDetailPage() {
           {item.status === 'stale' && (
             <div style={{ padding: '16px', borderRadius: '8px', backgroundColor: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', marginBottom: '16px' }}>
               <p style={{ fontSize: '13px', color: '#F59E0B', margin: 0 }}>
-                This collateral is stale because your source data has changed. Click "Regenerate" to get fresh content.
+                This collateral is stale because your source data has changed. Click &quot;Regenerate&quot; to get fresh content.
               </p>
             </div>
           )}

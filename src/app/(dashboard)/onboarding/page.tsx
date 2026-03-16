@@ -196,7 +196,7 @@ export default function OnboardingPage() {
           <div style={{ background: 'rgba(99,102,241,0.05)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '12px', padding: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
               <Zap size={13} color="#818CF8" />
-              <span style={{ fontSize: '12px', fontWeight: '600', color: '#818CF8' }}>After setup, you'll be able to:</span>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: '#818CF8' }}>After setup, you&apos;ll be able to:</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {[
@@ -232,7 +232,7 @@ export default function OnboardingPage() {
           <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <LogIn size={15} color="#818CF8" />
-              <span style={{ fontSize: '13px', fontWeight: '600', color: '#EBEBEB' }}>Join your team's workspace</span>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: '#EBEBEB' }}>Join your team&apos;s workspace</span>
             </div>
             <p style={{ fontSize: '13px', color: '#888', margin: 0, lineHeight: '1.6' }}>
               Ask your team admin for the workspace invite code (visible in their Settings → Team section). It looks like <code style={{ color: '#818CF8', background: 'rgba(99,102,241,0.1)', padding: '1px 6px', borderRadius: '4px', fontSize: '12px' }}>crane-47</code>.
@@ -418,9 +418,9 @@ export default function OnboardingPage() {
             <div style={{ width: '56px', height: '56px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 0 24px rgba(34,197,94,0.15)' }}>
               <CheckCircle size={24} color="#22C55E" />
             </div>
-            <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#F0EEFF', marginBottom: '8px', letterSpacing: '-0.03em' }}>You're all set!</h2>
+            <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#F0EEFF', marginBottom: '8px', letterSpacing: '-0.03em' }}>You&apos;re all set!</h2>
             <p style={{ fontSize: '13px', color: '#555', lineHeight: '1.6' }}>
-              Your company profile, competitors, and battlecards are ready.<br />Here's what to do next:
+              Your company profile, competitors, and battlecards are ready.<br />Here&apos;s what to do next:
             </p>
           </div>
 
