@@ -6,7 +6,7 @@ import { FileText, Download, Eye, Trash2, RefreshCw } from 'lucide-react'
 import { CollateralTypeBadge } from './CollateralTypeBadge'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
-import type { Collateral, CollateralType, CollateralStatus } from '@/types'
+import type { Collateral, CollateralStatus } from '@/types'
 
 interface CollateralGridProps {
   collateral: Collateral[]
