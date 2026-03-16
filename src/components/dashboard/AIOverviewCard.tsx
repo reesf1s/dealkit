@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import useSWR from 'swr'
 import { Sparkles, RefreshCw, TrendingUp, AlertTriangle, Zap } from 'lucide-react'
 import { fetcher, isDbNotConfigured } from '@/lib/fetcher'
@@ -22,7 +22,10 @@ function getStorageKey(generatedAt: string) {
 
 export default function AIOverviewCard() {
   const [refreshing, setRefreshing] = useState(false)
+  const [autoFailed, setAutoFailed] = useState(false)
   const [doneActions, setDoneActions] = useState<Record<number, boolean>>({})
+  // Prevent the auto-generate effect from looping if the first attempt fails
+  const autoAttempted = useRef(false)
 
   const { data, error, mutate } = useSWR<{ data: AIOverview; cached: boolean }>(
     '/api/dashboard/ai-overview',
@@ -54,22 +57,26 @@ export default function AIOverviewCard() {
     })
   }, [overview?.generatedAt])
 
-  const handleRefresh = useCallback(async () => {
+  const handleRefresh = useCallback(async (isAuto = false) => {
     setRefreshing(true)
+    if (isAuto) setAutoFailed(false)
     try {
-      await fetch('/api/dashboard/ai-overview', { method: 'POST' })
+      const res = await fetch('/api/dashboard/ai-overview', { method: 'POST' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       await mutate()
     } catch {
-      // silent
+      if (isAuto) setAutoFailed(true)
     } finally {
       setRefreshing(false)
     }
   }, [mutate])
 
-  // Auto-generate on first visit if no cached overview exists
+  // Auto-generate ONCE on first visit if no cached overview exists.
+  // Uses a ref guard so a failed attempt never triggers a loop.
   useEffect(() => {
-    if (data && !data.data && !refreshing) {
-      handleRefresh()
+    if (data && !data.data && !autoAttempted.current) {
+      autoAttempted.current = true
+      handleRefresh(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data])
@@ -140,7 +147,7 @@ export default function AIOverviewCard() {
             </span>
           )}
           <button
-            onClick={handleRefresh}
+            onClick={() => handleRefresh()}
             disabled={refreshing || isLoading}
             style={{
               display: 'flex', alignItems: 'center', gap: '5px',
@@ -180,7 +187,14 @@ export default function AIOverviewCard() {
           </div>
         )}
 
-        {/* Error state */}
+        {/* Auto-generate failed (one-shot) — show prompt to retry manually */}
+        {autoFailed && !overview && !refreshing && (
+          <div style={{ fontSize: '13px', color: '#9CA3AF', padding: '4px 0' }}>
+            Couldn&apos;t generate overview automatically. Hit <strong style={{ color: '#818CF8' }}>Refresh</strong> to try again.
+          </div>
+        )}
+
+        {/* SWR fetch error */}
         {error && !dbNotConnected && (
           <div style={{ fontSize: '13px', color: '#9CA3AF', padding: '4px 0' }}>
             Could not load AI overview. Hit refresh to try again.
