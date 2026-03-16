@@ -14,6 +14,7 @@ import { SetupAlert } from '@/components/shared/SetupBanner'
 import { useUser } from '@clerk/nextjs'
 import { fetcher, isDbNotConfigured } from '@/lib/fetcher'
 import { annualizedValue } from '@/components/dashboard/ROIWidget'
+import { BRAIN_VERSION } from '@/lib/brain-constants'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -103,7 +104,9 @@ export default function DashboardPage() {
     const closedIds = new Set((deals?.data ?? []).filter((d: any) => d.stage === 'closed_won' || d.stage === 'closed_lost').map((d: any) => d.id))
     const brainHasStaleClosedDeals = deals?.data &&
       ([...(brain.urgentDeals ?? []), ...(brain.staleDeals ?? [])].some((u: any) => closedIds.has(u.dealId)))
-    if (hasOldSchema || hasOldPatterns || missingSnippets || missingIntel || missingMl || brainHasStaleClosedDeals) {
+    // Version-based cache-bust: force rebuild when brain was built before a critical calculation fix
+    const brainOutdated = !brain.brainVersion || brain.brainVersion < BRAIN_VERSION
+    if (hasOldSchema || hasOldPatterns || missingSnippets || missingIntel || missingMl || brainHasStaleClosedDeals || brainOutdated) {
       brainRebuildAttempted.current = true
       rebuildBrain()
     }

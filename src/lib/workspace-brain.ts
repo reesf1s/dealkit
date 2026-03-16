@@ -17,6 +17,8 @@ import { dealLogs, competitors as competitorRecords } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import { runMLEngine, computeCompositeScore, type TrainedMLModel, type DealMLPrediction, type MLTrends, type DealArchetype, type StageVelocityIntel, type CompetitivePattern, type ScoreCalibrationPoint, type CloseDateModel, ML_MIN_TRAINING_DEALS } from '@/lib/deal-ml'
 import { extractTextSignals, analyzeDeterioration, type TextSignals } from '@/lib/text-signals'
+import { BRAIN_VERSION } from '@/lib/brain-constants'
+export { BRAIN_VERSION } from '@/lib/brain-constants'
 
 export interface DealSignalSummary {
   momentum:         number    // 0–1 sentiment momentum (>0.5 = building)
@@ -47,6 +49,7 @@ export interface DealSnapshot {
 }
 
 export interface WorkspaceBrain {
+  brainVersion?: number               // bump BRAIN_VERSION to force a cache-bust rebuild
   updatedAt: string
   deals: DealSnapshot[]
   pipeline: {
@@ -946,6 +949,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
   })()
 
   const brain: WorkspaceBrain = {
+    brainVersion: BRAIN_VERSION,
     updatedAt: now.toISOString(),
     deals: snapshots,
     pipeline: { totalActive: activeDeals.length, totalValue, avgConversionScore, stageBreakdown },
