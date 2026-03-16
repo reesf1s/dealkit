@@ -90,7 +90,10 @@ export default function DashboardPage() {
     // Old snapshot missing newer fields, or patterns in legacy string format
     const hasOldSchema = !brain.pipelineRecommendations
     const hasOldPatterns = (brain.keyPatterns ?? []).some((p: any) => typeof p === 'string')
-    if (hasOldSchema || hasOldPatterns) {
+    // Patterns exist but none have riskSnippets — rebuild after new feature deployed
+    const missingSnippets = (brain.keyPatterns ?? []).length > 0 &&
+      !(brain.keyPatterns ?? []).some((p: any) => p.riskSnippets?.length > 0)
+    if (hasOldSchema || hasOldPatterns || missingSnippets) {
       brainRebuildAttempted.current = true
       rebuildBrain()
     }

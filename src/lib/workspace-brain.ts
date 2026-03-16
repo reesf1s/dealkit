@@ -245,10 +245,33 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
       return theme.keywords.some(kw => allText.includes(kw))
     })
     if (matchingDeals.length >= 2) {
-      // For competitor pressure: surface the actual named competitors from those deals
-      const competitorNames = theme.label === 'competitor pressure'
-        ? [...new Set(matchingDeals.flatMap(d => (d.dealCompetitors as string[]) ?? []).filter(Boolean))]
-        : undefined
+      // For competitor pressure: first try explicit competitors[] array, then scan risk text
+      let competitorNames: string[] | undefined
+      if (theme.label === 'competitor pressure') {
+        const fromArray = [...new Set(matchingDeals.flatMap(d => (d.dealCompetitors as string[]) ?? []).filter(Boolean))]
+        if (fromArray.length > 0) {
+          competitorNames = fromArray
+        } else {
+          // Fallback: extract likely competitor names from risk text using common patterns
+          const allRiskText = matchingDeals.flatMap(d => (d.dealRisks as string[]) ?? []).join(' ')
+          const extracted = new Set<string>()
+          const patterns = [
+            /\bvs\.?\s+([A-Z][a-zA-Z0-9]{2,}(?:\s+[A-Z][a-zA-Z0-9]{2,})?)/g,
+            /\bevaluating\s+([A-Z][a-zA-Z0-9]{2,}(?:\s+[A-Z][a-zA-Z0-9]{2,})?)/gi,
+            /\bconsidering\s+([A-Z][a-zA-Z0-9]{2,}(?:\s+[A-Z][a-zA-Z0-9]{2,})?)/gi,
+            /\busing\s+([A-Z][a-zA-Z0-9]{2,}(?:\s+[A-Z][a-zA-Z0-9]{2,})?)\s+(?:currently|instead|today)/gi,
+          ]
+          const stopWords = new Set(['The','This','They','Their','We','Our','Also','But','And','For','Has','Have','Not','Can','Will'])
+          for (const re of patterns) {
+            let m: RegExpExecArray | null
+            while ((m = re.exec(allRiskText)) !== null) {
+              const name = m[1].trim()
+              if (!stopWords.has(name.split(' ')[0])) extracted.add(name)
+            }
+          }
+          if (extracted.size > 0) competitorNames = [...extracted]
+        }
+      }
       // Extract the actual matching risk strings for each deal in this pattern
       const riskSnippets = matchingDeals.map(d => {
         const risks = (d.dealRisks as string[]) ?? []

@@ -1914,19 +1914,49 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate }: { dealId: string; dea
               </div>
             )}
 
-            {/* What to focus on — based on stage and score */}
+            {/* What to focus on — specific to this deal's data */}
             {deal.stage && deal.stage !== 'closed_won' && deal.stage !== 'closed_lost' && (
               <div style={{ padding: '10px 14px', background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.1)', borderRadius: '8px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: '#6366F1', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>What to focus on</div>
-                <div style={{ fontSize: '12px', color: '#9CA3AF', lineHeight: 1.6 }}>
-                  {deal.conversionScore == null
-                    ? 'Paste meeting notes and analyze them to get a conversion score and AI recommendations for this deal.'
-                    : deal.conversionScore < 40
-                    ? `Score is ${deal.conversionScore}% — this deal needs immediate attention. Address the identified risks and consider a re-qualification call.`
-                    : deal.conversionScore < 70
-                    ? `Score is ${deal.conversionScore}% — solid progress. Work through the flagged risks and keep the champion engaged to close this.`
-                    : `Score is ${deal.conversionScore}% — strong position. Keep momentum, confirm timeline, and send a mutual close plan.`}
-                </div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#6366F1', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>What to focus on</div>
+                {deal.conversionScore == null ? (
+                  <div style={{ fontSize: '12px', color: '#6B7280', lineHeight: 1.6 }}>
+                    Add meeting notes and run AI analysis to get a health score and specific recommendations for this deal.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                    {/* Next step from deal data */}
+                    {deal.nextSteps && (
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#6366F1', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '4px', padding: '1px 6px', flexShrink: 0, marginTop: '1px', letterSpacing: '0.04em' }}>NEXT</span>
+                        <span style={{ fontSize: '12px', color: '#D1D5DB', lineHeight: 1.5 }}>{deal.nextSteps}</span>
+                      </div>
+                    )}
+                    {/* Top risk */}
+                    {((deal.dealRisks as string[]) ?? []).length > 0 && (
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#F59E0B', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '4px', padding: '1px 6px', flexShrink: 0, marginTop: '1px', letterSpacing: '0.04em' }}>RISK</span>
+                        <span style={{ fontSize: '12px', color: '#D1D5DB', lineHeight: 1.5 }}>{(deal.dealRisks as string[])[0]}</span>
+                      </div>
+                    )}
+                    {/* First insight if no risks */}
+                    {((deal.dealRisks as string[]) ?? []).length === 0 && ((deal.conversionInsights as string[]) ?? []).length > 0 && (
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#818CF8', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '4px', padding: '1px 6px', flexShrink: 0, marginTop: '1px', letterSpacing: '0.04em' }}>KEY</span>
+                        <span style={{ fontSize: '12px', color: '#D1D5DB', lineHeight: 1.5 }}>{(deal.conversionInsights as string[])[0]}</span>
+                      </div>
+                    )}
+                    {/* Fallback when no specific data */}
+                    {!deal.nextSteps && ((deal.dealRisks as string[]) ?? []).length === 0 && ((deal.conversionInsights as string[]) ?? []).length === 0 && (
+                      <div style={{ fontSize: '12px', color: '#6B7280', lineHeight: 1.6 }}>
+                        {deal.conversionScore < 40
+                          ? 'Score critically low — add next steps and update meeting notes to identify specific blockers.'
+                          : deal.conversionScore < 70
+                          ? 'Add next steps to the deal and log latest meeting notes to surface specific actions here.'
+                          : 'Strong position. Add next steps to keep this deal on track to close.'}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
