@@ -42,7 +42,7 @@ export interface WorkspaceBrain {
     stageBreakdown: Record<string, number>
   }
   topRisks: string[]            // deduplicated across all active deals
-  keyPatterns: { label: string; dealIds: string[]; companies: string[]; dealNames: string[]; competitorNames?: string[] }[]  // recurring themes detected automatically
+  keyPatterns: { label: string; dealIds: string[]; companies: string[]; dealNames: string[]; competitorNames?: string[]; riskSnippets?: { dealId: string; company: string; snippets: string[] }[] }[]  // recurring themes detected automatically
   urgentDeals: {                // deals needing attention soon
     dealId: string
     dealName: string
@@ -249,11 +249,19 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
       const competitorNames = theme.label === 'competitor pressure'
         ? [...new Set(matchingDeals.flatMap(d => (d.dealCompetitors as string[]) ?? []).filter(Boolean))]
         : undefined
+      // Extract the actual matching risk strings for each deal in this pattern
+      const riskSnippets = matchingDeals.map(d => {
+        const risks = (d.dealRisks as string[]) ?? []
+        const matching = risks.filter(r => theme.keywords.some(kw => r.toLowerCase().includes(kw)))
+        return { dealId: d.id, company: d.prospectCompany, snippets: matching.slice(0, 2) }
+      }).filter(r => r.snippets.length > 0)
+
       keyPatterns.push({
         label: theme.label,
         dealIds: matchingDeals.map(d => d.id),
         companies: matchingDeals.map(d => d.prospectCompany),
         dealNames: matchingDeals.map(d => d.dealName),
+        ...(riskSnippets.length > 0 ? { riskSnippets } : {}),
         ...(competitorNames && competitorNames.length > 0 ? { competitorNames } : {}),
       })
     }

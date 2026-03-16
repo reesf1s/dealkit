@@ -1783,6 +1783,237 @@ function ProjectPlanTab({ dealId, deal, onUpdate }: { dealId: string; deal: any;
   )
 }
 
+function OverviewTab({ dealId, deal, dealGaps, onUpdate }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void }) {
+  const [editingSummary, setEditingSummary] = useState(false)
+  const [summaryDraft, setSummaryDraft] = useState('')
+  const [resetAIConfirm, setResetAIConfirm] = useState(false)
+  const [savingAI, setSavingAI] = useState(false)
+
+  const patchDeal = async (payload: Record<string, unknown>) => {
+    setSavingAI(true)
+    try {
+      await fetch(`/api/deals/${dealId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      onUpdate()
+    } finally {
+      setSavingAI(false)
+    }
+  }
+
+  const deleteRisk = (index: number) => {
+    const current: string[] = deal?.dealRisks ?? []
+    patchDeal({ dealRisks: current.filter((_: string, i: number) => i !== index) })
+  }
+
+  const deleteInsight = (index: number) => {
+    const current: string[] = deal?.conversionInsights ?? []
+    patchDeal({ conversionInsights: current.filter((_: string, i: number) => i !== index) })
+  }
+
+  const saveSummary = () => {
+    patchDeal({ aiSummary: summaryDraft.trim() || null })
+    setEditingSummary(false)
+  }
+
+  const resetAllAI = async () => {
+    await patchDeal({ aiSummary: null, conversionScore: null, conversionInsights: [], dealRisks: [] })
+    setResetAIConfirm(false)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+      {/* AI Analysis card — shown first if any AI data exists */}
+      {(deal.aiSummary || deal.conversionScore != null || (deal.conversionInsights as string[])?.length > 0 || (deal.dealRisks as string[])?.length > 0) && (
+        <div style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '12px', overflow: 'hidden' }}>
+          {/* Header row with score */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
+            <Sparkles size={14} color="#818CF8" />
+            <span style={{ fontSize: '13px', fontWeight: '700', color: '#818CF8' }}>AI Intelligence</span>
+            {deal.conversionScore != null && (
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '11px', color: deal.conversionScore >= 70 ? '#22C55E' : deal.conversionScore >= 40 ? '#F59E0B' : '#EF4444' }}>
+                  {deal.conversionScore >= 70 ? 'High likelihood' : deal.conversionScore >= 40 ? 'Needs attention' : 'At risk'}
+                </span>
+                <span style={{ fontSize: '22px', fontWeight: '800', letterSpacing: '-0.04em', color: deal.conversionScore >= 70 ? '#22C55E' : deal.conversionScore >= 40 ? '#F59E0B' : '#EF4444' }}>
+                  {deal.conversionScore}%
+                </span>
+                <button onClick={() => patchDeal({ conversionScore: null })} title="Clear score" style={{ fontSize: '10px', color: '#374151', background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}>✕</button>
+              </div>
+            )}
+          </div>
+
+          <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* Summary */}
+            {editingSummary ? (
+              <div>
+                <textarea
+                  value={summaryDraft}
+                  onChange={e => setSummaryDraft(e.target.value)}
+                  rows={4}
+                  style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '8px', color: '#EBEBEB', fontSize: '13px', lineHeight: '1.6', padding: '10px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+                  autoFocus
+                />
+                <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                  <button onClick={saveSummary} disabled={savingAI} style={{ fontSize: '11px', padding: '4px 10px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '5px', color: '#818CF8', cursor: 'pointer' }}>
+                    {savingAI ? 'Saving…' : 'Save'}
+                  </button>
+                  <button onClick={() => setEditingSummary(false)} style={{ fontSize: '11px', padding: '4px 10px', background: 'none', border: 'none', color: '#555', cursor: 'pointer' }}>Cancel</button>
+                </div>
+              </div>
+            ) : deal.aiSummary ? (
+              <div style={{ position: 'relative' }}
+                onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.edit-summary-ov') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
+                onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.edit-summary-ov') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
+              >
+                <p style={{ fontSize: '13px', color: '#9CA3AF', lineHeight: '1.7', margin: 0, paddingRight: '32px' }}>{deal.aiSummary}</p>
+                <button className="edit-summary-ov" onClick={() => { setSummaryDraft(deal.aiSummary); setEditingSummary(true) }}
+                  style={{ opacity: 0, position: 'absolute', top: 0, right: 0, fontSize: '10px', color: '#555', background: 'none', border: 'none', cursor: 'pointer', transition: 'opacity 0.15s', padding: '2px 4px' }}>✎ edit</button>
+              </div>
+            ) : (
+              <p style={{ fontSize: '12px', color: '#374151', margin: 0, fontStyle: 'italic' }}>No AI summary yet — paste meeting notes and click Analyze to generate.</p>
+            )}
+
+            {/* Insights */}
+            {(deal.conversionInsights as string[])?.length > 0 && (
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#818CF8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Key Insights</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {(deal.conversionInsights as string[]).map((insight: string, i: number) => (
+                    <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: '#9CA3AF' }}
+                      onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-insight-ov') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
+                      onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-insight-ov') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
+                    >
+                      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1', flexShrink: 0, marginTop: '5px' }} />
+                      <span style={{ flex: 1 }}>{insight}</span>
+                      <button className="del-insight-ov" onClick={() => deleteInsight(i)} style={{ opacity: 0, fontSize: '10px', color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s', padding: '0 2px' }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Risks */}
+            {(deal.dealRisks as string[])?.length > 0 && (
+              <div style={{ padding: '12px 14px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '8px' }}>
+                <div style={{ fontSize: '11px', color: '#F59E0B', fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>⚠ Deal Risks</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  {(deal.dealRisks as string[]).map((risk: string, i: number) => (
+                    <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: '#C9820A' }}
+                      onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-risk-ov') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
+                      onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-risk-ov') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
+                    >
+                      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#F59E0B', flexShrink: 0, marginTop: '5px' }} />
+                      <span style={{ flex: 1 }}>{risk}</span>
+                      <button className="del-risk-ov" onClick={() => deleteRisk(i)} style={{ opacity: 0, fontSize: '10px', color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s', padding: '0 2px' }}>✕</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* What to focus on — based on stage and score */}
+            {deal.stage && deal.stage !== 'closed_won' && deal.stage !== 'closed_lost' && (
+              <div style={{ padding: '10px 14px', background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.1)', borderRadius: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#6366F1', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>What to focus on</div>
+                <div style={{ fontSize: '12px', color: '#9CA3AF', lineHeight: 1.6 }}>
+                  {deal.conversionScore == null
+                    ? 'Paste meeting notes and analyze them to get a conversion score and AI recommendations for this deal.'
+                    : deal.conversionScore < 40
+                    ? `Score is ${deal.conversionScore}% — this deal needs immediate attention. Address the identified risks and consider a re-qualification call.`
+                    : deal.conversionScore < 70
+                    ? `Score is ${deal.conversionScore}% — solid progress. Work through the flagged risks and keep the champion engaged to close this.`
+                    : `Score is ${deal.conversionScore}% — strong position. Keep momentum, confirm timeline, and send a mutual close plan.`}
+                </div>
+              </div>
+            )}
+
+            {/* Reset all AI */}
+            <div style={{ paddingTop: '4px', borderTop: '1px solid rgba(255,255,255,0.04)', display: 'flex', justifyContent: 'flex-end' }}>
+              {resetAIConfirm ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', color: '#EF4444' }}>Reset all AI memory?</span>
+                  <button onClick={resetAllAI} disabled={savingAI} style={{ fontSize: '11px', color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '2px 8px', borderRadius: '5px', cursor: 'pointer' }}>
+                    {savingAI ? 'Resetting…' : 'Yes, reset'}
+                  </button>
+                  <button onClick={() => setResetAIConfirm(false)} style={{ fontSize: '11px', color: '#555', background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
+                </div>
+              ) : (
+                <button onClick={() => setResetAIConfirm(true)} style={{ fontSize: '11px', color: '#374151', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+                  Reset all AI inferences
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Product gaps banner */}
+      {dealGaps.length > 0 && (
+        <div style={{ padding: '14px 16px', background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <div style={{ fontSize: '11px', color: '#EF4444', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Product Gaps ({dealGaps.length})
+            </div>
+            <Link href="/product-gaps" style={{ fontSize: '11px', color: '#EF4444', textDecoration: 'none', opacity: 0.7 }}>View all →</Link>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {dealGaps.map((g: any) => (
+              <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: g.priority === 'critical' ? '#EF4444' : g.priority === 'high' ? '#F59E0B' : '#6366F1', flexShrink: 0 }} />
+                <span style={{ color: '#C0C0C8', flex: 1 }}>{g.title}</span>
+                {g.roadmap && <span style={{ fontSize: '10px', color: '#555', background: 'rgba(255,255,255,0.04)', borderRadius: '4px', padding: '1px 5px' }}>{g.roadmap}</span>}
+                <span style={{ fontSize: '10px', color: '#555' }}>{g.priority}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Deal info grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+        {[
+          { label: 'Stage', value: deal.stage?.replace(/_/g, ' ') },
+          { label: 'Deal Value', value: deal.dealValue ? `$${Number(deal.dealValue).toLocaleString()}` : null },
+          { label: 'Close Date', value: deal.closeDate ? new Date(deal.closeDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null },
+          { label: 'Deal Type', value: deal.dealType === 'recurring' ? `Recurring (${deal.recurringInterval ?? ''})`.trim() : deal.dealType === 'one_off' ? 'One-off' : null },
+          { label: 'Competitors', value: (deal.competitors as string[])?.join(', ') || null },
+          { label: 'Description', value: deal.description },
+          { label: 'Notes', value: deal.notes },
+          { label: 'Next Steps', value: deal.nextSteps },
+        ].filter(f => f.value).map(({ label, value }) => (
+          <div key={label} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '12px 14px' }}>
+            <div style={{ fontSize: '10px', color: '#4B5563', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>{label}</div>
+            <div style={{ fontSize: '13px', color: '#D1D5DB', fontWeight: '500', lineHeight: 1.5 }}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Contacts */}
+      {Array.isArray(deal.contacts) && deal.contacts.length > 0 && (
+        <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', padding: '12px 14px' }}>
+          <div style={{ fontSize: '10px', color: '#4B5563', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>Contacts</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {(deal.contacts as any[]).map((c: any, i: number) => (
+              <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '12px' }}>
+                <User size={12} color="#4B5563" style={{ flexShrink: 0 }} />
+                <span style={{ color: '#D1D5DB', fontWeight: 500 }}>{c.name}</span>
+                {c.title && <span style={{ color: '#4B5563' }}>· {c.title}</span>}
+                {c.email && <a href={`mailto:${c.email}`} style={{ color: '#6366F1', marginLeft: 'auto', fontSize: '11px', textDecoration: 'none' }}>{c.email}</a>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Activity log */}
+      <ActivityLog dealId={dealId} deal={deal} onUpdate={onUpdate} />
+    </div>
+  )
+}
+
 export default function DealDetailPage() {
   const { id } = useParams() as { id: string }
   const { data, mutate } = useSWR(id ? `/api/deals/${id}` : null, fetcher)
@@ -1804,9 +2035,9 @@ export default function DealDetailPage() {
     return () => setActiveDeal(null)
   }, [deal?.id, deal?.dealName, deal?.prospectCompany, deal?.stage])
 
-  // Auto-switch to Meeting Notes tab when deal has no prior notes (first visit)
+  // Auto-switch to Meeting Notes tab only if deal has no AI data at all AND no notes
   useEffect(() => {
-    if (deal && !deal.meetingNotes && !deal.aiSummary) {
+    if (deal && !deal.meetingNotes && !deal.aiSummary && !deal.conversionScore) {
       setActiveTab('meeting-notes')
     }
   }, [deal?.id])
@@ -1922,69 +2153,7 @@ export default function DealDetailPage() {
       ) : (
         <div>
           {activeTab === 'overview' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {/* Deal risks banner — only shown when AI has identified risks */}
-              {(deal.dealRisks as string[])?.length > 0 && (
-                <div style={{ padding: '14px 16px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '10px' }}>
-                  <div style={{ fontSize: '11px', color: '#F59E0B', fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    ⚠ AI-Identified Deal Risks
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    {(deal.dealRisks as string[]).map((risk: string, i: number) => (
-                      <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '13px', color: '#C9820A' }}>
-                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#F59E0B', flexShrink: 0, marginTop: '6px' }} />
-                        {risk}
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => setActiveTab('meeting-notes')}
-                    style={{ marginTop: '10px', fontSize: '11px', color: '#F59E0B', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
-                  >
-                    View full AI analysis →
-                  </button>
-                </div>
-              )}
-              {dealGaps.length > 0 && (
-                <div style={{ padding: '14px 16px', background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <div style={{ fontSize: '11px', color: '#EF4444', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                      Product Gaps ({dealGaps.length})
-                    </div>
-                    <Link href="/product-gaps" style={{ fontSize: '11px', color: '#EF4444', textDecoration: 'none', opacity: 0.7 }}>View all →</Link>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {dealGaps.map((g: any) => (
-                      <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
-                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: g.priority === 'critical' ? '#EF4444' : g.priority === 'high' ? '#F59E0B' : '#6366F1', flexShrink: 0 }} />
-                        <span style={{ color: '#C0C0C8', flex: 1 }}>{g.title}</span>
-                        {g.roadmap && <span style={{ fontSize: '10px', color: '#555', background: 'rgba(255,255,255,0.04)', borderRadius: '4px', padding: '1px 5px' }}>{g.roadmap}</span>}
-                        <span style={{ fontSize: '10px', color: '#555' }}>{g.priority}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                {[
-                  { label: 'Deal Name', value: deal.dealName },
-                  { label: 'Company', value: deal.prospectCompany },
-                  { label: 'Contact', value: deal.prospectName },
-                  { label: 'Title', value: deal.prospectTitle },
-                  { label: 'Stage', value: deal.stage?.replace('_', ' ') },
-                  { label: 'Deal Value', value: deal.dealValue ? `$${deal.dealValue.toLocaleString()}` : null },
-                  { label: 'Competitors', value: (deal.competitors as string[])?.join(', ') },
-                  { label: 'Notes', value: deal.notes },
-                  { label: 'Next Steps', value: deal.nextSteps },
-                ].filter(f => f.value).map(({ label, value }) => (
-                  <div key={label} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '14px' }}>
-                    <div style={{ fontSize: '11px', color: '#555', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-                    <div style={{ fontSize: '13px', color: '#EBEBEB', fontWeight: '500' }}>{value}</div>
-                  </div>
-                ))}
-              </div>
-              <ActivityLog dealId={id} deal={deal} onUpdate={() => mutate()} />
-            </div>
+            <OverviewTab dealId={id} deal={deal} dealGaps={dealGaps} onUpdate={() => mutate()} />
           )}
           {activeTab === 'meeting-notes' && (
             <MeetingNotesTab dealId={id} deal={deal} onUpdate={() => mutate()} onSwitchToPrep={() => setActiveTab('prep')} />

@@ -3,11 +3,11 @@ export const dynamic = 'force-dynamic'
 
 import useSWR from 'swr'
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Plus, AlertTriangle, CheckCircle, Circle, ArrowUpRight,
-  Sparkles, Zap, FileText, TrendingUp, Activity,
+  Sparkles, Zap, FileText, TrendingUp, Activity, RefreshCw,
 } from 'lucide-react'
 import AIOverviewCard from '@/components/dashboard/AIOverviewCard'
 import { SetupAlert } from '@/components/shared/SetupBanner'
@@ -63,14 +63,37 @@ export default function DashboardPage() {
   const { data: brainRes, mutate: mutateBrain } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
 
   const dbNotConnected = isDbNotConfigured(companyErr)
+  const [refreshingBrain, setRefreshingBrain] = useState(false)
+  const brainRebuildAttempted = useRef(false)
 
-  // Auto-rebuild brain if snapshot is stale
+  async function rebuildBrain() {
+    setRefreshingBrain(true)
+    try {
+      await fetch('/api/brain', { method: 'POST' })
+      await mutateBrain()
+    } catch { /* non-fatal */ }
+    finally { setRefreshingBrain(false) }
+  }
+
+  // Auto-rebuild brain if: never built, old schema (missing pipelineRecommendations),
+  // or patterns stored in old string[] format
   useEffect(() => {
+    if (brainRebuildAttempted.current) return
     const brain = brainRes?.data
+    // brainRes loaded but brain is null → never built yet
+    if (brainRes && !brain) {
+      brainRebuildAttempted.current = true
+      rebuildBrain()
+      return
+    }
     if (!brain) return
-    const patterns = brain.keyPatterns ?? []
-    const needsRebuild = patterns.length > 0 && patterns.some((p: any) => typeof p !== 'string' && !p.dealNames)
-    if (needsRebuild) fetch('/api/brain', { method: 'POST' }).then(() => mutateBrain()).catch(() => {})
+    // Old snapshot missing newer fields, or patterns in legacy string format
+    const hasOldSchema = !brain.pipelineRecommendations
+    const hasOldPatterns = (brain.keyPatterns ?? []).some((p: any) => typeof p === 'string')
+    if (hasOldSchema || hasOldPatterns) {
+      brainRebuildAttempted.current = true
+      rebuildBrain()
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brainRes])
 
@@ -153,6 +176,7 @@ export default function DashboardPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
 
       {/* ── Zone 1: Header + KPI strip ──────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
@@ -279,70 +303,122 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Zone 2.5: Deal Trends & Intelligence ──────────────────────────── */}
-      {brain && (brain.keyPatterns?.length > 0 || brain.pipelineRecommendations?.length > 0 || brain.topRisks?.length > 0) && (
-        <div style={{ display: 'grid', gridTemplateColumns: brain.keyPatterns?.length > 0 && brain.pipelineRecommendations?.length > 0 ? '1fr 1fr' : '1fr', gap: '12px' }}>
+      {(refreshingBrain || (brain && (brain.keyPatterns?.length > 0 || brain.pipelineRecommendations?.length > 0))) && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
 
-          {/* Key patterns — recurring cross-deal themes */}
-          {brain.keyPatterns?.length > 0 && (
-            <div style={card}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <Activity size={12} color="#A855F7" />
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Deal Patterns</span>
-                <span style={{ fontSize: '11px', color: '#374151', marginLeft: 'auto' }}>{brain.keyPatterns.length} trend{brain.keyPatterns.length !== 1 ? 's' : ''}</span>
+          {/* Key patterns — left column */}
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <Activity size={12} color="#A855F7" />
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Deal Patterns</span>
+              <span style={{ fontSize: '11px', color: '#374151', marginLeft: 'auto' }}>{brain?.keyPatterns?.length ?? 0} trend{(brain?.keyPatterns?.length ?? 0) !== 1 ? 's' : ''}</span>
+              <button onClick={rebuildBrain} disabled={refreshingBrain} style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: refreshingBrain ? 'default' : 'pointer', padding: '2px 4px', borderRadius: '4px', color: '#374151' }}
+                title="Refresh intelligence">
+                <RefreshCw size={10} style={{ animation: refreshingBrain ? 'spin 1s linear infinite' : 'none' }} />
+              </button>
+            </div>
+
+            {refreshingBrain && !brain?.keyPatterns?.length ? (
+              <div style={{ padding: '20px 14px', display: 'flex', alignItems: 'center', gap: '8px', color: '#374151', fontSize: '12px' }}>
+                <RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} /> Analysing deal patterns…
               </div>
+            ) : (brain?.keyPatterns ?? []).length === 0 ? (
+              <div style={{ padding: '20px 14px', fontSize: '12px', color: '#374151', textAlign: 'center' }}>
+                No recurring patterns yet — patterns surface when 2+ deals share the same risk theme.
+              </div>
+            ) : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {(brain.keyPatterns as any[]).slice(0, 4).map((p: any, i: number) => {
-                  const companies = p.companies ?? []
+                {((brain?.keyPatterns ?? []) as any[]).map((p: any, i: number) => {
+                  const allPatterns = brain?.keyPatterns ?? []
+                  const dealIds: string[] = p.dealIds ?? []
+                  const companies: string[] = p.companies ?? []
+                  const dealNames: string[] = p.dealNames ?? []
                   const competitorNames: string[] = p.competitorNames ?? []
                   const isCompetitor = p.label === 'competitor pressure'
-                  const isLast = i === Math.min(brain.keyPatterns.length, 4) - 1
+                  const isLast = i === allPatterns.length - 1
                   return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '9px 14px', borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.04)' }}>
-                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#A855F7', flexShrink: 0, marginTop: '4px' }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '12px', color: '#E5E7EB', fontWeight: 500, textTransform: 'capitalize' }}>{p.label}</div>
-                        {/* Competitor pressure — show actual competitor names */}
-                        {isCompetitor && competitorNames.length > 0 ? (
-                          <div style={{ display: 'flex', gap: '4px', marginTop: '4px', flexWrap: 'wrap' }}>
-                            {competitorNames.slice(0, 4).map((name: string) => (
-                              <Link key={name} href="/competitors" style={{
-                                fontSize: '10px', fontWeight: 600, color: '#F87171',
-                                background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.15)',
-                                padding: '1px 7px', borderRadius: '100px', textDecoration: 'none',
-                              }}>{name}</Link>
-                            ))}
-                            {competitorNames.length > 4 && (
-                              <span style={{ fontSize: '10px', color: '#555' }}>+{competitorNames.length - 4} more</span>
-                            )}
-                          </div>
-                        ) : companies.length > 0 && (
-                          <div style={{ fontSize: '11px', color: '#555', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {companies.slice(0, 3).join(', ')}{companies.length > 3 ? ` +${companies.length - 3} more` : ''}
-                          </div>
+                    <div key={i} style={{ borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.04)' }}>
+                      {/* Pattern header */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 14px 4px' }}>
+                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#A855F7', flexShrink: 0 }} />
+                        <span style={{ fontSize: '12px', color: '#E5E7EB', fontWeight: 600, textTransform: 'capitalize', flex: 1 }}>{p.label}</span>
+                        {/* Competitor pills */}
+                        {isCompetitor && competitorNames.length > 0 && competitorNames.map((name: string) => (
+                          <Link key={name} href="/competitors" style={{
+                            fontSize: '10px', fontWeight: 600, color: '#F87171',
+                            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+                            padding: '1px 7px', borderRadius: '100px', textDecoration: 'none', flexShrink: 0,
+                          }}>{name}</Link>
+                        ))}
+                        {isCompetitor && competitorNames.length === 0 && (
+                          <span style={{ fontSize: '10px', color: '#6B7280', fontStyle: 'italic' }}>no competitors named</span>
                         )}
                       </div>
-                      <span style={{ fontSize: '10px', fontWeight: 700, color: '#A855F7', background: 'rgba(168,85,247,0.1)', padding: '1px 6px', borderRadius: '100px', flexShrink: 0 }}>
-                        {p.dealIds?.length ?? 0} deals
-                      </span>
+                      {/* Affected deals — each as its own link row */}
+                      <div style={{ paddingLeft: '28px', paddingBottom: '8px', display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                        {dealIds.map((id: string, j: number) => {
+                          const riskSnippets: string[] = (p.riskSnippets ?? []).find((r: any) => r.dealId === id)?.snippets ?? []
+                          return (
+                            <Link key={id} href={`/deals/${id}`} style={{
+                              display: 'flex', flexDirection: 'column', gap: '1px',
+                              padding: '4px 14px 4px 0', textDecoration: 'none',
+                              borderRadius: '4px', transition: 'background 100ms',
+                            }}
+                              onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'}
+                              onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <ArrowUpRight size={10} color="#4B5563" style={{ flexShrink: 0 }} />
+                                <span style={{ fontSize: '11px', color: '#6B7280', fontWeight: 500 }}>{companies[j] ?? ''}</span>
+                                {dealNames[j] && companies[j] !== dealNames[j] && (
+                                  <span style={{ fontSize: '10px', color: '#4B5563' }}> · {dealNames[j]}</span>
+                                )}
+                              </div>
+                              {riskSnippets.slice(0, 1).map((snippet: string, si: number) => (
+                                <div key={si} style={{ fontSize: '10px', color: '#374151', paddingLeft: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.4 }}>
+                                  &quot;{snippet}&quot;
+                                </div>
+                              ))}
+                            </Link>
+                          )
+                        })}
+                        {isCompetitor && competitorNames.length === 0 && dealIds.length > 0 && (
+                          <Link href={`/deals/${dealIds[0]}`} style={{ fontSize: '10px', color: '#F87171', textDecoration: 'none', padding: '2px 0', opacity: 0.8 }}>
+                            + add competitor names to these deals →
+                          </Link>
+                        )}
+                      </div>
                     </div>
                   )
                 })}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* Pipeline recommendations */}
-          {brain.pipelineRecommendations?.length > 0 && (
-            <div style={card}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                <TrendingUp size={12} color="#10B981" />
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Recommendations</span>
-                <span style={{ fontSize: '11px', color: '#374151', marginLeft: 'auto' }}>{brain.pipelineRecommendations.filter((r: any) => r.priority === 'high').length} high priority</span>
+          {/* Pipeline recommendations — right column */}
+          <div style={card}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <TrendingUp size={12} color="#10B981" />
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Recommendations</span>
+              <span style={{ fontSize: '11px', color: '#374151', marginLeft: 'auto' }}>
+                {(brain?.pipelineRecommendations ?? []).filter((r: any) => r.priority === 'high').length} high priority
+              </span>
+            </div>
+
+            {refreshingBrain && !(brain?.pipelineRecommendations?.length) ? (
+              <div style={{ padding: '20px 14px', display: 'flex', alignItems: 'center', gap: '8px', color: '#374151', fontSize: '12px' }}>
+                <RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} /> Building recommendations…
               </div>
+            ) : (brain?.pipelineRecommendations ?? []).length === 0 ? (
+              <div style={{ padding: '20px 14px', fontSize: '12px', color: '#374151', textAlign: 'center' }}>
+                No recommendations yet — add more deals and meeting notes to get personalised suggestions.
+              </div>
+            ) : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {(brain.pipelineRecommendations as any[]).slice(0, 4).map((rec: any, i: number) => {
+                {((brain?.pipelineRecommendations ?? []) as any[]).map((rec: any, i: number) => {
+                  const recs = brain?.pipelineRecommendations ?? []
                   const priorityColor = rec.priority === 'high' ? '#EF4444' : rec.priority === 'medium' ? '#F59E0B' : '#6B7280'
-                  const isLast = i === Math.min(brain.pipelineRecommendations.length, 4) - 1
+                  const isLast = i === recs.length - 1
                   return (
                     <Link key={i} href={`/deals/${rec.dealId}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '9px 14px', borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.04)', textDecoration: 'none', transition: 'background 120ms' }}
                       onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'}
@@ -352,16 +428,18 @@ export default function DashboardPage() {
                         {rec.priority}
                       </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '12px', color: '#E5E7EB', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rec.recommendation}</div>
-                        <div style={{ fontSize: '11px', color: '#555', marginTop: '1px' }}>{rec.company}</div>
+                        <div style={{ fontSize: '12px', color: '#E5E7EB' }}>{rec.recommendation}</div>
+                        <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>
+                          {rec.company}{rec.dealName && rec.dealName !== rec.company ? ` · ${rec.dealName}` : ''}
+                        </div>
                       </div>
-                      <ArrowUpRight size={11} color="#333" style={{ flexShrink: 0 }} />
+                      <ArrowUpRight size={11} color="#333" style={{ flexShrink: 0, marginTop: '2px' }} />
                     </Link>
                   )
                 })}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 
