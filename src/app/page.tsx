@@ -450,7 +450,7 @@ export default function LandingPage() {
           </div>
           <div style={{ background: 'rgba(34,197,94,0.04)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '12px', padding: '24px' }}>
             <div style={{ fontSize: '12px', fontWeight: '700', color: '#22C55E', marginBottom: '18px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>After DealKit</div>
-            {['One source of truth, always current', 'Battlecards that regenerate on new intel', 'Every objection mapped with a tested response', 'New reps productive in week one', 'Every deal outcome compounds your knowledge', 'Probability-adjusted forecast from real conversion data', 'Live competitor W/L record updated per deal'].map(p => (
+            {['One source of truth, always current', 'Battlecards that regenerate on new intel', 'Every objection mapped with a tested response', 'New rep kit ready from day one — battlecards, objections, proof stories', 'Every deal outcome compounds your knowledge', 'Probability-adjusted forecast from real conversion data', 'Live competitor W/L record updated per deal'].map(p => (
               <div key={p} style={{ display: 'flex', gap: '8px', marginBottom: '11px', fontSize: '13px', color: '#7E7A9A', alignItems: 'flex-start' }}>
                 <CheckCircle size={13} color="#22C55E" style={{ flexShrink: 0, marginTop: '2px' }} /> {p}
               </div>
