@@ -637,7 +637,7 @@ export default function DashboardPage() {
                   alerts.push({ text: `Deals taking longer — ${tr.dealVelocity.priorAvgDays}d → ${tr.dealVelocity.recentAvgDays}d avg`, color: '#F59E0B' })
                 if (tr.dealVelocity.direction === 'faster')
                   alerts.push({ text: `Deals closing faster — ${tr.dealVelocity.priorAvgDays}d → ${tr.dealVelocity.recentAvgDays}d avg`, color: '#22C55E' })
-                const threats = tr.competitorThreats.filter(c => c.direction === 'more_competitive')
+                const threats = (tr.competitorThreats as { name: string; recentWinRatePct: number; allTimeWinRatePct: number; direction: string }[]).filter(c => c.direction === 'more_competitive')
                 threats.forEach(c => alerts.push({ text: `${c.name} more competitive recently — win rate ${c.allTimeWinRatePct}% → ${c.recentWinRatePct}%`, color: '#EF4444' }))
                 if (alerts.length === 0) return null
                 return (
