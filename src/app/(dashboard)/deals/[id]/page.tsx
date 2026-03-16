@@ -27,6 +27,23 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
   const [historyExpanded, setHistoryExpanded] = useState(false)
+  const [clearConfirm, setClearConfirm] = useState(false)
+  const [clearing, setClearing] = useState(false)
+
+  const clearNotes = async () => {
+    setClearing(true)
+    try {
+      await fetch(`/api/deals/${dealId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meetingNotes: null }),
+      })
+      setClearConfirm(false)
+      setHistoryExpanded(false)
+      onUpdate()
+    } finally {
+      setClearing(false)
+    }
+  }
 
   const analyze = async () => {
     if (!notes.trim()) return
@@ -68,7 +85,29 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
                   {entries.length > 0 ? `${entries.length} meeting${entries.length > 1 ? 's' : ''}` : 'legacy notes'}
                 </span>
               </div>
-              <span style={{ fontSize: '11px', color: '#555' }}>{historyExpanded ? 'Hide ↑' : 'Show ↓'}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {clearConfirm ? (
+                  <>
+                    <span style={{ fontSize: '11px', color: '#EF4444' }}>Clear all notes?</span>
+                    <button
+                      onClick={e => { e.stopPropagation(); clearNotes() }}
+                      disabled={clearing}
+                      style={{ fontSize: '11px', color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '2px 8px', borderRadius: '5px', cursor: 'pointer' }}
+                    >{clearing ? 'Clearing…' : 'Yes, clear'}</button>
+                    <button
+                      onClick={e => { e.stopPropagation(); setClearConfirm(false) }}
+                      style={{ fontSize: '11px', color: '#555', background: 'none', border: 'none', cursor: 'pointer' }}
+                    >Cancel</button>
+                  </>
+                ) : (
+                  <button
+                    onClick={e => { e.stopPropagation(); setClearConfirm(true) }}
+                    style={{ fontSize: '11px', color: '#555', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: '4px' }}
+                    title="Clear all meeting notes for this deal"
+                  >Clear all</button>
+                )}
+                <span style={{ fontSize: '11px', color: '#555' }}>{historyExpanded ? 'Hide ↑' : 'Show ↓'}</span>
+              </div>
             </button>
             {historyExpanded && (
               <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '320px', overflowY: 'auto' }}>

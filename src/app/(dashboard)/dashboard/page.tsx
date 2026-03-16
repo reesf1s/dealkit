@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Plus, AlertTriangle, CheckCircle, Circle, ArrowUpRight,
-  Sparkles, Clock, Zap, FileText,
+  Sparkles, Zap, FileText, TrendingUp, Activity,
 } from 'lucide-react'
 import AIOverviewCard from '@/components/dashboard/AIOverviewCard'
 import { SetupAlert } from '@/components/shared/SetupBanner'
@@ -277,6 +277,77 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* ── Zone 2.5: Deal Trends & Intelligence ──────────────────────────── */}
+      {brain && (brain.keyPatterns?.length > 0 || brain.pipelineRecommendations?.length > 0 || brain.topRisks?.length > 0) && (
+        <div style={{ display: 'grid', gridTemplateColumns: brain.keyPatterns?.length > 0 && brain.pipelineRecommendations?.length > 0 ? '1fr 1fr' : '1fr', gap: '12px' }}>
+
+          {/* Key patterns — recurring cross-deal themes */}
+          {brain.keyPatterns?.length > 0 && (
+            <div style={card}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <Activity size={12} color="#A855F7" />
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Deal Patterns</span>
+                <span style={{ fontSize: '11px', color: '#374151', marginLeft: 'auto' }}>{brain.keyPatterns.length} trend{brain.keyPatterns.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {(brain.keyPatterns as any[]).slice(0, 4).map((p: any, i: number) => {
+                  const companies = p.companies ?? []
+                  const isLast = i === Math.min(brain.keyPatterns.length, 4) - 1
+                  return (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '9px 14px', borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.04)' }}>
+                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#A855F7', flexShrink: 0, marginTop: '4px' }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '12px', color: '#E5E7EB', fontWeight: 500, textTransform: 'capitalize' }}>{p.label}</div>
+                        {companies.length > 0 && (
+                          <div style={{ fontSize: '11px', color: '#555', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {companies.slice(0, 3).join(', ')}{companies.length > 3 ? ` +${companies.length - 3} more` : ''}
+                          </div>
+                        )}
+                      </div>
+                      <span style={{ fontSize: '10px', fontWeight: 700, color: '#A855F7', background: 'rgba(168,85,247,0.1)', padding: '1px 6px', borderRadius: '100px', flexShrink: 0 }}>
+                        {p.dealIds?.length ?? 0} deals
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Pipeline recommendations */}
+          {brain.pipelineRecommendations?.length > 0 && (
+            <div style={card}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <TrendingUp size={12} color="#10B981" />
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Recommendations</span>
+                <span style={{ fontSize: '11px', color: '#374151', marginLeft: 'auto' }}>{brain.pipelineRecommendations.filter((r: any) => r.priority === 'high').length} high priority</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {(brain.pipelineRecommendations as any[]).slice(0, 4).map((rec: any, i: number) => {
+                  const priorityColor = rec.priority === 'high' ? '#EF4444' : rec.priority === 'medium' ? '#F59E0B' : '#6B7280'
+                  const isLast = i === Math.min(brain.pipelineRecommendations.length, 4) - 1
+                  return (
+                    <Link key={i} href={`/deals/${rec.dealId}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '9px 14px', borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.04)', textDecoration: 'none', transition: 'background 120ms' }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                    >
+                      <span style={{ fontSize: '10px', fontWeight: 700, color: priorityColor, background: `${priorityColor}14`, padding: '2px 5px', borderRadius: '4px', flexShrink: 0, marginTop: '1px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        {rec.priority}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '12px', color: '#E5E7EB', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rec.recommendation}</div>
+                        <div style={{ fontSize: '11px', color: '#555', marginTop: '1px' }}>{rec.company}</div>
+                      </div>
+                      <ArrowUpRight size={11} color="#333" style={{ flexShrink: 0 }} />
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Zone 3: Pipeline by stage ────────────────────────────────────── */}
       {openDeals.length > 0 && (

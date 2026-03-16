@@ -133,11 +133,11 @@ type Intent = 'meeting_notes' | 'competitor_battlecard' | 'company_update' |
 
 function detectIntent(text: string): Intent {
   const lower = text.toLowerCase()
+  // Explicit deal creation MUST come before transcript detection —
+  // user may paste meeting notes as the deal content (e.g. "Create this deal: [notes]")
+  if (DEAL_CREATE_PATTERNS.some(p => p.test(text))) return 'deal_create'
   if (looksLikeMeetingTranscript(text)) return 'meeting_notes'
   if (BATTLECARD_PATTERNS.some(p => p.test(text))) return 'competitor_battlecard'
-  // Deal create must be checked BEFORE product_gap — deal descriptions mentioning
-  // integration gaps or missing features can inadvertently match /add.*gap/i etc.
-  if (DEAL_CREATE_PATTERNS.some(p => p.test(text))) return 'deal_create'
   // Product gap must be checked BEFORE company_update (pattern overlap)
   if (PRODUCT_GAP_PATTERNS.some(p => p.test(text))) return 'product_gap'
   // Collateral generation: only trigger for SHORT, focused requests (not complex multi-part analytical prompts)
