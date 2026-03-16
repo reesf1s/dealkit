@@ -72,6 +72,31 @@ export interface WorkspaceBrain {
     action?: string
     actionType?: 'stage_change' | 'follow_up' | 'collateral' | 'meeting' | 'custom'
   }[]
+  // ── Compounding intelligence — accumulates from closed deal history ─────────
+  winLossIntel?: {
+    winCount: number
+    lossCount: number
+    winRate: number                    // 0-100 integer
+    avgWonValue: number                // average value of won deals
+    avgDaysToClose: number             // average days from creation to close (won deals)
+    topLossReasons: string[]           // most common reasons deals were lost
+    competitorRecord: {                // win/loss record per named competitor
+      name: string
+      wins: number
+      losses: number
+      winRate: number                  // 0-100 integer
+    }[]
+    scoreCalibration: {
+      avgScoreOnWins: number | null    // avg AI score on deals that were eventually won
+      avgScoreOnLosses: number | null  // avg AI score on deals that were eventually lost
+      highScoreWinRate: number | null  // % of 70%+ scored deals that actually won (out of closed)
+    }
+  }
+  dealVelocity?: {
+    weightedForecast: number           // probability-adjusted pipeline: sum(value × score/100)
+    forecastDealCount: number          // active deals contributing to forecast
+    avgDaysToClose: number             // mirror from winLossIntel for quick access
+  }
 }
 
 let schemaMigrated = false
@@ -121,6 +146,11 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
       updatedAt: dealLogs.updatedAt,
       closeDate: dealLogs.closeDate,
       projectPlan: dealLogs.projectPlan,
+      // Historical intelligence fields
+      createdAt: dealLogs.createdAt,
+      wonDate: dealLogs.wonDate,
+      lostDate: dealLogs.lostDate,
+      lostReason: dealLogs.lostReason,
     })
     .from(dealLogs)
     .where(eq(dealLogs.workspaceId, workspaceId))
@@ -551,6 +581,102 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     }
   }
 
+  // ── Compounding intelligence: Win/Loss analysis from closed deal history ────
+  const wonDeals  = deals.filter(d => d.stage === 'closed_won')
+  const lostDeals = deals.filter(d => d.stage === 'closed_lost')
+  const totalClosed = wonDeals.length + lostDeals.length
+
+  let winLossIntel: WorkspaceBrain['winLossIntel'] | undefined
+  if (totalClosed >= 1) {
+    const winCount  = wonDeals.length
+    const lossCount = lostDeals.length
+    const winRate   = totalClosed > 0 ? Math.round((winCount / totalClosed) * 100) : 0
+
+    // Average value of won deals
+    const wonWithVal = wonDeals.filter(d => d.dealValue != null && d.dealValue > 0)
+    const avgWonValue = wonWithVal.length > 0
+      ? Math.round(wonWithVal.reduce((s, d) => s + (d.dealValue ?? 0), 0) / wonWithVal.length)
+      : 0
+
+    // Average deal cycle: createdAt → wonDate
+    const wonWithDates = wonDeals.filter(d => d.wonDate && d.createdAt)
+    const avgDaysToClose = wonWithDates.length > 0
+      ? Math.round(wonWithDates.reduce((s, d) => {
+          const ms = new Date(d.wonDate as Date).getTime() - new Date(d.createdAt).getTime()
+          return s + ms / 86_400_000
+        }, 0) / wonWithDates.length)
+      : 0
+
+    // Top loss reasons from lostReason field
+    const reasonFreq = new Map<string, number>()
+    for (const d of lostDeals) {
+      const r = (d.lostReason ?? '').trim()
+      if (r) reasonFreq.set(r, (reasonFreq.get(r) ?? 0) + 1)
+    }
+    const topLossReasons = [...reasonFreq.entries()]
+      .sort((a, b) => b[1] - a[1]).slice(0, 4).map(([r]) => r)
+
+    // Competitor win/loss record
+    const compStats = new Map<string, { wins: number; losses: number }>()
+    for (const d of wonDeals) {
+      for (const c of (d.dealCompetitors as string[]) ?? []) {
+        if (!c) continue
+        const k = c.toLowerCase()
+        const s = compStats.get(k) ?? { wins: 0, losses: 0 }
+        s.wins++; compStats.set(k, s)
+      }
+    }
+    for (const d of lostDeals) {
+      for (const c of (d.dealCompetitors as string[]) ?? []) {
+        if (!c) continue
+        const k = c.toLowerCase()
+        const s = compStats.get(k) ?? { wins: 0, losses: 0 }
+        s.losses++; compStats.set(k, s)
+      }
+    }
+    const competitorRecord = [...compStats.entries()]
+      .filter(([, s]) => s.wins + s.losses >= 1)
+      .map(([name, s]) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        wins: s.wins, losses: s.losses,
+        winRate: Math.round((s.wins / (s.wins + s.losses)) * 100),
+      }))
+      .sort((a, b) => (b.wins + b.losses) - (a.wins + a.losses))
+      .slice(0, 6)
+
+    // Score calibration: were AI scores predictive?
+    const wonWithScore  = wonDeals.filter(d => d.conversionScore != null)
+    const lostWithScore = lostDeals.filter(d => d.conversionScore != null)
+    const avgScoreOnWins   = wonWithScore.length > 0
+      ? Math.round(wonWithScore.reduce((s, d) => s + (d.conversionScore ?? 0), 0) / wonWithScore.length)
+      : null
+    const avgScoreOnLosses = lostWithScore.length > 0
+      ? Math.round(lostWithScore.reduce((s, d) => s + (d.conversionScore ?? 0), 0) / lostWithScore.length)
+      : null
+    // High-score (70%+) win rate: among closed deals with score ≥ 70, what % were won?
+    const highScoreDeals = [...wonDeals, ...lostDeals].filter(d => (d.conversionScore ?? 0) >= 70)
+    const highScoreWinRate = highScoreDeals.length >= 2
+      ? Math.round((highScoreDeals.filter(d => d.stage === 'closed_won').length / highScoreDeals.length) * 100)
+      : null
+
+    winLossIntel = {
+      winCount, lossCount, winRate, avgWonValue, avgDaysToClose,
+      topLossReasons, competitorRecord,
+      scoreCalibration: { avgScoreOnWins, avgScoreOnLosses, highScoreWinRate },
+    }
+  }
+
+  // ── Deal Velocity: probability-adjusted forecast from active pipeline ────────
+  const forecastDeals = activeDeals.filter(d => d.dealValue && d.dealValue > 0 && d.conversionScore != null)
+  const weightedForecast = Math.round(
+    forecastDeals.reduce((s, d) => s + (d.dealValue! * (d.conversionScore! / 100)), 0)
+  )
+  const dealVelocity: WorkspaceBrain['dealVelocity'] = {
+    weightedForecast,
+    forecastDealCount: forecastDeals.length,
+    avgDaysToClose: winLossIntel?.avgDaysToClose ?? 0,
+  }
+
   const brain: WorkspaceBrain = {
     updatedAt: now.toISOString(),
     deals: snapshots,
@@ -561,6 +687,8 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     staleDeals,
     suggestedCollateral,
     pipelineRecommendations,
+    winLossIntel,
+    dealVelocity,
   }
 
   await db.execute(sql`
@@ -659,6 +787,26 @@ export function formatBrainContext(brain: WorkspaceBrain): string {
       const p = d.projectPlanProgress!
       lines.push(`• ${d.name} (${d.company}): ${p.complete}/${p.total} tasks complete`)
     }
+  }
+
+  // Win/Loss intelligence — feeds historical context into AI responses
+  const wl = brain.winLossIntel
+  if (wl && (wl.winCount + wl.lossCount) >= 1) {
+    lines.push(`\nHISTORICAL WIN/LOSS INTELLIGENCE:`)
+    lines.push(`Win rate: ${wl.winRate}% (${wl.winCount} won / ${wl.lossCount} lost)`)
+    if (wl.avgWonValue > 0) lines.push(`Avg won deal value: ${fmt(wl.avgWonValue)}`)
+    if (wl.avgDaysToClose > 0) lines.push(`Avg days to close: ${wl.avgDaysToClose} days`)
+    if (wl.scoreCalibration.avgScoreOnWins != null) lines.push(`AI score on won deals: avg ${wl.scoreCalibration.avgScoreOnWins}% | on lost deals: avg ${wl.scoreCalibration.avgScoreOnLosses ?? 'N/A'}%`)
+    if (wl.scoreCalibration.highScoreWinRate != null) lines.push(`Deals scored 70%+: ${wl.scoreCalibration.highScoreWinRate}% actually won`)
+    if (wl.topLossReasons.length > 0) lines.push(`Top loss reasons: ${wl.topLossReasons.slice(0, 3).join(' | ')}`)
+    if (wl.competitorRecord.length > 0) {
+      lines.push(`Competitor record: ${wl.competitorRecord.slice(0, 4).map(c => `${c.name} ${c.wins}W-${c.losses}L (${c.winRate}% win rate)`).join(' | ')}`)
+    }
+  }
+
+  const dv = brain.dealVelocity
+  if (dv && dv.weightedForecast > 0) {
+    lines.push(`\nWEIGHTED FORECAST (probability-adjusted): ${fmt(dv.weightedForecast)} across ${dv.forecastDealCount} scored deals`)
   }
 
   return lines.join('\n')

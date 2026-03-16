@@ -93,7 +93,9 @@ export default function DashboardPage() {
     // Patterns exist but none have riskSnippets — rebuild after new feature deployed
     const missingSnippets = (brain.keyPatterns ?? []).length > 0 &&
       !(brain.keyPatterns ?? []).some((p: any) => p.riskSnippets?.length > 0)
-    if (hasOldSchema || hasOldPatterns || missingSnippets) {
+    // Missing win/loss intelligence or deal velocity — new feature
+    const missingIntel = !brain.dealVelocity
+    if (hasOldSchema || hasOldPatterns || missingSnippets || missingIntel) {
       brainRebuildAttempted.current = true
       rebuildBrain()
     }
@@ -445,6 +447,117 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* ── Zone 2.8: Compounding Intelligence ──────────────────────────── */}
+      {(() => {
+        const wl  = brain?.winLossIntel
+        const dv  = brain?.dealVelocity
+        const hasClosed   = (wl?.winCount ?? 0) + (wl?.lossCount ?? 0) > 0
+        const hasForecast = (dv?.weightedForecast ?? 0) > 0 && (dv?.forecastDealCount ?? 0) > 0
+        if (!hasClosed && !hasForecast) return null
+        const calColor = (wl?.scoreCalibration.highScoreWinRate ?? 0) >= 60 ? '#22C55E' : (wl?.scoreCalibration.highScoreWinRate ?? 0) >= 40 ? '#F59E0B' : '#EF4444'
+        return (
+          <div>
+            {/* Section label */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <Sparkles size={11} color="#6366F1" />
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Pipeline Intelligence</span>
+              <span style={{ fontSize: '10px', color: '#2A2A2A', marginLeft: '4px' }}>compounding with every closed deal</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
+
+              {/* Weighted forecast */}
+              {hasForecast && (
+                <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.14)', borderRadius: '12px', padding: '14px 16px' }}>
+                  <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>Weighted Forecast</div>
+                  <div style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.04em', color: '#818CF8', lineHeight: 1, marginBottom: '4px' }}>{fmt(dv!.weightedForecast)}</div>
+                  <div style={{ fontSize: '11px', color: '#4B5563' }}>probability-adjusted · {dv!.forecastDealCount} scored deal{dv!.forecastDealCount !== 1 ? 's' : ''}</div>
+                  <div style={{ fontSize: '10px', color: '#374151', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                    vs {fmt(brain?.pipeline.totalValue ?? 0)} raw pipeline
+                  </div>
+                </div>
+              )}
+
+              {/* Win rate */}
+              {hasClosed && (
+                <div style={{ background: wl!.winRate >= 50 ? 'rgba(34,197,94,0.06)' : 'rgba(245,158,11,0.06)', border: `1px solid ${wl!.winRate >= 50 ? 'rgba(34,197,94,0.14)' : 'rgba(245,158,11,0.14)'}`, borderRadius: '12px', padding: '14px 16px' }}>
+                  <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>Win Rate</div>
+                  <div style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.04em', color: wl!.winRate >= 50 ? '#22C55E' : '#F59E0B', lineHeight: 1, marginBottom: '4px' }}>{wl!.winRate}%</div>
+                  <div style={{ fontSize: '11px', color: '#4B5563' }}>{wl!.winCount}W · {wl!.lossCount}L · {wl!.winCount + wl!.lossCount} closed</div>
+                  {wl!.avgDaysToClose > 0 && (
+                    <div style={{ fontSize: '10px', color: '#374151', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                      avg {wl!.avgDaysToClose}d to close
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Score calibration */}
+              {hasClosed && wl!.scoreCalibration.avgScoreOnWins != null && (
+                <div style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.14)', borderRadius: '12px', padding: '14px 16px' }}>
+                  <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>AI Score Calibration</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '11px', color: '#22C55E' }}>Wins</span>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#22C55E' }}>{wl!.scoreCalibration.avgScoreOnWins}% avg score</span>
+                    </div>
+                    {wl!.scoreCalibration.avgScoreOnLosses != null && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '11px', color: '#EF4444' }}>Losses</span>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#EF4444' }}>{wl!.scoreCalibration.avgScoreOnLosses}% avg score</span>
+                      </div>
+                    )}
+                    {wl!.scoreCalibration.highScoreWinRate != null && (
+                      <div style={{ marginTop: '4px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.04)', fontSize: '10px', color: calColor }}>
+                        70%+ scored deals won at {wl!.scoreCalibration.highScoreWinRate}%
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Competitor record */}
+              {hasClosed && (wl?.competitorRecord ?? []).length > 0 && (
+                <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)', borderRadius: '12px', padding: '14px 16px' }}>
+                  <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>Competitor Record</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {(wl!.competitorRecord ?? []).slice(0, 4).map((c, ci) => (
+                      <div key={ci} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '11px', color: '#9CA3AF', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                        <span style={{ fontSize: '10px', color: '#555' }}>{c.wins}W-{c.losses}L</span>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: c.winRate >= 60 ? '#22C55E' : c.winRate >= 40 ? '#F59E0B' : '#EF4444', minWidth: '28px', textAlign: 'right' }}>{c.winRate}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Top loss reasons */}
+              {hasClosed && (wl?.topLossReasons ?? []).length > 0 && (
+                <div style={{ background: 'rgba(107,114,128,0.05)', border: '1px solid rgba(107,114,128,0.12)', borderRadius: '12px', padding: '14px 16px' }}>
+                  <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>Loss Patterns</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {(wl!.topLossReasons ?? []).slice(0, 4).map((r, ri) => (
+                      <div key={ri} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#EF4444', flexShrink: 0, marginTop: '4px' }} />
+                        <span style={{ fontSize: '11px', color: '#9CA3AF', lineHeight: 1.4 }}>{r}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Teaser when no closed data yet */}
+              {!hasClosed && hasForecast && (
+                <div style={{ background: 'rgba(99,102,241,0.04)', border: '1px dashed rgba(99,102,241,0.15)', borderRadius: '12px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ fontSize: '11px', color: '#4B5563', fontWeight: 500 }}>Win/Loss intelligence unlocks after your first close</div>
+                  <div style={{ fontSize: '10px', color: '#374151' }}>Win rate · Avg deal cycle · AI score calibration · Competitor record</div>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Zone 3: Pipeline by stage ────────────────────────────────────── */}
       {openDeals.length > 0 && (
