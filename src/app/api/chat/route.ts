@@ -967,52 +967,66 @@ async function handleProjectPlan(
     : ''
 
   const extractMsg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001', max_tokens: 2000,
+    model: 'claude-sonnet-4-5-20250514', max_tokens: 4000,
+    system: `You are a project plan extractor for a sales deal management tool.
+Convert ANY format of input (tables, emails, spreadsheet data, meeting notes, free text) into structured project plan JSON.
+Respond with ONLY a valid JSON object — no explanation, no preamble, no markdown fences.`,
     messages: [{
       role: 'user',
-      content: `Parse this into a structured project plan for a deal with "${matchedDeal.prospectCompany}".
-Extract phases and tasks. Infer owners, dates, and status from context.
+      content: `Convert this into a project plan for the deal with "${matchedDeal.prospectCompany}".
+
+The input may be a table, spreadsheet, or free text. Extract all tasks/calls/meetings and group into logical phases by timing or theme.
+For tables: each row = a task; use column headers as field names.
+"Internal" = internal task; "External" = customer-facing.
+Status: blank → "not_started"; done → "complete".
 ${todoContext}
 
-Return ONLY valid JSON:
+Return this JSON (use short IDs like "p1", "t1"):
 {
-  "title": "Project Plan — [descriptive title]",
+  "title": "Project Plan — [short descriptive title]",
   "phases": [
     {
-      "id": "uuid-format-string",
+      "id": "p1",
       "name": "Phase name",
-      "description": "What this phase covers",
+      "description": "Brief description",
       "order": 1,
-      "targetDate": "ISO date or null",
+      "targetDate": "YYYY-MM-DD or null",
       "tasks": [
         {
-          "id": "uuid-format-string",
+          "id": "t1",
           "text": "Task description",
-          "status": "not_started|in_progress|complete",
-          "owner": "person name or null",
-          "dueDate": "ISO date or null",
-          "linkedTodoId": "matching todo ID if relevant, or null",
-          "notes": null
+          "status": "not_started",
+          "owner": "person/team or null",
+          "dueDate": "YYYY-MM-DD or null",
+          "linkedTodoId": null,
+          "notes": "availability windows or extra context, or null"
         }
       ]
     }
   ]
 }
 
-Use random UUIDs for all IDs. If a task matches an existing to-do, set linkedTodoId.
-
-Text:
-${text.slice(0, 6000)}`,
+Input:
+${text.slice(0, 8000)}`,
     }],
   })
 
   let parsed: any
   try {
     const raw = (extractMsg.content[0] as { type: string; text: string }).text
-    parsed = JSON.parse(raw.replace(/^```json?\n?/i, '').replace(/\n?```$/i, '').trim())
+    // Try direct parse, then strip fences, then find first { ... }
+    let jsonText = raw.trim()
+    try { parsed = JSON.parse(jsonText) } catch {
+      jsonText = jsonText.replace(/^```(?:json)?\s*/im, '').replace(/\s*```\s*$/im, '').trim()
+      try { parsed = JSON.parse(jsonText) } catch {
+        const s = raw.indexOf('{'), e = raw.lastIndexOf('}')
+        if (s !== -1 && e > s) parsed = JSON.parse(raw.slice(s, e + 1))
+        else throw new Error('no JSON')
+      }
+    }
   } catch {
     return {
-      reply: "I couldn't parse that into a project plan. Try pasting a more structured list with phases, milestones, or tasks.",
+      reply: "I couldn't extract a project plan from that. Try mentioning the deal name and pasting the plan content — tables, bullet points, or meeting notes all work.",
       actions: [],
     }
   }

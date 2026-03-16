@@ -24,6 +24,22 @@ async function ensureProjectPlanCol() {
   colMigrated = true
 }
 
+/** Robustly extract the first valid JSON object from a string */
+function extractJsonFromText(text: string): any {
+  // 1. Try direct parse
+  try { return JSON.parse(text.trim()) } catch {}
+  // 2. Strip markdown code fences (```json ... ``` or ``` ... ```)
+  const fenceStripped = text.replace(/^```(?:json)?\s*/im, '').replace(/\s*```\s*$/im, '').trim()
+  try { return JSON.parse(fenceStripped) } catch {}
+  // 3. Find first { to last } and parse that slice
+  const start = text.indexOf('{')
+  const end = text.lastIndexOf('}')
+  if (start !== -1 && end > start) {
+    try { return JSON.parse(text.slice(start, end + 1)) } catch {}
+  }
+  throw new Error('No JSON found in response')
+}
+
 // POST: Parse pasted text/table into structured project plan using AI
 export async function POST(req: NextRequest, { params }: Params) {
   try {
@@ -44,59 +60,65 @@ export async function POST(req: NextRequest, { params }: Params) {
     // Get existing todos for linking context
     const existingTodos = (deal.todos as any[]) ?? []
     const todoContext = existingTodos.length > 0
-      ? `\n\nExisting deal to-dos (you may link relevant tasks using these IDs):\n${existingTodos.map((t: any) => `- ID: ${t.id} | "${t.text}" | Done: ${t.done}`).join('\n')}`
+      ? `\n\nExisting deal to-dos (link relevant tasks using these IDs):\n${existingTodos.map((t: any) => `- ID: ${t.id} | "${t.text}" | Done: ${t.done}`).join('\n')}`
       : ''
 
     const extractMsg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2000,
+      model: 'claude-sonnet-4-5-20250514',
+      max_tokens: 4000,
+      system: `You are a project plan extractor for a sales deal management tool.
+Your job is to convert ANY format of input (tables, emails, meeting notes, spreadsheet data, free text) into a structured project plan JSON.
+You MUST respond with ONLY a valid JSON object — no explanation, no preamble, no markdown fences, just the raw JSON.`,
       messages: [{
         role: 'user',
-        content: `Parse this text into a structured project plan for a sales deal with "${deal.prospectCompany}".
+        content: `Convert this input into a project plan for the deal with "${deal.prospectCompany}".
 
-Extract logical phases and tasks. Each task should have a clear owner if mentioned, and realistic status inference.
+The input may be a table, spreadsheet, meeting notes, or any format. Extract all tasks/calls/meetings and group them into logical phases based on timing or theme.
+
+For tables: each row is typically a task. Column headers give you field names. Parse dates intelligently.
+For calls/meetings: "Internal" = internal task, "External" = customer-facing task.
+Owner inference: if "Internal" → internal team; if "External" → both parties.
+Status: blank/no status → "not_started"; explicitly done → "complete".
 ${todoContext}
 
-Return ONLY valid JSON:
+Return this exact JSON structure (use short unique IDs like "p1", "p2", "t1", "t2" etc):
 {
-  "title": "Project Plan — [descriptive title]",
+  "title": "Project Plan — [short descriptive title based on content]",
   "phases": [
     {
-      "id": "uuid-string",
+      "id": "p1",
       "name": "Phase name",
-      "description": "What this phase covers",
+      "description": "Brief description of this phase",
       "order": 1,
-      "targetDate": "ISO date or null",
+      "targetDate": "YYYY-MM-DD or null",
       "tasks": [
         {
-          "id": "uuid-string",
-          "text": "Task description",
-          "status": "not_started|in_progress|complete",
-          "owner": "person name or null",
-          "dueDate": "ISO date or null",
-          "linkedTodoId": "matching todo ID if relevant, or null",
-          "notes": "additional context or null"
+          "id": "t1",
+          "text": "Clear task description",
+          "status": "not_started",
+          "owner": "person or team name, or null",
+          "dueDate": "YYYY-MM-DD or null",
+          "linkedTodoId": null,
+          "notes": "any extra context like availability windows, or null"
         }
       ]
     }
   ]
 }
 
-Use UUIDs for all IDs (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx, use random-looking values).
-If a task clearly matches an existing to-do, set linkedTodoId to that to-do's ID.
-Infer status from context: items marked done/complete → "complete", in-progress items → "in_progress", else "not_started".
-
-Text to parse:
-${text.slice(0, 6000)}`,
+Input to parse:
+${text.slice(0, 8000)}`,
       }],
     })
 
     let parsed: any
     try {
       const raw = (extractMsg.content[0] as { type: string; text: string }).text
-      parsed = JSON.parse(raw.replace(/^```json?\n?/i, '').replace(/\n?```$/i, '').trim())
+      parsed = extractJsonFromText(raw)
     } catch {
-      return NextResponse.json({ error: 'Failed to parse the text into a project plan. Try providing more structured input.' }, { status: 422 })
+      // Log the raw response to help debug, then return a clear error
+      console.error('Project plan parse failed. Raw AI response:', (extractMsg.content[0] as any)?.text?.slice(0, 500))
+      return NextResponse.json({ error: 'The AI could not extract a structured plan from this input. Try pasting the content as plain text or with clearer column headers.' }, { status: 422 })
     }
 
     const now = new Date().toISOString()
