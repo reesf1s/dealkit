@@ -26,11 +26,14 @@ export const ML_FEATURE_NAMES = [
   'stage_progress',       // 0 = prospecting → 1 = negotiation
   'deal_value',           // log-normalised by workspace max
   'pipeline_age',         // days / 180, capped at 1
-  'has_risks',            // binary: risk flags present
+  'risk_intensity',       // continuous: dealRisks.length / 5, capped at 1 (replaces binary has_risks)
   'competitor_win_rate',  // historical win rate against this deal's rivals
   'todo_engagement',      // todos-completed / total
   'text_engagement',      // NLP composite from meeting notes (sentiment × recency × signals)
                           // Replaces ai_confidence — no circular LLM dependency.
+  'momentum_score',       // recent vs early sentiment delta (0–1, 0.5=stable)
+  'stakeholder_depth',    // breadth of stakeholder engagement (0–1, 6 categories)
+  'urgency_score',        // urgency language density from NLP (0–1)
 ] as const
 
 export const ML_MIN_TRAINING_DEALS = 6
@@ -52,11 +55,14 @@ export interface DealMLInput {
   todos: { done: boolean }[]
   createdAt: Date | string | null
   updatedAt: Date | string | null
-  meetingNotes?: string | null     // used for text_engagement feature extraction
+  meetingNotes?: string | null     // used for NLP feature extraction
   wonDate?: Date | string | null
   lostDate?: Date | string | null
-  /** Pre-computed textEngagement (0–1) — if not provided, extracted from meetingNotes. */
-  textEngagement?: number
+  /** Pre-computed NLP features — if not provided, extracted from meetingNotes. */
+  textEngagement?: number          // 0–1 composite NLP signal
+  momentumScore?: number           // 0–1 recent vs early sentiment
+  stakeholderDepth?: number        // 0–1 breadth of stakeholder engagement
+  urgencyScore?: number            // 0–1 urgency language density
 }
 
 // ─── Output types ─────────────────────────────────────────────────────────────
@@ -84,6 +90,7 @@ export interface DealMLPrediction {
   similarLosses: { dealId: string; company: string; similarity: number }[]
   archetypeId: number | null
   riskFlags: string[]
+  predictedDaysToClose: number | null            // OLS regression prediction (null if no model)
 }
 
 export interface DealArchetype {
@@ -128,6 +135,16 @@ export interface ScoreCalibrationPoint {
   discrimination: number    // avgMlOnWins − avgMlOnLoss (positive = good)
 }
 
+export interface CloseDateModel {
+  intercept: number          // regression intercept (normalised space)
+  coefficients: number[]     // one coefficient per ML feature
+  targetScale: number        // max training days — multiply normalised prediction by this
+  trainingSize: number       // number of won deals used
+  rmse: number               // root-mean-square error in days
+  meanDaysToClose: number    // mean of training targets (for context)
+  lastTrained: string
+}
+
 export interface MLTrends {
   winRate: {
     direction: 'improving' | 'declining' | 'stable'
@@ -156,6 +173,7 @@ export interface MLEngineResult {
   stageVelocity: StageVelocityIntel | null
   competitivePatterns: CompetitivePattern[]
   calibrationTimeline: ScoreCalibrationPoint[]
+  closeDateModel: CloseDateModel | null
 }
 
 // ─── Math helpers ─────────────────────────────────────────────────────────────
@@ -259,7 +277,8 @@ function extractFeatures(
   const createdMs = deal.createdAt ? new Date(deal.createdAt).getTime() : now.getTime()
   const f_age = Math.min((now.getTime() - createdMs) / 86_400_000 / 180, 1)
 
-  const f_risks = deal.dealRisks.length > 0 ? 1 : 0
+  // risk_intensity: continuous (replaces binary has_risks)
+  const f_risk = Math.min(deal.dealRisks.length / 5, 1)
 
   const comps = deal.dealCompetitors.filter(Boolean)
   const f_comp = comps.length > 0
@@ -269,15 +288,20 @@ function extractFeatures(
   const todos = deal.todos ?? []
   const f_todo = todos.length > 0 ? todos.filter(t => t.done).length / todos.length : 0.5
 
-  // text_engagement: NLP-derived from meeting notes — no LLM dependency
-  const f_text = deal.textEngagement ??
-    extractTextSignals(
-      deal.meetingNotes,
-      deal.createdAt ?? now,
-      deal.updatedAt ?? now,
-    ).textEngagement
+  // NLP features — lazy-extract text signals if any are missing
+  let _sig: ReturnType<typeof extractTextSignals> | null = null
+  const sig = (): ReturnType<typeof extractTextSignals> => {
+    if (!_sig) _sig = extractTextSignals(deal.meetingNotes, deal.createdAt ?? now, deal.updatedAt ?? now)
+    return _sig
+  }
 
-  return [f_stage, f_value, f_age, f_risks, f_comp, f_todo, f_text]
+  const f_text       = deal.textEngagement   ?? sig().textEngagement
+  const f_momentum   = deal.momentumScore    ?? sig().momentumScore
+  const f_stakeholder= deal.stakeholderDepth ?? sig().stakeholderDepth
+  const f_urgency    = deal.urgencyScore     ?? sig().urgencyScore
+
+  // Order must match ML_FEATURE_NAMES exactly
+  return [f_stage, f_value, f_age, f_risk, f_comp, f_todo, f_text, f_momentum, f_stakeholder, f_urgency]
 }
 
 // ─── Logistic regression ──────────────────────────────────────────────────────
@@ -325,10 +349,12 @@ function computeLOO(examples: { features: number[]; label: number }[]): number {
 
 function labelArchetype(c: number[]): string {
   if (c.length === 0) return 'Mixed pipeline'
-  const [stage, value, age, risks,, , ai] = c
-  if ((age ?? 0) > 0.6 || (risks ?? 0) > 0.6) return 'At-risk deals'
+  // Indices: 0=stage, 1=value, 2=age, 3=risk, 4=comp, 5=todo, 6=text, 7=momentum, 8=stakeholder, 9=urgency
+  const [stage, value, age, risk,,, text, momentum, stakeholder] = c
+  if ((age ?? 0) > 0.6 || (risk ?? 0) > 0.6) return 'At-risk deals'
   if ((value ?? 0) > 0.65 && (stage ?? 0) > 0.55) return 'Enterprise opportunities'
-  if ((stage ?? 0) > 0.65 && (ai ?? 0) > 0.6) return 'High-confidence closes'
+  if ((stage ?? 0) > 0.65 && (text ?? 0) > 0.6) return 'High-confidence closes'
+  if ((momentum ?? 0) > 0.65 && (stakeholder ?? 0) > 0.5) return 'High-momentum deals'
   if ((stage ?? 0) < 0.3 && (value ?? 0) < 0.4) return 'Early-stage leads'
   if ((value ?? 0) > 0.5) return 'High-value opportunities'
   return 'Mid-market pipeline'
@@ -341,8 +367,9 @@ function winningCharacteristic(c: number[]): string {
     const dev = Math.abs((c[i] ?? 0.5) - 0.5)
     if (dev > maxDev) { maxDev = dev; topIdx = i; topDir = (c[i] ?? 0.5) > 0.5 ? 1 : -1 }
   }
-  const pos = ['Advanced stage','High deal value','Long pipeline age','Has risk flags','Strong comp record','High engagement','High AI score']
-  const neg = ['Early stage','Smaller deals','Fresh entries','No risk flags','Weak comp record','Low engagement','Low AI score']
+  // One label per feature (10 features)
+  const pos = ['Advanced stage','High deal value','Long pipeline age','Multiple risk flags','Strong comp record','High action completion','Strong notes engagement','Building momentum','Broad stakeholder coverage','High urgency from prospect']
+  const neg = ['Early stage','Smaller deal','Fresh entry','No risk flags','Weak comp record','Low action completion','Weak notes engagement','Declining momentum','Narrow stakeholder reach','Low urgency from prospect']
   return (topDir > 0 ? pos[topIdx] : neg[topIdx]) ?? 'Mixed'
 }
 
@@ -391,19 +418,25 @@ const WIN_CONDITIONS: Record<string, string> = {
   stage_progress:       'Late-stage deals',
   deal_value:           'Smaller deal sizes',
   pipeline_age:         'Fresh pipeline entries',
-  has_risks:            'Deals without risk flags',
+  risk_intensity:       'Deals with few or no risk flags',
   competitor_win_rate:  'Strong competitive track record',
   todo_engagement:      'High rep engagement',
-  ai_confidence:        'High AI confidence score',
+  text_engagement:      'Strong positive engagement in notes',
+  momentum_score:       'Deal momentum building over time',
+  stakeholder_depth:    'Broad multi-function stakeholder engagement',
+  urgency_score:        'Strong urgency expressed by prospect',
 }
 const LOSS_RISKS: Record<string, string> = {
   stage_progress:       'Early-stage deals',
   deal_value:           'Large deal values',
   pipeline_age:         'Aging or stalling deals',
-  has_risks:            'Multiple active risk flags',
+  risk_intensity:       'Multiple active risk flags',
   competitor_win_rate:  'Weak competitive positioning',
   todo_engagement:      'Low rep engagement',
-  ai_confidence:        'Low AI confidence score',
+  text_engagement:      'Weak or negative engagement in notes',
+  momentum_score:       'Declining deal momentum over time',
+  stakeholder_depth:    'Limited stakeholder engagement',
+  urgency_score:        'No urgency from prospect',
 }
 
 function computeCompetitivePatterns(
@@ -510,6 +543,78 @@ function computeCalibrationTimeline(
   return timeline
 }
 
+// ─── Close date regression (OLS via gradient descent) ─────────────────────────
+// Predicts days-to-close for open deals using the same feature space as the LR model.
+// Trained only on closed_won deals that have both createdAt and wonDate.
+
+function trainCloseDateRegression(
+  wonDeals: DealMLInput[],
+  competitorWinRates: Map<string, number>,
+  avgDealValue: number,
+  maxDealValue: number,
+  now: Date,
+): CloseDateModel | null {
+  const samples = wonDeals
+    .filter(d => d.createdAt && d.wonDate)
+    .map(d => ({
+      features: extractFeatures(d, competitorWinRates, avgDealValue, maxDealValue, now),
+      daysToClose: (new Date(d.wonDate!).getTime() - new Date(d.createdAt!).getTime()) / 86_400_000,
+    }))
+    .filter(s => s.daysToClose >= 0)
+
+  if (samples.length < 4) return null
+
+  const meanDays    = samples.reduce((s, e) => s + e.daysToClose, 0) / samples.length
+  const maxDays     = Math.max(...samples.map(s => s.daysToClose), 1)
+  const targetScale = maxDays
+
+  // Normalise targets to [0,1] for stable gradient descent
+  const normalised = samples.map(s => ({
+    features: s.features,
+    target:   s.daysToClose / targetScale,
+  }))
+
+  const n = normalised[0]?.features.length ?? ML_FEATURE_NAMES.length
+  const w = new Array<number>(n).fill(0)
+  let   b = 0.5   // init at midpoint
+  const lambda = 0.01
+  const lr     = 0.05
+
+  for (let epoch = 0; epoch < 1200; epoch++) {
+    const dw = new Array<number>(n).fill(0)
+    let db = 0
+    for (const { features, target } of normalised) {
+      const err = dot(w, features) + b - target
+      for (let i = 0; i < n; i++) dw[i] += err * (features[i] ?? 0)
+      db += err
+    }
+    const m = normalised.length
+    for (let i = 0; i < n; i++) w[i] -= lr * (dw[i] / m + 2 * lambda * w[i])
+    b -= lr * (db / m)
+  }
+
+  // RMSE in days
+  const mse = samples.reduce((s, { features, daysToClose }) => {
+    const pred = (dot(w, features) + b) * targetScale
+    return s + (pred - daysToClose) ** 2
+  }, 0) / samples.length
+
+  return {
+    intercept:       b,
+    coefficients:    w,
+    targetScale,
+    trainingSize:    samples.length,
+    rmse:            Math.round(Math.sqrt(mse)),
+    meanDaysToClose: Math.round(meanDays),
+    lastTrained:     now.toISOString(),
+  }
+}
+
+export function predictDaysToClose(model: CloseDateModel, features: number[]): number {
+  const raw = (dot(model.coefficients, features) + model.intercept) * model.targetScale
+  return Math.max(1, Math.round(raw))
+}
+
 // ─── Main engine ──────────────────────────────────────────────────────────────
 
 export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngineResult {
@@ -522,6 +627,7 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
     model: null, predictions: [], trends: null,
     archetypes: [], stageVelocity: null,
     competitivePatterns: [], calibrationTimeline: [],
+    closeDateModel: null,
   }
   if (closed.length < ML_MIN_TRAINING_DEALS) return empty
 
@@ -642,11 +748,12 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
       minDist < 0.25 ? 'high' : minDist < 0.55 ? 'medium' : 'low'
 
     const riskFlags: string[] = []
-    if (feats[4] < 0.4 && deal.dealCompetitors.filter(Boolean).length > 0)
+    if ((feats[4] ?? 0.5) < 0.4 && deal.dealCompetitors.filter(Boolean).length > 0)
       riskFlags.push(`Below 40% win rate vs ${deal.dealCompetitors.filter(Boolean)[0]} historically`)
-    if (feats[2] > 0.65) riskFlags.push('Deal aging in pipeline — similar deals stalled')
-    if (feats[3] === 1)  riskFlags.push('Active risk flags on this deal')
-    if (deal.conversionScore != null && feats[6] < 0.35) riskFlags.push('Low AI confidence score')
+    if ((feats[2] ?? 0) > 0.65) riskFlags.push('Deal aging in pipeline — similar deals stalled')
+    if ((feats[3] ?? 0) > 0.4)  riskFlags.push('Multiple risk flags on this deal')
+    if ((feats[6] ?? 0.5) < 0.35) riskFlags.push('Weak engagement signal in meeting notes')
+    if ((feats[7] ?? 0.5) < 0.35) riskFlags.push('Deal momentum declining — notes turning negative')
 
     // Archetype: find which cluster this deal was assigned to
     const globalIdx = allDeals.findIndex(d => d.id === deal.id)
@@ -666,6 +773,7 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
       similarLosses,
       archetypeId,
       riskFlags,
+      predictedDaysToClose: null,  // filled after closeDateModel is trained below
     }
   })
 
@@ -683,6 +791,18 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
   const calibrationTimeline = computeCalibrationTimeline(
     closed, weights, bias, competitorWinRates, avgDealValue, maxDealValue, now
   )
+
+  // ── Close date regression ────────────────────────────────────────────────
+  const closeDateModel = trainCloseDateRegression(
+    closedWon, competitorWinRates, avgDealValue, maxDealValue, now
+  )
+
+  // Backfill predictedDaysToClose on open-deal predictions
+  const predictionsWithDates = predictions.map(pred => {
+    if (!closeDateModel) return pred
+    const feats = featMap.get(pred.dealId) ?? []
+    return { ...pred, predictedDaysToClose: predictDaysToClose(closeDateModel, feats) }
+  })
 
   // ── Trend detection ───────────────────────────────────────────────────────
   type MonthBucket = { wins: number; total: number; days: number[] }
@@ -759,7 +879,7 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
     }
   }
 
-  return { model, predictions, trends, archetypes, stageVelocity, competitivePatterns, calibrationTimeline }
+  return { model, predictions: predictionsWithDates, trends, archetypes, stageVelocity, competitivePatterns, calibrationTimeline, closeDateModel }
 }
 
 // ─── Composite score computation (called from analyze-notes after LLM scores) ─

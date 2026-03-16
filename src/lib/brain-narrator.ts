@@ -35,6 +35,12 @@ export interface DealBriefing {
   archetype: string | null             // deal archetype label from k-means
   competitorInsight: string | null     // e.g. "You win 60% vs Competitor Y"
   recommendation: string               // single most important recommended action
+  // Extended signals
+  isDeteriorating: boolean             // note sentiment declining over time
+  momentumDirection: 'building' | 'stable' | 'declining'
+  predictedCloseDays: number | null    // OLS regression prediction
+  stakeholderDepth: number | null      // 0-1 breadth of stakeholder coverage
+  nextStepDefined: boolean
 }
 
 export interface OverviewBriefing {
@@ -49,6 +55,9 @@ export interface OverviewBriefing {
   topRisks: string[]                   // up to 5 recurring risks
   topRecommendations: string[]         // up to 4 most important pipeline actions
   forecast: number | null              // probability-weighted pipeline value
+  pipelineHealth: string | null        // e.g. "Strong (74/100)"
+  deterioratingDeals: string[]         // deal names with declining sentiment
+  nextMonthForecast: string | null     // ML revenue forecast for next month
 }
 
 export interface MeetingPrepBriefing {
@@ -138,6 +147,14 @@ export function buildDealBriefing(
   if (stalledDays && stalledDays > 7) recommendation = `Deal has stalled ${stalledDays} days past expected stage duration — re-engage now`
   if (risks.length > 0 && !recommendation.includes('risk')) recommendation = `Address key risk: ${risks[0]}`
 
+  // Extended signal data from brain snapshot
+  const snap = brain?.deals?.find(d => d.id === dealId)
+  const sig  = snap?.signalSummary
+  const momentumDirection: DealBriefing['momentumDirection'] =
+    sig == null        ? 'stable' :
+    sig.momentum > 0.6 ? 'building' :
+    sig.momentum < 0.4 ? 'declining' : 'stable'
+
   return {
     dealName: deal.dealName,
     company: deal.company,
@@ -153,6 +170,11 @@ export function buildDealBriefing(
     archetype,
     competitorInsight,
     recommendation,
+    isDeteriorating:  sig?.isDeteriorating ?? false,
+    momentumDirection,
+    predictedCloseDays: sig?.predictedCloseDays ?? null,
+    stakeholderDepth:  sig?.stakeholderDepth ?? null,
+    nextStepDefined:   sig?.nextStepDefined ?? false,
   }
 }
 
@@ -165,6 +187,7 @@ export function buildOverviewBriefing(brain: WorkspaceBrain | null): OverviewBri
       stageBreakdown: {}, winRate: null, winRateTrend: null,
       topUrgencies: [], topStale: [], topRisks: [],
       topRecommendations: [], forecast: null,
+      pipelineHealth: null, deterioratingDeals: [], nextMonthForecast: null,
     }
   }
 
@@ -176,6 +199,22 @@ export function buildOverviewBriefing(brain: WorkspaceBrain | null): OverviewBri
     .sort((a, b) => (a.priority === 'high' ? -1 : b.priority === 'high' ? 1 : 0))
     .slice(0, 4)
     .map(r => `${r.dealName} (${r.company}): ${r.recommendation}`)
+
+  const phi = brain.pipelineHealthIndex
+  const pipelineHealth = phi ? `${phi.interpretation} (${phi.score}/100) — ${phi.keyInsight}` : null
+
+  const deterioratingDeals = (brain.deteriorationAlerts ?? [])
+    .slice(0, 3)
+    .map(d => `${d.dealName} (${d.company}): ${d.warning}`)
+
+  // Next month revenue forecast (using Date to handle December rollover correctly)
+  const now = new Date()
+  const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+  const nextMonthKey  = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}`
+  const nextMonthRF = (brain.revenueForecasts ?? []).find(r => r.month === nextMonthKey)
+  const nextMonthForecast = nextMonthRF
+    ? `£${Math.round(nextMonthRF.expectedRevenue / 1000)}k expected (${nextMonthRF.dealCount} deals, ${nextMonthRF.avgConfidence}% avg confidence)`
+    : null
 
   return {
     totalActive: brain.pipeline.totalActive,
@@ -189,6 +228,9 @@ export function buildOverviewBriefing(brain: WorkspaceBrain | null): OverviewBri
     topRisks: (brain.topRisks ?? []).slice(0, 5),
     topRecommendations,
     forecast: brain.dealVelocity?.weightedForecast ?? null,
+    pipelineHealth,
+    deterioratingDeals,
+    nextMonthForecast,
   }
 }
 
@@ -282,6 +324,22 @@ export function scoreNarrationPrompt(briefing: DealBriefing): string {
     ? `Competitive context: ${briefing.competitorInsight}.`
     : ''
 
+  const momentumLine = briefing.isDeteriorating
+    ? `⚠ Deal signals deteriorating — recent notes more negative than early notes.`
+    : briefing.momentumDirection === 'building'
+      ? `Deal momentum building — recent notes more positive than earlier.`
+      : ''
+
+  const closeDateLine = briefing.predictedCloseDays != null
+    ? `Predicted close: ~${briefing.predictedCloseDays} days from now (based on similar historical deals).`
+    : ''
+
+  const stakeholderLine = briefing.stakeholderDepth != null && briefing.stakeholderDepth < 0.34
+    ? `Limited stakeholder coverage detected — only one functional area engaged so far.`
+    : briefing.stakeholderDepth != null && briefing.stakeholderDepth > 0.5
+      ? `Multi-function stakeholder engagement confirmed.`
+      : ''
+
   return `You are a sales intelligence narrator. The scoring engine has determined the following facts about "${briefing.dealName}" (${briefing.company}):
 
 Score: ${briefing.score}/100 (${briefing.scoreBasis === 'ml_composite' ? 'ML composite' : 'signal heuristic'}).
@@ -291,9 +349,12 @@ ${risksLine}
 ${stalledLine}
 ${similarLine}
 ${competitorLine}
+${momentumLine}
+${closeDateLine}
+${stakeholderLine}
 Primary recommendation: ${briefing.recommendation}
 
-Write exactly 3 short bullet points for the sales rep — what the score means, the biggest positive signal, and the most important action. Be specific and direct. Use "your pipeline" not "the algorithm". Do not use JSON. Do not say "AI" or "model". Max 20 words per bullet.`
+Write exactly 3 short bullet points for the sales rep — what the score means, the most important signal (positive or risk), and the most important action. Be specific and direct. Use "your pipeline" not "the algorithm". Do not use JSON. Do not say "AI" or "model". Max 20 words per bullet.`
 }
 
 export function overviewNarrationPrompt(briefing: OverviewBriefing, dateStr: string): string {
@@ -302,10 +363,13 @@ export function overviewNarrationPrompt(briefing: OverviewBriefing, dateStr: str
     `${briefing.totalActive} active deals, £${briefing.totalValue.toLocaleString()} total value.`,
     briefing.avgScore != null ? `Average deal score: ${briefing.avgScore}/100.` : '',
     briefing.winRate != null ? `Historical win rate: ${briefing.winRate}% ${briefing.winRateTrend ? `(${briefing.winRateTrend})` : ''}.` : '',
+    briefing.pipelineHealth ? `Pipeline health: ${briefing.pipelineHealth}.` : '',
     briefing.topUrgencies.length ? `Urgent: ${briefing.topUrgencies.join(' | ')}.` : '',
     briefing.topStale.length ? `Stale: ${briefing.topStale.join(' | ')}.` : '',
+    briefing.deterioratingDeals.length ? `Deteriorating: ${briefing.deterioratingDeals.join(' | ')}.` : '',
     briefing.topRisks.length ? `Recurring risks: ${briefing.topRisks.join('; ')}.` : '',
     briefing.forecast != null ? `Probability-weighted forecast: £${Math.round(briefing.forecast).toLocaleString()}.` : '',
+    briefing.nextMonthForecast ? `Next month ML revenue forecast: ${briefing.nextMonthForecast}.` : '',
     briefing.topRecommendations.length ? `Top actions: ${briefing.topRecommendations.join(' | ')}.` : '',
   ].filter(Boolean).join('\n')
 

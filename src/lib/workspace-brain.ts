@@ -15,8 +15,19 @@
 import { db } from '@/lib/db'
 import { dealLogs, competitors as competitorRecords } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
-import { runMLEngine, computeCompositeScore, type TrainedMLModel, type DealMLPrediction, type MLTrends, type DealArchetype, type StageVelocityIntel, type CompetitivePattern, type ScoreCalibrationPoint, ML_MIN_TRAINING_DEALS } from '@/lib/deal-ml'
-import { extractTextSignals } from '@/lib/text-signals'
+import { runMLEngine, computeCompositeScore, type TrainedMLModel, type DealMLPrediction, type MLTrends, type DealArchetype, type StageVelocityIntel, type CompetitivePattern, type ScoreCalibrationPoint, type CloseDateModel, ML_MIN_TRAINING_DEALS } from '@/lib/deal-ml'
+import { extractTextSignals, analyzeDeterioration, type TextSignals } from '@/lib/text-signals'
+
+export interface DealSignalSummary {
+  momentum:         number    // 0–1 sentiment momentum (>0.5 = building)
+  riskLevel:        'low' | 'medium' | 'high'
+  isDeteriorating:  boolean
+  predictedCloseDays: number | null
+  velocity:         'accelerating' | 'steady' | 'decelerating'
+  stakeholderDepth: number    // 0–1
+  nextStepDefined:  boolean
+  championStrength: number    // 0–1
+}
 
 export interface DealSnapshot {
   id: string
@@ -32,6 +43,7 @@ export interface DealSnapshot {
   closeDate: string | null     // ISO string or null
   daysSinceUpdate: number
   projectPlanProgress?: { total: number; complete: number } | null
+  signalSummary?: DealSignalSummary
 }
 
 export interface WorkspaceBrain {
@@ -107,6 +119,39 @@ export interface WorkspaceBrain {
   stageVelocityIntel?: StageVelocityIntel         // quantile-based stall detection
   competitivePatterns?: CompetitivePattern[]      // per-competitor mini-LR insights
   calibrationTimeline?: ScoreCalibrationPoint[]   // monthly ML discrimination tracking
+  closeDateModel?: CloseDateModel                 // OLS close date regression model
+  // ── Pipeline health & revenue intelligence ──────────────────────────────────
+  pipelineHealthIndex?: PipelineHealthIndex        // composite 0–100 pipeline health
+  revenueForecasts?: RevenueForecast[]             // probability-weighted monthly revenue
+  deteriorationAlerts?: DeteriorationAlert[]       // deals showing declining note sentiment
+}
+
+export interface PipelineHealthIndex {
+  score:                 number     // 0–100 composite
+  stageDepth:            number     // 0–100: % of deals in proposal/negotiation
+  velocityHealth:        number     // 0–100: % of deals not stalling
+  conversionConfidence:  number     // 0–100: avg ML win probability (or avg score)
+  momentumScore:         number     // 0–100: aggregate deal momentum
+  interpretation: 'Excellent' | 'Strong' | 'Moderate' | 'Weak' | 'Critical'
+  keyInsight:            string
+}
+
+export interface RevenueForecast {
+  month:           string    // "2026-04"
+  expectedRevenue: number    // probability-weighted: sum(dealValue × winProbability)
+  bestCase:        number    // sum of deal values (assuming all win)
+  dealCount:       number
+  avgConfidence:   number    // avg ML win probability (0–100)
+}
+
+export interface DeteriorationAlert {
+  dealId:         string
+  dealName:       string
+  company:        string
+  earlySentiment: number    // 0–1
+  recentSentiment:number    // 0–1
+  delta:          number    // recent − early (negative = deteriorating)
+  warning:        string
 }
 
 let schemaMigrated = false
@@ -169,11 +214,22 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
   const now = new Date()
   const activeDeals = deals.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
 
+  // ── Extract text signals for ALL deals upfront (used for ML features and signal summaries) ──
+  const signalMap = new Map<string, TextSignals>()
+  for (const d of deals) {
+    signalMap.set(d.id, extractTextSignals(
+      d.meetingNotes as string | null,
+      d.createdAt,
+      d.updatedAt,
+    ))
+  }
+
   const snapshots: DealSnapshot[] = deals.map(d => {
     const allTodos = (d.todos as { text: string; done: boolean }[]) ?? []
     const pending = allTodos.filter(t => !t.done).map(t => t.text)
     const updatedMs = d.updatedAt ? new Date(d.updatedAt).getTime() : now.getTime()
     const daysSince = Math.floor((now.getTime() - updatedMs) / 86_400_000)
+    const sig = signalMap.get(d.id)
     return {
       id: d.id,
       name: d.dealName,
@@ -196,6 +252,16 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
         if (tasks.length === 0) return null
         return { total: tasks.length, complete: tasks.filter((t: any) => t.status === 'complete').length }
       })(),
+      signalSummary: sig ? {
+        momentum:          sig.momentumScore,
+        riskLevel:         sig.objectionCount >= 4 ? 'high' : sig.objectionCount >= 2 ? 'medium' : 'low',
+        isDeteriorating:   false,   // filled in deterioration pass below
+        predictedCloseDays: null,   // filled in after ML runs
+        velocity:          sig.engagementVelocity,
+        stakeholderDepth:  sig.stakeholderDepth,
+        nextStepDefined:   sig.nextStepDefined,
+        championStrength:  sig.championStrength,
+      } : undefined,
     }
   })
 
@@ -696,16 +762,14 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
   let stageVelocityIntel: WorkspaceBrain['stageVelocityIntel'] = undefined
   let competitivePatterns: WorkspaceBrain['competitivePatterns'] = undefined
   let calibrationTimeline: WorkspaceBrain['calibrationTimeline'] = undefined
+  let closeDateModel: WorkspaceBrain['closeDateModel']     = undefined
 
   if ((wonDeals.length + lostDeals.length) >= ML_MIN_TRAINING_DEALS) {
-    // Extract text signals for every deal — used for the text_engagement ML feature.
-    // This is the only NLP pass; the ML model trains on these signals, not LLM scores.
+    // Build ML inputs using pre-extracted text signals — no LLM dependency.
+    // All 4 NLP features (textEngagement, momentumScore, stakeholderDepth, urgencyScore)
+    // are pre-computed from the signalMap built above.
     const mlInputs = deals.map(d => {
-      const signals = extractTextSignals(
-        d.meetingNotes as string | null,
-        d.createdAt,
-        d.updatedAt,
-      )
+      const sig = signalMap.get(d.id)
       return {
         id:               d.id,
         company:          d.prospectCompany,
@@ -718,7 +782,10 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
         updatedAt:        d.updatedAt,
         wonDate:          d.wonDate,
         lostDate:         d.lostDate,
-        textEngagement:   signals.textEngagement,  // pre-computed — no LLM dependency
+        textEngagement:   sig?.textEngagement,
+        momentumScore:    sig?.momentumScore,
+        stakeholderDepth: sig?.stakeholderDepth,
+        urgencyScore:     sig?.urgencyScore,
       }
     })
 
@@ -730,6 +797,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
       stageVelocityIntel   = mlResult.stageVelocity ?? undefined
       competitivePatterns  = mlResult.competitivePatterns.length > 0 ? mlResult.competitivePatterns : undefined
       calibrationTimeline  = mlResult.calibrationTimeline.length > 0 ? mlResult.calibrationTimeline : undefined
+      closeDateModel       = mlResult.closeDateModel ?? undefined
 
       // Embed composite scores into predictions — blends LLM+ML so stored conversionScore reflects both
       mlPredictions = mlResult.predictions.map(pred => {
@@ -740,8 +808,125 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
         }
         return pred
       })
+
+      // Backfill predictedDaysToClose into snapshot signalSummaries
+      for (const pred of mlPredictions) {
+        const snap = snapshots.find(s => s.id === pred.dealId)
+        if (snap?.signalSummary && pred.predictedDaysToClose != null) {
+          snap.signalSummary.predictedCloseDays = pred.predictedDaysToClose
+        }
+      }
     }
   }
+
+  // ── Deterioration alerts — active deals with declining note sentiment ────────
+  const deteriorationAlerts: DeteriorationAlert[] = []
+  for (const d of activeDeals) {
+    const notes = d.meetingNotes as string | null
+    const det = analyzeDeterioration(notes)
+    if (det.isDeteriorating && det.warning) {
+      deteriorationAlerts.push({
+        dealId:         d.id,
+        dealName:       d.dealName,
+        company:        d.prospectCompany,
+        earlySentiment: det.earlySentiment,
+        recentSentiment:det.recentSentiment,
+        delta:          det.delta,
+        warning:        det.warning,
+      })
+      // Also update the snapshot's signalSummary
+      const snap = snapshots.find(s => s.id === d.id)
+      if (snap?.signalSummary) snap.signalSummary.isDeteriorating = true
+    }
+  }
+
+  // ── Pipeline Health Index ─────────────────────────────────────────────────
+  const lateStageCount = activeDeals.filter(d => ['proposal', 'negotiation'].includes(d.stage)).length
+  const stageDepthPct  = activeDeals.length > 0 ? Math.round((lateStageCount / activeDeals.length) * 100) : 0
+
+  const stallingCount  = stageVelocityIntel?.stageAlerts.length ?? 0
+  const velocityHealthPct = activeDeals.length > 0
+    ? Math.max(0, Math.round(((activeDeals.length - stallingCount) / activeDeals.length) * 100))
+    : 100
+
+  let conversionConfidencePct: number
+  if (mlPredictions && mlPredictions.length > 0) {
+    const avgProb = mlPredictions.reduce((s, p) => s + p.winProbability, 0) / mlPredictions.length
+    conversionConfidencePct = Math.round(avgProb * 100)
+  } else {
+    conversionConfidencePct = avgConversionScore ?? 50
+  }
+
+  const momVals = activeDeals.map(d => signalMap.get(d.id)?.momentumScore ?? 0.5)
+  const avgMomentumPct = momVals.length > 0
+    ? Math.round((momVals.reduce((a, b) => a + b, 0) / momVals.length) * 100)
+    : 50
+
+  const phiScore = Math.round(
+    stageDepthPct          * 0.25 +
+    velocityHealthPct      * 0.30 +
+    conversionConfidencePct* 0.30 +
+    avgMomentumPct         * 0.15
+  )
+  const phiInterpretation: PipelineHealthIndex['interpretation'] =
+    phiScore >= 80 ? 'Excellent' :
+    phiScore >= 65 ? 'Strong'    :
+    phiScore >= 50 ? 'Moderate'  :
+    phiScore >= 35 ? 'Weak'      : 'Critical'
+
+  let phiKeyInsight: string
+  if (stallingCount >= Math.ceil(activeDeals.length / 2) && stallingCount > 0) {
+    phiKeyInsight = `${stallingCount} of ${activeDeals.length} active deals are stalling past expected velocity`
+  } else if (deteriorationAlerts.length >= 2) {
+    phiKeyInsight = `${deteriorationAlerts.length} deals showing declining sentiment — review before they go cold`
+  } else if (lateStageCount >= Math.ceil(activeDeals.length * 0.4) && lateStageCount > 0) {
+    phiKeyInsight = `${lateStageCount} deals in late stages — strong near-term revenue opportunity`
+  } else if (avgMomentumPct < 40) {
+    phiKeyInsight = 'Deal momentum declining across the board — re-engagement needed'
+  } else if (conversionConfidencePct > 65) {
+    phiKeyInsight = 'ML model sees above-average win probability across the open pipeline'
+  } else {
+    phiKeyInsight = `${phiInterpretation} pipeline with ${activeDeals.length} active deals under management`
+  }
+
+  const pipelineHealthIndex: PipelineHealthIndex = {
+    score:                phiScore,
+    stageDepth:           stageDepthPct,
+    velocityHealth:       velocityHealthPct,
+    conversionConfidence: conversionConfidencePct,
+    momentumScore:        avgMomentumPct,
+    interpretation:       phiInterpretation,
+    keyInsight:           phiKeyInsight,
+  }
+
+  // ── Revenue forecasts — probability-weighted by predicted close date ────────
+  const revenueForecasts: RevenueForecast[] = (() => {
+    if (!mlPredictions || mlPredictions.length === 0) return []
+    const buckets = new Map<string, { expected: number; bestCase: number; count: number; probSum: number }>()
+    for (const pred of mlPredictions) {
+      if (pred.predictedDaysToClose == null) continue
+      const deal = activeDeals.find(d => d.id === pred.dealId)
+      if (!deal?.dealValue || deal.dealValue <= 0) continue
+      const closeDate = new Date(now.getTime() + pred.predictedDaysToClose * 86_400_000)
+      const monthKey  = `${closeDate.getFullYear()}-${String(closeDate.getMonth() + 1).padStart(2, '0')}`
+      const b = buckets.get(monthKey) ?? { expected: 0, bestCase: 0, count: 0, probSum: 0 }
+      b.expected += deal.dealValue * pred.winProbability
+      b.bestCase += deal.dealValue
+      b.count++
+      b.probSum  += pred.winProbability
+      buckets.set(monthKey, b)
+    }
+    return [...buckets.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(0, 6)
+      .map(([month, b]) => ({
+        month,
+        expectedRevenue: Math.round(b.expected),
+        bestCase:        Math.round(b.bestCase),
+        dealCount:       b.count,
+        avgConfidence:   Math.round((b.probSum / b.count) * 100),
+      }))
+  })()
 
   const brain: WorkspaceBrain = {
     updatedAt: now.toISOString(),
@@ -762,6 +947,10 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     stageVelocityIntel,
     competitivePatterns,
     calibrationTimeline,
+    closeDateModel,
+    pipelineHealthIndex: activeDeals.length > 0 ? pipelineHealthIndex : undefined,
+    revenueForecasts:    revenueForecasts.length > 0 ? revenueForecasts : undefined,
+    deteriorationAlerts: deteriorationAlerts.length > 0 ? deteriorationAlerts : undefined,
   }
 
   await db.execute(sql`
@@ -955,6 +1144,38 @@ export function formatBrainContext(brain: WorkspaceBrain): string {
     } else {
       lines.push(`\nML CALIBRATION (${latest.month}): discrimination ${Math.round(latest.discrimination)}pp — model needs more data`)
     }
+  }
+
+  // Pipeline Health Index
+  const phi = brain.pipelineHealthIndex
+  if (phi) {
+    lines.push(`\nPIPELINE HEALTH INDEX: ${phi.score}/100 (${phi.interpretation})`)
+    lines.push(`Stage depth: ${phi.stageDepth}% | Velocity health: ${phi.velocityHealth}% | ML confidence: ${phi.conversionConfidence}% | Momentum: ${phi.momentumScore}%`)
+    lines.push(`Insight: ${phi.keyInsight}`)
+  }
+
+  // Deterioration alerts
+  const detAlerts = brain.deteriorationAlerts ?? []
+  if (detAlerts.length > 0) {
+    lines.push(`\nDETERIORATION ALERTS (declining note sentiment):`)
+    for (const d of detAlerts.slice(0, 4)) {
+      lines.push(`⚠ ${d.dealName} (${d.company}): ${d.warning}`)
+    }
+  }
+
+  // Revenue forecast
+  const rfx = brain.revenueForecasts ?? []
+  if (rfx.length > 0) {
+    lines.push(`\nML REVENUE FORECAST (probability-weighted by predicted close date):`)
+    for (const r of rfx) {
+      lines.push(`• ${r.month}: ${fmt(r.expectedRevenue)} expected / ${fmt(r.bestCase)} best-case (${r.dealCount} deal${r.dealCount === 1 ? '' : 's'}, ${r.avgConfidence}% avg confidence)`)
+    }
+  }
+
+  // Close date model
+  const cdm = brain.closeDateModel
+  if (cdm) {
+    lines.push(`\nCLOSE DATE MODEL: trained on ${cdm.trainingSize} won deals | avg close time ${cdm.meanDaysToClose} days | ±${cdm.rmse} day RMSE`)
   }
 
   return lines.join('\n')
