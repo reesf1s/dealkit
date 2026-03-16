@@ -80,7 +80,14 @@ async function ensureBrainColumn() {
   try {
     await db.execute(sql`
       ALTER TABLE workspaces
-      ADD COLUMN IF NOT EXISTS workspace_brain jsonb
+      ADD COLUMN IF NOT EXISTS workspace_brain jsonb,
+      ADD COLUMN IF NOT EXISTS pipeline_config jsonb
+    `)
+  } catch { /* already exists */ }
+  try {
+    await db.execute(sql`
+      ALTER TABLE deal_logs
+      ADD COLUMN IF NOT EXISTS project_plan jsonb
     `)
   } catch { /* already exists */ }
   schemaMigrated = true
