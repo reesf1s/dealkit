@@ -11,6 +11,8 @@ import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { rebuildWorkspaceBrain, getWorkspaceBrain } from '@/lib/workspace-brain'
 import { computeCompositeScore } from '@/lib/deal-ml'
+import { extractTextSignals, heuristicScore } from '@/lib/text-signals'
+import { buildDealBriefing, scoreNarrationPrompt } from '@/lib/brain-narrator'
 
 const anthropic = new Anthropic()
 
@@ -35,6 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       aiSummary: dealLogs.aiSummary,
       dealRisks: dealLogs.dealRisks,
       meetingNotes: dealLogs.meetingNotes,
+      createdAt: dealLogs.createdAt,
     }).from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -76,46 +79,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       ? `\n\nEXISTING OPEN ACTION ITEMS:\n${openTodos.map((t: any) => `- [${t.id}] ${t.text}`).join('\n')}\n\nRules for todos:\n- Do NOT add duplicates or near-duplicates of existing items\n- Return obsoleteTodoIds: IDs of existing items that are now done, superseded, irrelevant, or duplicated — these will be DELETED`
       : ''
 
+    // Phase 1: LLM extracts structured data ONLY — no scoring.
+    // Scoring is computed deterministically by the brain from text signals + ML.
     const msg = await anthropic.messages.create({
-      // Sonnet for deeper analysis + larger output budget — handles complex multi-field extraction reliably
-      model: 'claude-haiku-4-5-20251001', max_tokens: 3000,
-      messages: [{ role: 'user', content: `You are analyzing B2B sales meeting notes. Extract structured information and return ONLY valid JSON, no markdown.
+      model: 'claude-haiku-4-5-20251001', max_tokens: 2000,
+      messages: [{ role: 'user', content: `You are extracting structured data from B2B sales meeting notes. Return ONLY valid JSON, no markdown, no analysis.
 
-${previousContext ? `${previousContext}\n\n---\n\n` : ''}NEW MEETING NOTES TO ANALYZE:
+${previousContext ? `${previousContext}\n\n---\n\n` : ''}NEW MEETING NOTES:
 ${meetingNotes}
 
-Deal context: ${deal.dealName} with ${deal.prospectCompany}${capabilitiesContext}${existingTodosContext}
+Deal: ${deal.dealName} with ${deal.prospectCompany}${capabilitiesContext}${existingTodosContext}
 
-${previousContext ? 'Use the full meeting history above to inform your analysis — the summary, conversion score, and risks should reflect the entire deal trajectory, not just today\'s notes.' : ''}
-
-Return this exact JSON structure:
+Return this exact JSON — extract facts, do not score or judge:
 {
-  "summary": "2-3 sentence deal summary",
-  "conversionScore": 65,
-  "conversionInsights": ["Why score is X", "Key risk or opportunity", "Recommended next action"],
-  "risks": ["Deal risk or warning signal observed in the notes"],
-  "todos": [{"text": "action item"}],
-  "obsoleteTodoIds": ["existing-todo-id-if-now-irrelevant"],
-  "productGaps": [{"title": "gap title", "description": "what customer needs that product lacks", "priority": "high"}]
+  "summary": "2-3 sentence factual summary of deal status and trajectory",
+  "risks": ["observable risk signal from the notes — disengagement, budget, competition, timeline, etc."],
+  "todos": [{"text": "specific action item"}],
+  "obsoleteTodoIds": ["id-of-existing-todo-now-done-or-irrelevant"],
+  "productGaps": [{"title": "gap title", "description": "what prospect said is missing", "priority": "high"}]
 }
 
-conversionScore: 0-100. priority: critical | high | medium | low
-
-IMPORTANT — todos rules:
-- Only add NEW action items not already covered by existing open items.
-- Do not duplicate: if an existing item says "Send proposal" and the notes mention sending a proposal, do NOT add it again.
-- obsoleteTodoIds: list IDs of existing open items that are now clearly done, superseded, or irrelevant based on the new notes. Return [] if none.
-
-IMPORTANT — risks rules:
-- Include any signals that could jeopardise this deal: disengagement, slow responses, champion leaving, budget concerns, competing priorities, late-stage hesitation, unclear decision-maker, etc.
-- These are deal-level risks, NOT product feature complaints. A risk is something about this specific sales cycle.
-- Keep each risk concise (1 sentence). Max 4 risks. Return [] if none observed.
-
-IMPORTANT — productGaps rules:
-- Only include a product gap if the prospect EXPLICITLY mentioned a missing feature, integration, or capability that your product does not currently support.
-- Examples of real product gaps: "we need Salesforce integration", "it doesn't support SSO", "we require an API for X".
-- DO NOT create product gaps from: scheduling tasks, follow-up emails, admin work, attendance tracking requests (unless the prospect said the product lacks it), general to-dos, deal risks, or anything that is a sales/process action rather than a product capability complaint.
-- If no explicit product gaps are mentioned, return an empty array: "productGaps": []` }],
+Rules — risks: deal-level signals only (not product feature requests). Max 4. Return [] if none.
+Rules — todos: new items only. No duplicates of existing open items. Return [] if none.
+Rules — obsoleteTodoIds: IDs of open items now done, superseded, or irrelevant. Return [].
+Rules — productGaps: only if prospect EXPLICITLY said your product lacks a feature/integration. Return [] otherwise.
+priority: critical | high | medium | low` }],
     })
     // Strip markdown fences and any leading/trailing text before the JSON object
     function stripToJson(raw: string): string {
@@ -161,34 +149,57 @@ IMPORTANT — productGaps rules:
     }
     if (parseOk && parsed.summary) updateFields.aiSummary = parsed.summary
 
-    // ── Score reconciliation: blend LLM score with ML model prediction ─────────
-    // If the workspace brain has an ML prediction for this deal, compute a composite
-    // score that weights LLM (dominant early on) → ML (dominant once 10+ closed deals).
-    if (parseOk && parsed.conversionScore != null) {
-      let finalScore = parsed.conversionScore
-      let finalInsights = parsed.conversionInsights ?? null
-      try {
-        const brain = await getWorkspaceBrain(workspaceId)
-        const mlPred = brain?.mlPredictions?.find(p => p.dealId === id)
-        if (mlPred && brain?.mlModel) {
-          const { composite, insight } = computeCompositeScore(
-            parsed.conversionScore,
-            mlPred.winProbability,
-            brain.mlModel.trainingSize,
-          )
-          finalScore = composite
-          if (insight) {
-            finalInsights = Array.isArray(finalInsights)
-              ? [insight, ...finalInsights]
-              : [insight]
-          }
-        }
-      } catch { /* non-fatal — fall back to LLM score */ }
+    // ── Phase 2: Brain-determined scoring ──────────────────────────────────────
+    // The brain (ML + text signals) determines the score. The LLM did NOT produce one.
+    // Pipeline: text signals → heuristic score (always) → ML composite (if trained).
+    try {
+      const combinedNotes = appendedNotes  // includes today's notes
+      const signals = extractTextSignals(combinedNotes, deal.createdAt ?? new Date(), new Date())
+      const brain = await getWorkspaceBrain(workspaceId)
+      const mlPred = brain?.mlPredictions?.find(p => p.dealId === id)
+
+      let finalScore: number
+      let scoreBasis: 'ml_composite' | 'text_heuristic' = 'text_heuristic'
+
+      if (mlPred && brain?.mlModel) {
+        // ML model trained on closed deals: use composite (ML dominates as training grows)
+        const { composite } = computeCompositeScore(
+          heuristicScore(signals),         // heuristic as the "LLM" input for backward compat
+          mlPred.winProbability,
+          brain.mlModel.trainingSize,
+        )
+        finalScore = composite
+        scoreBasis = 'ml_composite'
+      } else {
+        // No ML model yet: pure text signal heuristic
+        finalScore = heuristicScore(signals)
+      }
+
+      // Phase 3: LLM narrates the brain's determination (tiny call — 3 bullets only)
+      const dealForBriefing = {
+        dealName: deal.dealName,
+        company: deal.prospectCompany,
+        stage: deal.stage,
+        dealRisks: parsed.risks ?? [],
+        dealCompetitors: [],
+        conversionScore: finalScore,
+      }
+      const briefing = buildDealBriefing(brain, id, dealForBriefing, signals)
+      const narrationMsg = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001', max_tokens: 300,
+        messages: [{ role: 'user', content: scoreNarrationPrompt(briefing) }],
+      })
+      const narration = (narrationMsg.content[0] as any)?.text?.trim() ?? ''
+      // Parse bullet points from narration into insight strings
+      const narratedInsights = narration
+        .split('\n')
+        .map((l: string) => l.replace(/^[-•*·]\s*/, '').trim())
+        .filter((l: string) => l.length > 8)
+        .slice(0, 3)
+
       updateFields.conversionScore = finalScore
-      if (finalInsights != null) updateFields.conversionInsights = finalInsights
-    } else if (parseOk && parsed.conversionInsights != null) {
-      updateFields.conversionInsights = parsed.conversionInsights
-    }
+      if (narratedInsights.length > 0) updateFields.conversionInsights = narratedInsights
+    } catch { /* non-fatal — deal saves without score if brain fails */ }
 
     const [updatedDeal] = await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, id)).returning()
     const createdGaps = []

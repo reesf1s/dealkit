@@ -29,7 +29,8 @@ export const ML_FEATURE_NAMES = [
   'has_risks',            // binary: risk flags present
   'competitor_win_rate',  // historical win rate against this deal's rivals
   'todo_engagement',      // todos-completed / total
-  'ai_confidence',        // LLM conversion score / 100
+  'text_engagement',      // NLP composite from meeting notes (sentiment × recency × signals)
+                          // Replaces ai_confidence — no circular LLM dependency.
 ] as const
 
 export const ML_MIN_TRAINING_DEALS = 6
@@ -46,14 +47,16 @@ export interface DealMLInput {
   company: string
   stage: string
   dealValue: number | null
-  conversionScore: number | null
   dealRisks: string[]
   dealCompetitors: string[]
   todos: { done: boolean }[]
   createdAt: Date | string | null
   updatedAt: Date | string | null
+  meetingNotes?: string | null     // used for text_engagement feature extraction
   wonDate?: Date | string | null
   lostDate?: Date | string | null
+  /** Pre-computed textEngagement (0–1) — if not provided, extracted from meetingNotes. */
+  textEngagement?: number
 }
 
 // ─── Output types ─────────────────────────────────────────────────────────────
@@ -237,6 +240,8 @@ function kMeans(
 
 // ─── Feature extraction ───────────────────────────────────────────────────────
 
+import { extractTextSignals } from '@/lib/text-signals'
+
 function extractFeatures(
   deal: DealMLInput,
   competitorWinRates: Map<string, number>,
@@ -264,9 +269,15 @@ function extractFeatures(
   const todos = deal.todos ?? []
   const f_todo = todos.length > 0 ? todos.filter(t => t.done).length / todos.length : 0.5
 
-  const f_ai = deal.conversionScore != null ? deal.conversionScore / 100 : 0.5
+  // text_engagement: NLP-derived from meeting notes — no LLM dependency
+  const f_text = deal.textEngagement ??
+    extractTextSignals(
+      deal.meetingNotes,
+      deal.createdAt ?? now,
+      deal.updatedAt ?? now,
+    ).textEngagement
 
-  return [f_stage, f_value, f_age, f_risks, f_comp, f_todo, f_ai]
+  return [f_stage, f_value, f_age, f_risks, f_comp, f_todo, f_text]
 }
 
 // ─── Logistic regression ──────────────────────────────────────────────────────

@@ -16,6 +16,7 @@ import { db } from '@/lib/db'
 import { dealLogs, competitors as competitorRecords } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import { runMLEngine, computeCompositeScore, type TrainedMLModel, type DealMLPrediction, type MLTrends, type DealArchetype, type StageVelocityIntel, type CompetitivePattern, type ScoreCalibrationPoint, ML_MIN_TRAINING_DEALS } from '@/lib/deal-ml'
+import { extractTextSignals } from '@/lib/text-signals'
 
 export interface DealSnapshot {
   id: string
@@ -160,6 +161,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
       wonDate: dealLogs.wonDate,
       lostDate: dealLogs.lostDate,
       lostReason: dealLogs.lostReason,
+      meetingNotes: dealLogs.meetingNotes,
     })
     .from(dealLogs)
     .where(eq(dealLogs.workspaceId, workspaceId))
@@ -696,20 +698,29 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
   let calibrationTimeline: WorkspaceBrain['calibrationTimeline'] = undefined
 
   if ((wonDeals.length + lostDeals.length) >= ML_MIN_TRAINING_DEALS) {
-    const mlInputs = deals.map(d => ({
-      id:               d.id,
-      company:          d.prospectCompany,
-      stage:            d.stage,
-      dealValue:        d.dealValue,
-      conversionScore:  d.conversionScore,
-      dealRisks:        (d.dealRisks as string[]) ?? [],
-      dealCompetitors:  (d.dealCompetitors as string[]) ?? [],
-      todos:            (d.todos as { done: boolean }[]) ?? [],
-      createdAt:        d.createdAt,
-      updatedAt:        d.updatedAt,
-      wonDate:          d.wonDate,
-      lostDate:         d.lostDate,
-    }))
+    // Extract text signals for every deal — used for the text_engagement ML feature.
+    // This is the only NLP pass; the ML model trains on these signals, not LLM scores.
+    const mlInputs = deals.map(d => {
+      const signals = extractTextSignals(
+        d.meetingNotes as string | null,
+        d.createdAt,
+        d.updatedAt,
+      )
+      return {
+        id:               d.id,
+        company:          d.prospectCompany,
+        stage:            d.stage,
+        dealValue:        d.dealValue,
+        dealRisks:        (d.dealRisks as string[]) ?? [],
+        dealCompetitors:  (d.dealCompetitors as string[]) ?? [],
+        todos:            (d.todos as { done: boolean }[]) ?? [],
+        createdAt:        d.createdAt,
+        updatedAt:        d.updatedAt,
+        wonDate:          d.wonDate,
+        lostDate:         d.lostDate,
+        textEngagement:   signals.textEngagement,  // pre-computed — no LLM dependency
+      }
+    })
 
     const mlResult = runMLEngine(mlInputs, now)
     if (mlResult.model) {
