@@ -361,8 +361,8 @@ matchedDealId must be one of the IDs above (or null). Stage values: prospecting|
       const pendingTodos = ((existingDeal.todos as { id: string; text: string; done: boolean }[]) ?? []).filter(t => !t.done)
 
       // Smart todo management: ask Claude what to do with existing todos
-      let todoRemove: string[] = []
-      let todoComplete: string[] = []
+      let todoRemoveIndices: number[] = []
+      let todoCompleteIndices: number[] = []
       let todoAdd: string[] = parsed.todos.map(t => t.text)
 
       if (pendingTodos.length > 0 && parsed.todos.length > 0) {
@@ -376,13 +376,13 @@ matchedDealId must be one of the IDs above (or null). Stage values: prospecting|
 Meeting notes (summary): ${parsed.summary}
 New todos from meeting: ${parsed.todos.map(t => t.text).join('; ')}
 
-Existing pending todos:
-${pendingTodos.map(t => `id:${t.id} | "${t.text}"`).join('\n')}
+Existing pending todos (numbered 1 to ${pendingTodos.length}):
+${pendingTodos.map((t, i) => `${i + 1}. "${t.text}"`).join('\n')}
 
-Return ONLY JSON:
+Return ONLY JSON using the 1-based numbers above:
 {
-  "complete": ["id-of-todo-mentioned-as-done"],
-  "remove": ["id-of-todo-that-is-now-irrelevant"],
+  "complete": [1],
+  "remove": [2, 3],
   "add": ["new todo text from meeting that is NOT already in existing todos"]
 }
 
@@ -390,17 +390,23 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
             }],
           })
           const todoResult = JSON.parse(stripJson((todoMsg.content[0] as { type: string; text: string }).text))
-          todoRemove = Array.isArray(todoResult.remove) ? todoResult.remove : []
-          todoComplete = Array.isArray(todoResult.complete) ? todoResult.complete : []
+          const toNums = (arr: unknown): number[] =>
+            (Array.isArray(arr) ? arr : []).map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= pendingTodos.length)
+          todoRemoveIndices = toNums(todoResult.remove)
+          todoCompleteIndices = toNums(todoResult.complete)
           todoAdd = Array.isArray(todoResult.add) ? todoResult.add : todoAdd
         } catch { /* fall back to just adding */ }
       }
 
+      // Map indices back to IDs — immune to UUID hallucination
+      const todoRemoveIds = new Set(todoRemoveIndices.map(n => pendingTodos[n - 1]?.id).filter(Boolean))
+      const todoCompleteIds = new Set(todoCompleteIndices.map(n => pendingTodos[n - 1]?.id).filter(Boolean))
+
       // Apply todo changes
       const allTodos = (existingDeal.todos as { id: string; text: string; done: boolean; createdAt: string }[]) ?? []
       const updatedTodos = allTodos
-        .filter(t => !todoRemove.includes(t.id))
-        .map(t => todoComplete.includes(t.id) ? { ...t, done: true } : t)
+        .filter(t => !todoRemoveIds.has(t.id))
+        .map(t => todoCompleteIds.has(t.id) ? { ...t, done: true } : t)
       const newTodos = todoAdd.map(text => ({ id: crypto.randomUUID(), text, done: false, createdAt: new Date().toISOString() }))
       const mergedTodos = [...updatedTodos, ...newTodos]
 
@@ -417,8 +423,8 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
       await db.update(dealLogs).set(updatePayload).where(eq(dealLogs.id, parsed.matchedDealId))
 
       const todosAdded = newTodos.length
-      const todosRemoved = todoRemove.length
-      const todosCompleted = todoComplete.length
+      const todosRemoved = todoRemoveIds.size
+      const todosCompleted = todoCompleteIds.size
       if (todosAdded) dealChanges.push(`+${todosAdded} todo${todosAdded > 1 ? 's' : ''}`)
       if (todosCompleted) dealChanges.push(`${todosCompleted} todo${todosCompleted > 1 ? 's' : ''} marked done`)
       if (todosRemoved) dealChanges.push(`${todosRemoved} stale todo${todosRemoved > 1 ? 's' : ''} removed`)
@@ -1407,13 +1413,13 @@ Deal: "${deal.dealName}" — ${deal.prospectCompany} (stage: ${deal.stage})
 Meeting history / notes:
 ${recentNotes}
 
-Pending todos:
-${pendingTodos.map(t => `id:${t.id} | "${t.text}"`).join('\n')}
+Pending todos (numbered 1 to ${pendingTodos.length}):
+${pendingTodos.map((t, i) => `${i + 1}. "${t.text}"`).join('\n')}
 
-Return ONLY JSON:
+Return ONLY JSON using the 1-based numbers above:
 {
-  "remove": ["id-to-remove"],
-  "complete": ["id-to-mark-done"],
+  "remove": [2, 4],
+  "complete": [1],
   "reason": "brief explanation of changes made"
 }
 
@@ -1422,28 +1428,38 @@ Be conservative — only remove todos that are clearly stale, already handled, o
     }],
   })
 
-  interface TodoDecision { remove: string[]; complete: string[]; reason: string }
+  interface TodoDecision { remove: number[]; complete: number[]; reason: string }
   let decisions: TodoDecision = { remove: [], complete: [], reason: '' }
-  try { decisions = JSON.parse(stripJson((decideMsg.content[0] as { type: string; text: string }).text)) } catch { /* no changes */ }
+  try {
+    const raw = JSON.parse(stripJson((decideMsg.content[0] as { type: string; text: string }).text))
+    // Normalise: coerce any string entries (e.g. "2") to numbers, filter invalid
+    const toNumbers = (arr: unknown): number[] =>
+      (Array.isArray(arr) ? arr : []).map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= pendingTodos.length)
+    decisions = { remove: toNumbers(raw.remove), complete: toNumbers(raw.complete), reason: raw.reason ?? '' }
+  } catch { /* no changes */ }
+
+  // Map 1-based indices back to actual todo IDs — immune to UUID hallucination
+  const removeIds = new Set(decisions.remove.map(n => pendingTodos[n - 1]?.id).filter(Boolean))
+  const completeIds = new Set(decisions.complete.map(n => pendingTodos[n - 1]?.id).filter(Boolean))
 
   const updatedTodos = allTodos
-    .filter(t => !decisions.remove.includes(t.id))
-    .map(t => decisions.complete.includes(t.id) ? { ...t, done: true } : t)
+    .filter(t => !removeIds.has(t.id))
+    .map(t => completeIds.has(t.id) ? { ...t, done: true } : t)
 
   await db.update(dealLogs).set({ todos: updatedTodos, updatedAt: new Date() }).where(eq(dealLogs.id, deal.id))
   await db.insert(events).values({
     workspaceId, userId, type: 'deal_log.todos_updated',
-    metadata: { dealId: deal.id, removed: decisions.remove.length, completed: decisions.complete.length, source: 'ai_chat' },
+    metadata: { dealId: deal.id, removed: removeIds.size, completed: completeIds.size, source: 'ai_chat' },
     createdAt: new Date(),
   })
   after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
 
-  const removed = decisions.remove.length
-  const completed = decisions.complete.length
+  const removed = removeIds.size
+  const completed = completeIds.size
 
   // Look up which todo texts were removed/completed for transparency
-  const removedTexts = allTodos.filter(t => decisions.remove.includes(t.id)).map(t => t.text)
-  const completedTexts = allTodos.filter(t => decisions.complete.includes(t.id)).map(t => t.text)
+  const removedTexts = allTodos.filter(t => removeIds.has(t.id)).map(t => t.text)
+  const completedTexts = allTodos.filter(t => completeIds.has(t.id)).map(t => t.text)
   const remainingPending = updatedTodos.filter(t => !t.done)
 
   let reply: string
