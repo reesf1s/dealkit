@@ -4,7 +4,8 @@ export const dynamic = 'force-dynamic'
 import useSWR, { mutate } from 'swr'
 import Link from 'next/link'
 import { useState } from 'react'
-import { AlertTriangle, TrendingUp, CheckCircle, Circle, Clock, Zap, DollarSign, Trash2, X } from 'lucide-react'
+import { AlertTriangle, TrendingUp, CheckCircle, Circle, Clock, Zap, DollarSign, Trash2, X, Swords, BookOpen } from 'lucide-react'
+import { PageTabs } from '@/components/shared/PageTabs'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -84,6 +85,13 @@ export default function ProductGapsPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+      {/* Intelligence tabs */}
+      <PageTabs tabs={[
+        { label: 'Competitors',  href: '/competitors',  icon: Swords        },
+        { label: 'Case Studies', href: '/case-studies', icon: BookOpen      },
+        { label: 'Feature Gaps', href: '/product-gaps', icon: AlertTriangle },
+      ]} />
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>

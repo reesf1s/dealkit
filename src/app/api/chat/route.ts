@@ -135,6 +135,9 @@ function detectIntent(text: string): Intent {
   const lower = text.toLowerCase()
   if (looksLikeMeetingTranscript(text)) return 'meeting_notes'
   if (BATTLECARD_PATTERNS.some(p => p.test(text))) return 'competitor_battlecard'
+  // Deal create must be checked BEFORE product_gap — deal descriptions mentioning
+  // integration gaps or missing features can inadvertently match /add.*gap/i etc.
+  if (DEAL_CREATE_PATTERNS.some(p => p.test(text))) return 'deal_create'
   // Product gap must be checked BEFORE company_update (pattern overlap)
   if (PRODUCT_GAP_PATTERNS.some(p => p.test(text))) return 'product_gap'
   // Collateral generation: only trigger for SHORT, focused requests (not complex multi-part analytical prompts)
@@ -165,7 +168,6 @@ function detectIntent(text: string): Intent {
   // deal_action BEFORE company_update — "review BOE to-do's" must not be mistaken for a profile update
   if (DEAL_ACTION_PATTERNS.some(p => p.test(text))) return 'deal_action'
   if (COMPANY_UPDATE_PATTERNS.some(p => p.test(text))) return 'company_update'
-  if (DEAL_CREATE_PATTERNS.some(p => p.test(text))) return 'deal_create'
   if (CASE_STUDY_PATTERNS.some(p => p.test(text))) return 'case_study_create'
   return 'qa'
 }

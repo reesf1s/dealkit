@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sparkles, ArrowRight, CheckCircle, Building2, Users, Loader2, ClipboardPaste, Zap, Target, FileText, ClipboardList, LogIn } from 'lucide-react'
+import { PageTabs } from '@/components/shared/PageTabs'
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -134,6 +135,12 @@ export default function OnboardingPage() {
 
   return (
     <div style={{ maxWidth: '680px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+
+      {/* Company / AI Import tabs */}
+      <PageTabs tabs={[
+        { label: 'Company Profile', href: '/company',    icon: Building2 },
+        { label: 'AI Import',       href: '/onboarding', icon: Sparkles  },
+      ]} />
 
       {/* Header */}
       <div style={{ textAlign: 'center' }}>

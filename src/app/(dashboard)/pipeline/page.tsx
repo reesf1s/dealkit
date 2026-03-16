@@ -9,8 +9,10 @@ import {
   Plus, TrendingUp, DollarSign, Sparkles,
   CheckSquare, MoreHorizontal, Target, Zap, ArrowUpRight,
   Star, AlertTriangle, Clock,
-  Settings, Edit, X, Trash2, Check
+  Settings, Edit, X, Trash2, Check,
+  Kanban, List,
 } from 'lucide-react'
+import { PageTabs } from '@/components/shared/PageTabs'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -483,6 +485,12 @@ export default function PipelinePage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0, width: '100%' }}>
+
+      {/* View toggle */}
+      <PageTabs tabs={[
+        { label: 'Board View', href: '/pipeline', icon: Kanban },
+        { label: 'List View',  href: '/deals',    icon: List   },
+      ]} />
 
       {/* Brain focus bar */}
       {(urgentCount > 0 || staleCount > 0) && (

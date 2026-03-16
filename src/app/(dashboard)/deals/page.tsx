@@ -4,7 +4,8 @@ export const dynamic = 'force-dynamic'
 import { useState } from 'react'
 import useSWR from 'swr'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Plus, X, ClipboardList } from 'lucide-react'
+import { Plus, X, ClipboardList, Kanban, List } from 'lucide-react'
+import { PageTabs } from '@/components/shared/PageTabs'
 import { DealTable } from '@/components/deals/DealTable'
 import { DealForm } from '@/components/deals/DealForm'
 import { DealInsights } from '@/components/deals/DealInsights'
@@ -57,6 +58,11 @@ export default function DealsPage() {
 
   return (
     <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto' }}>
+      {/* View toggle */}
+      <PageTabs tabs={[
+        { label: 'Board View', href: '/pipeline', icon: Kanban },
+        { label: 'List View',  href: '/deals',    icon: List   },
+      ]} />
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
         <div>

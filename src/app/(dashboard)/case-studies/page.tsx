@@ -4,7 +4,8 @@ export const dynamic = 'force-dynamic'
 import { useState } from 'react'
 import useSWR from 'swr'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Plus, X, BookOpen } from 'lucide-react'
+import { Plus, X, BookOpen, Swords, AlertTriangle } from 'lucide-react'
+import { PageTabs } from '@/components/shared/PageTabs'
 import { CaseStudyGrid } from '@/components/case-studies/CaseStudyGrid'
 import { CaseStudyForm } from '@/components/case-studies/CaseStudyForm'
 import { SkeletonGrid } from '@/components/shared/SkeletonCard'
@@ -48,6 +49,12 @@ export default function CaseStudiesPage() {
 
   return (
     <div style={{ padding: '32px', maxWidth: '1100px', margin: '0 auto' }}>
+      {/* Intelligence tabs */}
+      <PageTabs tabs={[
+        { label: 'Competitors',  href: '/competitors',  icon: Swords        },
+        { label: 'Case Studies', href: '/case-studies', icon: BookOpen      },
+        { label: 'Feature Gaps', href: '/product-gaps', icon: AlertTriangle },
+      ]} />
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
         <div>

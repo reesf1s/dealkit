@@ -8,6 +8,7 @@ import SetupBanner from '@/components/shared/SetupBanner'
 import { fetcher, isDbNotConfigured } from '@/lib/fetcher'
 import type { CompanyProfile } from '@/types'
 import { Building2, Sparkles } from 'lucide-react'
+import { PageTabs } from '@/components/shared/PageTabs'
 
 export default function CompanyPage() {
   const { data, isLoading, error, mutate } = useSWR<{ data: CompanyProfile | null }>(
@@ -19,6 +20,11 @@ export default function CompanyPage() {
 
   return (
     <div style={{ maxWidth: '760px' }}>
+      {/* Company / AI Import tabs */}
+      <PageTabs tabs={[
+        { label: 'Company Profile', href: '/company',    icon: Building2 },
+        { label: 'AI Import',       href: '/onboarding', icon: Sparkles  },
+      ]} />
       {/* Header */}
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>

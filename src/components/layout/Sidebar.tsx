@@ -5,26 +5,25 @@ import { usePathname } from 'next/navigation'
 import { useClerk, useUser } from '@clerk/nextjs'
 import useSWR from 'swr'
 import {
-  LayoutDashboard, Building2, Swords, BookOpen,
-  ClipboardList, FileText, Settings, LogOut, Search,
-  Kanban, AlertTriangle, Sparkles, ChevronLeft, ChevronRight,
+  LayoutDashboard, Building2, Swords,
+  FileText, Settings, LogOut, Search,
+  Kanban, ChevronLeft, ChevronRight,
   X, Brain,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
+// Simplified nav: 6 items — Pipeline+Deals unified, Intel hub, Company+Setup unified
 const CORE_ITEMS = [
-  { href: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard'    },
-  { href: '/pipeline',     icon: Kanban,          label: 'Pipeline'     },
-  { href: '/deals',        icon: ClipboardList,   label: 'Deals'        },
-  { href: '/collateral',   icon: FileText,        label: 'Collateral'   },
+  { href: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',    matchPaths: ['/dashboard'] },
+  { href: '/pipeline',   icon: Kanban,          label: 'Deals',        matchPaths: ['/pipeline', '/deals'] },
+  { href: '/collateral', icon: FileText,        label: 'Collateral',   matchPaths: ['/collateral'] },
 ]
 
 const INTEL_ITEMS = [
-  { href: '/competitors',   icon: Swords,         label: 'Competitors'  },
-  { href: '/case-studies',  icon: BookOpen,       label: 'Case Studies' },
-  { href: '/product-gaps',  icon: AlertTriangle,  label: 'Feature Gaps' },
+  { href: '/competitors', icon: Swords,    label: 'Intelligence', matchPaths: ['/competitors', '/case-studies', '/product-gaps'] },
+  { href: '/company',     icon: Building2, label: 'Company',      matchPaths: ['/company', '/onboarding'] },
 ]
 
 export default function Sidebar() {
@@ -37,7 +36,10 @@ export default function Sidebar() {
   const urgentCount = brain?.urgentDeals?.length ?? 0
   const staleCount = brain?.staleDeals?.length ?? 0
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
+  const isActive = (href: string, matchPaths?: string[]) => {
+    const paths = matchPaths ? [href, ...matchPaths] : [href]
+    return paths.some(p => pathname === p || pathname.startsWith(p + '/'))
+  }
   const w = collapsed ? '56px' : '216px'
 
   const brainAge = brain?.updatedAt
@@ -50,8 +52,8 @@ export default function Sidebar() {
       })()
     : null
 
-  function NavItem({ href, icon: Icon, label, badge }: { href: string; icon: React.ElementType; label: string; badge?: { count: number; color: string } }) {
-    const active = isActive(href)
+  function NavItem({ href, icon: Icon, label, badge, matchPaths }: { href: string; icon: React.ElementType; label: string; badge?: { count: number; color: string }; matchPaths?: string[] }) {
+    const active = isActive(href, matchPaths)
     return (
       <Link
         href={href}
@@ -213,7 +215,6 @@ export default function Sidebar() {
             {...item}
             badge={
               item.href === '/pipeline' && urgentCount > 0 ? { count: urgentCount, color: '#EF4444' } :
-              item.href === '/deals' && staleCount > 0 ? { count: staleCount, color: '#F59E0B' } :
               undefined
             }
           />
@@ -223,36 +224,6 @@ export default function Sidebar() {
         {INTEL_ITEMS.map(item => <NavItem key={item.href} {...item} />)}
 
         <div style={{ margin: '8px 4px', height: '1px', background: 'rgba(255,255,255,0.05)' }} />
-
-        {/* Company */}
-        <NavItem href="/company" icon={Building2} label="Company" />
-
-        {/* AI Setup */}
-        {!collapsed ? (
-          <Link href="/onboarding" onClick={() => closeMobile()} style={{
-            display: 'flex', alignItems: 'center', gap: '9px',
-            padding: '0 10px', height: '32px', borderRadius: '7px', marginTop: '2px',
-            textDecoration: 'none', fontSize: '13px', fontWeight: '500', color: '#818CF8',
-            background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.18)',
-            transition: 'all 0.1s',
-          }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.16)'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.1)'}
-          >
-            <Sparkles size={13} color="#818CF8" />
-            AI Setup
-          </Link>
-        ) : (
-          <Link href="/onboarding" onClick={() => closeMobile()} title="AI Setup" style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            height: '32px', borderRadius: '7px', marginTop: '2px',
-            textDecoration: 'none', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.18)',
-          }}>
-            <Sparkles size={13} color="#818CF8" />
-          </Link>
-        )}
-
-        <div style={{ margin: '6px 4px', height: '1px', background: 'rgba(255,255,255,0.05)' }} />
 
         <NavItem href="/settings" icon={Settings} label="Settings" />
       </nav>

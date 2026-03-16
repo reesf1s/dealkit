@@ -4,7 +4,8 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Plus, X, RefreshCw, Swords } from 'lucide-react'
+import { Plus, X, RefreshCw, Swords, BookOpen, AlertTriangle } from 'lucide-react'
+import { PageTabs } from '@/components/shared/PageTabs'
 import { CompetitorTable } from '@/components/competitors/CompetitorTable'
 import { CompetitorForm } from '@/components/competitors/CompetitorForm'
 import { SkeletonCard } from '@/components/shared/SkeletonCard'
@@ -95,8 +96,16 @@ export default function CompetitorsPage() {
     }
   }
 
+  const INTEL_TABS = [
+    { label: 'Competitors',   href: '/competitors',   icon: Swords        },
+    { label: 'Case Studies',  href: '/case-studies',  icon: BookOpen      },
+    { label: 'Feature Gaps',  href: '/product-gaps',  icon: AlertTriangle },
+  ]
+
   return (
     <div style={{ padding: '32px', maxWidth: '1100px', margin: '0 auto' }}>
+      {/* Intelligence tabs */}
+      <PageTabs tabs={INTEL_TABS} />
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
         <div>
