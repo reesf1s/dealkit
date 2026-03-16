@@ -378,7 +378,8 @@ export default function AiChatBar() {
               ref={inputRef}
               value={input}
               onChange={e => setInput(e.target.value)}
-              onFocus={handleInputFocus}
+              onFocus={e => { handleInputFocus(); (e.target as HTMLTextAreaElement).style.borderColor = 'rgba(99,102,241,0.5)' }}
+              onBlur={e => ((e.target as HTMLTextAreaElement).style.borderColor = 'rgba(255,255,255,0.08)')}
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
               }}
@@ -391,8 +392,6 @@ export default function AiChatBar() {
                 padding: '8px 12px', outline: 'none', fontFamily: 'inherit',
                 boxSizing: 'border-box', maxHeight: '80px', overflowY: 'auto',
               }}
-              onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.5)')}
-              onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
             />
           </div>
 
