@@ -521,7 +521,7 @@ export default function DashboardPage() {
                 <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)', borderRadius: '12px', padding: '14px 16px' }}>
                   <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>Competitor Record</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {(wl!.competitorRecord ?? []).slice(0, 4).map((c, ci) => (
+                    {(wl!.competitorRecord ?? []).slice(0, 4).map((c: { name: string; wins: number; losses: number; winRate: number }, ci: number) => (
                       <div key={ci} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontSize: '11px', color: '#9CA3AF', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
                         <span style={{ fontSize: '10px', color: '#555' }}>{c.wins}W-{c.losses}L</span>
