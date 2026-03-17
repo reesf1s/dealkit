@@ -2179,6 +2179,48 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
               </div>
             )}
 
+            {/* Similar Deals — semantic embedding similarity */}
+            {(() => {
+              // eslint-disable-next-line react-hooks/rules-of-hooks
+              const { data: similarData } = useSWR(deal?.id ? `/api/deals/${deal.id}/similar` : null, (url: string) => fetch(url).then(r => r.json()), { revalidateOnFocus: false })
+              const similarDeals = similarData?.data ?? []
+              if (similarDeals.length === 0) return null
+              return (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Similar Deals</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {similarDeals.slice(0, 3).map((sd: any) => (
+                      <Link
+                        key={sd.id}
+                        href={`/deals/${sd.id}`}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+                          padding: '6px 10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+                          borderRadius: '6px', textDecoration: 'none', transition: 'border-color 150ms ease',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)' }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)' }}
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '12px', fontWeight: 600, color: '#D1D5DB', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sd.dealName}</div>
+                          <div style={{ fontSize: '10px', color: '#555' }}>{sd.prospectCompany}</div>
+                        </div>
+                        <span style={{
+                          fontSize: '10px', fontWeight: 600,
+                          color: sd.similarity >= 80 ? '#22C55E' : sd.similarity >= 60 ? '#A78BFA' : '#6B7280',
+                          background: sd.similarity >= 80 ? 'rgba(34,197,94,0.1)' : sd.similarity >= 60 ? 'rgba(167,139,250,0.1)' : 'rgba(255,255,255,0.04)',
+                          border: `1px solid ${sd.similarity >= 80 ? 'rgba(34,197,94,0.2)' : sd.similarity >= 60 ? 'rgba(167,139,250,0.2)' : 'rgba(255,255,255,0.08)'}`,
+                          borderRadius: '4px', padding: '1px 5px', flexShrink: 0,
+                        }}>
+                          {sd.similarity}% match
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Reset all AI */}
             <div style={{ paddingTop: '4px', borderTop: '1px solid rgba(255,255,255,0.04)', display: 'flex', justifyContent: 'flex-end' }}>
               {resetAIConfirm ? (

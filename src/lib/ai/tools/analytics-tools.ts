@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { eq, and, or, ilike } from 'drizzle-orm'
+import { eq, and, or, ilike, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { dealLogs, competitors, caseStudies, productGaps } from '@/lib/db/schema'
 import { getWorkspaceBrain } from '@/lib/workspace-brain'
@@ -180,6 +180,8 @@ export const search_workspace = {
     const pattern = `%${params.query}%`
     const wsId = ctx.workspaceId
 
+    // Run keyword search and semantic search in parallel
+    let semanticResults: { entityId: string; entityType: string; similarity: number }[] = []
     const [deals, comps, cases, gaps] = await Promise.all([
       db.select({ id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany, stage: dealLogs.stage })
         .from(dealLogs)
@@ -197,9 +199,62 @@ export const search_workspace = {
         .from(productGaps)
         .where(and(eq(productGaps.workspaceId, wsId), ilike(productGaps.title, pattern)))
         .limit(10),
+      // Semantic search — non-blocking fallback (returns [] if embeddings unavailable)
+      (async () => {
+        try {
+          const { semanticSearch } = await import('@/lib/semantic-search')
+          semanticResults = await semanticSearch(wsId, params.query, { limit: 8, minSimilarity: 0.35 })
+        } catch { /* non-fatal */ }
+      })(),
     ])
 
-    const totalResults = deals.length + comps.length + cases.length + gaps.length
+    // Merge keyword + semantic results
+    const seenIds = new Set([
+      ...deals.map(d => d.id),
+      ...comps.map(c => c.id),
+      ...cases.map(c => c.id),
+      ...gaps.map(g => g.id),
+    ])
+
+    // Collect semantic-only results (not already found by keyword)
+    const semanticOnlyDeals: string[] = []
+    const semanticOnlyComps: string[] = []
+    const semanticOnlyCases: string[] = []
+    const semanticOnlyGaps: string[] = []
+    for (const sr of semanticResults) {
+      if (seenIds.has(sr.entityId)) continue
+      seenIds.add(sr.entityId)
+      if (sr.entityType === 'deal') semanticOnlyDeals.push(sr.entityId)
+      else if (sr.entityType === 'competitor') semanticOnlyComps.push(sr.entityId)
+      else if (sr.entityType === 'case_study') semanticOnlyCases.push(sr.entityId)
+      else if (sr.entityType === 'product_gap') semanticOnlyGaps.push(sr.entityId)
+    }
+
+    // Fetch details for semantic-only results
+    const [semDeals, semComps, semCases, semGaps] = await Promise.all([
+      semanticOnlyDeals.length > 0
+        ? db.select({ id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany, stage: dealLogs.stage })
+            .from(dealLogs).where(and(eq(dealLogs.workspaceId, wsId), inArray(dealLogs.id, semanticOnlyDeals)))
+        : Promise.resolve([]),
+      semanticOnlyComps.length > 0
+        ? db.select({ id: competitors.id, name: competitors.name })
+            .from(competitors).where(and(eq(competitors.workspaceId, wsId), inArray(competitors.id, semanticOnlyComps)))
+        : Promise.resolve([]),
+      semanticOnlyCases.length > 0
+        ? db.select({ id: caseStudies.id, customerName: caseStudies.customerName })
+            .from(caseStudies).where(and(eq(caseStudies.workspaceId, wsId), inArray(caseStudies.id, semanticOnlyCases)))
+        : Promise.resolve([]),
+      semanticOnlyGaps.length > 0
+        ? db.select({ id: productGaps.id, title: productGaps.title, status: productGaps.status })
+            .from(productGaps).where(and(eq(productGaps.workspaceId, wsId), inArray(productGaps.id, semanticOnlyGaps)))
+        : Promise.resolve([]),
+    ])
+
+    const allDeals = [...deals, ...semDeals]
+    const allComps = [...comps, ...semComps]
+    const allCases = [...cases, ...semCases]
+    const allGaps = [...gaps, ...semGaps]
+    const totalResults = allDeals.length + allComps.length + allCases.length + allGaps.length
 
     if (totalResults === 0) {
       return { result: `No results found for "${params.query}".` }
@@ -207,25 +262,78 @@ export const search_workspace = {
 
     const lines: string[] = [`Found **${totalResults}** result${totalResults === 1 ? '' : 's'} for "${params.query}":`]
 
-    if (deals.length > 0) {
+    if (allDeals.length > 0) {
       lines.push('\n**Deals:**')
       const slabel = (id: string) => ctx.stageLabels?.[id] ?? id
-      deals.forEach(d => lines.push(`- ${d.dealName} (${d.prospectCompany}) — ${slabel(d.stage)} [ID: ${d.id}]`))
+      allDeals.forEach(d => lines.push(`- ${d.dealName} (${d.prospectCompany}) — ${slabel(d.stage)} [ID: ${d.id}]`))
     }
-    if (comps.length > 0) {
+    if (allComps.length > 0) {
       lines.push('\n**Competitors:**')
-      comps.forEach(c => lines.push(`- ${c.name} [ID: ${c.id}]`))
+      allComps.forEach(c => lines.push(`- ${c.name} [ID: ${c.id}]`))
     }
-    if (cases.length > 0) {
+    if (allCases.length > 0) {
       lines.push('\n**Case Studies:**')
-      cases.forEach(cs => lines.push(`- ${cs.customerName} [ID: ${cs.id}]`))
+      allCases.forEach(cs => lines.push(`- ${cs.customerName} [ID: ${cs.id}]`))
     }
-    if (gaps.length > 0) {
+    if (allGaps.length > 0) {
       lines.push('\n**Product Gaps:**')
-      gaps.forEach(g => lines.push(`- ${g.title} (${g.status}) [ID: ${g.id}]`))
+      allGaps.forEach(g => lines.push(`- ${g.title} (${g.status}) [ID: ${g.id}]`))
     }
 
     return { result: lines.join('\n') }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// find_similar_deals
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const find_similar_deals = {
+  description: 'Find deals semantically similar to a given deal — useful for pattern matching, learning from past wins/losses, and identifying common themes. Uses AI embeddings to match deals by context, not just keywords.',
+  parameters: z.object({
+    dealId: z.string().describe('The UUID of the deal to find similar deals for'),
+    limit: z.number().optional().describe('Max results (default 5)'),
+  }),
+  execute: async (params: { dealId: string; limit?: number }, ctx: ToolContext): Promise<ToolResult> => {
+    try {
+      const { findSimilarDeals } = await import('@/lib/semantic-search')
+      const similar = await findSimilarDeals(ctx.workspaceId, params.dealId, params.limit ?? 5)
+
+      if (similar.length === 0) {
+        return { result: 'No similar deals found. Embeddings may not be generated yet — they build automatically after deal updates.' }
+      }
+
+      // Fetch deal details for similar deals
+      const ids = similar.map(s => s.entityId)
+      const dealRows = await db
+        .select({
+          id: dealLogs.id,
+          dealName: dealLogs.dealName,
+          prospectCompany: dealLogs.prospectCompany,
+          stage: dealLogs.stage,
+          dealValue: dealLogs.dealValue,
+          conversionScore: dealLogs.conversionScore,
+        })
+        .from(dealLogs)
+        .where(and(eq(dealLogs.workspaceId, ctx.workspaceId), inArray(dealLogs.id, ids)))
+
+      const dealMap = new Map(dealRows.map(d => [d.id, d]))
+      const sl = (id: string) => ctx.stageLabels?.[id] ?? id
+      const fmt = (v: number) => v >= 1000 ? `£${(v / 1000).toFixed(0)}k` : `£${v}`
+
+      const lines = [`**Similar deals** (by semantic similarity):\n`]
+      for (const s of similar) {
+        const d = dealMap.get(s.entityId)
+        if (!d) continue
+        const score = d.conversionScore != null ? ` | Score: ${d.conversionScore}%` : ''
+        const value = d.dealValue ? ` | ${fmt(d.dealValue)}` : ''
+        lines.push(`- **${d.dealName}** (${d.prospectCompany}) — ${sl(d.stage)}${value}${score} — ${Math.round(s.similarity * 100)}% match [ID: ${d.id}]`)
+      }
+
+      return { result: lines.join('\n') }
+    } catch {
+      return { result: 'Semantic search is not available. Embeddings may need to be configured.' }
+    }
   },
 }
 

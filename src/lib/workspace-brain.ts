@@ -773,7 +773,21 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
         .from(competitorRecords)
         .where(eq(competitorRecords.workspaceId, workspaceId))
       const existingNames = new Set(existingRows.map(r => r.name.toLowerCase()))
-      const newNames = allCompetitorNames.filter(n => !existingNames.has(n.toLowerCase()))
+      let newNames = allCompetitorNames.filter(n => !existingNames.has(n.toLowerCase()))
+
+      // Semantic dedup — catch aliases like "Salesforce" vs "SFDC" vs "Salesforce CRM"
+      if (newNames.length > 0) {
+        try {
+          const { findCompetitorDuplicates } = await import('@/lib/semantic-search')
+          const dupes = await findCompetitorDuplicates(workspaceId, newNames, 0.82)
+          if (dupes.length > 0) {
+            const dupeNames = new Set(dupes.map(d => d.newName.toLowerCase()))
+            console.log(`[brain] Semantic dedup: skipping ${dupeNames.size} competitor aliases: ${[...dupeNames].join(', ')}`)
+            newNames = newNames.filter(n => !dupeNames.has(n.toLowerCase()))
+          }
+        } catch { /* non-fatal — semantic dedup is best-effort enhancement */ }
+      }
+
       if (newNames.length > 0) {
         const nowTs = new Date()
         await db.insert(competitorRecords).values(
@@ -1533,6 +1547,17 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     SET workspace_brain = ${JSON.stringify(brain)}::jsonb
     WHERE id = ${workspaceId}
   `)
+
+  // ── Semantic embeddings — fire-and-forget after brain is saved ────────────────
+  // Embeds all workspace entities for semantic search, deal similarity, and
+  // competitor deduplication. Uses content hashing to skip unchanged entities.
+  void (async () => {
+    try {
+      const { embedWorkspaceEntities } = await import('@/lib/semantic-search')
+      await embedWorkspaceEntities(workspaceId)
+    }
+    catch { /* non-fatal — embeddings disabled if no provider available */ }
+  })()
 
   // ── Proactive collateral generation — fire-and-forget after brain is saved ───
   // Non-blocking: auto-generates 1–2 highest-priority collateral pieces when the
