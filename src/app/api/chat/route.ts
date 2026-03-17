@@ -15,6 +15,7 @@ import { PLAN_LIMITS, isWithinLimit } from '@/lib/stripe/plans'
 import type { CollateralType } from '@/types'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getWorkspaceBrain, formatBrainContext, rebuildWorkspaceBrain } from '@/lib/workspace-brain'
+import type { WorkspaceBrain } from '@/lib/workspace-brain'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -29,7 +30,22 @@ export type ActionCard =
   | { type: 'gaps_logged'; gaps: string[]; count: number }
   | { type: 'todos_updated'; added: number; removed: number; completed: number; dealName: string }
 
-// ── Intent detection ───────────────────────────────────────────────────────────
+export interface PendingAction {
+  type: 'todo_cleanup'
+  dealId: string
+  dealName: string
+  removeIds: string[]
+  completeIds: string[]
+  removedTexts: string[]
+  completedTexts: string[]
+}
+
+// ── Intent classification — LLM-first, regex fallback ─────────────────────────
+type Intent =
+  | 'meeting_notes' | 'competitor_battlecard' | 'company_update'
+  | 'collateral' | 'project_plan' | 'deal_create' | 'case_study_create'
+  | 'deal_action' | 'product_gap' | 'pipeline_query' | 'qa'
+
 const MEETING_KEYWORDS = [
   'action item', 'follow up', 'next step', 'discussed', 'agenda',
   'attendee', 'participant', 'meeting notes', 'call notes', 'recap',
@@ -44,153 +60,58 @@ function looksLikeMeetingTranscript(text: string): boolean {
   return keywordMatches >= 2 || (lineCount >= 8 && keywordMatches >= 1)
 }
 
-const BATTLECARD_PATTERNS = [
-  /battlecard/i, /battle[\s-]card/i,
-  /add competitor/i, /create competitor/i, /new competitor/i, /research competitor/i,
-  /track competitor/i, /save competitor/i, /add a competitor/i,
-  /competitor:/i, /competing with/i, /they compete/i, /our competitor/i,
-  /add.*as a competitor/i, /track.*as competitor/i,
-  /going up against/i, /we('re| are) competing/i,
-]
-
-const COLLATERAL_TYPES: { keyword: string; type: CollateralType }[] = [
-  { keyword: 'objection handler', type: 'objection_handler' },
-  { keyword: 'one-pager', type: 'one_pager' },
-  { keyword: 'one pager', type: 'one_pager' },
-  { keyword: 'talk track', type: 'talk_track' },
-  { keyword: 'email sequence', type: 'email_sequence' },
-  { keyword: 'email follow-up', type: 'email_sequence' },
-  { keyword: 'follow-up email', type: 'email_sequence' },
-  { keyword: 'followup email', type: 'email_sequence' },
-  { keyword: 'follow up email', type: 'email_sequence' },
-  { keyword: 'case study doc', type: 'case_study_doc' },
-]
-
-const PRODUCT_GAP_PATTERNS = [
-  /product\s+gap/i, /feature\s+gap/i, /feature\s+request/i,
-  /missing\s+feature/i, /gap\s+for/i, /gap\s+from/i,
-  /add.*gap/i, /log.*gap/i, /track.*gap/i,
-  /doesn't\s+(have|support)/i, /doesn't\s+(have|support)/i,
-  /they\s+(need|want|require)\s+(an?\s+)?integration/i,
-  /as\s+a\s+(product|feature)\s+gap/i,
-]
-
-const COMPANY_UPDATE_PATTERNS = [
-  /update.*compan/i, /update.*profile/i, /update our/i,
-  /add.*product(?!\s+gap)/i, /new product(?!\s+gap)/i, /we(('re| are) a\b| offer| provide| do\b| help)/i,
-  /company description/i, /value prop/i, /our differentiator/i,
-]
-
-const DEAL_CREATE_PATTERNS = [
-  /new deal/i, /new prospect/i, /new lead/i, /new opportunity/i,
-  /add.*deal/i, /create.*deal/i, /log.*deal/i, /just.*meeting with/i,
-]
-
-const CASE_STUDY_PATTERNS = [
-  /case study/i, /customer win/i, /we won/i, /just closed with/i,
-  /success story/i, /customer success/i, /closed.*deal with/i,
-]
-
-// Matches any deal modification request: todos (with/without hyphen), tasks,
-// stage changes, value updates, deal field edits, etc.
-const DEAL_ACTION_PATTERNS = [
-  // to-do / todo / to do variants (hyphen, apostrophe, space)
-  /remove.*to[\s-']?do/i, /delete.*to[\s-']?do/i, /clear.*to[\s-']?do/i,
-  /mark.*to[\s-']?do/i, /complete.*to[\s-']?do/i, /tick.*to[\s-']?do/i,
-  /outdated.*to[\s-']?do/i, /stale.*to[\s-']?do/i, /clean.*up.*to[\s-']?do/i,
-  /to[\s-']?do.*deal/i, /deal.*to[\s-']?do/i,
-  // review / check / scan / audit / look at / tidy / organize todos
-  /review.*to[\s-']?do/i, /check.*to[\s-']?do/i, /audit.*to[\s-']?do/i,
-  /scan.*to[\s-']?do/i, /look\s+at.*to[\s-']?do/i, /tidy.*to[\s-']?do/i,
-  /organiz.*to[\s-']?do/i, /organis.*to[\s-']?do/i,
-  // "scan/review/audit [company/deal] to-do's" (word between verb and todo)
-  /scan\s+(?:all\s+)?[\w\s]+to[\s-']?do/i,
-  /review\s+(?:all\s+)?[\w\s]+to[\s-']?do/i,
-  /audit\s+(?:all\s+)?[\w\s]+to[\s-']?do/i,
-  /check\s+(?:all\s+)?[\w\s]+to[\s-']?do/i,
-  /clean\s+(?:up\s+)?(?:all\s+)?[\w\s]+to[\s-']?do/i,
-  /look\s+(?:at|for|through)\s+(?:all\s+)?[\w\s]+to[\s-']?do/i,
-  // "to-do's" / "todos" mentioned with action verbs (delete/remove them, etc.)
-  /to[\s-']?do'?s?\b.*\b(?:delete|remove|clear|clean|tidy|scan|audit|review)\b/i,
-  // review / check tasks
-  /review.*task/i, /check.*task/i, /scan.*task/i,
-  // tasks
-  /remove.*task/i, /clear.*task/i, /delete.*task/i, /complete.*task/i,
-  // "duplicates" near "todo" or "action"
-  /duplicat.*to[\s-']?do/i, /to[\s-']?do.*duplicat/i,
-  /duplicat.*action/i, /action.*duplicat/i,
-  // deal field updates via chat (stage, value, notes on a named deal)
-  /update.*deal/i, /change.*stage/i, /move.*deal/i, /mark.*deal/i,
-  /deal.*stage/i, /set.*stage/i,
-  // generic "in/for/on the/this X deal" action phrases
-  /in the .+ deal/i, /for the .+ deal/i, /on the .+ deal/i,
-  /in this .+ deal/i, /for this .+ deal/i, /on this .+ deal/i,
-  /in this deal/i, /for this deal/i, /on this deal/i,
-  // close date / next steps / competitor / contact updates
-  /close date/i, /closing date/i, /due date/i,
-  /next step/i, /set.*next/i, /update.*next/i,
-  /add.*competitor/i, /remove.*competitor/i,
-  /add.*contact/i, /add.*person/i, /add.*stakeholder/i,
-]
-
-type Intent = 'meeting_notes' | 'competitor_battlecard' | 'company_update' |
-  'collateral_generate' | 'freeform_collateral' | 'project_plan' | 'deal_create' | 'case_study_create' | 'deal_action' | 'product_gap' | 'pipeline_query' | 'qa'
-
-const PIPELINE_QUERY_PATTERNS = [
-  /what('s| is) (my |the )?(pipeline|deals?|forecast)/i,
-  /show (me )?(my |the )?(pipeline|deals?|overview)/i,
-  /pipeline (overview|summary|status|health)/i,
-  /deal (overview|summary|status|snapshot)/i,
-  /what should i (focus|work) on/i,
-  /where should i (focus|spend)/i,
-  /what('s| are) (my |the )?(top|priority|urgent) deals?/i,
-  /how('s| is) (my |the )?(pipeline|forecast) (looking|doing)/i,
-  /give me (a |an )?(pipeline|deal) (summary|overview|update|report)/i,
-  /which deals? (should|need|are)/i,
-  /at.?risk deals?/i,
-  /deals? (most likely|close|closing) (to |this )?/i,
-]
-
-function detectIntent(text: string): Intent {
+// Fallback regex-based classifier (used when Haiku call fails)
+function detectIntentFallback(text: string): Intent {
   const lower = text.toLowerCase()
-  // Explicit deal creation MUST come before transcript detection —
-  // user may paste meeting notes as the deal content (e.g. "Create this deal: [notes]")
-  if (DEAL_CREATE_PATTERNS.some(p => p.test(text))) return 'deal_create'
+  if (/\b(new deal|new prospect|add.*deal|create.*deal|log.*deal)\b/i.test(text)) return 'deal_create'
   if (looksLikeMeetingTranscript(text)) return 'meeting_notes'
-  if (BATTLECARD_PATTERNS.some(p => p.test(text))) return 'competitor_battlecard'
-  // Product gap must be checked BEFORE company_update (pattern overlap)
-  if (PRODUCT_GAP_PATTERNS.some(p => p.test(text))) return 'product_gap'
-  // Collateral generation: only trigger for SHORT, focused requests (not complex multi-part analytical prompts)
-  const hasGenerateVerb = /\b(generate|create|make|write|build)\b/.test(lower)
-  const isShortFocused = text.length < 200 && !/\b(for each|identify|analyze|analyse|top \d|biggest|priority|summarize|summarise)\b/i.test(text)
-  if (hasGenerateVerb && isShortFocused && COLLATERAL_TYPES.some(c => lower.includes(c.keyword))) return 'collateral_generate'
-  // Project plan: user pastes text/table and wants a project plan created
-  const PROJECT_PLAN_PATTERNS = [
-    /project\s+plan/i, /implementation\s+plan/i, /rollout\s+plan/i,
-    /deployment\s+plan/i, /onboarding\s+plan/i, /go[\s-]live\s+plan/i,
-    /poc\s+plan/i, /proof\s+of\s+concept\s+plan/i, /trial\s+plan/i,
-    /create.*plan\s+for/i, /build.*plan\s+for/i, /make.*plan\s+for/i,
-    /plan.*for.*deal/i, /plan.*this\s+deal/i,
-    /here(?:'s| is).*(?:plan|timeline|schedule|milestones|phases)/i,
-  ]
-  if (PROJECT_PLAN_PATTERNS.some(p => p.test(text)) || (text.length > 300 && /\b(milestone|phase|timeline|deliverable|sprint|week\s+\d|month\s+\d|q[1-4])\b/i.test(lower) && hasGenerateVerb)) return 'project_plan'
-  // Freeform collateral: "generate a pricing justification", "create a competitive analysis", etc.
-  // Must match a generate verb + short focused + NOT a standard type
-  if (hasGenerateVerb && isShortFocused && !COLLATERAL_TYPES.some(c => lower.includes(c.keyword))) {
-    // Only if it looks like a document/material request (not "create a deal", "generate a report" etc.)
-    const isMaterialRequest = /\b(generate|create|make|build)\b.*\b(document|doc|analysis|justification|comparison|brief|playbook|cheat\s?sheet|guide|handbook|framework|matrix|scorecard|assessment|audit|plan|strategy|deck|pitch|presentation|overview|summary|profile|report|template|proposal|recommendation)\b/i.test(text)
-    if (isMaterialRequest) return 'freeform_collateral'
-  }
-  // Content creation requests (draft/write an email/letter/message) → Q&A so AI writes inline
-  // Must be checked BEFORE deal_action to prevent "in this deal" from hijacking content requests
-  const isContentRequest = /\b(draft|write|compose|prepare|create|send)\b.*\b(email|letter|message|response|reply|note|memo)\b/i.test(text)
-  if (isContentRequest) return 'qa'
-  // deal_action BEFORE company_update — "review BOE to-do's" must not be mistaken for a profile update
-  if (DEAL_ACTION_PATTERNS.some(p => p.test(text))) return 'deal_action'
-  if (COMPANY_UPDATE_PATTERNS.some(p => p.test(text))) return 'company_update'
-  if (CASE_STUDY_PATTERNS.some(p => p.test(text))) return 'case_study_create'
-  if (PIPELINE_QUERY_PATTERNS.some(p => p.test(text))) return 'pipeline_query'
+  if (/battlecard|add competitor|create competitor|new competitor|track.*competitor/i.test(text)) return 'competitor_battlecard'
+  if (/product\s+gap|feature\s+gap|feature\s+request|missing\s+feature/i.test(text)) return 'product_gap'
+  if (/\b(generate|create|make|write|build)\b.*\b(email|analysis|one.?pager|talk.?track|objection|handler|doc|brief|playbook|strategy|proposal|pitch|template|battlecard|collateral|asset)\b/i.test(text)) return 'collateral'
+  if (/project\s+plan|implementation\s+plan|rollout|onboarding\s+plan/i.test(text)) return 'project_plan'
+  if (/\b(draft|write|compose)\b.*\b(email|message|reply|response)\b/i.test(text)) return 'qa'
+  if (/update.*compan|update.*profile|value prop|our differentiator/i.test(text)) return 'company_update'
+  if (/remove.*to[\s-']?do|review.*to[\s-']?do|clean.*todo|scan.*todo|update.*stage|move.*deal|change.*stage|close date|next step/i.test(text)) return 'deal_action'
+  if (/case study|customer win|we won|just closed with/i.test(text)) return 'case_study_create'
+  if (/what.*pipeline|pipeline.*overview|pipeline.*summary|what should i focus|where should i/i.test(text)) return 'pipeline_query'
   return 'qa'
+}
+
+async function classifyIntent(text: string): Promise<Intent> {
+  try {
+    const msg = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 20,
+      messages: [{
+        role: 'user',
+        content: `Classify this sales rep message into ONE intent. Return ONLY the intent name, nothing else.
+
+Intents:
+meeting_notes - pasting meeting/call transcript or detailed notes from a meeting
+competitor_battlecard - adding a competitor company or requesting a battlecard
+product_gap - logging a missing feature, integration, or product gap
+company_update - updating own company profile, products, or value propositions
+collateral - requesting to generate/create any document or asset (one-pager, email sequence, talk track, objection handler, analysis, proposal, etc.)
+project_plan - creating a project plan with phases, tasks, or milestones
+deal_create - creating a new deal, prospect, or opportunity
+case_study_create - logging a customer win or success story
+deal_action - modifying a deal (todos, stage, value, contacts, competitors, notes, close date)
+pipeline_query - asking about pipeline health, overview, what to focus on, forecast
+qa - any question, content draft request, or anything else
+
+Message: "${text.slice(0, 600)}"`,
+      }],
+    })
+    const raw = (msg.content[0] as { type: string; text: string }).text.trim().toLowerCase()
+    const valid: Intent[] = [
+      'meeting_notes', 'competitor_battlecard', 'company_update', 'collateral',
+      'project_plan', 'deal_create', 'case_study_create', 'deal_action',
+      'product_gap', 'pipeline_query', 'qa',
+    ]
+    return valid.includes(raw as Intent) ? (raw as Intent) : 'qa'
+  } catch {
+    return detectIntentFallback(text)
+  }
 }
 
 function stripJson(raw: string): string {
@@ -209,7 +130,7 @@ async function handleCompetitorBattlecard(
     model: 'claude-haiku-4-5-20251001', max_tokens: 600,
     messages: [{
       role: 'user',
-      content: `Extract competitor names from this text. The user wants to add/track these competitors. Return ONLY a JSON array of objects — even if only a name is given with no details.\n\nEach object: { "name": "required", "description": "1-2 sentences or null", "strengths": [], "weaknesses": [], "keyFeatures": [], "notes": null }\n\nExamples that should return results:\n- "add Salesforce as a competitor" → [{"name":"Salesforce",...}]\n- "track HubSpot and Pipedrive" → two objects\n- "we're competing against Notion" → [{"name":"Notion",...}]\n\nReturn [] ONLY if absolutely no company/product names are present.\n\nText: ${text.slice(0, 3000)}`,
+      content: `Extract competitor names from this text. Return ONLY a JSON array of objects.\n\nEach object: { "name": "required", "description": "1-2 sentences or null", "strengths": [], "weaknesses": [], "keyFeatures": [], "notes": null }\n\nReturn [] ONLY if absolutely no company/product names are present.\n\nText: ${text.slice(0, 3000)}`,
     }],
   })
 
@@ -289,7 +210,7 @@ async function handleCompetitorBattlecard(
 
 // ── Handler: meeting transcript ────────────────────────────────────────────────
 async function handleMeetingNotes(
-  workspaceId: string, userId: string, text: string,
+  workspaceId: string, userId: string, text: string, activeDealId: string | null,
 ): Promise<{ reply: string; actions: ActionCard[] }> {
   const openDeals = await db
     .select({ id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany, stage: dealLogs.stage, todos: dealLogs.todos, dealValue: dealLogs.dealValue, notes: dealLogs.notes })
@@ -297,11 +218,17 @@ async function handleMeetingNotes(
     .where(and(eq(dealLogs.workspaceId, workspaceId), sql`${dealLogs.stage} NOT IN ('closed_won', 'closed_lost')`))
     .limit(20)
 
-  // Include last 3 date-stamped entries from accumulated notes so Claude has clean prior context per deal
   function recentNoteEntries(notes: string | null, n = 3): string {
     if (!notes) return ''
     const entries = notes.split('\n').filter(l => l.startsWith('['))
     return entries.slice(-n).join(' | ')
+  }
+
+  // If activeDealId is provided, skip the LLM matching and use it directly
+  let forcedMatchId: string | null = null
+  if (activeDealId) {
+    const activeDeal = openDeals.find(d => d.id === activeDealId)
+    if (activeDeal) forcedMatchId = activeDealId
   }
 
   const dealList = openDeals.map(d =>
@@ -319,6 +246,7 @@ ${text}
 
 Open deals:
 ${dealList || 'No open deals yet.'}
+${forcedMatchId ? `\nIMPORTANT: The user is currently viewing deal ID "${forcedMatchId}". Set matchedDealId to this value.` : ''}
 
 Return:
 {
@@ -331,7 +259,7 @@ Return:
   "risks": ["risk or blocker"]
 }
 
-matchedDealId must be one of the IDs above (or null). Stage values: prospecting|qualification|discovery|proposal|negotiation|closed_won|closed_lost. dealValue in dollars (integer). Priority: critical|high|medium|low.`,
+matchedDealId must be one of the IDs above (or null). Stage values: prospecting|qualification|discovery|proposal|negotiation|closed_won|closed_lost. dealValue in dollars (integer).`,
     }],
   })
 
@@ -345,6 +273,13 @@ matchedDealId must be one of the IDs above (or null). Stage values: prospecting|
   try {
     parsed = JSON.parse(stripJson((analysisMsg.content[0] as { type: string; text: string }).text))
   } catch { /* use defaults */ }
+
+  // If activeDealId was provided, override whatever Claude matched
+  if (forcedMatchId && (!parsed.matchedDealId || parsed.matchedDealId !== forcedMatchId)) {
+    const activeDeal = openDeals.find(d => d.id === forcedMatchId)
+    parsed.matchedDealId = forcedMatchId
+    parsed.matchedDealName = activeDeal?.dealName ?? parsed.matchedDealName
+  }
 
   const actions: ActionCard[] = []
   const dealChanges: string[] = []
@@ -360,7 +295,6 @@ matchedDealId must be one of the IDs above (or null). Stage values: prospecting|
     if (existingDeal) {
       const pendingTodos = ((existingDeal.todos as { id: string; text: string; done: boolean }[]) ?? []).filter(t => !t.done)
 
-      // Smart todo management: ask Claude what to do with existing todos
       let todoRemoveIndices: number[] = []
       let todoCompleteIndices: number[] = []
       let todoAdd: string[] = parsed.todos.map(t => t.text)
@@ -383,7 +317,7 @@ Return ONLY JSON using the 1-based numbers above:
 {
   "complete": [1],
   "remove": [2, 3],
-  "add": ["new todo text from meeting that is NOT already in existing todos"]
+  "add": ["new todo text NOT already in existing todos"]
 }
 
 Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if truly irrelevant/outdated. "add" should not duplicate existing todos.`,
@@ -398,11 +332,9 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
         } catch { /* fall back to just adding */ }
       }
 
-      // Map indices back to IDs — immune to UUID hallucination
       const todoRemoveIds = new Set(todoRemoveIndices.map(n => pendingTodos[n - 1]?.id).filter(Boolean))
       const todoCompleteIds = new Set(todoCompleteIndices.map(n => pendingTodos[n - 1]?.id).filter(Boolean))
 
-      // Apply todo changes
       const allTodos = (existingDeal.todos as { id: string; text: string; done: boolean; createdAt: string }[]) ?? []
       const updatedTodos = allTodos
         .filter(t => !todoRemoveIds.has(t.id))
@@ -410,7 +342,6 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
       const newTodos = todoAdd.map(text => ({ id: crypto.randomUUID(), text, done: false, createdAt: new Date().toISOString() }))
       const mergedTodos = [...updatedTodos, ...newTodos]
 
-      // Accumulate meeting notes as a running log — each entry stamped with date
       const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
       const newEntry = `[${dateStr}] ${parsed.summary}`
       const accumulatedNotes = existingDeal.notes ? `${existingDeal.notes}\n${newEntry}` : newEntry
@@ -467,7 +398,7 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
   if (!parsed.matchedDealId && openDeals.length > 0) reply += `\n\n_Tip: I couldn't match these notes to a deal. Paste notes on the deal page for a precise match._`
   else if (!parsed.matchedDealId) reply += `\n\n_No open deals found. Log a deal first, then I can link meeting notes to it._`
 
-  // ── Auto-generate risk-based objection handler when risks found on a matched deal ──
+  // Auto-generate risk-based objection handler when risks found on a matched deal
   if (parsed.risks?.length >= 1 && parsed.matchedDealId) {
     const matchedDeal = openDeals.find(d => d.id === parsed.matchedDealId)
     const riskContext = [
@@ -510,11 +441,10 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
           metadata: { collateralId: colRecord.id, collateralType: 'objection_handler', title: result.title, source: 'auto_risk' },
           createdAt: new Date(),
         })
-      } catch { /* best effort — don't block meeting notes response */ }
+      } catch { /* best effort */ }
     })
   }
 
-  // Background: rebuild workspace brain + extract Q&A to knowledge base
   after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
   after(async () => {
     try {
@@ -579,7 +509,6 @@ Text: ${text.slice(0, 3000)}`,
   for (const gap of gaps) {
     if (!gap.title) continue
 
-    // Try to find a matching deal by name or company so we can link it
     let linkedDealId: string | null = null
     if (gap.sourceDeal) {
       const [matchedDeal] = await db
@@ -679,7 +608,6 @@ Text: ${text.slice(0, 6000)}`,
   if (extracted.founded) { mergeUpdate.founded = extracted.founded; updatedFields.push('founded year') }
   if (extracted.employeeCount) { mergeUpdate.employeeCount = extracted.employeeCount; updatedFields.push('employee count') }
 
-  // Merge arrays (append, don't replace)
   if (extracted.valuePropositions?.length) {
     const existing_vp = (existing?.valuePropositions as string[]) ?? []
     const merged = [...new Set([...existing_vp, ...extracted.valuePropositions])]
@@ -734,117 +662,10 @@ Text: ${text.slice(0, 6000)}`,
   }
 }
 
-// ── Handler: generate collateral ──────────────────────────────────────────────
-async function handleCollateralGeneration(
+// ── Handler: unified collateral generation (fully freeform, brain-enriched) ───
+async function handleCollateral(
   workspaceId: string, userId: string, text: string, plan: string,
-): Promise<{ reply: string; actions: ActionCard[] }> {
-  const lower = text.toLowerCase()
-
-  // Detect which type to generate
-  const match = COLLATERAL_TYPES.find(c => lower.includes(c.keyword))
-  if (!match) {
-    return {
-      reply: 'I can generate: **Objection Handler**, **One-Pager**, **Talk Track**, **Email Sequence**, or **Case Study Doc**.\n\nTry: _"Generate an objection handler"_ or _"Create a talk track for CTOs"_',
-      actions: [],
-    }
-  }
-
-  // Check company profile exists
-  const [profileRow] = await db.select({ id: companyProfiles.id }).from(companyProfiles)
-    .where(eq(companyProfiles.workspaceId, workspaceId)).limit(1)
-  if (!profileRow) {
-    return { reply: "I need your **Company Profile** before I can generate collateral. Complete it at [Company](/company) first.", actions: [] }
-  }
-
-  // Check plan limits
-  const limits = PLAN_LIMITS[plan as 'free' | 'starter' | 'pro']
-  if (limits.collateral !== null) {
-    const [{ value: cc }] = await db.select({ value: count() }).from(collateral).where(eq(collateral.workspaceId, workspaceId))
-    if (!isWithinLimit(Number(cc), limits.collateral)) {
-      return { reply: `Collateral limit reached on your ${plan} plan. [Upgrade](/settings) to generate more.`, actions: [] }
-    }
-  }
-
-  // Extract optional params (buyerRole for talk_track/email_sequence)
-  let buyerRole: string | undefined
-  if (match.type === 'talk_track' || match.type === 'email_sequence') {
-    const roleMatch = text.match(/for\s+(a\s+)?([A-Z][A-Za-z\s]+?)(?:\s+(?:at|in|with|$)|\s*$)/m)
-    if (roleMatch) buyerRole = roleMatch[2].trim()
-  }
-
-  // Try to match a deal by name/company so we can inject deal context
-  let dealContext: string | undefined
-  let sourceDealLogId: string | null = null
-  const dealRows = await db.select({
-    id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
-    stage: dealLogs.stage, dealRisks: dealLogs.dealRisks, aiSummary: dealLogs.aiSummary,
-    dealValue: dealLogs.dealValue, competitors: dealLogs.competitors,
-  }).from(dealLogs).where(and(eq(dealLogs.workspaceId, workspaceId), sql`${dealLogs.stage} NOT IN ('closed_won', 'closed_lost')`)).limit(20)
-
-  const lowerText = text.toLowerCase()
-  const matchedDeal = dealRows.find(d =>
-    lowerText.includes(d.dealName.toLowerCase()) || lowerText.includes(d.prospectCompany.toLowerCase())
-  )
-  if (matchedDeal) {
-    sourceDealLogId = matchedDeal.id
-    const risks = (matchedDeal.dealRisks as string[]) ?? []
-    const comps = (matchedDeal.competitors as string[]) ?? []
-    dealContext = [
-      `Prospect: ${matchedDeal.prospectCompany}`,
-      `Stage: ${matchedDeal.stage?.replace(/_/g, ' ')}`,
-      comps.length ? `Competitors: ${comps.join(', ')}` : '',
-      matchedDeal.aiSummary ? `Deal summary: ${matchedDeal.aiSummary}` : '',
-      risks.length ? `Active risks: ${risks.join('; ')}` : '',
-      matchedDeal.dealValue ? `Deal value: $${matchedDeal.dealValue.toLocaleString()}` : '',
-    ].filter(Boolean).join('\n')
-  }
-
-  // Include custom prompt from user text
-  const customPrompt = text.length > 30 ? text : undefined
-
-  const typeLabel: Record<CollateralType, string> = {
-    battlecard: 'Battlecard', case_study_doc: 'Case Study Doc', one_pager: 'One-Pager',
-    objection_handler: 'Objection Handler', talk_track: 'Talk Track', email_sequence: 'Email Sequence',
-    custom: 'Custom',
-  }
-  const dealSuffix = matchedDeal ? ` — ${matchedDeal.prospectCompany}` : ''
-  const title = buyerRole ? `${typeLabel[match.type]} — ${buyerRole}${dealSuffix}` : `${typeLabel[match.type]}${dealSuffix}`
-  const now = new Date()
-
-  const [record] = await db.insert(collateral).values({
-    workspaceId, userId, type: match.type,
-    title: `Generating ${title}…`, status: 'generating',
-    sourceCompetitorId: null, sourceCaseStudyId: null, sourceDealLogId,
-    content: null, rawResponse: null, generatedAt: null, createdAt: now, updatedAt: now,
-  }).returning()
-
-  const colId = record.id
-  const colType = match.type
-  try {
-    const result = await generateCollateral({ workspaceId, type: colType, buyerRole, dealContext, customPrompt })
-    const generatedAt = new Date()
-    await db.update(collateral)
-      .set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt })
-      .where(eq(collateral.id, colId))
-    await db.insert(events).values({ workspaceId, userId, type: 'collateral.generated', metadata: { collateralId: colId, collateralType: colType, title: result.title }, createdAt: new Date() })
-  } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err)
-    await db.update(collateral).set({ status: 'stale', rawResponse: { error: errMsg }, updatedAt: new Date() }).where(eq(collateral.id, colId))
-    return {
-      reply: `❌ Failed to generate **${title}**: ${errMsg}`,
-      actions: [],
-    }
-  }
-
-  return {
-    reply: `Your **${title}** is ready in [Collateral](/collateral).`,
-    actions: [{ type: 'collateral_generating', colType: match.type, title }],
-  }
-}
-
-// ── Handler: freeform collateral generation ────────────────────────────────────
-async function handleFreeformCollateral(
-  workspaceId: string, userId: string, text: string, plan: string,
+  activeDealId: string | null, brain: WorkspaceBrain | null,
 ): Promise<{ reply: string; actions: ActionCard[] }> {
   // Check company profile exists
   const [profileRow] = await db.select({ id: companyProfiles.id }).from(companyProfiles)
@@ -862,52 +683,102 @@ async function handleFreeformCollateral(
     }
   }
 
-  // Use AI to extract title + description from user request
+  // Use Haiku to extract what the user wants to generate
   const extractMsg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001', max_tokens: 300,
+    model: 'claude-haiku-4-5-20251001', max_tokens: 400,
     messages: [{
       role: 'user',
-      content: `Extract the document title and description from this request. Return ONLY JSON:
-{"title": "short document title", "description": "what the document should contain", "customTypeName": "short type label e.g. Pricing Justification, Competitive Analysis, Strategy Brief"}
-Request: ${text.slice(0, 500)}`,
+      content: `Extract document generation request details. Return ONLY JSON:
+{
+  "title": "concise document title (5-8 words)",
+  "description": "what the document should contain and achieve",
+  "customTypeName": "short type label e.g. 'Objection Handler', 'One-Pager', 'Talk Track', 'Pricing Justification', 'Competitive Analysis', 'Email Sequence', 'Strategy Brief'",
+  "targetAudience": "who this is for, e.g. 'CFO', 'IT team', 'all stakeholders' or null",
+  "mentionedCompany": "prospect/company name mentioned in request, or null"
+}
+Request: ${text.slice(0, 600)}`,
     }],
   })
 
-  let extracted: { title: string; description: string; customTypeName: string } = {
-    title: 'Custom Document', description: text, customTypeName: 'Custom',
+  let extracted: { title: string; description: string; customTypeName: string; targetAudience: string | null; mentionedCompany: string | null } = {
+    title: 'Custom Document', description: text, customTypeName: 'Custom Document', targetAudience: null, mentionedCompany: null,
   }
   try {
     extracted = JSON.parse(stripJson((extractMsg.content[0] as { type: string; text: string }).text))
   } catch { /* use defaults */ }
 
-  // Try to match a deal by name/company for context
+  // Build deal context — prefer activeDealId directly, then text-based fuzzy match
   let dealContext: string | undefined
   let sourceDealLogId: string | null = null
-  const dealRows = await db.select({
-    id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
-    stage: dealLogs.stage, dealRisks: dealLogs.dealRisks, aiSummary: dealLogs.aiSummary,
-    dealValue: dealLogs.dealValue, competitors: dealLogs.competitors,
-  }).from(dealLogs).where(and(eq(dealLogs.workspaceId, workspaceId), sql`${dealLogs.stage} NOT IN ('closed_won', 'closed_lost')`)).limit(20)
 
-  const lowerText = text.toLowerCase()
-  const matchedDeal = dealRows.find(d =>
-    lowerText.includes(d.dealName.toLowerCase()) || lowerText.includes(d.prospectCompany.toLowerCase())
-  )
-  if (matchedDeal) {
-    sourceDealLogId = matchedDeal.id
-    const risks = (matchedDeal.dealRisks as string[]) ?? []
-    const comps = (matchedDeal.competitors as string[]) ?? []
-    dealContext = [
-      `Prospect: ${matchedDeal.prospectCompany}`,
-      `Stage: ${matchedDeal.stage?.replace(/_/g, ' ')}`,
-      comps.length ? `Competitors: ${comps.join(', ')}` : '',
-      matchedDeal.aiSummary ? `Deal summary: ${matchedDeal.aiSummary}` : '',
-      risks.length ? `Active risks: ${risks.join('; ')}` : '',
-      matchedDeal.dealValue ? `Deal value: $${matchedDeal.dealValue.toLocaleString()}` : '',
+  if (activeDealId && brain?.deals) {
+    const brainDeal = brain.deals.find(d => d.id === activeDealId)
+    if (brainDeal) {
+      sourceDealLogId = activeDealId
+      const winConditions = (brain.winPlaybook as any)?.perCompetitorWinCondition
+      const dealComps = brainDeal.risks ?? []
+      dealContext = [
+        `Prospect: ${brainDeal.company}`,
+        `Deal: "${brainDeal.name}"`,
+        `Stage: ${brainDeal.stage?.replace(/_/g, ' ')}`,
+        brainDeal.dealValue ? `Deal value: £${brainDeal.dealValue.toLocaleString()}` : '',
+        brainDeal.conversionScore != null ? `Win probability score: ${brainDeal.conversionScore}%` : '',
+        dealComps.length ? `Active risks: ${dealComps.slice(0, 3).join('; ')}` : '',
+        brainDeal.summary ? `Deal summary: ${brainDeal.summary}` : '',
+        extracted.targetAudience ? `Target audience: ${extracted.targetAudience}` : '',
+        winConditions ? `Win conditions based on past deals: ${JSON.stringify(winConditions).slice(0, 300)}` : '',
+      ].filter(Boolean).join('\n')
+    }
+  }
+
+  // Fallback: fuzzy match by company name mentioned in text
+  if (!dealContext) {
+    const dealRows = await db.select({
+      id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
+      stage: dealLogs.stage, dealRisks: dealLogs.dealRisks, aiSummary: dealLogs.aiSummary,
+      dealValue: dealLogs.dealValue, competitors: dealLogs.competitors,
+    }).from(dealLogs).where(and(eq(dealLogs.workspaceId, workspaceId), sql`${dealLogs.stage} NOT IN ('closed_won', 'closed_lost')`)).limit(20)
+
+    const lowerText = (text + ' ' + (extracted.mentionedCompany ?? '')).toLowerCase()
+    const matchedDeal = dealRows.find(d =>
+      lowerText.includes(d.dealName.toLowerCase()) || lowerText.includes(d.prospectCompany.toLowerCase())
+    )
+    if (matchedDeal) {
+      sourceDealLogId = matchedDeal.id
+      const risks = (matchedDeal.dealRisks as string[]) ?? []
+      const comps = (matchedDeal.competitors as string[]) ?? []
+      dealContext = [
+        `Prospect: ${matchedDeal.prospectCompany}`,
+        `Stage: ${matchedDeal.stage?.replace(/_/g, ' ')}`,
+        comps.length ? `Competitors: ${comps.join(', ')}` : '',
+        matchedDeal.aiSummary ? `Deal summary: ${matchedDeal.aiSummary}` : '',
+        risks.length ? `Active risks: ${risks.join('; ')}` : '',
+        matchedDeal.dealValue ? `Deal value: £${matchedDeal.dealValue.toLocaleString()}` : '',
+        extracted.targetAudience ? `Target audience: ${extracted.targetAudience}` : '',
+      ].filter(Boolean).join('\n')
+    }
+  }
+
+  // Inject pipeline-wide intelligence for richer generation
+  let brainContext = ''
+  if (brain) {
+    const winRate = (brain.winLossIntel as any)?.winRate
+    const champLift = (brain.winPlaybook as any)?.championPattern?.championLift
+    const topGaps = (brain.productGapPriority ?? []).slice(0, 3).map((g: any) => g.title)
+    brainContext = [
+      winRate != null ? `Workspace win rate: ${winRate}%` : '',
+      champLift != null ? `Having a champion improves win rate by +${Math.round(champLift * 100)}pts` : '',
+      topGaps.length ? `Top product gaps to address: ${topGaps.join(', ')}` : '',
     ].filter(Boolean).join('\n')
   }
 
-  const dealSuffix = matchedDeal ? ` — ${matchedDeal.prospectCompany}` : ''
+  const enhancedPrompt = [
+    text,
+    brainContext ? `\n\nWorkspace intelligence:\n${brainContext}` : '',
+    extracted.targetAudience ? `\nTarget audience: ${extracted.targetAudience}` : '',
+  ].filter(Boolean).join('')
+
+  const dealSuffix = dealContext ? ` — ${dealContext.split('\n')[0].replace('Prospect: ', '')}` : ''
   const title = `${extracted.title}${dealSuffix}`
   const now = new Date()
 
@@ -927,44 +798,49 @@ Request: ${text.slice(0, 500)}`,
       title: extracted.title,
       description: extracted.description,
       dealContext,
-      customPrompt: text,
+      customPrompt: enhancedPrompt,
     })
     const generatedAt = new Date()
     await db.update(collateral)
       .set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt })
       .where(eq(collateral.id, colId))
-    await db.insert(events).values({ workspaceId, userId, type: 'collateral.generated', metadata: { collateralId: colId, collateralType: 'custom', customTypeName: extracted.customTypeName, title: result.title, source: 'chat' }, createdAt: new Date() })
+    await db.insert(events).values({
+      workspaceId, userId, type: 'collateral.generated',
+      metadata: { collateralId: colId, collateralType: 'custom', customTypeName: extracted.customTypeName, title: result.title, source: 'chat' },
+      createdAt: new Date(),
+    })
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err)
     await db.update(collateral).set({ status: 'stale', rawResponse: { error: errMsg }, updatedAt: new Date() }).where(eq(collateral.id, colId))
-    return {
-      reply: `❌ Failed to generate **${title}**: ${errMsg}`,
-      actions: [],
-    }
+    return { reply: `❌ Failed to generate **${title}**: ${errMsg}`, actions: [] }
   }
 
   return {
-    reply: `Your **${extracted.customTypeName}** is ready: [View in Collateral](/collateral/${colId})`,
-    actions: [{ type: 'collateral_generating', colType: 'custom', title }],
+    reply: `Your **${extracted.customTypeName}** is ready — [View in Collateral](/collateral/${colId})`,
+    actions: [{ type: 'collateral_generating', colType: 'custom', title: extracted.title }],
   }
 }
 
 // ── Handler: project plan creation ──────────────────────────────────────────
 async function handleProjectPlan(
-  workspaceId: string, userId: string, text: string,
+  workspaceId: string, userId: string, text: string, activeDealId: string | null,
 ): Promise<{ reply: string; actions: ActionCard[] }> {
-  // Find which deal to associate this plan with
   const dealRows = await db.select({
     id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
     stage: dealLogs.stage, projectPlan: dealLogs.projectPlan, todos: dealLogs.todos,
   }).from(dealLogs).where(and(eq(dealLogs.workspaceId, workspaceId), sql`${dealLogs.stage} NOT IN ('closed_won', 'closed_lost')`)).limit(20)
 
   const lowerText = text.toLowerCase()
-  let matchedDeal = dealRows.find(d =>
-    lowerText.includes(d.dealName.toLowerCase()) || lowerText.includes(d.prospectCompany.toLowerCase())
-  )
 
-  // If no deal matched by name, try to use AI to extract which deal
+  // Prefer activeDealId if provided
+  let matchedDeal = activeDealId ? dealRows.find(d => d.id === activeDealId) : undefined
+
+  if (!matchedDeal) {
+    matchedDeal = dealRows.find(d =>
+      lowerText.includes(d.dealName.toLowerCase()) || lowerText.includes(d.prospectCompany.toLowerCase())
+    )
+  }
+
   if (!matchedDeal && dealRows.length > 0) {
     const dealList = dealRows.map(d => `${d.dealName} (${d.prospectCompany})`).join(', ')
     const matchMsg = await anthropic.messages.create({
@@ -984,12 +860,11 @@ async function handleProjectPlan(
 
   if (!matchedDeal) {
     return {
-      reply: "I need to know which deal this project plan is for. Mention the deal or company name, or try: _\"Project plan for [Company Name]: [paste your plan]\"_",
+      reply: "I need to know which deal this project plan is for. Mention the deal or company name, or navigate to the deal page and ask again.",
       actions: [],
     }
   }
 
-  // Parse the text into a structured project plan using AI
   const existingTodos = ((matchedDeal as any).todos as any[]) ?? []
   const todoContext = existingTodos.length > 0
     ? `\n\nExisting deal to-dos (link relevant tasks using these IDs):\n${existingTodos.map((t: any) => `- ID: ${t.id} | "${t.text}" | Done: ${t.done}`).join('\n')}`
@@ -997,17 +872,12 @@ async function handleProjectPlan(
 
   const extractMsg = await anthropic.messages.create({
     model: 'claude-sonnet-4-6', max_tokens: 4000,
-    system: `You are a project plan extractor for a sales deal management tool.
-Convert ANY format of input (tables, emails, spreadsheet data, meeting notes, free text) into structured project plan JSON.
-Respond with ONLY a valid JSON object — no explanation, no preamble, no markdown fences.`,
+    system: `You are a project plan extractor for a sales deal management tool. Convert ANY format of input into structured project plan JSON. Respond with ONLY a valid JSON object — no explanation, no preamble, no markdown fences.`,
     messages: [{
       role: 'user',
       content: `Convert this into a project plan for the deal with "${matchedDeal.prospectCompany}".
 
-The input may be a table, spreadsheet, or free text. Extract all tasks/calls/meetings and group into logical phases by timing or theme.
-For tables: each row = a task; use column headers as field names.
-"Internal" = internal task; "External" = customer-facing.
-Status: blank → "not_started"; done → "complete".
+The input may be a table, spreadsheet, or free text. Extract all tasks/calls/meetings and group into logical phases.
 ${todoContext}
 
 Return this JSON (use short IDs like "p1", "t1"):
@@ -1028,7 +898,7 @@ Return this JSON (use short IDs like "p1", "t1"):
           "owner": "person/team or null",
           "dueDate": "YYYY-MM-DD or null",
           "linkedTodoId": null,
-          "notes": "availability windows or extra context, or null"
+          "notes": "extra context or null"
         }
       ]
     }
@@ -1043,7 +913,6 @@ ${text.slice(0, 8000)}`,
   let parsed: any
   try {
     const raw = (extractMsg.content[0] as { type: string; text: string }).text
-    // Try direct parse, then strip fences, then find first { ... }
     let jsonText = raw.trim()
     try { parsed = JSON.parse(jsonText) } catch {
       jsonText = jsonText.replace(/^```(?:json)?\s*/im, '').replace(/\s*```\s*$/im, '').trim()
@@ -1144,7 +1013,6 @@ Text: ${text.slice(0, 3000)}`,
     stage: (extracted.stage as 'prospecting' | 'qualification' | 'discovery' | 'proposal' | 'negotiation') ?? 'prospecting',
     competitors: extracted.competitors ?? [],
     notes: extracted.notes ?? null,
-    // Let notNull columns with defaults use their schema defaults (don't pass null)
     createdAt: now, updatedAt: now,
   }).returning()
 
@@ -1215,31 +1083,34 @@ Text: ${text.slice(0, 4000)}`,
   }
 }
 
-// ── Handler: deal action (manage todos) ───────────────────────────────────────
+// ── Handler: deal action (manage todos, field updates) — activeDealId-aware ───
 async function handleDealAction(
-  workspaceId: string, userId: string, text: string,
-): Promise<{ reply: string; actions: ActionCard[] }> {
-  // Selective columns — avoids SELECT * failing if any new schema col hasn't been DB-migrated yet
+  workspaceId: string, userId: string, text: string, activeDealId: string | null,
+): Promise<{ reply: string; actions: ActionCard[]; confirmationRequired?: boolean; pendingAction?: PendingAction }> {
   const dealRows = await db.select({
     id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
     stage: dealLogs.stage, todos: dealLogs.todos, notes: dealLogs.notes, meetingNotes: dealLogs.meetingNotes,
     dealValue: dealLogs.dealValue, competitors: dealLogs.competitors, contacts: dealLogs.contacts,
   }).from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId))
+
   if (dealRows.length === 0) {
     return { reply: 'No deals found in your workspace.', actions: [] }
   }
 
+  // Always run LLM for action classification — pass activeDealId as a strong hint
   const dealList = dealRows.map(d => `id:${d.id} | "${d.dealName}" — ${d.prospectCompany}`).join('\n')
+  const activeDealHint = activeDealId
+    ? `\nIMPORTANT: The user is currently viewing deal ID "${activeDealId}". Use this as the target deal unless the request clearly refers to a different deal.`
+    : ''
 
-  // Step 1: identify target deal + action type
   const identifyMsg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001', max_tokens: 300,
+    model: 'claude-haiku-4-5-20251001', max_tokens: 350,
     messages: [{
       role: 'user',
       content: `User request: "${text}"
 
 Available deals:
-${dealList}
+${dealList}${activeDealHint}
 
 Return ONLY JSON:
 {
@@ -1251,13 +1122,11 @@ Return ONLY JSON:
   "notesText": "text to append if action=update_notes, else null",
   "closeDateISO": "ISO date string YYYY-MM-DD if action=update_close_date, else null",
   "nextStepsText": "new next steps text if action=update_next_steps, else null",
-  "competitorName": "competitor name if action=add_competitor or remove_competitor, else null",
+  "competitorName": "competitor name if add/remove_competitor, else null",
   "contactName": "contact name if action=add_contact, else null",
   "contactTitle": "contact title if action=add_contact, else null",
   "contactEmail": "contact email if action=add_contact, else null"
-}
-
-Match the deal by name/company. If no clear deal match, return dealId: null.`,
+}`,
     }],
   })
 
@@ -1271,8 +1140,10 @@ Match the deal by name/company. If no clear deal match, return dealId: null.`,
   let identified: ActionIdentified = { dealId: null, action: 'qa', description: '' }
   try { identified = JSON.parse(stripJson((identifyMsg.content[0] as { type: string; text: string }).text)) } catch { /* use defaults */ }
 
-  if (!identified.dealId) {
-    // Couldn't match a deal — show full todos for all deals
+  // Fall back to activeDealId if LLM didn't identify a deal
+  const resolvedDealId = identified.dealId ?? activeDealId
+
+  if (!resolvedDealId) {
     const allTodoSummaries = dealRows.slice(0, 10).map(d => {
       const pending = ((d.todos as { text: string; done: boolean }[]) ?? []).filter(t => !t.done)
       return `**${d.dealName}**: ${pending.length === 0 ? 'no pending todos' : pending.map(t => `• ${t.text}`).join(', ')}`
@@ -1280,102 +1151,96 @@ Match the deal by name/company. If no clear deal match, return dealId: null.`,
     return { reply: `I couldn't identify a specific deal from your message. Here are current todos:\n\n${allTodoSummaries}`, actions: [] }
   }
 
-  const deal = dealRows.find(d => d.id === identified.dealId)
-  if (!deal) return { reply: "Couldn't find that deal.", actions: [] }
+  const targetDeal = dealRows.find(d => d.id === resolvedDealId)
+  if (!targetDeal) return { reply: "Couldn't find that deal.", actions: [] }
 
   // Handle non-todo deal field updates
   if (identified.action === 'update_stage' && identified.stageValue) {
-    await db.update(dealLogs).set({ stage: identified.stageValue as 'prospecting' | 'qualification' | 'discovery' | 'proposal' | 'negotiation' | 'closed_won' | 'closed_lost', updatedAt: new Date() }).where(eq(dealLogs.id, deal.id))
-    await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'stage', value: identified.stageValue, source: 'ai_chat' }, createdAt: new Date() })
+    await db.update(dealLogs).set({ stage: identified.stageValue as any, updatedAt: new Date() }).where(eq(dealLogs.id, targetDeal.id))
+    await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: targetDeal.id, field: 'stage', value: identified.stageValue, source: 'ai_chat' }, createdAt: new Date() })
     after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     return {
-      reply: `Updated **${deal.dealName}** stage to **${identified.stageValue}**.`,
-      actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: [`stage → ${identified.stageValue}`] }],
+      reply: `Updated **${targetDeal.dealName}** stage to **${identified.stageValue}**.`,
+      actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: [`stage → ${identified.stageValue}`] }],
     }
   }
 
   if (identified.action === 'update_value' && identified.valueInDollars != null) {
-    await db.update(dealLogs).set({ dealValue: identified.valueInDollars, updatedAt: new Date() }).where(eq(dealLogs.id, deal.id))
-    await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'dealValue', value: identified.valueInDollars, source: 'ai_chat' }, createdAt: new Date() })
+    await db.update(dealLogs).set({ dealValue: identified.valueInDollars, updatedAt: new Date() }).where(eq(dealLogs.id, targetDeal.id))
     after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     return {
-      reply: `Updated **${deal.dealName}** deal value to **$${identified.valueInDollars.toLocaleString()}**.`,
-      actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: [`value → $${identified.valueInDollars.toLocaleString()}`] }],
+      reply: `Updated **${targetDeal.dealName}** deal value to **$${identified.valueInDollars.toLocaleString()}**.`,
+      actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: [`value → $${identified.valueInDollars.toLocaleString()}`] }],
     }
   }
 
   if (identified.action === 'update_notes' && identified.notesText) {
-    const newNotes = ((deal.notes ?? '') + '\n\n' + identified.notesText).trim()
-    await db.update(dealLogs).set({ notes: newNotes, updatedAt: new Date() }).where(eq(dealLogs.id, deal.id))
-    await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'notes', source: 'ai_chat' }, createdAt: new Date() })
+    const newNotes = ((targetDeal.notes ?? '') + '\n\n' + identified.notesText).trim()
+    await db.update(dealLogs).set({ notes: newNotes, updatedAt: new Date() }).where(eq(dealLogs.id, targetDeal.id))
     after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     return {
-      reply: `Added notes to **${deal.dealName}**.`,
-      actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: ['notes updated'] }],
+      reply: `Added notes to **${targetDeal.dealName}**.`,
+      actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: ['notes updated'] }],
     }
   }
 
   if (identified.action === 'update_close_date' && identified.closeDateISO) {
     const closeDate = new Date(identified.closeDateISO)
     if (!isNaN(closeDate.getTime())) {
-      await db.update(dealLogs).set({ closeDate, updatedAt: new Date() } as any).where(eq(dealLogs.id, deal.id))
-      await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'closeDate', value: identified.closeDateISO, source: 'ai_chat' }, createdAt: new Date() })
+      await db.update(dealLogs).set({ closeDate, updatedAt: new Date() } as any).where(eq(dealLogs.id, targetDeal.id))
       after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
       return {
-        reply: `Set close date for **${deal.dealName}** to **${closeDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}**.`,
-        actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: [`close date → ${identified.closeDateISO}`] }],
+        reply: `Set close date for **${targetDeal.dealName}** to **${closeDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}**.`,
+        actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: [`close date → ${identified.closeDateISO}`] }],
       }
     }
   }
 
   if (identified.action === 'update_next_steps' && identified.nextStepsText) {
-    await db.update(dealLogs).set({ nextSteps: identified.nextStepsText, updatedAt: new Date() } as any).where(eq(dealLogs.id, deal.id))
-    await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'nextSteps', value: identified.nextStepsText, source: 'ai_chat' }, createdAt: new Date() })
+    await db.update(dealLogs).set({ nextSteps: identified.nextStepsText, updatedAt: new Date() } as any).where(eq(dealLogs.id, targetDeal.id))
     after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     return {
-      reply: `Updated next steps for **${deal.dealName}**: "${identified.nextStepsText}"`,
-      actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: ['next steps updated'] }],
+      reply: `Updated next steps for **${targetDeal.dealName}**: "${identified.nextStepsText}"`,
+      actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: ['next steps updated'] }],
     }
   }
 
   if (identified.action === 'add_competitor' && identified.competitorName) {
-    const currentComp: string[] = (deal as any).competitors ?? []
+    const currentComp: string[] = (targetDeal as any).competitors ?? []
     if (!currentComp.map((c: string) => c.toLowerCase()).includes(identified.competitorName.toLowerCase())) {
-      const updated = [...currentComp, identified.competitorName]
-      await db.update(dealLogs).set({ competitors: updated, updatedAt: new Date() } as any).where(eq(dealLogs.id, deal.id))
-      await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: deal.id, field: 'competitors', value: identified.competitorName, source: 'ai_chat' }, createdAt: new Date() })
+      await db.update(dealLogs).set({ competitors: [...currentComp, identified.competitorName], updatedAt: new Date() } as any).where(eq(dealLogs.id, targetDeal.id))
       after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     }
     return {
-      reply: `Added **${identified.competitorName}** as a competitor on **${deal.dealName}**.`,
-      actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: [`competitor added: ${identified.competitorName}`] }],
+      reply: `Added **${identified.competitorName}** as a competitor on **${targetDeal.dealName}**.`,
+      actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: [`competitor added: ${identified.competitorName}`] }],
     }
   }
 
   if (identified.action === 'remove_competitor' && identified.competitorName) {
-    const currentComp: string[] = (deal as any).competitors ?? []
+    const currentComp: string[] = (targetDeal as any).competitors ?? []
     const updated = currentComp.filter((c: string) => c.toLowerCase() !== identified.competitorName!.toLowerCase())
-    await db.update(dealLogs).set({ competitors: updated, updatedAt: new Date() } as any).where(eq(dealLogs.id, deal.id))
+    await db.update(dealLogs).set({ competitors: updated, updatedAt: new Date() } as any).where(eq(dealLogs.id, targetDeal.id))
     after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     return {
-      reply: `Removed **${identified.competitorName}** from competitors on **${deal.dealName}**.`,
-      actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: [`competitor removed: ${identified.competitorName}`] }],
+      reply: `Removed **${identified.competitorName}** from competitors on **${targetDeal.dealName}**.`,
+      actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: [`competitor removed: ${identified.competitorName}`] }],
     }
   }
 
   if (identified.action === 'add_contact' && identified.contactName) {
-    const existing: any = await db.select({ contacts: dealLogs.contacts }).from(dealLogs).where(eq(dealLogs.id, deal.id)).limit(1)
+    const existing: any = await db.select({ contacts: dealLogs.contacts }).from(dealLogs).where(eq(dealLogs.id, targetDeal.id)).limit(1)
     const currentContacts: any[] = (existing[0]?.contacts as any[]) ?? []
     const newContact = { name: identified.contactName, title: identified.contactTitle ?? undefined, email: identified.contactEmail ?? undefined }
-    const updated = [...currentContacts, newContact]
-    await db.update(dealLogs).set({ contacts: updated, updatedAt: new Date() } as any).where(eq(dealLogs.id, deal.id))
+    await db.update(dealLogs).set({ contacts: [...currentContacts, newContact], updatedAt: new Date() } as any).where(eq(dealLogs.id, targetDeal.id))
     after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     return {
-      reply: `Added **${identified.contactName}**${identified.contactTitle ? ` (${identified.contactTitle})` : ''} to **${deal.dealName}**.`,
-      actions: [{ type: 'deal_updated', dealId: deal.id, dealName: deal.dealName, changes: [`contact added: ${identified.contactName}`] }],
+      reply: `Added **${identified.contactName}**${identified.contactTitle ? ` (${identified.contactTitle})` : ''} to **${targetDeal.dealName}**.`,
+      actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: [`contact added: ${identified.contactName}`] }],
     }
   }
 
+  const deal = targetDeal
   const allTodos = (deal.todos as { id: string; text: string; done: boolean; createdAt: string }[]) ?? []
   const pendingTodos = allTodos.filter(t => !t.done)
 
@@ -1383,30 +1248,24 @@ Match the deal by name/company. If no clear deal match, return dealId: null.`,
     return { reply: `**${deal.dealName}** has no pending todos.`, actions: [] }
   }
 
-  // Step 2: decide which todos to remove/complete
-  // Use meetingNotes (structured [date] entries from analyze-notes) as primary history
-  // Fall back to notes (chat-accumulated) if meetingNotes is empty
+  // Build meeting history for context
   const recentNotes = (() => {
     const history = (deal.meetingNotes as string | null) || (deal.notes as string | null)
     if (!history) return 'No meeting history recorded.'
-    // Extract last 5 structured [date] entries to keep context focused
     const entries = history.split('\n').reduce<string[]>((acc, line) => {
       if (/^\[\d/.test(line)) acc.push(line)
       else if (acc.length > 0) acc[acc.length - 1] += ' ' + line.trim()
       return acc
     }, [])
     if (entries.length > 0) return entries.slice(-5).join('\n')
-    // Fallback: last 40 lines of raw history
     return history.split('\n').filter(l => l.trim()).slice(-40).join('\n')
   })()
 
   const decideMsg = await anthropic.messages.create({
-    // Haiku with 1000 tokens handles todo review fine — structured input, small JSON output
     model: 'claude-haiku-4-5-20251001', max_tokens: 1000,
     messages: [{
       role: 'user',
       content: `User request: "${text}"
-Goal: ${identified.description}
 
 Deal: "${deal.dealName}" — ${deal.prospectCompany} (stage: ${deal.stage})
 
@@ -1424,7 +1283,7 @@ Return ONLY JSON using the 1-based numbers above:
 }
 
 Cross-reference the meeting history to judge which todos are still relevant.
-Be conservative — only remove todos that are clearly stale, already handled, or made irrelevant by what happened in meetings. Never remove todos that are still clearly needed.`,
+Be conservative — only remove todos that are clearly stale, already handled, or made irrelevant by what happened in meetings.`,
     }],
   })
 
@@ -1432,60 +1291,123 @@ Be conservative — only remove todos that are clearly stale, already handled, o
   let decisions: TodoDecision = { remove: [], complete: [], reason: '' }
   try {
     const raw = JSON.parse(stripJson((decideMsg.content[0] as { type: string; text: string }).text))
-    // Normalise: coerce any string entries (e.g. "2") to numbers, filter invalid
     const toNumbers = (arr: unknown): number[] =>
       (Array.isArray(arr) ? arr : []).map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= pendingTodos.length)
     decisions = { remove: toNumbers(raw.remove), complete: toNumbers(raw.complete), reason: raw.reason ?? '' }
   } catch { /* no changes */ }
 
-  // Map 1-based indices back to actual todo IDs — immune to UUID hallucination
-  const removeIds = new Set(decisions.remove.map(n => pendingTodos[n - 1]?.id).filter(Boolean))
-  const completeIds = new Set(decisions.complete.map(n => pendingTodos[n - 1]?.id).filter(Boolean))
+  const removeIds = decisions.remove.map(n => pendingTodos[n - 1]?.id).filter(Boolean) as string[]
+  const completeIds = decisions.complete.map(n => pendingTodos[n - 1]?.id).filter(Boolean) as string[]
 
-  const updatedTodos = allTodos
-    .filter(t => !removeIds.has(t.id))
-    .map(t => completeIds.has(t.id) ? { ...t, done: true } : t)
+  if (removeIds.length === 0 && completeIds.length === 0) {
+    return { reply: `No todos were changed for **${deal.dealName}**. ${decisions.reason || 'All todos appear current and relevant.'}`, actions: [] }
+  }
 
+  // For destructive removals, require confirmation before executing
+  if (removeIds.length > 0) {
+    const removedTexts = allTodos.filter(t => removeIds.includes(t.id)).map(t => t.text)
+    const completedTexts = allTodos.filter(t => completeIds.includes(t.id)).map(t => t.text)
+
+    let previewReply = `Here's what I'd change for **${deal.dealName}**:`
+    if (removeIds.length > 0) {
+      previewReply += `\n\n**Remove (${removeIds.length}):**`
+      removedTexts.forEach(t => { previewReply += `\n- ~~${t}~~` })
+    }
+    if (completeIds.length > 0) {
+      previewReply += `\n\n**Mark Done (${completeIds.length}):**`
+      completedTexts.forEach(t => { previewReply += `\n- ✓ ${t}` })
+    }
+    if (decisions.reason) previewReply += `\n\n_${decisions.reason}_`
+    previewReply += `\n\n**Confirm to apply these changes.**`
+
+    return {
+      reply: previewReply,
+      actions: [],
+      confirmationRequired: true,
+      pendingAction: {
+        type: 'todo_cleanup',
+        dealId: deal.id,
+        dealName: deal.dealName,
+        removeIds,
+        completeIds,
+        removedTexts,
+        completedTexts,
+      },
+    }
+  }
+
+  // Complete-only (non-destructive) — execute immediately
+  const updatedTodos = allTodos.map(t => completeIds.includes(t.id) ? { ...t, done: true } : t)
   await db.update(dealLogs).set({ todos: updatedTodos, updatedAt: new Date() }).where(eq(dealLogs.id, deal.id))
   await db.insert(events).values({
     workspaceId, userId, type: 'deal_log.todos_updated',
-    metadata: { dealId: deal.id, removed: removeIds.size, completed: completeIds.size, source: 'ai_chat' },
+    metadata: { dealId: deal.id, removed: 0, completed: completeIds.length, source: 'ai_chat' },
     createdAt: new Date(),
   })
   after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
 
-  const removed = removeIds.size
-  const completed = completeIds.size
-
-  // Look up which todo texts were removed/completed for transparency
-  const removedTexts = allTodos.filter(t => removeIds.has(t.id)).map(t => t.text)
-  const completedTexts = allTodos.filter(t => completeIds.has(t.id)).map(t => t.text)
-  const remainingPending = updatedTodos.filter(t => !t.done)
-
-  let reply: string
-  if (removed === 0 && completed === 0) {
-    reply = `No todos were changed for **${deal.dealName}**. ${decisions.reason || 'All todos appear current.'}`
-  } else {
-    reply = `✅ **${deal.dealName}** — Todos Updated`
-    if (removed > 0) {
-      reply += `\n\n**Removed (${removed}):**`
-      removedTexts.forEach(t => { reply += `\n- ~~${t}~~` })
-    }
-    if (completed > 0) {
-      reply += `\n\n**Marked Done (${completed}):**`
-      completedTexts.forEach(t => { reply += `\n- ✓ ${t}` })
-    }
-    if (decisions.reason) reply += `\n\n_${decisions.reason}_`
-    if (remainingPending.length > 0) {
-      reply += `\n\n**Remaining (${remainingPending.length}):**`
-      remainingPending.forEach(t => { reply += `\n- ${t.text}` })
-    }
-  }
+  const completedTexts = allTodos.filter(t => completeIds.includes(t.id)).map(t => t.text)
+  let reply = `✅ **${deal.dealName}** — Marked ${completeIds.length} todo${completeIds.length > 1 ? 's' : ''} done:`
+  completedTexts.forEach(t => { reply += `\n- ✓ ${t}` })
+  if (decisions.reason) reply += `\n\n_${decisions.reason}_`
 
   return {
     reply,
-    actions: [{ type: 'todos_updated', added: 0, removed, completed, dealName: deal.dealName }],
+    actions: [{ type: 'todos_updated', added: 0, removed: 0, completed: completeIds.length, dealName: deal.dealName }],
   }
+}
+
+// ── Execute a confirmed pending action ────────────────────────────────────────
+async function executeConfirmedAction(
+  workspaceId: string, userId: string, pendingAction: PendingAction,
+): Promise<{ reply: string; actions: ActionCard[] }> {
+  if (pendingAction.type === 'todo_cleanup') {
+    const { dealId, dealName, removeIds, completeIds } = pendingAction
+
+    const [dealRow] = await db.select({ todos: dealLogs.todos })
+      .from(dealLogs).where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId))).limit(1)
+
+    if (!dealRow) return { reply: "Couldn't find that deal.", actions: [] }
+
+    const allTodos = (dealRow.todos as { id: string; text: string; done: boolean; createdAt: string }[]) ?? []
+    const removeSet = new Set(removeIds)
+    const completeSet = new Set(completeIds)
+
+    const updatedTodos = allTodos
+      .filter(t => !removeSet.has(t.id))
+      .map(t => completeSet.has(t.id) ? { ...t, done: true } : t)
+
+    await db.update(dealLogs).set({ todos: updatedTodos, updatedAt: new Date() }).where(eq(dealLogs.id, dealId))
+    await db.insert(events).values({
+      workspaceId, userId, type: 'deal_log.todos_updated',
+      metadata: { dealId, removed: removeIds.length, completed: completeIds.length, source: 'ai_chat_confirmed' },
+      createdAt: new Date(),
+    })
+    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+
+    let reply = `✅ **${dealName}** — Todos updated`
+    if (removeIds.length > 0) {
+      reply += `\n\n**Removed (${removeIds.length}):**`
+      pendingAction.removedTexts.forEach(t => { reply += `\n- ~~${t}~~` })
+    }
+    if (completeIds.length > 0) {
+      reply += `\n\n**Marked Done (${completeIds.length}):**`
+      pendingAction.completedTexts.forEach(t => { reply += `\n- ✓ ${t}` })
+    }
+
+    const remaining = updatedTodos.filter(t => !t.done)
+    if (remaining.length > 0) {
+      reply += `\n\n**Remaining (${remaining.length}):**`
+      remaining.forEach(t => { reply += `\n- ${t.text}` })
+    }
+
+    return {
+      reply,
+      actions: [{ type: 'todos_updated', added: 0, removed: removeIds.length, completed: completeIds.length, dealName }],
+    }
+  }
+
+  return { reply: 'Unknown action type.', actions: [] }
 }
 
 // ── Handler: pipeline query — structured overview using brain data ────────────
@@ -1504,7 +1426,6 @@ async function handlePipelineQuery(
   const activeDeals = brain.deals.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
   const urgentDeals = brain.urgentDeals ?? []
   const staleDeals = brain.staleDeals ?? []
-  const topRisks = brain.topRisks ?? []
   const patterns = brain.keyPatterns ?? []
   const recs = brain.pipelineRecommendations ?? []
 
@@ -1512,15 +1433,13 @@ async function handlePipelineQuery(
   const highScore = activeDeals.filter(d => (d.conversionScore ?? 0) >= 70)
   const atRisk = activeDeals.filter(d => d.conversionScore != null && d.conversionScore < 40)
 
-  // Build a rich prompt for Claude to produce a CEO-level summary
   const dealSummaries = activeDeals.slice(0, 15).map(d =>
-    `- ${d.company} "${d.name}" | ${d.stage} | ${d.dealValue ? `$${d.dealValue.toLocaleString()}` : 'no value'} | score: ${d.conversionScore != null ? `${d.conversionScore}%` : 'not scored'}${(d.risks ?? []).length > 0 ? ` | risks: ${d.risks.slice(0, 2).join('; ')}` : ''}${(d.pendingTodos ?? []).length > 0 ? ` | ${d.pendingTodos.length} open todos` : ''}`
+    `- ${d.company} "${d.name}" | ${d.stage} | ${d.dealValue ? `£${d.dealValue.toLocaleString()}` : 'no value'} | score: ${d.conversionScore != null ? `${d.conversionScore}%` : 'not scored'}${(d.risks ?? []).length > 0 ? ` | risks: ${d.risks.slice(0, 2).join('; ')}` : ''}${(d.pendingTodos ?? []).length > 0 ? ` | ${d.pendingTodos.length} open todos` : ''}`
   ).join('\n')
 
   const patternSummary = patterns.slice(0, 4).map(p => `• ${p.label} — ${p.companies?.slice(0, 3).join(', ')}`).join('\n')
   const recSummary = recs.filter(r => r.priority === 'high').slice(0, 3).map(r => `• ${r.action} → ${r.dealName}`).join('\n')
 
-  // Churn risk alerts from ML predictions
   const churnAlerts = (brain.mlPredictions ?? [])
     .filter(p => (p.churnRisk ?? 0) >= 65)
     .sort((a, b) => (b.churnRisk ?? 0) - (a.churnRisk ?? 0))
@@ -1532,7 +1451,6 @@ async function handlePipelineQuery(
       }).join('\n')}`
     : ''
 
-  // Product gap win rate deltas
   const gapImpacts = (brain.productGapPriority ?? [])
     .filter(g => typeof g.winRateDelta === 'number' && g.winRateDelta <= -10)
     .slice(0, 3)
@@ -1553,7 +1471,7 @@ User asked: "${text}"
 Pipeline data:
 ${dealSummaries}
 
-Stats: ${activeDeals.length} active deals | Total pipeline value: ${totalValue > 0 ? `$${totalValue.toLocaleString()}` : 'unknown'} | ${highScore.length} likely to close | ${atRisk.length} at risk
+Stats: ${activeDeals.length} active deals | Total pipeline value: ${totalValue > 0 ? `£${totalValue.toLocaleString()}` : 'unknown'} | ${highScore.length} likely to close | ${atRisk.length} at risk
 
 Urgent deals: ${urgentDeals.slice(0, 3).map(d => d.company).join(', ') || 'none'}
 Stale deals: ${staleDeals.slice(0, 3).map(d => d.company).join(', ') || 'none'}${churnSection}${gapSection}
@@ -1567,7 +1485,7 @@ ${recSummary || 'None yet'}
 Write a direct, scannable summary with:
 1. One-line overall health assessment
 2. Top 2-3 deals to focus on RIGHT NOW (with specific reason)
-3. Biggest risk across the pipeline (use churn alerts if present)
+3. Biggest risk across the pipeline
 4. One action the sales leader should take today
 
 Be specific. Reference deal names. UK English. Use markdown.`,
@@ -1586,13 +1504,21 @@ export async function POST(req: NextRequest) {
     const rl = await checkRateLimit(userId, 'chat', 20)
     if (!rl.allowed) return rateLimitResponse(rl.resetAt)
     const { workspaceId, plan } = await getWorkspaceContext(userId)
-    const { messages, activeDealId, currentPage } = await req.json()
+    const { messages, activeDealId, currentPage, confirmAction } = await req.json()
+
+    // ── Confirmed action (user clicked "Confirm" on a pending destructive action) ──
+    if (confirmAction) {
+      const result = await executeConfirmedAction(workspaceId, userId, confirmAction as PendingAction)
+      return NextResponse.json(result)
+    }
+
     if (!messages?.length) return NextResponse.json({ error: 'messages required' }, { status: 400 })
 
     const lastUserMsg = [...messages].reverse().find((m: { role: string }) => m.role === 'user')
     const lastText: string = lastUserMsg?.content ?? ''
 
-    const intent = detectIntent(lastText)
+    // LLM-based intent classification (with regex fallback)
+    const intent = await classifyIntent(lastText)
 
     if (intent === 'competitor_battlecard') {
       const result = await handleCompetitorBattlecard(workspaceId, userId, lastText, plan)
@@ -1600,7 +1526,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (intent === 'meeting_notes') {
-      const result = await handleMeetingNotes(workspaceId, userId, lastText)
+      const result = await handleMeetingNotes(workspaceId, userId, lastText, activeDealId ?? null)
       return NextResponse.json(result)
     }
 
@@ -1614,18 +1540,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result)
     }
 
-    if (intent === 'collateral_generate') {
-      const result = await handleCollateralGeneration(workspaceId, userId, lastText, plan)
+    if (intent === 'collateral') {
+      // Load brain for rich context injection
+      const brain = await getWorkspaceBrain(workspaceId)
+      const result = await handleCollateral(workspaceId, userId, lastText, plan, activeDealId ?? null, brain)
       return NextResponse.json(result)
     }
 
     if (intent === 'project_plan') {
-      const result = await handleProjectPlan(workspaceId, userId, lastText)
-      return NextResponse.json(result)
-    }
-
-    if (intent === 'freeform_collateral') {
-      const result = await handleFreeformCollateral(workspaceId, userId, lastText, plan)
+      const result = await handleProjectPlan(workspaceId, userId, lastText, activeDealId ?? null)
       return NextResponse.json(result)
     }
 
@@ -1640,7 +1563,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (intent === 'deal_action') {
-      const result = await handleDealAction(workspaceId, userId, lastText)
+      const result = await handleDealAction(workspaceId, userId, lastText, activeDealId ?? null)
       return NextResponse.json(result)
     }
 
@@ -1649,10 +1572,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result)
     }
 
-    // ── Q&A: brain-first context (lean queries, no duplication) ────────────────
-    // The brain already contains deal snapshots, risks, todos, patterns.
-    // We only need: company profile, competitors (compact), case studies (compact), and gaps (compact).
-    // If brain exists, skip the heavy per-deal DB fan-out.
+    // ── Q&A: brain-first context ──────────────────────────────────────────────
     const [profileRows, competitorRows, caseStudyRows, brain] = await Promise.all([
       db.select().from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)).limit(1),
       db.select({ name: competitors.name, strengths: competitors.strengths, weaknesses: competitors.weaknesses })
@@ -1662,7 +1582,6 @@ export async function POST(req: NextRequest) {
       getWorkspaceBrain(workspaceId),
     ])
 
-    // Only fetch deal rows + gaps if brain is missing (cold start fallback)
     const needDealFallback = !brain
     const [dealRows, gapRows] = needDealFallback
       ? await Promise.all([
@@ -1687,13 +1606,11 @@ export async function POST(req: NextRequest) {
       kbParts.push(`## Case Studies: ${caseStudyRows.map(cs => `${cs.customerName}: ${(cs.challenge ?? '').slice(0, 50)}`).join(' | ')}`)
     }
 
-    // Brain-first: if brain exists, it IS the deal/pipeline context (no duplication)
     let brainSection = ''
     if (brain) {
       try { brainSection = `\n\n## Pipeline Intelligence\n${formatBrainContext(brain)}` }
       catch { /* non-fatal */ }
     } else if (dealRows.length > 0) {
-      // Fallback: no brain yet, use raw deal data (compact)
       const open = dealRows.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
       kbParts.push(`## ${open.length} open deals`)
       open.slice(0, 8).forEach(d => {
@@ -1705,18 +1622,16 @@ export async function POST(req: NextRequest) {
       kbParts.push(`## Gaps: ${gapRows.map(g => `${g.title} [${g.priority}]`).join(', ')}`)
     }
 
-    // Active deal focus — pull from brain snapshot if available, else from dealRows
     const brainDeals = brain?.deals ?? []
     const activeBrainDeal = activeDealId ? brainDeals.find(d => d.id === activeDealId) : null
     const activeDealRow = activeDealId && !activeBrainDeal ? dealRows.find(d => d.id === activeDealId) : null
     const activeDealSection = activeBrainDeal
-      ? `\n\n## CURRENTLY VIEWING: ${activeBrainDeal.company}\nDeal: "${activeBrainDeal.name}" | Stage: ${activeBrainDeal.stage}${activeBrainDeal.dealValue ? ` | £${activeBrainDeal.dealValue.toLocaleString()}` : ''}${activeBrainDeal.conversionScore != null ? ` | ${activeBrainDeal.conversionScore}%` : ''}\n${(activeBrainDeal.risks ?? []).length > 0 ? `Risks: ${activeBrainDeal.risks.join(', ')}\n` : ''}${(activeBrainDeal.pendingTodos ?? []).length > 0 ? `Todos: ${activeBrainDeal.pendingTodos.join(', ')}\n` : ''}When "this deal" / "this company" = ${activeBrainDeal.company}.`
+      ? `\n\n## CURRENTLY VIEWING: ${activeBrainDeal.company}\nDeal: "${activeBrainDeal.name}" | Stage: ${activeBrainDeal.stage}${activeBrainDeal.dealValue ? ` | £${activeBrainDeal.dealValue.toLocaleString()}` : ''}${activeBrainDeal.conversionScore != null ? ` | Score: ${activeBrainDeal.conversionScore}%` : ''}\n${(activeBrainDeal.risks ?? []).length > 0 ? `Risks: ${activeBrainDeal.risks.join(', ')}\n` : ''}${(activeBrainDeal.pendingTodos ?? []).length > 0 ? `Open todos: ${activeBrainDeal.pendingTodos.join('; ')}\n` : ''}${activeBrainDeal.summary ? `Summary: ${activeBrainDeal.summary}\n` : ''}When the user says "this deal" or "this company" they mean ${activeBrainDeal.company}.`
       : activeDealRow
-        ? `\n\n## CURRENTLY VIEWING: ${activeDealRow.prospectCompany}\nDeal: "${activeDealRow.dealName}" | Stage: ${activeDealRow.stage}\nWhen "this deal" / "this company" = ${activeDealRow.prospectCompany}.`
+        ? `\n\n## CURRENTLY VIEWING: ${activeDealRow.prospectCompany}\nDeal: "${activeDealRow.dealName}" | Stage: ${activeDealRow.stage}\nWhen the user says "this deal" or "this company" they mean ${activeDealRow.prospectCompany}.`
         : ''
 
     const pageContext = currentPage ? `\nUser is currently on: ${currentPage}` : ''
-    // Detect if user wants content drafted (email, message, etc.) — allow longer output
     const wantsContent = /\b(draft|write|compose|prepare|create|send)\b.*\b(email|letter|message|response|reply|memo|proposal|brief|summary)\b/i.test(lastText)
     const qaMaxTokens = wantsContent ? 2000 : 800
 
@@ -1729,22 +1644,17 @@ WHAT I CAN DO:
 • **"New deal: [Company]"** → log a deal instantly
 • **"Move [Deal] to proposal"** → change stage
 • **"Set close date for [Deal] to [date]"** → update close date
-• **"Add next step to [Deal]: [action]"** → set next steps
-• **"Add [Name] as competitor on [Deal]"** → update competitors
-• **"Add [Name], [Title] to [Deal]"** → add a contact
-• **"Generate [objection handler / one-pager / talk track / email sequence]"** → create collateral
+• **"Generate [anything]"** → create any sales asset — one-pager, email sequence, competitive analysis, pricing brief, etc.
 • **"Battlecard for [Competitor]"** → competitor research + battlecard
 • **"Project plan for [Company]: [paste plan]"** → structured plan with phases & tasks
-• **"Scan [Deal] todos"** → clean up stale actions
+• **"Scan [Deal] todos"** → review and clean up stale actions
 • **"What's my pipeline?"** → full pipeline overview
 
 CONTENT: If asked to draft an email, write a message, or create any content — produce it immediately, complete and ready to send. Use deal data to personalise.
-
-${wantsContent ? `CONTENT MODE: Write a COMPLETE, polished, ready-to-use piece. Include subject line for emails. Personalise using deal context — never be generic.` : ''}
+${wantsContent ? `\nCONTENT MODE: Write a COMPLETE, polished, ready-to-use piece. Include subject line for emails. Personalise using deal context — never be generic.` : ''}
 ${activeDealSection}
 ${kbParts.join('\n') || 'No workspace data yet.'}${brainSection}`
 
-    // Stream the Q&A response for instant perceived speed
     const stream = anthropic.messages.stream({
       model: 'claude-sonnet-4-6', max_tokens: qaMaxTokens,
       system: systemPrompt,
