@@ -1939,6 +1939,38 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
               </div>
             )}
 
+            {/* Intent Signals — extracted by AI from meeting notes */}
+            {deal.intentSignals && (() => {
+              const is = deal.intentSignals as { championStatus?: string; budgetStatus?: string; decisionTimeline?: string | null; nextMeetingBooked?: boolean }
+              const champColor = is.championStatus === 'confirmed' ? '#22C55E' : is.championStatus === 'suspected' ? '#F59E0B' : '#374151'
+              const champLabel = is.championStatus === 'confirmed' ? '✓ Confirmed' : is.championStatus === 'suspected' ? '~ Suspected' : '— None'
+              const budgetColor = is.budgetStatus === 'approved' ? '#22C55E' : is.budgetStatus === 'awaiting' ? '#F59E0B' : is.budgetStatus === 'blocked' ? '#EF4444' : '#374151'
+              const budgetLabel = is.budgetStatus === 'approved' ? '✓ Approved' : is.budgetStatus === 'awaiting' ? '⏳ Awaiting' : is.budgetStatus === 'blocked' ? '✕ Blocked' : '— Not discussed'
+              return (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Intent Signals</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                    <div style={{ padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '9px', fontWeight: 700, color: '#444', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '3px' }}>Champion</div>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: champColor }}>{champLabel}</div>
+                    </div>
+                    <div style={{ padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '9px', fontWeight: 700, color: '#444', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '3px' }}>Budget</div>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: budgetColor }}>{budgetLabel}</div>
+                    </div>
+                    <div style={{ padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '9px', fontWeight: 700, color: '#444', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '3px' }}>Decision Timeline</div>
+                      <div style={{ fontSize: '12px', color: is.decisionTimeline ? '#D1D5DB' : '#374151', fontWeight: is.decisionTimeline ? 500 : 400 }}>{is.decisionTimeline ?? '— Not mentioned'}</div>
+                    </div>
+                    <div style={{ padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '9px', fontWeight: 700, color: '#444', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '3px' }}>Next Meeting</div>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: is.nextMeetingBooked ? '#22C55E' : '#374151' }}>{is.nextMeetingBooked ? '✓ Booked' : '— Not set'}</div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* What to focus on — specific to this deal's data */}
             {deal.stage && deal.stage !== 'closed_won' && deal.stage !== 'closed_lost' && (
               <div style={{ padding: '10px 14px', background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.1)', borderRadius: '8px' }}>

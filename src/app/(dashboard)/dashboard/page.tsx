@@ -167,6 +167,11 @@ export default function DashboardPage() {
     })),
   ]
 
+  // Follow-up cadence alerts from brain (critical + alert only)
+  const followUpAlerts: any[] = (brain?.followUpIntel?.followUpAlerts ?? [])
+    .filter((a: any) => a.urgency === 'critical' || a.urgency === 'alert')
+    .slice(0, 4)
+
   const priorityTodos = dealList
     .filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
     .flatMap(d => (d.todos ?? []).filter((t: any) => !t.done).map((t: any) => ({
@@ -276,6 +281,33 @@ export default function DashboardPage() {
                     <ArrowUpRight size={11} color="#333" style={{ flexShrink: 0 }} />
                   </Link>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Follow-up cadence alerts */}
+          {followUpAlerts.length > 0 && (
+            <div style={card}>
+              <SectionHeader label="Follow-up Overdue" count={followUpAlerts.length} />
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {followUpAlerts.map((alert: any, i: number) => {
+                  const color = alert.urgency === 'critical' ? '#EF4444' : '#F97316'
+                  const urgencyLabel = alert.urgency === 'critical' ? 'Critical' : 'Overdue'
+                  return (
+                    <Link key={alert.dealId} href={`/deals/${alert.dealId}`} style={listRow(i < followUpAlerts.length - 1)}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                    >
+                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: color, flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '12px', color: '#E5E7EB', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{alert.company}</div>
+                        <div style={{ fontSize: '11px', color: '#555', marginTop: '1px' }}>{alert.daysSinceLastNote}d since last note · typical {alert.typicalMaxGapDays}d</div>
+                      </div>
+                      <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', fontWeight: 600, color, background: `${color}14`, flexShrink: 0 }}>{urgencyLabel}</span>
+                      <ArrowUpRight size={11} color="#333" style={{ flexShrink: 0 }} />
+                    </Link>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -633,6 +665,49 @@ export default function DashboardPage() {
                         )}
                       </div>
                     </div>
+                  </div>
+                )
+              })()}
+
+              {/* Rep coaching intelligence */}
+              {(brain?.repIntel ?? []).length > 0 && (() => {
+                const reps: any[] = brain!.repIntel!
+                const isSolo = reps.length === 1
+                const rep0 = reps[0]
+                const winColor = (r: any) => r.winRate >= 50 ? '#22C55E' : r.winRate >= 30 ? '#F59E0B' : '#EF4444'
+                const todoColor = (r: any) => r.avgTodoCompletionRate >= 70 ? '#22C55E' : r.avgTodoCompletionRate >= 40 ? '#F59E0B' : '#EF4444'
+                const statBox = (label: string, value: string, sub: string, color: string) => (
+                  <div style={{ padding: '8px 10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '9px', fontWeight: 700, color: '#444', textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: '3px' }}>{label}</div>
+                    <div style={{ fontSize: '16px', fontWeight: 800, color }}>{value}</div>
+                    <div style={{ fontSize: '10px', color: '#374151', marginTop: '2px' }}>{sub}</div>
+                  </div>
+                )
+                return (
+                  <div style={{ background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.12)', borderRadius: '12px', padding: '14px 16px', gridColumn: isSolo ? 'auto' : 'span 2' }}>
+                    <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>
+                      {isSolo ? 'Your Coaching Stats' : 'Rep Performance'}
+                    </div>
+                    {isSolo ? (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                        {statBox('Win Rate', `${rep0.winRate}%`, `${rep0.wonDeals}/${rep0.totalDeals} deals`, winColor(rep0))}
+                        {statBox('To-Do Completion', `${rep0.avgTodoCompletionRate}%`, 'of tasks completed', todoColor(rep0))}
+                        {statBox('Deals with Next Step', `${rep0.dealsWithNextStepPct}%`, 'open deals covered', rep0.dealsWithNextStepPct >= 60 ? '#22C55E' : '#F59E0B')}
+                        {statBox('Avg Days Since Note', `${rep0.avgDaysSinceLastNote}d`, 'across open deals', rep0.avgDaysSinceLastNote <= 7 ? '#22C55E' : rep0.avgDaysSinceLastNote <= 14 ? '#F59E0B' : '#EF4444')}
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {reps.map((rep: any, ri: number) => (
+                          <div key={ri} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ fontSize: '11px', color: '#6B7280', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Rep {ri + 1}</span>
+                            <span style={{ fontSize: '11px', color: winColor(rep), fontWeight: 700, width: '36px', textAlign: 'right' }}>{rep.winRate}%</span>
+                            <span style={{ fontSize: '10px', color: '#374151' }}>win rate</span>
+                            <span style={{ fontSize: '11px', color: todoColor(rep), fontWeight: 700, width: '36px', textAlign: 'right' }}>{rep.avgTodoCompletionRate}%</span>
+                            <span style={{ fontSize: '10px', color: '#374151' }}>to-dos</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )
               })()}
