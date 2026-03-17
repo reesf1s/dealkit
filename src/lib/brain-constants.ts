@@ -3,4 +3,4 @@
  * calculation fix or schema change.  The dashboard checks this against the
  * stored brain snapshot and triggers an automatic rebuild when outdated.
  */
-export const BRAIN_VERSION = 10
+export const BRAIN_VERSION = 11

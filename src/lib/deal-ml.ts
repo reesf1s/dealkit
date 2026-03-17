@@ -34,6 +34,7 @@ export const ML_FEATURE_NAMES = [
   'momentum_score',       // recent vs early sentiment delta (0–1, 0.5=stable)
   'stakeholder_depth',    // breadth of stakeholder engagement (0–1, 6 categories)
   'urgency_score',        // urgency language density from NLP (0–1)
+  'rep_win_rate',         // owning rep's historical win rate across closed deals (0–1, 0.5=unknown)
 ] as const
 
 export const ML_MIN_TRAINING_DEALS = 4
@@ -58,6 +59,7 @@ export interface DealMLInput {
   meetingNotes?: string | null     // used for NLP feature extraction
   wonDate?: Date | string | null
   lostDate?: Date | string | null
+  repId?: string | null            // owning rep/user ID — used for rep_win_rate feature
   /** Pre-computed NLP features — if not provided, extracted from meetingNotes. */
   textEngagement?: number          // 0–1 composite NLP signal
   momentumScore?: number           // 0–1 recent vs early sentiment
@@ -98,6 +100,8 @@ export interface DealMLPrediction {
   nearestLoss: { dealId: string; company: string } | null
   similarWins:  { dealId: string; company: string; similarity: number }[]
   similarLosses: { dealId: string; company: string; similarity: number }[]
+  churnRisk?: number                             // 0-100 probability deal goes silent (survival model)
+  churnDaysOverdue?: number                      // days past the stage's safe follow-up window
   archetypeId: number | null
   riskFlags: string[]
   predictedDaysToClose: number | null            // OLS regression prediction (null if no model)
@@ -274,6 +278,7 @@ import { extractTextSignals } from '@/lib/text-signals'
 function extractFeatures(
   deal: DealMLInput,
   competitorWinRates: Map<string, number>,
+  repWinRates: Map<string, number>,
   avgDealValue: number,
   maxDealValue: number,
   now: Date,
@@ -311,8 +316,11 @@ function extractFeatures(
   const f_stakeholder= deal.stakeholderDepth ?? sig().stakeholderDepth
   const f_urgency    = deal.urgencyScore     ?? sig().urgencyScore
 
+  // rep_win_rate: owning rep's historical win rate; 0.5 = neutral/unknown
+  const f_rep = deal.repId ? (repWinRates.get(deal.repId) ?? 0.5) : 0.5
+
   // Order must match ML_FEATURE_NAMES exactly
-  return [f_stage, f_value, f_age, f_risk, f_comp, f_todo, f_text, f_momentum, f_stakeholder, f_urgency]
+  return [f_stage, f_value, f_age, f_risk, f_comp, f_todo, f_text, f_momentum, f_stakeholder, f_urgency, f_rep]
 }
 
 // ─── Logistic regression ──────────────────────────────────────────────────────
@@ -378,9 +386,9 @@ function winningCharacteristic(c: number[]): string {
     const dev = Math.abs((c[i] ?? 0.5) - 0.5)
     if (dev > maxDev) { maxDev = dev; topIdx = i; topDir = (c[i] ?? 0.5) > 0.5 ? 1 : -1 }
   }
-  // One label per feature (10 features)
-  const pos = ['Advanced stage','High deal value','Long pipeline age','Multiple risk flags','Strong comp record','High action completion','Strong notes engagement','Building momentum','Broad stakeholder coverage','High urgency from prospect']
-  const neg = ['Early stage','Smaller deal','Fresh entry','No risk flags','Weak comp record','Low action completion','Weak notes engagement','Declining momentum','Narrow stakeholder reach','Low urgency from prospect']
+  // One label per feature (11 features — indices 0-10)
+  const pos = ['Advanced stage','High deal value','Long pipeline age','Multiple risk flags','Strong comp record','High action completion','Strong notes engagement','Building momentum','Broad stakeholder coverage','High urgency from prospect','High-performing rep']
+  const neg = ['Early stage','Smaller deal','Fresh entry','No risk flags','Weak comp record','Low action completion','Weak notes engagement','Declining momentum','Narrow stakeholder reach','Low urgency from prospect','Rep win rate below average']
   return (topDir > 0 ? pos[topIdx] : neg[topIdx]) ?? 'Mixed'
 }
 
@@ -436,6 +444,7 @@ const SCORE_DRIVER_LABELS: Record<string, { pos: string; neg: string }> = {
   momentum_score:       { pos: 'Building deal momentum',         neg: 'Declining momentum' },
   stakeholder_depth:    { pos: 'Broad stakeholder coverage',     neg: 'Limited stakeholder reach' },
   urgency_score:        { pos: 'Prospect urgency expressed',     neg: 'No urgency from prospect' },
+  rep_win_rate:         { pos: 'Strong rep track record',        neg: 'Rep win rate below average' },
 }
 
 /** Compute per-deal score drivers: which features are pushing win probability up or down. */
@@ -472,6 +481,7 @@ const WIN_CONDITIONS: Record<string, string> = {
   momentum_score:       'Deal momentum building over time',
   stakeholder_depth:    'Broad multi-function stakeholder engagement',
   urgency_score:        'Strong urgency expressed by prospect',
+  rep_win_rate:         'Assigned to a high-performing rep',
 }
 const LOSS_RISKS: Record<string, string> = {
   stage_progress:       'Early-stage deals',
@@ -484,11 +494,13 @@ const LOSS_RISKS: Record<string, string> = {
   momentum_score:       'Declining deal momentum over time',
   stakeholder_depth:    'Limited stakeholder engagement',
   urgency_score:        'No urgency from prospect',
+  rep_win_rate:         'Rep with below-average close rate',
 }
 
 function computeCompetitivePatterns(
   closed: DealMLInput[],
   competitorWinRates: Map<string, number>,
+  repWinRates: Map<string, number>,
   avgDealValue: number,
   maxDealValue: number,
   now: Date,
@@ -510,7 +522,7 @@ function computeCompetitivePatterns(
     const winRate = Math.round((won.length / deals.length) * 100)
 
     const examples = deals.map(d => ({
-      features: extractFeatures(d, competitorWinRates, avgDealValue, maxDealValue, now),
+      features: extractFeatures(d, competitorWinRates, repWinRates, avgDealValue, maxDealValue, now),
       label: d.stage === 'closed_won' ? 1 : 0,
     }))
 
@@ -550,6 +562,7 @@ function computeCalibrationTimeline(
   weights: number[],
   bias: number,
   competitorWinRates: Map<string, number>,
+  repWinRates: Map<string, number>,
   avgDealValue: number,
   maxDealValue: number,
   now: Date,
@@ -570,7 +583,7 @@ function computeCalibrationTimeline(
     const won  = deals.filter(d => d.stage === 'closed_won')
     const lost = deals.filter(d => d.stage === 'closed_lost')
     const pred = (d: DealMLInput) =>
-      sigmoid(dot(weights, extractFeatures(d, competitorWinRates, avgDealValue, maxDealValue, now)) + bias) * 100
+      sigmoid(dot(weights, extractFeatures(d, competitorWinRates, repWinRates, avgDealValue, maxDealValue, now)) + bias) * 100
 
     const predsWon  = won.map(pred)
     const predsLost = lost.map(pred)
@@ -597,6 +610,7 @@ function computeCalibrationTimeline(
 function trainCloseDateRegression(
   wonDeals: DealMLInput[],
   competitorWinRates: Map<string, number>,
+  repWinRates: Map<string, number>,
   avgDealValue: number,
   maxDealValue: number,
   now: Date,
@@ -604,7 +618,7 @@ function trainCloseDateRegression(
   const samples = wonDeals
     .filter(d => d.createdAt && d.wonDate)
     .map(d => ({
-      features: extractFeatures(d, competitorWinRates, avgDealValue, maxDealValue, now),
+      features: extractFeatures(d, competitorWinRates, repWinRates, avgDealValue, maxDealValue, now),
       daysToClose: (new Date(d.wonDate!).getTime() - new Date(d.createdAt!).getTime()) / 86_400_000,
     }))
     .filter(s => s.daysToClose >= 0)
@@ -684,14 +698,18 @@ export function runMLEngine(
   }
   if (closed.length < ML_MIN_TRAINING_DEALS) {
     // Cold start: if we have a global prior, use it to generate predictions for open deals
-    if (globalPrior && globalPrior.weights.length === ML_FEATURE_NAMES.length && open.length > 0) {
+    if (globalPrior && globalPrior.weights.length >= ML_FEATURE_NAMES.length - 1 && open.length > 0) {
       const allVals = allDeals.map(d => d.dealValue ?? 0).filter(v => v > 0)
       const avgDV = allVals.length > 0 ? allVals.reduce((a, b) => a + b, 0) / allVals.length : 50_000
       const maxDV = allVals.length > 0 ? Math.max(...allVals) : 100_000
       const compRates = new Map<string, number>()
+      const repRates  = new Map<string, number>()
+      // Pad global prior weights to match current feature count (handles old 10-feature priors)
+      const paddedWeights = [...globalPrior.weights]
+      while (paddedWeights.length < ML_FEATURE_NAMES.length) paddedWeights.push(0)
       const coldPredictions: DealMLPrediction[] = open.map(deal => {
-        const feats = extractFeatures(deal, compRates, avgDV, maxDV, now)
-        const winProb = sigmoid(dot(globalPrior.weights, feats) + globalPrior.bias)
+        const feats = extractFeatures(deal, compRates, repRates, avgDV, maxDV, now)
+        const winProb = sigmoid(dot(paddedWeights, feats) + globalPrior.bias)
         return {
           dealId: deal.id,
           winProbability: winProb,
@@ -704,11 +722,11 @@ export function runMLEngine(
           predictedDaysToClose: globalPrior.stageVelocityP50 > 0
             ? Math.round(globalPrior.stageVelocityP50)
             : null,
-          scoreDrivers: computeScoreDrivers(feats, globalPrior.weights),
+          scoreDrivers: computeScoreDrivers(feats, paddedWeights),
         }
       })
       const coldModel: TrainedMLModel = {
-        weights: globalPrior.weights,
+        weights: paddedWeights,
         bias: globalPrior.bias,
         featureNames: ML_FEATURE_NAMES,
         trainingSize: 0,
@@ -746,10 +764,26 @@ export function runMLEngine(
     [...compStats.entries()].map(([k, s]) => [k, s.total > 0 ? s.wins / s.total : 0.5])
   )
 
+  // ── Rep win rates (feature 10: rep behaviour as ML dimension) ─────────────
+  const repStats = new Map<string, { wins: number; total: number }>()
+  for (const d of closed) {
+    if (!d.repId) continue
+    const s = repStats.get(d.repId) ?? { wins: 0, total: 0 }
+    s.total++
+    if (d.stage === 'closed_won') s.wins++
+    repStats.set(d.repId, s)
+  }
+  // Only use rep win rate if we have ≥ 3 closed deals for that rep; otherwise neutral 0.5
+  const repWinRates = new Map<string, number>(
+    [...repStats.entries()]
+      .filter(([, s]) => s.total >= 3)
+      .map(([k, s]) => [k, s.wins / s.total])
+  )
+
   // ── Feature extraction for all deals ─────────────────────────────────────
   const allFeats = allDeals.map(d => ({
     id: d.id,
-    features: extractFeatures(d, competitorWinRates, avgDealValue, maxDealValue, now),
+    features: extractFeatures(d, competitorWinRates, repWinRates, avgDealValue, maxDealValue, now),
   }))
   const featMap = new Map<string, number[]>(allFeats.map(f => [f.id, f.features]))
 
@@ -765,13 +799,16 @@ export function runMLEngine(
 
   // ── Bayesian blend with global prior (if available) ───────────────────────
   // α_global = 1 / (1 + localClosedDeals / 10) — fades to zero as local data grows
+  // Global prior may have 10 features (before rep_win_rate was added); pad with 0 if needed.
   let weights = rawWeights
   let bias    = rawBias
   let globalAlpha = 0
-  if (globalPrior && globalPrior.weights.length === ML_FEATURE_NAMES.length) {
+  if (globalPrior && globalPrior.weights.length >= ML_FEATURE_NAMES.length - 1) {
+    const paddedGlobalWeights = [...globalPrior.weights]
+    while (paddedGlobalWeights.length < ML_FEATURE_NAMES.length) paddedGlobalWeights.push(0)
     globalAlpha  = 1 / (1 + closed.length / 10)
     const localAlpha = 1 - globalAlpha
-    weights = globalPrior.weights.map((gw, i) => globalAlpha * gw + localAlpha * (rawWeights[i] ?? 0))
+    weights = paddedGlobalWeights.map((gw, i) => globalAlpha * gw + localAlpha * (rawWeights[i] ?? 0))
     bias    = globalAlpha * globalPrior.bias + localAlpha * rawBias
   }
 
@@ -833,7 +870,7 @@ export function runMLEngine(
   const knn = Math.max(2, Math.min(5, Math.floor(closed.length / 4)))
 
   const predictions: DealMLPrediction[] = open.map((deal, oi) => {
-    const feats   = featMap.get(deal.id) ?? extractFeatures(deal, competitorWinRates, avgDealValue, maxDealValue, now)
+    const feats   = featMap.get(deal.id) ?? extractFeatures(deal, competitorWinRates, repWinRates, avgDealValue, maxDealValue, now)
     const winProb = sigmoid(dot(weights, feats) + bias)
 
     const ranked = training
@@ -894,17 +931,17 @@ export function runMLEngine(
 
   // ── Competitive patterns ──────────────────────────────────────────────────
   const competitivePatterns = computeCompetitivePatterns(
-    closed, competitorWinRates, avgDealValue, maxDealValue, now
+    closed, competitorWinRates, repWinRates, avgDealValue, maxDealValue, now
   )
 
   // ── Score calibration timeline ────────────────────────────────────────────
   const calibrationTimeline = computeCalibrationTimeline(
-    closed, weights, bias, competitorWinRates, avgDealValue, maxDealValue, now
+    closed, weights, bias, competitorWinRates, repWinRates, avgDealValue, maxDealValue, now
   )
 
   // ── Close date regression ────────────────────────────────────────────────
   const closeDateModel = trainCloseDateRegression(
-    closedWon, competitorWinRates, avgDealValue, maxDealValue, now
+    closedWon, competitorWinRates, repWinRates, avgDealValue, maxDealValue, now
   )
 
   // Backfill predictedDaysToClose on open-deal predictions

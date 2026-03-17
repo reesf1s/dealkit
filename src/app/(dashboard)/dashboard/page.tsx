@@ -172,6 +172,19 @@ export default function DashboardPage() {
     .filter((a: any) => a.urgency === 'critical' || a.urgency === 'alert')
     .slice(0, 4)
 
+  // Churn risk deals: open deals where the survival model signals ≥65% P(go silent)
+  // Excludes deals already in followUpAlerts to avoid double-listing the same issue
+  const followUpAlertDealIds = new Set(followUpAlerts.map((a: any) => a.dealId))
+  const churnRiskDeals: any[] = (brain?.mlPredictions ?? [])
+    .filter((p: any) => typeof p.churnRisk === 'number' && p.churnRisk >= 65 && !followUpAlertDealIds.has(p.dealId))
+    .sort((a: any, b: any) => b.churnRisk - a.churnRisk)
+    .slice(0, 4)
+    .map((p: any) => {
+      const snap = (brain?.deals ?? []).find((d: any) => d.id === p.dealId)
+      return snap ? { ...p, dealName: snap.name, company: snap.company, stage: snap.stage } : null
+    })
+    .filter(Boolean)
+
   const priorityTodos = dealList
     .filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
     .flatMap(d => (d.todos ?? []).filter((t: any) => !t.done).map((t: any) => ({
@@ -304,6 +317,33 @@ export default function DashboardPage() {
                         <div style={{ fontSize: '11px', color: '#555', marginTop: '1px' }}>{alert.daysSinceLastNote}d since last note · typical {alert.typicalMaxGapDays}d</div>
                       </div>
                       <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', fontWeight: 600, color, background: `${color}14`, flexShrink: 0 }}>{urgencyLabel}</span>
+                      <ArrowUpRight size={11} color="#333" style={{ flexShrink: 0 }} />
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Deal churn survival model — deals at risk of going silent */}
+          {churnRiskDeals.length > 0 && (
+            <div style={card}>
+              <SectionHeader label="At Risk of Going Silent" count={churnRiskDeals.length} />
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {churnRiskDeals.map((deal: any, i: number) => {
+                  const risk = deal.churnRisk as number
+                  const color = risk >= 80 ? '#EF4444' : '#F97316'
+                  return (
+                    <Link key={deal.dealId} href={`/deals/${deal.dealId}`} style={listRow(i < churnRiskDeals.length - 1)}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                    >
+                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: color, flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '12px', color: '#E5E7EB', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.company}</div>
+                        <div style={{ fontSize: '11px', color: '#555', marginTop: '1px' }}>{deal.stage} · {deal.churnDaysOverdue > 0 ? `${deal.churnDaysOverdue}d past safe window` : 'approaching silence threshold'}</div>
+                      </div>
+                      <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '4px', fontWeight: 700, color, background: `${color}14`, flexShrink: 0 }}>{risk}%</span>
                       <ArrowUpRight size={11} color="#333" style={{ flexShrink: 0 }} />
                     </Link>
                   )
@@ -821,12 +861,20 @@ export default function DashboardPage() {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     {(brain!.productGapPriority!).filter((g: any) => g.revenueAtRisk > 0 || g.dealsBlocked > 0).slice(0, 4).map((g: any, gi: number) => (
-                      <div key={gi} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '11px', color: '#9CA3AF', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.title}</span>
-                        {g.revenueAtRisk > 0 && (
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#EF4444', flexShrink: 0 }}>{fmt(g.revenueAtRisk, currencySymbol)}</span>
+                      <div key={gi} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '11px', color: '#9CA3AF', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.title}</span>
+                          {g.revenueAtRisk > 0 && (
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: '#EF4444', flexShrink: 0 }}>{fmt(g.revenueAtRisk, currencySymbol)}</span>
+                          )}
+                          <span style={{ fontSize: '10px', color: '#374151', flexShrink: 0 }}>{g.dealsBlocked} deal{g.dealsBlocked !== 1 ? 's' : ''}</span>
+                        </div>
+                        {typeof g.winRateDelta === 'number' && (
+                          <div style={{ fontSize: '10px', color: g.winRateDelta <= -10 ? '#EF4444' : g.winRateDelta <= -5 ? '#F97316' : '#9CA3AF', paddingLeft: '0', fontWeight: 500 }}>
+                            {g.winRateWithGap}% win rate with gap vs {g.winRateWithoutGap}% without
+                            {g.winRateDelta <= -5 ? ` · ▼ ${Math.abs(g.winRateDelta)}pts impact` : ''}
+                          </div>
                         )}
-                        <span style={{ fontSize: '10px', color: '#374151', flexShrink: 0 }}>{g.dealsBlocked} deal{g.dealsBlocked !== 1 ? 's' : ''}</span>
                       </div>
                     ))}
                   </div>

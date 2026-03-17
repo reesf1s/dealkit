@@ -139,6 +139,18 @@ export interface WorkspaceBrain {
     winRateWithTheme: number                       // 0-100
     globalWinRate?: number                         // 0-100 industry win rate for this theme (if global prior active)
   }[]
+  objectionConditionalWins?: {                     // per-theme × stage × champion conditional model
+    theme: string
+    dealsWithTheme: number
+    stageBreakdown: {
+      stage: string
+      winRateWithChampion: number | null           // 0-100 win rate when champion present (null = <2 samples)
+      winRateNoChampion: number | null             // 0-100 win rate when no champion (null = <2 samples)
+      championLift: number | null                  // pts difference (withChampion − noChampion)
+      sampleSize: number
+    }[]
+    championLiftAvg: number | null                 // avg pts lift of having champion across all stages
+  }[]
   productGapPriority?: {                           // gaps ranked by open pipeline revenue at risk
     gapId: string
     title: string
@@ -146,6 +158,9 @@ export interface WorkspaceBrain {
     status: string
     revenueAtRisk: number
     dealsBlocked: number
+    winRateWithGap?: number                        // 0-100 win rate on closed deals where gap came up
+    winRateWithoutGap?: number                     // 0-100 win rate on closed deals without this gap
+    winRateDelta?: number                          // winRateWithGap - winRateWithoutGap (negative = gap hurts)
   }[]
   collateralEffectiveness?: {                      // win rate per collateral type used in closed deals
     type: string
@@ -589,15 +604,101 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     objectionWinMap.sort((a, b) => b.winsWithTheme - a.winsWithTheme)
   }
 
-  // ── Tier 2: Product Gap Revenue Priority ───────────────────────────────────
+  // ── Tier 2: Objection × Stage × Champion Conditional Model ────────────────
+  // For each risk theme present in closed deals, break down win rate by:
+  //   - Stage the deal was in when the theme was present
+  //   - Whether a champion was identified (championStrength > 0.5 from text signals)
+  // This answers: "When 'budget concerns' comes up in proposal WITH a champion, we win 71% vs 23% without"
+  // Minimum: ≥6 closed deals with the theme to compute stage breakdown
+  const objectionConditionalWins: NonNullable<WorkspaceBrain['objectionConditionalWins']> = []
+  if (closedDeals.length >= 6) {
+    for (const theme of riskWords) {
+      const withTheme = closedDeals.filter(d => {
+        const allText = ((d.dealRisks as string[]) ?? []).join(' ').toLowerCase()
+        return theme.keywords.some(kw => allText.includes(kw))
+      })
+      if (withTheme.length < 4) continue
+
+      // Group by stage
+      const stageMap = new Map<string, { wins: number; totalWithChamp: number; winsWithChamp: number; totalNoChamp: number; winsNoChamp: number }>()
+      for (const d of withTheme) {
+        const sig = signalMap.get(d.id)
+        const hasChampion = (sig?.championStrength ?? 0) > 0.5
+        const isWon = d.stage === 'closed_won'
+        const entry = stageMap.get(d.stage) ?? { wins: 0, totalWithChamp: 0, winsWithChamp: 0, totalNoChamp: 0, winsNoChamp: 0 }
+        if (isWon) entry.wins++
+        if (hasChampion) {
+          entry.totalWithChamp++
+          if (isWon) entry.winsWithChamp++
+        } else {
+          entry.totalNoChamp++
+          if (isWon) entry.winsNoChamp++
+        }
+        stageMap.set(d.stage, entry)
+      }
+
+      const stageOrder = ['prospecting', 'qualification', 'discovery', 'proposal', 'negotiation']
+      const stageBreakdown: NonNullable<WorkspaceBrain['objectionConditionalWins']>[0]['stageBreakdown'] = []
+      const liftValues: number[] = []
+
+      for (const stage of stageOrder) {
+        const entry = stageMap.get(stage)
+        if (!entry) continue
+        const sampleSize = entry.totalWithChamp + entry.totalNoChamp
+        if (sampleSize < 2) continue
+
+        // Bayesian rate with Laplace smoothing (α=0.5) — stabilises small sample estimates
+        const wrWithChamp = entry.totalWithChamp >= 2
+          ? Math.round(((entry.winsWithChamp + 0.5) / (entry.totalWithChamp + 1)) * 100)
+          : null
+        const wrNoChamp = entry.totalNoChamp >= 2
+          ? Math.round(((entry.winsNoChamp + 0.5) / (entry.totalNoChamp + 1)) * 100)
+          : null
+        const lift = wrWithChamp != null && wrNoChamp != null ? wrWithChamp - wrNoChamp : null
+        if (lift != null) liftValues.push(lift)
+
+        stageBreakdown.push({ stage, winRateWithChampion: wrWithChamp, winRateNoChampion: wrNoChamp, championLift: lift, sampleSize })
+      }
+
+      if (stageBreakdown.length === 0) continue
+      const championLiftAvg = liftValues.length > 0
+        ? Math.round(liftValues.reduce((a, b) => a + b, 0) / liftValues.length)
+        : null
+
+      objectionConditionalWins.push({
+        theme: theme.label,
+        dealsWithTheme: withTheme.length,
+        stageBreakdown,
+        championLiftAvg,
+      })
+    }
+    objectionConditionalWins.sort((a, b) => b.dealsWithTheme - a.dealsWithTheme)
+  }
+
+  // ── Tier 2: Product Gap Revenue Priority + Win Rate Delta ──────────────────
   // For each active gap, compute how much open pipeline revenue is at risk
   // by joining sourceDeals[] against active deals with a deal value.
+  // Also compute: win rate on deals WITH this gap vs WITHOUT it (requires ≥3 closed deals with gap).
   const productGapPriority: NonNullable<WorkspaceBrain['productGapPriority']> = []
   for (const gap of gaps) {
     if (gap.status === 'shipped' || gap.status === 'wont_fix') continue
     const sourceDealIds: string[] = (gap.sourceDeals as string[]) ?? []
     const openGapDeals = activeDeals.filter(d => sourceDealIds.includes(d.id))
     const revenueAtRisk = openGapDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
+    // Win rate delta: deals WITH this gap that closed vs. deals WITHOUT this gap that closed
+    const closedWithGap    = closedDeals.filter(d => sourceDealIds.includes(d.id))
+    const closedWithoutGap = closedDeals.filter(d => !sourceDealIds.includes(d.id))
+    let winRateWithGap:    number | undefined
+    let winRateWithoutGap: number | undefined
+    let winRateDelta:      number | undefined
+    if (closedWithGap.length >= 3) {
+      winRateWithGap = Math.round((closedWithGap.filter(d => d.stage === 'closed_won').length / closedWithGap.length) * 100)
+      if (closedWithoutGap.length >= 3) {
+        winRateWithoutGap = Math.round((closedWithoutGap.filter(d => d.stage === 'closed_won').length / closedWithoutGap.length) * 100)
+        winRateDelta      = winRateWithGap - winRateWithoutGap
+      }
+    }
+
     productGapPriority.push({
       gapId:         gap.id,
       title:         gap.title,
@@ -605,6 +706,9 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
       status:        gap.status,
       revenueAtRisk,
       dealsBlocked:  openGapDeals.length,
+      winRateWithGap,
+      winRateWithoutGap,
+      winRateDelta,
     })
   }
   productGapPriority.sort((a, b) => b.revenueAtRisk - a.revenueAtRisk || b.dealsBlocked - a.dealsBlocked)
@@ -974,6 +1078,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
       updatedAt:        d.updatedAt,
       wonDate:          d.wonDate,
       lostDate:         d.lostDate,
+      repId:            d.userId as string | null,   // rep identity as ML feature dimension
       textEngagement:   sig?.textEngagement,
       momentumScore:    sig?.momentumScore,
       stakeholderDepth: sig?.stakeholderDepth,
@@ -1087,6 +1192,40 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
   const followUpIntel: FollowUpCadenceIntel = {
     stageStats:      followUpStageStats,
     followUpAlerts:  followUpAlerts.sort((a, b) => b.daysSinceLastNote - a.daysSinceLastNote).slice(0, 10),
+  }
+
+  // ── Deal churn survival model ──────────────────────────────────────────────
+  // Discrete-time survival model: P(deal goes silent within 14 days) per open deal.
+  // Uses per-stage p75 note gap from won deals as the "safe window" baseline.
+  // Formula: sigmoid(2.5 × (daysSince/p75 − 0.8)) + risk/nextStep adjustments.
+  // Requires stageGapBuckets to have ≥1 stage with data (otherwise uses 14d global fallback).
+  // Merges churnRisk into mlPredictions entries so it surfaces in the deal detail ML panel.
+  for (const d of activeDeals) {
+    const sig = signalMap.get(d.id)
+    if (!sig) continue
+    const daysSince = sig.daysSinceLastNote
+    const stageStat = followUpStageStats.find(s => s.stage === d.stage)
+    const p75 = stageStat?.p75GapDays ?? 14   // fallback to global stale threshold
+
+    // gap_ratio: 0 = just contacted, 1 = at danger threshold, 2 = well past threshold
+    const gapRatio  = daysSince / Math.max(p75, 1)
+    // Base logit: sigmoid(2.5 × (gap_ratio − 0.8)):
+    //   gap_ratio 0.0 → ~12%,  0.8 → 50%,  1.2 → ~73%,  1.5 → ~85%,  2.0 → ~95%
+    const baseLogit = 2.5 * (gapRatio - 0.8)
+    const riskCount = ((d.dealRisks as string[]) ?? []).length
+    const logit     = baseLogit + (riskCount >= 3 ? 0.7 : 0) - (sig.nextStepDefined ? 0.7 : 0)
+    const churnProb = 1 / (1 + Math.exp(-logit))
+    const churnRisk = Math.min(95, Math.max(5, Math.round(churnProb * 100)))
+    const daysOverdue = Math.max(0, Math.round(daysSince - p75))
+
+    // Merge into mlPrediction for this deal (set after ML engine runs)
+    if (mlPredictions) {
+      const pred = mlPredictions.find(p => p.dealId === d.id)
+      if (pred) {
+        pred.churnRisk = churnRisk
+        pred.churnDaysOverdue = daysOverdue
+      }
+    }
   }
 
   // ── Rep intelligence — per-rep behavioural stats correlated with outcomes ────
@@ -1263,6 +1402,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     followUpIntel:          (followUpStageStats.length > 0 || followUpAlerts.length > 0) ? followUpIntel : undefined,
     repIntel:               repIntel.length > 0 ? repIntel : undefined,
     objectionWinMap:        objectionWinMap.length > 0 ? objectionWinMap : undefined,
+    objectionConditionalWins: objectionConditionalWins.length > 0 ? objectionConditionalWins : undefined,
     productGapPriority:     productGapPriority.length > 0 ? productGapPriority : undefined,
     collateralEffectiveness: collateralEffectiveness.length > 0 ? collateralEffectiveness : undefined,
     globalPrior:            globalPriorMeta,
@@ -1311,6 +1451,9 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
           const fAge    = Math.min(ageMs / 86_400_000 / 180, 1)
           const fRisk   = Math.min(((d.dealRisks as string[]) ?? []).length / 5, 1)
           const fTodo   = (() => { const t = (d.todos as { done: boolean }[]) ?? []; return t.length > 0 ? t.filter(x => x.done).length / t.length : 0.5 })()
+          // Intentionally 10 features (excludes rep_win_rate at index 10).
+          // rep_win_rate is workspace-specific and must never cross workspace boundaries.
+          // Global pool trains on 10-feature vectors; Bayesian blend pads to 11 locally.
           const features = [
             fStage, fValue, fAge, fRisk,
             0.5,   // competitor_win_rate: use neutral default (avoid cross-workspace leakage)

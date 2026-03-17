@@ -448,7 +448,7 @@ const STAGE_PLAYBOOK: Record<string, string[]> = {
   ],
 }
 
-function MeetingPrepTab({ dealId, deal, objectionWinMap = [] }: { dealId: string; deal: any; objectionWinMap?: any[] }) {
+function MeetingPrepTab({ dealId, deal, objectionWinMap = [], objectionConditionalWins = [] }: { dealId: string; deal: any; objectionWinMap?: any[]; objectionConditionalWins?: any[] }) {
   const [prep, setPrep] = useState('')
   const [loading, setLoading] = useState(false)
   const [fullBriefShown, setFullBriefShown] = useState(false)
@@ -589,6 +589,62 @@ function MeetingPrepTab({ dealId, deal, objectionWinMap = [] }: { dealId: string
           </div>
         </div>
       )}
+
+      {/* Per-objection × stage × champion conditional model */}
+      {objectionConditionalWins.length > 0 && (() => {
+        const currentStage: string = deal?.stage ?? ''
+        // Find entries where we have data for this deal's current stage
+        const relevant = objectionConditionalWins
+          .map((entry: any) => {
+            const sb = (entry.stageBreakdown ?? []).find((s: any) => s.stage === currentStage)
+            return sb ? { ...entry, stageStat: sb } : null
+          })
+          .filter(Boolean)
+          .slice(0, 4)
+        if (relevant.length === 0) return null
+        return (
+          <div style={cardStyle}>
+            {sectionTitle('Champion Effect on Your Objections', '#A78BFA')}
+            <div style={{ fontSize: '11px', color: '#555', marginBottom: '10px', lineHeight: 1.5 }}>
+              In {currentStage.replace('_', ' ')} stage, having a champion changes the odds for each objection type.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {relevant.map((entry: any, i: number) => {
+                const sb = entry.stageStat
+                const lift = sb.championLift as number | null
+                const liftColor = lift != null && lift >= 10 ? '#22C55E' : lift != null && lift >= 0 ? '#A78BFA' : '#EF4444'
+                const liftLabel = lift != null ? (lift >= 0 ? `+${lift}pts with champion` : `${lift}pts without champion`) : null
+                return (
+                  <div key={i} style={{ padding: '9px 12px', background: 'rgba(167,139,250,0.04)', border: '1px solid rgba(167,139,250,0.12)', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+                      <span style={{ fontSize: '12px', color: '#E5E7EB', fontWeight: 600, textTransform: 'capitalize' }}>{entry.theme}</span>
+                      {liftLabel && (
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: liftColor }}>{liftLabel}</span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: '16px' }}>
+                      {sb.winRateWithChampion != null && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
+                          <span style={{ fontSize: '11px', color: '#9CA3AF' }}>With champion:</span>
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: '#22C55E' }}>{sb.winRateWithChampion}%</span>
+                        </div>
+                      )}
+                      {sb.winRateNoChampion != null && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#EF4444', flexShrink: 0 }} />
+                          <span style={{ fontSize: '11px', color: '#9CA3AF' }}>Without:</span>
+                          <span style={{ fontSize: '12px', fontWeight: 700, color: '#EF4444' }}>{sb.winRateNoChampion}%</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Expected objections */}
       {(dealRisks.length > 0 || commonObjections.length > 0) && (
@@ -2011,6 +2067,34 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
               )
             })()}
 
+            {/* Churn survival model — P(deal goes silent) for open deals */}
+            {mlPrediction && typeof mlPrediction.churnRisk === 'number' && deal.stage !== 'closed_won' && deal.stage !== 'closed_lost' && mlPrediction.churnRisk >= 40 && (() => {
+              const risk = mlPrediction.churnRisk as number
+              const daysOverdue = mlPrediction.churnDaysOverdue as number ?? 0
+              const color = risk >= 75 ? '#EF4444' : risk >= 55 ? '#F97316' : '#F59E0B'
+              const label = risk >= 75 ? 'High risk of silence' : risk >= 55 ? 'Moderate silence risk' : 'Approaching threshold'
+              return (
+                <div style={{ padding: '10px 14px', background: `${color}08`, border: `1px solid ${color}28`, borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      Churn Risk
+                    </div>
+                    <div style={{ fontSize: '13px', fontWeight: 800, color }}>{risk}%</div>
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#9CA3AF', lineHeight: '1.5' }}>
+                    {label}
+                    {daysOverdue > 0
+                      ? ` — ${daysOverdue}d past the safe follow-up window for ${deal.stage} stage`
+                      : ` — approaching the silence threshold for ${deal.stage} stage`}
+                    {(deal.dealRisks ?? []).length >= 3 ? '. Multiple active risks increase the probability.' : ''}
+                  </div>
+                  <div style={{ marginTop: '6px', height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${risk}%`, background: color, borderRadius: '2px' }} />
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Intent Signals — extracted by AI from meeting notes */}
             {deal.intentSignals && (() => {
               const is = deal.intentSignals as { championStatus?: string; budgetStatus?: string; decisionTimeline?: string | null; nextMeetingBooked?: boolean }
@@ -2184,6 +2268,7 @@ export default function DealDetailPage() {
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
   const mlPrediction = (brainRes?.data?.mlPredictions ?? []).find((p: any) => p.dealId === id) ?? null
   const objectionWinMap: any[] = brainRes?.data?.objectionWinMap ?? []
+  const objectionConditionalWins: any[] = brainRes?.data?.objectionConditionalWins ?? []
   const globalPrior: any = brainRes?.data?.globalPrior ?? null
   const { setActiveDeal } = useSidebar()
 
@@ -2323,7 +2408,7 @@ export default function DealDetailPage() {
           {activeTab === 'meeting-notes' && (
             <MeetingNotesTab dealId={id} deal={deal} onUpdate={() => mutate()} onSwitchToPrep={() => setActiveTab('prep')} />
           )}
-          {activeTab === 'prep' && <MeetingPrepTab dealId={id} deal={deal} objectionWinMap={objectionWinMap} />}
+          {activeTab === 'prep' && <MeetingPrepTab dealId={id} deal={deal} objectionWinMap={objectionWinMap} objectionConditionalWins={objectionConditionalWins} />}
           {activeTab === 'todos' && (
             <TodosTab dealId={id} deal={deal} onUpdate={() => mutate()} />
           )}
