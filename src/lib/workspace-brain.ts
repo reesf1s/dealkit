@@ -2017,14 +2017,17 @@ function buildProactiveCustomPrompt(
     // Inject win playbook data if available
     const wp = brain.winPlaybook
     if (wp) {
-      if (wp.topWinFactors.length > 0) parts.push(`Key win factors to leverage: ${wp.topWinFactors.join(', ')}`)
-      if (wp.avgDaysToClose) parts.push(`Typical close timeline: ${wp.avgDaysToClose} days`)
+      if (wp.topObjectionWinPatterns.length > 0) {
+        const factors = wp.topObjectionWinPatterns.map(p => p.howBeaten).filter(Boolean)
+        if (factors.length > 0) parts.push(`Key win factors to leverage: ${factors.join(', ')}`)
+      }
+      if (wp.fastestClosePattern) parts.push(`Typical close timeline: ${wp.fastestClosePattern.avgDaysToClose} days`)
     }
     const objWins = brain.objectionWinMap ?? []
     if (objWins.length > 0) {
       parts.push('Historical objection outcomes:')
       for (const o of objWins.slice(0, 3)) {
-        parts.push(`- "${o.objection}": ${o.winRate}% win rate when encountered (${o.totalDeals} deals)`)
+        parts.push(`- "${o.theme}": ${o.winRateWithTheme}% win rate when encountered (${o.dealsWithTheme} deals)`)
       }
     }
   }
@@ -2055,8 +2058,9 @@ function buildProactiveCustomPrompt(
   if (suggestion.type === 'talk_track') {
     parts.push('Structure as a discovery call guide: opening, qualifying questions, pain point exploration, value demonstration, next steps.')
     const wp = brain.winPlaybook
-    if (wp?.topWinFactors.length) {
-      parts.push(`Discovery should explore these win factors: ${wp.topWinFactors.join(', ')}`)
+    if (wp?.topObjectionWinPatterns.length) {
+      const factors = wp.topObjectionWinPatterns.map(p => p.theme).filter(Boolean)
+      if (factors.length > 0) parts.push(`Discovery should explore these themes: ${factors.join(', ')}`)
     }
   }
 
