@@ -16,16 +16,27 @@ import { PageTabs } from '@/components/shared/PageTabs'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
-// ── Brain-powered urgency/stale lookup ─────────────────────────────────────
+// ── Brain-powered urgency/stale/ML lookup ──────────────────────────────────
 function useDealFlags(deals: any[]) {
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
   const brain = brainRes?.data
-  if (!brain) return { urgentMap: {} as Record<string, string>, staleMap: {} as Record<string, number> }
+  if (!brain) return {
+    urgentMap: {} as Record<string, string>,
+    staleMap: {} as Record<string, number>,
+    mlMap: {} as Record<string, { churnRisk?: number; winProb?: number }>,
+  }
   const urgentMap: Record<string, string> = {}
   const staleMap: Record<string, number> = {}
+  const mlMap: Record<string, { churnRisk?: number; winProb?: number }> = {}
   for (const u of (brain.urgentDeals ?? [])) urgentMap[u.dealId] = u.reason
   for (const s of (brain.staleDeals ?? [])) staleMap[s.dealId] = s.daysSinceUpdate
-  return { urgentMap, staleMap }
+  for (const p of (brain.mlPredictions ?? [])) {
+    mlMap[p.dealId] = {
+      churnRisk: p.churnRisk,
+      winProb: p.winProbability != null ? Math.round(p.winProbability * 100) : undefined,
+    }
+  }
+  return { urgentMap, staleMap, mlMap }
 }
 
 // Annualise a deal's stored value so one-off and recurring are comparable
@@ -82,6 +93,7 @@ function DealCard({
   isDragging,
   urgentReason,
   staleDays,
+  churnRisk,
   currencySymbol = '$',
 }: {
   deal: any
@@ -91,6 +103,7 @@ function DealCard({
   isDragging: boolean
   urgentReason?: string
   staleDays?: number
+  churnRisk?: number
   currencySymbol?: string
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -214,6 +227,21 @@ function DealCard({
         <div style={{ display: 'flex', gap: '5px', alignItems: 'center', padding: '5px 8px', borderRadius: '6px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.12)', marginBottom: '8px' }}>
           <Clock size={9} color="#F59E0B" />
           <span style={{ fontSize: '10px', color: '#FDE68A' }}>{staleDays}d since last update</span>
+        </div>
+      )}
+      {/* Churn risk — ML survival model signal */}
+      {!urgentReason && churnRisk !== undefined && churnRisk >= 65 && (
+        <div style={{
+          display: 'flex', gap: '5px', alignItems: 'center',
+          padding: '5px 8px', borderRadius: '6px',
+          background: churnRisk >= 85 ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.05)',
+          border: churnRisk >= 85 ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(245,158,11,0.15)',
+          marginBottom: '8px',
+        }}>
+          <span style={{ fontSize: '10px' }}>🔇</span>
+          <span style={{ fontSize: '10px', color: churnRisk >= 85 ? '#FCA5A5' : '#FDE68A' }}>
+            {churnRisk}% going silent
+          </span>
         </div>
       )}
 
@@ -433,7 +461,7 @@ export default function PipelinePage() {
   const { sidebarWidth, aiSidebarWidth } = useSidebar()
   const { data: dealsData, isLoading } = useSWR('/api/deals', fetcher)
   const deals: any[] = dealsData?.data ?? []
-  const { urgentMap, staleMap } = useDealFlags(deals)
+  const { urgentMap, staleMap, mlMap } = useDealFlags(deals)
   const { data: configData, mutate: mutateConfig } = useSWR('/api/pipeline-config', fetcher)
   const pipelineConfig = configData?.data
   const presets = configData?.presets ?? []
@@ -492,6 +520,7 @@ export default function PipelinePage() {
 
   const urgentCount = Object.keys(urgentMap).length
   const staleCount = Object.keys(staleMap).length
+  const churnCount = Object.values(mlMap).filter(m => (m.churnRisk ?? 0) >= 65).length
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0, width: '100%' }}>
@@ -503,7 +532,7 @@ export default function PipelinePage() {
       ]} />
 
       {/* Brain focus bar */}
-      {(urgentCount > 0 || staleCount > 0) && (
+      {(urgentCount > 0 || staleCount > 0 || churnCount > 0) && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px',
           background: '#0F0F0F', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '8px',
@@ -520,6 +549,11 @@ export default function PipelinePage() {
             <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#FDE68A', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.12)', borderRadius: '4px', padding: '2px 8px' }}>
               <Clock size={9} color="#F59E0B" />
               {staleCount} stale
+            </span>
+          )}
+          {churnCount > 0 && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#FCA5A5', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.12)', borderRadius: '4px', padding: '2px 8px' }}>
+              🔇 {churnCount} going silent
             </span>
           )}
           <span style={{ fontSize: '11px', color: '#333', marginLeft: 'auto' }}>Flagged by Sales Brain · hover for detail</span>
@@ -774,6 +808,7 @@ export default function PipelinePage() {
                       isDragging={draggedId === deal.id}
                       urgentReason={urgentMap[deal.id]}
                       staleDays={staleMap[deal.id]}
+                      churnRisk={mlMap[deal.id]?.churnRisk}
                       currencySymbol={currencySymbol}
                     />
                   ))
