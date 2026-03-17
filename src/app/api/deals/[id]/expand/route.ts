@@ -53,6 +53,15 @@ export async function POST(
 
     const defaultName = body.dealName || `${parent.prospectCompany} — ${typeLabel}`
 
+    // Build inherited description with expansion context
+    const inheritedDescription = body.description
+      || `${typeLabel} opportunity from won deal "${parent.dealName}".${parent.description ? `\n\nOriginal deal context: ${parent.description}` : ''}`
+
+    // Build inherited notes with attribution
+    const parentNotes = parent.notes
+      ? `--- Inherited from "${parent.dealName}" ---\n${parent.notes}`
+      : null
+
     const now = new Date()
     const [newDeal] = await db.insert(dealLogs).values({
       workspaceId,
@@ -62,13 +71,26 @@ export async function POST(
       prospectName: parent.prospectName,
       prospectTitle: parent.prospectTitle,
       contacts: parent.contacts ?? [],
-      description: body.description || `${typeLabel} opportunity from won deal "${parent.dealName}".${parent.description ? `\n\nOriginal deal context: ${parent.description}` : ''}`,
-      dealValue: body.dealValue ?? null,
+      description: inheritedDescription,
+      dealValue: body.dealValue ?? parent.dealValue ?? null,
       stage: 'prospecting',
       competitors: parent.competitors ?? [],
-      notes: null,
-      nextSteps: null,
+      notes: parentNotes,
+      meetingNotes: parent.meetingNotes ?? null,
+      aiSummary: parent.aiSummary ? `[Inherited from "${parent.dealName}"] ${parent.aiSummary}` : null,
+      conversionInsights: parent.conversionInsights ?? [],
+      dealRisks: parent.dealRisks ?? [],
+      todos: [],                                               // fresh todos for expansion
+      successCriteria: parent.successCriteria ?? null,
+      successCriteriaTodos: ((parent.successCriteriaTodos as any[]) ?? []).map((sc: any) => ({
+        ...sc,
+        achieved: false,                                       // reset achievement status
+      })),
+      nextSteps: parent.nextSteps ?? null,
       closeDate: null,
+      links: parent.links ?? [],
+      projectPlan: null,                                       // fresh project plan for expansion
+      intentSignals: parent.intentSignals ?? null,
       dealType: expansionType === 'renewal' ? 'recurring' : (parent.dealType as string) ?? 'one_off',
       recurringInterval: expansionType === 'renewal' ? ((parent.recurringInterval as string) ?? 'annual') : null,
       parentDealId: parentId,

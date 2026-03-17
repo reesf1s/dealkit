@@ -31,7 +31,7 @@ const stageEnum = z.string().describe('Deal stage: prospecting, qualification, d
 
 function formatDealSummary(deal: any, stageLabels?: Record<string, string>): string {
   const lines = [
-    `**${deal.dealName}** (${deal.prospectCompany})`,
+    `**${deal.dealName}** (${deal.prospectCompany}) — ID: \`${deal.id}\``,
     `- Stage: ${stageLabels?.[deal.stage] ?? deal.stage}`,
   ]
   if (deal.dealValue != null) lines.push(`- Value: $${deal.dealValue.toLocaleString()}`)
@@ -40,6 +40,9 @@ function formatDealSummary(deal: any, stageLabels?: Record<string, string>): str
   if (deal.aiSummary) lines.push(`- Summary: ${deal.aiSummary}`)
   return lines.join('\n')
 }
+
+// UUID v4 pattern
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function formatDealDetailed(deal: any, stageLabels?: Record<string, string>): string {
   const lines = [
@@ -183,19 +186,52 @@ export const search_deals = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const get_deal_details = {
-  description: 'Get full details of a specific deal including todos, contacts, notes, risks, and project plan.',
+  description: 'Get full details of a specific deal. Accepts a UUID deal ID OR a deal name/company name — will auto-search if a non-UUID is provided.',
   parameters: z.object({
-    dealId: z.string().describe('The UUID of the deal to retrieve'),
+    dealId: z.string().describe('The UUID of the deal, OR a deal name / company name to search for'),
   }),
   execute: async (params: { dealId: string }, ctx: ToolContext): Promise<ToolResult> => {
-    const [deal] = await db
-      .select()
-      .from(dealLogs)
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .limit(1)
+    let deal: any = null
+
+    // If it looks like a UUID, do a direct lookup
+    if (UUID_RE.test(params.dealId)) {
+      const [row] = await db
+        .select()
+        .from(dealLogs)
+        .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+        .limit(1)
+      deal = row
+    }
+
+    // If no UUID match (or it wasn't a UUID), fall back to name/company search
+    if (!deal) {
+      const pattern = `%${params.dealId}%`
+      const matches = await db
+        .select()
+        .from(dealLogs)
+        .where(and(
+          eq(dealLogs.workspaceId, ctx.workspaceId),
+          or(
+            ilike(dealLogs.dealName, pattern),
+            ilike(dealLogs.prospectCompany, pattern),
+          ),
+        ))
+        .orderBy(dealLogs.updatedAt)
+        .limit(5)
+
+      if (matches.length === 1) {
+        deal = matches[0]
+      } else if (matches.length > 1) {
+        // Multiple matches — return summaries so the agent can pick
+        const summaries = matches.map(d => formatDealSummary(d, ctx.stageLabels))
+        return {
+          result: `Found **${matches.length}** deals matching "${params.dealId}". Which one?\n\n${summaries.join('\n\n')}`,
+        }
+      }
+    }
 
     if (!deal) {
-      return { result: 'Deal not found. It may have been deleted or belongs to a different workspace.' }
+      return { result: `Deal "${params.dealId}" not found. Try searching with a different name.` }
     }
 
     return { result: formatDealDetailed(deal, ctx.stageLabels) }

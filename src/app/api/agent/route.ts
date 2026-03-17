@@ -155,6 +155,14 @@ When the user asks you to DO something, CALL THE MUTATION TOOL IMMEDIATELY.
 - Do NOT explain what you're going to do — just do it and confirm what you did.
 - If you need a deal ID, search ONCE then immediately call the mutation tool with the ID.
 
+═══ CRITICAL: NEVER FABRICATE IDs ═══
+
+Deal IDs are UUID v4 strings like "a1b2c3d4-e5f6-7890-abcd-ef1234567890".
+- NEVER invent/guess a deal ID. NEVER use placeholder IDs like "boe-deal-id" or "deal-123".
+- If you don't have the real UUID from the active deal context or a previous tool call, you MUST call search_deals or get_deal_details with the deal NAME first.
+- get_deal_details accepts BOTH UUIDs and deal names — pass the name directly if you don't have the ID.
+- The ONLY valid deal IDs are: (1) the activeDealId provided in context, or (2) an ID returned by a tool call in this conversation.
+
 ═══ RULE #1: COPY-PASTE USER TEXT, NEVER REPHRASE ═══
 
 This is the most important rule. When the user gives you text to store (requirements, questions, todos, criteria, notes), you must COPY their exact words into the tool parameters. Do not rewrite, shorten, summarize, or "improve" their wording.
@@ -274,7 +282,15 @@ The more deals that are logged and closed, the smarter the brain gets. Explain t
 7. DESTRUCTIVE OPS: Only warn for deletions. All other mutations should happen immediately.
 8. FORMAT: Use markdown sparingly. Bold for names/values, bullets for lists. Keep it scannable.
 9. HOLISTIC UPDATES: When processing meeting notes, always report what was updated across todos, success criteria, project plan, and stage. If nothing changed in a category, don't mention it.
-10. INTELLIGENCE GROUNDING: Never make claims about deal health without checking ML data first. Say "let me check the intelligence" and call get_deal_intelligence.`
+10. INTELLIGENCE GROUNDING: Never make claims about deal health without checking ML data first. Say "let me check the intelligence" and call get_deal_intelligence.
+
+═══ SPEED & PARALLEL EXECUTION ═══
+
+You can call MULTIPLE tools in a single response. When gathering info, call tools in parallel:
+- "summarise what I can do for boe" → call get_deal_details("boe") AND get_deal_intelligence in parallel
+- "how's my pipeline?" → call get_pipeline_forecast AND get_workspace_overview AND get_score_trends in parallel
+- "compare deal A and B" → call get_deal_details for both in parallel
+Never chain sequential tool calls when they're independent. Always batch independent lookups.`
 }
 
 // ── POST handler ─────────────────────────────────────────────────────────────
@@ -426,7 +442,7 @@ export async function POST(req: NextRequest) {
       system: systemPrompt,
       messages,
       tools: sdkTools,
-      maxSteps: 15,
+      maxSteps: 20,
       onFinish: async () => {
         after(async () => {
           try {
