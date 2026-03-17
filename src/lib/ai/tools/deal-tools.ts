@@ -437,8 +437,8 @@ export const import_deal = {
         await db.update(dealLogs).set({
           conversionScore: Math.round(finalScore * 100),
           conversionInsights: [
-            `Momentum: ${signals.momentum.toFixed(2)}`,
-            `Risk level: ${signals.riskLevel}`,
+            `Momentum: ${signals.momentumScore.toFixed(2)}`,
+            `Engagement: ${signals.engagementScore.toFixed(2)}`,
             `Stakeholder depth: ${signals.stakeholderDepth.toFixed(2)}`,
           ],
         }).where(eq(dealLogs.id, created.id))
