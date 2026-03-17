@@ -45,6 +45,7 @@ type Intent =
   | 'meeting_notes' | 'competitor_battlecard' | 'company_update'
   | 'collateral' | 'project_plan' | 'deal_create' | 'case_study_create'
   | 'deal_action' | 'product_gap' | 'pipeline_query' | 'qa'
+  | 'competitor_update' | 'gap_manage' | 'deal_delete'
 
 const MEETING_KEYWORDS = [
   'action item', 'follow up', 'next step', 'discussed', 'agenda',
@@ -74,6 +75,9 @@ function detectIntentFallback(text: string): Intent {
   if (/remove.*to[\s-']?do|review.*to[\s-']?do|clean.*todo|scan.*todo|update.*stage|move.*deal|change.*stage|close date|next step/i.test(text)) return 'deal_action'
   if (/case study|customer win|we won|just closed with/i.test(text)) return 'case_study_create'
   if (/what.*pipeline|pipeline.*overview|pipeline.*summary|what should i focus|where should i/i.test(text)) return 'pipeline_query'
+  if (/update.*competitor|edit.*competitor|add.*strength|add.*weakness|regenerate.*battlecard/i.test(text)) return 'competitor_update'
+  if (/resolve.*gap|close.*gap|update.*gap|gap.*priority|mark.*gap.*resolved/i.test(text)) return 'gap_manage'
+  if (/delete.*deal|remove.*deal|archive.*deal|close.*deal.*permanently/i.test(text)) return 'deal_delete'
   return 'qa'
 }
 
@@ -97,6 +101,9 @@ deal_create - creating a new deal, prospect, or opportunity
 case_study_create - logging a customer win or success story
 deal_action - modifying a deal (todos, stage, value, contacts, competitors, notes, close date)
 pipeline_query - asking about pipeline health, overview, what to focus on, forecast
+competitor_update - editing, updating, or enriching a competitor profile (strengths, weaknesses, description, notes) or regenerating their battlecard
+gap_manage - resolving, closing, updating priority of, or archiving a product gap
+deal_delete - permanently deleting or archiving a deal
 qa - any question, content draft request, or anything else
 
 Message: "${text.slice(0, 600)}"`,
@@ -107,6 +114,7 @@ Message: "${text.slice(0, 600)}"`,
       'meeting_notes', 'competitor_battlecard', 'company_update', 'collateral',
       'project_plan', 'deal_create', 'case_study_create', 'deal_action',
       'product_gap', 'pipeline_query', 'qa',
+      'competitor_update', 'gap_manage', 'deal_delete',
     ]
     return valid.includes(raw as Intent) ? (raw as Intent) : 'qa'
   } catch {
@@ -1364,6 +1372,14 @@ async function executeConfirmedAction(
   if (pendingAction.type === 'todo_cleanup') {
     const { dealId, dealName, removeIds, completeIds } = pendingAction
 
+    // Special case: full deal deletion
+    if (removeIds[0] === '__delete_deal__') {
+      await db.delete(dealLogs).where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId)))
+      await db.insert(events).values({ workspaceId, userId, type: 'deal_log.deleted', metadata: { dealId, dealName, source: 'ai_chat_confirmed' }, createdAt: new Date() })
+      after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+      return { reply: `🗑️ **${dealName}** has been permanently deleted.`, actions: [{ type: 'deal_updated', dealId, dealName, changes: ['deal deleted'] }] }
+    }
+
     const [dealRow] = await db.select({ todos: dealLogs.todos })
       .from(dealLogs).where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId))).limit(1)
 
@@ -1408,6 +1424,189 @@ async function executeConfirmedAction(
   }
 
   return { reply: 'Unknown action type.', actions: [] }
+}
+
+// ── Handler: update competitor profile ───────────────────────────────────────
+async function handleCompetitorUpdate(
+  workspaceId: string, userId: string, text: string, plan: string,
+): Promise<{ reply: string; actions: ActionCard[] }> {
+  const allCompetitors = await db.select().from(competitors).where(eq(competitors.workspaceId, workspaceId))
+  if (allCompetitors.length === 0) {
+    return { reply: "No competitors tracked yet. Add one first: _\"Add Salesforce as a competitor\"_", actions: [] }
+  }
+
+  const compList = allCompetitors.map(c => `id:${c.id} | "${c.name}"`).join('\n')
+
+  const extractMsg = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001', max_tokens: 800,
+    messages: [{
+      role: 'user',
+      content: `Extract competitor update details from this request. Return ONLY JSON.
+
+Available competitors:
+${compList}
+
+{
+  "competitorId": "matching competitor id or null",
+  "competitorName": "name if id not found",
+  "addStrengths": ["string"] or [],
+  "addWeaknesses": ["string"] or [],
+  "addKeyFeatures": ["string"] or [],
+  "description": "updated description or null",
+  "notes": "notes to append or null",
+  "regenerateBattlecard": true or false
+}
+
+Request: ${text.slice(0, 1000)}`
+    }]
+  })
+
+  let extracted: {
+    competitorId?: string | null; competitorName?: string
+    addStrengths?: string[]; addWeaknesses?: string[]; addKeyFeatures?: string[]
+    description?: string | null; notes?: string | null; regenerateBattlecard?: boolean
+  } = {}
+  try { extracted = JSON.parse(stripJson((extractMsg.content[0] as { type: string; text: string }).text)) } catch { /* defaults */ }
+
+  const comp = extracted.competitorId
+    ? allCompetitors.find(c => c.id === extracted.competitorId)
+    : allCompetitors.find(c => c.name.toLowerCase() === (extracted.competitorName ?? '').toLowerCase())
+      ?? allCompetitors.find(c => text.toLowerCase().includes(c.name.toLowerCase()))
+
+  if (!comp) {
+    return { reply: `I couldn't find that competitor. Available: ${allCompetitors.map(c => c.name).join(', ')}`, actions: [] }
+  }
+
+  const updatedStrengths = [...new Set([...((comp.strengths as string[]) ?? []), ...(extracted.addStrengths ?? [])])]
+  const updatedWeaknesses = [...new Set([...((comp.weaknesses as string[]) ?? []), ...(extracted.addWeaknesses ?? [])])]
+  const updatedKeyFeatures = [...new Set([...((comp.keyFeatures as string[]) ?? []), ...(extracted.addKeyFeatures ?? [])])]
+  const updatedNotes = extracted.notes
+    ? ((comp.notes ?? '') + '\n' + extracted.notes).trim()
+    : comp.notes
+
+  const updatePayload: Record<string, unknown> = { updatedAt: new Date() }
+  const changed: string[] = []
+  if (extracted.addStrengths?.length) { updatePayload.strengths = updatedStrengths; changed.push(`+${extracted.addStrengths.length} strengths`) }
+  if (extracted.addWeaknesses?.length) { updatePayload.weaknesses = updatedWeaknesses; changed.push(`+${extracted.addWeaknesses.length} weaknesses`) }
+  if (extracted.addKeyFeatures?.length) { updatePayload.keyFeatures = updatedKeyFeatures; changed.push(`+${extracted.addKeyFeatures.length} key features`) }
+  if (extracted.description) { updatePayload.description = extracted.description; changed.push('description updated') }
+  if (extracted.notes) { updatePayload.notes = updatedNotes; changed.push('notes updated') }
+
+  if (changed.length > 0) {
+    await db.update(competitors).set(updatePayload).where(eq(competitors.id, comp.id))
+    await db.insert(events).values({ workspaceId, userId, type: 'competitor.updated', metadata: { competitorId: comp.id, name: comp.name, changes: changed, source: 'ai_chat' }, createdAt: new Date() })
+  }
+
+  if (extracted.regenerateBattlecard) {
+    const [profileRow] = await db.select({ id: companyProfiles.id }).from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)).limit(1)
+    if (profileRow) {
+      const limits = PLAN_LIMITS[plan as 'free' | 'starter' | 'pro']
+      const withinLimit = limits.collateral === null || isWithinLimit(
+        Number((await db.select({ value: count() }).from(collateral).where(eq(collateral.workspaceId, workspaceId)))[0]?.value ?? 0),
+        limits.collateral,
+      )
+      if (withinLimit) {
+        const now = new Date()
+        const [colRecord] = await db.insert(collateral).values({
+          workspaceId, userId, type: 'battlecard', title: `Battlecard: vs ${comp.name}`,
+          status: 'generating', sourceCompetitorId: comp.id,
+          sourceCaseStudyId: null, sourceDealLogId: null, content: null, rawResponse: null,
+          generatedAt: null, createdAt: now, updatedAt: now,
+        }).returning()
+        try {
+          const result = await generateCollateral({ workspaceId, type: 'battlecard', competitorId: comp.id })
+          await db.update(collateral).set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt: new Date(), updatedAt: new Date() }).where(eq(collateral.id, colRecord.id))
+          changed.push('battlecard regenerated')
+        } catch { await db.update(collateral).set({ status: 'stale', updatedAt: new Date() }).where(eq(collateral.id, colRecord.id)) }
+      }
+    }
+  }
+
+  const changedText = changed.length > 0 ? changed.join(', ') : 'no changes detected'
+  return {
+    reply: `Updated **${comp.name}**: ${changedText}.\n\nView in [Competitors](/competitors).`,
+    actions: [{ type: 'competitor_created', names: [comp.name], battlecardsStarted: extracted.regenerateBattlecard ?? false }],
+  }
+}
+
+// ── Handler: product gap management ───────────────────────────────────────────
+async function handleGapManage(
+  workspaceId: string, userId: string, text: string,
+): Promise<{ reply: string; actions: ActionCard[] }> {
+  const allGaps = await db.select().from(productGaps).where(eq(productGaps.workspaceId, workspaceId))
+  if (allGaps.length === 0) {
+    return { reply: "No product gaps logged yet.", actions: [] }
+  }
+
+  const gapList = allGaps.map(g => `id:${g.id} | "${g.title}" [${g.priority}] [${g.status}]`).join('\n')
+
+  const extractMsg = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001', max_tokens: 400,
+    messages: [{
+      role: 'user',
+      content: `Extract gap management action. Return ONLY JSON.
+
+Available gaps:
+${gapList}
+
+{
+  "gapId": "matching gap id or null",
+  "action": "resolve|close|update_priority|reopen",
+  "newPriority": "critical|high|medium|low or null",
+  "notes": "reason for change or null"
+}
+
+Request: ${text.slice(0, 500)}`
+    }]
+  })
+
+  let extracted: { gapId?: string | null; action?: string; newPriority?: string | null; notes?: string | null } = {}
+  try { extracted = JSON.parse(stripJson((extractMsg.content[0] as { type: string; text: string }).text)) } catch { /* defaults */ }
+
+  if (!extracted.gapId) {
+    return {
+      reply: `Here are your open gaps:\n\n${allGaps.filter(g => g.status === 'open').map(g => `• **${g.title}** [${g.priority}] — seen ${g.frequency ?? 1}x`).join('\n')}\n\nTell me which to resolve or update.`,
+      actions: [],
+    }
+  }
+
+  const gap = allGaps.find(g => g.id === extracted.gapId)
+  if (!gap) return { reply: "Couldn't find that gap.", actions: [] }
+
+  const updatePayload: Record<string, unknown> = { updatedAt: new Date() }
+  const changes: string[] = []
+  if (extracted.action === 'resolve' || extracted.action === 'close') { updatePayload.status = 'resolved'; changes.push('marked resolved') }
+  if (extracted.action === 'reopen') { updatePayload.status = 'open'; changes.push('reopened') }
+  if (extracted.newPriority && ['critical','high','medium','low'].includes(extracted.newPriority)) { updatePayload.priority = extracted.newPriority; changes.push(`priority → ${extracted.newPriority}`) }
+
+  await db.update(productGaps).set(updatePayload).where(eq(productGaps.id, gap.id))
+
+  return {
+    reply: `**${gap.title}**: ${changes.join(', ')}.\n\nView in [Feature Gaps](/product-gaps).`,
+    actions: [{ type: 'gaps_logged', gaps: [gap.title], count: 1 }],
+  }
+}
+
+// ── Handler: delete / archive deal — requires confirmation ────────────────────
+async function handleDealDelete(
+  workspaceId: string, userId: string, text: string, activeDealId: string | null,
+): Promise<{ reply: string; actions: ActionCard[]; confirmationRequired?: boolean; pendingAction?: PendingAction }> {
+  const dealRows = await db.select({ id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany, stage: dealLogs.stage, dealValue: dealLogs.dealValue })
+    .from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId))
+
+  let deal = activeDealId ? dealRows.find(d => d.id === activeDealId) : undefined
+  if (!deal) {
+    const lower = text.toLowerCase()
+    deal = dealRows.find(d => lower.includes(d.dealName.toLowerCase()) || lower.includes(d.prospectCompany.toLowerCase()))
+  }
+  if (!deal) return { reply: `I couldn't identify which deal to delete. Specify the deal name, or navigate to the deal page first.`, actions: [] }
+
+  return {
+    reply: `⚠️ **Delete "${deal.dealName}"?**\n\nThis will permanently remove the deal, all todos, meeting notes, and project plans for **${deal.prospectCompany}**${deal.dealValue ? ` (£${deal.dealValue.toLocaleString()})` : ''}. This cannot be undone.\n\n**Confirm to delete.**`,
+    actions: [],
+    confirmationRequired: true,
+    pendingAction: { type: 'todo_cleanup' as const, dealId: deal.id, dealName: deal.dealName, removeIds: ['__delete_deal__'], completeIds: [], removedTexts: [`Delete entire deal: ${deal.dealName}`], completedTexts: [] },
+  }
 }
 
 // ── Handler: pipeline query — structured overview using brain data ────────────
@@ -1567,98 +1766,224 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result)
     }
 
+    if (intent === 'competitor_update') {
+      const result = await handleCompetitorUpdate(workspaceId, userId, lastText, plan)
+      return NextResponse.json(result)
+    }
+
+    if (intent === 'gap_manage') {
+      const result = await handleGapManage(workspaceId, userId, lastText)
+      return NextResponse.json(result)
+    }
+
+    if (intent === 'deal_delete') {
+      const result = await handleDealDelete(workspaceId, userId, lastText, activeDealId ?? null)
+      return NextResponse.json(result)
+    }
+
     if (intent === 'pipeline_query') {
       const result = await handlePipelineQuery(workspaceId, lastText)
       return NextResponse.json(result)
     }
 
-    // ── Q&A: brain-first context ──────────────────────────────────────────────
-    const [profileRows, competitorRows, caseStudyRows, brain] = await Promise.all([
+    // ── Q&A: full-knowledge context load ─────────────────────────────────────
+    // Load everything in parallel — no limits on competitors, case studies, gaps
+    const [profileRows, allCompetitorRows, allCaseStudyRows, allGapRows, allCollateralRows, brain] = await Promise.all([
       db.select().from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)).limit(1),
-      db.select({ name: competitors.name, strengths: competitors.strengths, weaknesses: competitors.weaknesses })
-        .from(competitors).where(eq(competitors.workspaceId, workspaceId)).limit(8),
-      db.select({ customerName: caseStudies.customerName, challenge: caseStudies.challenge, results: caseStudies.results })
-        .from(caseStudies).where(eq(caseStudies.workspaceId, workspaceId)).limit(5),
+      db.select().from(competitors).where(eq(competitors.workspaceId, workspaceId)),
+      db.select().from(caseStudies).where(eq(caseStudies.workspaceId, workspaceId)),
+      db.select().from(productGaps).where(eq(productGaps.workspaceId, workspaceId)),
+      db.select({ id: collateral.id, type: collateral.type, title: collateral.title, status: collateral.status, customTypeName: collateral.customTypeName, updatedAt: collateral.updatedAt })
+        .from(collateral).where(eq(collateral.workspaceId, workspaceId)).orderBy(collateral.updatedAt),
       getWorkspaceBrain(workspaceId),
     ])
 
-    const needDealFallback = !brain
-    const [dealRows, gapRows] = needDealFallback
-      ? await Promise.all([
-          db.select({
-            id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
-            stage: dealLogs.stage, todos: dealLogs.todos, dealValue: dealLogs.dealValue,
-          }).from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)).limit(12),
-          db.select({ title: productGaps.title, priority: productGaps.priority, status: productGaps.status })
-            .from(productGaps).where(eq(productGaps.workspaceId, workspaceId)).limit(10),
-        ])
-      : [[], []]
+    // If activeDealId, load the FULL deal record (all fields, notes, contacts, todos, plan)
+    const fullActiveDeal = activeDealId
+      ? (await db.select().from(dealLogs).where(and(eq(dealLogs.id, activeDealId), eq(dealLogs.workspaceId, workspaceId))).limit(1))[0] ?? null
+      : null
+
+    // Fallback deal list if no brain yet
+    const dealFallbackRows = !brain
+      ? await db.select({ id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany, stage: dealLogs.stage, todos: dealLogs.todos, dealValue: dealLogs.dealValue }).from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)).limit(20)
+      : []
 
     const profile = profileRows[0]
-    const kbParts: string[] = []
+
+    // ── Build company profile section ──
+    let companySection = ''
     if (profile) {
-      kbParts.push(`## Company: ${profile.companyName}\nValue props: ${((profile.valuePropositions as string[]) ?? []).slice(0, 4).join(', ')}\nDifferentiators: ${((profile.differentiators as string[]) ?? []).slice(0, 3).join(', ')}\nObjections: ${((profile.commonObjections as string[]) ?? []).slice(0, 3).join('; ')}`)
-    }
-    if (competitorRows.length > 0) {
-      kbParts.push(`## Competitors: ${competitorRows.map(c => `${c.name} (weaknesses: ${((c.weaknesses as string[]) ?? []).slice(0, 2).join(', ')})`).join(' | ')}`)
-    }
-    if (caseStudyRows.length > 0) {
-      kbParts.push(`## Case Studies: ${caseStudyRows.map(cs => `${cs.customerName}: ${(cs.challenge ?? '').slice(0, 50)}`).join(' | ')}`)
+      const products = ((profile.products as any[]) ?? []).slice(0, 5)
+      companySection = `## OUR COMPANY: ${profile.companyName}
+Description: ${profile.description ?? 'N/A'}
+Industry: ${profile.industry ?? 'N/A'} | Founded: ${profile.founded ?? 'N/A'} | Size: ${profile.employeeCount ?? 'N/A'}
+Target market: ${profile.targetMarket ?? 'N/A'}
+Competitive advantage: ${profile.competitiveAdvantage ?? 'N/A'}
+Value propositions: ${((profile.valuePropositions as string[]) ?? []).join(' | ')}
+Differentiators: ${((profile.differentiators as string[]) ?? []).join(' | ')}
+Common objections & answers: ${((profile.commonObjections as string[]) ?? []).slice(0, 8).join(' | ')}
+Known capabilities: ${((profile.knownCapabilities as string[]) ?? []).slice(0, 6).join(', ')}
+${products.length > 0 ? `Products:\n${products.map((p: any) => `  - ${p.name}: ${p.description} (features: ${(p.keyFeatures ?? []).join(', ')})`).join('\n')}` : ''}`
     }
 
+    // ── Build full competitor section ──
+    let competitorSection = ''
+    if (allCompetitorRows.length > 0) {
+      competitorSection = `## COMPETITORS (${allCompetitorRows.length} tracked)\n` +
+        allCompetitorRows.map(c => {
+          const str = (c.strengths as string[]) ?? []
+          const weak = (c.weaknesses as string[]) ?? []
+          const feat = (c.keyFeatures as string[]) ?? []
+          const diff = (c.differentiators as string[]) ?? []
+          return `### ${c.name}\n  Description: ${c.description ?? 'N/A'}\n  Strengths: ${str.join(', ') || 'N/A'}\n  Weaknesses: ${weak.join(', ') || 'N/A'}\n  Key features: ${feat.join(', ') || 'N/A'}\n  Our differentiators vs them: ${diff.join(', ') || 'N/A'}\n  Notes: ${c.notes ?? 'N/A'}`
+        }).join('\n')
+    }
+
+    // ── Build full case studies section ──
+    let caseStudySection = ''
+    if (allCaseStudyRows.length > 0) {
+      caseStudySection = `## CASE STUDIES / CUSTOMER WINS (${allCaseStudyRows.length} total)\n` +
+        allCaseStudyRows.map(cs => {
+          const metrics = ((cs.metrics as any[]) ?? []).map((m: any) => `${m.label}: ${m.value}${m.unit ?? ''}`).join(', ')
+          return `### ${cs.customerName} (${cs.customerIndustry ?? 'unknown industry'}, ${cs.customerSize ?? 'unknown size'})\n  Challenge: ${(cs.challenge ?? '').slice(0, 200)}\n  Solution: ${(cs.solution ?? '').slice(0, 200)}\n  Results: ${(cs.results ?? '').slice(0, 200)}${metrics ? `\n  Metrics: ${metrics}` : ''}`
+        }).join('\n')
+    }
+
+    // ── Build product gaps section ──
+    let gapSection = ''
+    if (allGapRows.length > 0) {
+      const openGaps = allGapRows.filter(g => g.status !== 'resolved')
+      const resolvedGaps = allGapRows.filter(g => g.status === 'resolved')
+      gapSection = `## PRODUCT GAPS (${openGaps.length} open, ${resolvedGaps.length} resolved)\n` +
+        openGaps.map(g => `  • [${g.priority?.toUpperCase()}] ${g.title} — seen ${g.frequency ?? 1}x | ${g.description ?? ''}`).join('\n')
+    }
+
+    // ── Build collateral section ──
+    let collateralSection = ''
+    if (allCollateralRows.length > 0) {
+      const ready = allCollateralRows.filter(c => c.status === 'ready')
+      collateralSection = `## COLLATERAL LIBRARY (${ready.length} ready assets)\n` +
+        ready.slice(-20).map(c => `  • ${c.customTypeName ?? c.type}: "${c.title}" [${c.status}]`).join('\n')
+    }
+
+    // ── Build FULL active deal section ──
+    let activeDealSection = ''
+    if (fullActiveDeal) {
+      const todos = (fullActiveDeal.todos as any[]) ?? []
+      const pendingTodos = todos.filter((t: any) => !t.done)
+      const doneTodos = todos.filter((t: any) => t.done)
+      const contacts = (fullActiveDeal.contacts as any[]) ?? []
+      const dealComps = (fullActiveDeal.competitors as string[]) ?? []
+      const risks = (fullActiveDeal.dealRisks as string[]) ?? []
+      const projectPlan = fullActiveDeal.projectPlan as any
+      const brainDeal = brain?.deals?.find(d => d.id === activeDealId)
+
+      activeDealSection = `\n\n## ═══ CURRENTLY VIEWING DEAL: ${fullActiveDeal.prospectCompany} ═══
+Deal name: "${fullActiveDeal.dealName}"
+Prospect company: ${fullActiveDeal.prospectCompany}
+Stage: ${fullActiveDeal.stage}
+Deal value: ${fullActiveDeal.dealValue ? `£${fullActiveDeal.dealValue.toLocaleString()}` : 'not set'}
+Close date: ${fullActiveDeal.closeDate ? new Date(fullActiveDeal.closeDate as Date).toLocaleDateString('en-GB') : 'not set'}
+${brainDeal?.conversionScore != null ? `Win probability score: ${brainDeal.conversionScore}% (ML model)` : ''}
+
+PROSPECT CONTACT: ${fullActiveDeal.prospectName ?? 'not set'}${fullActiveDeal.prospectTitle ? ` (${fullActiveDeal.prospectTitle})` : ''}
+ALL CONTACTS (${contacts.length}):
+${contacts.length > 0 ? contacts.map((c: any) => `  • ${c.name}${c.title ? ` — ${c.title}` : ''}${c.email ? ` | ${c.email}` : ''}${c.phone ? ` | ${c.phone}` : ''}`).join('\n') : '  None added yet'}
+
+COMPETITORS ON THIS DEAL: ${dealComps.length > 0 ? dealComps.join(', ') : 'none'}
+ACTIVE RISKS: ${risks.length > 0 ? risks.join(' | ') : 'none identified'}
+AI SUMMARY: ${fullActiveDeal.aiSummary ?? 'not generated yet'}
+NEXT STEPS: ${(fullActiveDeal as any).nextSteps ?? 'not set'}
+
+PENDING TODOS (${pendingTodos.length}):
+${pendingTodos.length > 0 ? pendingTodos.map((t: any, i: number) => `  ${i+1}. ${t.text}`).join('\n') : '  None'}
+COMPLETED TODOS (${doneTodos.length}): ${doneTodos.map((t: any) => t.text).join('; ') || 'none'}
+
+MEETING NOTES HISTORY:
+${(fullActiveDeal.notes as string | null)?.slice(-3000) ?? 'No meeting notes recorded yet'}
+
+PROJECT PLAN: ${projectPlan?.phases?.length > 0
+  ? `${projectPlan.phases.length} phases, ${projectPlan.phases.reduce((s: number, p: any) => s + (p.tasks?.length ?? 0), 0)} tasks\n${projectPlan.phases.map((p: any) => `  Phase: ${p.name} — ${p.tasks?.filter((t: any) => t.status === 'complete').length ?? 0}/${p.tasks?.length ?? 0} tasks done`).join('\n')}`
+  : 'No project plan yet'}
+
+When user says "this deal", "this company", "here", "this prospect" → they mean ${fullActiveDeal.prospectCompany}.`
+    } else if (activeDealId && brain?.deals) {
+      // Fallback to brain snapshot if full deal load failed
+      const bd = brain.deals.find(d => d.id === activeDealId)
+      if (bd) {
+        activeDealSection = `\n\n## CURRENTLY VIEWING: ${bd.company}\nDeal: "${bd.name}" | Stage: ${bd.stage}${bd.dealValue ? ` | £${bd.dealValue.toLocaleString()}` : ''}${bd.conversionScore != null ? ` | Score: ${bd.conversionScore}%` : ''}\n${(bd.risks ?? []).length > 0 ? `Risks: ${bd.risks.join(', ')}\n` : ''}${(bd.pendingTodos ?? []).length > 0 ? `Todos: ${bd.pendingTodos.join('; ')}\n` : ''}\nWhen user says "this deal"/"this company" → ${bd.company}.`
+      }
+    }
+
+    // ── Brain pipeline intelligence ──
     let brainSection = ''
     if (brain) {
-      try { brainSection = `\n\n## Pipeline Intelligence\n${formatBrainContext(brain)}` }
+      try { brainSection = `\n\n## PIPELINE INTELLIGENCE\n${formatBrainContext(brain)}` }
       catch { /* non-fatal */ }
-    } else if (dealRows.length > 0) {
-      const open = dealRows.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
-      kbParts.push(`## ${open.length} open deals`)
-      open.slice(0, 8).forEach(d => {
-        const pending = ((d.todos as { text: string; done: boolean }[]) ?? []).filter(t => !t.done)
-        kbParts.push(`- ${d.dealName} (${d.prospectCompany}) ${d.stage}${d.dealValue ? ` £${d.dealValue.toLocaleString()}` : ''}${pending.length > 0 ? ` — ${pending.length} todos` : ''}`)
-      })
-    }
-    if (!brain && gapRows.length > 0) {
-      kbParts.push(`## Gaps: ${gapRows.map(g => `${g.title} [${g.priority}]`).join(', ')}`)
+    } else if (dealFallbackRows.length > 0) {
+      const open = dealFallbackRows.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+      brainSection = `\n\n## OPEN DEALS (${open.length})\n` + open.map(d => {
+        const pending = ((d.todos as any[]) ?? []).filter((t: any) => !t.done)
+        return `  • ${d.dealName} (${d.prospectCompany}) — ${d.stage}${d.dealValue ? ` £${d.dealValue.toLocaleString()}` : ''}${pending.length > 0 ? ` | ${pending.length} todos` : ''}`
+      }).join('\n')
     }
 
-    const brainDeals = brain?.deals ?? []
-    const activeBrainDeal = activeDealId ? brainDeals.find(d => d.id === activeDealId) : null
-    const activeDealRow = activeDealId && !activeBrainDeal ? dealRows.find(d => d.id === activeDealId) : null
-    const activeDealSection = activeBrainDeal
-      ? `\n\n## CURRENTLY VIEWING: ${activeBrainDeal.company}\nDeal: "${activeBrainDeal.name}" | Stage: ${activeBrainDeal.stage}${activeBrainDeal.dealValue ? ` | £${activeBrainDeal.dealValue.toLocaleString()}` : ''}${activeBrainDeal.conversionScore != null ? ` | Score: ${activeBrainDeal.conversionScore}%` : ''}\n${(activeBrainDeal.risks ?? []).length > 0 ? `Risks: ${activeBrainDeal.risks.join(', ')}\n` : ''}${(activeBrainDeal.pendingTodos ?? []).length > 0 ? `Open todos: ${activeBrainDeal.pendingTodos.join('; ')}\n` : ''}${activeBrainDeal.summary ? `Summary: ${activeBrainDeal.summary}\n` : ''}When the user says "this deal" or "this company" they mean ${activeBrainDeal.company}.`
-      : activeDealRow
-        ? `\n\n## CURRENTLY VIEWING: ${activeDealRow.prospectCompany}\nDeal: "${activeDealRow.dealName}" | Stage: ${activeDealRow.stage}\nWhen the user says "this deal" or "this company" they mean ${activeDealRow.prospectCompany}.`
-        : ''
+    // ── Win playbook intelligence ──
+    let winPlaybookSection = ''
+    if (brain?.winPlaybook) {
+      const wp = brain.winPlaybook as any
+      const lines = []
+      if (wp.fastestClosePattern) lines.push(`Fastest closes: avg ${wp.fastestClosePattern.avgDaysToClose} days, stage pattern: ${wp.fastestClosePattern.stagePattern?.join(' → ')}`)
+      if (wp.championPattern?.championLift != null) lines.push(`Champion effect: +${Math.round(wp.championPattern.championLift * 100)}pts win rate with a champion vs without`)
+      if (wp.perCompetitorWinCondition) {
+        const entries = Object.entries(wp.perCompetitorWinCondition as Record<string, any>)
+        if (entries.length > 0) lines.push(`Win conditions vs competitors:\n${entries.slice(0, 5).map(([name, cond]: [string, any]) => `  vs ${name}: "${cond.condition}" (${cond.winRate}% win rate)`).join('\n')}`)
+      }
+      if (wp.objectionWinPatterns?.length) lines.push(`Winning objection patterns: ${wp.objectionWinPatterns.slice(0, 3).map((p: any) => `"${p.objection}"`).join('; ')}`)
+      if (lines.length > 0) winPlaybookSection = `\n\n## WIN PLAYBOOK\n${lines.join('\n')}`
+    }
 
-    const pageContext = currentPage ? `\nUser is currently on: ${currentPage}` : ''
+    const pageContext = currentPage ? `\nUser is on: ${currentPage}` : ''
     const wantsContent = /\b(draft|write|compose|prepare|create|send)\b.*\b(email|letter|message|response|reply|memo|proposal|brief|summary)\b/i.test(lastText)
-    const qaMaxTokens = wantsContent ? 2000 : 800
+    const isDeepQuery = lastText.length > 100 || /\b(full|complete|all|everything|detail|analysis|breakdown|overview|report)\b/i.test(lastText)
+    const qaMaxTokens = wantsContent ? 3000 : isDeepQuery ? 2000 : 1200
 
-    const systemPrompt = `You are DealKit AI — the central command for this sales team. You have full visibility across the pipeline, deals, risks, and collateral. Be direct, specific, concise. UK English.
+    const systemPrompt = `You are DealKit AI — the autonomous intelligence layer for this sales operation. You have COMPLETE, real-time knowledge of everything in this workspace and can act on any of it.${pageContext}
 
-RULES: Short answers. No filler. Bold deal names and numbers. Bullet lists over prose. Reference specific deals/contacts/risks. When asked what to do — be prescriptive, not vague.${pageContext}
+## YOUR FULL CAPABILITIES
+KNOWLEDGE: You know every deal, contact, competitor, case study, product gap, collateral asset, win pattern, ML prediction, and meeting note in this workspace — it's all loaded below.
 
-WHAT I CAN DO:
-• **Meeting notes** → paste them and I'll update the deal, todos, risks, and generate an objection handler
-• **"New deal: [Company]"** → log a deal instantly
-• **"Move [Deal] to proposal"** → change stage
-• **"Set close date for [Deal] to [date]"** → update close date
-• **"Generate [anything]"** → create any sales asset — one-pager, email sequence, competitive analysis, pricing brief, etc.
-• **"Battlecard for [Competitor]"** → competitor research + battlecard
-• **"Project plan for [Company]: [paste plan]"** → structured plan with phases & tasks
-• **"Scan [Deal] todos"** → review and clean up stale actions
-• **"What's my pipeline?"** → full pipeline overview
+ACTIONS you can take (user just needs to ask):
+• Update any deal field → stage, value, close date, contacts, risks, next steps, notes
+• Clean up todos → review, remove stale, mark complete (with confirmation)
+• Log meeting notes → extracts todos, risks, updates deal, auto-generates objection handler
+• Create anything → deals, competitors, case studies, product gaps
+• Generate any asset → email, one-pager, competitive analysis, talk track, pricing brief, battle card, proposal — anything
+• Update competitors → add strengths/weaknesses, update profile, regenerate battlecard
+• Manage product gaps → resolve, update priority, close
+• Delete deals → permanently remove (with confirmation)
+• Build project plans → from any format (tables, notes, free text)
+• Pipeline overview → full analysis with ML predictions, churn risks, win conditions
 
-CONTENT: If asked to draft an email, write a message, or create any content — produce it immediately, complete and ready to send. Use deal data to personalise.
-${wantsContent ? `\nCONTENT MODE: Write a COMPLETE, polished, ready-to-use piece. Include subject line for emails. Personalise using deal context — never be generic.` : ''}
-${activeDealSection}
-${kbParts.join('\n') || 'No workspace data yet.'}${brainSection}`
+INTELLIGENCE: You have access to ML win probability scores, churn risk alerts, deal velocity, champion lift data, per-competitor win conditions, and cross-deal pattern analysis.
+
+## RESPONSE RULES
+- Short by default. Expand ONLY when asked for detail or analysis.
+- Bold deal names and numbers. Bullets over prose.
+- Reference specific contacts, risks, values, scores from the data below — never be vague.
+- When asked to DO something → do it, don't describe it. When asked to ANALYSE → give sharp, specific insight.
+- UK English.${wantsContent ? '\n\nCONTENT MODE: Write complete, polished, ready-to-use content. Include subject lines for emails. Personalise from the deal data below.' : ''}
+
+${companySection}
+${competitorSection}
+${caseStudySection}
+${gapSection}
+${collateralSection}${activeDealSection}${brainSection}${winPlaybookSection}`
 
     const stream = anthropic.messages.stream({
       model: 'claude-sonnet-4-6', max_tokens: qaMaxTokens,
       system: systemPrompt,
-      messages: messages.slice(-6).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })),
+      messages: messages.slice(-8).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })),
     })
 
     const encoder = new TextEncoder()

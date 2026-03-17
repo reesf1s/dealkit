@@ -39,9 +39,9 @@ interface Message {
 function getQuickPrompts(activeDealCompany?: string) {
   if (activeDealCompany) {
     return [
-      { icon: BarChart2, color: '#22C55E', label: 'Deal overview', prompt: `Give me a full overview of the ${activeDealCompany} deal — score, risks, todos, and next steps.` },
+      { icon: BarChart2, color: '#22C55E', label: 'Full briefing', prompt: `Give me a complete briefing on the ${activeDealCompany} deal — score, all contacts, risks, todos, meeting history, and what to do next.` },
       { icon: FileText, color: '#6366F1', label: 'Paste meeting notes', prompt: 'Here are my meeting notes:\n\n', partial: true },
-      { icon: Mail, color: '#06B6D4', label: 'Risk email', prompt: `Draft a follow-up email addressing the biggest risk in the ${activeDealCompany} deal.` },
+      { icon: Mail, color: '#06B6D4', label: 'Draft email', prompt: `Draft a follow-up email for ${activeDealCompany} addressing the biggest risk in this deal.` },
       { icon: Zap, color: '#F59E0B', label: 'Generate collateral', prompt: `Generate a one-pager for ${activeDealCompany}`, partial: true },
       { icon: CheckCircle2, color: '#10B981', label: 'Review todos', prompt: `Review and clean up the todos for ${activeDealCompany}. Remove anything stale.` },
       { icon: BookOpen, color: '#A855F7', label: 'Win conditions', prompt: `What does it take to win the ${activeDealCompany} deal? What are the key objections and how do I handle them?` },
@@ -50,7 +50,7 @@ function getQuickPrompts(activeDealCompany?: string) {
   return [
     { icon: BarChart2, color: '#22C55E', label: "Pipeline health", prompt: "What's my pipeline looking like? Give me a full overview with what to focus on." },
     { icon: FileText, color: '#6366F1', label: 'Paste meeting notes', prompt: 'Here are my meeting notes:\n\n', partial: true },
-    { icon: Sword, color: '#EC4899', label: 'Competitor battlecard', prompt: 'Create a battlecard for: ', partial: true },
+    { icon: Sword, color: '#EC4899', label: 'Competitor intel', prompt: 'Give me a full breakdown of our competitors — strengths, weaknesses, and how to beat each one.' },
     { icon: Mail, color: '#06B6D4', label: 'Risk follow-ups', prompt: 'For my top 3 open deals, draft a short personalised follow-up email addressing the biggest risk in each.' },
     { icon: Zap, color: '#F59E0B', label: 'Generate asset', prompt: 'Generate a ', partial: true },
     { icon: BookOpen, color: '#A855F7', label: 'Today\'s focus', prompt: 'What should I focus on today? Give me the top 3 actions across my pipeline with specific reasons.' },
@@ -509,7 +509,7 @@ export default function AiChatBar() {
               placeholder={
                 activeDeal
                   ? `Ask about ${activeDeal.company}, paste meeting notes, generate assets…`
-                  : 'Ask anything, paste notes, create assets… (⏎ to send)'
+                  : 'Ask anything — I know every deal, contact, competitor, and gap in your pipeline…'
               }
               rows={1}
               className="ai-input"
@@ -607,7 +607,7 @@ export default function AiChatBar() {
                   }}>
                     <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1', flexShrink: 0 }} />
                     <span style={{ color: '#A5B4FC', fontSize: '11.5px' }}>
-                      Context: <strong style={{ color: '#C7D2FE' }}>{activeDeal.company}</strong> — I know this deal. Ask anything about it.
+                      Context: <strong style={{ color: '#C7D2FE' }}>{activeDeal.company}</strong> — full deal loaded: contacts, todos, notes, risks, project plan.
                     </span>
                   </div>
                 )}
@@ -640,6 +640,18 @@ export default function AiChatBar() {
                       {qp.label}
                     </button>
                   ))}
+                </div>
+                <div style={{
+                  marginTop: '12px',
+                  padding: '8px 12px',
+                  background: 'rgba(99,102,241,0.04)',
+                  border: '1px solid rgba(99,102,241,0.1)',
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                  color: '#4B5563',
+                  lineHeight: '1.6',
+                }}>
+                  <span style={{ color: '#6366F1', fontWeight: 600 }}>Ask anything:</span> pipeline overview · deal analysis · competitor intel · generate any asset · clean up todos · log meeting notes · update deal fields · delete deals
                 </div>
               </div>
             )}
