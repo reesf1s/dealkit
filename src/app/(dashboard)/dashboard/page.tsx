@@ -202,11 +202,11 @@ export default function DashboardPage() {
   // ── Setup health ──────────────────────────────────────────────────────────
   const hasCompany = !!companyData?.id
   const setupSteps = [
-    { done: hasCompany,                          label: 'Complete company profile',   href: '/company' },
-    { done: (competitors?.data?.length ?? 0) > 0, label: 'Add a competitor',           href: '/competitors' },
-    { done: (caseStudies?.data?.length ?? 0) > 0, label: 'Add a case study',           href: '/case-studies' },
-    { done: dealList.length > 0,                 label: 'Log a deal',                 href: '/pipeline' },
-    { done: collateralList.length > 0,           label: 'Generate collateral',         href: '/collateral' },
+    { done: hasCompany,                          label: 'Teach brain your company',    href: '/company' },
+    { done: (competitors?.data?.length ?? 0) > 0, label: 'Add a competitor to track',   href: '/competitors' },
+    { done: (caseStudies?.data?.length ?? 0) > 0, label: 'Add a success story',         href: '/case-studies' },
+    { done: dealList.length > 0,                 label: 'Log a deal for analysis',     href: '/pipeline' },
+    { done: collateralList.length > 0,           label: 'Generate AI collateral',      href: '/collateral' },
   ]
   const completedSteps = setupSteps.filter(s => s.done).length
   const healthPct = Math.round((completedSteps / setupSteps.length) * 100)
@@ -216,7 +216,7 @@ export default function DashboardPage() {
   const hour = new Date().getHours()
   const greeting = firstName
     ? `${hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'}, ${firstName}`
-    : 'Dashboard'
+    : 'Brain Dashboard'
 
   const recentCollateral = collateralList.slice(0, 4)
 
@@ -238,18 +238,31 @@ export default function DashboardPage() {
             )}
           </p>
           {brain?.updatedAt && (
-            <p style={{ fontSize: '11px', color: '#374151', margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <Activity size={10} color="#A855F7" />
-              <span>Brain updated {(() => {
-                const diff = Date.now() - new Date(brain.updatedAt).getTime()
-                const mins = Math.floor(diff / 60000)
-                if (mins < 1) return 'just now'
-                if (mins < 60) return `${mins}m ago`
-                const hrs = Math.floor(mins / 60)
-                if (hrs < 24) return `${hrs}h ago`
-                return `${Math.floor(hrs / 24)}d ago`
-              })()} · {dealList.length} deal{dealList.length !== 1 ? 's' : ''} analyzed</span>
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                padding: '3px 10px', borderRadius: '100px',
+                background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)',
+              }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 5px rgba(34,197,94,0.5)' }} />
+                <span style={{ fontSize: '10px', color: '#818CF8', fontWeight: 600 }}>
+                  Brain active · {(() => {
+                    const diff = Date.now() - new Date(brain.updatedAt).getTime()
+                    const mins = Math.floor(diff / 60000)
+                    if (mins < 1) return 'just now'
+                    if (mins < 60) return `${mins}m ago`
+                    const hrs = Math.floor(mins / 60)
+                    if (hrs < 24) return `${hrs}h ago`
+                    return `${Math.floor(hrs / 24)}d ago`
+                  })()}
+                </span>
+              </div>
+              <span style={{ fontSize: '10px', color: '#374151' }}>
+                {dealList.length} deal{dealList.length !== 1 ? 's' : ''} analyzed
+                {brain?.mlModel ? ' · ML model trained' : ''}
+                {(brain?.keyPatterns?.length ?? 0) > 0 ? ` · ${brain.keyPatterns.length} patterns detected` : ''}
+              </span>
+            </div>
           )}
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
@@ -284,10 +297,10 @@ export default function DashboardPage() {
       {/* Setup alert */}
       {dbNotConnected && <SetupAlert />}
 
-      {/* ── Zone 2: AI Intelligence + Needs Attention ───────────────────── */}
+      {/* ── Zone 2: Brain Intelligence + Autonomous Alerts ─────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '12px', alignItems: 'start' }}>
 
-        {/* AI Intelligence — full AI Overview */}
+        {/* Brain Briefing — autonomous intelligence summary */}
         <AIOverviewCard />
 
         {/* Needs Attention */}
@@ -425,8 +438,8 @@ export default function DashboardPage() {
           <div style={card}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <Activity size={12} color="#A855F7" />
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Deal Signals</span>
-              <span style={{ fontSize: '11px', color: '#374151', marginLeft: 'auto' }}>{brain?.keyPatterns?.length ?? 0} trend{(brain?.keyPatterns?.length ?? 0) !== 1 ? 's' : ''}</span>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Autonomous Signals</span>
+              <span style={{ fontSize: '11px', color: '#374151', marginLeft: 'auto' }}>{brain?.keyPatterns?.length ?? 0} detected</span>
               <button onClick={rebuildBrain} disabled={refreshingBrain} style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: refreshingBrain ? 'default' : 'pointer', padding: '2px 4px', borderRadius: '4px', color: '#374151' }}
                 title="Refresh intelligence">
                 <RefreshCw size={10} style={{ animation: refreshingBrain ? 'spin 1s linear infinite' : 'none' }} />
@@ -439,7 +452,7 @@ export default function DashboardPage() {
               </div>
             ) : (brain?.keyPatterns ?? []).length === 0 ? (
               <div style={{ padding: '20px 14px', fontSize: '12px', color: '#374151', textAlign: 'center' }}>
-                No recurring patterns yet — patterns surface when 2+ deals share the same risk theme.
+                The brain is learning your patterns — signals surface autonomously when 2+ deals share themes.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -514,7 +527,7 @@ export default function DashboardPage() {
           <div style={card}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <TrendingUp size={12} color="#10B981" />
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Brain Recommendations</span>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Brain Actions</span>
               <span style={{ fontSize: '11px', color: '#374151', marginLeft: 'auto' }}>
                 {(brain?.pipelineRecommendations ?? []).filter((r: any) => r.priority === 'high').length} high priority
               </span>
@@ -530,7 +543,7 @@ export default function DashboardPage() {
               </div>
             ) : (brain?.pipelineRecommendations ?? []).length === 0 ? (
               <div style={{ padding: '20px 14px', fontSize: '12px', color: '#374151', textAlign: 'center' }}>
-                No recommendations yet — add more deals and meeting notes to get personalised suggestions.
+                Brain is learning — add more deals and meeting notes and it will autonomously surface actions.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -575,8 +588,8 @@ export default function DashboardPage() {
             {/* Section label */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
               <Sparkles size={11} color="#6366F1" />
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Brain Output</span>
-              <span style={{ fontSize: '10px', color: '#2A2A2A', marginLeft: '4px' }}>models trained on your closed deals</span>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Intelligence Engine</span>
+              <span style={{ fontSize: '10px', color: '#2A2A2A', marginLeft: '4px' }}>self-trained on your deal history</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
 
@@ -658,7 +671,7 @@ export default function DashboardPage() {
               {/* Score calibration */}
               {hasClosed && wl!.scoreCalibration.avgScoreOnWins != null && (
                 <div style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.14)', borderRadius: '12px', padding: '14px 16px' }}>
-                  <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>AI Score Calibration</div>
+                  <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>Brain Accuracy</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '11px', color: '#22C55E' }}>Wins</span>
@@ -728,7 +741,7 @@ export default function DashboardPage() {
                 return (
                   <div style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.14)', borderRadius: '12px', padding: '14px 16px', gridColumn: 'span 2' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                      <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Predictive Model</div>
+                      <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Autonomous ML Model</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                         <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: accColor }} />
                         <span style={{ fontSize: '10px', color: accColor, fontWeight: 600 }}>
@@ -758,7 +771,7 @@ export default function DashboardPage() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       {/* Feature importances */}
                       <div>
-                        <div style={{ fontSize: '10px', color: '#4B5563', marginBottom: '6px', fontWeight: 500 }}>What drives wins at your company</div>
+                        <div style={{ fontSize: '10px', color: '#4B5563', marginBottom: '6px', fontWeight: 500 }}>Brain-identified win factors</div>
                         {ml.featureImportance.slice(0, 4).map((f: { name: string; importance: number; direction: 'helps' | 'hurts' }, fi: number) => (
                           <div key={fi} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                             <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.04)', borderRadius: '2px', overflow: 'hidden' }}>
@@ -1031,7 +1044,7 @@ export default function DashboardPage() {
               <div style={{ margin: '0 10px 10px', padding: '6px 10px', background: 'rgba(99,102,241,0.05)', borderRadius: '6px', display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
                 <Zap size={10} color="#6366F1" style={{ marginTop: '2px', flexShrink: 0 }} />
                 <span style={{ fontSize: '11px', color: '#6366F1', lineHeight: '1.5' }}>
-                  Complete setup for the best AI outputs
+                  Complete setup so the brain can work autonomously
                 </span>
               </div>
             )}

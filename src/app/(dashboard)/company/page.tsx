@@ -40,7 +40,7 @@ export default function CompanyPage() {
       {/* Company / AI Import tabs */}
       <PageTabs tabs={[
         { label: 'Company Profile', href: '/company',    icon: Building2 },
-        { label: 'AI Import',       href: '/onboarding', icon: Sparkles  },
+        { label: 'Brain Setup',     href: '/onboarding', icon: Sparkles  },
       ]} />
       {/* Header */}
       <div style={{ marginBottom: '28px' }}>
@@ -77,7 +77,7 @@ export default function CompanyPage() {
           </button>
         </div>
         <p style={{ fontSize: '13px', color: '#555', margin: 0, paddingLeft: '42px', lineHeight: '1.6' }}>
-          This is the foundation of your AI-generated collateral. The more detail you add, the better the output.
+          This is how the brain learns your business. The more detail you add, the smarter it gets.
         </p>
       </div>
 
@@ -85,7 +85,7 @@ export default function CompanyPage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 16px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '10px', marginBottom: '24px' }}>
         <Sparkles size={14} color="#818CF8" style={{ marginTop: '1px', flexShrink: 0 }} />
         <p style={{ fontSize: '12px', color: '#818CF8', margin: 0, lineHeight: '1.6' }}>
-          <strong>AI tip:</strong> Fill in your value propositions, differentiators, and common objections to get the most targeted battlecards and email sequences. The AI uses every field here.
+          <strong>Brain tip:</strong> Fill in your value propositions, differentiators, and common objections. The brain uses every field here to autonomously generate collateral and identify deal risks.
         </p>
       </div>
 

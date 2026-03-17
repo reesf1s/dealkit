@@ -139,7 +139,7 @@ export default function OnboardingPage() {
       {/* Company / AI Import tabs */}
       <PageTabs tabs={[
         { label: 'Company Profile', href: '/company',    icon: Building2 },
-        { label: 'AI Import',       href: '/onboarding', icon: Sparkles  },
+        { label: 'Brain Setup',     href: '/onboarding', icon: Sparkles  },
       ]} />
 
       {/* Header */}
@@ -154,10 +154,10 @@ export default function OnboardingPage() {
           <Sparkles size={24} color="#818CF8" />
         </div>
         <h1 style={{ fontSize: '24px', fontWeight: '700', letterSpacing: '-0.04em', color: '#F1F1F3', marginBottom: '8px' }}>
-          Set up DealKit in 30 seconds
+          Train the brain in 30 seconds
         </h1>
         <p style={{ fontSize: '14px', color: '#555', lineHeight: '1.6' }}>
-          Paste anything — a pitch deck, company page, or notes — and AI will fill in your profile <em>and</em> generate your first battlecards automatically
+          Paste anything — a pitch deck, company page, or notes — and the brain will learn your business, then autonomously generate your first battlecards
         </p>
       </div>
 

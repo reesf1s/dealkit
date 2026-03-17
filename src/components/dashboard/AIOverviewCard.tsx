@@ -126,7 +126,7 @@ export default function AIOverviewCard() {
             <Sparkles size={14} color="#A78BFA" />
           </div>
           <span style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF', letterSpacing: '-0.01em' }}>
-            AI Overview
+            Brain Briefing
           </span>
           {allDone && (
             <span style={{

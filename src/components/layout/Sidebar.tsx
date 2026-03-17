@@ -8,17 +8,17 @@ import {
   LayoutDashboard, Building2, Swords,
   FileText, Settings, LogOut, Search,
   Kanban, ChevronLeft, ChevronRight,
-  X, Brain,
+  X, Brain, Zap, Activity,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
-// Simplified nav: 6 items — Pipeline+Deals unified, Intel hub, Company+Setup unified
+// Nav: Brain-centric — command center + intelligence layers
 const CORE_ITEMS = [
-  { href: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',    matchPaths: ['/dashboard'] },
-  { href: '/pipeline',   icon: Kanban,          label: 'Deals',        matchPaths: ['/pipeline', '/deals'] },
-  { href: '/collateral', icon: FileText,        label: 'Collateral',   matchPaths: ['/collateral'] },
+  { href: '/dashboard',  icon: Activity,        label: 'Brain',        matchPaths: ['/dashboard'] },
+  { href: '/pipeline',   icon: Kanban,          label: 'Pipeline',     matchPaths: ['/pipeline', '/deals'] },
+  { href: '/collateral', icon: Zap,             label: 'Collateral',   matchPaths: ['/collateral'] },
 ]
 
 const INTEL_ITEMS = [
@@ -148,8 +148,9 @@ export default function Sidebar() {
               background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
               borderRadius: '7px',
               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              boxShadow: '0 0 12px rgba(99,102,241,0.35)',
             }}>
-              <FileText size={13} color="#fff" strokeWidth={2.5} />
+              <Brain size={13} color="#fff" strokeWidth={2.5} />
             </div>
             <span style={{ fontWeight: '700', fontSize: '14px', letterSpacing: '-0.02em', color: '#F0EEFF' }}>DealKit</span>
           </div>
@@ -160,8 +161,9 @@ export default function Sidebar() {
             background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
             borderRadius: '7px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 12px rgba(99,102,241,0.35)',
           }}>
-            <FileText size={13} color="#fff" strokeWidth={2.5} />
+            <Brain size={13} color="#fff" strokeWidth={2.5} />
           </div>
         )}
         <button
@@ -208,7 +210,7 @@ export default function Sidebar() {
       {/* Nav */}
       <nav style={{ flex: 1, padding: '0 6px', overflowY: 'auto', overflowX: 'hidden' }}>
 
-        <SectionLabel>Core</SectionLabel>
+        <SectionLabel>Command</SectionLabel>
         {CORE_ITEMS.map(item => (
           <NavItem
             key={item.href}
@@ -230,18 +232,36 @@ export default function Sidebar() {
 
       {/* Brain status + user */}
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '8px 8px 10px' }}>
-        {/* Brain health indicator */}
-        {!collapsed && brainAge && (
+        {/* Brain health indicator — pulsing when active */}
+        {!collapsed && (
           <div style={{
-            display: 'flex', alignItems: 'center', gap: '5px',
-            padding: '5px 8px', marginBottom: '6px', borderRadius: '6px',
-            background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)',
+            display: 'flex', alignItems: 'center', gap: '6px',
+            padding: '7px 10px', marginBottom: '6px', borderRadius: '8px',
+            background: urgentCount > 0
+              ? 'rgba(239,68,68,0.06)'
+              : 'rgba(99,102,241,0.06)',
+            border: `1px solid ${urgentCount > 0 ? 'rgba(239,68,68,0.15)' : 'rgba(99,102,241,0.15)'}`,
           }}>
-            <Brain size={10} color="#6366F1" />
-            <span style={{ fontSize: '10px', color: '#374151', flex: 1 }}>Brain updated {brainAge}</span>
-            {(urgentCount > 0 || staleCount > 0) && (
-              <span style={{ fontSize: '10px', color: '#EF4444' }}>{urgentCount + staleCount} flagged</span>
-            )}
+            <div style={{
+              width: '7px', height: '7px', borderRadius: '50%',
+              background: brainAge
+                ? (urgentCount > 0 ? '#EF4444' : '#22C55E')
+                : '#374151',
+              boxShadow: brainAge
+                ? (urgentCount > 0 ? '0 0 6px rgba(239,68,68,0.6)' : '0 0 6px rgba(34,197,94,0.5)')
+                : 'none',
+              flexShrink: 0,
+            }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '10px', color: brainAge ? '#9CA3AF' : '#374151', fontWeight: 600 }}>
+                {brainAge ? `Brain active · ${brainAge}` : 'Brain idle'}
+              </div>
+              {(urgentCount > 0 || staleCount > 0) && (
+                <div style={{ fontSize: '9px', color: '#EF4444', marginTop: '1px' }}>
+                  {urgentCount + staleCount} deal{urgentCount + staleCount !== 1 ? 's' : ''} need attention
+                </div>
+              )}
+            </div>
           </div>
         )}
 

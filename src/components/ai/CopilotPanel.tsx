@@ -230,7 +230,7 @@ export default function CopilotPanel() {
           <Sparkles size={14} />
           <span style={{ letterSpacing: '0.01em' }}>
             <span style={{ opacity: 0.7, fontSize: '11px', fontWeight: 500, marginRight: '4px' }}>&#8984;K</span>
-            Ask AI
+            Ask Brain
           </span>
         </button>
       )}
@@ -296,7 +296,7 @@ export default function CopilotPanel() {
             fontSize: '13.5px', fontWeight: 700, color: 'rgba(200,196,255,0.9)',
             letterSpacing: '0.01em', flex: 1,
           }}>
-            DealKit AI
+            DealKit Brain
           </span>
 
           {/* Clear chat */}
@@ -430,7 +430,7 @@ export default function CopilotPanel() {
                 fontSize: '12px', color: '#4B5563', marginBottom: '14px',
                 textAlign: 'center', letterSpacing: '0.01em',
               }}>
-                {activeDeal ? `What would you like to do with ${activeDeal.company}?` : 'Ask anything about your pipeline'}
+                {activeDeal ? `What should the brain do for ${activeDeal.company}?` : 'The brain has full context on your pipeline'}
               </div>
 
               {/* Quick action chips */}
@@ -641,7 +641,7 @@ export default function CopilotPanel() {
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask anything about your pipeline..."
+                placeholder="Ask the brain anything..."
                 rows={1}
                 style={{
                   width: '100%',

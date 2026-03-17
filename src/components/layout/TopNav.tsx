@@ -13,17 +13,17 @@ import { useSidebar } from './SidebarContext'
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 const PAGE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
-  '/dashboard':    { label: 'Dashboard',    Icon: LayoutDashboard },
-  '/pipeline':     { label: 'Pipeline',     Icon: Kanban },
-  '/deals':        { label: 'Deal Log',     Icon: ClipboardList },
-  '/collateral':   { label: 'Collateral',   Icon: FileText },
-  '/product-gaps': { label: 'Product Gaps', Icon: AlertTriangle },
-  '/company':      { label: 'Company',      Icon: Building2 },
-  '/competitors':  { label: 'Competitors',  Icon: Swords },
-  '/case-studies': { label: 'Case Studies', Icon: BookOpen },
-  '/settings':     { label: 'Settings',     Icon: Settings },
-  '/onboarding':   { label: 'AI Setup',     Icon: Sparkles },
-  '/chat':         { label: 'Ask AI',       Icon: MessageSquare },
+  '/dashboard':    { label: 'Brain',             Icon: Brain },
+  '/pipeline':     { label: 'Pipeline',          Icon: Kanban },
+  '/deals':        { label: 'Deal Intelligence', Icon: ClipboardList },
+  '/collateral':   { label: 'Collateral',        Icon: FileText },
+  '/product-gaps': { label: 'Product Gaps',      Icon: AlertTriangle },
+  '/company':      { label: 'Company Profile',   Icon: Building2 },
+  '/competitors':  { label: 'Intelligence',      Icon: Swords },
+  '/case-studies': { label: 'Case Studies',      Icon: BookOpen },
+  '/settings':     { label: 'Settings',          Icon: Settings },
+  '/onboarding':   { label: 'Brain Setup',       Icon: Sparkles },
+  '/chat':         { label: 'Ask AI',            Icon: MessageSquare },
 }
 
 function getPageInfo(pathname: string) {
@@ -92,7 +92,7 @@ export default function TopNav() {
           <Menu size={15} color="#9CA3AF" />
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '12px', color: '#4B5563', fontWeight: '500' }}>Menu</span>
+          <span style={{ fontSize: '12px', color: '#4B5563', fontWeight: '500' }}>DealKit</span>
           <span style={{ fontSize: '12px', color: '#4B5563' }}>/</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Icon size={13} color="#A78BFA" strokeWidth={2} />

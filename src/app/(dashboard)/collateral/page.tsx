@@ -31,31 +31,31 @@ const ALL_TYPES: CollateralType[] = [
 const TYPE_META: Record<CollateralType, { label: string; description: string }> = {
   battlecard: {
     label: 'Battlecard',
-    description: 'Counter competitors on live calls — strengths, weaknesses, win themes',
+    description: 'Brain-generated competitive intelligence — auto-updated as your deals evolve',
   },
   case_study_doc: {
     label: 'Case Study Doc',
-    description: 'Prove ROI against a prospect\'s risk or blocker using real customer evidence',
+    description: 'Autonomously built from your wins — proves ROI with real customer evidence',
   },
   one_pager: {
     label: 'One-Pager',
-    description: 'Executive summary of your product for quick sharing with stakeholders',
+    description: 'Executive summary the brain writes from your company profile and win data',
   },
   objection_handler: {
     label: 'Objection Handler',
-    description: 'Q&A from recurring sales call objections — confident, ready-to-use answers',
+    description: 'The brain identifies recurring objections and writes the winning responses',
   },
   talk_track: {
     label: 'Talk Track',
-    description: 'Structured narrative for discovery and demo calls with key questions',
+    description: 'Structured call narrative built from your best-performing deal patterns',
   },
   email_sequence: {
     label: 'Email Sequence',
-    description: 'Multi-touch follow-up emails for prospects post-meeting',
+    description: 'Multi-touch sequences the brain drafts based on your prospect context',
   },
   custom: {
     label: 'Custom',
-    description: 'AI-generated freeform document — ask for anything via chat',
+    description: 'Ask the brain to generate any document from your intelligence base',
   },
 }
 
