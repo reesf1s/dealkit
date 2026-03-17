@@ -791,7 +791,7 @@ export function runMLEngine(
   const training = closed.map(d => ({
     dealId:   d.id,
     company:  d.company,
-    features: featMap.get(d.id) ?? extractFeatures(d, competitorWinRates, avgDealValue, maxDealValue, now),
+    features: featMap.get(d.id) ?? extractFeatures(d, competitorWinRates, repWinRates, avgDealValue, maxDealValue, now),
     label:    d.stage === 'closed_won' ? 1 : 0,
   }))
 
