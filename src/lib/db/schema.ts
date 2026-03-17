@@ -82,6 +82,7 @@ export const workspaces = pgTable('workspaces', {
   aiOverviewGeneratedAt: timestamp('ai_overview_generated_at', { withTimezone: true }),
   workspaceBrain: jsonb('workspace_brain'),                // compressed org knowledge — updated after every deal analysis
   pipelineConfig: jsonb('pipeline_config'),                    // PipelineConfig JSON — custom stages, labels, industry preset
+  embeddingCache: jsonb('embedding_cache'),                    // Semantic embedding vectors for deals, competitors, collateral
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
