@@ -1,23 +1,25 @@
 /**
  * Embedding Engine — unified interface for generating text embeddings.
  *
- * Provider hierarchy (configurable):
- * 1. Ollama (local) — if OLLAMA_BASE_URL is set and reachable, uses local models
- *    Default: Qwen3-embedding (best local embedding model, 1024d)
+ * Providers:
+ * 1. Ollama (local) — primary provider. Free, private, runs on your infra.
+ *    Default model: Qwen3-embedding (best local embedding model, 1024d)
  *    Also supports: nomic-embed-text, mxbai-embed-large, bge-large, snowflake-arctic-embed
- * 2. Voyage AI (cloud) — Anthropic's recommended embedding provider, excellent retrieval quality
- * 3. Claude API (cloud) — uses Anthropic's text embedding via Voyage partnership
- * 4. Fallback — returns null (callers must handle gracefully)
+ * 2. Voyage AI (cloud) — optional, if you add a VOYAGE_API_KEY
+ * 3. Fallback — returns null (callers handle gracefully, keyword search still works)
+ *
+ * Anthropic's Claude API is used for LLM reasoning throughout DealKit but does
+ * NOT have an embeddings endpoint. Embeddings are a separate concern — Ollama
+ * provides them locally for free via Qwen3-embedding.
  *
  * All vectors are normalised to unit length for cosine similarity via dot product.
  *
  * Environment variables:
- *   OLLAMA_BASE_URL      — e.g. "http://localhost:11434" (optional)
+ *   OLLAMA_BASE_URL      — e.g. "http://localhost:11434" (required for embeddings)
  *   OLLAMA_EMBED_MODEL   — model name, default "qwen3-embedding" (1024d)
- *   VOYAGE_API_KEY       — Voyage AI API key (optional)
+ *   VOYAGE_API_KEY       — Voyage AI API key (optional cloud alternative)
  *   VOYAGE_MODEL         — model name, default "voyage-3-lite" (512d)
- *   ANTHROPIC_API_KEY    — Claude/Anthropic API key (used for Voyage via Anthropic partnership)
- *   EMBEDDING_PROVIDER   — force provider: "ollama" | "voyage" | "claude" | "auto" (default)
+ *   EMBEDDING_PROVIDER   — force provider: "ollama" | "voyage" | "auto" (default)
  */
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,7 +78,7 @@ export function topKSimilar(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Ollama provider (local, privacy-preserving)
+// Ollama provider (local, privacy-preserving, free)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function createOllamaProvider(): EmbeddingProvider {
@@ -136,7 +138,7 @@ function createOllamaProvider(): EmbeddingProvider {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Voyage AI provider (cloud, high quality)
+// Voyage AI provider (cloud, optional — requires separate VOYAGE_API_KEY)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function createVoyageProvider(): EmbeddingProvider {
@@ -200,72 +202,6 @@ function createVoyageProvider(): EmbeddingProvider {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Claude API provider (Anthropic → Voyage partnership endpoint)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function createClaudeProvider(): EmbeddingProvider {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  // Anthropic routes embedding requests to Voyage AI under the hood
-  const model = process.env.VOYAGE_MODEL ?? 'voyage-3-lite'
-
-  const DIMS: Record<string, number> = {
-    'voyage-3-lite': 512,
-    'voyage-3': 1024,
-    'voyage-code-3': 1024,
-    'voyage-finance-2': 1024,
-  }
-  const dimensions = DIMS[model] ?? 512
-
-  return {
-    name: 'voyage' as const,  // same backend
-    model,
-    dimensions,
-
-    async isAvailable(): Promise<boolean> {
-      // Only use this provider if VOYAGE_API_KEY is not set but ANTHROPIC_API_KEY is
-      return !!apiKey && !process.env.VOYAGE_API_KEY
-    },
-
-    async embed(texts: string[]): Promise<number[][]> {
-      if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set')
-
-      const batchSize = 128
-      const allEmbeddings: number[][] = []
-
-      for (let i = 0; i < texts.length; i += batchSize) {
-        const batch = texts.slice(i, i + batchSize)
-        // Use Voyage API directly with Anthropic key (they accept Anthropic keys)
-        const res = await fetch('https://api.voyageai.com/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model,
-            input: batch,
-            input_type: 'document',
-          }),
-        })
-
-        if (!res.ok) {
-          const errText = await res.text().catch(() => '')
-          throw new Error(`Claude/Voyage embed failed (${res.status}): ${errText}`)
-        }
-
-        const data = await res.json() as {
-          data: { embedding: number[] }[]
-          usage?: { total_tokens: number }
-        }
-        allEmbeddings.push(...data.data.map(d => normalise(d.embedding)))
-      }
-
-      return allEmbeddings
-    },
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Provider resolution & caching
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -277,12 +213,12 @@ const PROVIDER_CACHE_TTL = 60_000 // re-check availability every 60s
  * Get the active embedding provider. Returns null if no provider is available.
  *
  * Resolution order (auto mode):
- * 1. Voyage AI with dedicated key (best quality, explicit opt-in)
- * 2. Ollama/Qwen local (if OLLAMA_BASE_URL is set — free, private)
- * 3. Claude API → Voyage (uses existing ANTHROPIC_API_KEY — zero config)
+ * 1. Ollama/Qwen local (primary — free, private, no API costs)
+ * 2. Voyage AI (optional cloud fallback — requires VOYAGE_API_KEY)
  *
- * The Claude API path uses the existing Anthropic key you already have —
- * no additional setup required. Ollama is only tried when explicitly configured.
+ * Note: Anthropic's Claude API does NOT have an embeddings endpoint.
+ * Claude is used for LLM reasoning throughout DealKit. Embeddings are
+ * a separate concern handled by Ollama (local) or Voyage (cloud).
  */
 export async function getEmbeddingProvider(): Promise<EmbeddingProvider | null> {
   const now = Date.now()
@@ -290,22 +226,16 @@ export async function getEmbeddingProvider(): Promise<EmbeddingProvider | null> 
     return _cachedProvider
   }
 
-  const forced = process.env.EMBEDDING_PROVIDER as 'ollama' | 'voyage' | 'claude' | 'auto' | undefined
+  const forced = process.env.EMBEDDING_PROVIDER as 'ollama' | 'voyage' | 'auto' | undefined
   const providers: EmbeddingProvider[] = []
 
   if (forced === 'ollama') {
     providers.push(createOllamaProvider())
   } else if (forced === 'voyage') {
     providers.push(createVoyageProvider())
-  } else if (forced === 'claude') {
-    providers.push(createClaudeProvider())
   } else {
-    // Auto: dedicated Voyage key first, then local if configured, then Claude API fallback
-    providers.push(createVoyageProvider())
-    if (process.env.OLLAMA_BASE_URL) {
-      providers.push(createOllamaProvider())
-    }
-    providers.push(createClaudeProvider())
+    // Auto: local first (free), then cloud if available
+    providers.push(createOllamaProvider(), createVoyageProvider())
   }
 
   for (const p of providers) {
