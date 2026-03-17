@@ -1109,7 +1109,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     const perCompetitorWinCondition: NonNullable<WorkspaceBrain['winPlaybook']>['perCompetitorWinCondition'] = []
     const compWinMap = new Map<string, { wins: number; total: number }>()
     for (const d of closedDeals) {
-      const comps = (d.competitors as string[]) ?? []
+      const comps = (d.dealCompetitors as string[]) ?? []
       for (const comp of comps) {
         const entry = compWinMap.get(comp) ?? { wins: 0, total: 0 }
         entry.total++
