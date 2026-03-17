@@ -1,6 +1,6 @@
 /**
  * GET /api/cron/brain-refresh
- * Triggered every 4 hours by Vercel Cron (see vercel.json).
+ * Triggered daily at 3 AM UTC by Vercel Cron (see vercel.json).
  *
  * Background agentic workflow:
  * 1. Find all workspaces with deal activity in the last 24 hours

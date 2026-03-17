@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/brain-refresh",
-      "schedule": "0 */4 * * *"
+      "schedule": "0 3 * * *"
     }
   ]
 }
