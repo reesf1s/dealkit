@@ -8,6 +8,7 @@ import { getWorkspaceContext } from '@/lib/workspace'
 import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
 import Anthropic from '@anthropic-ai/sdk'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { ensureLinksColumn } from '@/lib/api-helpers'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { workspaceId } = await getWorkspaceContext(userId)
     const { id } = await params
     await ensureProjectPlanCol()
+    await ensureLinksColumn()
 
     const [deal] = await db.select({ id: dealLogs.id, projectPlan: dealLogs.projectPlan, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany, stage: dealLogs.stage, todos: dealLogs.todos })
       .from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)

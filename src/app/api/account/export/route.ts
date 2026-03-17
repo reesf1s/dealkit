@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { users, companyProfiles, competitors, caseStudies, dealLogs, collateral, events, productGaps } from '@/lib/db/schema'
+import { ensureLinksColumn } from '@/lib/api-helpers'
 
 // GET /api/account/export — export all user data as JSON (GDPR right to portability)
 export async function GET() {
@@ -15,6 +16,7 @@ export async function GET() {
     const { getWorkspaceContext } = await import('@/lib/workspace')
     const { workspaceId } = await getWorkspaceContext(userId)
 
+    await ensureLinksColumn()
     const [
       userRows,
       profileRows,

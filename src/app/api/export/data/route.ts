@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { companyProfiles, competitors, caseStudies, dealLogs, collateral } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
+import { ensureLinksColumn } from '@/lib/api-helpers'
 
 export async function GET() {
   const { userId } = await auth()
@@ -12,6 +13,7 @@ export async function GET() {
   const [company] = await db.select().from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)).limit(1)
   const competitorRows = await db.select().from(competitors).where(eq(competitors.workspaceId, workspaceId)).orderBy(competitors.createdAt)
   const caseStudyRows = await db.select().from(caseStudies).where(eq(caseStudies.workspaceId, workspaceId)).orderBy(caseStudies.createdAt)
+  await ensureLinksColumn()
   const dealRows = await db.select().from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)).orderBy(dealLogs.createdAt)
   const collateralRows = await db.select({ id: collateral.id, type: collateral.type, title: collateral.title, status: collateral.status, sourceCompetitorId: collateral.sourceCompetitorId, sourceCaseStudyId: collateral.sourceCaseStudyId, sourceDealLogId: collateral.sourceDealLogId, generatedAt: collateral.generatedAt, createdAt: collateral.createdAt, updatedAt: collateral.updatedAt }).from(collateral).where(eq(collateral.workspaceId, workspaceId)).orderBy(collateral.createdAt)
   const payload = JSON.stringify({ exportedAt: new Date().toISOString(), company: company ?? null, competitors: competitorRows, caseStudies: caseStudyRows, deals: dealRows, collateral: collateralRows }, null, 2)

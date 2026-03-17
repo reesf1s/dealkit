@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { sql } from 'drizzle-orm'
+import { db } from '@/lib/db'
 
 /** Returns true if the error is due to a missing / bad DATABASE_URL */
 export function isDbConnectionError(err: unknown): boolean {
@@ -26,6 +28,16 @@ export function dbNotConfigured(): NextResponse {
     },
     { status: 503 },
   )
+}
+
+/** Ensure the `links` column exists on deal_logs (idempotent, cached per cold-start) */
+let _linksMigrated = false
+export async function ensureLinksColumn() {
+  if (_linksMigrated) return
+  try {
+    await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS links jsonb NOT NULL DEFAULT '[]'::jsonb`)
+  } catch { /* column already exists */ }
+  _linksMigrated = true
 }
 
 /** Wraps a route handler with standard DB error handling */

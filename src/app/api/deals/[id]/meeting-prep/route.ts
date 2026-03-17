@@ -9,6 +9,7 @@ import { dealLogs, companyProfiles, competitors, collateral } from '@/lib/db/sch
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getWorkspaceBrain, formatBrainContext } from '@/lib/workspace-brain'
+import { ensureLinksColumn } from '@/lib/api-helpers'
 
 const anthropic = new Anthropic()
 
@@ -20,6 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!rl.allowed) return rateLimitResponse(rl.resetAt)
     const { workspaceId } = await getWorkspaceContext(userId)
     const { id } = await params
+    await ensureLinksColumn()
     const [[deal], [company], comps, relatedCollateral, brain] = await Promise.all([
       db.select().from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1),
       db.select().from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)).limit(1),

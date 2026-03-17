@@ -21,7 +21,8 @@ async function ensureDealColumns() {
       ALTER TABLE deal_logs
       ADD COLUMN IF NOT EXISTS contacts jsonb NOT NULL DEFAULT '[]'::jsonb,
       ADD COLUMN IF NOT EXISTS description text,
-      ADD COLUMN IF NOT EXISTS project_plan jsonb
+      ADD COLUMN IF NOT EXISTS project_plan jsonb,
+      ADD COLUMN IF NOT EXISTS links jsonb NOT NULL DEFAULT '[]'::jsonb
     `)
   } catch { /* columns may already exist */ }
   try {

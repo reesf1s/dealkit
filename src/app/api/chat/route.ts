@@ -16,6 +16,7 @@ import type { CollateralType } from '@/types'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getWorkspaceBrain, formatBrainContext, rebuildWorkspaceBrain } from '@/lib/workspace-brain'
 import type { WorkspaceBrain } from '@/lib/workspace-brain'
+import { ensureLinksColumn } from '@/lib/api-helpers'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -1704,6 +1705,8 @@ export async function POST(req: NextRequest) {
     if (!rl.allowed) return rateLimitResponse(rl.resetAt)
     const { workspaceId, plan } = await getWorkspaceContext(userId)
     const { messages, activeDealId, currentPage, confirmAction } = await req.json()
+
+    await ensureLinksColumn()
 
     // ── Confirmed action (user clicked "Confirm" on a pending destructive action) ──
     if (confirmAction) {

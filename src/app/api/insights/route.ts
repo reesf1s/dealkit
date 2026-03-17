@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
-import { dbErrResponse } from '@/lib/api-helpers'
+import { dbErrResponse, ensureLinksColumn } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 
 export async function GET() {
@@ -11,6 +11,7 @@ export async function GET() {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { workspaceId } = await getWorkspaceContext(userId)
+    await ensureLinksColumn()
     const deals = await db.select().from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId))
     const totalDeals = deals.length
     const wonDeals = deals.filter(d => d.stage === 'closed_won').length

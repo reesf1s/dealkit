@@ -9,7 +9,7 @@ import { collateral, companyProfiles, competitors, dealLogs, events } from '@/li
 import { PLAN_LIMITS, isWithinLimit } from '@/lib/stripe/plans'
 import { generateCollateral, generateFreeformCollateral } from '@/lib/ai/generate'
 import type { CollateralType } from '@/types'
-import { dbErrResponse } from '@/lib/api-helpers'
+import { dbErrResponse, ensureLinksColumn } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
     let sourceDealLogId: string | null = null
 
     if (dealId) {
+      await ensureLinksColumn()
       const [dealRow] = await db.select().from(dealLogs)
         .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId))).limit(1)
 

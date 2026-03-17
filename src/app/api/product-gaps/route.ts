@@ -5,6 +5,7 @@ import { eq, desc, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { productGaps, dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
+import { ensureLinksColumn } from '@/lib/api-helpers'
 
 export async function GET() {
   try {
@@ -17,6 +18,7 @@ export async function GET() {
     const allDealIds = [...new Set(gaps.flatMap(g => (g.sourceDeals as string[]) ?? []))]
     const dealValueMap = new Map<string, number>()
     if (allDealIds.length > 0) {
+      await ensureLinksColumn()
       const dealRows = await db.select({ id: dealLogs.id, dealValue: dealLogs.dealValue, stage: dealLogs.stage })
         .from(dealLogs).where(inArray(dealLogs.id, allDealIds))
       for (const d of dealRows) {

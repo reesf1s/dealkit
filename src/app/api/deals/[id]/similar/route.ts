@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { eq, and, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
-import { dbErrResponse } from '@/lib/api-helpers'
+import { dbErrResponse, ensureLinksColumn } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 
 export async function GET(
@@ -31,6 +31,7 @@ export async function GET(
 
     // Fetch deal details for similar deals
     const ids = similar.map(s => s.entityId)
+    await ensureLinksColumn()
     const deals = await db
       .select({
         id: dealLogs.id,

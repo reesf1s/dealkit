@@ -303,7 +303,8 @@ async function ensureBrainColumn() {
     await db.execute(sql`
       ALTER TABLE deal_logs
       ADD COLUMN IF NOT EXISTS project_plan jsonb,
-      ADD COLUMN IF NOT EXISTS intent_signals jsonb
+      ADD COLUMN IF NOT EXISTS intent_signals jsonb,
+      ADD COLUMN IF NOT EXISTS links jsonb NOT NULL DEFAULT '[]'::jsonb
     `)
   } catch { /* already exists */ }
   schemaMigrated = true

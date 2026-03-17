@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { dealLogs, workspaces, companyProfiles, competitors } from '@/lib/db/schema'
-import { dbErrResponse } from '@/lib/api-helpers'
+import { dbErrResponse, ensureLinksColumn } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { anthropic } from '@/lib/ai/client'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
@@ -56,6 +56,7 @@ async function ensureColumns() {
 }
 
 async function generateOverview(workspaceId: string): Promise<AIOverview> {
+  await ensureLinksColumn()
   const [deals, companyRows, comps, stageLabels] = await Promise.all([
     db.select().from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)),
     db.select().from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)).limit(1),

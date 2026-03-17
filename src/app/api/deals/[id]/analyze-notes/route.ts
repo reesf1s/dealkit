@@ -12,6 +12,7 @@ import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { rebuildWorkspaceBrain, getWorkspaceBrain } from '@/lib/workspace-brain'
 import { computeCompositeScore } from '@/lib/deal-ml'
+import { ensureLinksColumn } from '@/lib/api-helpers'
 import { extractTextSignals, heuristicScore } from '@/lib/text-signals'
 import { buildDealBriefing, scoreNarrationPrompt } from '@/lib/brain-narrator'
 
@@ -51,6 +52,7 @@ async function ensureIntentSignalsCol() {
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await ensureIntentSignalsCol()
+    await ensureLinksColumn()
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const rl = await checkRateLimit(userId, 'analyze-notes', 10)
