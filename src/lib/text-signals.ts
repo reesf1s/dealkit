@@ -189,7 +189,7 @@ function hasAny(text: string, vocab: string[]): boolean {
 }
 
 /** Split structured meeting notes (entries beginning with a date) into individual entries. */
-function parseMeetingEntries(notes: string): { text: string; date: Date | null }[] {
+export function parseMeetingEntries(notes: string): { text: string; date: Date | null }[] {
   if (!notes?.trim()) return []
   const parts = notes.split(/(?=\n?\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}|\n?\[?\d{1,2}\s+\w{3,9}\s+\d{4})/)
   return parts

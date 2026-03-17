@@ -220,6 +220,7 @@ export const dealLogs = pgTable('deal_logs', {
   recurringInterval: text('recurring_interval'),                   // 'monthly' | 'quarterly' | 'annual'
   kanbanOrder: integer('kanban_order').notNull().default(0),
   projectPlan: jsonb('project_plan'),                          // ProjectPlan JSON
+  intentSignals: jsonb('intent_signals'),                      // LLM-extracted intent: champion/budget/timeline/nextMeeting
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

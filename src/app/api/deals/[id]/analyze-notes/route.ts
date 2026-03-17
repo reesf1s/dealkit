@@ -3,7 +3,7 @@ export const maxDuration = 60
 import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import Anthropic from '@anthropic-ai/sdk'
 import { db } from '@/lib/db'
 import { dealLogs, productGaps, companyProfiles, workspaces } from '@/lib/db/schema'
@@ -16,8 +16,19 @@ import { buildDealBriefing, scoreNarrationPrompt } from '@/lib/brain-narrator'
 
 const anthropic = new Anthropic()
 
+// Ensure intent_signals column exists — runs once per process lifetime
+let intentSignalsMigrated = false
+async function ensureIntentSignalsCol() {
+  if (intentSignalsMigrated) return
+  try {
+    await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS intent_signals jsonb`)
+  } catch { /* already exists */ }
+  intentSignalsMigrated = true
+}
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    await ensureIntentSignalsCol()
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const rl = await checkRateLimit(userId, 'analyze-notes', 10)
@@ -108,7 +119,13 @@ Return this exact JSON — extract facts, do not score or judge:
   "todos": [{"text": "specific action item"}],
   "obsoleteTodoIds": ["id-of-existing-todo-now-done-or-irrelevant"],
   "productGaps": [{"title": "gap title", "description": "what prospect said is missing", "priority": "high"}],
-  "competitors": ["competitor or alternative vendor name ONLY if explicitly mentioned as something the prospect is evaluating or comparing against — company/product names only"]
+  "competitors": ["competitor or alternative vendor name ONLY if explicitly mentioned as something the prospect is evaluating or comparing against — company/product names only"],
+  "intentSignals": {
+    "championStatus": "confirmed|suspected|none",
+    "budgetStatus": "approved|awaiting|not_discussed|blocked",
+    "decisionTimeline": "e.g. Q2 2026 or end of year — null if not mentioned",
+    "nextMeetingBooked": false
+  }
 }
 
 Rules — risks: deal-level signals only (not product feature requests). Max 4. Return [] if none.
@@ -116,6 +133,7 @@ Rules — todos: new items only. No duplicates of existing open items. Return []
 Rules — obsoleteTodoIds: IDs of open items now done, superseded, or irrelevant. Return [].
 Rules — productGaps: only if prospect EXPLICITLY said your product lacks a feature/integration. Return [] otherwise.
 Rules — competitors: max 4, ONLY if named as an explicit alternative being evaluated. Return [] if none.
+Rules — intentSignals: extract ONLY what is explicitly stated. championStatus=confirmed only if someone is actively advocating internally. budgetStatus=approved only if spend is explicitly confirmed. decisionTimeline=null if not mentioned. nextMeetingBooked=true only if a specific next meeting was arranged in these notes.
 priority: critical | high | medium | low` }],
     })
     // Strip markdown fences and any leading/trailing text before the JSON object
@@ -229,9 +247,32 @@ priority: critical | high | medium | low` }],
         .filter((l: string) => l.length > 8)
         .slice(0, 3)
 
+      // ── Intent signal score adjustment ─────────────────────────────────────────
+      // LLM-extracted intent catches paraphrases that vocabulary matching misses.
+      // Only adjusts when the LLM sees something the text signals didn't detect.
+      if (parsed.intentSignals) {
+        const is = parsed.intentSignals
+        if (is.championStatus === 'confirmed' && !signals.decisionMakerSignal) finalScore = Math.min(100, finalScore + 6)
+        if (is.championStatus === 'suspected' && !signals.decisionMakerSignal) finalScore = Math.min(100, finalScore + 3)
+        if (is.budgetStatus === 'approved' && !signals.budgetConfirmed)         finalScore = Math.min(100, finalScore + 8)
+        if (is.budgetStatus === 'awaiting' && !signals.budgetConfirmed)         finalScore = Math.min(100, finalScore + 2)
+        if (is.budgetStatus === 'blocked')                                       finalScore = Math.max(0,  finalScore - 8)
+        if (is.nextMeetingBooked === true)                                       finalScore = Math.min(100, finalScore + 3)
+        if (typeof is.decisionTimeline === 'string' && is.decisionTimeline) {
+          const tlDate = Date.parse(is.decisionTimeline)
+          if (!isNaN(tlDate)) {
+            const daysTo = (tlDate - Date.now()) / 86_400_000
+            if (daysTo >= 0 && daysTo <= 90) finalScore = Math.min(100, finalScore + 3)
+          }
+        }
+      }
+
       updateFields.conversionScore = finalScore
       if (narratedInsights.length > 0) updateFields.conversionInsights = narratedInsights
     } catch { /* non-fatal — deal saves without score if brain fails */ }
+
+    // Persist intent signals — separate from scoring so a scoring failure doesn't lose them
+    if (parseOk && parsed.intentSignals) updateFields.intentSignals = parsed.intentSignals
 
     const [updatedDeal] = await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, id)).returning()
     const createdGaps = []

@@ -16,7 +16,7 @@ import { db } from '@/lib/db'
 import { dealLogs, competitors as competitorRecords } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import { runMLEngine, computeCompositeScore, type TrainedMLModel, type DealMLPrediction, type MLTrends, type DealArchetype, type StageVelocityIntel, type CompetitivePattern, type ScoreCalibrationPoint, type CloseDateModel, ML_MIN_TRAINING_DEALS } from '@/lib/deal-ml'
-import { extractTextSignals, analyzeDeterioration, type TextSignals } from '@/lib/text-signals'
+import { extractTextSignals, analyzeDeterioration, parseMeetingEntries, type TextSignals } from '@/lib/text-signals'
 import { BRAIN_VERSION } from '@/lib/brain-constants'
 export { BRAIN_VERSION } from '@/lib/brain-constants'
 
@@ -127,6 +127,9 @@ export interface WorkspaceBrain {
   pipelineHealthIndex?: PipelineHealthIndex        // composite 0–100 pipeline health
   revenueForecasts?: RevenueForecast[]             // probability-weighted monthly revenue
   deteriorationAlerts?: DeteriorationAlert[]       // deals showing declining note sentiment
+  // ── Tier 1 intelligence ─────────────────────────────────────────────────────
+  followUpIntel?: FollowUpCadenceIntel             // per-stage optimal follow-up cadence + alerts
+  repIntel?: RepIntelStats[]                       // per-rep behavioural stats
 }
 
 export interface PipelineHealthIndex {
@@ -145,6 +148,37 @@ export interface RevenueForecast {
   bestCase:        number    // sum of deal values (assuming all win)
   dealCount:       number
   avgConfidence:   number    // avg ML win probability (0–100)
+}
+
+export interface FollowUpCadenceIntel {
+  /** Per-stage: how long won deals tolerated between notes — the safe follow-up window */
+  stageStats: {
+    stage:          string
+    p50GapDays:     number    // median max note gap across won deals in this stage
+    p75GapDays:     number    // 75th percentile — "danger zone" threshold
+    sampleSize:     number
+  }[]
+  /** Open deals that have exceeded the safe window for their current stage */
+  followUpAlerts: {
+    dealId:              string
+    dealName:            string
+    company:             string
+    stage:               string
+    daysSinceLastNote:   number
+    typicalMaxGapDays:   number   // p75 from won deals (or fallback 14)
+    urgency:             'nudge' | 'alert' | 'critical'
+    daysOverdue:         number
+  }[]
+}
+
+export interface RepIntelStats {
+  userId:                  string
+  totalDeals:              number
+  wonDeals:                number
+  winRate:                 number    // 0–100 (among closed deals)
+  avgTodoCompletionRate:   number    // 0–1
+  dealsWithNextStepPct:    number    // % of deals with a defined next step
+  avgDaysSinceLastNote:    number    // how recently they typically update deals
 }
 
 export interface DeteriorationAlert {
@@ -170,7 +204,8 @@ async function ensureBrainColumn() {
   try {
     await db.execute(sql`
       ALTER TABLE deal_logs
-      ADD COLUMN IF NOT EXISTS project_plan jsonb
+      ADD COLUMN IF NOT EXISTS project_plan jsonb,
+      ADD COLUMN IF NOT EXISTS intent_signals jsonb
     `)
   } catch { /* already exists */ }
   schemaMigrated = true
@@ -192,6 +227,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
   const deals = await db
     .select({
       id: dealLogs.id,
+      userId: dealLogs.userId,
       dealName: dealLogs.dealName,
       prospectCompany: dealLogs.prospectCompany,
       stage: dealLogs.stage,
@@ -839,6 +875,104 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     }
   }
 
+  // ── Follow-up cadence intelligence ────────────────────────────────────────────
+  // Compute per-stage "safe gap" from won deals — how long they went between notes and still won
+  function localQuantile(sorted: number[], q: number): number {
+    if (sorted.length === 0) return 0
+    const idx = q * (sorted.length - 1)
+    const lo = Math.floor(idx)
+    const hi = Math.ceil(idx)
+    return (sorted[lo] ?? 0) + ((sorted[hi] ?? sorted[lo] ?? 0) - (sorted[lo] ?? 0)) * (idx - lo)
+  }
+
+  const stageGapBuckets = new Map<string, number[]>()
+  for (const d of deals.filter(d => d.stage === 'closed_won')) {
+    const notes = d.meetingNotes as string | null
+    if (!notes) continue
+    const dates = parseMeetingEntries(notes)
+      .map(e => e.date)
+      .filter((dt): dt is Date => dt !== null && !isNaN(dt.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime())
+    if (dates.length < 2) continue
+    let maxGap = 0
+    for (let i = 1; i < dates.length; i++) {
+      const gap = (dates[i].getTime() - dates[i - 1].getTime()) / 86_400_000
+      if (gap > maxGap) maxGap = gap
+    }
+    if (maxGap <= 0 || maxGap > 90) continue // ignore outliers
+    const arr = stageGapBuckets.get(d.stage) ?? []
+    arr.push(maxGap)
+    stageGapBuckets.set(d.stage, arr)
+  }
+
+  const followUpStageStats: FollowUpCadenceIntel['stageStats'] = [...stageGapBuckets.entries()].map(([stage, gaps]) => {
+    const sorted = [...gaps].sort((a, b) => a - b)
+    return {
+      stage,
+      p50GapDays: Math.round(localQuantile(sorted, 0.5)),
+      p75GapDays: Math.round(localQuantile(sorted, 0.75)),
+      sampleSize: sorted.length,
+    }
+  })
+
+  const followUpAlerts: FollowUpCadenceIntel['followUpAlerts'] = []
+  for (const d of activeDeals) {
+    const sig = signalMap.get(d.id)
+    if (!sig || sig.daysSinceLastNote < 1) continue
+    const daysSince = sig.daysSinceLastNote
+    const stageStat = followUpStageStats.find(s => s.stage === d.stage)
+    const p75 = stageStat?.p75GapDays ?? 14  // fallback to global stale threshold
+    if (daysSince < p75 * 0.6) continue      // still within safe zone
+    const urgency: 'nudge' | 'alert' | 'critical' =
+      daysSince > p75 * 1.5 ? 'critical' :
+      daysSince > p75       ? 'alert'    : 'nudge'
+    followUpAlerts.push({
+      dealId: d.id, dealName: d.dealName, company: d.prospectCompany, stage: d.stage,
+      daysSinceLastNote: Math.round(daysSince), typicalMaxGapDays: p75, urgency,
+      daysOverdue: Math.max(0, Math.round(daysSince - p75)),
+    })
+  }
+
+  const followUpIntel: FollowUpCadenceIntel = {
+    stageStats:      followUpStageStats,
+    followUpAlerts:  followUpAlerts.sort((a, b) => b.daysSinceLastNote - a.daysSinceLastNote).slice(0, 10),
+  }
+
+  // ── Rep intelligence — per-rep behavioural stats correlated with outcomes ────
+  const repDealMap = new Map<string, typeof deals>()
+  for (const d of deals) {
+    const uid = d.userId as string | null
+    if (!uid) continue
+    const arr = repDealMap.get(uid) ?? []
+    arr.push(d)
+    repDealMap.set(uid, arr)
+  }
+
+  const repIntel: RepIntelStats[] = []
+  for (const [userId, repDealList] of repDealMap.entries()) {
+    const closed = repDealList.filter(d => d.stage === 'closed_won' || d.stage === 'closed_lost')
+    const won    = repDealList.filter(d => d.stage === 'closed_won')
+    const winRate = closed.length > 0 ? Math.round((won.length / closed.length) * 100) : 0
+
+    const todoRates = repDealList
+      .map(d => { const t = (d.todos as { done: boolean }[]) ?? []; return t.length > 0 ? t.filter(x => x.done).length / t.length : null })
+      .filter((r): r is number => r !== null)
+    const avgTodoCompletionRate = todoRates.length > 0
+      ? Math.round((todoRates.reduce((a, b) => a + b, 0) / todoRates.length) * 100) / 100 : 0
+
+    const sigs = repDealList.map(d => signalMap.get(d.id)).filter(Boolean) as TextSignals[]
+    const nextStepCount = sigs.filter(s => s.nextStepDefined).length
+    const dealsWithNextStepPct = sigs.length > 0 ? Math.round((nextStepCount / sigs.length) * 100) : 0
+    const daysArr = sigs.map(s => s.daysSinceLastNote).filter(d => d < 365)
+    const avgDaysSinceLastNote = daysArr.length > 0
+      ? Math.round(daysArr.reduce((a, b) => a + b, 0) / daysArr.length) : 0
+
+    repIntel.push({
+      userId, totalDeals: repDealList.length, wonDeals: won.length, winRate,
+      avgTodoCompletionRate, dealsWithNextStepPct, avgDaysSinceLastNote,
+    })
+  }
+
   // ── Deterioration alerts — active deals with declining note sentiment ────────
   const deteriorationAlerts: DeteriorationAlert[] = []
   for (const d of activeDeals) {
@@ -972,6 +1106,8 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     pipelineHealthIndex: activeDeals.length > 0 ? pipelineHealthIndex : undefined,
     revenueForecasts:    revenueForecasts.length > 0 ? revenueForecasts : undefined,
     deteriorationAlerts: deteriorationAlerts.length > 0 ? deteriorationAlerts : undefined,
+    followUpIntel:       (followUpStageStats.length > 0 || followUpAlerts.length > 0) ? followUpIntel : undefined,
+    repIntel:            repIntel.length > 0 ? repIntel : undefined,
   }
 
   await db.execute(sql`
