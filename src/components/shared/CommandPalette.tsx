@@ -24,15 +24,12 @@ const ALL_ITEMS: CommandItem[] = [
   { id: 'deals',          label: 'Deal Log',             section: 'navigate', icon: TrendingUp,       href: '/deals' },
   { id: 'collateral',     label: 'Collateral',           section: 'navigate', icon: FileText,         href: '/collateral' },
   { id: 'company',        label: 'Company Profile',      section: 'navigate', icon: Building2,        href: '/company' },
-  { id: 'settings',       label: 'Settings',             section: 'icon',     href: '/settings' },
+  { id: 'settings',       label: 'Settings',             section: 'navigate', icon: Settings,         href: '/settings' },
   { id: 'add-competitor', label: 'Add competitor',       section: 'actions',  icon: Plus,             href: '/competitors' },
   { id: 'log-deal',       label: 'Log deal',             section: 'actions',  icon: Plus,             href: '/deals' },
   { id: 'add-case-study', label: 'Add case study',       section: 'actions',  icon: Plus,             href: '/case-studies' },
   { id: 'gen-collateral', label: 'Generate collateral',  section: 'actions',  icon: Zap,              href: '/collateral' },
 ]
-
-// Re-export Settings here so it's importable for the nav item icon
-ALL_ITEMS.find(i => i.id === 'settings')!.icon = Settings
 
 type PaletteMode = 'nav' | 'ai'
 
