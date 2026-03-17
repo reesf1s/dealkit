@@ -262,8 +262,8 @@ export async function POST(req: NextRequest) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           execute: async (params: any) => {
             // Validate params through the original zod schema
-            const validated = t.parameters.parse(params)
-            const result = await t.execute(validated, toolContext)
+            const validated = t.parameters.parse(params) as any
+            const result = await (t.execute as any)(validated, toolContext)
             if (result.actions?.length) {
               accumulatedActions.push(...result.actions)
             }
