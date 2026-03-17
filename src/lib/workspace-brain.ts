@@ -197,10 +197,11 @@ export interface RepIntelStats {
   userId:                  string
   totalDeals:              number
   wonDeals:                number
+  closedDeals:             number    // won + lost (denominator for winRate)
   winRate:                 number    // 0–100 (among closed deals)
-  avgTodoCompletionRate:   number    // 0–1
-  dealsWithNextStepPct:    number    // % of deals with a defined next step
-  avgDaysSinceLastNote:    number    // how recently they typically update deals
+  avgTodoCompletionRate:   number    // 0–100 integer %
+  dealsWithNextStepPct:    number    // % of open deals with a defined next step
+  avgDaysSinceLastNote:    number    // how recently they typically update open deals
 }
 
 export interface DeteriorationAlert {
@@ -1058,18 +1059,21 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     const todoRates = repDealList
       .map(d => { const t = (d.todos as { done: boolean }[]) ?? []; return t.length > 0 ? t.filter(x => x.done).length / t.length : null })
       .filter((r): r is number => r !== null)
+    // Fix: multiply by 100 then round to get integer % (was dividing by 100 yielding 0–1 range)
     const avgTodoCompletionRate = todoRates.length > 0
-      ? Math.round((todoRates.reduce((a, b) => a + b, 0) / todoRates.length) * 100) / 100 : 0
+      ? Math.round((todoRates.reduce((a, b) => a + b, 0) / todoRates.length) * 100) : 0
 
-    const sigs = repDealList.map(d => signalMap.get(d.id)).filter(Boolean) as TextSignals[]
-    const nextStepCount = sigs.filter(s => s.nextStepDefined).length
-    const dealsWithNextStepPct = sigs.length > 0 ? Math.round((nextStepCount / sigs.length) * 100) : 0
-    const daysArr = sigs.map(s => s.daysSinceLastNote).filter(d => d < 365)
+    // Fix: use open deals only for next-step coverage and avg days since note
+    const openRepDeals = repDealList.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+    const openSigs = openRepDeals.map(d => signalMap.get(d.id)).filter(Boolean) as TextSignals[]
+    const nextStepCount = openSigs.filter(s => s.nextStepDefined).length
+    const dealsWithNextStepPct = openSigs.length > 0 ? Math.round((nextStepCount / openSigs.length) * 100) : 0
+    const daysArr = openSigs.map(s => s.daysSinceLastNote).filter(d => d < 365)
     const avgDaysSinceLastNote = daysArr.length > 0
       ? Math.round(daysArr.reduce((a, b) => a + b, 0) / daysArr.length) : 0
 
     repIntel.push({
-      userId, totalDeals: repDealList.length, wonDeals: won.length, winRate,
+      userId, totalDeals: repDealList.length, wonDeals: won.length, closedDeals: closed.length, winRate,
       avgTodoCompletionRate, dealsWithNextStepPct, avgDaysSinceLastNote,
     })
   }

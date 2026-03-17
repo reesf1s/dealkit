@@ -690,7 +690,7 @@ export default function DashboardPage() {
                     </div>
                     {isSolo ? (
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                        {statBox('Win Rate', `${rep0.winRate}%`, `${rep0.wonDeals}/${rep0.totalDeals} deals`, winColor(rep0))}
+                        {statBox('Win Rate', `${rep0.winRate}%`, `${rep0.wonDeals}/${rep0.closedDeals} closed`, winColor(rep0))}
                         {statBox('To-Do Completion', `${rep0.avgTodoCompletionRate}%`, 'of tasks completed', todoColor(rep0))}
                         {statBox('Deals with Next Step', `${rep0.dealsWithNextStepPct}%`, 'open deals covered', rep0.dealsWithNextStepPct >= 60 ? '#22C55E' : '#F59E0B')}
                         {statBox('Avg Days Since Note', `${rep0.avgDaysSinceLastNote}d`, 'across open deals', rep0.avgDaysSinceLastNote <= 7 ? '#22C55E' : rep0.avgDaysSinceLastNote <= 14 ? '#F59E0B' : '#EF4444')}
