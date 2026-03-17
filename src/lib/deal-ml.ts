@@ -36,7 +36,7 @@ export const ML_FEATURE_NAMES = [
   'urgency_score',        // urgency language density from NLP (0–1)
 ] as const
 
-export const ML_MIN_TRAINING_DEALS = 6
+export const ML_MIN_TRAINING_DEALS = 4
 
 const STAGE_ORDINAL: Record<string, number> = {
   prospecting: 0, qualification: 1, discovery: 2,
@@ -630,6 +630,8 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
     closeDateModel: null,
   }
   if (closed.length < ML_MIN_TRAINING_DEALS) return empty
+  // Logistic regression needs at least one example of each class to be meaningful
+  if (closedWon.length === 0 || closedLost.length === 0) return empty
 
   // ── Normalisation ─────────────────────────────────────────────────────────
   const allVals = allDeals.map(d => d.dealValue ?? 0).filter(v => v > 0)
@@ -902,7 +904,9 @@ export function computeCompositeScore(
   insight: string | null
 } {
   const mlScore   = Math.round(mlProbability * 100)
-  const alpha     = Math.min(0.7, trainingSize / 100)   // 0 at 0 deals → 0.7 at 100 deals
+  // Scale ML weight more aggressively: 4 deals → 14%, 10 → 33%, 20 → 57%, 30+ → 70%
+  // Previous formula (/ 100) gave only 10% weight at 10 deals — too conservative.
+  const alpha     = Math.min(0.7, trainingSize / 30)
   const composite = Math.round(alpha * mlScore + (1 - alpha) * llmScore)
   const divergence = Math.abs(mlScore - llmScore)
 

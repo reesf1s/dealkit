@@ -132,11 +132,14 @@ export default function DashboardPage() {
   const wonDeals  = dealList.filter(d => d.stage === 'closed_won')
   const winRate   = insightsData?.winRate ?? 0
 
-  // Revenue KPIs
+  // Revenue KPIs — all values annualised so recurring and one-off are on the same scale
   const pipeline   = openDeals.reduce((s, d) => s + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
   const wonRevenue = wonDeals.reduce((s, d) => s + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
   const allWithVal = dealList.filter(d => d.dealValue && d.dealValue > 0)
   const avgDeal    = allWithVal.length ? allWithVal.reduce((s, d) => s + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0) / allWithVal.length : 0
+  // Detect recurring deals so we can label annualised values correctly
+  const openRecurring = openDeals.filter(d => d.dealType === 'recurring').length
+  const isArrBased = openRecurring > openDeals.length / 2  // majority recurring → show as ARR
 
   // ── Pipeline by stage ─────────────────────────────────────────────────────
   const stageMap: Record<string, number> = {}
@@ -227,10 +230,10 @@ export default function DashboardPage() {
       {/* ── KPI strip ───────────────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
         {[
-          { label: 'Active Pipeline', value: pipeline > 0 ? fmt(pipeline, currencySymbol) : '—', sub: `${openDeals.length} deal${openDeals.length !== 1 ? 's' : ''}`, color: '#6366F1', glow: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.15)' },
-          { label: 'Revenue Won',     value: wonRevenue > 0 ? fmt(wonRevenue, currencySymbol) : '—', sub: wonRevenue === 0 && wonDeals.length > 0 ? 'Add values to won deals →' : `${wonDeals.length} closed`, color: '#22C55E', glow: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.15)' },
+          { label: 'Active Pipeline', value: pipeline > 0 ? fmt(pipeline, currencySymbol) : '—', sub: `${openDeals.length} deal${openDeals.length !== 1 ? 's' : ''}${isArrBased ? ' · ARR' : ''}`, color: '#6366F1', glow: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.15)' },
+          { label: 'Revenue Won',     value: wonRevenue > 0 ? fmt(wonRevenue, currencySymbol) : '—', sub: wonRevenue === 0 && wonDeals.length > 0 ? 'Add values to won deals →' : `${wonDeals.length} closed${wonDeals.some(d => d.dealType === 'recurring') ? ' · ARR' : ''}`, color: '#22C55E', glow: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.15)' },
           { label: 'Win Rate',        value: dealList.length > 0 ? `${winRate}%` : '—', sub: `${dealList.length} tracked`, color: '#10B981', glow: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.15)' },
-          { label: 'Avg Deal Size',   value: avgDeal > 0 ? fmt(avgDeal, currencySymbol) : '—', sub: allWithVal.length > 0 ? `${allWithVal.length} deals` : 'Log deal values', color: '#F59E0B', glow: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.15)' },
+          { label: 'Avg Deal Size',   value: avgDeal > 0 ? fmt(avgDeal, currencySymbol) : '—', sub: allWithVal.length > 0 ? `${allWithVal.length} deals${allWithVal.some(d => d.dealType === 'recurring') ? ' · ARR' : ''}` : 'Log deal values', color: '#F59E0B', glow: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.15)' },
         ].map(kpi => (
           <div key={kpi.label} style={{ background: kpi.glow, border: `1px solid ${kpi.border}`, borderRadius: '12px', padding: '14px 16px' }}>
             <div style={{ fontSize: '11px', color: '#555', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>{kpi.label}</div>
@@ -485,10 +488,10 @@ export default function DashboardPage() {
               {hasForecast && (
                 <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.14)', borderRadius: '12px', padding: '14px 16px' }}>
                   <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>Weighted Forecast</div>
-                  <div style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.04em', color: '#818CF8', lineHeight: 1, marginBottom: '4px' }}>{fmt(dv!.weightedForecast)}</div>
-                  <div style={{ fontSize: '11px', color: '#4B5563' }}>probability-adjusted · {dv!.forecastDealCount} scored deal{dv!.forecastDealCount !== 1 ? 's' : ''}</div>
+                  <div style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.04em', color: '#818CF8', lineHeight: 1, marginBottom: '4px' }}>{fmt(dv!.weightedForecast, currencySymbol)}</div>
+                  <div style={{ fontSize: '11px', color: '#4B5563' }}>probability-adjusted ARR · {dv!.forecastDealCount} scored deal{dv!.forecastDealCount !== 1 ? 's' : ''}</div>
                   <div style={{ fontSize: '10px', color: '#374151', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                    vs {fmt(brain?.pipeline.totalValue ?? 0)} raw pipeline
+                    vs {fmt(pipeline, currencySymbol)} full pipeline (ARR)
                   </div>
                 </div>
               )}
