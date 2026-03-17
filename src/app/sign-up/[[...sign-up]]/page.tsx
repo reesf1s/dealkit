@@ -9,30 +9,30 @@ const features = [
 
 export default function SignUpPage() {
   return (
-    <main style={{ minHeight: '100dvh', backgroundColor: '#0A0A0A', display: 'flex' }}>
+    <main style={{ minHeight: '100dvh', backgroundColor: 'var(--bg)', display: 'flex' }}>
       {/* Left panel - branding */}
       <div style={{
         flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
-        padding: '60px', borderRight: '1px solid rgba(255,255,255,0.05)',
-        background: 'linear-gradient(135deg, #0A0A0A 0%, #0D0D0D 100%)',
+        padding: '60px', borderRight: '1px solid var(--border)',
+        background: 'var(--bg)',
         position: 'relative', overflow: 'hidden',
       }}>
         {/* Background glow */}
-        <div style={{ position: 'absolute', top: '-20%', left: '-10%', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(99,102,241,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: '-20%', left: '-10%', width: '500px', height: '500px', background: 'radial-gradient(circle, var(--accent-subtle) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '60px' }}>
-          <div style={{ width: '36px', height: '36px', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(99,102,241,0.5)' }}>
+          <div style={{ width: '36px', height: '36px', background: 'linear-gradient(135deg, var(--accent), #7C3AED)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px var(--accent-subtle)' }}>
             <FileText size={17} color="#fff" strokeWidth={2.5} />
           </div>
-          <span style={{ fontWeight: '700', fontSize: '18px', letterSpacing: '-0.03em', color: '#EBEBEB' }}>SellSight</span>
+          <span style={{ fontWeight: '700', fontSize: '18px', letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>SellSight</span>
         </div>
 
         {/* Headline */}
-        <h1 style={{ fontSize: '36px', fontWeight: '800', letterSpacing: '-0.04em', color: '#EBEBEB', marginBottom: '16px', lineHeight: '1.1', background: 'linear-gradient(135deg, #EBEBEB 0%, #888 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+        <h1 style={{ fontSize: '36px', fontWeight: '800', letterSpacing: '-0.04em', color: 'var(--text-primary)', marginBottom: '16px', lineHeight: '1.1' }}>
           Close more deals<br />with AI sales intel
         </h1>
-        <p style={{ fontSize: '15px', color: '#555', marginBottom: '48px', lineHeight: '1.7', maxWidth: '360px' }}>
+        <p style={{ fontSize: '15px', color: 'var(--text-tertiary)', marginBottom: '48px', lineHeight: '1.7', maxWidth: '360px' }}>
           Turn every competitor insight, case study, and deal outcome into polished sales collateral in seconds.
         </p>
 
@@ -40,25 +40,25 @@ export default function SignUpPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '360px' }}>
           {features.map(({ icon: Icon, label, desc }) => (
             <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-              <div style={{ width: '34px', height: '34px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
-                <Icon size={15} color="#818CF8" />
+              <div style={{ width: '34px', height: '34px', background: 'var(--accent-subtle)', border: '1px solid var(--border)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '1px' }}>
+                <Icon size={15} color="var(--accent)" />
               </div>
               <div>
-                <div style={{ fontSize: '13px', fontWeight: '600', color: '#EBEBEB', marginBottom: '2px' }}>{label}</div>
-                <div style={{ fontSize: '12px', color: '#555', lineHeight: '1.5' }}>{desc}</div>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' }}>{label}</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: '1.5' }}>{desc}</div>
               </div>
             </div>
           ))}
         </div>
 
         {/* Founder note */}
-        <div style={{ marginTop: '48px', padding: '16px 20px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '10px', maxWidth: '360px' }}>
-          <div style={{ fontSize: '13px', color: '#888', fontStyle: 'italic', lineHeight: '1.6', marginBottom: '10px' }}>
+        <div style={{ marginTop: '48px', padding: '16px 20px', background: 'var(--accent-subtle)', border: '1px solid var(--border)', borderRadius: '10px', maxWidth: '360px' }}>
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontStyle: 'italic', lineHeight: '1.6', marginBottom: '10px' }}>
             &ldquo;I built SellSight because we kept losing deals to competitors we couldn&apos;t track. Two hours of prep per call. I wanted that time back.&rdquo;
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', border: '1px solid rgba(139,92,246,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff' }}>R</div>
-            <span style={{ fontSize: '12px', color: '#555' }}>Rees Foulkes · Founder, SellSight</span>
+            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent), #8B5CF6)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff' }}>R</div>
+            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Rees Foulkes · Founder, SellSight</span>
           </div>
         </div>
       </div>
@@ -67,8 +67,8 @@ export default function SignUpPage() {
       <div style={{ width: '480px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
         <div style={{ width: '100%', maxWidth: '400px' }}>
           <div style={{ marginBottom: '28px', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '-0.03em', color: '#EBEBEB', marginBottom: '6px' }}>Create your account</h2>
-            <p style={{ fontSize: '13px', color: '#555' }}>Start closing more deals today</p>
+            <h2 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '6px' }}>Create your account</h2>
+            <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>Start closing more deals today</p>
           </div>
           <SignUp
             fallbackRedirectUrl="/dashboard"
@@ -84,44 +84,44 @@ export default function SignUpPage() {
                 headerTitle: { display: 'none' },
                 headerSubtitle: { display: 'none' },
                 socialButtonsBlockButton: {
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  color: '#EBEBEB',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-primary)',
                   borderRadius: '8px',
                   height: '42px',
                   fontSize: '13px',
                   fontWeight: '500',
                 },
                 socialButtonsBlockButton__google: {},
-                dividerLine: { background: 'rgba(255,255,255,0.07)' },
-                dividerText: { color: '#444', fontSize: '12px' },
+                dividerLine: { background: 'var(--border)' },
+                dividerText: { color: 'var(--text-tertiary)', fontSize: '12px' },
                 formFieldInput: {
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  color: '#EBEBEB',
+                  background: 'var(--input-bg)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-primary)',
                   borderRadius: '8px',
                   height: '42px',
                   fontSize: '13px',
                 },
                 formButtonPrimary: {
-                  background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
+                  background: 'linear-gradient(135deg, var(--accent), #7C3AED)',
                   borderRadius: '8px',
                   height: '42px',
                   fontSize: '13px',
                   fontWeight: '600',
-                  boxShadow: '0 0 20px rgba(99,102,241,0.35)',
+                  boxShadow: '0 0 20px var(--accent-subtle)',
                 },
-                footerActionLink: { color: '#818CF8' },
-                formFieldLabel: { color: '#888', fontSize: '12px' },
-                identityPreviewText: { color: '#EBEBEB' },
-                formFieldInputShowPasswordButton: { color: '#555' },
+                footerActionLink: { color: 'var(--accent)' },
+                formFieldLabel: { color: 'var(--text-tertiary)', fontSize: '12px' },
+                identityPreviewText: { color: 'var(--text-primary)' },
+                formFieldInputShowPasswordButton: { color: 'var(--text-tertiary)' },
               },
               variables: {
-                colorBackground: '#141414',
-                colorText: '#EBEBEB',
-                colorTextSecondary: '#888',
-                colorInputBackground: 'rgba(255,255,255,0.04)',
-                colorInputText: '#EBEBEB',
+                colorBackground: 'var(--bg-secondary)',
+                colorText: 'var(--text-primary)',
+                colorTextSecondary: 'var(--text-tertiary)',
+                colorInputBackground: 'var(--input-bg)',
+                colorInputText: 'var(--text-primary)',
                 borderRadius: '8px',
                 colorPrimary: '#6366F1',
                 colorDanger: '#EF4444',

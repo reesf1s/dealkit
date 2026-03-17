@@ -83,9 +83,9 @@ export default function CompetitorDetailPage() {
       {/* Back nav */}
       <Link
         href="/competitors"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#888', textDecoration: 'none', marginBottom: '20px' }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = '#EBEBEB' }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = '#888' }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-tertiary)', textDecoration: 'none', marginBottom: '20px' }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)' }}
       >
         <ArrowLeft size={14} strokeWidth={2} />
         Back to competitors
@@ -97,17 +97,17 @@ export default function CompetitorDetailPage() {
           <SkeletonCard lines={5} showHeader={false} />
         </div>
       ) : !competitor ? (
-        <div style={{ padding: '16px', borderRadius: '8px', backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444', fontSize: '13px' }}>
+        <div style={{ padding: '16px', borderRadius: '8px', backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--danger)', fontSize: '13px' }}>
           Competitor not found.
         </div>
       ) : (
         <>
           <div style={{ marginBottom: '24px' }}>
-            <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', margin: 0, marginBottom: '4px' }}>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0, marginBottom: '4px' }}>
               {competitor.name}
             </h1>
             {competitor.website && (
-              <a href={competitor.website} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: '#6366F1', textDecoration: 'none' }}>
+              <a href={competitor.website} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>
                 {competitor.website}
               </a>
             )}

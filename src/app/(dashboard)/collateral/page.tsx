@@ -221,13 +221,13 @@ function CollateralPageInner() {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
             <div style={{ width: '32px', height: '32px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <FileText size={15} color="#FCD34D" />
+              <FileText size={15} color="var(--warning)" />
             </div>
-            <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', margin: 0 }}>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>
               Collateral
             </h1>
           </div>
-          <p style={{ fontSize: '13px', color: '#555', margin: 0, paddingLeft: '42px' }}>
+          <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', margin: 0, paddingLeft: '42px' }}>
             {collateral.length} pieces • AI-generated sales materials
           </p>
         </div>
@@ -236,7 +236,7 @@ function CollateralPageInner() {
           {staleCount > 0 && (
             <button
               onClick={handleRegenAll}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', cursor: 'pointer', transition: 'all 150ms ease' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: 'var(--warning)', backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', cursor: 'pointer', transition: 'all 150ms ease' }}
               onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.18)' }}
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.1)' }}
             >
@@ -246,7 +246,7 @@ function CollateralPageInner() {
           )}
           <button
             onClick={() => setGenerateOpen(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', background: 'linear-gradient(135deg, #4F46E5, #7C3AED)', border: 'none', cursor: 'pointer', boxShadow: '0 0 16px rgba(99,102,241,0.3)', transition: 'opacity 150ms ease' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', background: 'linear-gradient(135deg, var(--accent-hover), #7C3AED)', border: 'none', cursor: 'pointer', boxShadow: '0 0 16px var(--accent-subtle)', transition: 'opacity 150ms ease' }}
             onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9' }}
             onMouseLeave={(e) => { e.currentTarget.style.opacity = '1' }}
           >
@@ -258,18 +258,18 @@ function CollateralPageInner() {
 
       {/* Deal context banner */}
       {dealIdParam && contextDeal && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', marginBottom: '4px', background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: '10px' }}>
-          <Target size={14} color="#818CF8" strokeWidth={2.5} style={{ flexShrink: 0 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', marginBottom: '4px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: '10px' }}>
+          <Target size={14} color="var(--accent)" strokeWidth={2.5} style={{ flexShrink: 0 }} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#818CF8' }}>Tailoring for deal: </span>
-            <span style={{ fontSize: '13px', color: '#EBEBEB' }}>{contextDeal.dealName ?? contextDeal.prospectCompany}</span>
-            <span style={{ fontSize: '12px', color: '#555', marginLeft: '8px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--accent)' }}>Tailoring for deal: </span>
+            <span style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{contextDeal.dealName ?? contextDeal.prospectCompany}</span>
+            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginLeft: '8px' }}>
               — collateral will be customised to this deal&apos;s context, risks, and competitors
             </span>
           </div>
           <button
             onClick={() => { setSelectedType('battlecard'); setGenerateOpen(true) }}
-            style={{ flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#818CF8', backgroundColor: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            style={{ flexShrink: 0, height: '30px', padding: '0 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: 'var(--accent)', backgroundColor: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.3)', cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             Quick Generate
           </button>
@@ -282,7 +282,7 @@ function CollateralPageInner() {
         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
           <button
             onClick={() => setTypeFilter('all')}
-            style={{ height: '28px', padding: '0 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, color: typeFilter === 'all' ? '#EBEBEB' : '#888', backgroundColor: typeFilter === 'all' ? 'rgba(255,255,255,0.08)' : 'transparent', border: typeFilter === 'all' ? '1px solid rgba(255,255,255,0.12)' : '1px solid transparent', cursor: 'pointer' }}
+            style={{ height: '28px', padding: '0 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, color: typeFilter === 'all' ? 'var(--text-primary)' : 'var(--text-tertiary)', backgroundColor: typeFilter === 'all' ? 'var(--surface-hover)' : 'transparent', border: typeFilter === 'all' ? '1px solid var(--border-strong)' : '1px solid transparent', cursor: 'pointer' }}
           >
             All types
           </button>
@@ -290,21 +290,21 @@ function CollateralPageInner() {
             <button
               key={type}
               onClick={() => setTypeFilter(type)}
-              style={{ height: '28px', padding: '0 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, color: typeFilter === type ? '#EBEBEB' : '#888', backgroundColor: typeFilter === type ? 'rgba(255,255,255,0.08)' : 'transparent', border: typeFilter === type ? '1px solid rgba(255,255,255,0.12)' : '1px solid transparent', cursor: 'pointer' }}
+              style={{ height: '28px', padding: '0 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, color: typeFilter === type ? 'var(--text-primary)' : 'var(--text-tertiary)', backgroundColor: typeFilter === type ? 'var(--surface-hover)' : 'transparent', border: typeFilter === type ? '1px solid var(--border-strong)' : '1px solid transparent', cursor: 'pointer' }}
             >
               {TYPE_META[type].label}
             </button>
           ))}
         </div>
 
-        <div style={{ width: '1px', height: '20px', backgroundColor: 'rgba(255,255,255,0.08)', margin: '0 4px' }} />
+        <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--surface-hover)', margin: '0 4px' }} />
 
         {/* Status filter */}
         {['all', 'ready', 'stale', 'generating'].map((status) => (
           <button
             key={status}
             onClick={() => setStatusFilter(status)}
-            style={{ height: '28px', padding: '0 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, color: statusFilter === status ? '#EBEBEB' : '#888', backgroundColor: statusFilter === status ? 'rgba(255,255,255,0.08)' : 'transparent', border: statusFilter === status ? '1px solid rgba(255,255,255,0.12)' : '1px solid transparent', cursor: 'pointer', textTransform: 'capitalize' }}
+            style={{ height: '28px', padding: '0 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, color: statusFilter === status ? 'var(--text-primary)' : 'var(--text-tertiary)', backgroundColor: statusFilter === status ? 'var(--surface-hover)' : 'transparent', border: statusFilter === status ? '1px solid var(--border-strong)' : '1px solid transparent', cursor: 'pointer', textTransform: 'capitalize' }}
           >
             {status === 'all' ? 'All status' : status}
           </button>
@@ -327,13 +327,13 @@ function CollateralPageInner() {
       <Dialog.Root open={generateOpen} onOpenChange={(open) => { setGenerateOpen(open); if (!open) { setSelectedProduct(''); setBuyerRole(''); setCustomPrompt(''); setSpecificObjections(''); setSelectedDealId('') } }}>
         <Dialog.Portal>
           <Dialog.Overlay style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 500 }} />
-          <Dialog.Content style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 501, width: '100%', maxWidth: '520px', background: 'rgba(12,10,24,0.97)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', padding: '24px', boxShadow: '0 24px 64px rgba(0,0,0,0.9)', outline: 'none' }}>
+          <Dialog.Content style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 501, width: '100%', maxWidth: '520px', background: 'var(--glass)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)', border: '1px solid var(--border)', borderRadius: '16px', padding: '24px', boxShadow: 'var(--shadow-lg)', outline: 'none' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <Dialog.Title style={{ fontSize: '16px', fontWeight: 600, color: '#EBEBEB', margin: 0 }}>
+              <Dialog.Title style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
                 Generate collateral
               </Dialog.Title>
               <Dialog.Close asChild>
-                <button style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: '#888' }}>
+                <button style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)' }}>
                   <X size={14} strokeWidth={2} />
                 </button>
               </Dialog.Close>
@@ -342,7 +342,7 @@ function CollateralPageInner() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Type selector */}
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '8px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '8px' }}>
                   Type
                 </label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
@@ -357,27 +357,27 @@ function CollateralPageInner() {
                         gap: '6px',
                         padding: '12px',
                         borderRadius: '8px',
-                        backgroundColor: selectedType === type ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.03)',
-                        border: `1px solid ${selectedType === type ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.06)'}`,
+                        backgroundColor: selectedType === type ? 'var(--accent-subtle)' : 'var(--surface)',
+                        border: `1px solid ${selectedType === type ? 'rgba(99,102,241,0.4)' : 'var(--border)'}`,
                         cursor: 'pointer',
                         transition: 'all 150ms ease',
                         textAlign: 'left',
                       }}
                       onMouseEnter={(e) => {
                         if (selectedType !== type) {
-                          e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'
-                          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'
+                          e.currentTarget.style.backgroundColor = 'var(--surface-hover)'
+                          e.currentTarget.style.borderColor = 'var(--border-strong)'
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (selectedType !== type) {
-                          e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'
-                          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'
+                          e.currentTarget.style.backgroundColor = 'var(--surface)'
+                          e.currentTarget.style.borderColor = 'var(--border)'
                         }
                       }}
                     >
                       <CollateralTypeBadge type={type} />
-                      <span style={{ fontSize: '11px', color: '#666', lineHeight: 1.4 }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', lineHeight: 1.4 }}>
                         {TYPE_META[type].description}
                       </span>
                     </button>
@@ -388,13 +388,13 @@ function CollateralPageInner() {
               {/* Battlecard source */}
               {selectedType === 'battlecard' && competitors.length > 0 && (
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
                     Competitor (optional)
                   </label>
                   <select
                     value={selectedCompetitor}
                     onChange={(e) => setSelectedCompetitor(e.target.value)}
-                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
                   >
                     <option value="">Select a competitor…</option>
                     {competitors.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -405,13 +405,13 @@ function CollateralPageInner() {
               {/* Case study source */}
               {selectedType === 'case_study_doc' && caseStudies.length > 0 && (
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
                     Case study (optional)
                   </label>
                   <select
                     value={selectedCaseStudy}
                     onChange={(e) => setSelectedCaseStudy(e.target.value)}
-                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
                   >
                     <option value="">Select a case study…</option>
                     {caseStudies.map((cs) => <option key={cs.id} value={cs.id}>{cs.customerName}</option>)}
@@ -422,13 +422,13 @@ function CollateralPageInner() {
               {/* Product selector for one-pager */}
               {selectedType === 'one_pager' && products.length > 0 && (
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
                     Product (optional)
                   </label>
                   <select
                     value={selectedProduct}
                     onChange={(e) => setSelectedProduct(e.target.value)}
-                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
                   >
                     <option value="">Use first product ({products[0]?.name ?? '—'})</option>
                     {products.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
@@ -439,7 +439,7 @@ function CollateralPageInner() {
               {/* Buyer role for talk track / email sequence */}
               {(selectedType === 'talk_track' || selectedType === 'email_sequence') && (
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
                     Target buyer role (optional)
                   </label>
                   <input
@@ -447,7 +447,7 @@ function CollateralPageInner() {
                     value={buyerRole}
                     onChange={(e) => setBuyerRole(e.target.value)}
                     placeholder="e.g. VP of Operations, CTO, Head of Finance"
-                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
                   />
                 </div>
               )}
@@ -455,7 +455,7 @@ function CollateralPageInner() {
               {/* Specific objections for objection handler */}
               {selectedType === 'objection_handler' && (
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
                     Objections to include <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
                   </label>
                   <textarea
@@ -463,22 +463,22 @@ function CollateralPageInner() {
                     onChange={(e) => setSpecificObjections(e.target.value)}
                     placeholder={`e.g. "Your price is 3x what we pay today"\n"We already use Salesforce for this"\n"We need SSO before we can consider you"`}
                     rows={3}
-                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(99,102,241,0.25)', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'var(--input-bg)', border: '1px solid rgba(99,102,241,0.25)', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5', boxSizing: 'border-box' }}
                   />
-                  <p style={{ fontSize: '11px', color: '#555', margin: '4px 0 0' }}>One objection per line — the AI will write scripted responses for each.</p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '4px 0 0' }}>One objection per line — the AI will write scripted responses for each.</p>
                 </div>
               )}
 
               {/* Deal selector */}
               {!dealIdParam && deals.length > 0 && (
                 <div>
-                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
                     Tailor for a deal <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
                   </label>
                   <select
                     value={selectedDealId}
                     onChange={(e) => setSelectedDealId(e.target.value)}
-                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: `1px solid ${selectedDealId ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.1)'}`, color: selectedDealId ? '#EBEBEB' : '#666', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
+                    style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'var(--input-bg)', border: `1px solid ${selectedDealId ? 'rgba(99,102,241,0.4)' : 'var(--border)'}`, color: selectedDealId ? 'var(--text-primary)' : 'var(--text-tertiary)', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
                   >
                     <option value="">No deal — generic output</option>
                     {deals.map((d: any) => (
@@ -486,7 +486,7 @@ function CollateralPageInner() {
                     ))}
                   </select>
                   {selectedDealId && (
-                    <p style={{ fontSize: '11px', color: '#6366F1', margin: '4px 0 0' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--accent)', margin: '4px 0 0' }}>
                       AI will use this deal&apos;s context, risks, and competitors to tailor the output.
                     </p>
                   )}
@@ -495,7 +495,7 @@ function CollateralPageInner() {
 
               {/* Custom prompt */}
               <div>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
                   Instructions for the AI <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
                 </label>
                 <textarea
@@ -503,22 +503,22 @@ function CollateralPageInner() {
                   onChange={(e) => setCustomPrompt(e.target.value)}
                   placeholder="e.g. Focus on security and compliance angle, use a formal tone, include NHS reference, emphasise ROI…"
                   rows={3}
-                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5', boxSizing: 'border-box' }}
                 />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '4px' }}>
                 <Dialog.Close asChild>
-                  <button style={{ height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, color: '#888', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}>
+                  <button style={{ height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--text-tertiary)', backgroundColor: 'var(--surface-hover)', border: '1px solid var(--surface-hover)', cursor: 'pointer' }}>
                     Cancel
                   </button>
                 </Dialog.Close>
                 <button
                   onClick={handleGenerate}
                   disabled={generating}
-                  style={{ height: '34px', padding: '0 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: generating ? '#333' : '#6366F1', border: 'none', cursor: generating ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
-                  onMouseEnter={(e) => { if (!generating) e.currentTarget.style.backgroundColor = '#4F46E5' }}
-                  onMouseLeave={(e) => { if (!generating) e.currentTarget.style.backgroundColor = '#6366F1' }}
+                  style={{ height: '34px', padding: '0 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: generating ? 'var(--surface)' : 'var(--accent)', border: 'none', cursor: generating ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
+                  onMouseEnter={(e) => { if (!generating) e.currentTarget.style.backgroundColor = 'var(--accent-hover)' }}
+                  onMouseLeave={(e) => { if (!generating) e.currentTarget.style.backgroundColor = 'var(--accent)' }}
                 >
                   {generating ? 'Starting…' : 'Generate'}
                 </button>

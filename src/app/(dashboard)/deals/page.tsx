@@ -67,15 +67,15 @@ export default function DealsPage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-            <div style={{ width: '32px', height: '32px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <ClipboardList size={15} color="#818CF8" />
+            <div style={{ width: '32px', height: '32px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <ClipboardList size={15} color="var(--accent)" />
             </div>
-            <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', margin: 0 }}>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>
               Deal Log
             </h1>
           </div>
-          <p style={{ fontSize: '13px', color: '#555', margin: 0, paddingLeft: '42px' }}>
-            <span style={{ color: '#818CF8', fontWeight: 600 }}>{deals.length}</span>
+          <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', margin: 0, paddingLeft: '42px' }}>
+            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{deals.length}</span>
             {' '}deals · Track wins and losses to improve closing
           </p>
         </div>
@@ -90,16 +90,16 @@ export default function DealsPage() {
             background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
             border: '1px solid rgba(99,102,241,0.4)',
             cursor: 'pointer',
-            boxShadow: '0 0 20px rgba(99,102,241,0.3), 0 2px 8px rgba(0,0,0,0.3)',
+            boxShadow: 'var(--shadow)',
             transition: 'opacity 150ms ease, box-shadow 150ms ease',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.opacity = '0.9'
-            e.currentTarget.style.boxShadow = '0 0 28px rgba(99,102,241,0.45), 0 2px 8px rgba(0,0,0,0.3)'
+            e.currentTarget.style.boxShadow = 'var(--shadow-lg)'
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.opacity = '1'
-            e.currentTarget.style.boxShadow = '0 0 20px rgba(99,102,241,0.3), 0 2px 8px rgba(0,0,0,0.3)'
+            e.currentTarget.style.boxShadow = 'var(--shadow)'
           }}
         >
           <Plus size={14} strokeWidth={2.5} />
@@ -143,16 +143,16 @@ export default function DealsPage() {
             transform: 'translate(-50%, -50%)',
             zIndex: 501, width: '100%', maxWidth: '520px',
             maxHeight: '90vh', overflowY: 'auto',
-            background: 'rgba(12,12,20,0.95)',
+            background: 'var(--elevated)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255,255,255,0.10)',
+            border: '1px solid var(--border-strong)',
             borderRadius: '16px', padding: '24px',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.8), 0 0 0 1px rgba(99,102,241,0.1), inset 0 1px 0 rgba(255,255,255,0.08)',
+            boxShadow: 'var(--shadow-lg)',
             outline: 'none',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <Dialog.Title style={{ fontSize: '16px', fontWeight: 700, color: '#F1F1F3', margin: 0, letterSpacing: '-0.02em' }}>
+              <Dialog.Title style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em' }}>
                 Log a deal
               </Dialog.Title>
               <Dialog.Close asChild>
@@ -160,13 +160,13 @@ export default function DealsPage() {
                   width: '28px', height: '28px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   borderRadius: '6px',
-                  backgroundColor: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  cursor: 'pointer', color: '#888',
+                  backgroundColor: 'var(--surface-hover)',
+                  border: '1px solid var(--border)',
+                  cursor: 'pointer', color: 'var(--text-tertiary)',
                   transition: 'background 0.15s',
                 }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--border-strong)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface-hover)' }}
                 >
                   <X size={14} strokeWidth={2} />
                 </button>

@@ -41,7 +41,7 @@ const PLAN_DETAILS: Record<Plan, { name: string; price: string; color: string; b
     features: ['1 product', '1 competitor', '2 case studies', '5 deal logs', '3 AI collateral pieces'],
   },
   starter: {
-    name: 'Starter', price: '$79/mo', color: '#6366F1', bg: 'rgba(99,102,241,0.08)',
+    name: 'Starter', price: '$79/mo', color: '#6366F1', bg: 'var(--accent-subtle)',
     features: ['5 products', '15 competitors', 'Unlimited case studies', 'Unlimited deals', 'Unlimited collateral', 'AI meeting prep', '.docx export'],
   },
   pro: {
@@ -53,13 +53,13 @@ const PLAN_DETAILS: Record<Plan, { name: string; price: string; color: string; b
 function SectionCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-      border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', overflow: 'hidden',
-      boxShadow: '0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)',
+      background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+      border: '1px solid var(--card-border)', borderRadius: '12px', overflow: 'hidden',
+      boxShadow: 'var(--shadow)',
     }}>
-      <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
-        <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#F1F1F3', margin: 0, marginBottom: description ? '3px' : 0 }}>{title}</h2>
-        {description && <p style={{ fontSize: '11px', color: '#666', margin: 0 }}>{description}</p>}
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+        <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: description ? '3px' : 0 }}>{title}</h2>
+        {description && <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: 0 }}>{description}</p>}
       </div>
       <div style={{ padding: '16px 18px' }}>{children}</div>
     </div>
@@ -68,9 +68,9 @@ function SectionCard({ title, description, children }: { title: string; descript
 
 function FieldRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-      <span style={{ fontSize: '12px', color: '#666' }}>{label}</span>
-      <span style={{ fontSize: '12px', color: '#F1F1F3', fontWeight: 500 }}>{value}</span>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+      <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{label}</span>
+      <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 500 }}>{value}</span>
     </div>
   )
 }
@@ -362,10 +362,10 @@ export default function SettingsPage() {
       <div style={{ marginBottom: '20px' }}>
         <h1 style={{
           fontSize: '20px', fontWeight: 800, letterSpacing: '-0.04em', margin: 0, marginBottom: '4px',
-          background: 'linear-gradient(135deg, #F1F1F3 0%, #A5A5C0 100%)',
+          background: 'linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%)',
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
         }}>Settings</h1>
-        <p style={{ fontSize: '12px', color: '#888', margin: 0 }}>Manage your workspace, team, and billing</p>
+        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Manage your workspace, team, and billing</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -382,8 +382,8 @@ export default function SettingsPage() {
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '5px',
                     height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
-                    color: '#F1F1F3', backgroundColor: 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.10)', textDecoration: 'none',
+                    color: 'var(--text-primary)', backgroundColor: 'var(--surface-hover)',
+                    border: '1px solid var(--border-strong)', textDecoration: 'none',
                   }}>
                   <ExternalLink size={11} strokeWidth={2} />
                   Manage on Clerk
@@ -399,15 +399,15 @@ export default function SettingsPage() {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', gap: '12px' }}>
                 <div>
-                  <p style={{ fontSize: '13px', fontWeight: 600, color: '#F1F1F3', margin: 0 }}>{dbUser?.workspaceName ?? 'My Workspace'}</p>
-                  <p style={{ fontSize: '11px', color: '#555', margin: '2px 0 0' }}>Role: <span style={{ color: '#888', textTransform: 'capitalize' }}>{dbUser?.role}</span></p>
+                  <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{dbUser?.workspaceName ?? 'My Workspace'}</p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '2px 0 0' }}>Role: <span style={{ color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{dbUser?.role}</span></p>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                  <p style={{ fontSize: '11px', color: '#555', margin: 0 }}>Join code</p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: 0 }}>Join code</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <code style={{
-                      fontSize: '12px', fontWeight: 600, color: '#818CF8',
-                      background: 'rgba(99,102,241,0.12)', padding: '3px 8px', borderRadius: '6px',
+                      fontSize: '12px', fontWeight: 600, color: 'var(--accent)',
+                      background: 'var(--accent-subtle)', padding: '3px 8px', borderRadius: '6px',
                       border: '1px solid rgba(99,102,241,0.25)', fontFamily: 'monospace',
                     }}>
                       {dbUser?.workspaceSlug ?? '—'}
@@ -417,8 +417,8 @@ export default function SettingsPage() {
                       style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         width: '26px', height: '26px', borderRadius: '6px',
-                        background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
-                        cursor: 'pointer', color: '#888',
+                        background: 'var(--surface-hover)', border: '1px solid var(--border-strong)',
+                        cursor: 'pointer', color: 'var(--text-secondary)',
                       }}>
                       <Copy size={11} />
                     </button>
@@ -426,8 +426,8 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <p style={{ fontSize: '11px', color: '#555', margin: '0 0 10px' }}>
-                Share the join code with teammates. They enter it at <strong style={{ color: '#888' }}>/settings</strong> → Join workspace.
+              <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '0 0 10px' }}>
+                Share the join code with teammates. They enter it at <strong style={{ color: 'var(--text-secondary)' }}>/settings</strong> → Join workspace.
               </p>
 
               {/* Members list */}
@@ -436,40 +436,40 @@ export default function SettingsPage() {
                   <div key={m.id} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     padding: '8px 10px', borderRadius: '8px',
-                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                    background: 'var(--surface)', border: '1px solid var(--border)',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div style={{
                         width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
                         background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.3))',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '11px', fontWeight: 700, color: '#818CF8',
+                        fontSize: '11px', fontWeight: 700, color: 'var(--accent)',
                       }}>
                         {m.email[0].toUpperCase()}
                       </div>
                       <div>
-                        <p style={{ fontSize: '12px', color: '#E5E7EB', margin: 0 }}>{m.email}</p>
-                        <p style={{ fontSize: '10px', color: '#555', margin: 0, textTransform: 'capitalize' }}>{m.role}</p>
+                        <p style={{ fontSize: '12px', color: 'var(--text-primary)', margin: 0 }}>{m.email}</p>
+                        <p style={{ fontSize: '10px', color: 'var(--text-tertiary)', margin: 0, textTransform: 'capitalize' }}>{m.role}</p>
                       </div>
                     </div>
                     {isOwner && m.userId !== dbUser?.id && (
                       <button onClick={() => handleRemoveMember(m.userId, m.email)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', padding: '4px', borderRadius: '5px', display: 'flex', alignItems: 'center' }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
-                        onMouseLeave={e => (e.currentTarget.style.color = '#555')}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '4px', borderRadius: '5px', display: 'flex', alignItems: 'center' }}
+                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--danger)')}
+                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
                       >
                         <Trash2 size={12} />
                       </button>
                     )}
                     {m.userId === dbUser?.id && (
-                      <span style={{ fontSize: '10px', color: '#555', background: 'rgba(255,255,255,0.05)', padding: '2px 7px', borderRadius: '4px' }}>you</span>
+                      <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--surface)', padding: '2px 7px', borderRadius: '4px' }}>you</span>
                     )}
                   </div>
                 ))}
               </div>
 
               {/* Join another workspace */}
-              <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border)' }}>
                 <JoinWorkspaceForm onJoined={() => window.location.reload()} />
               </div>
 
@@ -478,7 +478,7 @@ export default function SettingsPage() {
                   style={{
                     marginTop: '12px', display: 'inline-flex', alignItems: 'center', gap: '5px',
                     padding: '6px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
-                    color: '#EF4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)',
+                    color: 'var(--danger)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)',
                     cursor: 'pointer',
                   }}>
                   <LogOut size={12} />
@@ -495,7 +495,7 @@ export default function SettingsPage() {
 
             {/* Currency */}
             <div>
-              <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
                 Currency symbol used across deal values, KPIs, and reports
               </div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -517,9 +517,9 @@ export default function SettingsPage() {
                       disabled={savingCurrency}
                       style={{
                         height: '32px', padding: '0 14px', borderRadius: '7px', fontSize: '12px', fontWeight: isActive ? '600' : '400',
-                        background: isActive ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
-                        border: isActive ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(255,255,255,0.08)',
-                        color: isActive ? '#818CF8' : '#9CA3AF',
+                        background: isActive ? 'var(--accent-subtle)' : 'var(--surface)',
+                        border: isActive ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)',
+                        color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
                         cursor: savingCurrency ? 'not-allowed' : 'pointer',
                         transition: 'all 0.1s',
                       }}
@@ -533,10 +533,10 @@ export default function SettingsPage() {
 
             {/* ARR / MRR display */}
             <div>
-              <div style={{ fontSize: '12px', color: '#888', marginBottom: '6px' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
                 How recurring revenue is shown across the dashboard, pipeline, and reports
               </div>
-              <div style={{ fontSize: '11px', color: '#555', marginBottom: '10px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '10px' }}>
                 ARR annualises monthly deals (e.g. £149/mo → £1,788/yr). MRR shows the monthly equivalent.
               </div>
               <div style={{ display: 'flex', gap: '6px' }}>
@@ -553,15 +553,15 @@ export default function SettingsPage() {
                       style={{
                         height: '48px', padding: '0 16px', borderRadius: '7px', fontSize: '12px',
                         fontWeight: isActive ? '600' : '400', textAlign: 'left',
-                        background: isActive ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
-                        border: isActive ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(255,255,255,0.08)',
-                        color: isActive ? '#818CF8' : '#9CA3AF',
+                        background: isActive ? 'var(--accent-subtle)' : 'var(--surface)',
+                        border: isActive ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)',
+                        color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
                         cursor: savingDisplay ? 'not-allowed' : 'pointer',
                         transition: 'all 0.1s', display: 'flex', flexDirection: 'column', gap: '2px',
                       }}
                     >
                       <span>{label}</span>
-                      <span style={{ fontSize: '10px', color: isActive ? '#6366F1' : '#444', fontWeight: 400 }}>{desc}</span>
+                      <span style={{ fontSize: '10px', color: isActive ? 'var(--accent)' : 'var(--text-tertiary)', fontWeight: 400 }}>{desc}</span>
                     </button>
                   )
                 })}
@@ -583,7 +583,7 @@ export default function SettingsPage() {
                 <CheckCircle size={16} strokeWidth={2} style={{ color: planDetail.color, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: '13px', fontWeight: 700, color: planDetail.color, margin: 0 }}>{planDetail.name} Plan</p>
-                  <p style={{ fontSize: '11px', color: '#666', margin: '2px 0 0' }}>{planDetail.features.join(' · ')}</p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '2px 0 0' }}>{planDetail.features.join(' · ')}</p>
                 </div>
                 <span style={{ fontSize: '14px', fontWeight: 800, color: planDetail.color }}>{planDetail.price}</span>
               </div>
@@ -595,16 +595,16 @@ export default function SettingsPage() {
                   return (
                     <div key={plan} style={{
                       padding: '12px', borderRadius: '10px',
-                      background: isCurrent ? detail.bg : 'rgba(255,255,255,0.02)',
-                      border: `1px solid ${isCurrent ? `${detail.color}44` : 'rgba(255,255,255,0.07)'}`,
+                      background: isCurrent ? detail.bg : 'var(--surface)',
+                      border: `1px solid ${isCurrent ? `${detail.color}44` : 'var(--card-border)'}`,
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 700, color: isCurrent ? detail.color : '#F1F1F3' }}>{detail.name}</span>
-                        <span style={{ fontSize: '11px', color: '#666' }}>{detail.price}</span>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: isCurrent ? detail.color : 'var(--text-primary)' }}>{detail.name}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{detail.price}</span>
                       </div>
                       <ul style={{ margin: '0 0 10px', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '3px' }}>
                         {detail.features.map(f => (
-                          <li key={f} style={{ fontSize: '10px', color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <li key={f} style={{ fontSize: '10px', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <CheckCircle size={9} strokeWidth={2} style={{ color: detail.color, flexShrink: 0 }} />{f}
                           </li>
                         ))}
@@ -615,9 +615,9 @@ export default function SettingsPage() {
                         <button disabled={billingLoading === plan} onClick={() => plan === 'free' ? handleBillingPortal() : handleUpgrade(plan as 'starter' | 'pro')}
                           style={{
                             width: '100%', height: '28px', borderRadius: '7px', fontSize: '11px', fontWeight: 600,
-                            color: isUpgrade ? '#fff' : '#888',
-                            background: isUpgrade ? `linear-gradient(135deg, ${detail.color}, ${detail.color}cc)` : 'rgba(255,255,255,0.05)',
-                            border: isUpgrade ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                            color: isUpgrade ? '#fff' : 'var(--text-secondary)',
+                            background: isUpgrade ? `linear-gradient(135deg, ${detail.color}, ${detail.color}cc)` : 'var(--surface)',
+                            border: isUpgrade ? 'none' : '1px solid var(--border)',
                             cursor: billingLoading === plan ? 'not-allowed' : 'pointer',
                             opacity: billingLoading === plan ? 0.6 : 1,
                           }}>
@@ -630,18 +630,18 @@ export default function SettingsPage() {
               </div>
 
               {currentPlan !== 'free' && (
-                <p style={{ fontSize: '11px', color: '#666', margin: 0 }}>
+                <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: 0 }}>
                   Manage invoices via the{' '}
                   <button onClick={handleBillingPortal} disabled={billingLoading === 'portal'}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6366F1', fontSize: '11px', padding: 0 }}>
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: '11px', padding: 0 }}>
                     {billingLoading === 'portal' ? 'Redirecting…' : 'Stripe billing portal'}
                   </button>.
                 </p>
               )}
-              <p style={{ fontSize: '11px', color: '#555', margin: '8px 0 0' }}>
+              <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '8px 0 0' }}>
                 Plan not reflecting a recent change?{' '}
                 <button onClick={handleSyncPlan} disabled={billingLoading === 'sync'}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6366F1', fontSize: '11px', padding: 0 }}>
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: '11px', padding: 0 }}>
                   {billingLoading === 'sync' ? 'Syncing…' : 'Sync from Stripe'}
                 </button>
               </p>
@@ -654,7 +654,7 @@ export default function SettingsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
             {/* HubSpot */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', padding: '14px', borderRadius: '10px', background: hubspot?.connected ? 'rgba(255,160,50,0.05)' : 'rgba(255,255,255,0.02)', border: `1px solid ${hubspot?.connected ? 'rgba(255,160,50,0.25)' : 'rgba(255,255,255,0.08)'}` }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', padding: '14px', borderRadius: '10px', background: hubspot?.connected ? 'rgba(255,160,50,0.05)' : 'var(--surface)', border: `1px solid ${hubspot?.connected ? 'rgba(255,160,50,0.25)' : 'var(--border)'}` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 {/* HubSpot orange sprocket logo mark */}
                 <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(255,122,0,0.12)', border: '1px solid rgba(255,122,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -663,24 +663,24 @@ export default function SettingsPage() {
                   </svg>
                 </div>
                 <div>
-                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#F1F1F3', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     HubSpot CRM
                     {hubspot?.connected && (
-                      <span style={{ fontSize: '10px', fontWeight: '700', color: '#22C55E', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '100px', padding: '1px 7px' }}>Connected</span>
+                      <span style={{ fontSize: '10px', fontWeight: '700', color: 'var(--success)', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '100px', padding: '1px 7px' }}>Connected</span>
                     )}
                   </div>
                   {hubspot?.connected ? (
-                    <div style={{ fontSize: '11px', color: '#666', lineHeight: 1.5 }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', lineHeight: 1.5 }}>
                       Portal {hubspot.portalId} ·{' '}
                       {hubspot.lastSyncAt
                         ? `Last synced ${new Date(hubspot.lastSyncAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · ${hubspot.dealsImported} deals imported`
                         : 'Never synced — click "Sync deals" to import your pipeline'}
                       {hubspot.syncError && (
-                        <div style={{ color: '#EF4444', marginTop: '4px' }}>⚠ Last sync error: {hubspot.syncError}</div>
+                        <div style={{ color: 'var(--danger)', marginTop: '4px' }}>⚠ Last sync error: {hubspot.syncError}</div>
                       )}
                     </div>
                   ) : (
-                    <div style={{ fontSize: '11px', color: '#666' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
                       Import your entire HubSpot pipeline — deals, stages, contacts, and values — directly into SellSight.
                     </div>
                   )}
@@ -692,7 +692,7 @@ export default function SettingsPage() {
                     <button
                       onClick={handleHubspotSync}
                       disabled={hubspotSyncing}
-                      style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#F1F1F3', backgroundColor: 'rgba(255,122,0,0.15)', border: '1px solid rgba(255,122,0,0.3)', cursor: hubspotSyncing ? 'not-allowed' : 'pointer', opacity: hubspotSyncing ? 0.6 : 1 }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)', backgroundColor: 'rgba(255,122,0,0.15)', border: '1px solid rgba(255,122,0,0.3)', cursor: hubspotSyncing ? 'not-allowed' : 'pointer', opacity: hubspotSyncing ? 0.6 : 1 }}
                     >
                       <RefreshCw size={11} style={{ animation: hubspotSyncing ? 'spin 1s linear infinite' : 'none' }} />
                       {hubspotSyncing ? 'Syncing…' : 'Sync deals'}
@@ -700,7 +700,7 @@ export default function SettingsPage() {
                     <button
                       onClick={handleHubspotDisconnect}
                       disabled={hubspotDisconnecting}
-                      style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#9CA3AF', backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', cursor: hubspotDisconnecting ? 'not-allowed' : 'pointer', opacity: hubspotDisconnecting ? 0.6 : 1 }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', cursor: hubspotDisconnecting ? 'not-allowed' : 'pointer', opacity: hubspotDisconnecting ? 0.6 : 1 }}
                     >
                       <Unplug size={11} />
                       Disconnect
@@ -722,7 +722,7 @@ export default function SettingsPage() {
             {showTokenInput && !hubspot?.connected && (
               <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(255,122,0,0.04)', border: '1px solid rgba(255,122,0,0.2)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                  <p style={{ fontSize: '12px', fontWeight: 600, color: '#F1F1F3', margin: 0 }}>Connect via Private App token</p>
+                  <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Connect via Private App token</p>
                   <a
                     href="https://app.hubspot.com/private-apps"
                     target="_blank"
@@ -742,7 +742,7 @@ export default function SettingsPage() {
                   ].map(({ n, text }) => (
                     <div key={n} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                       <span style={{ flexShrink: 0, width: '18px', height: '18px', borderRadius: '50%', background: 'rgba(255,122,0,0.15)', border: '1px solid rgba(255,122,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, color: '#FF7A00', marginTop: '1px' }}>{n}</span>
-                      <span style={{ fontSize: '11px', color: '#888', lineHeight: 1.6 }}>{text}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{text}</span>
                     </div>
                   ))}
                 </div>
@@ -760,8 +760,8 @@ export default function SettingsPage() {
                     autoComplete="off"
                     style={{
                       flex: 1, height: '32px', padding: '0 10px', borderRadius: '7px', fontSize: '12px',
-                      background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,122,0,0.3)',
-                      color: '#F1F1F3', outline: 'none', fontFamily: 'monospace',
+                      background: 'var(--surface-hover)', border: '1px solid rgba(255,122,0,0.3)',
+                      color: 'var(--text-primary)', outline: 'none', fontFamily: 'monospace',
                     }}
                   />
                   <button
@@ -780,7 +780,7 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => { setShowTokenInput(false); setHubspotToken('') }}
-                    style={{ height: '32px', padding: '0 10px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#666', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer' }}
+                    style={{ height: '32px', padding: '0 10px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--text-tertiary)', background: 'transparent', border: '1px solid var(--border)', cursor: 'pointer' }}
                   >
                     Cancel
                   </button>
@@ -788,7 +788,7 @@ export default function SettingsPage() {
               </div>
             )}
 
-            <p style={{ fontSize: '11px', color: '#444', margin: 0, lineHeight: 1.5 }}>
+            <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: 0, lineHeight: 1.5 }}>
               More integrations coming — Salesforce, Pipedrive, and Close are on the roadmap.
             </p>
           </div>
@@ -800,9 +800,9 @@ export default function SettingsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
             {/* Explainer */}
-            <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.14)' }}>
-              <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0, lineHeight: 1.7 }}>
-                When enabled, SellSight contributes <strong style={{ color: '#EBEBEB' }}>10 anonymised behavioural signals</strong> per closed deal to a shared learning pool.
+            <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.14)' }}>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.7 }}>
+                When enabled, SellSight contributes <strong style={{ color: 'var(--text-primary)' }}>10 anonymised behavioural signals</strong> per closed deal to a shared learning pool.
                 In return, your predictions are benchmarked against industry data and new workspaces start with a pre-calibrated model instead of a 50/50 coin flip.
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '10px' }}>
@@ -816,7 +816,7 @@ export default function SettingsPage() {
                   { ok: false, label: 'Exact deal values' },
                   { ok: false, label: 'Contact info or loss reasons' },
                 ].map(({ ok, label }) => (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: ok ? '#6EE7B7' : '#6B7280' }}>
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: ok ? '#6EE7B7' : 'var(--text-tertiary)' }}>
                     <span style={{ fontSize: '10px', flexShrink: 0 }}>{ok ? '✓ shared' : '✗ never'}</span>
                     <span>{label}</span>
                   </div>
@@ -825,10 +825,10 @@ export default function SettingsPage() {
             </div>
 
             {/* Consent toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.025)', border: `1px solid ${globalConsent ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.07)'}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '10px', background: 'var(--surface)', border: `1px solid ${globalConsent ? 'rgba(34,197,94,0.25)' : 'var(--border)'}` }}>
               <div>
-                <p style={{ fontSize: '13px', fontWeight: 600, color: '#F1F1F3', margin: 0 }}>Contribute to Industry Intelligence</p>
-                <p style={{ fontSize: '11px', color: '#666', margin: '3px 0 0' }}>
+                <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Contribute to Industry Intelligence</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '3px 0 0' }}>
                   {globalConsent
                     ? 'Active — your anonymised outcomes are improving predictions for all users'
                     : 'Disabled — enable to unlock industry benchmarks and improve your predictions'}
@@ -839,7 +839,7 @@ export default function SettingsPage() {
                 disabled={consentLoading || (dbUser?.role !== 'owner' && dbUser?.role !== 'admin')}
                 style={{
                   position: 'relative', width: '44px', height: '24px', borderRadius: '12px',
-                  background: globalConsent ? '#22C55E' : 'rgba(255,255,255,0.12)',
+                  background: globalConsent ? 'var(--success)' : 'var(--border-strong)',
                   border: 'none', cursor: (consentLoading || (dbUser?.role !== 'owner' && dbUser?.role !== 'admin')) ? 'not-allowed' : 'pointer',
                   opacity: consentLoading ? 0.6 : 1, transition: 'background 0.2s', flexShrink: 0,
                 }}
@@ -857,11 +857,11 @@ export default function SettingsPage() {
             {dbUser?.role === 'owner' && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '10px', background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.14)' }}>
                 <div>
-                  <p style={{ fontSize: '12px', fontWeight: 500, color: '#EF4444', margin: 0 }}>Remove from global pool</p>
-                  <p style={{ fontSize: '11px', color: '#666', margin: '2px 0 0' }}>GDPR Article 17 — erase all contributed records within 30 days</p>
+                  <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--danger)', margin: 0 }}>Remove from global pool</p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '2px 0 0' }}>GDPR Article 17 — erase all contributed records within 30 days</p>
                 </div>
                 <button onClick={handleGlobalErase} disabled={eraseLoading}
-                  style={{ height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#EF4444', background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.22)', cursor: eraseLoading ? 'not-allowed' : 'pointer', opacity: eraseLoading ? 0.6 : 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  style={{ height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--danger)', background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.22)', cursor: eraseLoading ? 'not-allowed' : 'pointer', opacity: eraseLoading ? 0.6 : 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
                   {eraseLoading ? 'Erasing…' : 'Erase my data'}
                 </button>
               </div>
@@ -882,19 +882,19 @@ export default function SettingsPage() {
                 { icon: '✅', label: 'SOC 2 auth provider', sub: 'Clerk (SOC 2 Type II)' },
                 { icon: '🌍', label: 'GDPR & CCPA ready', sub: 'EU/UK/California rights supported' },
               ].map(({ icon, label, sub }) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderRadius: '9px', background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderRadius: '9px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
                   <span style={{ fontSize: '14px', flexShrink: 0, marginTop: '1px' }}>{icon}</span>
                   <div>
-                    <p style={{ fontSize: '12px', fontWeight: 600, color: '#EBEBEB', margin: 0 }}>{label}</p>
-                    <p style={{ fontSize: '11px', color: '#666', margin: '2px 0 0' }}>{sub}</p>
+                    <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{label}</p>
+                    <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '2px 0 0' }}>{sub}</p>
                   </div>
                 </div>
               ))}
             </div>
 
             {/* Sub-processors */}
-            <div style={{ padding: '12px 14px', borderRadius: '9px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-              <p style={{ fontSize: '11px', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>Sub-processors</p>
+            <div style={{ padding: '12px 14px', borderRadius: '9px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>Sub-processors</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {[
                   ['Clerk', 'Auth & user management', 'US (SOC 2)'],
@@ -904,31 +904,31 @@ export default function SettingsPage() {
                   ['Vercel', 'Hosting & CDN', 'US/Global (SCCs)'],
                 ].map(([name, purpose, location]) => (
                   <div key={name} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-                    <span style={{ color: '#EBEBEB', fontWeight: 500, width: '80px', flexShrink: 0 }}>{name}</span>
-                    <span style={{ color: '#666', flex: 1 }}>{purpose}</span>
-                    <span style={{ color: '#555', fontSize: '11px', textAlign: 'right' }}>{location}</span>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 500, width: '80px', flexShrink: 0 }}>{name}</span>
+                    <span style={{ color: 'var(--text-tertiary)', flex: 1 }}>{purpose}</span>
+                    <span style={{ color: 'var(--text-tertiary)', fontSize: '11px', textAlign: 'right' }}>{location}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Rights */}
-            <div style={{ padding: '10px 14px', borderRadius: '9px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)' }}>
-              <p style={{ fontSize: '11px', color: '#818CF8', fontWeight: 600, margin: '0 0 6px' }}>Your rights (GDPR / CCPA)</p>
-              <p style={{ fontSize: '12px', color: '#777', margin: 0, lineHeight: 1.6 }}>
-                Access, correct, export, or delete your data at any time using the buttons below, or email <a href="mailto:privacy@sellsight.io" style={{ color: '#818CF8' }}>privacy@sellsight.io</a>. We respond within 30 days.
+            <div style={{ padding: '10px 14px', borderRadius: '9px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.15)' }}>
+              <p style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600, margin: '0 0 6px' }}>Your rights (GDPR / CCPA)</p>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>
+                Access, correct, export, or delete your data at any time using the buttons below, or email <a href="mailto:privacy@sellsight.io" style={{ color: 'var(--accent)' }}>privacy@sellsight.io</a>. We respond within 30 days.
               </p>
             </div>
 
             {/* Links */}
             <div style={{ display: 'flex', gap: '8px' }}>
               <a href="/privacy" target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#818CF8', backgroundColor: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', textDecoration: 'none' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--accent)', backgroundColor: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.2)', textDecoration: 'none' }}>
                 <ExternalLink size={11} />
                 Privacy Policy
               </a>
               <a href="/terms" target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#9CA3AF', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', textDecoration: 'none' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', textDecoration: 'none' }}>
                 <ExternalLink size={11} />
                 Terms of Service
               </a>
@@ -938,13 +938,13 @@ export default function SettingsPage() {
 
         <SectionCard title="Your data" description="Export or delete all workspace data">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '10px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
               <div>
-                <p style={{ fontSize: '12px', fontWeight: 500, color: '#F1F1F3', margin: 0 }}>Export all data</p>
-                <p style={{ fontSize: '11px', color: '#666', margin: '2px 0 0' }}>Download as JSON</p>
+                <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>Export all data</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '2px 0 0' }}>Download as JSON</p>
               </div>
               <button onClick={handleExportData} disabled={exportLoading}
-                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#F1F1F3', backgroundColor: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', cursor: exportLoading ? 'not-allowed' : 'pointer', opacity: exportLoading ? 0.6 : 1 }}>
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)', backgroundColor: 'var(--surface-hover)', border: '1px solid var(--border-strong)', cursor: exportLoading ? 'not-allowed' : 'pointer', opacity: exportLoading ? 0.6 : 1 }}>
                 <Download size={12} strokeWidth={2} />
                 {exportLoading ? 'Exporting…' : 'Export'}
               </button>
@@ -952,11 +952,11 @@ export default function SettingsPage() {
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '10px', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.18)' }}>
               <div>
-                <p style={{ fontSize: '12px', fontWeight: 500, color: '#EF4444', margin: 0 }}>Delete account</p>
-                <p style={{ fontSize: '11px', color: '#666', margin: '2px 0 0' }}>Permanently delete everything. Cannot be undone.</p>
+                <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--danger)', margin: 0 }}>Delete account</p>
+                <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '2px 0 0' }}>Permanently delete everything. Cannot be undone.</p>
               </div>
               <button onClick={() => setDeleteOpen(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#EF4444', backgroundColor: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.22)', cursor: 'pointer' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--danger)', backgroundColor: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.22)', cursor: 'pointer' }}>
                 <Trash2 size={12} strokeWidth={2} />
                 Delete
               </button>
@@ -966,7 +966,7 @@ export default function SettingsPage() {
 
         <div style={{ display: 'flex', gap: '8px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)' }}>
           <AlertTriangle size={13} strokeWidth={2} style={{ color: '#F59E0B', flexShrink: 0, marginTop: '1px' }} />
-          <p style={{ fontSize: '11px', color: '#888', margin: 0, lineHeight: 1.5 }}>
+          <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
             Account deletion removes your account, cancels subscriptions, and deletes all workspace data. Only the workspace owner can delete the workspace.
           </p>
         </div>
@@ -1009,14 +1009,14 @@ function JoinWorkspaceForm({ onJoined }: { onJoined: () => void }) {
         placeholder="Enter join code (e.g. crane-47)"
         style={{
           flex: 1, height: '30px', padding: '0 10px', borderRadius: '7px', fontSize: '12px',
-          background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)',
-          color: '#F1F1F3', outline: 'none', fontFamily: 'inherit',
+          background: 'var(--surface)', border: '1px solid var(--border-strong)',
+          color: 'var(--text-primary)', outline: 'none', fontFamily: 'inherit',
         }}
       />
       <button type="submit" disabled={loading || !slug.trim()}
         style={{
           height: '30px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 600,
-          color: '#fff', background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
+          color: '#fff', background: 'linear-gradient(135deg, var(--accent), #7C3AED)',
           border: 'none', cursor: loading || !slug.trim() ? 'not-allowed' : 'pointer',
           opacity: loading || !slug.trim() ? 0.6 : 1, whiteSpace: 'nowrap',
         }}>

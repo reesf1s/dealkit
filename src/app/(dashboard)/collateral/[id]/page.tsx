@@ -137,9 +137,9 @@ export default function CollateralDetailPage() {
     <div style={{ padding: '32px', maxWidth: '900px', margin: '0 auto' }}>
       <Link
         href="/collateral"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#888', textDecoration: 'none', marginBottom: '20px' }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = '#EBEBEB' }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = '#888' }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-tertiary)', textDecoration: 'none', marginBottom: '20px' }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)' }}
       >
         <ArrowLeft size={14} strokeWidth={2} />
         Back to collateral
@@ -154,7 +154,7 @@ export default function CollateralDetailPage() {
       )}
 
       {error && (
-        <div style={{ padding: '16px', borderRadius: '8px', backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444', fontSize: '13px' }}>
+        <div style={{ padding: '16px', borderRadius: '8px', backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--danger)', fontSize: '13px' }}>
           Failed to load collateral. Please refresh.
         </div>
       )}
@@ -168,10 +168,10 @@ export default function CollateralDetailPage() {
                 <CollateralTypeBadge type={item.type} customTypeName={item.customTypeName} />
                 <StatusBadge status={item.status as 'ready' | 'stale' | 'generating' | 'archived'} />
               </div>
-              <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', margin: 0, marginBottom: '4px' }}>
+              <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0, marginBottom: '4px' }}>
                 {item.title}
               </h1>
-              <p style={{ fontSize: '12px', color: '#555', margin: 0 }}>
+              <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: 0 }}>
                 Generated {formatDate(item.generatedAt)}
               </p>
             </div>
@@ -179,9 +179,9 @@ export default function CollateralDetailPage() {
             <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
               <button
                 onClick={handleRegenerate}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, color: '#EBEBEB', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', transition: 'background-color 150ms ease' }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', backgroundColor: 'var(--surface-hover)', border: '1px solid var(--surface-hover)', cursor: 'pointer', transition: 'background-color 150ms ease' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--border-strong)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface-hover)' }}
               >
                 <RefreshCw size={13} strokeWidth={2} />
                 Regenerate
@@ -193,9 +193,9 @@ export default function CollateralDetailPage() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px',
                   fontSize: '13px', fontWeight: 500, cursor: deleting ? 'not-allowed' : 'pointer', transition: 'all 150ms ease',
-                  color: deleteConfirm ? '#fff' : '#EF4444',
-                  backgroundColor: deleteConfirm ? '#EF4444' : 'rgba(239,68,68,0.08)',
-                  border: deleteConfirm ? '1px solid #EF4444' : '1px solid rgba(239,68,68,0.25)',
+                  color: deleteConfirm ? '#fff' : 'var(--danger)',
+                  backgroundColor: deleteConfirm ? 'var(--danger)' : 'rgba(239,68,68,0.08)',
+                  border: deleteConfirm ? '1px solid var(--danger)' : '1px solid rgba(239,68,68,0.25)',
                   opacity: deleting ? 0.6 : 1,
                 }}
                 onMouseEnter={(e) => { if (!deleteConfirm) e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.15)' }}
@@ -210,9 +210,9 @@ export default function CollateralDetailPage() {
                 <button
                   onClick={handleShare}
                   disabled={shareLoading}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, color: item.isShared ? '#6366F1' : '#EBEBEB', backgroundColor: item.isShared ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.06)', border: item.isShared ? '1px solid rgba(99,102,241,0.3)' : '1px solid rgba(255,255,255,0.08)', cursor: shareLoading ? 'not-allowed' : 'pointer', opacity: shareLoading ? 0.6 : 1, transition: 'background-color 150ms ease' }}
-                  onMouseEnter={(e) => { if (!shareLoading) e.currentTarget.style.backgroundColor = item.isShared ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.1)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = item.isShared ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.06)' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, color: item.isShared ? 'var(--accent)' : 'var(--text-primary)', backgroundColor: item.isShared ? 'var(--accent-subtle)' : 'var(--surface-hover)', border: item.isShared ? '1px solid rgba(99,102,241,0.3)' : '1px solid var(--surface-hover)', cursor: shareLoading ? 'not-allowed' : 'pointer', opacity: shareLoading ? 0.6 : 1, transition: 'background-color 150ms ease' }}
+                  onMouseEnter={(e) => { if (!shareLoading) e.currentTarget.style.backgroundColor = item.isShared ? 'rgba(99,102,241,0.2)' : 'var(--border-strong)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = item.isShared ? 'var(--accent-subtle)' : 'var(--surface-hover)' }}
                 >
                   <Share2 size={13} strokeWidth={2} />
                   {shareLoading ? 'Sharing…' : item.isShared ? 'Shared' : 'Share'}
@@ -220,19 +220,19 @@ export default function CollateralDetailPage() {
 
                 {sharePopoverOpen && item.isShared && (
                   <div
-                    style={{ position: 'absolute', top: '40px', right: 0, width: '320px', zIndex: 100, background: 'rgba(20,20,20,0.85)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '14px', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}
+                    style={{ position: 'absolute', top: '40px', right: 0, width: '320px', zIndex: 100, background: 'var(--glass)', backdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', boxShadow: 'var(--shadow-lg)' }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <p style={{ fontSize: '12px', fontWeight: 600, color: '#EBEBEB', margin: '0 0 8px' }}>Share link</p>
+                    <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 8px' }}>Share link</p>
                     <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
                       <code
-                        style={{ flex: 1, fontSize: '11px', color: '#888', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px', padding: '6px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}
+                        style={{ flex: 1, fontSize: '11px', color: 'var(--text-tertiary)', background: 'var(--input-bg)', border: '1px solid var(--surface-hover)', borderRadius: '5px', padding: '6px 8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}
                       >
                         {shareUrl}
                       </code>
                       <button
                         onClick={handleCopyLink}
-                        style={{ display: 'flex', alignItems: 'center', gap: '4px', height: '32px', padding: '0 10px', borderRadius: '5px', fontSize: '12px', fontWeight: 600, color: copied ? '#22C55E' : '#EBEBEB', backgroundColor: copied ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer', flexShrink: 0, transition: 'background-color 150ms ease' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', height: '32px', padding: '0 10px', borderRadius: '5px', fontSize: '12px', fontWeight: 600, color: copied ? 'var(--success)' : 'var(--text-primary)', backgroundColor: copied ? 'rgba(34,197,94,0.1)' : 'var(--surface-hover)', border: '1px solid var(--surface-hover)', cursor: 'pointer', flexShrink: 0, transition: 'background-color 150ms ease' }}
                       >
                         {copied ? <Check size={11} strokeWidth={2} /> : <Copy size={11} strokeWidth={2} />}
                         {copied ? 'Copied' : 'Copy'}
@@ -240,7 +240,7 @@ export default function CollateralDetailPage() {
                     </div>
                     <button
                       onClick={handleStopSharing}
-                      style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', color: '#EF4444', cursor: 'pointer', opacity: 0.8 }}
+                      style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', color: 'var(--danger)', cursor: 'pointer', opacity: 0.8 }}
                       onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
                       onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.8' }}
                     >
@@ -255,9 +255,9 @@ export default function CollateralDetailPage() {
                   href={`/api/collateral/${id}/export`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: '#6366F1', textDecoration: 'none', transition: 'background-color 150ms ease' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#4F46E5' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#6366F1' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: 'var(--accent)', textDecoration: 'none', transition: 'background-color 150ms ease' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--accent-hover)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--accent)' }}
                 >
                   <Download size={13} strokeWidth={2} />
                   Export
@@ -268,12 +268,12 @@ export default function CollateralDetailPage() {
 
           {/* Generating state */}
           {item.status === 'generating' && (
-            <div style={{ padding: '32px', textAlign: 'center', background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', marginBottom: '16px' }}>
+            <div style={{ padding: '32px', textAlign: 'center', background: 'var(--surface)', backdropFilter: 'blur(12px)', border: '1px solid var(--border)', borderRadius: '10px', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '8px' }}>
-                <RefreshCw size={16} style={{ color: '#6366F1', animation: 'spin 1s linear infinite' }} />
-                <span style={{ fontSize: '14px', fontWeight: 600, color: '#EBEBEB' }}>Generating content…</span>
+                <RefreshCw size={16} style={{ color: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
+                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Generating content…</span>
               </div>
-              <p style={{ fontSize: '13px', color: '#555', margin: 0 }}>This usually takes 10-30 seconds. Page will update automatically.</p>
+              <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', margin: 0 }}>This usually takes 10-30 seconds. Page will update automatically.</p>
             </div>
           )}
 
@@ -284,7 +284,7 @@ export default function CollateralDetailPage() {
 
           {item.status === 'stale' && (
             <div style={{ padding: '16px', borderRadius: '8px', backgroundColor: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', marginBottom: '16px' }}>
-              <p style={{ fontSize: '13px', color: '#F59E0B', margin: 0 }}>
+              <p style={{ fontSize: '13px', color: 'var(--warning)', margin: 0 }}>
                 This collateral is stale because your source data has changed. Click &quot;Regenerate&quot; to get fresh content.
               </p>
             </div>

@@ -305,7 +305,7 @@ export default function CommandPalette() {
     return (
       <div key={label}>
         <div style={{
-          fontSize: '11px', color: '#555', fontWeight: 700,
+          fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 700,
           letterSpacing: '0.06em', textTransform: 'uppercase',
           padding: '8px 12px 4px',
         }}>
@@ -325,16 +325,16 @@ export default function CommandPalette() {
                 display: 'flex', alignItems: 'center', gap: '10px',
                 height: '40px', padding: '0 12px',
                 cursor: 'pointer', borderRadius: '6px', margin: '0 6px',
-                backgroundColor: isActive ? 'rgba(255,255,255,0.06)' : 'transparent',
+                backgroundColor: isActive ? 'var(--surface-hover)' : 'transparent',
                 transition: 'background-color 0.05s',
               }}
             >
-              <Icon size={16} color="#666" strokeWidth={1.5} />
-              <span style={{ flex: 1, fontSize: '13px', color: '#EBEBEB', letterSpacing: '-0.01em' }}>
+              <Icon size={16} color="var(--text-tertiary)" strokeWidth={1.5} />
+              <span style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
                 {item.label}
               </span>
               {item.shortcut && (
-                <span style={{ fontSize: '11px', color: '#555' }}>{item.shortcut}</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{item.shortcut}</span>
               )}
             </div>
           )
@@ -349,11 +349,11 @@ export default function CommandPalette() {
     return (
       <div>
         {!atTop && navFlat.length > 0 && (
-          <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', margin: '6px 12px' }} />
+          <div style={{ height: '1px', background: 'var(--border)', margin: '6px 12px' }} />
         )}
         {atTop && (
           <div style={{
-            fontSize: '11px', color: '#555', fontWeight: 700,
+            fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 700,
             letterSpacing: '0.06em', textTransform: 'uppercase',
             padding: '8px 12px 4px',
           }}>
@@ -368,7 +368,7 @@ export default function CommandPalette() {
             display: 'flex', alignItems: 'center', gap: '10px',
             height: '44px', padding: '0 12px',
             cursor: 'pointer', borderRadius: '8px', margin: '0 6px',
-            backgroundColor: isActive ? 'rgba(99,102,241,0.12)' : 'transparent',
+            backgroundColor: isActive ? 'var(--accent-subtle)' : 'transparent',
             border: isActive ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent',
             transition: 'all 0.05s',
           }}
@@ -380,15 +380,15 @@ export default function CommandPalette() {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0,
           }}>
-            <Sparkles size={13} color="#818CF8" />
+            <Sparkles size={13} color="var(--accent)" />
           </div>
-          <span style={{ flex: 1, fontSize: '13px', color: '#E2E0F0', letterSpacing: '-0.01em' }}>
+          <span style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
             {atTop
-              ? <><span style={{ color: '#A5B4FC' }}>{query}</span></>
-              : <>Ask AI: <span style={{ color: '#A5B4FC' }}>{query}</span></>
+              ? <><span style={{ color: 'var(--text-secondary)' }}>{query}</span></>
+              : <>Ask AI: <span style={{ color: 'var(--text-secondary)' }}>{query}</span></>
             }
           </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#555' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--text-tertiary)' }}>
             <CornerDownLeft size={11} />
           </div>
         </div>
@@ -412,10 +412,10 @@ export default function CommandPalette() {
         style={{
           width: '600px',
           maxHeight: mode === 'ai' ? '580px' : '480px',
-          background: 'rgba(10,8,20,0.98)',
+          background: 'var(--bg)',
           backdropFilter: 'blur(28px)',
           WebkitBackdropFilter: 'blur(28px)',
-          border: '1px solid rgba(255,255,255,0.12)',
+          border: '1px solid var(--border-strong)',
           borderRadius: '16px',
           boxShadow: '0 40px 100px rgba(0,0,0,0.9), 0 0 0 1px rgba(99,102,241,0.1)',
           display: 'flex',
@@ -428,7 +428,7 @@ export default function CommandPalette() {
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <div style={{
             position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)',
-            color: mode === 'ai' || intent === 'ai' ? '#818CF8' : '#555',
+            color: mode === 'ai' || intent === 'ai' ? 'var(--accent)' : 'var(--text-tertiary)',
             display: 'flex', alignItems: 'center',
             transition: 'color 0.15s',
           }}>
@@ -457,13 +457,13 @@ export default function CommandPalette() {
             placeholder="Ask anything or jump to..."
             style={{
               width: '100%', height: '52px',
-              fontSize: '15px', color: '#EBEBEB',
+              fontSize: '15px', color: 'var(--text-primary)',
               backgroundColor: 'transparent',
               border: 'none', outline: 'none',
               padding: '0 16px 0 42px',
               letterSpacing: '-0.02em',
               boxSizing: 'border-box',
-              caretColor: '#6366F1',
+              caretColor: 'var(--accent)',
             }}
           />
           {/* Intent hint */}
@@ -471,10 +471,10 @@ export default function CommandPalette() {
             <div style={{
               position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
               display: 'flex', alignItems: 'center', gap: '4px',
-              fontSize: '11px', color: '#555',
+              fontSize: '11px', color: 'var(--text-tertiary)',
             }}>
               {intent === 'ai'
-                ? <span style={{ color: '#818CF8' }}>↵ ask AI</span>
+                ? <span style={{ color: 'var(--accent)' }}>↵ ask AI</span>
                 : <><CornerDownLeft size={11} /> ask AI</>
               }
             </div>
@@ -491,7 +491,7 @@ export default function CommandPalette() {
               }}
               style={{
                 position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
-                fontSize: '11px', color: '#818CF8', background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: '11px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer',
                 letterSpacing: '-0.01em',
               }}
             >
@@ -501,7 +501,7 @@ export default function CommandPalette() {
         </div>
 
         {/* Divider */}
-        <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', flexShrink: 0 }} />
+        <div style={{ height: '1px', background: 'var(--border)', flexShrink: 0 }} />
 
         {/* AI response */}
         {mode === 'ai' && (
@@ -510,21 +510,21 @@ export default function CommandPalette() {
             style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', minHeight: '80px' }}
           >
             {aiLoading && !aiAnswer && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#555' }}>
-                <Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite', color: '#818CF8' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-tertiary)' }}>
+                <Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite', color: 'var(--accent)' }} />
                 Thinking…
               </div>
             )}
             {aiAnswer && (
               <div style={{
-                fontSize: '13px', color: '#E2E0F0',
+                fontSize: '13px', color: 'var(--text-primary)',
                 lineHeight: '1.65', letterSpacing: '-0.01em', whiteSpace: 'pre-wrap',
               }}>
                 {renderMarkdown(aiAnswer)}
                 {!aiDone && (
                   <span style={{
                     display: 'inline-block', width: '8px', height: '14px',
-                    background: '#6366F1', borderRadius: '1px',
+                    background: 'var(--accent)', borderRadius: '1px',
                     animation: 'blink 0.8s step-end infinite',
                     verticalAlign: 'text-bottom', marginLeft: '2px',
                   }} />
@@ -540,7 +540,7 @@ export default function CommandPalette() {
             {navFlat.length === 0 && !showAskAI ? (
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                height: '80px', fontSize: '13px', color: '#555',
+                height: '80px', fontSize: '13px', color: 'var(--text-tertiary)',
               }}>
                 No results
               </div>
@@ -553,7 +553,7 @@ export default function CommandPalette() {
                 {navFlat.length > 0 && (
                   <>
                     {askAIFirst && navFlat.length > 0 && (
-                      <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', margin: '6px 12px' }} />
+                      <div style={{ height: '1px', background: 'var(--border)', margin: '6px 12px' }} />
                     )}
                     {renderNavSection('Navigate', navigateItems, 0)}
                     {renderNavSection('Actions', actionItems, navigateItems.length)}
@@ -571,24 +571,24 @@ export default function CommandPalette() {
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '8px 14px',
-          borderTop: '1px solid rgba(255,255,255,0.05)',
+          borderTop: '1px solid var(--border)',
           flexShrink: 0,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '11px', color: '#333', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <kbd style={{ fontSize: '10px', color: '#444', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '1px 5px' }}>↑↓</kbd>
+            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <kbd style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', padding: '1px 5px' }}>↑↓</kbd>
               navigate
             </span>
-            <span style={{ fontSize: '11px', color: '#333', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <kbd style={{ fontSize: '10px', color: '#444', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '1px 5px' }}>↵</kbd>
+            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <kbd style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', padding: '1px 5px' }}>↵</kbd>
               {mode === 'ai' ? 'ask' : intent === 'ai' && showAskAI ? 'ask AI' : 'select'}
             </span>
-            <span style={{ fontSize: '11px', color: '#333', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <kbd style={{ fontSize: '10px', color: '#444', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '1px 5px' }}>esc</kbd>
+            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <kbd style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '4px', padding: '1px 5px' }}>esc</kbd>
               close
             </span>
           </div>
-          <div style={{ fontSize: '11px', color: '#2D2A40', letterSpacing: '-0.01em' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', letterSpacing: '-0.01em' }}>
             SellSight AI
           </div>
         </div>
@@ -612,7 +612,7 @@ function renderMarkdown(text: string): React.ReactNode {
       const content = line.replace(/^[•\-\*] /, '')
       return (
         <div key={key} style={{ display: 'flex', gap: '8px', marginBottom: '3px' }}>
-          <span style={{ color: '#6366F1', flexShrink: 0, marginTop: '1px' }}>•</span>
+          <span style={{ color: 'var(--accent)', flexShrink: 0, marginTop: '1px' }}>•</span>
           <span>{renderInline(content)}</span>
         </div>
       )
@@ -620,7 +620,7 @@ function renderMarkdown(text: string): React.ReactNode {
     if (/^##+ /.test(line)) {
       const content = line.replace(/^##+ /, '')
       return (
-        <div key={key} style={{ fontWeight: '700', color: '#818CF8', marginTop: i > 0 ? '12px' : '0', marginBottom: '4px', fontSize: '12px', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+        <div key={key} style={{ fontWeight: '700', color: 'var(--accent)', marginTop: i > 0 ? '12px' : '0', marginBottom: '4px', fontSize: '12px', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
           {content}
         </div>
       )
@@ -634,7 +634,7 @@ function renderInline(text: string): React.ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*)/)
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} style={{ color: '#F0EEFF', fontWeight: '600' }}>{part.slice(2, -2)}</strong>
+      return <strong key={i} style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{part.slice(2, -2)}</strong>
     }
     return part
   })
