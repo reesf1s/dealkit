@@ -14,27 +14,27 @@ const NAV: React.CSSProperties = {
 }
 
 const COLLATERAL_TYPES = [
-  { icon: Shield, label: 'Battlecard', desc: 'Win every competitive deal with real intel on every rival — updated automatically as your pipeline shifts.' },
-  { icon: BookOpen, label: 'Case Study', desc: 'Turn closed-won deals into compelling proof stories that close the next one.' },
-  { icon: FileText, label: 'One-Pager', desc: 'Product overviews that sell the outcome, not the feature list.' },
-  { icon: Target, label: 'Objection Handler', desc: 'Every pushback your team will face, with responses grounded in what actually worked.' },
-  { icon: Users, label: 'Talk Track', desc: 'Tailored messaging for every buyer persona — CTO, CFO, Head of Ops.' },
-  { icon: Mail, label: 'Email Sequence', desc: 'Follow-up sequences grounded in real deal outcomes and proven responses from your pipeline.' },
+  { icon: Shield, label: 'Battlecard', desc: 'Auto-generated competitive intel on every rival — rebuilt when your win/loss record shifts.' },
+  { icon: BookOpen, label: 'Case Study', desc: 'Turns closed-won deals into proof stories autonomously. Always current.' },
+  { icon: FileText, label: 'One-Pager', desc: 'Outcome-focused product overviews the brain writes and keeps fresh.' },
+  { icon: Target, label: 'Objection Handler', desc: 'Every pushback your team faces, with responses grounded in what actually closed deals.' },
+  { icon: Users, label: 'Talk Track', desc: 'Tailored messaging per buyer persona — generated and updated without lifting a finger.' },
+  { icon: Mail, label: 'Email Sequence', desc: 'Follow-up sequences built from real deal outcomes and proven win patterns.' },
 ]
 
 const PRICING = [
   {
-    name: 'Free', price: '£0', period: '',
+    name: 'Free', price: '\u00A30', period: '',
     features: ['1 product', '2 competitors', '5 case studies', '10 deal logs', '5 collateral items'],
     cta: 'Get started', highlight: false,
   },
   {
-    name: 'Starter', price: '£79', period: '/mo',
+    name: 'Starter', price: '\u00A379', period: '/mo',
     features: ['3 products', '10 competitors', 'Unlimited case studies', 'Unlimited deals', 'Unlimited collateral', '.docx export', 'No watermark'],
     cta: 'Start free trial', highlight: true,
   },
   {
-    name: 'Pro', price: '£149', period: '/mo',
+    name: 'Pro', price: '\u00A3149', period: '/mo',
     features: ['Everything in Starter', 'Unlimited products', 'Batch regenerate', 'Email sequences', 'AI meeting prep', 'Team features'],
     cta: 'Start free trial', highlight: false,
   },
@@ -64,7 +64,7 @@ export default function LandingPage() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <a href="#how-it-works" style={{ padding: '6px 14px', borderRadius: '6px', color: '#888', fontSize: '13px', textDecoration: 'none' }}>How it works</a>
-          <a href="#intelligence" style={{ padding: '6px 14px', borderRadius: '6px', color: '#888', fontSize: '13px', textDecoration: 'none' }}>Intelligence</a>
+          <a href="#features" style={{ padding: '6px 14px', borderRadius: '6px', color: '#888', fontSize: '13px', textDecoration: 'none' }}>Features</a>
           <a href="#pricing" style={{ padding: '6px 14px', borderRadius: '6px', color: '#888', fontSize: '13px', textDecoration: 'none' }}>Pricing</a>
           <Link href="/sign-in" style={{ padding: '6px 14px', borderRadius: '6px', color: '#888', fontSize: '13px', textDecoration: 'none' }}>Sign in</Link>
           <Link href="/sign-up" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 16px', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', boxShadow: '0 0 14px rgba(99,102,241,0.35)', borderRadius: '7px', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>
@@ -74,16 +74,16 @@ export default function LandingPage() {
       </nav>
 
       {/* ── HERO ─────────────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, paddingTop: '160px', paddingBottom: '100px', textAlign: 'center', maxWidth: '760px', margin: '0 auto', padding: '160px 32px 80px' }}>
+      <section style={{ position: 'relative', zIndex: 1, paddingTop: '160px', paddingBottom: '80px', textAlign: 'center', maxWidth: '760px', margin: '0 auto', padding: '160px 32px 80px' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 12px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: '100px', fontSize: '12px', color: '#A78BFA', fontWeight: '600', marginBottom: '28px' }}>
-          <Zap size={11} />
-          Your pipeline · your history · industry context
+          <Brain size={11} />
+          Autonomous sales intelligence
         </div>
         <h1 style={{ fontSize: '58px', fontWeight: '800', letterSpacing: '-0.05em', lineHeight: '1.06', marginBottom: '22px', background: 'linear-gradient(180deg, #F0EEFF 50%, #8B6FD4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-          Know which deals<br />to chase. Today.
+          An AI brain that runs<br />your sales intelligence
         </h1>
         <p style={{ fontSize: '18px', color: '#7E7A9A', lineHeight: '1.7', marginBottom: '36px', maxWidth: '560px', margin: '0 auto 36px' }}>
-          DealKit scores every open deal against your own win history, surfaces what needs attention each morning, and benchmarks your performance against hundreds of similar deals across the industry.
+          DealKit learns from every deal you close, identifies risks and opportunities autonomously, and creates the collateral your team needs — before they ask for it.
         </p>
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/sign-up" style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '12px 24px', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', boxShadow: '0 0 24px rgba(99,102,241,0.4), 0 4px 16px rgba(0,0,0,0.3)', borderRadius: '9px', color: '#fff', fontSize: '14px', fontWeight: '700', textDecoration: 'none' }}>
@@ -97,7 +97,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── APP PREVIEW ─────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '1000px', margin: '0 auto', padding: '0 32px 100px' }}>
+      <section style={{ position: 'relative', zIndex: 1, maxWidth: '1000px', margin: '0 auto', padding: '0 32px 80px' }}>
         <div style={{ background: 'rgba(9,6,18,0.9)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(139,92,246,0.2)', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 40px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,102,241,0.08)' }}>
           <div style={{ padding: '10px 16px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
@@ -112,7 +112,7 @@ export default function LandingPage() {
                 <div style={{ width: '22px', height: '22px', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', borderRadius: '6px', flexShrink: 0 }} />
                 <span style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF', letterSpacing: '-0.02em' }}>DealKit</span>
               </div>
-              {[['Dashboard', true], ['Pipeline', false], ['Deals', false], ['AI Chat', false], ['Case Studies', false], ['Competitors', false], ['Collateral', false], ['Product Gaps', false]].map(([label, active]) => (
+              {[['Dashboard', true], ['Pipeline', false], ['Collateral', false], ['Intelligence', false], ['Company', false]].map(([label, active]) => (
                 <div key={String(label)} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '12px', color: active ? '#C4B5FD' : '#4A4A5A', background: active ? 'rgba(99,102,241,0.12)' : 'transparent', border: active ? '1px solid rgba(99,102,241,0.2)' : '1px solid transparent', display: 'flex', alignItems: 'center', gap: '7px' }}>
                   <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: active ? 'rgba(99,102,241,0.5)' : 'rgba(255,255,255,0.07)', flexShrink: 0 }} />
                   {String(label)}
@@ -187,30 +187,27 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── HOW IT WORKS (3 plain steps) ──────────────────────────────────────── */}
-      <section id="how-it-works" style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 100px' }}>
+      {/* ── HOW IT WORKS ──────────────────────────────────────────────────────── */}
+      <section id="how-it-works" style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
         <div style={{ textAlign: 'center', marginBottom: '56px' }}>
-          <h2 style={{ fontSize: '34px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '12px', color: '#F0EEFF' }}>Set up in a morning.<br />Value from day one.</h2>
-          <p style={{ color: '#7E7A9A', fontSize: '15px', maxWidth: '500px', margin: '0 auto', lineHeight: '1.65' }}>Most tools take months to show ROI. DealKit generates useful collateral from the moment you add your product and first competitor.</p>
+          <h2 style={{ fontSize: '34px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '12px', color: '#F0EEFF' }}>Three steps. Then it runs itself.</h2>
+          <p style={{ color: '#7E7A9A', fontSize: '15px', maxWidth: '500px', margin: '0 auto', lineHeight: '1.65' }}>Set up once, then let the brain do the work. It rebuilds every 4 hours for active workspaces.</p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
           {[
             {
-              n: '01', icon: '🏢', title: 'Tell it about your business',
-              desc: 'Add your product, value props, known capabilities, and competitors. Takes 10 minutes. DealKit immediately generates tailored battlecards, objection handlers, and talk tracks.',
-              detail: 'You\'re already useful from day one — no historical data required.',
+              n: '01', icon: '🏢', title: 'Set up your company profile',
+              desc: 'Add your product, value props, and competitors. Takes 10 minutes. The brain immediately generates your first battlecards, objection handlers, and talk tracks.',
             },
             {
               n: '02', icon: '📋', title: 'Log deals and paste your notes',
-              desc: 'After each meeting, paste in your notes. DealKit extracts todos, risks, product gaps, and competitor mentions automatically — then scores the deal.',
-              detail: 'No CRM sync needed. Works with any notes you already write.',
+              desc: 'After each meeting, paste in your notes. The brain extracts intelligence, scores the deal, identifies risks, and tracks competitors — all automatically.',
             },
             {
-              n: '03', icon: '🧠', title: 'The system learns as you close',
-              desc: 'Every closed deal trains your private ML model. Win probability, forecast accuracy, competitive patterns, and collateral relevance all improve with every outcome you log.',
-              detail: 'After 10+ closed deals, scores are driven by your own data. Opt in and your win rates also benchmark against the industry — zero PII ever leaves your workspace.',
+              n: '03', icon: '🧠', title: 'The brain works autonomously',
+              desc: 'Proactive alerts when deals stall. Auto-generated collateral when patterns shift. ML models that improve with every outcome. It never stops learning.',
             },
-          ].map(({ n, icon, title, desc, detail }) => (
+          ].map(({ n, icon, title, desc }) => (
             <div key={n} style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '26px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '2px' }}>
                 <div style={{ fontSize: '22px', lineHeight: 1 }}>{icon}</div>
@@ -218,14 +215,13 @@ export default function LandingPage() {
               </div>
               <div style={{ fontSize: '15px', fontWeight: '700', letterSpacing: '-0.02em', color: '#F0EEFF' }}>{title}</div>
               <div style={{ fontSize: '13px', color: '#7E7A9A', lineHeight: '1.65' }}>{desc}</div>
-              <div style={{ fontSize: '11.5px', color: '#6366F1', padding: '7px 10px', background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '7px', lineHeight: '1.5' }}>{detail}</div>
             </div>
           ))}
         </div>
       </section>
 
       {/* ── THE DEAL VIEW ─────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 100px' }}>
+      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', alignItems: 'center' }}>
           {/* Left: copy */}
           <div>
@@ -237,7 +233,7 @@ export default function LandingPage() {
               Paste your notes.<br />Get a scored deal back.
             </h2>
             <p style={{ fontSize: '14px', color: '#7E7A9A', lineHeight: '1.7', marginBottom: '20px' }}>
-              After every meeting, paste your notes into DealKit. Within seconds it extracts action items, surfaces risks, identifies product gaps, and scores the deal — using a model trained on your own win history.
+              After every meeting, paste your notes into DealKit. The brain extracts action items, surfaces risks, identifies product gaps, and scores the deal — using models trained on your own win history.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {[
@@ -273,7 +269,7 @@ export default function LandingPage() {
 
             {/* Score insights */}
             <div style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: '8px', padding: '10px 12px' }}>
-              <div style={{ fontSize: '9px', color: '#4ADE80', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>AI Score Insights</div>
+              <div style={{ fontSize: '9px', color: '#4ADE80', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Score Insights</div>
               {['Champion confirmed: Sarah advocating internally for DealKit', 'Budget approved — finance sign-off confirmed in last call', 'Evaluating Salesforce: our win rate vs Salesforce is 70%'].map((ins, i) => (
                 <div key={i} style={{ fontSize: '10px', color: '#C4B5FD', lineHeight: '1.4', marginBottom: i < 2 ? '4px' : 0 }}>• {ins}</div>
               ))}
@@ -309,18 +305,18 @@ export default function LandingPage() {
       </section>
 
       {/* ── THE INTELLIGENCE ENGINE ────────────────────────────────────────────── */}
-      <section id="intelligence" style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 120px' }}>
+      <section id="intelligence" style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
 
         <div style={{ textAlign: 'center', marginBottom: '60px' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 12px', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', borderRadius: '100px', fontSize: '12px', color: '#C4B5FD', fontWeight: '600', marginBottom: '20px' }}>
             <Brain size={11} />
-            Three layers, fully private
+            One brain, three capabilities
           </div>
           <h2 style={{ fontSize: '36px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '16px', color: '#F0EEFF' }}>
-            How DealKit figures out<br />which deals will close
+            It reads. It learns.<br />It acts on its own.
           </h2>
           <p style={{ color: '#7E7A9A', fontSize: '16px', lineHeight: '1.7', maxWidth: '560px', margin: '0 auto' }}>
-            No black-box AI guesses. Three distinct layers work together — each grounded in data, none dependent on generic models.
+            Three autonomous capabilities working together — reading your deals, learning from your outcomes, and taking action before you have to ask.
           </p>
         </div>
 
@@ -329,24 +325,24 @@ export default function LandingPage() {
           {[
             {
               num: '1', icon: '📡', color: '#6366F1',
-              title: 'Reads every note automatically',
-              badge: 'No manual tagging',
-              desc: 'Every meeting note is scanned for buying signals, risks, stall signs, and competitor mentions — automatically. No forms to fill in, no tagging. Just paste your notes and it extracts what matters.',
-              outputs: ['Champion and budget status', 'Next step defined?', 'Objection category', 'Engagement direction (rising or falling)'],
+              title: 'Reads and understands',
+              badge: 'Auto-extraction',
+              desc: 'Every meeting note is scanned for buying signals, risks, stall signs, competitor mentions, and product gaps. No forms, no tagging — just paste your notes and the brain extracts what matters.',
+              outputs: ['Champion and budget status', 'Risk signals and stall indicators', 'Competitor mentions logged to W/L', 'Product gaps tracked automatically'],
             },
             {
               num: '2', icon: '🤖', color: '#8B5CF6',
-              title: 'Learns from every deal you close',
-              badge: 'Gets smarter over time',
-              desc: 'Every time a deal closes, your model updates. Win probability, stage stall detection, close-date prediction, and competitive win conditions all improve as your history grows. All private — your data never trains anyone else\'s model.',
-              outputs: ['Win probability per open deal', 'Which deals are stalling', 'Predicted close date', 'What beats each competitor'],
+              title: 'Learns and predicts',
+              badge: 'Private ML models',
+              desc: 'Every closed deal trains your private models. Win probability, stage stall detection, close-date prediction, and competitive win conditions all improve as your history grows. Your data never trains anyone else.',
+              outputs: ['Win probability per deal', 'Deals likely to stall', 'Predicted close dates', 'Per-competitor win conditions'],
             },
             {
               num: '3', icon: '✦', color: '#A78BFA',
-              title: 'Tells you what to do next',
-              badge: 'Plain English, every morning',
-              desc: 'Claude never generates a score. It reads the output of your ML model and explains it in plain English — which deals need action today, what the risks are, and what to do next. Scores come from your data; the explanation comes from the AI.',
-              outputs: ['Daily pipeline briefing', 'Top deal to action now', 'Risk explanation per deal', 'Recommended single action'],
+              title: 'Acts autonomously',
+              badge: 'Proactive intelligence',
+              desc: 'The brain doesn\'t wait for you to ask. It proactively generates collateral when patterns shift, alerts you to risks before deals slip, and tells you exactly what to do next — every morning.',
+              outputs: ['Daily pipeline briefing', 'Auto-generated battlecards', 'Stall alerts before deals slip', 'Recommended next actions'],
             },
           ].map(({ num, icon, color, title, badge, desc, outputs }) => (
             <div key={num} style={{ background: 'rgba(255,255,255,0.025)', border: `1px solid ${color}25`, borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative', overflow: 'hidden' }}>
@@ -356,7 +352,7 @@ export default function LandingPage() {
                 <span style={{ fontSize: '9px', fontWeight: '700', color, background: `${color}14`, border: `1px solid ${color}25`, padding: '2px 8px', borderRadius: '100px' }}>{badge}</span>
               </div>
               <div>
-                <div style={{ fontSize: '14px', fontWeight: '700', color: '#F0EEFF', marginBottom: '6px', letterSpacing: '-0.02em' }}>Layer {num}: {title}</div>
+                <div style={{ fontSize: '14px', fontWeight: '700', color: '#F0EEFF', marginBottom: '6px', letterSpacing: '-0.02em' }}>{title}</div>
                 <div style={{ fontSize: '12px', color: '#7E7A9A', lineHeight: '1.65' }}>{desc}</div>
               </div>
               <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '10px 12px' }}>
@@ -369,69 +365,26 @@ export default function LandingPage() {
           ))}
         </div>
 
-        {/* Composite scoring explanation */}
-        <div style={{ background: 'linear-gradient(135deg, rgba(14,10,32,0.98), rgba(18,12,38,0.98))', border: '1px solid rgba(139,92,246,0.25)', borderRadius: '14px', padding: '28px 32px', display: 'flex', gap: '28px', alignItems: 'flex-start', marginBottom: '48px' }}>
-          <div style={{ flexShrink: 0, width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>⚖️</div>
-          <div>
-            <div style={{ fontSize: '14px', fontWeight: '800', color: '#F0EEFF', letterSpacing: '-0.02em', marginBottom: '8px' }}>How the score works — and why it gets more accurate every month</div>
-            <div style={{ fontSize: '13px', color: '#7E7A9A', lineHeight: '1.7', maxWidth: '680px', marginBottom: '12px' }}>
-              At first, scores lean on observable signals from your notes. As you close deals, your own ML model takes over — automatically scaling from 0% to 70% weight as your training set grows. Opt into Industry Intelligence and your score also benchmarks against the industry from day one.
-            </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {['4 deals → ML activates (14% weight)', '10 deals → ML at 33%', '30+ deals → ML at 70%', 'Your data, your model, private', 'Industry benchmarks from day one (opt-in)'].map(tag => (
-                <div key={tag} style={{ fontSize: '11px', color: '#A78BFA', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', padding: '3px 10px', borderRadius: '100px', fontWeight: '600' }}>{tag}</div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* The data moat flywheel */}
-        <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px', padding: '36px', marginBottom: '48px' }}>
-          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <div style={{ fontSize: '13px', fontWeight: '700', color: '#818CF8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>The compounding moat</div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: '#F0EEFF', letterSpacing: '-0.03em' }}>The longer you use it, the harder you are to beat</div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0' }}>
-            {[
-              { milestone: 'Day 1', deals: '0 deals closed', desc: 'Battlecards, objection handlers, and talk tracks generated immediately from your product and competitor profiles.', color: '#4B4565' },
-              { milestone: '1 month', deals: '4–10 deals', desc: 'ML activates. Win probability, weighted forecast, and competitive win/loss record all start accumulating.', color: '#6366F1' },
-              { milestone: '3 months', deals: '20–50 deals', desc: 'Deal archetypes form. Per-competitor models emerge. Stage velocity baselines set. Scores now 33%+ ML-driven.', color: '#8B5CF6' },
-              { milestone: '6 months', deals: '50+ deals', desc: 'You have logistic regression weights, KNN similarity search, trend detection, and calibrated forecasts — unique to your sales motion. And you can see exactly how you compare to the industry without exposing a single deal name.', color: '#A78BFA' },
-            ].map(({ milestone, deals, desc, color }, i) => (
-              <div key={milestone} style={{ padding: '20px', borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, marginBottom: '12px', boxShadow: `0 0 8px ${color}60` }} />
-                <div style={{ fontSize: '13px', fontWeight: '800', color, marginBottom: '2px', letterSpacing: '-0.02em' }}>{milestone}</div>
-                <div style={{ fontSize: '10px', color: '#555', marginBottom: '8px' }}>{deals}</div>
-                <div style={{ fontSize: '12px', color: '#7E7A9A', lineHeight: '1.55' }}>{desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Nine ML models */}
+        {/* What the brain does — outcomes */}
         <div style={{ background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.18)', borderRadius: '16px', padding: '36px' }}>
-          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '28px' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: '20px', padding: '4px 12px', marginBottom: '14px' }}>
               <Brain size={11} color="#818CF8" />
-              <span style={{ fontSize: '11px', fontWeight: '700', color: '#818CF8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Proprietary ML engine</span>
+              <span style={{ fontSize: '11px', fontWeight: '700', color: '#818CF8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>What the brain does</span>
             </div>
-            <div style={{ fontSize: '20px', fontWeight: '800', color: '#F0EEFF', letterSpacing: '-0.03em', marginBottom: '8px' }}>Nine models. All trained on your data. None replicable.</div>
-            <div style={{ fontSize: '13px', color: '#7E7A9A', maxWidth: '520px', margin: '0 auto' }}>No shared infrastructure. Every model runs in your workspace, trained exclusively on your closed deal history.</div>
+            <div style={{ fontSize: '20px', fontWeight: '800', color: '#F0EEFF', letterSpacing: '-0.03em', marginBottom: '8px' }}>Five things happening autonomously, every night</div>
+            <div style={{ fontSize: '13px', color: '#7E7A9A', maxWidth: '520px', margin: '0 auto' }}>Private ML models trained exclusively on your closed deal history. No shared infrastructure.</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             {[
-              { num: '01', title: 'Win probability — per deal, per morning', detail: 'Every open deal gets a 0–100 score each night. Trained on your closed deal history — not generic benchmarks. Tells you which deal to call first.' },
-              { num: '02', title: 'Honest accuracy check', detail: 'The model tests itself every rebuild. It trains with one deal held out, checks its prediction, repeats for every deal. You always know how reliable your scores actually are.' },
-              { num: '03', title: 'Finds your most similar past wins', detail: 'For each open deal, finds the 3 closest historical matches by deal shape, size, and signals. Shows you what happened last time you were in this situation.' },
-              { num: '04', title: 'Groups your pipeline into deal types', detail: 'Clusters your deals into natural patterns — fast SMB, slow enterprise, competitive displacement. Each type has its own typical win rate and timeline.' },
-              { num: '05', title: 'Per-competitor win conditions', detail: 'A separate model per competitor. Learns what signals predict beating Salesforce vs. HubSpot vs. Pipedrive. Your battlecards get smarter as the record grows.' },
-              { num: '06', title: 'Trend detection across months', detail: 'Is your win rate improving? Getting slower to close? Winning more against a specific rival? Trend detection runs across monthly cohorts and tells you before it shows up in a missed quarter.' },
-              { num: '07', title: 'Stage stall alerts', detail: 'Knows how long deals normally spend in each stage from your own history. Flags every deal that is taking longer than normal before it slips off your radar.' },
-              { num: '08', title: 'Score calibration tracking', detail: 'Tracks the gap between scores on deals that won vs. those that lost over time. Tells you month-by-month whether your model is getting more predictive or drifting.' },
-              { num: '09', title: 'Close-date prediction', detail: 'Trained on your won deals, predicts days to close for every open deal. Drives probability-weighted revenue forecasts for each month.' },
-            ].map(({ num, title, detail }) => (
-              <div key={num} style={{ display: 'flex', gap: '12px', padding: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px' }}>
-                <div style={{ fontSize: '11px', fontWeight: '800', color: '#4B4565', fontVariantNumeric: 'tabular-nums', flexShrink: 0, paddingTop: '2px' }}>{num}</div>
+              { icon: '🎯', title: 'Scores every deal nightly with YOUR win probability', detail: 'Each open deal gets a 0-100 score trained on your own closed deals. Not benchmarks — your conversion patterns.' },
+              { icon: '⚠️', title: 'Flags stalling deals before they slip', detail: 'Knows how long your deals normally spend in each stage. Alerts you the moment something takes longer than your baseline.' },
+              { icon: '🏆', title: 'Learns per-competitor win conditions from your record', detail: 'A separate model per competitor. Learns what signals predict beating Salesforce vs. HubSpot — and your battlecards reflect it.' },
+              { icon: '📅', title: 'Predicts close dates driving probability-weighted forecasts', detail: 'Trained on your won deals to predict days-to-close for every open deal. Your pipeline forecast uses real probabilities, not gut feel.' },
+              { icon: '📈', title: 'Detects trends before they show in your numbers', detail: 'Win rate improving? Close times slowing? Losing more against a specific rival? The brain spots it across monthly cohorts before it becomes a missed quarter.' },
+            ].map(({ icon, title, detail }) => (
+              <div key={title} style={{ display: 'flex', gap: '12px', padding: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px' }}>
+                <div style={{ fontSize: '18px', flexShrink: 0, paddingTop: '2px' }}>{icon}</div>
                 <div>
                   <div style={{ fontSize: '13px', fontWeight: '700', color: '#C4B5FD', marginBottom: '4px', letterSpacing: '-0.01em' }}>{title}</div>
                   <div style={{ fontSize: '12px', color: '#7E7A9A', lineHeight: '1.55' }}>{detail}</div>
@@ -444,23 +397,23 @@ export default function LandingPage() {
       </section>
 
       {/* ── PIPELINE INTELLIGENCE ─────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 100px' }}>
+      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
         <div style={{ textAlign: 'center', marginBottom: '48px' }}>
           <h2 style={{ fontSize: '32px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '12px', color: '#F0EEFF' }}>
-            What you see across your whole pipeline
+            Autonomous pipeline intelligence
           </h2>
           <p style={{ color: '#7E7A9A', fontSize: '15px', maxWidth: '500px', margin: '0 auto', lineHeight: '1.65' }}>
-            Not just deal-level scores — DealKit surfaces patterns across your entire pipeline that would take hours to spot manually.
+            The brain surfaces patterns across your entire pipeline — proactively, without you asking.
           </p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
           {[
-            { icon: '📊', title: 'Revenue forecast that earns its numbers', desc: 'Your pipeline value, multiplied by your actual win probability per deal — not a made-up 30% multiplier. Updates every night as deals move and close.', badge: 'Probability-weighted', badgeColor: '#8B5CF6' },
-            { icon: '🧑‍💼', title: 'Rep coaching, without a manager doing the maths', desc: 'Win rate, to-do completion, deals with a next step, and days since last note — per rep. Every morning, automatically. Spot who needs support before the quarter ends.', badge: 'Per-rep stats', badgeColor: '#6366F1' },
-            { icon: '⏰', title: 'Knows your safe follow-up window', desc: 'Learns how long deals in each stage can go without a note before they go cold — based on your own won deals. Alerts you before the silence becomes a problem.', badge: 'Cadence intelligence', badgeColor: '#22C55E' },
-            { icon: '🏆', title: 'Objections you\'ve beaten before', desc: 'Budget concern on this deal? Legal blocker? DealKit shows you every time you\'ve faced that objection in the past — and whether you closed it anyway. Now with industry comparison.', badge: 'Objection Win Map', badgeColor: '#F59E0B' },
-            { icon: '⚠️', title: 'Catches deals going cold', desc: 'Sentiment arc analysis compares how recent notes sound vs. earlier ones — flags deals that have gone quiet or where engagement is dropping before they ghost you.', badge: 'Deterioration alerts', badgeColor: '#EF4444' },
-            { icon: '💬', title: 'Ask anything about your pipeline', desc: '"Which deals have budget concerns?" "Show me our win rate vs Salesforce this quarter." "Which reps have deals with no next step?" Answers grounded in your actual data.', badge: 'AI Chat', badgeColor: '#A78BFA' },
+            { icon: '📊', title: 'Probability-weighted forecast, rebuilt nightly', desc: 'Your pipeline value multiplied by actual win probability per deal — not a made-up 30% multiplier. The brain recalculates every night as deals move.', badge: 'Auto-updating', badgeColor: '#8B5CF6' },
+            { icon: '🧑‍💼', title: 'Rep performance surfaced autonomously', desc: 'Win rate, to-do completion, deals with a next step, and days since last note — per rep. Generated every morning without a manager lifting a finger.', badge: 'Per-rep stats', badgeColor: '#6366F1' },
+            { icon: '⏰', title: 'Follow-up cadence learned from your wins', desc: 'The brain learns how long deals in each stage can go silent before going cold — based on your own won deals. Alerts you before the silence becomes a problem.', badge: 'Cadence intelligence', badgeColor: '#22C55E' },
+            { icon: '🏆', title: 'Objections you\'ve beaten before', desc: 'Budget concern on this deal? The brain shows every time you\'ve faced that objection — and whether you closed anyway. Autonomously matched and surfaced.', badge: 'Objection Win Map', badgeColor: '#F59E0B' },
+            { icon: '⚠️', title: 'Deterioration detected automatically', desc: 'The brain compares recent note sentiment against earlier ones — flags deals going quiet or where engagement is dropping before they ghost you.', badge: 'Proactive alerts', badgeColor: '#EF4444' },
+            { icon: '💬', title: 'Ask anything about your pipeline', desc: '"Which deals have budget concerns?" "Show me our win rate vs Salesforce this quarter." Answers grounded in your actual data, instantly.', badge: 'AI Chat', badgeColor: '#A78BFA' },
           ].map(({ icon, title, desc, badge, badgeColor }) => (
             <div key={title} style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
@@ -475,7 +428,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── INDUSTRY INTELLIGENCE ─────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 100px' }}>
+      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', alignItems: 'center' }}>
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '100px', fontSize: '11px', color: '#A78BFA', fontWeight: '600', marginBottom: '20px' }}>
@@ -561,7 +514,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── COMPETITIVE INTELLIGENCE ─────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 100px' }}>
+      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', alignItems: 'center' }}>
           <div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '100px', fontSize: '11px', color: '#4ADE80', fontWeight: '600', marginBottom: '20px' }}>
@@ -620,7 +573,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── PRODUCT GAPS ─────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 100px' }}>
+      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', alignItems: 'center' }}>
           {/* Product gap mockup */}
           <div style={{ background: 'rgba(9,6,18,0.9)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -653,7 +606,7 @@ export default function LandingPage() {
               Turn lost deals into<br />your product roadmap
             </h2>
             <p style={{ fontSize: '14px', color: '#7E7A9A', lineHeight: '1.7', marginBottom: '20px' }}>
-              Every time a prospect says your product is missing something, DealKit extracts and tracks it automatically. You get a prioritised list of product gaps — ranked by how many deals they appear in and how much revenue they put at risk.
+              Every time a prospect says your product is missing something, the brain extracts and tracks it automatically. You get a prioritised list of product gaps — ranked by how many deals they appear in and how much revenue they put at risk.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {[
@@ -679,12 +632,12 @@ export default function LandingPage() {
       <ROICalc />
 
       {/* ── COLLATERAL TYPES ─────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 100px' }}>
+      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
         <div style={{ textAlign: 'center', marginBottom: '48px' }}>
           <h2 style={{ fontSize: '32px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '12px', color: '#F0EEFF' }}>
-            Everything your team needs to sell
+            Collateral the brain creates for you
           </h2>
-          <p style={{ color: '#7E7A9A', fontSize: '15px', maxWidth: '480px', margin: '0 auto' }}>Six types of collateral — all grounded in your deal data, all regenerating automatically when the picture changes.</p>
+          <p style={{ color: '#7E7A9A', fontSize: '15px', maxWidth: '480px', margin: '0 auto' }}>Six types of sales collateral — generated autonomously and rebuilt when your deal data changes.</p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
           {COLLATERAL_TYPES.map(({ icon: Icon, label, desc }) => (
@@ -700,7 +653,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── BEFORE / AFTER ───────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 100px' }}>
+      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
         <div style={{ textAlign: 'center', marginBottom: '48px' }}>
           <h2 style={{ fontSize: '32px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '12px', color: '#F0EEFF' }}>Before and after</h2>
         </div>
@@ -713,11 +666,6 @@ export default function LandingPage() {
               'Pipeline forecast based on gut feel',
               'Rep walks into a call cold on competitor objections',
               'Lost deal knowledge disappears with the rep',
-              'Product gaps scattered across Slack and Notion',
-              'New rep takes 3–6 months to ramp',
-              'No idea how your win rate compares to similar companies',
-              'Rep coaching happens quarterly in a spreadsheet, if at all',
-              'New team doesn\'t get ML predictions until months of deals are closed',
             ].map(p => (
               <div key={p} style={{ display: 'flex', gap: '8px', marginBottom: '11px', fontSize: '13px', color: '#7E7A9A', alignItems: 'flex-start' }}>
                 <span style={{ color: '#EF4444', flexShrink: 0, marginTop: '1px', fontWeight: '700' }}>×</span> {p}
@@ -727,16 +675,11 @@ export default function LandingPage() {
           <div style={{ background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '12px', padding: '28px' }}>
             <div style={{ fontSize: '12px', fontWeight: '700', color: '#22C55E', marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>With DealKit</div>
             {[
-              'Battlecards that regenerate when competitive patterns shift',
-              'Every morning: which deals need you, and why',
-              'Probability-adjusted forecast from your real conversion data',
-              'Rep walks in knowing the last 3 risks, competitor record, and open actions',
-              'Every closed deal trains the model and lives in the knowledge base',
-              'Product gaps auto-extracted, prioritised by affected revenue',
-              'New rep kit ready day one — playbooks, objections, proof stories',
-              'Your win rate benchmarked against the industry — every morning',
-              'Rep stats calculated automatically — win rate, to-do rate, cadence quality',
-              'New workspace gets ML predictions from day one via industry context',
+              'Battlecards that regenerate autonomously when competitive patterns shift',
+              'Every morning: which deals need you, why, and what to do',
+              'Probability-weighted forecast from your real conversion data',
+              'Rep walks in knowing risks, competitor record, and open actions',
+              'Every closed deal trains the brain and compounds your advantage',
             ].map(p => (
               <div key={p} style={{ display: 'flex', gap: '8px', marginBottom: '11px', fontSize: '13px', color: '#7E7A9A', alignItems: 'flex-start' }}>
                 <CheckCircle size={13} color="#22C55E" style={{ flexShrink: 0, marginTop: '2px' }} /> {p}
@@ -747,7 +690,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── PRICING ──────────────────────────────────────────────────────────── */}
-      <section id="pricing" style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 100px' }}>
+      <section id="pricing" style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
         <div style={{ textAlign: 'center', marginBottom: '48px' }}>
           <h2 style={{ fontSize: '32px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '12px', color: '#F0EEFF' }}>Simple pricing</h2>
           <p style={{ color: '#7E7A9A', fontSize: '15px' }}>Start free. Upgrade when your team is ready.</p>
@@ -778,7 +721,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── FOUNDER QUOTE ────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '640px', margin: '0 auto', padding: '0 32px 100px', textAlign: 'center' }}>
+      <section style={{ position: 'relative', zIndex: 1, maxWidth: '640px', margin: '0 auto', padding: '0 32px 80px', textAlign: 'center' }}>
         <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: '16px', padding: '40px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
           <div style={{ fontSize: '36px', color: 'rgba(139,92,246,0.4)', marginBottom: '12px', lineHeight: 1 }}>&ldquo;</div>
           <p style={{ fontSize: '16px', lineHeight: '1.7', color: '#C4B5FD', fontStyle: 'italic', marginBottom: '20px' }}>
@@ -795,13 +738,13 @@ export default function LandingPage() {
       <section style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '0 32px 120px' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 12px', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', borderRadius: '100px', fontSize: '12px', color: '#C4B5FD', fontWeight: '600', marginBottom: '20px' }}>
           <Brain size={11} />
-          Every deal you close makes the next one easier
+          Every deal you close makes the brain smarter
         </div>
         <h2 style={{ fontSize: '38px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '16px', color: '#F0EEFF' }}>
-          Start building your data advantage today
+          Start building your autonomous sales brain today
         </h2>
         <p style={{ color: '#7E7A9A', marginBottom: '32px', fontSize: '15px', maxWidth: '480px', margin: '0 auto 32px' }}>
-          Free to start. No credit card. Your first battlecard generates in under 5 minutes.
+          Free to start. No credit card. Your first collateral generates in under 5 minutes.
         </p>
         <Link href="/sign-up" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '13px 28px', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', boxShadow: '0 0 32px rgba(99,102,241,0.4), 0 8px 24px rgba(0,0,0,0.4)', borderRadius: '10px', color: '#fff', fontSize: '15px', fontWeight: '700', textDecoration: 'none' }}>
           Start for free <ArrowRight size={15} />
@@ -818,7 +761,7 @@ export default function LandingPage() {
           <span style={{ fontWeight: '700', fontSize: '13px', color: '#F0EEFF' }}>DealKit</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <span style={{ fontSize: '12px', color: '#4B4565' }}>© 2026 DealKit. All rights reserved.</span>
+          <span style={{ fontSize: '12px', color: '#4B4565' }}>&copy; 2026 DealKit. All rights reserved.</span>
           <a href="/privacy" style={{ fontSize: '12px', color: '#4B4565', textDecoration: 'none' }}>Privacy Policy</a>
           <a href="/terms" style={{ fontSize: '12px', color: '#4B4565', textDecoration: 'none' }}>Terms of Service</a>
         </div>
