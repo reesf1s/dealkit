@@ -378,10 +378,10 @@ export const update_deal = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const manage_todos = {
-  description: 'Add, complete, or remove action items (todos) on a deal. Uses fuzzy matching for completion/removal.',
+  description: 'Add, complete, or remove action items (todos) on a deal. IMPORTANT: When adding todos, copy-paste the user\'s exact text. Do NOT rephrase, summarize, or shorten. If user said "What percentage of the time do employees in Sydney sit at the same desk area", that exact sentence is the todo text.',
   parameters: z.object({
     dealId: z.string().describe('The UUID of the deal'),
-    add: z.array(z.string()).optional().describe('New todo texts to add'),
+    add: z.array(z.string()).optional().describe('New todo texts — COPY the user\'s exact words, do not rephrase or summarize'),
     completeTexts: z.array(z.string()).optional().describe('Todo texts to mark as completed (fuzzy matched)'),
     removeTexts: z.array(z.string()).optional().describe('Todo texts to remove entirely (fuzzy matched)'),
   }),
