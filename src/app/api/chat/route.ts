@@ -309,7 +309,7 @@ async function handleMeetingNotes(
   ).join('\n')
 
   const analysisMsg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001', max_tokens: 900,
+    model: 'claude-sonnet-4-6', max_tokens: 1200,
     messages: [{
       role: 'user',
       content: `Analyze these B2B sales meeting notes. Return ONLY valid JSON.
@@ -1520,8 +1520,30 @@ async function handlePipelineQuery(
   const patternSummary = patterns.slice(0, 4).map(p => `• ${p.label} — ${p.companies?.slice(0, 3).join(', ')}`).join('\n')
   const recSummary = recs.filter(r => r.priority === 'high').slice(0, 3).map(r => `• ${r.action} → ${r.dealName}`).join('\n')
 
+  // Churn risk alerts from ML predictions
+  const churnAlerts = (brain.mlPredictions ?? [])
+    .filter(p => (p.churnRisk ?? 0) >= 65)
+    .sort((a, b) => (b.churnRisk ?? 0) - (a.churnRisk ?? 0))
+    .slice(0, 4)
+  const churnSection = churnAlerts.length > 0
+    ? `\nChurn risk alerts:\n${churnAlerts.map(p => {
+        const d = activeDeals.find(deal => deal.id === p.dealId)
+        return `• ${d?.company ?? p.dealId} "${d?.name ?? ''}" — ${p.churnRisk}% churn risk${p.churnDaysOverdue ? ` (${p.churnDaysOverdue}d since last contact)` : ''}`
+      }).join('\n')}`
+    : ''
+
+  // Product gap win rate deltas
+  const gapImpacts = (brain.productGapPriority ?? [])
+    .filter(g => typeof g.winRateDelta === 'number' && g.winRateDelta <= -10)
+    .slice(0, 3)
+  const gapSection = gapImpacts.length > 0
+    ? `\nProduct gaps impacting win rate:\n${gapImpacts.map(g =>
+        `• "${g.title}": ${g.winRateWithGap}% win rate with gap vs ${g.winRateWithoutGap}% without (▼${Math.abs(g.winRateDelta!)}pts)`
+      ).join('\n')}`
+    : ''
+
   const summaryMsg = await anthropic.messages.create({
-    model: 'claude-haiku-4-5-20251001', max_tokens: 800,
+    model: 'claude-sonnet-4-6', max_tokens: 1200,
     messages: [{
       role: 'user',
       content: `You are a B2B sales AI assistant. Produce a concise, direct pipeline summary for the CEO/sales leader.
@@ -1534,7 +1556,7 @@ ${dealSummaries}
 Stats: ${activeDeals.length} active deals | Total pipeline value: ${totalValue > 0 ? `$${totalValue.toLocaleString()}` : 'unknown'} | ${highScore.length} likely to close | ${atRisk.length} at risk
 
 Urgent deals: ${urgentDeals.slice(0, 3).map(d => d.company).join(', ') || 'none'}
-Stale deals: ${staleDeals.slice(0, 3).map(d => d.company).join(', ') || 'none'}
+Stale deals: ${staleDeals.slice(0, 3).map(d => d.company).join(', ') || 'none'}${churnSection}${gapSection}
 
 Cross-deal patterns:
 ${patternSummary || 'None detected'}
@@ -1545,7 +1567,7 @@ ${recSummary || 'None yet'}
 Write a direct, scannable summary with:
 1. One-line overall health assessment
 2. Top 2-3 deals to focus on RIGHT NOW (with specific reason)
-3. Biggest risk across the pipeline
+3. Biggest risk across the pipeline (use churn alerts if present)
 4. One action the sales leader should take today
 
 Be specific. Reference deal names. UK English. Use markdown.`,
@@ -1696,7 +1718,7 @@ export async function POST(req: NextRequest) {
     const pageContext = currentPage ? `\nUser is currently on: ${currentPage}` : ''
     // Detect if user wants content drafted (email, message, etc.) — allow longer output
     const wantsContent = /\b(draft|write|compose|prepare|create|send)\b.*\b(email|letter|message|response|reply|memo|proposal|brief|summary)\b/i.test(lastText)
-    const qaMaxTokens = wantsContent ? 1500 : 600
+    const qaMaxTokens = wantsContent ? 2000 : 800
 
     const systemPrompt = `You are DealKit AI — the central command for this sales team. You have full visibility across the pipeline, deals, risks, and collateral. Be direct, specific, concise. UK English.
 
@@ -1724,7 +1746,7 @@ ${kbParts.join('\n') || 'No workspace data yet.'}${brainSection}`
 
     // Stream the Q&A response for instant perceived speed
     const stream = anthropic.messages.stream({
-      model: 'claude-haiku-4-5-20251001', max_tokens: qaMaxTokens,
+      model: 'claude-sonnet-4-6', max_tokens: qaMaxTokens,
       system: systemPrompt,
       messages: messages.slice(-6).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })),
     })

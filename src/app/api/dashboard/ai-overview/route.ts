@@ -112,14 +112,39 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
   const brain = await getWorkspaceBrain(workspaceId)
   let brainContext = ''
   if (brain) {
-    try { brainContext = `\n\nDEAL INTELLIGENCE (from meeting analysis):\n${formatBrainContext(brain)}` }
+    try {
+      const baseBrainCtx = formatBrainContext(brain)
+
+      // Churn risk alerts — deals overdue for follow-up
+      const churnAlerts = (brain.mlPredictions ?? [])
+        .filter(p => (p.churnRisk ?? 0) >= 65)
+        .sort((a, b) => (b.churnRisk ?? 0) - (a.churnRisk ?? 0))
+        .slice(0, 5)
+      const churnCtx = churnAlerts.length > 0
+        ? `\nCHURN RISK ALERTS:\n${churnAlerts.map(p => {
+            const deal = openDeals.find(d => d.id === p.dealId)
+            return `- ${deal?.dealName ?? p.dealId}: ${p.churnRisk}% churn risk${p.churnDaysOverdue ? ` (${p.churnDaysOverdue}d overdue)` : ''}`
+          }).join('\n')}`
+        : ''
+
+      // Product gap win rate deltas
+      const gapDeltas = (brain.productGapPriority ?? [])
+        .filter(g => typeof g.winRateDelta === 'number' && g.winRateDelta <= -10)
+        .slice(0, 3)
+      const gapCtx = gapDeltas.length > 0
+        ? `\nPRODUCT GAPS HURTING WIN RATE:\n${gapDeltas.map(g =>
+            `- "${g.title}": ${g.winRateWithGap}% win rate with gap vs ${g.winRateWithoutGap}% without (▼${Math.abs(g.winRateDelta!)}pts impact)`
+          ).join('\n')}`
+        : ''
+
+      brainContext = `\n\nDEAL INTELLIGENCE (from meeting analysis):\n${baseBrainCtx}${churnCtx}${gapCtx}`
+    }
     catch { /* non-fatal: stale/corrupt brain snapshot */ }
   }
 
   const msg = await anthropic.messages.create({
-    // Haiku is sufficient here — input is well-structured pipeline data, output is a small JSON object
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 1200,
+    model: 'claude-sonnet-4-6',
+    max_tokens: 1500,
     system: `You are a senior sales strategist reviewing a sales team's pipeline. Analyse the data and respond with ONLY a JSON object — no markdown, no explanation — with these exact keys:
 - "summary": string — 2–3 sentences summarising pipeline health and outlook, using specific numbers (deals, values, win rate). Be direct and honest.
 - "keyActions": string[] — exactly 3–5 specific, actionable items the rep should do TODAY. Each must start with a verb and be under 15 words. Prioritise by urgency/value.

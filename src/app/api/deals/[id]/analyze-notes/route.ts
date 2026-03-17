@@ -104,7 +104,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Phase 1: LLM extracts structured data ONLY — no scoring.
     // Scoring is computed deterministically by the brain from text signals + ML.
     const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001', max_tokens: 2000,
+      model: 'claude-sonnet-4-6', max_tokens: 2000,
       messages: [{ role: 'user', content: `You are extracting structured data from B2B sales meeting notes. Return ONLY valid JSON, no markdown, no analysis.
 
 ${previousContext ? `${previousContext}\n\n---\n\n` : ''}NEW MEETING NOTES:
@@ -236,7 +236,7 @@ priority: critical | high | medium | low` }],
       }
       const briefing = buildDealBriefing(brain, id, dealForBriefing, signals)
       const narrationMsg = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001', max_tokens: 300,
+        model: 'claude-sonnet-4-6', max_tokens: 400,
         messages: [{ role: 'user', content: scoreNarrationPrompt(briefing) }],
       })
       const narration = (narrationMsg.content[0] as any)?.text?.trim() ?? ''
