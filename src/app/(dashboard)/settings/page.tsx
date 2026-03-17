@@ -96,13 +96,64 @@ export default function SettingsPage() {
   const [hubspotConnecting, setHubspotConnecting] = useState(false)
   const [hubspotToken, setHubspotToken] = useState('')
   const [showTokenInput, setShowTokenInput] = useState(false)
+  const [globalConsent, setGlobalConsent] = useState<boolean | null>(null)
+  const [consentLoading, setConsentLoading] = useState(false)
+  const [eraseLoading, setEraseLoading] = useState(false)
 
   const { data: userRes, isLoading: loadingUser } = useSWR<{ data: DbUser }>('/api/user', fetcher)
   const { data: membersRes, isLoading: loadingMembers, mutate: mutateMembers } = useSWR<{ data: Member[] }>('/api/workspaces/members', fetcher)
   const { data: hubspotRes, mutate: mutateHubspot } = useSWR<{ data: HubspotStatus }>('/api/integrations/hubspot/status', fetcher, { revalidateOnFocus: false })
   const { data: configData, mutate: mutateConfig } = useSWR('/api/pipeline-config', fetcher, { revalidateOnFocus: false })
+  const { data: consentRes } = useSWR<{ consented: boolean }>('/api/global/consent', fetcher, { revalidateOnFocus: false })
   const hubspot = hubspotRes?.data
   const dbUser = userRes?.data
+
+  // Sync consent state from server
+  useEffect(() => {
+    if (consentRes && globalConsent === null) setGlobalConsent(consentRes.consented ?? false)
+  }, [consentRes, globalConsent])
+
+  const handleConsentToggle = async (value: boolean) => {
+    if (!dbUser?.workspaceId) return
+    setConsentLoading(true)
+    try {
+      const res = await fetch('/api/global/consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consented: value, workspaceId: dbUser.workspaceId }),
+      })
+      if (res.ok) {
+        setGlobalConsent(value)
+        toast(value
+          ? 'Industry Intelligence enabled — your anonymised deal outcomes will improve predictions for all users.'
+          : 'Contribution disabled. Your data will be excluded from the next model update.',
+          'success')
+      } else {
+        toast('Failed to update consent preference', 'error')
+      }
+    } catch { toast('Failed to update consent preference', 'error') }
+    finally { setConsentLoading(false) }
+  }
+
+  const handleGlobalErase = async () => {
+    if (!dbUser?.workspaceId) return
+    setEraseLoading(true)
+    try {
+      const res = await fetch('/api/global/erase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId: dbUser.workspaceId }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        setGlobalConsent(false)
+        toast(json.message ?? 'Data erased from global pool.', 'success')
+      } else {
+        toast(json.error ?? 'Erasure failed', 'error')
+      }
+    } catch { toast('Erasure failed', 'error') }
+    finally { setEraseLoading(false) }
+  }
   const members = membersRes?.data ?? []
   const [savingCurrency, setSavingCurrency] = useState(false)
   const [savingDisplay, setSavingDisplay] = useState(false)
@@ -744,6 +795,80 @@ export default function SettingsPage() {
         </SectionCard>
 
         {/* Data */}
+        {/* ── Industry Intelligence ─────────────────────────────────────────── */}
+        <SectionCard title="Industry Intelligence" description="Cross-workspace learning — powered by anonymised benchmarks">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+            {/* Explainer */}
+            <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.14)' }}>
+              <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0, lineHeight: 1.7 }}>
+                When enabled, DealKit contributes <strong style={{ color: '#EBEBEB' }}>10 anonymised behavioural signals</strong> per closed deal to a shared learning pool.
+                In return, your predictions are benchmarked against industry data and new workspaces start with a pre-calibrated model instead of a 50/50 coin flip.
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '10px' }}>
+                {[
+                  { ok: true,  label: 'Win/loss outcome' },
+                  { ok: true,  label: '10 engagement signal floats' },
+                  { ok: true,  label: 'Deal value bracket (5 bands)' },
+                  { ok: true,  label: 'Risk category flags (7 booleans)' },
+                  { ok: false, label: 'Deal names or company names' },
+                  { ok: false, label: 'Meeting notes or AI summaries' },
+                  { ok: false, label: 'Exact deal values' },
+                  { ok: false, label: 'Contact info or loss reasons' },
+                ].map(({ ok, label }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: ok ? '#6EE7B7' : '#6B7280' }}>
+                    <span style={{ fontSize: '10px', flexShrink: 0 }}>{ok ? '✓ shared' : '✗ never'}</span>
+                    <span>{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Consent toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.025)', border: `1px solid ${globalConsent ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.07)'}` }}>
+              <div>
+                <p style={{ fontSize: '13px', fontWeight: 600, color: '#F1F1F3', margin: 0 }}>Contribute to Industry Intelligence</p>
+                <p style={{ fontSize: '11px', color: '#666', margin: '3px 0 0' }}>
+                  {globalConsent
+                    ? 'Active — your anonymised outcomes are improving predictions for all users'
+                    : 'Disabled — enable to unlock industry benchmarks and improve your predictions'}
+                </p>
+              </div>
+              <button
+                onClick={() => handleConsentToggle(!globalConsent)}
+                disabled={consentLoading || (dbUser?.role !== 'owner' && dbUser?.role !== 'admin')}
+                style={{
+                  position: 'relative', width: '44px', height: '24px', borderRadius: '12px',
+                  background: globalConsent ? '#22C55E' : 'rgba(255,255,255,0.12)',
+                  border: 'none', cursor: (consentLoading || (dbUser?.role !== 'owner' && dbUser?.role !== 'admin')) ? 'not-allowed' : 'pointer',
+                  opacity: consentLoading ? 0.6 : 1, transition: 'background 0.2s', flexShrink: 0,
+                }}
+                title={dbUser?.role === 'member' ? 'Owner or admin required' : ''}
+              >
+                <span style={{
+                  position: 'absolute', top: '3px', width: '18px', height: '18px', borderRadius: '50%',
+                  background: '#fff', transition: 'left 0.2s', left: globalConsent ? '23px' : '3px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                }} />
+              </button>
+            </div>
+
+            {/* Erasure */}
+            {dbUser?.role === 'owner' && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '10px', background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.14)' }}>
+                <div>
+                  <p style={{ fontSize: '12px', fontWeight: 500, color: '#EF4444', margin: 0 }}>Remove from global pool</p>
+                  <p style={{ fontSize: '11px', color: '#666', margin: '2px 0 0' }}>GDPR Article 17 — erase all contributed records within 30 days</p>
+                </div>
+                <button onClick={handleGlobalErase} disabled={eraseLoading}
+                  style={{ height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#EF4444', background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.22)', cursor: eraseLoading ? 'not-allowed' : 'pointer', opacity: eraseLoading ? 0.6 : 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {eraseLoading ? 'Erasing…' : 'Erase my data'}
+                </button>
+              </div>
+            )}
+          </div>
+        </SectionCard>
+
         <SectionCard title="Privacy & compliance" description="How DealKit handles your data">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
@@ -753,7 +878,7 @@ export default function SettingsPage() {
                 { icon: '🔒', label: 'Encryption in transit', sub: 'TLS on all connections' },
                 { icon: '🏦', label: 'No card storage', sub: 'Payments via Stripe (PCI-DSS)' },
                 { icon: '🚫', label: 'No data selling', sub: 'Your data is never sold' },
-                { icon: '🤖', label: 'No AI training', sub: 'Your data never trains models' },
+                { icon: '🤖', label: 'No AI training', sub: 'Identifiable data never trains models' },
                 { icon: '✅', label: 'SOC 2 auth provider', sub: 'Clerk (SOC 2 Type II)' },
                 { icon: '🌍', label: 'GDPR & CCPA ready', sub: 'EU/UK/California rights supported' },
               ].map(({ icon, label, sub }) => (

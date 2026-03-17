@@ -381,6 +381,104 @@ export const productGapsRelations = relations(productGaps, ({ one }) => ({
 }))
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Global transfer-learning tables  (privacy-preserving, cross-workspace pool)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Per-workspace consent record for contributing to the global pool.
+ * Default: NOT consented (opt-in required).
+ * Stores consent version so policy updates can require re-consent.
+ */
+export const workspaceGlobalConsent = pgTable('workspace_global_consent', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  workspaceId:        uuid('workspace_id')
+    .notNull()
+    .references(() => workspaces.id, { onDelete: 'cascade' })
+    .unique(),
+  consented:          boolean('consented').notNull().default(false),
+  consentedAt:        timestamp('consented_at', { withTimezone: true }),
+  consentedByUserId:  text('consented_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  consentVersion:     integer('consent_version').notNull().default(1),
+  revokedAt:          timestamp('revoked_at', { withTimezone: true }),
+  erasedAt:           timestamp('erased_at', { withTimezone: true }),   // set on GDPR erasure completion
+  createdAt:          timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:          timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
+ * Anonymised deal outcome vectors.
+ * NEVER contains PII — workspace is identified only by one-way HMAC hash.
+ * Contains only 10 normalised ML feature floats + outcome (0/1) + coarse metadata.
+ */
+export const globalDealOutcomes = pgTable('global_deal_outcomes', {
+  id:                    text('id').primaryKey(),           // sha256 fingerprint — deduplication key
+  poolContributorId:     text('pool_contributor_id').notNull(),  // HMAC(workspaceId, SALT) — NOT a FK
+  features:              jsonb('features').notNull(),        // number[10] matching ML_FEATURE_NAMES
+  outcome:               integer('outcome').notNull(),       // 0=lost, 1=won
+  dealValueBucket:       text('deal_value_bucket').notNull().default('m'),  // xs/s/m/l/xl
+  stageDurationBucket:   integer('stage_duration_bucket').notNull().default(0), // days rounded to 5
+  riskThemes:            jsonb('risk_themes').notNull().default([]),   // boolean[7]
+  collateralUsed:        jsonb('collateral_used').notNull().default([]), // string[] type enum only
+  brainVersion:          integer('brain_version').notNull().default(8),
+  isErased:              boolean('is_erased').notNull().default(false),
+  contributedAt:         timestamp('contributed_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
+ * Trained universal prior model.
+ * Only one row is active at a time. Versions increment monotonically.
+ */
+export const globalMlModel = pgTable('global_ml_model', {
+  id:                  uuid('id').primaryKey().defaultRandom(),
+  version:             integer('version').notNull().unique(),
+  isActive:            boolean('is_active').notNull().default(false),
+  weights:             jsonb('weights').notNull(),           // number[10]
+  bias:                jsonb('bias').notNull(),              // stored as jsonb for portability
+  featureNames:        jsonb('feature_names').notNull(),
+  trainingSize:        integer('training_size').notNull(),
+  looAccuracy:         jsonb('loo_accuracy').notNull(),
+  featureImportance:   jsonb('feature_importance').notNull(),
+  globalWinRate:       jsonb('global_win_rate').notNull(),   // 0-1
+  stageVelocityP25:    jsonb('stage_velocity_p25'),
+  stageVelocityP50:    jsonb('stage_velocity_p50'),
+  stageVelocityP75:    jsonb('stage_velocity_p75'),
+  riskThemeWinRates:   jsonb('risk_theme_win_rates'),        // number[7]
+  collateralLift:      jsonb('collateral_lift'),             // {type,withRate,withoutRate}[]
+  archetypeCentroids:  jsonb('archetype_centroids'),         // number[][]
+  archetypeWinRates:   jsonb('archetype_win_rates'),         // number[]
+  minBrainVersion:     integer('min_brain_version').notNull().default(8),
+  trainedAt:           timestamp('trained_at', { withTimezone: true }).notNull().defaultNow(),
+  trainingDurationMs:  integer('training_duration_ms'),
+})
+
+/**
+ * Immutable audit log for all global pool events.
+ * Required for GDPR compliance and SOC2 audit trail.
+ */
+export const globalContributionAudit = pgTable('global_contribution_audit', {
+  id:                  uuid('id').primaryKey().defaultRandom(),
+  poolContributorId:   text('pool_contributor_id').notNull(),
+  eventType:           text('event_type').notNull(),   // 'contributed'|'retracted'|'erased'|'consent_granted'|'consent_revoked'
+  dealCount:           integer('deal_count'),
+  brainVersion:        integer('brain_version'),
+  metadata:            jsonb('metadata').notNull().default({}),
+  createdAt:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
+ * 24-hour cache for cross-workspace benchmark aggregates.
+ * Prevents hot aggregate queries on global_deal_outcomes at scale.
+ */
+export const globalBenchmarkCache = pgTable('global_benchmark_cache', {
+  id:              uuid('id').primaryKey().defaultRandom(),
+  cacheKey:        text('cache_key').notNull().unique(),
+  data:            jsonb('data').notNull(),
+  computedFromN:   integer('computed_from_n').notNull(),
+  expiresAt:       timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Inferred row types
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -413,3 +511,15 @@ export type NewEventRow = typeof events.$inferInsert
 
 export type ProductGapRow = typeof productGaps.$inferSelect
 export type NewProductGapRow = typeof productGaps.$inferInsert
+
+export type WorkspaceGlobalConsentRow = typeof workspaceGlobalConsent.$inferSelect
+export type NewWorkspaceGlobalConsentRow = typeof workspaceGlobalConsent.$inferInsert
+
+export type GlobalDealOutcomeRow = typeof globalDealOutcomes.$inferSelect
+export type NewGlobalDealOutcomeRow = typeof globalDealOutcomes.$inferInsert
+
+export type GlobalMlModelRow = typeof globalMlModel.$inferSelect
+export type NewGlobalMlModelRow = typeof globalMlModel.$inferInsert
+
+export type GlobalContributionAuditRow = typeof globalContributionAudit.$inferSelect
+export type GlobalBenchmarkCacheRow = typeof globalBenchmarkCache.$inferSelect

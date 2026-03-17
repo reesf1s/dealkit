@@ -548,6 +548,55 @@ export default function DashboardPage() {
                 </div>
               )}
 
+              {/* Industry benchmark comparison */}
+              {brain?.globalPrior && brain.globalPrior.usingPrior && hasClosed && (() => {
+                const gp = brain.globalPrior!
+                const localWR  = wl?.winRate ?? 0
+                const globalWR = gp.globalWinRate
+                const delta    = localWR - globalWR
+                const deltaColor = delta >= 5 ? '#22C55E' : delta <= -5 ? '#EF4444' : '#F59E0B'
+                return (
+                  <div style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.14)', borderRadius: '12px', padding: '14px 16px' }}>
+                    <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>vs Industry</div>
+                    {/* Win rate comparison bar */}
+                    <div style={{ marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '10px', color: '#9CA3AF' }}>Your win rate</span>
+                        <span style={{ fontSize: '11px', color: '#EBEBEB', fontWeight: 600 }}>{localWR}%</span>
+                      </div>
+                      <div style={{ height: '5px', background: 'rgba(255,255,255,0.04)', borderRadius: '3px', overflow: 'hidden', marginBottom: '4px' }}>
+                        <div style={{ height: '100%', width: `${localWR}%`, background: '#22C55E', borderRadius: '3px' }} />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '10px', color: '#9CA3AF' }}>Industry median</span>
+                        <span style={{ fontSize: '11px', color: '#6B7280', fontWeight: 600 }}>{globalWR}%</span>
+                      </div>
+                      <div style={{ height: '5px', background: 'rgba(255,255,255,0.04)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${globalWR}%`, background: '#6366F1', borderRadius: '3px' }} />
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '11px', color: deltaColor, fontWeight: 600 }}>
+                      {delta >= 5 ? `▲ ${delta}pts above industry median`
+                        : delta <= -5 ? `▼ ${Math.abs(delta)}pts below industry median`
+                        : `≈ In line with industry median`}
+                    </div>
+                    {gp.stageVelocityP50 > 0 && wl?.avgDaysToClose != null && wl.avgDaysToClose > 0 && (
+                      <div style={{ fontSize: '10px', color: '#374151', marginTop: '6px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                        Close speed: {wl.avgDaysToClose}d avg vs {gp.stageVelocityP50}d industry median
+                        {wl.avgDaysToClose > gp.stageVelocityP75
+                          ? <span style={{ color: '#EF4444' }}> — slower than 75th pct</span>
+                          : wl.avgDaysToClose < gp.stageVelocityP50
+                            ? <span style={{ color: '#22C55E' }}> — faster than median</span>
+                            : null}
+                      </div>
+                    )}
+                    <div style={{ fontSize: '10px', color: '#555', marginTop: '6px' }}>
+                      Based on {gp.trainingSize.toLocaleString()} industry deals
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* Score calibration */}
               {hasClosed && wl!.scoreCalibration.avgScoreOnWins != null && (
                 <div style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.14)', borderRadius: '12px', padding: '14px 16px' }}>
@@ -614,18 +663,40 @@ export default function DashboardPage() {
               {/* ML Predictive Model card */}
               {brain?.mlModel && (() => {
                 const ml = brain.mlModel!
+                const gp = brain.globalPrior
                 const topFeature = ml.featureImportance[0]
                 const accColor = ml.looAccuracy >= 0.7 ? '#22C55E' : ml.looAccuracy >= 0.55 ? '#F59E0B' : '#EF4444'
+                const isColdStart = ml.trainingSize === 0 && ml.usingGlobalPrior
                 return (
                   <div style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.14)', borderRadius: '12px', padding: '14px 16px', gridColumn: 'span 2' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                       <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Predictive Model</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                         <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: accColor }} />
-                        <span style={{ fontSize: '10px', color: accColor, fontWeight: 600 }}>{Math.round(ml.looAccuracy * 100)}% accurate</span>
-                        <span style={{ fontSize: '10px', color: '#374151', marginLeft: '4px' }}>trained on {ml.trainingSize} deals</span>
+                        <span style={{ fontSize: '10px', color: accColor, fontWeight: 600 }}>
+                          {isColdStart ? 'Global prior' : `${Math.round(ml.looAccuracy * 100)}% accurate`}
+                        </span>
+                        <span style={{ fontSize: '10px', color: '#374151', marginLeft: '4px' }}>
+                          {isColdStart
+                            ? `based on ${(gp?.trainingSize ?? 0).toLocaleString()} industry deals`
+                            : gp?.usingPrior
+                              ? `${ml.trainingSize} local + ${(gp.trainingSize).toLocaleString()} industry`
+                              : `trained on ${ml.trainingSize} deals`}
+                        </span>
                       </div>
                     </div>
+                    {/* Cold start / blend badge */}
+                    {gp?.usingPrior && (
+                      <div style={{ padding: '7px 10px', borderRadius: '8px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.16)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '7px' }}>
+                        <span style={{ fontSize: '13px' }}>🧠</span>
+                        <span style={{ fontSize: '11px', color: '#9CA3AF', lineHeight: 1.5 }}>
+                          {isColdStart
+                            ? <>Predictions based on <strong style={{ color: '#EBEBEB' }}>{(gp.trainingSize).toLocaleString()} industry deals</strong>. Accuracy will improve as you close more deals.</>
+                            : <>Model blends your {ml.trainingSize} closed deals ({gp.localWeight}%) with {(gp.trainingSize).toLocaleString()} industry deals ({100 - gp.localWeight}%).</>
+                          }
+                        </span>
+                      </div>
+                    )}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       {/* Feature importances */}
                       <div>

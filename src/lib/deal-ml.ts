@@ -77,6 +77,8 @@ export interface TrainedMLModel {
   avgDealValue: number
   maxDealValue: number
   featureImportance: { name: string; importance: number; direction: 'helps' | 'hurts' }[]
+  globalPriorAlpha?: number  // 0 = pure local, 1 = pure global prior (Bayesian blend weight)
+  usingGlobalPrior?: boolean
 }
 
 export interface ScoreDriver {
@@ -662,7 +664,13 @@ export function predictDaysToClose(model: CloseDateModel, features: number[]): n
 
 // ─── Main engine ──────────────────────────────────────────────────────────────
 
-export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngineResult {
+import type { GlobalPriorInput } from '@/lib/global-pool'
+
+export function runMLEngine(
+  allDeals: DealMLInput[],
+  now = new Date(),
+  globalPrior?: GlobalPriorInput | null,
+): MLEngineResult {
   const closedWon  = allDeals.filter(d => d.stage === 'closed_won')
   const closedLost = allDeals.filter(d => d.stage === 'closed_lost')
   const closed     = [...closedWon, ...closedLost]
@@ -674,7 +682,47 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
     competitivePatterns: [], calibrationTimeline: [],
     closeDateModel: null,
   }
-  if (closed.length < ML_MIN_TRAINING_DEALS) return empty
+  if (closed.length < ML_MIN_TRAINING_DEALS) {
+    // Cold start: if we have a global prior, use it to generate predictions for open deals
+    if (globalPrior && globalPrior.weights.length === ML_FEATURE_NAMES.length && open.length > 0) {
+      const allVals = allDeals.map(d => d.dealValue ?? 0).filter(v => v > 0)
+      const avgDV = allVals.length > 0 ? allVals.reduce((a, b) => a + b, 0) / allVals.length : 50_000
+      const maxDV = allVals.length > 0 ? Math.max(...allVals) : 100_000
+      const compRates = new Map<string, number>()
+      const coldPredictions: DealMLPrediction[] = open.map(deal => {
+        const feats = extractFeatures(deal, compRates, avgDV, maxDV, now)
+        const winProb = sigmoid(dot(globalPrior.weights, feats) + globalPrior.bias)
+        return {
+          dealId: deal.id,
+          winProbability: winProb,
+          compositeScore: null,
+          confidence: 'low' as const,
+          nearestWin: null, nearestLoss: null,
+          similarWins: [], similarLosses: [],
+          archetypeId: null,
+          riskFlags: [],
+          predictedDaysToClose: globalPrior.stageVelocityP50 > 0
+            ? Math.round(globalPrior.stageVelocityP50)
+            : null,
+          scoreDrivers: computeScoreDrivers(feats, globalPrior.weights),
+        }
+      })
+      const coldModel: TrainedMLModel = {
+        weights: globalPrior.weights,
+        bias: globalPrior.bias,
+        featureNames: ML_FEATURE_NAMES,
+        trainingSize: 0,
+        looAccuracy: 0,
+        lastTrained: now.toISOString(),
+        avgDealValue: avgDV, maxDealValue: maxDV,
+        featureImportance: globalPrior.featureImportance,
+        globalPriorAlpha: 1,
+        usingGlobalPrior: true,
+      }
+      return { model: coldModel, predictions: coldPredictions, trends: null, archetypes: [], stageVelocity: null, competitivePatterns: [], calibrationTimeline: [], closeDateModel: null }
+    }
+    return empty
+  }
   // Logistic regression needs at least one example of each class to be meaningful
   if (closedWon.length === 0 || closedLost.length === 0) return empty
 
@@ -713,7 +761,19 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
     label:    d.stage === 'closed_won' ? 1 : 0,
   }))
 
-  const { weights, bias } = trainLR(training.map(e => ({ features: e.features, label: e.label })))
+  const { weights: rawWeights, bias: rawBias } = trainLR(training.map(e => ({ features: e.features, label: e.label })))
+
+  // ── Bayesian blend with global prior (if available) ───────────────────────
+  // α_global = 1 / (1 + localClosedDeals / 10) — fades to zero as local data grows
+  let weights = rawWeights
+  let bias    = rawBias
+  let globalAlpha = 0
+  if (globalPrior && globalPrior.weights.length === ML_FEATURE_NAMES.length) {
+    globalAlpha  = 1 / (1 + closed.length / 10)
+    const localAlpha = 1 - globalAlpha
+    weights = globalPrior.weights.map((gw, i) => globalAlpha * gw + localAlpha * (rawWeights[i] ?? 0))
+    bias    = globalAlpha * globalPrior.bias + localAlpha * rawBias
+  }
 
   // ── LOO accuracy ──────────────────────────────────────────────────────────
   let loo: number
@@ -740,6 +800,8 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
     lastTrained: now.toISOString(),
     avgDealValue, maxDealValue,
     featureImportance,
+    globalPriorAlpha:  globalAlpha > 0 ? Math.round(globalAlpha * 100) / 100 : undefined,
+    usingGlobalPrior:  globalAlpha > 0,
   }
 
   // ── K-means archetypes (k=2 small / k=3 larger) ───────────────────────────

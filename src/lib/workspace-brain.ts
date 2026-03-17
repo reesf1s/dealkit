@@ -19,6 +19,7 @@ import { runMLEngine, computeCompositeScore, type TrainedMLModel, type DealMLPre
 import { extractTextSignals, analyzeDeterioration, parseMeetingEntries, type TextSignals } from '@/lib/text-signals'
 import { BRAIN_VERSION } from '@/lib/brain-constants'
 export { BRAIN_VERSION } from '@/lib/brain-constants'
+import { getActiveGlobalModel, getGlobalConsent, extractContributions, contributeToGlobalPool } from '@/lib/global-pool'
 
 export interface DealSignalSummary {
   momentum:         number    // 0–1 sentiment momentum (>0.5 = building)
@@ -152,6 +153,15 @@ export interface WorkspaceBrain {
     losses: number
     winRate: number                                // 0-100
   }[]
+  // ── Cross-workspace transfer learning ────────────────────────────────────────
+  globalPrior?: {
+    trainingSize:     number    // how many records are in the global pool
+    globalWinRate:    number    // 0-100 industry-wide win rate
+    stageVelocityP50: number    // global median days to close
+    stageVelocityP75: number    // global p75 days to close
+    usingPrior:       boolean   // whether global prior is actively blended
+    localWeight:      number    // 0-100: % of local vs global in blended model
+  }
 }
 
 export interface PipelineHealthIndex {
@@ -912,7 +922,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     avgDaysToClose: winLossIntel?.avgDaysToClose ?? 0,
   }
 
-  // ── ML engine — train on closed deal history ────────────────────────────────
+  // ── ML engine — fetch global prior then train on closed deal history ─────────
   let mlModel: WorkspaceBrain['mlModel']                   = undefined
   let mlPredictions: WorkspaceBrain['mlPredictions']       = undefined
   let mlTrends: WorkspaceBrain['mlTrends']                 = undefined
@@ -921,33 +931,37 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
   let competitivePatterns: WorkspaceBrain['competitivePatterns'] = undefined
   let calibrationTimeline: WorkspaceBrain['calibrationTimeline'] = undefined
   let closeDateModel: WorkspaceBrain['closeDateModel']     = undefined
+  let globalPriorMeta: WorkspaceBrain['globalPrior']       = undefined
 
-  if ((wonDeals.length + lostDeals.length) >= ML_MIN_TRAINING_DEALS) {
-    // Build ML inputs using pre-extracted text signals — no LLM dependency.
-    // All 4 NLP features (textEngagement, momentumScore, stakeholderDepth, urgencyScore)
-    // are pre-computed from the signalMap built above.
-    const mlInputs = deals.map(d => {
-      const sig = signalMap.get(d.id)
-      return {
-        id:               d.id,
-        company:          d.prospectCompany,
-        stage:            d.stage,
-        dealValue:        d.dealValue,
-        dealRisks:        (d.dealRisks as string[]) ?? [],
-        dealCompetitors:  (d.dealCompetitors as string[]) ?? [],
-        todos:            (d.todos as { done: boolean }[]) ?? [],
-        createdAt:        d.createdAt,
-        updatedAt:        d.updatedAt,
-        wonDate:          d.wonDate,
-        lostDate:         d.lostDate,
-        textEngagement:   sig?.textEngagement,
-        momentumScore:    sig?.momentumScore,
-        stakeholderDepth: sig?.stakeholderDepth,
-        urgencyScore:     sig?.urgencyScore,
-      }
-    })
+  // Fetch global prior in parallel — non-blocking, fails gracefully
+  const globalPrior = await getActiveGlobalModel().catch(() => null)
 
-    const mlResult = runMLEngine(mlInputs, now)
+  // Build ML inputs using pre-extracted text signals — no LLM dependency.
+  // All 4 NLP features are pre-computed from the signalMap built above.
+  // Always built (needed for contribution extraction and cold-start predictions).
+  const mlInputs = deals.map(d => {
+    const sig = signalMap.get(d.id)
+    return {
+      id:               d.id,
+      company:          d.prospectCompany,
+      stage:            d.stage,
+      dealValue:        d.dealValue,
+      dealRisks:        (d.dealRisks as string[]) ?? [],
+      dealCompetitors:  (d.dealCompetitors as string[]) ?? [],
+      todos:            (d.todos as { done: boolean }[]) ?? [],
+      createdAt:        d.createdAt,
+      updatedAt:        d.updatedAt,
+      wonDate:          d.wonDate,
+      lostDate:         d.lostDate,
+      textEngagement:   sig?.textEngagement,
+      momentumScore:    sig?.momentumScore,
+      stakeholderDepth: sig?.stakeholderDepth,
+      urgencyScore:     sig?.urgencyScore,
+    }
+  })
+
+  if ((wonDeals.length + lostDeals.length) >= ML_MIN_TRAINING_DEALS || globalPrior) {
+    const mlResult = runMLEngine(mlInputs, now, globalPrior)
     if (mlResult.model) {
       mlModel              = mlResult.model
       mlTrends             = mlResult.trends ?? undefined
@@ -972,6 +986,19 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
         const snap = snapshots.find(s => s.id === pred.dealId)
         if (snap?.signalSummary && pred.predictedDaysToClose != null) {
           snap.signalSummary.predictedCloseDays = pred.predictedDaysToClose
+        }
+      }
+
+      // Capture global prior metadata for the brain (displayed in UI as "based on X industry deals")
+      if (globalPrior && mlResult.model?.usingGlobalPrior !== false) {
+        const alpha = mlResult.model?.globalPriorAlpha ?? 0
+        globalPriorMeta = {
+          trainingSize:     globalPrior.trainingSize,
+          globalWinRate:    Math.round(globalPrior.globalWinRate * 100),
+          stageVelocityP50: Math.round(globalPrior.stageVelocityP50),
+          stageVelocityP75: Math.round(globalPrior.stageVelocityP75),
+          usingPrior:       alpha > 0,
+          localWeight:      Math.round((1 - alpha) * 100),
         }
       }
     }
@@ -1216,6 +1243,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     objectionWinMap:        objectionWinMap.length > 0 ? objectionWinMap : undefined,
     productGapPriority:     productGapPriority.length > 0 ? productGapPriority : undefined,
     collateralEffectiveness: collateralEffectiveness.length > 0 ? collateralEffectiveness : undefined,
+    globalPrior:            globalPriorMeta,
   }
 
   await db.execute(sql`
@@ -1223,6 +1251,71 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     SET workspace_brain = ${JSON.stringify(brain)}::jsonb
     WHERE id = ${workspaceId}
   `)
+
+  // ── Global pool contribution — fire-and-forget after brain is saved ───────────
+  // Non-blocking: never fails the rebuild. Only runs if workspace has consent.
+  void (async () => {
+    try {
+      const hasConsent = await getGlobalConsent(workspaceId)
+      if (!hasConsent) return
+
+      // Build closed deal contribution records using the pre-computed mlInputs feature vectors
+      // We need to re-run extractFeatures to get the per-deal feature vectors.
+      // Use the collateral types already fetched earlier in the rebuild.
+      const collateralByDeal = new Map<string, string[]>()
+      for (const c of collateralRows) {
+        if (!c.sourceDealLogId) continue
+        const arr = collateralByDeal.get(c.sourceDealLogId) ?? []
+        arr.push(c.type)
+        collateralByDeal.set(c.sourceDealLogId, arr)
+      }
+
+      const closedForContribution = deals
+        .filter(d => d.stage === 'closed_won' || d.stage === 'closed_lost')
+        .map(d => {
+          const sig = signalMap.get(d.id)
+          // Re-derive feature vector — same logic as extractFeatures in deal-ml.ts
+          // but we use the pre-computed NLP features from signalMap
+          const stageOrdinal: Record<string, number> = {
+            prospecting: 0, qualification: 1, discovery: 2,
+            proposal: 3, negotiation: 4, closed_won: 4, closed_lost: 4,
+          }
+          const fStage = (stageOrdinal[d.stage] ?? 0) / 4
+          const allVals = deals.map(x => x.dealValue ?? 0).filter(v => v > 0)
+          const maxVal  = allVals.length > 0 ? Math.max(...allVals) : 100_000
+          const val     = Math.max(d.dealValue ?? 0, 1)
+          const fValue  = maxVal > 1 ? Math.log(val + 1) / Math.log(maxVal + 1) : 0.5
+          const ageMs   = d.createdAt ? (now.getTime() - new Date(d.createdAt).getTime()) : 0
+          const fAge    = Math.min(ageMs / 86_400_000 / 180, 1)
+          const fRisk   = Math.min(((d.dealRisks as string[]) ?? []).length / 5, 1)
+          const fTodo   = (() => { const t = (d.todos as { done: boolean }[]) ?? []; return t.length > 0 ? t.filter(x => x.done).length / t.length : 0.5 })()
+          const features = [
+            fStage, fValue, fAge, fRisk,
+            0.5,   // competitor_win_rate: use neutral default (avoid cross-workspace leakage)
+            fTodo,
+            sig?.textEngagement    ?? 0.5,
+            sig?.momentumScore     ?? 0.5,
+            sig?.stakeholderDepth  ?? 0.5,
+            sig?.urgencyScore      ?? 0.5,
+          ]
+          return {
+            stage:           d.stage,
+            dealValue:       d.dealValue,
+            dealRisks:       (d.dealRisks as string[]) ?? [],
+            createdAt:       d.createdAt,
+            wonDate:         d.wonDate,
+            lostDate:        d.lostDate,
+            collateralTypes: collateralByDeal.get(d.id) ?? [],
+            features,
+          }
+        })
+
+      const contributions = extractContributions(closedForContribution)
+      await contributeToGlobalPool(workspaceId, contributions)
+    } catch {
+      // Silently swallow — pool contribution must never block or error workspace operations
+    }
+  })()
 
   return brain
 }
