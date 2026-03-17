@@ -71,9 +71,25 @@ function CollateralCard({
         >
           {item.title}
         </h3>
-        <p style={{ fontSize: '12px', color: '#555', margin: '4px 0 0', fontVariantNumeric: 'tabular-nums' }}>
-          Generated {formatDate(item.generatedAt)}
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+          <p style={{ fontSize: '12px', color: '#555', margin: 0, fontVariantNumeric: 'tabular-nums' }}>
+            Generated {formatDate(item.generatedAt)}
+          </p>
+          {item.generationSource === 'proactive_brain' && (
+            <span style={{
+              fontSize: '10px',
+              fontWeight: 500,
+              color: '#A78BFA',
+              background: 'rgba(167,139,250,0.1)',
+              border: '1px solid rgba(167,139,250,0.2)',
+              borderRadius: '4px',
+              padding: '1px 5px',
+              letterSpacing: '0.02em',
+            }}>
+              Auto-generated
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Actions */}

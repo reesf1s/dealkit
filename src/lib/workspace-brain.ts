@@ -14,7 +14,7 @@
  */
 import { db } from '@/lib/db'
 import { dealLogs, competitors as competitorRecords, productGaps as productGapsTable, collateral as collateralTable } from '@/lib/db/schema'
-import { eq, sql } from 'drizzle-orm'
+import { eq, and, sql } from 'drizzle-orm'
 import { runMLEngine, computeCompositeScore, type TrainedMLModel, type DealMLPrediction, type MLTrends, type DealArchetype, type StageVelocityIntel, type CompetitivePattern, type ScoreCalibrationPoint, type CloseDateModel, ML_MIN_TRAINING_DEALS } from '@/lib/deal-ml'
 import { extractTextSignals, analyzeDeterioration, parseMeetingEntries, type TextSignals } from '@/lib/text-signals'
 import { BRAIN_VERSION } from '@/lib/brain-constants'
@@ -1534,6 +1534,14 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     WHERE id = ${workspaceId}
   `)
 
+  // ── Proactive collateral generation — fire-and-forget after brain is saved ───
+  // Non-blocking: auto-generates 1–2 highest-priority collateral pieces when the
+  // brain detects risks/patterns and has enough grounding knowledge.
+  void (async () => {
+    try { await generateProactiveCollateral(workspaceId, brain) }
+    catch { /* non-fatal */ }
+  })()
+
   // ── Global pool contribution — fire-and-forget after brain is saved ───────────
   // Non-blocking: never fails the rebuild. Only runs if workspace has consent.
   void (async () => {
@@ -1823,4 +1831,219 @@ export function formatBrainContext(brain: WorkspaceBrain, stageLabels?: Record<s
   }
 
   return lines.join('\n')
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Proactive Collateral Auto-Generation
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * After a brain rebuild, check for high-priority collateral suggestions and
+ * auto-generate the top 1–2 if the workspace has enough grounding knowledge.
+ *
+ * Runs as a fire-and-forget background task — never blocks the rebuild.
+ * Skips generation if:
+ * - No company profile exists (content would be generic/useless)
+ * - A similar collateral piece already exists for the same deal
+ * - The suggestion lacks grounding data (e.g. battlecard without competitor intel)
+ */
+export async function generateProactiveCollateral(
+  workspaceId: string,
+  brain: WorkspaceBrain,
+): Promise<void> {
+  const { generateFreeformCollateral } = await import('@/lib/ai/generate')
+  const { companyProfiles } = await import('@/lib/db/schema')
+
+  const suggestions = brain.suggestedCollateral ?? []
+  if (suggestions.length === 0) return
+
+  // 0. Cooldown — only generate proactive collateral once per 24 hours per workspace
+  const recentProactive = await db
+    .select({ id: collateralTable.id })
+    .from(collateralTable)
+    .where(
+      and(
+        eq(collateralTable.workspaceId, workspaceId),
+        eq(collateralTable.generationSource, 'proactive_brain'),
+        sql`${collateralTable.createdAt} > NOW() - INTERVAL '24 hours'`,
+      )
+    )
+    .limit(1)
+  if (recentProactive.length > 0) return
+
+  // 1. Check company profile exists — needed for grounded content
+  const [profile] = await db
+    .select({ id: companyProfiles.id })
+    .from(companyProfiles)
+    .where(eq(companyProfiles.workspaceId, workspaceId))
+    .limit(1)
+  if (!profile) return
+
+  // 2. Load existing collateral to de-duplicate
+  const existingCollateral = await db
+    .select({
+      title: collateralTable.title,
+      type: collateralTable.type,
+      sourceDealLogId: collateralTable.sourceDealLogId,
+      generationSource: collateralTable.generationSource,
+      customTypeName: collateralTable.customTypeName,
+    })
+    .from(collateralTable)
+    .where(eq(collateralTable.workspaceId, workspaceId))
+
+  // Build a set of "dealId:type" keys for fast dedup
+  const existingKeys = new Set(
+    existingCollateral.map(c => `${c.sourceDealLogId ?? ''}:${c.type}:${(c.customTypeName ?? c.title).toLowerCase()}`)
+  )
+
+  // 3. Check grounding knowledge availability
+  const hasCompetitorIntel = (brain.competitivePatterns ?? []).length > 0
+    || (brain.winLossIntel?.competitorRecord ?? []).length > 0
+  const hasWinPlaybook = !!brain.winPlaybook
+  const hasWinLossData = (brain.winLossIntel?.winCount ?? 0) + (brain.winLossIntel?.lossCount ?? 0) >= 3
+
+  // 4. Filter and prioritise suggestions
+  const viable: typeof suggestions = []
+  for (const s of suggestions) {
+    if (viable.length >= 2) break
+
+    // Skip if similar collateral already exists for this deal
+    const key = `${s.dealId}:custom:${s.suggestion.toLowerCase()}`
+    const titleKey = `${s.dealId}:${s.type === 'custom' ? 'custom' : s.type}:${s.suggestion.toLowerCase()}`
+    if (existingKeys.has(key) || existingKeys.has(titleKey)) continue
+
+    // Also check fuzzy match on title
+    const hasSimilar = existingCollateral.some(c =>
+      c.sourceDealLogId === s.dealId &&
+      (c.customTypeName ?? c.title).toLowerCase().includes(s.suggestion.toLowerCase().slice(0, 20))
+    )
+    if (hasSimilar) continue
+
+    // Check grounding requirements by type
+    if (s.type === 'battlecard' && !hasCompetitorIntel) continue
+    if (s.type === 'objection_handler' && !hasWinLossData && !hasWinPlaybook) continue
+
+    viable.push(s)
+  }
+
+  if (viable.length === 0) return
+
+  // 5. Generate top 1–2 collateral pieces
+  for (const suggestion of viable) {
+    try {
+      // Build deal context for grounding
+      const dealSnap = (brain.deals ?? []).find(d => d.id === suggestion.dealId)
+      let dealContext: string | undefined
+      if (dealSnap) {
+        const lines = [
+          `Deal: ${dealSnap.name} with ${dealSnap.company}`,
+          `Stage: ${dealSnap.stage}`,
+        ]
+        if (dealSnap.dealValue) lines.push(`Value: £${dealSnap.dealValue.toLocaleString()}`)
+        if (dealSnap.summary) lines.push(`Summary: ${dealSnap.summary}`)
+        if (dealSnap.risks.length > 0) lines.push(`Risks: ${dealSnap.risks.join('; ')}`)
+        if (dealSnap.pendingTodos.length > 0) lines.push(`Pending actions: ${dealSnap.pendingTodos.slice(0, 5).join('; ')}`)
+        dealContext = lines.join('\n')
+      }
+
+      const generated = await generateFreeformCollateral({
+        workspaceId,
+        title: suggestion.suggestion,
+        description: `${suggestion.reason}. Generate actionable, specific content grounded in workspace intelligence and deal data.`,
+        dealContext,
+        customPrompt: buildProactiveCustomPrompt(suggestion, brain),
+      })
+
+      // Save to collateral table
+      await db
+        .insert(collateralTable)
+        .values({
+          workspaceId,
+          userId: null, // system-generated, no user
+          type: 'custom',
+          title: generated.title,
+          status: 'ready',
+          content: generated.content,
+          rawResponse: generated.rawResponse,
+          generatedAt: new Date(),
+          customTypeName: suggestion.suggestion,
+          generationSource: 'proactive_brain',
+          sourceDealLogId: suggestion.dealId,
+        })
+
+      console.log(`[proactive] Generated collateral: "${generated.title}" for deal ${suggestion.dealName}`)
+    } catch (err) {
+      // Non-fatal — log and continue to next suggestion
+      console.error(`[proactive] Failed to generate "${suggestion.suggestion}":`, err)
+    }
+  }
+}
+
+/** Build type-specific additional instructions for proactive generation. */
+function buildProactiveCustomPrompt(
+  suggestion: WorkspaceBrain['suggestedCollateral'][number],
+  brain: WorkspaceBrain,
+): string {
+  const parts: string[] = []
+
+  if (suggestion.type === 'objection_handler') {
+    parts.push('Focus on specific objections identified in the deal risks.')
+    parts.push('Include: the objection, why it surfaces, reframing language, proof points, and a suggested response script.')
+    // Inject win playbook data if available
+    const wp = brain.winPlaybook
+    if (wp) {
+      if (wp.topWinFactors.length > 0) parts.push(`Key win factors to leverage: ${wp.topWinFactors.join(', ')}`)
+      if (wp.avgDaysToClose) parts.push(`Typical close timeline: ${wp.avgDaysToClose} days`)
+    }
+    const objWins = brain.objectionWinMap ?? []
+    if (objWins.length > 0) {
+      parts.push('Historical objection outcomes:')
+      for (const o of objWins.slice(0, 3)) {
+        parts.push(`- "${o.objection}": ${o.winRate}% win rate when encountered (${o.totalDeals} deals)`)
+      }
+    }
+  }
+
+  if (suggestion.type === 'battlecard') {
+    parts.push('Structure as a competitive battlecard: positioning, strengths vs weaknesses, counter-objections, win themes.')
+    const compPats = brain.competitivePatterns ?? []
+    if (compPats.length > 0) {
+      parts.push('Competitive intelligence from ML analysis:')
+      for (const cp of compPats.slice(0, 3)) {
+        parts.push(`- vs ${cp.competitor}: ${cp.winRate}% win rate | Win when: ${cp.topWinCondition} | Lose when: ${cp.topLossRisk}`)
+      }
+    }
+    const compRecord = brain.winLossIntel?.competitorRecord ?? []
+    if (compRecord.length > 0) {
+      parts.push('Historical competitor record:')
+      for (const c of compRecord.slice(0, 3)) {
+        parts.push(`- ${c.name}: ${c.wins}W-${c.losses}L (${c.winRate}% win rate)`)
+      }
+    }
+  }
+
+  if (suggestion.type === 'email_sequence') {
+    parts.push('Create a 3-email re-engagement sequence with clear subject lines, personalised opening, value hook, and CTA.')
+    parts.push('Emails should be spaced 3-5 days apart, escalating in urgency but not desperation.')
+  }
+
+  if (suggestion.type === 'talk_track') {
+    parts.push('Structure as a discovery call guide: opening, qualifying questions, pain point exploration, value demonstration, next steps.')
+    const wp = brain.winPlaybook
+    if (wp?.topWinFactors.length) {
+      parts.push(`Discovery should explore these win factors: ${wp.topWinFactors.join(', ')}`)
+    }
+  }
+
+  if (suggestion.type === 'custom') {
+    parts.push('This is a cross-deal strategic document. Make it actionable and specific to the patterns detected.')
+    if (suggestion.reason.includes('budget')) {
+      parts.push('Focus on ROI quantification, cost-benefit framing, and business case structure.')
+    }
+    if (suggestion.reason.includes('competitor')) {
+      parts.push('Focus on competitive positioning, differentiation, and win strategies.')
+    }
+  }
+
+  return parts.join('\n')
 }
