@@ -331,7 +331,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
           {/* Insights — per-item delete (filter out score-summary insights to avoid conflicting scores) */}
           {deal?.conversionInsights?.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '10px' }}>
-              {(deal.conversionInsights as string[]).filter((ins: string) => !/\d+\/100/i.test(ins)).map((insight: string, i: number) => (
+              {(deal.conversionInsights as string[]).filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins)).map((insight: string, i: number) => (
                 <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: '#888' }}
                   onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-insight') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
                   onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-insight') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
@@ -1972,11 +1972,11 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
             )}
 
             {/* Insights — filter out score-summary insights (e.g. "rates X at 82/100") to avoid conflicting with ML score */}
-            {(deal.conversionInsights as string[])?.filter((ins: string) => !/\d+\/100/i.test(ins))?.length > 0 && (
+            {(deal.conversionInsights as string[])?.filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins))?.length > 0 && (
               <div>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: '#818CF8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Key Insights</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {(deal.conversionInsights as string[]).filter((ins: string) => !/\d+\/100/i.test(ins)).map((insight: string, i: number) => (
+                  {(deal.conversionInsights as string[]).filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins)).map((insight: string, i: number) => (
                     <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: '#9CA3AF' }}
                       onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-insight-ov') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
                       onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-insight-ov') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
@@ -2158,14 +2158,14 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
                       </div>
                     )}
                     {/* First insight if no risks — filter out score summaries */}
-                    {((deal.dealRisks as string[]) ?? []).length === 0 && ((deal.conversionInsights as string[]) ?? []).filter((ins: string) => !/\d+\/100/i.test(ins)).length > 0 && (
+                    {((deal.dealRisks as string[]) ?? []).length === 0 && ((deal.conversionInsights as string[]) ?? []).filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins)).length > 0 && (
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                         <span style={{ fontSize: '10px', fontWeight: 700, color: '#818CF8', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '4px', padding: '1px 6px', flexShrink: 0, marginTop: '1px', letterSpacing: '0.04em' }}>KEY</span>
-                        <span style={{ fontSize: '12px', color: '#D1D5DB', lineHeight: 1.5 }}>{((deal.conversionInsights as string[]) ?? []).filter((ins: string) => !/\d+\/100/i.test(ins))[0]}</span>
+                        <span style={{ fontSize: '12px', color: '#D1D5DB', lineHeight: 1.5 }}>{((deal.conversionInsights as string[]) ?? []).filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins))[0]}</span>
                       </div>
                     )}
                     {/* Fallback when no specific data */}
-                    {!deal.nextSteps && ((deal.dealRisks as string[]) ?? []).length === 0 && ((deal.conversionInsights as string[]) ?? []).filter((ins: string) => !/\d+\/100/i.test(ins)).length === 0 && (
+                    {!deal.nextSteps && ((deal.dealRisks as string[]) ?? []).length === 0 && ((deal.conversionInsights as string[]) ?? []).filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins)).length === 0 && (
                       <div style={{ fontSize: '12px', color: '#6B7280', lineHeight: 1.6 }}>
                         {deal.conversionScore < 40
                           ? 'Score critically low — add next steps and update meeting notes to identify specific blockers.'
