@@ -105,7 +105,9 @@ export default function SettingsPage() {
   const dbUser = userRes?.data
   const members = membersRes?.data ?? []
   const [savingCurrency, setSavingCurrency] = useState(false)
+  const [savingDisplay, setSavingDisplay] = useState(false)
   const currentCurrency: string = configData?.data?.currency ?? '$'
+  const currentDisplay: string = configData?.data?.valueDisplay ?? 'arr'
 
   // Show toast when redirected back from HubSpot OAuth
   useEffect(() => {
@@ -244,6 +246,21 @@ export default function SettingsPage() {
       toast(`Currency updated to ${symbol}`, 'success')
     } catch { toast('Failed to save currency', 'error') }
     finally { setSavingCurrency(false) }
+  }
+
+  async function handleDisplayChange(mode: string) {
+    setSavingDisplay(true)
+    try {
+      const res = await fetch('/api/pipeline-config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ valueDisplay: mode }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      await mutateConfig()
+      toast(`Values now showing as ${mode.toUpperCase()}`, 'success')
+    } catch { toast('Failed to save display preference', 'error') }
+    finally { setSavingDisplay(false) }
   }
 
   async function handleDeleteAccount() {
@@ -423,41 +440,83 @@ export default function SettingsPage() {
 
         {/* Workspace preferences */}
         <SectionCard title="Preferences" description="Currency and display settings for your workspace">
-          <div>
-            <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>
-              Currency symbol used across deal values, KPIs, and reports
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+            {/* Currency */}
+            <div>
+              <div style={{ fontSize: '12px', color: '#888', marginBottom: '10px' }}>
+                Currency symbol used across deal values, KPIs, and reports
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {[
+                  { symbol: '$', label: 'USD $' },
+                  { symbol: '£', label: 'GBP £' },
+                  { symbol: '€', label: 'EUR €' },
+                  { symbol: '¥', label: 'JPY ¥' },
+                  { symbol: 'A$', label: 'AUD A$' },
+                  { symbol: 'C$', label: 'CAD C$' },
+                  { symbol: '₹', label: 'INR ₹' },
+                  { symbol: 'kr', label: 'SEK/NOK kr' },
+                ].map(({ symbol, label }) => {
+                  const isActive = currentCurrency === symbol
+                  return (
+                    <button
+                      key={symbol}
+                      onClick={() => handleCurrencyChange(symbol)}
+                      disabled={savingCurrency}
+                      style={{
+                        height: '32px', padding: '0 14px', borderRadius: '7px', fontSize: '12px', fontWeight: isActive ? '600' : '400',
+                        background: isActive ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
+                        border: isActive ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                        color: isActive ? '#818CF8' : '#9CA3AF',
+                        cursor: savingCurrency ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.1s',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {[
-                { symbol: '$', label: 'USD $' },
-                { symbol: '£', label: 'GBP £' },
-                { symbol: '€', label: 'EUR €' },
-                { symbol: '¥', label: 'JPY ¥' },
-                { symbol: 'A$', label: 'AUD A$' },
-                { symbol: 'C$', label: 'CAD C$' },
-                { symbol: '₹', label: 'INR ₹' },
-                { symbol: 'kr', label: 'SEK/NOK kr' },
-              ].map(({ symbol, label }) => {
-                const isActive = currentCurrency === symbol
-                return (
-                  <button
-                    key={symbol}
-                    onClick={() => handleCurrencyChange(symbol)}
-                    disabled={savingCurrency}
-                    style={{
-                      height: '32px', padding: '0 14px', borderRadius: '7px', fontSize: '12px', fontWeight: isActive ? '600' : '400',
-                      background: isActive ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
-                      border: isActive ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(255,255,255,0.08)',
-                      color: isActive ? '#818CF8' : '#9CA3AF',
-                      cursor: savingCurrency ? 'not-allowed' : 'pointer',
-                      transition: 'all 0.1s',
-                    }}
-                  >
-                    {label}
-                  </button>
-                )
-              })}
+
+            {/* ARR / MRR display */}
+            <div>
+              <div style={{ fontSize: '12px', color: '#888', marginBottom: '6px' }}>
+                How recurring revenue is shown across the dashboard, pipeline, and reports
+              </div>
+              <div style={{ fontSize: '11px', color: '#555', marginBottom: '10px' }}>
+                ARR annualises monthly deals (e.g. £149/mo → £1,788/yr). MRR shows the monthly equivalent.
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                {[
+                  { mode: 'arr', label: 'ARR  Annual', desc: '£149/mo → £1,788' },
+                  { mode: 'mrr', label: 'MRR  Monthly', desc: '£149/mo → £149' },
+                ].map(({ mode, label, desc }) => {
+                  const isActive = currentDisplay === mode
+                  return (
+                    <button
+                      key={mode}
+                      onClick={() => handleDisplayChange(mode)}
+                      disabled={savingDisplay}
+                      style={{
+                        height: '48px', padding: '0 16px', borderRadius: '7px', fontSize: '12px',
+                        fontWeight: isActive ? '600' : '400', textAlign: 'left',
+                        background: isActive ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
+                        border: isActive ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                        color: isActive ? '#818CF8' : '#9CA3AF',
+                        cursor: savingDisplay ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.1s', display: 'flex', flexDirection: 'column', gap: '2px',
+                      }}
+                    >
+                      <span>{label}</span>
+                      <span style={{ fontSize: '10px', color: isActive ? '#6366F1' : '#444', fontWeight: 400 }}>{desc}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
+
           </div>
         </SectionCard>
 

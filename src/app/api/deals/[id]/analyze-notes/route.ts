@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import Anthropic from '@anthropic-ai/sdk'
 import { db } from '@/lib/db'
-import { dealLogs, productGaps, companyProfiles } from '@/lib/db/schema'
+import { dealLogs, productGaps, companyProfiles, workspaces } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { rebuildWorkspaceBrain, getWorkspaceBrain } from '@/lib/workspace-brain'
@@ -26,6 +26,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params
     const { meetingNotes } = await req.json()
     if (!meetingNotes?.trim()) return NextResponse.json({ error: 'No meeting notes provided' }, { status: 400 })
+
+    // Load pipeline config to compute stage position for heuristic score
+    // (custom stages need position-relative baseline, not hardcoded stage-name priors)
+    const [wsRow] = await db.select({ pipelineConfig: workspaces.pipelineConfig })
+      .from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1)
+    const pipelineStages = ((wsRow?.pipelineConfig as any)?.stages ?? []) as { id: string; order: number; isDefault?: boolean }[]
+    const activeStages = pipelineStages
+      .filter(s => s.id !== 'closed_won' && s.id !== 'closed_lost')
+      .sort((a, b) => a.order - b.order)
+
     // Selective columns only — avoids SELECT * failing on any schema col that hasn't been migrated yet
     const [deal] = await db.select({
       id: dealLogs.id,
@@ -94,7 +104,7 @@ Deal: ${deal.dealName} with ${deal.prospectCompany}${capabilitiesContext}${exist
 Return this exact JSON — extract facts, do not score or judge:
 {
   "summary": "2-3 sentence factual summary of deal status and trajectory",
-  "risks": ["observable risk signal from the notes — disengagement, budget, competition, timeline, etc."],
+  "risks": ["direct observation from THESE notes only — what was said or happened (max 10 words, e.g. 'No reply for 2 weeks' or 'Budget under review' or 'Evaluating Salesforce' — no inferences, no assumptions about unseen stakeholders or processes)"],
   "todos": [{"text": "specific action item"}],
   "obsoleteTodoIds": ["id-of-existing-todo-now-done-or-irrelevant"],
   "productGaps": [{"title": "gap title", "description": "what prospect said is missing", "priority": "high"}],
@@ -176,16 +186,25 @@ priority: critical | high | medium | low` }],
 
       if (mlPred && brain?.mlModel) {
         // ML model trained on closed deals: use composite (ML dominates as training grows)
+        // Compute stage position (0–1) relative to this workspace's actual pipeline
+        const stageIdx = activeStages.findIndex(s => s.id === deal.stage)
+        const stageNorm = activeStages.length > 0 && stageIdx >= 0
+          ? stageIdx / Math.max(activeStages.length - 1, 1)
+          : 0.5
         const { composite } = computeCompositeScore(
-          heuristicScore(signals, deal.stage),  // stage-adjusted heuristic
+          heuristicScore(signals, stageNorm),
           mlPred.winProbability,
           brain.mlModel.trainingSize,
         )
         finalScore = composite
         scoreBasis = 'ml_composite'
       } else {
-        // No ML model yet: stage-adjusted text signal heuristic
-        finalScore = heuristicScore(signals, deal.stage)
+        // No ML model yet: stage-position-adjusted text signal heuristic
+        const stageIdx = activeStages.findIndex(s => s.id === deal.stage)
+        const stageNorm = activeStages.length > 0 && stageIdx >= 0
+          ? stageIdx / Math.max(activeStages.length - 1, 1)
+          : 0.5
+        finalScore = heuristicScore(signals, stageNorm)
       }
 
       // Phase 3: LLM narrates the brain's determination (tiny call — 3 bullets only)

@@ -379,21 +379,19 @@ export function analyzeDeterioration(
 
 // ─── Heuristic score ──────────────────────────────────────────────────────────
 
-/** Stage-based prior — funnel position alone tells us something about win probability */
-const STAGE_PRIOR: Record<string, number> = {
-  prospecting:   20,
-  qualification: 28,
-  discovery:     35,
-  proposal:      45,
-  negotiation:   58,
-}
-
 /**
- * Compute a heuristic deal score (0–100) from text signals + pipeline stage.
+ * Compute a heuristic deal score (0–100) from text signals + pipeline stage position.
  * Used when no ML model is available yet. Fully deterministic — no LLM required.
+ *
+ * stageNormalized: 0–1 position within the workspace's active pipeline stages.
+ *   0 = first stage (e.g. Prospecting / Lead In / Enquiry) → baseline ~20
+ *   1 = last active stage before closed (e.g. Negotiation / Contract) → baseline ~58
+ *   undefined = no stage info → baseline 35
+ *
+ * This is pipeline-agnostic — works for SaaS, Agency, Real Estate, Manufacturing, etc.
  */
-export function heuristicScore(signals: TextSignals, stage?: string): number {
-  const baseline = stage ? (STAGE_PRIOR[stage] ?? 35) : 35
+export function heuristicScore(signals: TextSignals, stageNormalized?: number): number {
+  const baseline = stageNormalized !== undefined ? Math.round(20 + stageNormalized * 38) : 35
   let score = baseline
 
   // Core signals
