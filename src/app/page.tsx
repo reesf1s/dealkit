@@ -77,13 +77,13 @@ export default function LandingPage() {
       <section style={{ position: 'relative', zIndex: 1, paddingTop: '160px', paddingBottom: '100px', textAlign: 'center', maxWidth: '760px', margin: '0 auto', padding: '160px 32px 80px' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 12px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: '100px', fontSize: '12px', color: '#A78BFA', fontWeight: '600', marginBottom: '28px' }}>
           <Zap size={11} />
-          Your pipeline, scored against your own win history
+          Your pipeline · your history · industry context
         </div>
         <h1 style={{ fontSize: '58px', fontWeight: '800', letterSpacing: '-0.05em', lineHeight: '1.06', marginBottom: '22px', background: 'linear-gradient(180deg, #F0EEFF 50%, #8B6FD4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
           Know which deals<br />to chase. Today.
         </h1>
         <p style={{ fontSize: '18px', color: '#7E7A9A', lineHeight: '1.7', marginBottom: '36px', maxWidth: '560px', margin: '0 auto 36px' }}>
-          DealKit scores every open deal against your own closed-deal history, surfaces what needs attention each morning, and gets sharper every time you close.
+          DealKit scores every open deal against your own win history, surfaces what needs attention each morning, and benchmarks your performance against hundreds of similar deals across the industry.
         </p>
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/sign-up" style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '12px 24px', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', boxShadow: '0 0 24px rgba(99,102,241,0.4), 0 4px 16px rgba(0,0,0,0.3)', borderRadius: '9px', color: '#fff', fontSize: '14px', fontWeight: '700', textDecoration: 'none' }}>
@@ -208,7 +208,7 @@ export default function LandingPage() {
             {
               n: '03', icon: '🧠', title: 'The system learns as you close',
               desc: 'Every closed deal trains your private ML model. Win probability, forecast accuracy, competitive patterns, and collateral relevance all improve with every outcome you log.',
-              detail: 'After 10+ closed deals, you have proprietary intelligence no competitor can replicate.',
+              detail: 'After 10+ closed deals, scores are driven by your own data. Opt in and your win rates also benchmark against the industry — zero PII ever leaves your workspace.',
             },
           ].map(({ n, icon, title, desc, detail }) => (
             <div key={n} style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '14px', padding: '26px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -329,24 +329,24 @@ export default function LandingPage() {
           {[
             {
               num: '1', icon: '📡', color: '#6366F1',
-              title: 'Text signal extraction',
-              badge: 'Runs on every note',
-              desc: 'Every meeting note is scanned for 100+ signals: sentiment, urgency, budget confirmation, champion presence, stakeholder breadth, objection type, and engagement velocity. No external API calls — fully deterministic.',
-              outputs: ['Sentiment trend (early vs. recent)', 'Next step defined?', 'Objection category', 'Champion strength score'],
+              title: 'Reads every note automatically',
+              badge: 'No manual tagging',
+              desc: 'Every meeting note is scanned for buying signals, risks, stall signs, and competitor mentions — automatically. No forms to fill in, no tagging. Just paste your notes and it extracts what matters.',
+              outputs: ['Champion and budget status', 'Next step defined?', 'Objection category', 'Engagement direction (rising or falling)'],
             },
             {
               num: '2', icon: '🤖', color: '#8B5CF6',
-              title: 'Your private ML model',
-              badge: 'Trains on YOUR deals',
-              desc: 'Nine models run on your closed deal history. Logistic regression predicts win probability. K-means clusters your archetypes. OLS detects trends. KNN finds similar wins. Per-competitor models identify what beats each rival.',
-              outputs: ['Win probability [0–100]', 'Nearest similar win/loss', 'Stage stall detection', 'Per-competitor win conditions'],
+              title: 'Learns from every deal you close',
+              badge: 'Gets smarter over time',
+              desc: 'Every time a deal closes, your model updates. Win probability, stage stall detection, close-date prediction, and competitive win conditions all improve as your history grows. All private — your data never trains anyone else\'s model.',
+              outputs: ['Win probability per open deal', 'Which deals are stalling', 'Predicted close date', 'What beats each competitor'],
             },
             {
               num: '3', icon: '✦', color: '#A78BFA',
-              title: 'Claude narrates the data',
-              badge: 'Explains, never decides',
-              desc: 'Claude (the LLM) never generates a score. It receives the structured output of the ML models and text signals, then writes 2–3 plain-English sentences explaining what the data means and what to do next.',
-              outputs: ['Plain-English score explanation', 'Top signal (positive or risk)', 'Single recommended action', 'Daily pipeline briefing'],
+              title: 'Tells you what to do next',
+              badge: 'Plain English, every morning',
+              desc: 'Claude never generates a score. It reads the output of your ML model and explains it in plain English — which deals need action today, what the risks are, and what to do next. Scores come from your data; the explanation comes from the AI.',
+              outputs: ['Daily pipeline briefing', 'Top deal to action now', 'Risk explanation per deal', 'Recommended single action'],
             },
           ].map(({ num, icon, color, title, badge, desc, outputs }) => (
             <div key={num} style={{ background: 'rgba(255,255,255,0.025)', border: `1px solid ${color}25`, borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative', overflow: 'hidden' }}>
@@ -373,12 +373,12 @@ export default function LandingPage() {
         <div style={{ background: 'linear-gradient(135deg, rgba(14,10,32,0.98), rgba(18,12,38,0.98))', border: '1px solid rgba(139,92,246,0.25)', borderRadius: '14px', padding: '28px 32px', display: 'flex', gap: '28px', alignItems: 'flex-start', marginBottom: '48px' }}>
           <div style={{ flexShrink: 0, width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>⚖️</div>
           <div>
-            <div style={{ fontSize: '14px', fontWeight: '800', color: '#F0EEFF', letterSpacing: '-0.02em', marginBottom: '8px' }}>How the score is computed — and why it gets more accurate over time</div>
+            <div style={{ fontSize: '14px', fontWeight: '800', color: '#F0EEFF', letterSpacing: '-0.02em', marginBottom: '8px' }}>How the score works — and why it gets more accurate every month</div>
             <div style={{ fontSize: '13px', color: '#7E7A9A', lineHeight: '1.7', maxWidth: '680px', marginBottom: '12px' }}>
-              The deal score is a composite of text signals (always available) and your ML model (activates after 4+ closed deals). As your training set grows, ML weight scales automatically from 0% → 70% — the more you use it, the more your own data drives the score rather than generic heuristics.
+              At first, scores lean on observable signals from your notes. As you close deals, your own ML model takes over — automatically scaling from 0% to 70% weight as your training set grows. Opt into Industry Intelligence and your score also benchmarks against the industry from day one.
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {['4 deals → ML activates (14% weight)', '10 deals → ML at 33%', '30+ deals → ML at 70%', 'Your data, your model, private'].map(tag => (
+              {['4 deals → ML activates (14% weight)', '10 deals → ML at 33%', '30+ deals → ML at 70%', 'Your data, your model, private', 'Industry benchmarks from day one (opt-in)'].map(tag => (
                 <div key={tag} style={{ fontSize: '11px', color: '#A78BFA', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', padding: '3px 10px', borderRadius: '100px', fontWeight: '600' }}>{tag}</div>
               ))}
             </div>
@@ -396,7 +396,7 @@ export default function LandingPage() {
               { milestone: 'Day 1', deals: '0 deals closed', desc: 'Battlecards, objection handlers, and talk tracks generated immediately from your product and competitor profiles.', color: '#4B4565' },
               { milestone: '1 month', deals: '4–10 deals', desc: 'ML activates. Win probability, weighted forecast, and competitive win/loss record all start accumulating.', color: '#6366F1' },
               { milestone: '3 months', deals: '20–50 deals', desc: 'Deal archetypes form. Per-competitor models emerge. Stage velocity baselines set. Scores now 33%+ ML-driven.', color: '#8B5CF6' },
-              { milestone: '6 months', deals: '50+ deals', desc: 'You have logistic regression weights, KNN similarity search, trend detection, and calibrated forecasts — unique to your sales motion. Irreplicable.', color: '#A78BFA' },
+              { milestone: '6 months', deals: '50+ deals', desc: 'You have logistic regression weights, KNN similarity search, trend detection, and calibrated forecasts — unique to your sales motion. And you can see exactly how you compare to the industry without exposing a single deal name.', color: '#A78BFA' },
             ].map(({ milestone, deals, desc, color }, i) => (
               <div key={milestone} style={{ padding: '20px', borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
                 <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, marginBottom: '12px', boxShadow: `0 0 8px ${color}60` }} />
@@ -420,15 +420,15 @@ export default function LandingPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             {[
-              { num: '01', title: 'Win probability (logistic regression)', detail: 'Trained on 10 deal signals from your pipeline. Outputs a win probability per open deal, calibrated entirely against your own closed history.' },
-              { num: '02', title: 'Model accuracy (leave-one-out CV)', detail: 'Honest accuracy estimate — trains N times, leaving one deal out each pass. Tells you exactly how predictive your model actually is.' },
-              { num: '03', title: 'Similar deals (K-nearest neighbours)', detail: 'Finds the most similar historical deals by distance in feature space. Shows what deals like this one actually resulted in.' },
-              { num: '04', title: 'Deal archetypes (K-means clustering)', detail: 'Groups your pipeline into natural archetypes — each with distinct win rates, average values, and characteristics.' },
-              { num: '05', title: 'Competitive win conditions (per-rival LR)', detail: 'A separate logistic regression per competitor identifies which signals predict wins and losses against each rival.' },
-              { num: '06', title: 'Trend detection (OLS regression)', detail: 'Slope estimation on monthly cohorts detects whether win rate, deal velocity, and competitive record are improving or declining.' },
-              { num: '07', title: 'Stage stall detection (velocity quantiles)', detail: 'Computes P50/P75 days-to-close from your won deals, then flags deals that have exceeded normal stage duration.' },
-              { num: '08', title: 'Score calibration (monthly tracking)', detail: 'Tracks the gap between ML score on winners vs. losers each month — measures how predictive your model is becoming.' },
-              { num: '09', title: 'Close-date prediction (OLS regression)', detail: 'Trained on your won deals, predicts days-to-close for every open deal. Drives probability-weighted monthly revenue forecasts.' },
+              { num: '01', title: 'Win probability — per deal, per morning', detail: 'Every open deal gets a 0–100 score each night. Trained on your closed deal history — not generic benchmarks. Tells you which deal to call first.' },
+              { num: '02', title: 'Honest accuracy check', detail: 'The model tests itself every rebuild. It trains with one deal held out, checks its prediction, repeats for every deal. You always know how reliable your scores actually are.' },
+              { num: '03', title: 'Finds your most similar past wins', detail: 'For each open deal, finds the 3 closest historical matches by deal shape, size, and signals. Shows you what happened last time you were in this situation.' },
+              { num: '04', title: 'Groups your pipeline into deal types', detail: 'Clusters your deals into natural patterns — fast SMB, slow enterprise, competitive displacement. Each type has its own typical win rate and timeline.' },
+              { num: '05', title: 'Per-competitor win conditions', detail: 'A separate model per competitor. Learns what signals predict beating Salesforce vs. HubSpot vs. Pipedrive. Your battlecards get smarter as the record grows.' },
+              { num: '06', title: 'Trend detection across months', detail: 'Is your win rate improving? Getting slower to close? Winning more against a specific rival? Trend detection runs across monthly cohorts and tells you before it shows up in a missed quarter.' },
+              { num: '07', title: 'Stage stall alerts', detail: 'Knows how long deals normally spend in each stage from your own history. Flags every deal that is taking longer than normal before it slips off your radar.' },
+              { num: '08', title: 'Score calibration tracking', detail: 'Tracks the gap between scores on deals that won vs. those that lost over time. Tells you month-by-month whether your model is getting more predictive or drifting.' },
+              { num: '09', title: 'Close-date prediction', detail: 'Trained on your won deals, predicts days to close for every open deal. Drives probability-weighted revenue forecasts for each month.' },
             ].map(({ num, title, detail }) => (
               <div key={num} style={{ display: 'flex', gap: '12px', padding: '14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px' }}>
                 <div style={{ fontSize: '11px', fontWeight: '800', color: '#4B4565', fontVariantNumeric: 'tabular-nums', flexShrink: 0, paddingTop: '2px' }}>{num}</div>
@@ -455,12 +455,12 @@ export default function LandingPage() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
           {[
-            { icon: '📊', title: 'Probability-adjusted forecast', desc: 'Weighted pipeline value using your actual win rates — not a static 30% multiplier. Honest revenue projection that improves as your data accumulates.', badge: 'Close-date model', badgeColor: '#8B5CF6' },
-            { icon: '📉', title: 'Win rate trends', desc: 'Is your win rate improving or declining month-on-month? OLS slope detection catches the trend before it shows up in missed quota.', badge: 'OLS trend regression', badgeColor: '#22C55E' },
-            { icon: '⚠️', title: 'Deals deteriorating silently', desc: 'Sentiment arc analysis compares how recent notes sound vs. earlier ones. Flags deals going quiet before they ghost you.', badge: 'NLP signal analysis', badgeColor: '#F59E0B' },
-            { icon: '🏷️', title: 'Deal archetypes', desc: 'Your pipeline is grouped into natural clusters — e.g. fast SMB, multi-stakeholder enterprise, competitive displacement. Each archetype has its own typical win rate and timeline.', badge: 'K-means clustering', badgeColor: '#6366F1' },
-            { icon: '🕐', title: 'Stage stall alerts', desc: 'Every deal is measured against the P75 days-to-close for that stage from your own history. Deals exceeding it get flagged before they slip.', badge: 'Velocity quantiles', badgeColor: '#A78BFA' },
-            { icon: '💬', title: 'Ask anything about your pipeline', desc: 'Chat interface over your workspace brain. "Which deals have budget concerns?" "Show me our win rate vs Salesforce." Answers grounded in your actual data.', badge: 'AI Chat (grounded)', badgeColor: '#EF4444' },
+            { icon: '📊', title: 'Revenue forecast that earns its numbers', desc: 'Your pipeline value, multiplied by your actual win probability per deal — not a made-up 30% multiplier. Updates every night as deals move and close.', badge: 'Probability-weighted', badgeColor: '#8B5CF6' },
+            { icon: '🧑‍💼', title: 'Rep coaching, without a manager doing the maths', desc: 'Win rate, to-do completion, deals with a next step, and days since last note — per rep. Every morning, automatically. Spot who needs support before the quarter ends.', badge: 'Per-rep stats', badgeColor: '#6366F1' },
+            { icon: '⏰', title: 'Knows your safe follow-up window', desc: 'Learns how long deals in each stage can go without a note before they go cold — based on your own won deals. Alerts you before the silence becomes a problem.', badge: 'Cadence intelligence', badgeColor: '#22C55E' },
+            { icon: '🏆', title: 'Objections you\'ve beaten before', desc: 'Budget concern on this deal? Legal blocker? DealKit shows you every time you\'ve faced that objection in the past — and whether you closed it anyway. Now with industry comparison.', badge: 'Objection Win Map', badgeColor: '#F59E0B' },
+            { icon: '⚠️', title: 'Catches deals going cold', desc: 'Sentiment arc analysis compares how recent notes sound vs. earlier ones — flags deals that have gone quiet or where engagement is dropping before they ghost you.', badge: 'Deterioration alerts', badgeColor: '#EF4444' },
+            { icon: '💬', title: 'Ask anything about your pipeline', desc: '"Which deals have budget concerns?" "Show me our win rate vs Salesforce this quarter." "Which reps have deals with no next step?" Answers grounded in your actual data.', badge: 'AI Chat', badgeColor: '#A78BFA' },
           ].map(({ icon, title, desc, badge, badgeColor }) => (
             <div key={title} style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
@@ -471,6 +471,92 @@ export default function LandingPage() {
               <div style={{ fontSize: '12px', color: '#7E7A9A', lineHeight: '1.6', flex: 1 }}>{desc}</div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── INDUSTRY INTELLIGENCE ─────────────────────────────────────────── */}
+      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 100px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', alignItems: 'center' }}>
+          <div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '100px', fontSize: '11px', color: '#A78BFA', fontWeight: '600', marginBottom: '20px' }}>
+              <Brain size={10} />
+              Industry Intelligence
+            </div>
+            <h2 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '14px', color: '#F0EEFF', lineHeight: '1.2' }}>
+              See how you stack up<br />against the industry
+            </h2>
+            <p style={{ fontSize: '14px', color: '#7E7A9A', lineHeight: '1.7', marginBottom: '20px' }}>
+              Opt in and your performance benchmarks anonymously against similar deals across the platform — giving you an industry win rate, close-speed comparison, and per-objection benchmark to measure against. Zero identifying information ever leaves your workspace.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+              {[
+                'New workspace? Get ML predictions from day one based on industry patterns',
+                'See your win rate vs. industry median — and exactly how far above or below',
+                'Compare your close speed to the industry median and 75th percentile',
+                'Per-objection benchmarks: is your budget-concern win rate above or below average?',
+              ].map((item, i) => (
+                <div key={i} style={{ display: 'flex', gap: '9px', fontSize: '13px', color: '#C4B5FD', alignItems: 'flex-start' }}>
+                  <CheckCircle size={13} color="#6366F1" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  {item}
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {['Opt-in only', 'Zero PII', 'GDPR Art.17 erasure', 'One-way anonymisation'].map(tag => (
+                <div key={tag} style={{ fontSize: '11px', color: '#818CF8', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', padding: '3px 9px', borderRadius: '100px' }}>{tag}</div>
+              ))}
+            </div>
+          </div>
+
+          {/* Industry benchmark mockup */}
+          <div style={{ background: 'rgba(9,6,18,0.9)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ fontSize: '10px', fontWeight: '700', color: '#818CF8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>vs Industry</div>
+
+            {/* Win rate comparison */}
+            <div style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.12)', borderRadius: '10px', padding: '12px 14px' }}>
+              <div style={{ fontSize: '9px', color: '#555', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Win rate</div>
+              <div style={{ marginBottom: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                  <span style={{ fontSize: '10px', color: '#9CA3AF' }}>Your team</span>
+                  <span style={{ fontSize: '11px', color: '#22C55E', fontWeight: '700' }}>68%</span>
+                </div>
+                <div style={{ height: '5px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden', marginBottom: '6px' }}>
+                  <div style={{ height: '100%', width: '68%', background: '#22C55E', borderRadius: '3px' }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                  <span style={{ fontSize: '10px', color: '#9CA3AF' }}>Industry median</span>
+                  <span style={{ fontSize: '11px', color: '#6366F1', fontWeight: '600' }}>52%</span>
+                </div>
+                <div style={{ height: '5px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: '52%', background: '#6366F1', borderRadius: '3px' }} />
+                </div>
+              </div>
+              <div style={{ fontSize: '11px', color: '#22C55E', fontWeight: '600' }}>▲ 16pts above industry median</div>
+            </div>
+
+            {/* Objection benchmarks */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '12px 14px' }}>
+              <div style={{ fontSize: '9px', color: '#555', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Objection Win Map vs Industry</div>
+              {[
+                { theme: 'budget concerns', yours: 61, industry: 48, delta: 13 },
+                { theme: 'competitor pressure', yours: 55, industry: 51, delta: 4 },
+                { theme: 'timeline slippage', yours: 38, industry: 44, delta: -6 },
+              ].map(({ theme, yours, industry, delta }) => {
+                const deltaColor = delta >= 5 ? '#22C55E' : delta <= -5 ? '#EF4444' : '#9CA3AF'
+                return (
+                  <div key={theme} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+                    <span style={{ fontSize: '10px', color: '#9CA3AF', flex: 1, textTransform: 'capitalize' }}>{theme}</span>
+                    <span style={{ fontSize: '11px', color: '#E5E7EB', fontWeight: '700', width: '28px', textAlign: 'right' }}>{yours}%</span>
+                    <span style={{ fontSize: '10px', color: deltaColor, fontWeight: '600', width: '44px', textAlign: 'right' }}>
+                      {delta >= 5 ? `▲ +${delta}` : delta <= -5 ? `▼ ${delta}` : `≈ ${industry}%`}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div style={{ fontSize: '10px', color: '#374151', textAlign: 'center' }}>Based on 2,400+ anonymised industry deals · Updated nightly</div>
+          </div>
         </div>
       </section>
 
@@ -629,6 +715,9 @@ export default function LandingPage() {
               'Lost deal knowledge disappears with the rep',
               'Product gaps scattered across Slack and Notion',
               'New rep takes 3–6 months to ramp',
+              'No idea how your win rate compares to similar companies',
+              'Rep coaching happens quarterly in a spreadsheet, if at all',
+              'New team doesn\'t get ML predictions until months of deals are closed',
             ].map(p => (
               <div key={p} style={{ display: 'flex', gap: '8px', marginBottom: '11px', fontSize: '13px', color: '#7E7A9A', alignItems: 'flex-start' }}>
                 <span style={{ color: '#EF4444', flexShrink: 0, marginTop: '1px', fontWeight: '700' }}>×</span> {p}
@@ -645,6 +734,9 @@ export default function LandingPage() {
               'Every closed deal trains the model and lives in the knowledge base',
               'Product gaps auto-extracted, prioritised by affected revenue',
               'New rep kit ready day one — playbooks, objections, proof stories',
+              'Your win rate benchmarked against the industry — every morning',
+              'Rep stats calculated automatically — win rate, to-do rate, cadence quality',
+              'New workspace gets ML predictions from day one via industry context',
             ].map(p => (
               <div key={p} style={{ display: 'flex', gap: '8px', marginBottom: '11px', fontSize: '13px', color: '#7E7A9A', alignItems: 'flex-start' }}>
                 <CheckCircle size={13} color="#22C55E" style={{ flexShrink: 0, marginTop: '2px' }} /> {p}

@@ -567,12 +567,21 @@ function MeetingPrepTab({ dealId, deal, objectionWinMap = [] }: { dealId: string
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {objectionWinMap.filter((o: any) => o.winsWithTheme > 0).slice(0, 4).map((o: any, i: number) => {
               const color = o.winRateWithTheme >= 60 ? '#22C55E' : o.winRateWithTheme >= 40 ? '#F59E0B' : '#EF4444'
+              const hasGlobal = typeof o.globalWinRate === 'number'
+              const delta = hasGlobal ? o.winRateWithTheme - o.globalWinRate : 0
               return (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: `${color}06`, border: `1px solid ${color}18`, borderRadius: '8px' }}>
                   <span style={{ fontSize: '12px', fontWeight: 800, color, minWidth: '38px', textAlign: 'right', flexShrink: 0 }}>{o.winRateWithTheme}%</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '12px', color: '#E5E7EB', fontWeight: 600, textTransform: 'capitalize' }}>{o.theme.replace(/_/g, ' ')}</div>
-                    <div style={{ fontSize: '11px', color: '#555', marginTop: '1px' }}>{o.winsWithTheme}/{o.dealsWithTheme} deals closed despite this objection</div>
+                    <div style={{ fontSize: '11px', color: '#555', marginTop: '1px' }}>
+                      {o.winsWithTheme}/{o.dealsWithTheme} deals closed despite this objection
+                      {hasGlobal && (
+                        <span style={{ marginLeft: '6px', color: delta >= 5 ? '#22C55E' : delta <= -5 ? '#EF4444' : '#9CA3AF', fontWeight: 600 }}>
+                          · {delta >= 5 ? `▲ ${delta}pts vs industry` : delta <= -5 ? `▼ ${Math.abs(delta)}pts vs industry` : `≈ industry avg (${o.globalWinRate}%)`}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )
@@ -1807,7 +1816,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate }: { dealId: string; deal: any;
   )
 }
 
-function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', mlPrediction = null }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void; currencySymbol?: string; mlPrediction?: any }) {
+function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', mlPrediction = null, globalPrior = null }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void; currencySymbol?: string; mlPrediction?: any; globalPrior?: any }) {
   const [editingSummary, setEditingSummary] = useState(false)
   const [summaryDraft, setSummaryDraft] = useState('')
   const [resetAIConfirm, setResetAIConfirm] = useState(false)
@@ -1962,6 +1971,45 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
                 </div>
               </div>
             )}
+
+            {/* Industry context — "teams like yours" global benchmark */}
+            {globalPrior && globalPrior.usingPrior && globalPrior.trainingSize > 0 && (() => {
+              const gwr = globalPrior.globalWinRate as number
+              const p50 = globalPrior.stageVelocityP50 as number
+              const p75 = globalPrior.stageVelocityP75 as number
+              const dealDays = deal.createdAt
+                ? Math.round((Date.now() - new Date(deal.createdAt).getTime()) / 86400000)
+                : null
+              const isOpen = deal.stage !== 'closed_won' && deal.stage !== 'closed_lost'
+              const velocityStatus = isOpen && dealDays != null && p50 > 0
+                ? dealDays > p75 ? 'slow' : dealDays > p50 ? 'moderate' : 'fast'
+                : null
+              const velocityColor = velocityStatus === 'slow' ? '#EF4444' : velocityStatus === 'moderate' ? '#F59E0B' : '#22C55E'
+              return (
+                <div style={{ padding: '10px 14px', background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.12)', borderRadius: '8px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: '#6366F1', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
+                    Industry Context
+                    <span style={{ fontSize: '9px', fontWeight: 400, color: '#374151', textTransform: 'none', letterSpacing: 0, marginLeft: '6px' }}>
+                      {globalPrior.trainingSize.toLocaleString()} similar deals
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '11px', color: '#9CA3AF' }}>Industry win rate</span>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: '#E5E7EB' }}>{gwr}%</span>
+                    </div>
+                    {velocityStatus && dealDays != null && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '11px', color: '#9CA3AF' }}>Deal age vs industry</span>
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: velocityColor }}>
+                          {dealDays}d — {velocityStatus === 'slow' ? `over p75 (${p75}d)` : velocityStatus === 'moderate' ? `p50–p75 (${p50}–${p75}d)` : `under median (${p50}d)`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Intent Signals — extracted by AI from meeting notes */}
             {deal.intentSignals && (() => {
@@ -2136,6 +2184,7 @@ export default function DealDetailPage() {
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
   const mlPrediction = (brainRes?.data?.mlPredictions ?? []).find((p: any) => p.dealId === id) ?? null
   const objectionWinMap: any[] = brainRes?.data?.objectionWinMap ?? []
+  const globalPrior: any = brainRes?.data?.globalPrior ?? null
   const { setActiveDeal } = useSidebar()
 
   const [activeTab, setActiveTab] = useState<'overview' | 'meeting-notes' | 'prep' | 'todos' | 'project-plan' | 'success'>('overview')
@@ -2269,7 +2318,7 @@ export default function DealDetailPage() {
       ) : (
         <div>
           {activeTab === 'overview' && (
-            <OverviewTab dealId={id} deal={deal} dealGaps={dealGaps} onUpdate={() => mutate()} currencySymbol={currencySymbol} mlPrediction={mlPrediction} />
+            <OverviewTab dealId={id} deal={deal} dealGaps={dealGaps} onUpdate={() => mutate()} currencySymbol={currencySymbol} mlPrediction={mlPrediction} globalPrior={globalPrior} />
           )}
           {activeTab === 'meeting-notes' && (
             <MeetingNotesTab dealId={id} deal={deal} onUpdate={() => mutate()} onSwitchToPrep={() => setActiveTab('prep')} />

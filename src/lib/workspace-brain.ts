@@ -137,6 +137,7 @@ export interface WorkspaceBrain {
     dealsWithTheme: number
     winsWithTheme: number
     winRateWithTheme: number                       // 0-100
+    globalWinRate?: number                         // 0-100 industry win rate for this theme (if global prior active)
   }[]
   productGapPriority?: {                           // gaps ranked by open pipeline revenue at risk
     gapId: string
@@ -155,12 +156,13 @@ export interface WorkspaceBrain {
   }[]
   // ── Cross-workspace transfer learning ────────────────────────────────────────
   globalPrior?: {
-    trainingSize:     number    // how many records are in the global pool
-    globalWinRate:    number    // 0-100 industry-wide win rate
-    stageVelocityP50: number    // global median days to close
-    stageVelocityP75: number    // global p75 days to close
-    usingPrior:       boolean   // whether global prior is actively blended
-    localWeight:      number    // 0-100: % of local vs global in blended model
+    trainingSize:      number     // how many records are in the global pool
+    globalWinRate:     number     // 0-100 industry-wide win rate
+    stageVelocityP50:  number     // global median days to close
+    stageVelocityP75:  number     // global p75 days to close
+    usingPrior:        boolean    // whether global prior is actively blended
+    localWeight:       number     // 0-100: % of local vs global in blended model
+    riskThemeWinRates: number[]   // 0-100 per theme (7 items, same index as riskWords)
   }
 }
 
@@ -616,7 +618,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     const deal = deals.find(d => d.id === item.sourceDealLogId)
     if (!deal || (deal.stage !== 'closed_won' && deal.stage !== 'closed_lost')) continue
     const cur = effectivenessMap.get(item.type) ?? { wins: 0, losses: 0 }
-    if (deal.stage === 'closed_won') cur.wins++ else cur.losses++
+    if (deal.stage === 'closed_won') { cur.wins++ } else { cur.losses++ }
     effectivenessMap.set(item.type, cur)
   }
   const collateralEffectiveness: NonNullable<WorkspaceBrain['collateralEffectiveness']> = []
@@ -936,6 +938,25 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
   // Fetch global prior in parallel — non-blocking, fails gracefully
   const globalPrior = await getActiveGlobalModel().catch(() => null)
 
+  // Augment objectionWinMap with per-theme global benchmark win rates
+  if (globalPrior && globalPrior.riskThemeWinRates.length === 7) {
+    const themeOrder = [
+      'budget concerns',
+      'slow responses / disengagement',
+      'competitor pressure',
+      'unclear decision-maker',
+      'timeline slippage',
+      'procurement / legal blockers',
+      'internal competing priorities',
+    ]
+    for (const entry of objectionWinMap) {
+      const idx = themeOrder.indexOf(entry.theme)
+      if (idx !== -1) {
+        entry.globalWinRate = Math.round(globalPrior.riskThemeWinRates[idx] * 100)
+      }
+    }
+  }
+
   // Build ML inputs using pre-extracted text signals — no LLM dependency.
   // All 4 NLP features are pre-computed from the signalMap built above.
   // Always built (needed for contribution extraction and cold-start predictions).
@@ -993,12 +1014,13 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
       if (globalPrior && mlResult.model?.usingGlobalPrior !== false) {
         const alpha = mlResult.model?.globalPriorAlpha ?? 0
         globalPriorMeta = {
-          trainingSize:     globalPrior.trainingSize,
-          globalWinRate:    Math.round(globalPrior.globalWinRate * 100),
-          stageVelocityP50: Math.round(globalPrior.stageVelocityP50),
-          stageVelocityP75: Math.round(globalPrior.stageVelocityP75),
-          usingPrior:       alpha > 0,
-          localWeight:      Math.round((1 - alpha) * 100),
+          trainingSize:      globalPrior.trainingSize,
+          globalWinRate:     Math.round(globalPrior.globalWinRate * 100),
+          stageVelocityP50:  Math.round(globalPrior.stageVelocityP50),
+          stageVelocityP75:  Math.round(globalPrior.stageVelocityP75),
+          usingPrior:        alpha > 0,
+          localWeight:       Math.round((1 - alpha) * 100),
+          riskThemeWinRates: globalPrior.riskThemeWinRates.map(r => Math.round(r * 100)),
         }
       }
     }

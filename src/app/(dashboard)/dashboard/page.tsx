@@ -856,6 +856,46 @@ export default function DashboardPage() {
                 </div>
               )}
 
+              {/* Objection Win Map — with global benchmark deltas when prior is active */}
+              {(brain?.objectionWinMap ?? []).filter((o: any) => o.winsWithTheme > 0).length > 0 && (() => {
+                const owm = brain!.objectionWinMap!.filter((o: any) => o.winsWithTheme > 0).slice(0, 5)
+                const hasGlobal = owm.some((o: any) => typeof o.globalWinRate === 'number')
+                return (
+                  <div style={{ background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)', borderRadius: '12px', padding: '14px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '8px' }}>
+                      <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Objection Win Map</div>
+                      {hasGlobal && (
+                        <div style={{ fontSize: '9px', color: '#374151' }}>vs industry avg</div>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      {owm.map((o: any, oi: number) => {
+                        const color = o.winRateWithTheme >= 60 ? '#22C55E' : o.winRateWithTheme >= 40 ? '#F59E0B' : '#EF4444'
+                        const hasG = typeof o.globalWinRate === 'number'
+                        const delta = hasG ? o.winRateWithTheme - o.globalWinRate : 0
+                        const deltaColor = delta >= 5 ? '#22C55E' : delta <= -5 ? '#EF4444' : '#9CA3AF'
+                        return (
+                          <div key={oi} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '11px', color: '#9CA3AF', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textTransform: 'capitalize' }}>
+                              {o.theme}
+                            </span>
+                            <div style={{ width: '40px', height: '4px', background: 'rgba(255,255,255,0.04)', borderRadius: '2px', overflow: 'hidden', flexShrink: 0 }}>
+                              <div style={{ height: '100%', width: `${o.winRateWithTheme}%`, background: color, borderRadius: '2px' }} />
+                            </div>
+                            <span style={{ fontSize: '11px', color, fontWeight: 700, width: '30px', textAlign: 'right', flexShrink: 0 }}>{o.winRateWithTheme}%</span>
+                            {hasG && (
+                              <span style={{ fontSize: '10px', color: deltaColor, fontWeight: 600, width: '52px', textAlign: 'right', flexShrink: 0 }}>
+                                {delta >= 5 ? `▲ +${delta}` : delta <= -5 ? `▼ ${delta}` : `≈ ${o.globalWinRate}%`}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })()}
+
             </div>
           </div>
         )
