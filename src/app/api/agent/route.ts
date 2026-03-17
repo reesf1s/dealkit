@@ -244,7 +244,8 @@ export async function POST(req: NextRequest) {
         tool({
           description: t.description,
           parameters: t.parameters,
-          execute: async (params: Record<string, unknown>) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          execute: async (params: any) => {
             const result = await t.execute(params, toolContext)
             if (result.actions?.length) {
               accumulatedActions.push(...result.actions)
