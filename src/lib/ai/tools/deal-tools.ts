@@ -207,7 +207,7 @@ export const get_deal_details = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const create_deal = {
-  description: 'Create a new deal in the pipeline. Returns the created deal details.',
+  description: 'Create a new deal in the pipeline. For large deal imports with contacts, notes, todos, risks, etc., use import_deal instead — it handles everything in one operation.',
   parameters: z.object({
     dealName: z.string().describe('Name of the deal'),
     prospectCompany: z.string().describe('Company name of the prospect'),
@@ -253,6 +253,220 @@ export const create_deal = {
 
     return {
       result: `Deal **${created.dealName}** with ${created.prospectCompany} created successfully in **${created.stage}** stage.${params.dealValue ? ` Value: $${params.dealValue.toLocaleString()}.` : ''}`,
+      actions: [{
+        type: 'deal_created',
+        dealId: created.id,
+        dealName: created.dealName,
+        company: created.prospectCompany,
+      }],
+      uiHint: 'refresh_deals',
+    }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// import_deal  (single-operation deal creation with all data)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const import_deal = {
+  description: 'Import a complete deal with ALL data in one operation — contacts, notes, todos, risks, summary, next steps, success criteria, competitors, project plan, and more. Use this when the user pastes a large deal description, interaction history, or CRM export. This is the preferred tool for creating deals with rich context.',
+  parameters: z.object({
+    dealName: z.string().describe('Name of the deal'),
+    prospectCompany: z.string().describe('Company name'),
+    stage: stageEnum.optional().describe('Deal stage — infer from context (e.g., "proposal" if proposals were sent)'),
+    dealValue: z.number().optional().describe('Deal value in dollars'),
+    closeDate: z.string().optional().describe('Expected close date (ISO format)'),
+    prospectName: z.string().optional().describe('Primary contact name'),
+    prospectTitle: z.string().optional().describe('Primary contact title'),
+    contacts: z.array(z.object({
+      name: z.string(),
+      title: z.string().optional(),
+      email: z.string().optional(),
+      phone: z.string().optional(),
+      role: z.string().optional().describe('Role in deal: Champion, Decision Maker, Technical Evaluator, Internal Sales Rep, etc.'),
+    })).optional().describe('All contacts involved in the deal'),
+    competitors: z.array(z.string()).optional().describe('Competitor names being evaluated'),
+    notes: z.string().optional().describe('Deal notes — preserve the user\'s exact wording and detail'),
+    meetingNotes: z.string().optional().describe('Chronological interaction history / meeting notes — preserve exact detail with dates'),
+    aiSummary: z.string().optional().describe('Comprehensive deal summary preserving all key details: names, dates, decisions, requirements, history'),
+    nextSteps: z.string().optional().describe('Current next steps'),
+    dealRisks: z.array(z.string()).optional().describe('Deal-closing risks (NOT product gaps)'),
+    todos: z.array(z.string()).optional().describe('Action items — preserve exact wording'),
+    successCriteria: z.array(z.object({
+      text: z.string().describe('Exact criterion text'),
+      category: z.string().optional().describe('Category: Security, Integration, Reporting, etc.'),
+    })).optional().describe('Success criteria / requirements'),
+    projectPlan: z.object({
+      phases: z.array(z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        targetDate: z.string().optional(),
+        tasks: z.array(z.object({
+          text: z.string(),
+          status: z.enum(['pending', 'in_progress', 'complete']).optional(),
+          owner: z.string().optional(),
+        })).optional(),
+      })),
+    }).optional().describe('Project plan with phases and tasks'),
+    dealType: z.enum(['one_off', 'recurring']).optional(),
+    recurringInterval: z.enum(['monthly', 'quarterly', 'annual']).optional(),
+  }),
+  execute: async (
+    params: {
+      dealName: string
+      prospectCompany: string
+      stage?: string
+      dealValue?: number
+      closeDate?: string
+      prospectName?: string
+      prospectTitle?: string
+      contacts?: { name: string; title?: string; email?: string; phone?: string; role?: string }[]
+      competitors?: string[]
+      notes?: string
+      meetingNotes?: string
+      aiSummary?: string
+      nextSteps?: string
+      dealRisks?: string[]
+      todos?: string[]
+      successCriteria?: { text: string; category?: string }[]
+      projectPlan?: { phases: { name: string; description?: string; targetDate?: string; tasks?: { text: string; status?: string; owner?: string }[] }[] }
+      dealType?: string
+      recurringInterval?: string
+    },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    // Build contacts array with IDs
+    const contacts = (params.contacts ?? []).map(c => ({
+      id: crypto.randomUUID(),
+      name: c.name,
+      ...(c.title ? { title: c.title } : {}),
+      ...(c.email ? { email: c.email } : {}),
+      ...(c.phone ? { phone: c.phone } : {}),
+      ...(c.role ? { role: c.role } : {}),
+    }))
+
+    // Build todos with IDs
+    const todos = (params.todos ?? []).map(text => ({
+      id: crypto.randomUUID(),
+      text,
+      done: false,
+      createdAt: new Date().toISOString(),
+    }))
+
+    // Build success criteria with IDs
+    const successCriteriaTodos = (params.successCriteria ?? []).map(c => ({
+      id: crypto.randomUUID(),
+      text: c.text,
+      category: c.category ?? 'General',
+      achieved: false,
+      note: '',
+      createdAt: new Date().toISOString(),
+    }))
+
+    // Build project plan
+    const projectPlan = params.projectPlan ? {
+      phases: params.projectPlan.phases.map(phase => ({
+        name: phase.name,
+        description: phase.description ?? '',
+        targetDate: phase.targetDate ?? null,
+        tasks: (phase.tasks ?? []).map(t => ({
+          id: crypto.randomUUID(),
+          text: t.text,
+          status: t.status ?? 'pending',
+          owner: t.owner ?? null,
+          dueDate: null,
+          notes: '',
+          createdAt: new Date().toISOString(),
+        })),
+      })),
+    } : null
+
+    // Parse close date
+    let closeDate: Date | null = null
+    if (params.closeDate) {
+      try { closeDate = new Date(params.closeDate) } catch { /* ignore invalid dates */ }
+    }
+
+    // Single DB insert with everything
+    const [created] = await db
+      .insert(dealLogs)
+      .values({
+        workspaceId: ctx.workspaceId,
+        userId: ctx.userId,
+        dealName: params.dealName,
+        prospectCompany: params.prospectCompany,
+        prospectName: params.prospectName ?? null,
+        prospectTitle: params.prospectTitle ?? null,
+        dealValue: params.dealValue ?? null,
+        stage: (params.stage as any) ?? 'prospecting',
+        closeDate,
+        competitors: params.competitors ?? [],
+        contacts,
+        notes: params.notes ?? null,
+        meetingNotes: params.meetingNotes ?? null,
+        aiSummary: params.aiSummary ?? null,
+        nextSteps: params.nextSteps ?? null,
+        dealRisks: params.dealRisks ?? [],
+        todos,
+        successCriteria: params.successCriteria ? JSON.stringify(params.successCriteria) : null,
+        successCriteriaTodos,
+        projectPlan,
+        dealType: (params.dealType as any) ?? 'one_off',
+        recurringInterval: params.recurringInterval ?? null,
+      })
+      .returning()
+
+    // Score the deal with ML signals
+    try {
+      const allText = [params.notes, params.meetingNotes, params.aiSummary].filter(Boolean).join('\n')
+      if (allText.length > 20) {
+        const signals = extractTextSignals(allText, created.createdAt ?? new Date(), new Date())
+        const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
+        const mlPred = brain?.mlPredictions?.find(p => p.dealId === created.id)
+        let finalScore: number
+        if (mlPred && brain?.mlModel) {
+          const { composite } = computeCompositeScore(
+            heuristicScore(signals, 0.5),
+            mlPred.winProbability,
+            brain.mlModel.trainingSize,
+          )
+          finalScore = composite
+        } else {
+          finalScore = heuristicScore(signals, 0.5)
+        }
+        await db.update(dealLogs).set({
+          conversionScore: Math.round(finalScore * 100),
+          conversionInsights: [
+            `Momentum: ${signals.momentum.toFixed(2)}`,
+            `Risk level: ${signals.riskLevel}`,
+            `Stakeholder depth: ${signals.stakeholderDepth.toFixed(2)}`,
+          ],
+        }).where(eq(dealLogs.id, created.id))
+      }
+    } catch { /* scoring is non-fatal */ }
+
+    after(async () => {
+      try { await rebuildWorkspaceBrain(ctx.workspaceId) } catch { /* non-fatal */ }
+    })
+
+    // Build summary
+    const parts: string[] = []
+    if (contacts.length) parts.push(`${contacts.length} contact(s)`)
+    if (todos.length) parts.push(`${todos.length} action item(s)`)
+    if (successCriteriaTodos.length) parts.push(`${successCriteriaTodos.length} success criteria`)
+    if (params.dealRisks?.length) parts.push(`${params.dealRisks.length} risk(s)`)
+    if (params.competitors?.length) parts.push(`${params.competitors.length} competitor(s)`)
+    if (projectPlan) {
+      const taskCount = projectPlan.phases.reduce((sum, p) => sum + p.tasks.length, 0)
+      parts.push(`${projectPlan.phases.length} phase(s) / ${taskCount} task(s)`)
+    }
+    if (params.meetingNotes) parts.push('interaction history')
+    if (params.aiSummary) parts.push('deal summary')
+
+    const detailStr = parts.length > 0 ? ` with ${parts.join(', ')}` : ''
+
+    return {
+      result: `Deal **${created.dealName}** (${created.prospectCompany}) imported successfully into **${created.stage}**${params.dealValue ? ` — $${params.dealValue.toLocaleString()}` : ''}${detailStr}.`,
       actions: [{
         type: 'deal_created',
         dealId: created.id,

@@ -1,5 +1,5 @@
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 300
 
 import { after } from 'next/server'
 import { NextRequest, NextResponse } from 'next/server'
@@ -176,7 +176,19 @@ This applies to: manage_todos add[], update_success_criteria add[].text, update_
 "Update this deal" → update_deal (use activeDealId directly)
 "Process these notes" → process_meeting_notes (use activeDealId)
 "Fix/correct X" → correct_deal_data
-"Create a deal" → create_deal (immediately, don't search first)
+"Create a deal" → create_deal (simple) or import_deal (with contacts/notes/history)
+
+IMPORTING LARGE DEALS:
+When the user pastes a large block of deal info (contacts, interaction history, contract details, action items, etc.), ALWAYS use import_deal — NOT create_deal. import_deal handles contacts, notes, meeting history, todos, risks, success criteria, and project plan in ONE operation. Do NOT chain create_deal → add_contact → update_deal — use import_deal once.
+
+When importing, preserve ALL detail from the user's paste:
+- Interaction history → meetingNotes (keep dates, names, specifics)
+- People mentioned → contacts (with roles: Champion, Decision Maker, Technical Evaluator, Internal Sales Rep)
+- Things to do → todos (exact wording)
+- Contract/pricing → notes
+- Deal summary → aiSummary (comprehensive, preserving names/dates/specifics)
+- Concerns about closing → dealRisks
+- Current action items → nextSteps
 
 NEVER stop after a search step. The search finds the ID — then you MUST call the mutation tool.
 
