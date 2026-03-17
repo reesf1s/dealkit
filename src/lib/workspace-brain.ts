@@ -324,6 +324,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
       lostDate: dealLogs.lostDate,
       lostReason: dealLogs.lostReason,
       meetingNotes: dealLogs.meetingNotes,
+      intentSignals: dealLogs.intentSignals,
     })
     .from(dealLogs)
     .where(eq(dealLogs.workspaceId, workspaceId))
