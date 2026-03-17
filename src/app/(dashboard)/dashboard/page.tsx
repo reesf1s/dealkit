@@ -237,6 +237,20 @@ export default function DashboardPage() {
               <span style={{ color: '#374151' }}> · {openDeals.length} active deal{openDeals.length !== 1 ? 's' : ''}</span>
             )}
           </p>
+          {brain?.updatedAt && (
+            <p style={{ fontSize: '11px', color: '#374151', margin: '2px 0 0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Activity size={10} color="#A855F7" />
+              <span>Brain updated {(() => {
+                const diff = Date.now() - new Date(brain.updatedAt).getTime()
+                const mins = Math.floor(diff / 60000)
+                if (mins < 1) return 'just now'
+                if (mins < 60) return `${mins}m ago`
+                const hrs = Math.floor(mins / 60)
+                if (hrs < 24) return `${hrs}h ago`
+                return `${Math.floor(hrs / 24)}d ago`
+              })()} · {dealList.length} deal{dealList.length !== 1 ? 's' : ''} analyzed</span>
+            </p>
+          )}
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
           <Link href="/pipeline" style={quickBtn(false)}>
@@ -504,6 +518,10 @@ export default function DashboardPage() {
               <span style={{ fontSize: '11px', color: '#374151', marginLeft: 'auto' }}>
                 {(brain?.pipelineRecommendations ?? []).filter((r: any) => r.priority === 'high').length} high priority
               </span>
+              <button onClick={rebuildBrain} disabled={refreshingBrain} style={{ display: 'flex', alignItems: 'center', background: 'none', border: 'none', cursor: refreshingBrain ? 'default' : 'pointer', padding: '2px 4px', borderRadius: '4px', color: '#374151' }}
+                title="Rebuild Brain">
+                <RefreshCw size={10} style={{ animation: refreshingBrain ? 'spin 1s linear infinite' : 'none' }} />
+              </button>
             </div>
 
             {refreshingBrain && !(brain?.pipelineRecommendations?.length) ? (

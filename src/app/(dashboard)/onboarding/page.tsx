@@ -458,7 +458,7 @@ export default function OnboardingPage() {
             {[
               { icon: ClipboardList, label: 'Log your first deal', desc: 'Track a prospect and get AI deal scoring', href: '/deals', color: '#F59E0B' },
               { icon: FileText, label: 'View your battlecards', desc: 'AI-generated competitive intel is ready', href: '/collateral?type=battlecard', color: '#6366F1' },
-              { icon: Target, label: 'Open AI chat', desc: 'Ask AI to create more collateral or analyze deals', href: '/chat', color: '#A78BFA' },
+              { icon: Target, label: 'Open your dashboard', desc: 'See your AI briefing and pipeline intelligence', href: '/dashboard', color: '#A78BFA' },
             ].map(({ icon: Icon, label, desc, href, color }) => (
               <a key={href} href={href} style={{
                 display: 'flex', alignItems: 'center', gap: '12px',
