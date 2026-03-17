@@ -360,7 +360,8 @@ GROUNDING RULES — read carefully before writing:
 3. Every sentence must be traceable to a specific listed signal or fact. If a signal is absent, do not mention its category.
 4. Write 2–3 sentences total (not bullets). Plain prose. No headers, no JSON, no markdown.
 5. Never say "AI", "model", "algorithm", or "scoring engine". Use "your pipeline" or "this deal".
-6. End with one concrete, specific next action grounded in the recommendation above.`
+6. NEVER mention the numeric score (e.g. "82/100" or "rates at 82"). The score is shown separately in the UI — mentioning it in prose creates confusing duplicate displays. Focus on the qualitative signals instead.
+7. End with one concrete, specific next action grounded in the recommendation above.`
 }
 
 export function overviewNarrationPrompt(briefing: OverviewBriefing, dateStr: string): string {

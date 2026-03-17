@@ -303,13 +303,13 @@ export const import_deal = {
         targetDate: z.string().optional(),
         tasks: z.array(z.object({
           text: z.string(),
-          status: z.enum(['pending', 'in_progress', 'complete']).optional(),
+          status: z.string().optional().describe('pending, in_progress, or complete'),
           owner: z.string().optional(),
         })).optional(),
       })),
     }).optional().describe('Project plan with phases and tasks'),
-    dealType: z.enum(['one_off', 'recurring']).optional(),
-    recurringInterval: z.enum(['monthly', 'quarterly', 'annual']).optional(),
+    dealType: z.string().optional().describe('one_off or recurring'),
+    recurringInterval: z.string().optional().describe('monthly, quarterly, or annual'),
   }),
   execute: async (
     params: {
@@ -511,7 +511,7 @@ export const enrich_deal = {
         targetDate: z.string().optional(),
         tasks: z.array(z.object({
           text: z.string(),
-          status: z.enum(['pending', 'in_progress', 'complete']).optional(),
+          status: z.string().optional().describe('pending, in_progress, or complete'),
           owner: z.string().optional(),
         })).optional(),
       })),
@@ -519,8 +519,8 @@ export const enrich_deal = {
     stage: z.string().optional().describe('Update deal stage'),
     dealValue: z.number().optional().describe('Update deal value'),
     closeDate: z.string().optional().describe('Update close date'),
-    dealType: z.enum(['one_off', 'recurring']).optional(),
-    recurringInterval: z.enum(['monthly', 'quarterly', 'annual']).optional(),
+    dealType: z.string().optional().describe('one_off or recurring'),
+    recurringInterval: z.string().optional().describe('monthly, quarterly, or annual'),
   }),
   execute: async (
     params: {
@@ -772,14 +772,15 @@ export const enrich_deal = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const update_deal = {
-  description: 'Update fields on an existing deal. Preserve the user\'s exact wording for notes and next steps — do not rephrase.',
+  description: 'Update fields on an existing deal. Preserve the user\'s exact wording for notes and next steps — do not rephrase. Use meetingNotes to log updates to the Activity Log (Updates + Notes tab).',
   parameters: z.object({
     dealId: z.string().describe('The UUID of the deal to update'),
     stage: stageEnum.optional().describe('New deal stage'),
     dealValue: z.number().optional().describe('Updated deal value in dollars'),
     closeDate: z.string().optional().describe('Expected close date (ISO format or natural date)'),
     nextSteps: z.string().optional().describe('Next steps for the deal — preserve user\'s exact wording'),
-    notes: z.string().optional().describe('Additional notes to append — preserve user\'s exact wording'),
+    notes: z.string().optional().describe('Additional notes to append to the Notes field — preserve user\'s exact wording'),
+    meetingNotes: z.string().optional().describe('Update/activity to log in the Activity Log (Updates + Notes tab). Use this when the user reports a conversation, meeting outcome, or deal update. Preserve exact wording.'),
     lostReason: z.string().optional().describe('Reason deal was lost (only for closed_lost)'),
     aiSummary: z.string().optional().describe('Replace the AI-generated deal summary'),
     dealRisks: z.array(z.string()).optional().describe('Replace the deal risks array entirely'),
@@ -793,6 +794,7 @@ export const update_deal = {
       closeDate?: string
       nextSteps?: string
       notes?: string
+      meetingNotes?: string
       lostReason?: string
       aiSummary?: string
       dealRisks?: string[]
@@ -835,6 +837,13 @@ export const update_deal = {
       const existingNotes = existing.notes ?? ''
       updateFields.notes = existingNotes ? `${existingNotes}\n\n${params.notes}` : params.notes
       changes.push('Notes appended')
+    }
+    if (params.meetingNotes) {
+      const dateHeader = `[${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}]`
+      const newEntry = `${dateHeader} ${params.meetingNotes}`
+      const existingMeetingNotes = existing.meetingNotes ?? ''
+      updateFields.meetingNotes = existingMeetingNotes ? `${newEntry}\n---\n${existingMeetingNotes}` : newEntry
+      changes.push('Activity log updated')
     }
     if (params.lostReason) {
       updateFields.lostReason = params.lostReason

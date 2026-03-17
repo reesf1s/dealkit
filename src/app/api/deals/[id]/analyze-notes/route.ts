@@ -301,6 +301,8 @@ priority: critical | high | medium | low` }],
         .split('\n')
         .map((l: string) => l.replace(/^[-•*·]\s*/, '').trim())
         .filter((l: string) => l.length > 8)
+        // Filter out score-summary insights to prevent dual-score display in UI
+        .filter((l: string) => !/\d+\/100/i.test(l))
         .slice(0, 3)
 
       // ── Intent signal score adjustment ─────────────────────────────────────────
