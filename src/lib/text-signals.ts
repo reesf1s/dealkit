@@ -379,13 +379,22 @@ export function analyzeDeterioration(
 
 // ─── Heuristic score ──────────────────────────────────────────────────────────
 
+/** Stage-based prior — funnel position alone tells us something about win probability */
+const STAGE_PRIOR: Record<string, number> = {
+  prospecting:   20,
+  qualification: 28,
+  discovery:     35,
+  proposal:      45,
+  negotiation:   58,
+}
+
 /**
- * Compute a heuristic deal score (0–100) from text signals alone.
- * Used when no ML model is available yet (fewer than 6 closed deals).
- * Fully deterministic — no LLM required.
+ * Compute a heuristic deal score (0–100) from text signals + pipeline stage.
+ * Used when no ML model is available yet. Fully deterministic — no LLM required.
  */
-export function heuristicScore(signals: TextSignals): number {
-  let score = 40  // baseline: uncertain
+export function heuristicScore(signals: TextSignals, stage?: string): number {
+  const baseline = stage ? (STAGE_PRIOR[stage] ?? 35) : 35
+  let score = baseline
 
   // Core signals
   score += signals.sentimentScore  * 22

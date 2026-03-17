@@ -1783,7 +1783,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate }: { dealId: string; deal: any;
   )
 }
 
-function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$' }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void; currencySymbol?: string }) {
+function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', mlPrediction = null }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void; currencySymbol?: string; mlPrediction?: any }) {
   const [editingSummary, setEditingSummary] = useState(false)
   const [summaryDraft, setSummaryDraft] = useState('')
   const [resetAIConfirm, setResetAIConfirm] = useState(false)
@@ -1910,6 +1910,31 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$' }:
                       <button className="del-risk-ov" onClick={() => deleteRisk(i)} style={{ opacity: 0, fontSize: '10px', color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s', padding: '0 2px' }}>✕</button>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* ML Score Drivers — what's pushing this deal's win probability up or down */}
+            {mlPrediction?.scoreDrivers?.length > 0 && (
+              <div style={{ padding: '10px 14px', background: 'rgba(129,140,248,0.04)', border: '1px solid rgba(129,140,248,0.12)', borderRadius: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#818CF8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
+                  ML Score Drivers
+                  <span style={{ fontSize: '9px', fontWeight: 400, color: '#374151', textTransform: 'none', marginLeft: '6px' }}>why this deal scores {deal.conversionScore ?? '?'}%</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  {mlPrediction.scoreDrivers.map((d: any, i: number) => {
+                    const barWidth = Math.min(100, Math.round(Math.abs(d.contribution) * 60))
+                    const isPos = d.direction === 'positive'
+                    return (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '10px', color: isPos ? '#22C55E' : '#EF4444', width: '10px', textAlign: 'center', flexShrink: 0 }}>{isPos ? '↑' : '↓'}</span>
+                        <span style={{ fontSize: '11px', color: '#9CA3AF', flex: 1, minWidth: 0 }}>{d.label}</span>
+                        <div style={{ width: '60px', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', flexShrink: 0 }}>
+                          <div style={{ width: `${barWidth}%`, height: '100%', borderRadius: '2px', background: isPos ? '#22C55E' : '#EF4444' }} />
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -2052,6 +2077,8 @@ export default function DealDetailPage() {
   const dealGaps: any[] = (gapsData?.data ?? []).filter((g: any) => (g.sourceDeals as string[] ?? []).includes(id))
   const { data: configData } = useSWR('/api/pipeline-config', fetcher, { revalidateOnFocus: false })
   const currencySymbol: string = configData?.data?.currency ?? '$'
+  const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
+  const mlPrediction = (brainRes?.data?.mlPredictions ?? []).find((p: any) => p.dealId === id) ?? null
   const { setActiveDeal } = useSidebar()
 
   const [activeTab, setActiveTab] = useState<'overview' | 'meeting-notes' | 'prep' | 'todos' | 'project-plan' | 'success'>('overview')
@@ -2185,7 +2212,7 @@ export default function DealDetailPage() {
       ) : (
         <div>
           {activeTab === 'overview' && (
-            <OverviewTab dealId={id} deal={deal} dealGaps={dealGaps} onUpdate={() => mutate()} currencySymbol={currencySymbol} />
+            <OverviewTab dealId={id} deal={deal} dealGaps={dealGaps} onUpdate={() => mutate()} currencySymbol={currencySymbol} mlPrediction={mlPrediction} />
           )}
           {activeTab === 'meeting-notes' && (
             <MeetingNotesTab dealId={id} deal={deal} onUpdate={() => mutate()} onSwitchToPrep={() => setActiveTab('prep')} />

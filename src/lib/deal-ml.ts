@@ -79,6 +79,14 @@ export interface TrainedMLModel {
   featureImportance: { name: string; importance: number; direction: 'helps' | 'hurts' }[]
 }
 
+export interface ScoreDriver {
+  feature: string           // ML_FEATURE_NAMES key
+  label: string             // human-readable label
+  value: number             // normalised feature value [0–1]
+  contribution: number      // weight × value (log-odds contribution; positive = helps win)
+  direction: 'positive' | 'negative'
+}
+
 export interface DealMLPrediction {
   dealId: string
   winProbability: number                         // raw LR output [0–1]
@@ -91,6 +99,7 @@ export interface DealMLPrediction {
   archetypeId: number | null
   riskFlags: string[]
   predictedDaysToClose: number | null            // OLS regression prediction (null if no model)
+  scoreDrivers: ScoreDriver[]                    // top factors pushing score up or down
 }
 
 export interface DealArchetype {
@@ -410,6 +419,42 @@ function computeStageVelocityIntel(
     p75DaysToClose: Math.round(p75),
     stageAlerts,
   }
+}
+
+// ─── Score driver labels (human-readable per-feature explanations) ────────────
+
+const SCORE_DRIVER_LABELS: Record<string, { pos: string; neg: string }> = {
+  stage_progress:       { pos: 'Advanced pipeline stage',        neg: 'Early pipeline stage' },
+  deal_value:           { pos: 'High-value deal',                neg: 'Smaller deal value' },
+  pipeline_age:         { pos: 'Pipeline maturity',              neg: 'Deal aging / stalling' },
+  risk_intensity:       { pos: 'Few active risks',               neg: 'Multiple risk flags' },
+  competitor_win_rate:  { pos: 'Strong competitive record',      neg: 'Weak vs this competitor' },
+  todo_engagement:      { pos: 'High action completion',         neg: 'Low action completion' },
+  text_engagement:      { pos: 'Positive engagement in notes',   neg: 'Weak / negative notes' },
+  momentum_score:       { pos: 'Building deal momentum',         neg: 'Declining momentum' },
+  stakeholder_depth:    { pos: 'Broad stakeholder coverage',     neg: 'Limited stakeholder reach' },
+  urgency_score:        { pos: 'Prospect urgency expressed',     neg: 'No urgency from prospect' },
+}
+
+/** Compute per-deal score drivers: which features are pushing win probability up or down. */
+function computeScoreDrivers(
+  features: number[],
+  weights: number[],
+): ScoreDriver[] {
+  return ML_FEATURE_NAMES
+    .map((name, i) => {
+      const value = features[i] ?? 0
+      const weight = weights[i] ?? 0
+      const contribution = weight * value
+      const direction: ScoreDriver['direction'] = contribution >= 0 ? 'positive' : 'negative'
+      const labels = SCORE_DRIVER_LABELS[name]
+      const label = labels
+        ? (contribution >= 0 ? labels.pos : labels.neg)
+        : (name as string)
+      return { feature: name as string, label, value, contribution, direction }
+    })
+    .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
+    .slice(0, 5)  // top 5 drivers by absolute contribution
 }
 
 // ─── Competitive pattern analysis ─────────────────────────────────────────────
@@ -776,6 +821,7 @@ export function runMLEngine(allDeals: DealMLInput[], now = new Date()): MLEngine
       archetypeId,
       riskFlags,
       predictedDaysToClose: null,  // filled after closeDateModel is trained below
+      scoreDrivers: computeScoreDrivers(feats, weights),
     }
   })
 

@@ -37,6 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       aiSummary: dealLogs.aiSummary,
       dealRisks: dealLogs.dealRisks,
       meetingNotes: dealLogs.meetingNotes,
+      competitors: dealLogs.competitors,
       createdAt: dealLogs.createdAt,
     }).from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -96,13 +97,15 @@ Return this exact JSON — extract facts, do not score or judge:
   "risks": ["observable risk signal from the notes — disengagement, budget, competition, timeline, etc."],
   "todos": [{"text": "specific action item"}],
   "obsoleteTodoIds": ["id-of-existing-todo-now-done-or-irrelevant"],
-  "productGaps": [{"title": "gap title", "description": "what prospect said is missing", "priority": "high"}]
+  "productGaps": [{"title": "gap title", "description": "what prospect said is missing", "priority": "high"}],
+  "competitors": ["competitor or alternative vendor name ONLY if explicitly mentioned as something the prospect is evaluating or comparing against — company/product names only"]
 }
 
 Rules — risks: deal-level signals only (not product feature requests). Max 4. Return [] if none.
 Rules — todos: new items only. No duplicates of existing open items. Return [] if none.
 Rules — obsoleteTodoIds: IDs of open items now done, superseded, or irrelevant. Return [].
 Rules — productGaps: only if prospect EXPLICITLY said your product lacks a feature/integration. Return [] otherwise.
+Rules — competitors: max 4, ONLY if named as an explicit alternative being evaluated. Return [] if none.
 priority: critical | high | medium | low` }],
     })
     // Strip markdown fences and any leading/trailing text before the JSON object
@@ -140,6 +143,15 @@ priority: critical | high | medium | low` }],
     const existingKeys = new Set(existingKept.map((t: any) => normalize(t.text)))
     const dedupedNew = newTodos.filter((t: any) => !existingKeys.has(normalize(t.text)))
     const mergedTodos = [...existingKept, ...dedupedNew]
+    // Merge newly extracted competitors with existing stored competitors (dedup, lowercase-normalised)
+    const extractedComps: string[] = (parsed.competitors ?? [])
+      .filter((c: unknown) => typeof c === 'string' && (c as string).trim().length > 0)
+      .map((c: string) => c.trim())
+    const existingComps: string[] = (deal.competitors as string[]) ?? []
+    const existingCompKeys = new Set(existingComps.map(c => c.toLowerCase()))
+    const newComps = extractedComps.filter(c => !existingCompKeys.has(c.toLowerCase()))
+    const mergedCompetitors = newComps.length > 0 ? [...existingComps, ...newComps] : undefined
+
     // Only overwrite aiSummary/conversionScore/insights if parse succeeded — never corrupt with raw text or nulls
     const updateFields: Record<string, unknown> = {
       meetingNotes: appendedNotes,
@@ -147,6 +159,7 @@ priority: critical | high | medium | low` }],
       todos: mergedTodos,
       updatedAt: new Date(),
     }
+    if (mergedCompetitors) updateFields.competitors = mergedCompetitors
     if (parseOk && parsed.summary) updateFields.aiSummary = parsed.summary
 
     // ── Phase 2: Brain-determined scoring ──────────────────────────────────────
@@ -164,15 +177,15 @@ priority: critical | high | medium | low` }],
       if (mlPred && brain?.mlModel) {
         // ML model trained on closed deals: use composite (ML dominates as training grows)
         const { composite } = computeCompositeScore(
-          heuristicScore(signals),         // heuristic as the "LLM" input for backward compat
+          heuristicScore(signals, deal.stage),  // stage-adjusted heuristic
           mlPred.winProbability,
           brain.mlModel.trainingSize,
         )
         finalScore = composite
         scoreBasis = 'ml_composite'
       } else {
-        // No ML model yet: pure text signal heuristic
-        finalScore = heuristicScore(signals)
+        // No ML model yet: stage-adjusted text signal heuristic
+        finalScore = heuristicScore(signals, deal.stage)
       }
 
       // Phase 3: LLM narrates the brain's determination (tiny call — 3 bullets only)
