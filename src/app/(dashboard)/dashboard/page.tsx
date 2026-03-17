@@ -67,6 +67,7 @@ export default function DashboardPage() {
 
   const dbNotConnected = isDbNotConfigured(companyErr)
   const [refreshingBrain, setRefreshingBrain] = useState(false)
+  const [intelTab, setIntelTab] = useState<'overview' | 'ml' | 'trends' | 'competitors'>('overview')
   const brainRebuildAttempted = useRef(false)
 
   async function rebuildBrain() {
@@ -238,15 +239,16 @@ export default function DashboardPage() {
             )}
           </p>
           {brain?.updatedAt && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '5px',
-                padding: '3px 10px', borderRadius: '100px',
-                background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)',
-              }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 5px rgba(34,197,94,0.5)' }} />
-                <span style={{ fontSize: '10px', color: '#818CF8', fontWeight: 600 }}>
-                  Brain active · {(() => {
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '10px', marginTop: '6px', flexWrap: 'wrap',
+              padding: '6px 12px', borderRadius: '8px',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.06), rgba(139,92,246,0.04))',
+              border: '1px solid rgba(99,102,241,0.12)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22C55E', boxShadow: '0 0 8px rgba(34,197,94,0.6)' }} />
+                <span style={{ fontSize: '10px', color: '#A5B4FC', fontWeight: 600 }}>
+                  Brain Active · {(() => {
                     const diff = Date.now() - new Date(brain.updatedAt).getTime()
                     const mins = Math.floor(diff / 60000)
                     if (mins < 1) return 'just now'
@@ -257,11 +259,28 @@ export default function DashboardPage() {
                   })()}
                 </span>
               </div>
-              <span style={{ fontSize: '10px', color: '#374151' }}>
-                {dealList.length} deal{dealList.length !== 1 ? 's' : ''} analyzed
-                {brain?.mlModel ? ' · ML model trained' : ''}
-                {(brain?.keyPatterns?.length ?? 0) > 0 ? ` · ${brain.keyPatterns.length} patterns detected` : ''}
-              </span>
+              <div style={{ width: '1px', height: '12px', background: 'rgba(99,102,241,0.15)' }} />
+              <span style={{ fontSize: '10px', color: '#555' }}>{dealList.length} analyzed</span>
+              {brain?.mlModel && (
+                <>
+                  <div style={{ width: '1px', height: '12px', background: 'rgba(99,102,241,0.15)' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: brain.mlModel.looAccuracy >= 0.7 ? '#22C55E' : '#F59E0B' }} />
+                    <span style={{ fontSize: '10px', color: '#555' }}>ML {Math.round(brain.mlModel.looAccuracy * 100)}%</span>
+                  </div>
+                </>
+              )}
+              {(brain?.keyPatterns?.length ?? 0) > 0 && (
+                <>
+                  <div style={{ width: '1px', height: '12px', background: 'rgba(99,102,241,0.15)' }} />
+                  <span style={{ fontSize: '10px', color: '#555' }}>{brain.keyPatterns.length} patterns</span>
+                </>
+              )}
+              <button onClick={rebuildBrain} disabled={refreshingBrain}
+                style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px', padding: '3px 8px', borderRadius: '5px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)', color: '#818CF8', fontSize: '10px', fontWeight: 600, cursor: refreshingBrain ? 'not-allowed' : 'pointer' }}>
+                <RefreshCw size={9} style={{ animation: refreshingBrain ? 'spin 1s linear infinite' : 'none' }} />
+                {refreshingBrain ? 'Rebuilding…' : 'Rebuild'}
+              </button>
             </div>
           )}
         </div>
@@ -279,17 +298,19 @@ export default function DashboardPage() {
       </div>
 
       {/* ── KPI strip ───────────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
         {[
-          { label: 'Active Pipeline', value: pipeline > 0 ? fmt(pipeline, currencySymbol) : '—', sub: `${openDeals.length} deal${openDeals.length !== 1 ? 's' : ''}${valueLabel}`, color: '#6366F1', glow: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.15)' },
-          { label: 'Revenue Won',     value: wonRevenue > 0 ? fmt(wonRevenue, currencySymbol) : '—', sub: wonRevenue === 0 && wonDeals.length > 0 ? 'Add values to won deals →' : `${wonDeals.length} closed${wonDeals.some(d => d.dealType === 'recurring') ? (valueDisplay === 'mrr' ? ' · MRR' : ' · ARR') : ''}`, color: '#22C55E', glow: 'rgba(34,197,94,0.08)', border: 'rgba(34,197,94,0.15)' },
-          { label: 'Win Rate',        value: dealList.length > 0 ? `${winRate}%` : '—', sub: `${dealList.length} tracked`, color: '#10B981', glow: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.15)' },
-          { label: 'Avg Deal Size',   value: avgDeal > 0 ? fmt(avgDeal, currencySymbol) : '—', sub: allWithVal.length > 0 ? `${allWithVal.length} deals${allWithVal.some(d => d.dealType === 'recurring') ? (valueDisplay === 'mrr' ? ' · MRR' : ' · ARR') : ''}` : 'Log deal values', color: '#F59E0B', glow: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.15)' },
+          { label: 'Pipeline', value: pipeline > 0 ? fmt(pipeline, currencySymbol) : '—', sub: `${openDeals.length} deal${openDeals.length !== 1 ? 's' : ''}${valueLabel}`, color: '#6366F1' },
+          { label: 'Won', value: wonRevenue > 0 ? fmt(wonRevenue, currencySymbol) : '—', sub: wonRevenue === 0 && wonDeals.length > 0 ? 'Add values →' : `${wonDeals.length} closed`, color: '#22C55E' },
+          { label: 'Win Rate', value: dealList.length > 0 ? `${winRate}%` : '—', sub: `${dealList.length} tracked`, color: '#10B981' },
+          { label: 'Avg Deal', value: avgDeal > 0 ? fmt(avgDeal, currencySymbol) : '—', sub: allWithVal.length > 0 ? `${allWithVal.length} deals` : 'Log values', color: '#F59E0B' },
         ].map(kpi => (
-          <div key={kpi.label} style={{ background: kpi.glow, border: `1px solid ${kpi.border}`, borderRadius: '12px', padding: '14px 16px' }}>
-            <div style={{ fontSize: '11px', color: '#555', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>{kpi.label}</div>
-            <div style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.04em', color: kpi.color, lineHeight: 1, marginBottom: '4px', textShadow: `0 0 20px ${kpi.color}40` }}>{kpi.value}</div>
-            <div style={{ fontSize: '11px', color: '#4B5563' }}>{kpi.sub}</div>
+          <div key={kpi.label} style={{ flex: '1 1 0', minWidth: '120px', padding: '10px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px' }}>
+            <div style={{ fontSize: '10px', color: '#555', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>{kpi.label}</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+              <span style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '-0.04em', color: kpi.color, lineHeight: 1 }}>{kpi.value}</span>
+              <span style={{ fontSize: '10px', color: '#4B5563' }}>{kpi.sub}</span>
+            </div>
           </div>
         ))}
       </div>
@@ -297,13 +318,13 @@ export default function DashboardPage() {
       {/* Setup alert */}
       {dbNotConnected && <SetupAlert />}
 
-      {/* ── Zone 2: Brain Intelligence + Autonomous Alerts ─────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '12px', alignItems: 'start' }}>
+      {/* ── Zone 2: Brain Briefing (Hero) ─────────────────────────────── */}
+      <AIOverviewCard />
 
-        {/* Brain Briefing — autonomous intelligence summary */}
-        <AIOverviewCard />
+      {/* ── Attention + Actions ───────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'start' }}>
 
-        {/* Needs Attention */}
+        {/* What the Brain Detected */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
           {/* Urgent + stale deals */}
@@ -379,6 +400,35 @@ export default function DashboardPage() {
             </div>
           )}
 
+          {/* Stale collateral alert */}
+          {staleCollateral.length > 0 && (
+            <Link href="/collateral?status=stale" style={{ ...card, display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', textDecoration: 'none', transition: 'border-color 0.1s' }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(234,179,8,0.3)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.07)'}
+            >
+              <AlertTriangle size={13} color="#EAB308" style={{ flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: '12px', color: '#E5E7EB' }}>
+                  <strong style={{ color: '#EAB308' }}>{staleCollateral.length}</strong> collateral {staleCollateral.length === 1 ? 'item needs' : 'items need'} refresh
+                </span>
+              </div>
+              <ArrowUpRight size={11} color="#EAB308" style={{ flexShrink: 0 }} />
+            </Link>
+          )}
+
+          {/* All clear state */}
+          {urgentItems.length === 0 && followUpAlerts.length === 0 && churnRiskDeals.length === 0 && staleCollateral.length === 0 && dealList.length > 0 && (
+            <div style={{ ...card, padding: '20px 14px', textAlign: 'center' }}>
+              <div style={{ fontSize: '20px', marginBottom: '6px' }}>✓</div>
+              <div style={{ fontSize: '13px', color: '#4B5563', fontWeight: 500 }}>All clear</div>
+              <div style={{ fontSize: '11px', color: '#374151', marginTop: '4px' }}>No risks detected by the brain</div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: What to Do */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
           {/* Priority todos */}
           {priorityTodos.length > 0 && (
             <div style={card}>
@@ -403,28 +453,42 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Stale collateral alert */}
-          {staleCollateral.length > 0 && (
-            <Link href="/collateral?status=stale" style={{ ...card, display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', textDecoration: 'none', transition: 'border-color 0.1s' }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(234,179,8,0.3)'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.07)'}
-            >
-              <AlertTriangle size={13} color="#EAB308" style={{ flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <span style={{ fontSize: '12px', color: '#E5E7EB' }}>
-                  <strong style={{ color: '#EAB308' }}>{staleCollateral.length}</strong> collateral {staleCollateral.length === 1 ? 'item needs' : 'items need'} refresh
-                </span>
+          {/* Recent collateral — quick access */}
+          {recentCollateral.length > 0 && (
+            <div style={card}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <SectionHeaderInline label="Brain Output" />
+                <Link href="/collateral" style={{ fontSize: '11px', color: '#4B5563', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  View all <ArrowUpRight size={10} />
+                </Link>
               </div>
-              <ArrowUpRight size={11} color="#EAB308" style={{ flexShrink: 0 }} />
-            </Link>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {recentCollateral.slice(0, 3).map((item: any, i: number) => (
+                  <Link key={item.id} href={`/collateral/${item.id}`} style={listRow(i < Math.min(recentCollateral.length, 3) - 1)}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                  >
+                    <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <FileText size={11} color="#818CF8" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '12px', color: '#E5E7EB', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
+                      <div style={{ fontSize: '10px', color: item.status === 'ready' ? '#22C55E' : item.status === 'stale' ? '#EAB308' : '#818CF8', marginTop: '1px' }}>
+                        {item.status === 'generating' ? 'Generating…' : item.status}
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
           )}
 
-          {/* Nothing to show */}
-          {urgentItems.length === 0 && priorityTodos.length === 0 && staleCollateral.length === 0 && dealList.length > 0 && (
+          {/* Empty right column state */}
+          {priorityTodos.length === 0 && recentCollateral.length === 0 && dealList.length > 0 && (
             <div style={{ ...card, padding: '20px 14px', textAlign: 'center' }}>
-              <div style={{ fontSize: '20px', marginBottom: '6px' }}>✓</div>
-              <div style={{ fontSize: '13px', color: '#4B5563', fontWeight: 500 }}>All caught up</div>
-              <div style={{ fontSize: '11px', color: '#374151', marginTop: '4px' }}>No urgent deals or open actions</div>
+              <Sparkles size={16} color="#6366F1" style={{ margin: '0 auto 8px' }} />
+              <div style={{ fontSize: '13px', color: '#4B5563', fontWeight: 500 }}>No pending actions</div>
+              <div style={{ fontSize: '11px', color: '#374151', marginTop: '4px' }}>The brain will surface actions as your deals evolve</div>
             </div>
           )}
         </div>
@@ -585,11 +649,23 @@ export default function DashboardPage() {
         const calColor = (wl?.scoreCalibration.highScoreWinRate ?? 0) >= 60 ? '#22C55E' : (wl?.scoreCalibration.highScoreWinRate ?? 0) >= 40 ? '#F59E0B' : '#EF4444'
         return (
           <div>
-            {/* Section label */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            {/* Tabbed Intelligence Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
               <Sparkles size={11} color="#6366F1" />
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Intelligence Engine</span>
-              <span style={{ fontSize: '10px', color: '#2A2A2A', marginLeft: '4px' }}>self-trained on your deal history</span>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.07em', marginRight: '4px' }}>Intelligence Engine</span>
+              {(['overview', 'ml', 'trends', 'competitors'] as const).map(tab => (
+                <button key={tab} onClick={() => setIntelTab(tab)}
+                  style={{
+                    padding: '3px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 500,
+                    background: intelTab === tab ? 'rgba(99,102,241,0.12)' : 'transparent',
+                    border: intelTab === tab ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent',
+                    color: intelTab === tab ? '#A5B4FC' : '#4B5563',
+                    cursor: 'pointer', transition: 'all 0.12s', textTransform: 'capitalize',
+                  }}
+                  onMouseEnter={e => { if (intelTab !== tab) (e.currentTarget as HTMLElement).style.color = '#9CA3AF' }}
+                  onMouseLeave={e => { if (intelTab !== tab) (e.currentTarget as HTMLElement).style.color = '#4B5563' }}
+                >{tab}</button>
+              ))}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
 
@@ -980,57 +1056,13 @@ export default function DashboardPage() {
         )
       })()}
 
-      {/* ── Zone 3: Recent Collateral + Setup health ──────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: healthPct < 100 ? '1fr 280px' : '1fr', gap: '12px', alignItems: 'start' }}>
-
-        {/* Recent Collateral */}
-        <div style={card}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-            <SectionHeaderInline label="Recent Collateral" />
-            <Link href="/collateral" style={{ fontSize: '11px', color: '#4B5563', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}>
-              View all <ArrowUpRight size={10} />
-            </Link>
-          </div>
-          {recentCollateral.length === 0 ? (
-            <div style={{ padding: '28px 14px', textAlign: 'center' }}>
-              <div style={{ fontSize: '12px', color: '#555', marginBottom: '8px' }}>No collateral yet</div>
-              <Link href="/collateral" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 12px', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '6px', color: '#818CF8', fontSize: '12px', textDecoration: 'none' }}>
-                <Plus size={11} /> Generate your first
-              </Link>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0' }}>
-              {recentCollateral.map((item: any, i: number) => (
-                <Link key={item.id} href={`/collateral/${item.id}`} style={{
-                  display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px',
-                  borderBottom: i < recentCollateral.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                  borderRight: i % 2 === 0 ? '1px solid rgba(255,255,255,0.04)' : 'none',
-                  textDecoration: 'none', transition: 'background 120ms',
-                }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
-                >
-                  <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={13} color="#818CF8" />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', color: '#E5E7EB', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</div>
-                    <div style={{ fontSize: '11px', color: item.status === 'ready' ? '#22C55E' : item.status === 'stale' ? '#EAB308' : '#818CF8', marginTop: '1px' }}>
-                      {item.status === 'generating' ? 'Generating…' : item.status}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Setup health — only show if incomplete */}
-        {healthPct < 100 && (
+      {/* ── Zone 3: Setup health ──────────────────────────────────────── */}
+      {healthPct < 100 && (
+        <div style={{ maxWidth: '400px' }}>
           <div style={card}>
             <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <SectionHeaderInline label="Setup" />
+                <SectionHeaderInline label="Brain Setup" />
                 <span style={{ fontSize: '11px', color: '#4B5563' }}>{healthPct}%</span>
               </div>
               <div style={{ height: '3px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
@@ -1049,8 +1081,8 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ── Cross-deal pattern alerts (kept compact at bottom) ─────────────── */}
       {(insightsData?.crossDealAlerts ?? []).length > 0 && (

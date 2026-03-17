@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Building2, Swords,
   FileText, Settings, LogOut, Search,
   Kanban, ChevronLeft, ChevronRight,
-  X, Brain, Zap, Activity,
+  X, Brain, Zap, Activity, MessageSquare,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 
@@ -30,7 +30,7 @@ export default function Sidebar() {
   const pathname = usePathname()
   const { signOut } = useClerk()
   const { user } = useUser()
-  const { collapsed, mobileOpen, toggleCollapsed, closeMobile } = useSidebar()
+  const { collapsed, mobileOpen, toggleCollapsed, closeMobile, toggleCopilot } = useSidebar()
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false, dedupingInterval: 30000 })
   const brain = brainRes?.data
   const urgentCount = brain?.urgentDeals?.length ?? 0
@@ -207,10 +207,49 @@ export default function Sidebar() {
         </div>
       )}
 
+      {/* Ask Brain CTA */}
+      {!collapsed ? (
+        <div style={{ padding: '0 8px 6px' }}>
+          <button
+            onClick={toggleCopilot}
+            style={{
+              width: '100%', height: '32px', borderRadius: '8px',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1))',
+              border: '1px solid rgba(99,102,241,0.25)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', padding: '0 10px',
+              transition: 'all 0.15s',
+              color: '#A5B4FC',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(139,92,246,0.18))'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.4)'
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1))'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.25)'
+            }}
+          >
+            <MessageSquare size={12} color="#818CF8" strokeWidth={2} />
+            <span style={{ flex: 1, fontSize: '12px', fontWeight: 600, textAlign: 'left' }}>Ask Brain</span>
+            <span style={{ fontSize: '10px', color: '#4B5563', background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: '3px', border: '1px solid rgba(255,255,255,0.08)' }}>⌘K</span>
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: '6px' }}>
+          <button
+            onClick={toggleCopilot}
+            title="Ask Brain (⌘K)"
+            style={{ width: '30px', height: '30px', borderRadius: '7px', background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1))', border: '1px solid rgba(99,102,241,0.25)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <MessageSquare size={12} color="#818CF8" />
+          </button>
+        </div>
+      )}
+
       {/* Nav */}
       <nav style={{ flex: 1, padding: '0 6px', overflowY: 'auto', overflowX: 'hidden' }}>
 
-        <SectionLabel>Command</SectionLabel>
+        <SectionLabel>Navigate</SectionLabel>
         {CORE_ITEMS.map(item => (
           <NavItem
             key={item.href}
@@ -222,7 +261,7 @@ export default function Sidebar() {
           />
         ))}
 
-        <SectionLabel>Intel</SectionLabel>
+        <SectionLabel>Intelligence</SectionLabel>
         {INTEL_ITEMS.map(item => <NavItem key={item.href} {...item} />)}
 
         <div style={{ margin: '8px 4px', height: '1px', background: 'rgba(255,255,255,0.05)' }} />
