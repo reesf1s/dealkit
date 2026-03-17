@@ -544,7 +544,7 @@ function renderMarkdown(text: string): React.ReactNode {
     if (/^##+ /.test(line)) {
       const content = line.replace(/^##+ /, '')
       return (
-        <div key={key} style={{ fontWeight: '700', color: '#F0EEFF', marginTop: i > 0 ? '12px' : '0', marginBottom: '4px', fontSize: '12px', letterSpacing: '0.02em', textTransform: 'uppercase', color: '#818CF8' }}>
+        <div key={key} style={{ fontWeight: '700', color: '#818CF8', marginTop: i > 0 ? '12px' : '0', marginBottom: '4px', fontSize: '12px', letterSpacing: '0.02em', textTransform: 'uppercase' }}>
           {content}
         </div>
       )
