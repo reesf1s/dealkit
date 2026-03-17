@@ -234,6 +234,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           if (linkedTodoId !== undefined) upd.linkedTodoId = linkedTodoId
           if (notes !== undefined) upd.notes = notes
           if (owner !== undefined) upd.owner = owner
+          if (body.assignee !== undefined) upd.assignee = body.assignee
           if (taskText !== undefined) upd.text = taskText
           return upd
         }),

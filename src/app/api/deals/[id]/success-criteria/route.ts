@@ -107,7 +107,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { workspaceId } = await getWorkspaceContext(userId)
     const { id } = await params
-    const { criterionId, achieved, note } = await req.json()
+    const { criterionId, achieved, note, assignee } = await req.json()
 
     const [deal] = await db.select({ successCriteriaTodos: dealLogs.successCriteriaTodos })
       .from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
@@ -115,7 +115,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const updated = ((deal.successCriteriaTodos as any[]) ?? []).map((c: any) =>
       c.id === criterionId
-        ? { ...c, ...(achieved !== undefined ? { achieved } : {}), ...(note !== undefined ? { note } : {}) }
+        ? { ...c, ...(achieved !== undefined ? { achieved } : {}), ...(note !== undefined ? { note } : {}), ...(assignee !== undefined ? { assignee } : {}) }
         : c
     )
 

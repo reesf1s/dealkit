@@ -19,15 +19,18 @@ function getQuickActions(activeDealCompany?: string, currentPage?: string): Quic
   if (activeDealCompany) {
     return [
       { label: 'Summarize this deal', prompt: `Give me a complete briefing on the ${activeDealCompany} deal — score, contacts, risks, todos, and what to do next.` },
+      { label: 'What\'s blocking this deal?', prompt: `Analyze the ${activeDealCompany} deal — what are the blockers, objections, and risks preventing this from closing? Check the ML intelligence and suggest specific actions to unblock it.` },
+      { label: 'Show deal health trend', prompt: `Show me the score history and health trend for the ${activeDealCompany} deal. Is it improving or declining? What changed and when?` },
+      { label: 'Compare to won deals', prompt: `Compare the ${activeDealCompany} deal to similar deals we've won. What did those deals have that this one is missing? What patterns led to wins?` },
       { label: 'Draft follow-up email', prompt: `Draft a follow-up email for ${activeDealCompany} addressing the biggest risk in this deal.` },
       { label: 'Review todos', prompt: `Review and clean up the todos for ${activeDealCompany}. Remove anything stale.` },
-      { label: 'Generate one-pager', prompt: `Generate a one-pager for ${activeDealCompany}`, partial: true },
     ]
   }
   if (currentPage?.includes('/pipeline') || currentPage === '/') {
     return [
       { label: 'Pipeline health check', prompt: "What's my pipeline looking like? Give me a full overview with what to focus on." },
       { label: 'What needs attention?', prompt: 'Which deals need attention right now? Flag anything at risk or stale.' },
+      { label: 'Score trends', prompt: 'Show me which deals are trending up vs down. Which deals have improved or declined the most recently?' },
       { label: 'Forecast this quarter', prompt: 'Give me a forecast for this quarter based on current pipeline stages and win probabilities.' },
     ]
   }

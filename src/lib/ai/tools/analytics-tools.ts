@@ -359,6 +359,23 @@ export const get_deal_intelligence = {
     lines.push(`**Win Probability:** ${(pred.winProbability * 100).toFixed(0)}%${pred.compositeScore != null ? ` (composite: ${(pred.compositeScore * 100).toFixed(0)}%)` : ''}`)
     lines.push(`**Confidence:** ${pred.confidence}`)
 
+    // Score trend history
+    const dealSnap = brain.deals?.find(d => d.id === params.dealId)
+    if (dealSnap?.scoreTrend && dealSnap.scoreTrend !== 'new') {
+      const trendLabel = dealSnap.scoreTrend === 'improving' ? 'Improving' : dealSnap.scoreTrend === 'declining' ? 'Declining' : 'Stable'
+      const arrow = dealSnap.scoreTrend === 'improving' ? '+' : dealSnap.scoreTrend === 'declining' ? '' : ''
+      lines.push(`**Score Trend:** ${trendLabel} (${arrow}${dealSnap.scoreVelocity ?? 0}pts over recent period)`)
+    }
+    if (dealSnap?.scoreHistory && dealSnap.scoreHistory.length >= 2) {
+      const recent = dealSnap.scoreHistory.slice(-5)
+      lines.push(`**Score History:** ${recent.map(p => `${p.date}: ${p.score}%`).join(' → ')}`)
+    }
+    // Score trend alert for this deal (if any)
+    const trendAlert = brain.scoreTrendAlerts?.find(a => a.dealId === params.dealId)
+    if (trendAlert) {
+      lines.push(`**Score Alert:** ${trendAlert.message}`)
+    }
+
     // Score drivers
     if (pred.scoreDrivers?.length) {
       lines.push('\n**Score Drivers** (what\'s moving this score):')
@@ -668,6 +685,26 @@ export const get_pipeline_forecast = {
       }
     }
 
+    // Score trends
+    const scoreTrends = brain.scoreTrendAlerts ?? []
+    if (scoreTrends.length > 0) {
+      const declining = scoreTrends.filter(t => t.trend === 'declining')
+      const improving = scoreTrends.filter(t => t.trend === 'improving')
+      lines.push('\n**Score Trends:**')
+      if (declining.length > 0) {
+        lines.push(`  ${declining.length} deal(s) declining:`)
+        for (const d of declining.slice(0, 3)) {
+          lines.push(`    - ${d.dealName}: ${d.priorScore}% -> ${d.currentScore}% (${d.delta}pts)`)
+        }
+      }
+      if (improving.length > 0) {
+        lines.push(`  ${improving.length} deal(s) improving:`)
+        for (const d of improving.slice(0, 3)) {
+          lines.push(`    + ${d.dealName}: ${d.priorScore}% -> ${d.currentScore}% (+${d.delta}pts)`)
+        }
+      }
+    }
+
     // Global benchmarks
     if (brain.globalPrior) {
       lines.push(`\n**Industry Benchmark:** ${brain.globalPrior.globalWinRate.toFixed(0)}% win rate (${brain.globalPrior.trainingSize} deals in pool)`)
@@ -753,6 +790,120 @@ export const get_workspace_overview = {
         lines.push(`- [${r.priority}] **${r.dealName}**: ${r.recommendation}`),
       )
     }
+
+    return { result: lines.join('\n') }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// get_deal_score_history
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const get_deal_score_history = {
+  description: 'Get the full score history timeline for a deal — shows how the deal\'s conversion score has changed over time. Useful for understanding momentum, identifying inflection points, and spotting declining deals.',
+  parameters: z.object({
+    dealId: z.string().describe('The UUID of the deal'),
+  }),
+  execute: async (params: { dealId: string }, ctx: ToolContext): Promise<ToolResult> => {
+    const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
+    if (!brain) return { result: 'No workspace intelligence available yet.' }
+
+    const deal = brain.deals?.find(d => d.id === params.dealId)
+    if (!deal) return { result: 'Deal not found in the brain.' }
+
+    const lines: string[] = [`**Score History for ${deal.name}** (${deal.company})`]
+    lines.push(`Current Stage: ${deal.stage} | Current Score: ${deal.conversionScore ?? 'N/A'}%`)
+
+    if (!deal.scoreHistory || deal.scoreHistory.length === 0) {
+      lines.push('\nNo score history available yet. History builds as the brain is rebuilt after deal updates.')
+      return { result: lines.join('\n') }
+    }
+
+    // Trend summary
+    if (deal.scoreTrend && deal.scoreTrend !== 'new') {
+      const arrow = deal.scoreTrend === 'improving' ? 'Trending UP' : deal.scoreTrend === 'declining' ? 'Trending DOWN' : 'Stable'
+      lines.push(`**Trend:** ${arrow} (${deal.scoreVelocity != null && deal.scoreVelocity > 0 ? '+' : ''}${deal.scoreVelocity ?? 0}pts over recent period)`)
+    }
+
+    // Full timeline
+    lines.push('\n**Timeline:**')
+    let prevScore: number | null = null
+    for (const pt of deal.scoreHistory) {
+      const delta = prevScore !== null ? pt.score - prevScore : 0
+      const deltaStr = prevScore !== null ? ` (${delta > 0 ? '+' : ''}${delta})` : ''
+      lines.push(`  ${pt.date}: **${pt.score}%**${deltaStr} — ${pt.stage}`)
+      prevScore = pt.score
+    }
+
+    // Overall change
+    if (deal.scoreHistory.length >= 2) {
+      const first = deal.scoreHistory[0]
+      const last = deal.scoreHistory[deal.scoreHistory.length - 1]
+      const totalDelta = last.score - first.score
+      const totalDays = Math.round((new Date(last.date).getTime() - new Date(first.date).getTime()) / 86_400_000)
+      lines.push(`\n**Overall:** ${first.score}% → ${last.score}% (${totalDelta > 0 ? '+' : ''}${totalDelta}pts over ${totalDays}d)`)
+    }
+
+    // Alert from brain if any
+    const alert = brain.scoreTrendAlerts?.find(a => a.dealId === params.dealId)
+    if (alert) {
+      lines.push(`\n**Alert:** ${alert.message}`)
+    }
+
+    return { result: lines.join('\n') }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// get_score_trends
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const get_score_trends = {
+  description: 'Get all deal score trends across the pipeline — shows which deals are improving, declining, or stable. Useful for pipeline health checks and identifying deals that need attention.',
+  parameters: z.object({}),
+  execute: async (_params: Record<string, never>, ctx: ToolContext): Promise<ToolResult> => {
+    const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
+    if (!brain) return { result: 'No workspace intelligence available yet.' }
+
+    const lines: string[] = ['**Pipeline Score Trends**\n']
+
+    // Score trend alerts (significant changes)
+    const alerts = brain.scoreTrendAlerts ?? []
+    if (alerts.length > 0) {
+      const improving = alerts.filter(a => a.trend === 'improving')
+      const declining = alerts.filter(a => a.trend === 'declining')
+
+      if (declining.length > 0) {
+        lines.push('**Declining Deals (needs attention):**')
+        for (const a of declining) {
+          lines.push(`  - **${a.dealName}** (${a.company}): ${a.priorScore}% -> ${a.currentScore}% (${a.delta}pts over ${a.periodDays}d)`)
+        }
+      }
+      if (improving.length > 0) {
+        lines.push(`\n**Improving Deals:**`)
+        for (const a of improving) {
+          lines.push(`  - **${a.dealName}** (${a.company}): ${a.priorScore}% -> ${a.currentScore}% (+${a.delta}pts over ${a.periodDays}d)`)
+        }
+      }
+    }
+
+    // All deals with trends
+    const dealsWithHistory = (brain.deals ?? []).filter(d =>
+      d.scoreHistory && d.scoreHistory.length >= 2 &&
+      d.stage !== 'closed_won' && d.stage !== 'closed_lost'
+    )
+    if (dealsWithHistory.length > 0 && alerts.length === 0) {
+      lines.push('All deals are currently stable (no significant score changes detected).')
+    }
+
+    // Summary stats
+    const allOpen = (brain.deals ?? []).filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+    const improvingCount = allOpen.filter(d => d.scoreTrend === 'improving').length
+    const decliningCount = allOpen.filter(d => d.scoreTrend === 'declining').length
+    const stableCount = allOpen.filter(d => d.scoreTrend === 'stable').length
+    const newCount = allOpen.filter(d => d.scoreTrend === 'new' || !d.scoreTrend).length
+
+    lines.push(`\n**Summary:** ${improvingCount} improving | ${decliningCount} declining | ${stableCount} stable | ${newCount} awaiting history`)
 
     return { result: lines.join('\n') }
   },

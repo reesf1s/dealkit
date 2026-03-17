@@ -168,6 +168,18 @@ export default function DashboardPage() {
     })),
   ]
 
+  // Declining score trend alerts — deals losing momentum (score dropped 8+ pts)
+  const decliningDealIds = new Set(urgentItems.map(u => u.dealId))
+  const decliningScoreAlerts: typeof urgentItems = (brain?.scoreTrendAlerts ?? [])
+    .filter((a: any) => a.trend === 'declining' && !decliningDealIds.has(a.dealId))
+    .slice(0, 3)
+    .map((a: any) => ({
+      dealId: a.dealId, company: a.company,
+      label: a.company, sublabel: `Score dropped ${Math.abs(a.delta)}pts (${a.priorScore}% → ${a.currentScore}%)`,
+      color: '#F97316',
+    }))
+  urgentItems.push(...decliningScoreAlerts)
+
   // Follow-up cadence alerts from brain (critical + alert only)
   const followUpAlerts: any[] = (brain?.followUpIntel?.followUpAlerts ?? [])
     .filter((a: any) => a.urgency === 'critical' || a.urgency === 'alert')

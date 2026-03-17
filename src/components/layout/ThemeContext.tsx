@@ -15,7 +15,7 @@ const ThemeContext = createContext<ThemeCtx>({
 })
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light')
+  const [theme, setTheme] = useState<Theme>('dark')
 
   useEffect(() => {
     const stored = localStorage.getItem('sellsight-theme') as Theme | null
@@ -23,8 +23,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setTheme(stored)
       document.documentElement.classList.toggle('dark', stored === 'dark')
     } else {
-      // Default to light
-      document.documentElement.classList.remove('dark')
+      // Default to dark
+      document.documentElement.classList.add('dark')
     }
   }, [])
 

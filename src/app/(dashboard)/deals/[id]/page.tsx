@@ -3,19 +3,264 @@ export const dynamic = 'force-dynamic'
 
 import useSWR from 'swr'
 import { useParams } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import * as Dialog from '@radix-ui/react-dialog'
 import {
   ArrowLeft, Sparkles, Square, Plus, Target, Loader2,
   Clipboard, DollarSign, Calendar,
-  User, Edit, Trash2, CheckCircle, X, Link2, Check,
-  Mail, Sword, Zap, Layers
+  User, UserPlus, Edit, Trash2, CheckCircle, X, Link2, Check,
+  Mail, Sword, Zap, Layers,
+  Globe, FileText, Database, BookOpen, Github, Cloud,
+  ExternalLink, ChevronDown, ChevronRight, PenTool
 } from 'lucide-react'
-import type { DealContact } from '@/types'
+import type { DealContact, DealLink as DealLinkType, DealLinkType as LinkTypeEnum } from '@/types'
 import { useSidebar } from '@/components/layout/SidebarContext'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
+
+// ─── Workspace members hook ─────────────────────────────────────────────────
+
+interface WorkspaceMember {
+  id: string
+  userId: string
+  email: string
+  role: string
+}
+
+function useWorkspaceMembers() {
+  const { data } = useSWR<{ data: WorkspaceMember[] }>('/api/workspaces/members', fetcher)
+  return data?.data ?? []
+}
+
+// ─── Assignee helpers ───────────────────────────────────────────────────────
+
+function getInitials(name: string): string {
+  if (!name) return '?'
+  if (name.includes('@')) {
+    return name.split('@')[0][0]?.toUpperCase() ?? '?'
+  }
+  const parts = name.trim().split(/\s+/)
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  return parts[0][0]?.toUpperCase() ?? '?'
+}
+
+function getDisplayName(assignee: string): string {
+  if (!assignee) return ''
+  if (assignee.includes('@')) return assignee.split('@')[0]
+  return assignee
+}
+
+// ─── AssigneePicker component ───────────────────────────────────────────────
+
+function AssigneePill({ assignee, onClick, size = 'sm' }: { assignee?: string; onClick: () => void; size?: 'sm' | 'md' }) {
+  const isSm = size === 'sm'
+  if (!assignee) {
+    return (
+      <button
+        onClick={e => { e.stopPropagation(); onClick() }}
+        style={{
+          background: 'none', border: '1px dashed var(--border)', borderRadius: '12px',
+          padding: isSm ? '1px 6px' : '2px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px',
+          color: 'var(--text-tertiary)', fontSize: isSm ? '10px' : '11px', flexShrink: 0,
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLElement).style.color = 'var(--accent)' }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)' }}
+        title="Assign"
+      >
+        <UserPlus size={isSm ? 10 : 11} />
+      </button>
+    )
+  }
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onClick() }}
+      style={{
+        background: 'var(--accent-subtle)', border: 'none', borderRadius: '12px',
+        padding: isSm ? '1px 8px 1px 2px' : '2px 10px 2px 3px', cursor: 'pointer', display: 'flex',
+        alignItems: 'center', gap: '4px', flexShrink: 0,
+      }}
+      title={assignee}
+    >
+      <div style={{
+        width: isSm ? 16 : 18, height: isSm ? 16 : 18, borderRadius: '50%',
+        background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', fontSize: isSm ? '8px' : '9px', fontWeight: 700,
+      }}>
+        {getInitials(assignee)}
+      </div>
+      <span style={{ fontSize: isSm ? '10px' : '11px', color: 'var(--accent)', fontWeight: 500, maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {getDisplayName(assignee)}
+      </span>
+    </button>
+  )
+}
+
+function AssigneeDropdown({
+  currentAssignee,
+  members,
+  onAssign,
+  onClose,
+  anchorRef,
+}: {
+  currentAssignee?: string
+  members: WorkspaceMember[]
+  onAssign: (assignee: string | null) => void
+  onClose: () => void
+  anchorRef: React.RefObject<HTMLDivElement | null>
+}) {
+  const [customName, setCustomName] = useState('')
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
+          anchorRef.current && !anchorRef.current.contains(e.target as Node)) {
+        onClose()
+      }
+    }
+    const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleEscape)
+    return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('keydown', handleEscape) }
+  }, [onClose, anchorRef])
+
+  const filteredMembers = customName.trim()
+    ? members.filter(m => m.email.toLowerCase().includes(customName.toLowerCase()))
+    : members
+
+  return (
+    <div
+      ref={dropdownRef}
+      style={{
+        position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 100,
+        background: 'var(--card-bg)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        border: '1px solid var(--border)', borderRadius: '10px', padding: '6px',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.2)', minWidth: '220px', maxHeight: '280px', overflowY: 'auto',
+      }}
+    >
+      <form onSubmit={e => { e.preventDefault(); if (customName.trim()) { onAssign(customName.trim()); onClose() } }}>
+        <input
+          ref={inputRef}
+          value={customName}
+          onChange={e => setCustomName(e.target.value)}
+          placeholder="Type a name or email..."
+          style={{
+            width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border)',
+            borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)',
+            fontSize: '12px', outline: 'none', boxSizing: 'border-box', marginBottom: '4px',
+          }}
+          onFocus={e => (e.target as HTMLElement).style.borderColor = 'var(--accent)'}
+          onBlur={e => (e.target as HTMLElement).style.borderColor = 'var(--border)'}
+        />
+      </form>
+
+      {customName.trim() && !members.some(m => m.email.toLowerCase() === customName.toLowerCase().trim()) && (
+        <button
+          onClick={() => { onAssign(customName.trim()); onClose() }}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
+            background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer',
+            color: 'var(--accent)', fontSize: '12px', textAlign: 'left',
+          }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}
+        >
+          <UserPlus size={12} />
+          <span>Assign to &quot;{customName.trim()}&quot;</span>
+        </button>
+      )}
+
+      {filteredMembers.length > 0 && (
+        <div style={{ borderTop: customName.trim() ? '1px solid var(--border)' : 'none', paddingTop: customName.trim() ? '4px' : 0, marginTop: customName.trim() ? '2px' : 0 }}>
+          <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', padding: '4px 8px 2px' }}>
+            Workspace Members
+          </div>
+          {filteredMembers.map(m => (
+            <button
+              key={m.userId}
+              onClick={() => { onAssign(m.email); onClose() }}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px',
+                background: currentAssignee === m.email ? 'var(--accent-subtle)' : 'none',
+                border: 'none', borderRadius: '6px', cursor: 'pointer', textAlign: 'left',
+              }}
+              onMouseEnter={e => { if (currentAssignee !== m.email) (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)' }}
+              onMouseLeave={e => { if (currentAssignee !== m.email) (e.currentTarget as HTMLElement).style.background = 'none' }}
+            >
+              <div style={{
+                width: 20, height: 20, borderRadius: '50%', background: currentAssignee === m.email ? 'var(--accent)' : 'var(--surface-hover)',
+                color: currentAssignee === m.email ? '#fff' : 'var(--text-secondary)', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 700, flexShrink: 0,
+              }}>
+                {getInitials(m.email)}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {m.email.split('@')[0]}
+                </div>
+                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {m.email}
+                </div>
+              </div>
+              {currentAssignee === m.email && <Check size={12} color="var(--accent)" />}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {currentAssignee && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '4px', marginTop: '4px' }}>
+          <button
+            onClick={() => { onAssign(null); onClose() }}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
+              background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer',
+              color: 'var(--text-tertiary)', fontSize: '12px', textAlign: 'left',
+            }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.06)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}
+          >
+            <X size={12} />
+            <span>Unassign</span>
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AssigneePicker({
+  assignee,
+  members,
+  onAssign,
+  size = 'sm',
+}: {
+  assignee?: string
+  members: WorkspaceMember[]
+  onAssign: (assignee: string | null) => void
+  size?: 'sm' | 'md'
+}) {
+  const [open, setOpen] = useState(false)
+  const anchorRef = useRef<HTMLDivElement>(null)
+
+  return (
+    <div ref={anchorRef} style={{ position: 'relative', display: 'inline-flex' }}>
+      <AssigneePill assignee={assignee} onClick={() => setOpen(v => !v)} size={size} />
+      {open && (
+        <AssigneeDropdown
+          currentAssignee={assignee}
+          members={members}
+          onAssign={onAssign}
+          onClose={() => setOpen(false)}
+          anchorRef={anchorRef}
+        />
+      )}
+    </div>
+  )
+}
 
 const STAGE_COLORS: Record<string, string> = {
   prospecting: 'var(--text-tertiary)', qualification: '#3B82F6', discovery: '#8B5CF6',
@@ -725,7 +970,7 @@ function MeetingPrepTab({ dealId, deal, objectionWinMap = [], objectionCondition
   )
 }
 
-function TodosTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
+function TodosTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: any; onUpdate: () => void; members: WorkspaceMember[] }) {
   const [newTodo, setNewTodo] = useState('')
   const [doneExpanded, setDoneExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -777,6 +1022,10 @@ function TodosTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpd
   }
 
   const deleteTodo = (id: string) => saveTodos(todos.filter((t: any) => t.id !== id))
+
+  const assignTodo = (id: string, assignee: string | null) => {
+    saveTodos(todos.map((t: any) => t.id === id ? { ...t, assignee: assignee ?? undefined } : t))
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -854,6 +1103,11 @@ function TodosTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpd
                         style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)', cursor: 'text' }}
                         title="Double-click to edit"
                       >{todo.text}</span>
+                      <AssigneePicker
+                        assignee={todo.assignee}
+                        members={members}
+                        onAssign={(a) => assignTodo(todo.id, a)}
+                      />
                       <button onClick={() => startEdit(todo)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '2px', display: 'flex', borderRadius: '4px', flexShrink: 0 }}
                         onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--accent)'}
                         onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
@@ -895,6 +1149,11 @@ function TodosTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpd
                         <CheckCircle size={13} color="var(--success)" />
                       </button>
                       <span style={{ flex: 1, fontSize: '12px', color: 'var(--text-tertiary)', textDecoration: 'line-through' }}>{todo.text}</span>
+                      {todo.assignee && (
+                        <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--surface-hover)', borderRadius: '10px', padding: '1px 6px' }}>
+                          {getDisplayName(todo.assignee)}
+                        </span>
+                      )}
                       <button onClick={() => deleteTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '1px', display: 'flex', borderRadius: '3px' }}
                         onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--danger)'}
                         onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
@@ -1437,7 +1696,7 @@ function ActivityLog({ dealId, deal, onUpdate }: { dealId: string; deal: any; on
   )
 }
 
-function SuccessCriteriaTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
+function SuccessCriteriaTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: any; onUpdate: () => void; members: WorkspaceMember[] }) {
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
   const [extractError, setExtractError] = useState<string | null>(null)
@@ -1492,6 +1751,14 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate }: { dealId: string; deal: 
     await fetch(`/api/deals/${dealId}/success-criteria`, {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ criterionId }),
+    })
+    onUpdate()
+  }
+
+  const assignCriterion = async (criterionId: string, assignee: string | null) => {
+    await fetch(`/api/deals/${dealId}/success-criteria`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ criterionId, assignee: assignee ?? '' }),
     })
     onUpdate()
   }
@@ -1573,6 +1840,11 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate }: { dealId: string; deal: 
                   <span style={{ flex: 1, fontSize: '13px', color: c.achieved ? 'var(--text-tertiary)' : 'var(--text-primary)', lineHeight: 1.5, textDecoration: c.achieved ? 'line-through' : 'none' }}>
                     {c.text}
                   </span>
+                  <AssigneePicker
+                    assignee={c.assignee || undefined}
+                    members={members}
+                    onAssign={(a) => assignCriterion(c.id, a)}
+                  />
                   <button onClick={() => { setEditingNote(c.id); setNoteText(c.note ?? '') }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', fontSize: '11px', color: c.note ? 'var(--accent)' : 'var(--text-tertiary)' }}>
                     {c.note ? '✎' : '+ note'}
                   </button>
@@ -1634,7 +1906,7 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate }: { dealId: string; deal: 
   )
 }
 
-function ProjectPlanTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
+function ProjectPlanTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: any; onUpdate: () => void; members: WorkspaceMember[] }) {
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1798,7 +2070,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate }: { dealId: string; deal: any;
                       }}>
                         {task.text}
                       </div>
-                      <div style={{ display: 'flex', gap: '10px', marginTop: '3px' }}>
+                      <div style={{ display: 'flex', gap: '10px', marginTop: '3px', alignItems: 'center' }}>
                         {task.owner && <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>👤 {task.owner}</span>}
                         {task.dueDate && <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>📅 {new Date(task.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>}
                         {linkedTodo && (
@@ -1808,6 +2080,11 @@ function ProjectPlanTab({ dealId, deal, onUpdate }: { dealId: string; deal: any;
                         )}
                       </div>
                     </div>
+                    <AssigneePicker
+                      assignee={task.assignee || task.owner || undefined}
+                      members={members}
+                      onAssign={(a) => updateTask(task.id, { assignee: a ?? '' })}
+                    />
                     <span style={{
                       fontSize: '10px', padding: '2px 8px', borderRadius: '4px',
                       background: sc.bg, border: `1px solid ${sc.border}`, color: sc.text,
@@ -1874,6 +2151,289 @@ function ProjectPlanTab({ dealId, deal, onUpdate }: { dealId: string; deal: any;
           {error && <span style={{ fontSize: '12px', color: 'var(--danger)' }}>{error}</span>}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// External Links Section
+// ─────────────────────────────────────────────────────────────────────────────
+
+function detectLinkType(url: string): LinkTypeEnum {
+  try {
+    const host = new URL(url).hostname.toLowerCase()
+    if (host.includes('sharepoint') || host.includes('.sharepoint.com')) return 'sharepoint'
+    if (host.includes('google.com') || host.includes('docs.google') || host.includes('drive.google') || host.includes('sheets.google') || host.includes('slides.google')) return 'google'
+    if (host.includes('salesforce') || host.includes('.force.com') || host.includes('.lightning.force.com')) return 'salesforce'
+    if (host.includes('notion.so') || host.includes('notion.site')) return 'notion'
+    if (host.includes('figma.com')) return 'figma'
+    if (host.includes('github.com') || host.includes('github.dev')) return 'github'
+  } catch { /* invalid URL */ }
+  return 'other'
+}
+
+function deriveLabelFromUrl(url: string): string {
+  try {
+    const u = new URL(url)
+    const path = u.pathname.replace(/\/$/, '')
+    const segments = path.split('/').filter(Boolean)
+    const lastSegment = segments[segments.length - 1] ?? ''
+    const decoded = decodeURIComponent(lastSegment).replace(/[-_]/g, ' ')
+    if (decoded && decoded.length < 80) return `${u.hostname.replace('www.', '')} — ${decoded}`
+    return u.hostname.replace('www.', '')
+  } catch {
+    return url.slice(0, 60)
+  }
+}
+
+const LINK_TYPE_ICON: Record<LinkTypeEnum, { icon: typeof Globe; color: string }> = {
+  sharepoint: { icon: Cloud, color: '#0078D4' },
+  google: { icon: FileText, color: '#4285F4' },
+  salesforce: { icon: Database, color: '#00A1E0' },
+  notion: { icon: BookOpen, color: 'var(--text-primary)' },
+  figma: { icon: PenTool, color: '#A259FF' },
+  github: { icon: Github, color: 'var(--text-primary)' },
+  other: { icon: Globe, color: 'var(--text-tertiary)' },
+}
+
+function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
+  const links: DealLinkType[] = Array.isArray(deal.links) ? deal.links : []
+  const [expanded, setExpanded] = useState(links.length > 0)
+  const [adding, setAdding] = useState(false)
+  const [urlInput, setUrlInput] = useState('')
+  const [labelInput, setLabelInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editLabel, setEditLabel] = useState('')
+
+  const patchLinks = async (newLinks: DealLinkType[]) => {
+    setSaving(true)
+    try {
+      await fetch(`/api/deals/${dealId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ links: newLinks }),
+      })
+      onUpdate()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const addLink = async () => {
+    const trimmed = urlInput.trim()
+    if (!trimmed) return
+    let url = trimmed
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url
+    try { new URL(url) } catch { return }
+
+    const type = detectLinkType(url)
+    const label = labelInput.trim() || deriveLabelFromUrl(url)
+    const newLink: DealLinkType = {
+      id: crypto.randomUUID(),
+      url,
+      label,
+      type,
+      addedAt: new Date().toISOString(),
+    }
+    await patchLinks([...links, newLink])
+    setUrlInput('')
+    setLabelInput('')
+    setAdding(false)
+  }
+
+  const deleteLink = (linkId: string) => {
+    patchLinks(links.filter(l => l.id !== linkId))
+  }
+
+  const saveEditLabel = (linkId: string) => {
+    const updated = links.map(l => l.id === linkId ? { ...l, label: editLabel.trim() || l.label } : l)
+    patchLinks(updated)
+    setEditingId(null)
+  }
+
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+          padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer',
+          borderBottom: expanded ? '1px solid var(--border)' : 'none',
+        }}
+      >
+        {expanded ? <ChevronDown size={12} color="var(--text-tertiary)" /> : <ChevronRight size={12} color="var(--text-tertiary)" />}
+        <Link2 size={13} color="var(--accent)" />
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+          External Links{links.length > 0 ? ` (${links.length})` : ''}
+        </span>
+        {!adding && (
+          <span
+            onClick={e => { e.stopPropagation(); setAdding(true); setExpanded(true) }}
+            style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent)', cursor: 'pointer', fontWeight: 500 }}
+          >
+            <Plus size={12} /> Add
+          </span>
+        )}
+      </button>
+
+      {expanded && (
+        <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {links.length === 0 && !adding && (
+            <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: 0, fontStyle: 'italic', padding: '4px 0' }}>
+              No links yet — paste a SharePoint, Google Doc, or any URL
+            </p>
+          )}
+
+          {links.map(link => {
+            const { icon: Icon, color } = LINK_TYPE_ICON[link.type] ?? LINK_TYPE_ICON.other
+            return (
+              <div
+                key={link.id}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
+                  borderRadius: '6px', background: 'var(--card-bg)',
+                  border: '1px solid var(--border)', transition: 'border-color 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+              >
+                <Icon size={14} color={color} style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {editingId === link.id ? (
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <input
+                        type="text"
+                        value={editLabel}
+                        onChange={e => setEditLabel(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') saveEditLabel(link.id); if (e.key === 'Escape') setEditingId(null) }}
+                        autoFocus
+                        style={{
+                          flex: 1, fontSize: '12px', padding: '2px 6px', background: 'var(--surface)',
+                          border: '1px solid var(--accent)', borderRadius: '4px', color: 'var(--text-primary)',
+                          outline: 'none', fontFamily: 'inherit',
+                        }}
+                      />
+                      <button onClick={() => saveEditLabel(link.id)} style={{ fontSize: '10px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                        <Check size={12} />
+                      </button>
+                      <button onClick={() => setEditingId(null)} style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}>
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+                      onDoubleClick={() => { setEditingId(link.id); setEditLabel(link.label) }}
+                      title="Double-click to rename"
+                    >
+                      <a
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)',
+                          textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          display: 'block', maxWidth: '100%',
+                        }}
+                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
+                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-primary)')}
+                      >
+                        {link.label}
+                      </a>
+                      <ExternalLink size={10} color="var(--text-tertiary)" style={{ flexShrink: 0 }} />
+                    </div>
+                  )}
+                  <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
+                    {link.url}
+                  </div>
+                </div>
+                <button
+                  onClick={() => deleteLink(link.id)}
+                  title="Remove link"
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
+                    color: 'var(--text-tertiary)', borderRadius: '4px', flexShrink: 0, display: 'flex',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--danger)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            )
+          })}
+
+          {adding && (
+            <div style={{
+              padding: '10px', borderRadius: '8px', background: 'var(--card-bg)',
+              border: '1px solid var(--accent)', display: 'flex', flexDirection: 'column', gap: '8px',
+            }}>
+              <input
+                type="url"
+                value={urlInput}
+                onChange={e => setUrlInput(e.target.value)}
+                placeholder="Paste URL (SharePoint, Google Docs, Salesforce, ...)"
+                autoFocus
+                onKeyDown={e => { if (e.key === 'Enter' && urlInput.trim()) addLink(); if (e.key === 'Escape') { setAdding(false); setUrlInput(''); setLabelInput('') } }}
+                style={{
+                  width: '100%', fontSize: '12px', padding: '8px 10px',
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: '6px', color: 'var(--text-primary)', outline: 'none',
+                  fontFamily: 'inherit', boxSizing: 'border-box',
+                }}
+              />
+              <input
+                type="text"
+                value={labelInput}
+                onChange={e => setLabelInput(e.target.value)}
+                placeholder="Label (optional — auto-detected from URL)"
+                onKeyDown={e => { if (e.key === 'Enter' && urlInput.trim()) addLink(); if (e.key === 'Escape') { setAdding(false); setUrlInput(''); setLabelInput('') } }}
+                style={{
+                  width: '100%', fontSize: '12px', padding: '8px 10px',
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: '6px', color: 'var(--text-primary)', outline: 'none',
+                  fontFamily: 'inherit', boxSizing: 'border-box',
+                }}
+              />
+              {urlInput.trim() && (
+                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {(() => {
+                    const t = detectLinkType(urlInput.trim())
+                    const { icon: TypeIcon, color } = LINK_TYPE_ICON[t]
+                    return <><TypeIcon size={10} color={color} /> Detected: {t}</>
+                  })()}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => { setAdding(false); setUrlInput(''); setLabelInput('') }}
+                  style={{
+                    fontSize: '11px', padding: '5px 12px', background: 'none',
+                    border: '1px solid var(--border)', borderRadius: '6px',
+                    color: 'var(--text-tertiary)', cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={addLink}
+                  disabled={!urlInput.trim() || saving}
+                  style={{
+                    fontSize: '11px', padding: '5px 12px',
+                    background: urlInput.trim() ? 'var(--accent)' : 'var(--surface-hover)',
+                    border: 'none', borderRadius: '6px',
+                    color: urlInput.trim() ? '#fff' : 'var(--text-tertiary)',
+                    cursor: urlInput.trim() ? 'pointer' : 'default',
+                    fontWeight: 600,
+                  }}
+                >
+                  {saving ? 'Saving...' : 'Add Link'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -2319,6 +2879,7 @@ export default function DealDetailPage() {
   const objectionConditionalWins: any[] = brainRes?.data?.objectionConditionalWins ?? []
   const globalPrior: any = brainRes?.data?.globalPrior ?? null
   const { setActiveDeal } = useSidebar()
+  const workspaceMembers = useWorkspaceMembers()
 
   const [activeTab, setActiveTab] = useState<'overview' | 'meeting-notes' | 'prep' | 'todos' | 'project-plan' | 'success'>('overview')
   const [editOpen, setEditOpen] = useState(false)
@@ -2458,13 +3019,13 @@ export default function DealDetailPage() {
           )}
           {activeTab === 'prep' && <MeetingPrepTab dealId={id} deal={deal} objectionWinMap={objectionWinMap} objectionConditionalWins={objectionConditionalWins} />}
           {activeTab === 'todos' && (
-            <TodosTab dealId={id} deal={deal} onUpdate={() => mutate()} />
+            <TodosTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
           )}
           {activeTab === 'project-plan' && (
-            <ProjectPlanTab dealId={id} deal={deal} onUpdate={() => mutate()} />
+            <ProjectPlanTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
           )}
           {activeTab === 'success' && (
-            <SuccessCriteriaTab dealId={id} deal={deal} onUpdate={() => mutate()} />
+            <SuccessCriteriaTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
           )}
         </div>
       )}

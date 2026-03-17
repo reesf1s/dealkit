@@ -57,6 +57,8 @@ export {
   get_win_playbook,
   get_rep_performance,
   get_pipeline_forecast,
+  get_deal_score_history,
+  get_score_trends,
 } from './analytics-tools'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -120,4 +122,6 @@ export const allTools = {
   get_win_playbook: analyticsTools.get_win_playbook,
   get_rep_performance: analyticsTools.get_rep_performance,
   get_pipeline_forecast: analyticsTools.get_pipeline_forecast,
+  get_deal_score_history: analyticsTools.get_deal_score_history,
+  get_score_trends: analyticsTools.get_score_trends,
 } as const

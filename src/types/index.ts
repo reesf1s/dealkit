@@ -102,6 +102,17 @@ export interface DealContact {
   email?: string
 }
 
+export type DealLinkType = 'sharepoint' | 'google' | 'salesforce' | 'notion' | 'figma' | 'github' | 'other'
+
+export interface DealLink {
+  id: string
+  url: string
+  label: string
+  type: DealLinkType
+  addedAt: string   // ISO date
+  addedBy?: string  // user email or name
+}
+
 export interface DealLog {
   id: string
   userId: string
@@ -122,6 +133,7 @@ export interface DealLog {
   lostReason: string | null
   dealType: 'one_off' | 'recurring'
   recurringInterval: 'monthly' | 'quarterly' | 'annual' | null
+  links: DealLink[]
   projectPlan?: ProjectPlan | null
   createdAt: Date
   updatedAt: Date
@@ -367,10 +379,39 @@ export interface ProjectTask {
   text: string
   status: 'not_started' | 'in_progress' | 'complete'
   owner?: string                        // responsible person
+  assignee?: string                     // assigned member email or custom name
   dueDate?: string                      // ISO date
   linkedTodoId?: string                 // link to deal todo
   notes?: string
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Todo items (stored as JSONB on dealLogs.todos)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface TodoItem {
+  id: string
+  text: string
+  done: boolean
+  assignee?: string                     // assigned member email or custom name
+  createdAt: string
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Success criteria items (stored as JSONB on dealLogs.successCriteriaTodos)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface SuccessCriterionItem {
+  id: string
+  text: string
+  category: string
+  achieved: boolean
+  assignee?: string                     // assigned member email or custom name
+  note?: string
+  createdAt: string
+}
+
+// DealLink is defined above (near DealContact) with full type detection support
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pipeline Configuration

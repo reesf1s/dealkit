@@ -222,6 +222,8 @@ export const dealLogs = pgTable('deal_logs', {
   kanbanOrder: integer('kanban_order').notNull().default(0),
   projectPlan: jsonb('project_plan'),                          // ProjectPlan JSON
   intentSignals: jsonb('intent_signals'),                      // LLM-extracted intent: champion/budget/timeline/nextMeeting
+  links: jsonb('links').notNull().default([]),                  // DealLink[] — external URLs (SharePoint, Google Docs, Salesforce, etc.)
+  // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS links jsonb NOT NULL DEFAULT '[]'::jsonb;
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

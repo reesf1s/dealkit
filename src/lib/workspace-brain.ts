@@ -32,6 +32,12 @@ export interface DealSignalSummary {
   championStrength: number    // 0–1
 }
 
+export interface ScoreHistoryPoint {
+  date: string       // ISO date string (YYYY-MM-DD)
+  score: number      // 0–100 conversion score at that point
+  stage: string      // stage at that point
+}
+
 export interface DealSnapshot {
   id: string
   name: string
@@ -47,6 +53,9 @@ export interface DealSnapshot {
   daysSinceUpdate: number
   projectPlanProgress?: { total: number; complete: number } | null
   signalSummary?: DealSignalSummary
+  scoreHistory?: ScoreHistoryPoint[]  // score snapshots over time (appended on each rebuild)
+  scoreTrend?: 'improving' | 'declining' | 'stable' | 'new'  // computed from scoreHistory
+  scoreVelocity?: number       // change in score over last 14 days (positive = improving)
 }
 
 export interface WorkspaceBrain {
@@ -128,6 +137,7 @@ export interface WorkspaceBrain {
   pipelineHealthIndex?: PipelineHealthIndex        // composite 0–100 pipeline health
   revenueForecasts?: RevenueForecast[]             // probability-weighted monthly revenue
   deteriorationAlerts?: DeteriorationAlert[]       // deals showing declining note sentiment
+  scoreTrendAlerts?: ScoreTrendAlert[]              // deals with significant score changes over time
   // ── Tier 1 intelligence ─────────────────────────────────────────────────────
   followUpIntel?: FollowUpCadenceIntel             // per-stage optimal follow-up cadence + alerts
   repIntel?: RepIntelStats[]                       // per-rep behavioural stats
@@ -257,6 +267,18 @@ export interface RepIntelStats {
   avgDaysSinceLastNote:    number    // how recently they typically update open deals
 }
 
+export interface ScoreTrendAlert {
+  dealId:         string
+  dealName:       string
+  company:        string
+  trend:          'improving' | 'declining'
+  currentScore:   number      // current score
+  priorScore:     number      // score ~14 days ago (or earliest in window)
+  delta:          number      // currentScore - priorScore
+  periodDays:     number      // how many days the trend spans
+  message:        string      // human-readable summary
+}
+
 export interface DeteriorationAlert {
   dealId:         string
   dealName:       string
@@ -299,6 +321,13 @@ export async function getWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
 /** Rebuild and persist the brain from current deal state. Call in background after any deal mutation. */
 export async function rebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceBrain> {
   await ensureBrainColumn()
+
+  // Load previous brain to carry forward score history
+  const previousBrain = await getWorkspaceBrain(workspaceId)
+  const previousDeals = new Map<string, DealSnapshot>()
+  if (previousBrain?.deals) {
+    for (const d of previousBrain.deals) previousDeals.set(d.id, d)
+  }
 
   const deals = await db
     .select({
@@ -396,6 +425,24 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
         nextStepDefined:   sig.nextStepDefined,
         championStrength:  sig.championStrength,
       } : undefined,
+      // ── Score history: carry forward from previous brain + append today's score ──
+      scoreHistory: (() => {
+        const prev = previousDeals.get(d.id)
+        const existing: ScoreHistoryPoint[] = prev?.scoreHistory ?? []
+        const todayStr = now.toISOString().slice(0, 10) // YYYY-MM-DD
+        const currentScore = d.conversionScore
+        if (currentScore == null) return existing.length > 0 ? existing : undefined
+        // Deduplicate: don't add if last entry is the same date with the same score
+        const last = existing[existing.length - 1]
+        if (last && last.date === todayStr && last.score === currentScore) return existing
+        // If same date but different score, replace the last entry
+        if (last && last.date === todayStr) {
+          return [...existing.slice(0, -1), { date: todayStr, score: currentScore, stage: d.stage }]
+        }
+        // Append new point, keep max 90 days of history
+        const newHistory = [...existing, { date: todayStr, score: currentScore, stage: d.stage }]
+        return newHistory.length > 90 ? newHistory.slice(-90) : newHistory
+      })(),
     }
   })
 
@@ -1420,6 +1467,63 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     }
   }
 
+  // ── Score trend analysis — compute per-deal trend + surface significant changes ──
+  const scoreTrendAlerts: ScoreTrendAlert[] = []
+  const TREND_WINDOW_DAYS = 14
+  const TREND_THRESHOLD = 8  // minimum score change to flag as meaningful
+  for (const snap of snapshots) {
+    if (snap.stage === 'closed_won' || snap.stage === 'closed_lost') continue
+    const history = snap.scoreHistory
+    if (!history || history.length < 2) {
+      snap.scoreTrend = snap.conversionScore != null ? 'new' : undefined
+      snap.scoreVelocity = 0
+      continue
+    }
+    // Find the score ~TREND_WINDOW_DAYS ago (or earliest available)
+    const todayStr = now.toISOString().slice(0, 10)
+    const windowStart = new Date(now.getTime() - TREND_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10)
+    // Find the earliest point within or before the window
+    let priorPoint: ScoreHistoryPoint | null = null
+    for (const pt of history) {
+      if (pt.date <= windowStart) priorPoint = pt
+      else if (!priorPoint && pt.date < todayStr) priorPoint = pt
+    }
+    const currentPoint = history[history.length - 1]
+    if (!priorPoint || priorPoint === currentPoint) {
+      snap.scoreTrend = 'stable'
+      snap.scoreVelocity = 0
+      continue
+    }
+    const delta = currentPoint.score - priorPoint.score
+    const daysBetween = Math.max(1, (new Date(currentPoint.date).getTime() - new Date(priorPoint.date).getTime()) / 86_400_000)
+    snap.scoreVelocity = Math.round(delta)
+    if (delta >= TREND_THRESHOLD) {
+      snap.scoreTrend = 'improving'
+    } else if (delta <= -TREND_THRESHOLD) {
+      snap.scoreTrend = 'declining'
+    } else {
+      snap.scoreTrend = 'stable'
+    }
+    // Surface significant changes as alerts
+    if (Math.abs(delta) >= TREND_THRESHOLD) {
+      const trend = delta > 0 ? 'improving' : 'declining'
+      scoreTrendAlerts.push({
+        dealId: snap.id,
+        dealName: snap.name,
+        company: snap.company,
+        trend,
+        currentScore: currentPoint.score,
+        priorScore: priorPoint.score,
+        delta,
+        periodDays: Math.round(daysBetween),
+        message: trend === 'improving'
+          ? `Score improved ${delta}pts (${priorPoint.score}% → ${currentPoint.score}%) over ${Math.round(daysBetween)}d`
+          : `Score dropped ${Math.abs(delta)}pts (${priorPoint.score}% → ${currentPoint.score}%) over ${Math.round(daysBetween)}d`,
+      })
+    }
+  }
+  scoreTrendAlerts.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+
   // ── Pipeline Health Index ─────────────────────────────────────────────────
   const lateStageCount = activeDeals.filter(d => ['proposal', 'negotiation'].includes(d.stage)).length
   const stageDepthPct  = activeDeals.length > 0 ? Math.round((lateStageCount / activeDeals.length) * 100) : 0
@@ -1532,6 +1636,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     pipelineHealthIndex: activeDeals.length > 0 ? pipelineHealthIndex : undefined,
     revenueForecasts:    revenueForecasts.length > 0 ? revenueForecasts : undefined,
     deteriorationAlerts: deteriorationAlerts.length > 0 ? deteriorationAlerts : undefined,
+    scoreTrendAlerts:    scoreTrendAlerts.length > 0 ? scoreTrendAlerts : undefined,
     followUpIntel:          (followUpStageStats.length > 0 || followUpAlerts.length > 0) ? followUpIntel : undefined,
     repIntel:               repIntel.length > 0 ? repIntel : undefined,
     objectionWinMap:        objectionWinMap.length > 0 ? objectionWinMap : undefined,
@@ -1837,6 +1942,29 @@ export function formatBrainContext(brain: WorkspaceBrain, stageLabels?: Record<s
     lines.push(`\nDETERIORATION ALERTS (declining note sentiment):`)
     for (const d of detAlerts.slice(0, 4)) {
       lines.push(`⚠ ${d.dealName} (${d.company}): ${d.warning}`)
+    }
+  }
+
+  // Score trend alerts
+  const scoreTrends = brain.scoreTrendAlerts ?? []
+  if (scoreTrends.length > 0) {
+    lines.push(`\nSCORE TREND ALERTS (significant score changes over time):`)
+    for (const t of scoreTrends.slice(0, 6)) {
+      const arrow = t.trend === 'improving' ? '↑' : '↓'
+      lines.push(`${arrow} ${t.dealName} (${t.company}): ${t.message}`)
+    }
+  }
+
+  // Per-deal score trends summary (for deals with history)
+  const dealsWithTrend = (brain.deals ?? []).filter(d =>
+    d.scoreTrend && d.scoreTrend !== 'new' && d.scoreTrend !== 'stable' &&
+    d.stage !== 'closed_won' && d.stage !== 'closed_lost'
+  )
+  if (dealsWithTrend.length > 0 && scoreTrends.length === 0) {
+    lines.push(`\nDEAL SCORE TRENDS:`)
+    for (const d of dealsWithTrend.slice(0, 6)) {
+      const arrow = d.scoreTrend === 'improving' ? '↑' : '↓'
+      lines.push(`${arrow} ${d.name} (${d.company}): ${d.scoreTrend} (${d.scoreVelocity != null && d.scoreVelocity > 0 ? '+' : ''}${d.scoreVelocity ?? 0}pts)`)
     }
   }
 
