@@ -24,6 +24,8 @@ function useDealFlags(deals: any[]) {
     urgentMap: {} as Record<string, string>,
     staleMap: {} as Record<string, number>,
     mlMap: {} as Record<string, { churnRisk?: number; winProb?: number }>,
+    daysInStageMap: {} as Record<string, number>,
+    momentumMap: {} as Record<string, 'hot' | 'cooling' | null>,
   }
   const urgentMap: Record<string, string> = {}
   const staleMap: Record<string, number> = {}
@@ -36,7 +38,23 @@ function useDealFlags(deals: any[]) {
       winProb: p.winProbability != null ? Math.round(p.winProbability * 100) : undefined,
     }
   }
-  return { urgentMap, staleMap, mlMap }
+  const daysInStageMap: Record<string, number> = {}
+  const momentumMap: Record<string, 'hot' | 'cooling' | null> = {}
+  for (const deal of deals) {
+    const days = Math.floor((Date.now() - new Date(deal.updatedAt ?? deal.createdAt).getTime()) / 86_400_000)
+    daysInStageMap[deal.id] = days
+    const ml = mlMap[deal.id]
+    const churnRisk = ml?.churnRisk ?? 0
+    const winProb = ml?.winProb != null ? ml.winProb / 100 : 0
+    if (churnRisk >= 65) {
+      momentumMap[deal.id] = 'cooling'
+    } else if (churnRisk < 30 && winProb >= 0.7) {
+      momentumMap[deal.id] = 'hot'
+    } else {
+      momentumMap[deal.id] = null
+    }
+  }
+  return { urgentMap, staleMap, mlMap, daysInStageMap, momentumMap }
 }
 
 // Annualise a deal's stored value so one-off and recurring are comparable
@@ -94,6 +112,8 @@ function DealCard({
   urgentReason,
   staleDays,
   churnRisk,
+  daysInStage,
+  momentum,
   currencySymbol = '$',
 }: {
   deal: any
@@ -104,6 +124,8 @@ function DealCard({
   urgentReason?: string
   staleDays?: number
   churnRisk?: number
+  daysInStage?: number
+  momentum?: 'hot' | 'cooling' | null
   currencySymbol?: string
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -242,6 +264,30 @@ function DealCard({
           <span style={{ fontSize: '10px', color: churnRisk >= 85 ? '#FCA5A5' : '#FDE68A' }}>
             {churnRisk}% going silent
           </span>
+        </div>
+      )}
+      {/* Days in stage badge */}
+      {daysInStage !== undefined && daysInStage > 0 && (
+        <div style={{
+          display: 'flex', gap: '5px', alignItems: 'center',
+          padding: '4px 8px', borderRadius: '6px',
+          background: 'rgba(107,114,128,0.08)',
+          border: '1px solid rgba(107,114,128,0.18)',
+          marginBottom: '8px',
+        }}>
+          <span style={{ fontSize: '10px', color: '#9CA3AF' }}>⏱ {daysInStage}d in stage</span>
+        </div>
+      )}
+      {/* Momentum: hot badge (cooling is already covered by churnRisk badge) */}
+      {momentum === 'hot' && (
+        <div style={{
+          display: 'flex', gap: '5px', alignItems: 'center',
+          padding: '4px 8px', borderRadius: '6px',
+          background: 'rgba(34,197,94,0.08)',
+          border: '1px solid rgba(34,197,94,0.2)',
+          marginBottom: '8px',
+        }}>
+          <span style={{ fontSize: '10px', color: '#86EFAC' }}>🔥 Hot</span>
         </div>
       )}
 
@@ -461,7 +507,7 @@ export default function PipelinePage() {
   const { sidebarWidth, aiSidebarWidth } = useSidebar()
   const { data: dealsData, isLoading } = useSWR('/api/deals', fetcher)
   const deals: any[] = dealsData?.data ?? []
-  const { urgentMap, staleMap, mlMap } = useDealFlags(deals)
+  const { urgentMap, staleMap, mlMap, daysInStageMap, momentumMap } = useDealFlags(deals)
   const { data: configData, mutate: mutateConfig } = useSWR('/api/pipeline-config', fetcher)
   const pipelineConfig = configData?.data
   const presets = configData?.presets ?? []
@@ -809,6 +855,8 @@ export default function PipelinePage() {
                       urgentReason={urgentMap[deal.id]}
                       staleDays={staleMap[deal.id]}
                       churnRisk={mlMap[deal.id]?.churnRisk}
+                      daysInStage={daysInStageMap[deal.id]}
+                      momentum={momentumMap[deal.id]}
                       currencySymbol={currencySymbol}
                     />
                   ))

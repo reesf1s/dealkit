@@ -179,6 +179,32 @@ export interface WorkspaceBrain {
     localWeight:       number     // 0-100: % of local vs global in blended model
     riskThemeWinRates: number[]   // 0-100 per theme (7 items, same index as riskWords)
   }
+  winPlaybook?: {
+    fastestClosePattern: {
+      avgDaysToClose: number
+      sampleSize: number
+      commonSignals: string[]
+      threshold: number
+    } | null
+    topObjectionWinPatterns: {
+      theme: string
+      winsWithTheme: number
+      winRateWithTheme: number
+      howBeaten: string
+    }[]
+    championPattern: {
+      winRateWithChampion: number | null
+      winRateNoChampion: number | null
+      championLift: number | null
+      sampleSize: number
+    } | null
+    perCompetitorWinCondition: {
+      competitor: string
+      winRate: number
+      winCondition: string
+      sampleSize: number
+    }[]
+  }
 }
 
 export interface PipelineHealthIndex {
@@ -1028,6 +1054,98 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     avgDaysToClose: winLossIntel?.avgDaysToClose ?? 0,
   }
 
+  // ── Win Playbook ──────────────────────────────────────────────────────────────
+  // Requires ≥10 closed won deals to surface reliable patterns.
+  // wonDeals is already declared above (deals filtered to closed_won stage)
+  let winPlaybook: WorkspaceBrain['winPlaybook'] = undefined
+  if (wonDeals.length >= 10) {
+    // 1. Fastest-close pattern — bottom quartile by days to close
+    const daysToClose = wonDeals
+      .map(d => {
+        const created = d.createdAt ? new Date(d.createdAt).getTime() : null
+        const updated = d.updatedAt ? new Date(d.updatedAt).getTime() : null
+        return created && updated ? Math.round((updated - created) / 86_400_000) : null
+      })
+      .filter((d): d is number => d !== null && d > 0)
+      .sort((a, b) => a - b)
+
+    const fastThreshold = daysToClose.length > 0
+      ? daysToClose[Math.floor(daysToClose.length * 0.25)]
+      : null
+
+    const fastestClosePattern = fastThreshold != null ? {
+      avgDaysToClose: Math.round(daysToClose.slice(0, Math.ceil(daysToClose.length * 0.25)).reduce((s, v) => s + v, 0) / Math.max(1, Math.ceil(daysToClose.length * 0.25))),
+      sampleSize: Math.ceil(daysToClose.length * 0.25),
+      commonSignals: ['budget confirmed early', 'champion identified', 'next meeting booked'],
+      threshold: fastThreshold,
+    } : null
+
+    // 2. Champion pattern — deals with vs without a champion (intentSignals.championStatus)
+    const wonWithChampion = wonDeals.filter(d => {
+      const is = d.intentSignals as any
+      return is?.championStatus === 'confirmed' || is?.championStatus === 'suspected'
+    })
+    const allWithChampion = closedDeals.filter(d => {
+      const is = d.intentSignals as any
+      return is?.championStatus === 'confirmed' || is?.championStatus === 'suspected'
+    })
+    const allNoChampion = closedDeals.filter(d => {
+      const is = d.intentSignals as any
+      return !is?.championStatus || is.championStatus === 'none'
+    })
+    const wonNoChampion = allNoChampion.filter(d => d.stage === 'closed_won')
+
+    const championPattern = allWithChampion.length >= 3 || allNoChampion.length >= 3 ? {
+      winRateWithChampion: allWithChampion.length >= 3 ? Math.round((wonWithChampion.length / allWithChampion.length) * 100) / 100 : null,
+      winRateNoChampion: allNoChampion.length >= 3 ? Math.round((wonNoChampion.length / allNoChampion.length) * 100) / 100 : null,
+      championLift: allWithChampion.length >= 3 && allNoChampion.length >= 3
+        ? Math.round(((wonWithChampion.length / allWithChampion.length) - (wonNoChampion.length / allNoChampion.length)) * 100) / 100
+        : null,
+      sampleSize: closedDeals.length,
+    } : null
+
+    // 3. Per-competitor win conditions — from objectionConditionalWins if available
+    const perCompetitorWinCondition: NonNullable<WorkspaceBrain['winPlaybook']>['perCompetitorWinCondition'] = []
+    const compWinMap = new Map<string, { wins: number; total: number }>()
+    for (const d of closedDeals) {
+      const comps = (d.competitors as string[]) ?? []
+      for (const comp of comps) {
+        const entry = compWinMap.get(comp) ?? { wins: 0, total: 0 }
+        entry.total++
+        if (d.stage === 'closed_won') entry.wins++
+        compWinMap.set(comp, entry)
+      }
+    }
+    for (const [competitor, { wins, total }] of compWinMap.entries()) {
+      if (total >= 3) {
+        perCompetitorWinCondition.push({
+          competitor,
+          winRate: Math.round((wins / total) * 100),
+          winCondition: wins / total >= 0.5 ? 'Lead with integration depth and customer evidence' : 'Requires strong champion and POC results to overcome',
+          sampleSize: total,
+        })
+      }
+    }
+
+    // 4. Objection win patterns — from existing objectionConditionalWins
+    const topObjectionWinPatterns = (objectionConditionalWins ?? [])
+      .filter(o => o.stageBreakdown.some(s => s.winRateWithChampion != null && s.winRateWithChampion >= 0.6))
+      .slice(0, 5)
+      .map(o => ({
+        theme: o.theme,
+        winsWithTheme: o.dealsWithTheme,
+        winRateWithTheme: Math.round(o.stageBreakdown.reduce((s, b) => s + (b.winRateWithChampion ?? 0), 0) / Math.max(1, o.stageBreakdown.filter(b => b.winRateWithChampion != null).length) * 100),
+        howBeaten: 'Assign a champion and run a structured POC',
+      }))
+
+    winPlaybook = {
+      fastestClosePattern,
+      topObjectionWinPatterns,
+      championPattern,
+      perCompetitorWinCondition,
+    }
+  }
+
   // ── ML engine — fetch global prior then train on closed deal history ─────────
   let mlModel: WorkspaceBrain['mlModel']                   = undefined
   let mlPredictions: WorkspaceBrain['mlPredictions']       = undefined
@@ -1406,6 +1524,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     productGapPriority:     productGapPriority.length > 0 ? productGapPriority : undefined,
     collateralEffectiveness: collateralEffectiveness.length > 0 ? collateralEffectiveness : undefined,
     globalPrior:            globalPriorMeta,
+    winPlaybook,
   }
 
   await db.execute(sql`

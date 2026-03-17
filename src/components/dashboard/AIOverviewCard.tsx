@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import useSWR from 'swr'
-import { Sparkles, RefreshCw, TrendingUp, AlertTriangle, Zap } from 'lucide-react'
+import { Sparkles, RefreshCw, TrendingUp, AlertTriangle, Zap, Target } from 'lucide-react'
 import { fetcher, isDbNotConfigured } from '@/lib/fetcher'
 import type { AIOverview } from '@/app/api/dashboard/ai-overview/route'
 
@@ -222,7 +222,19 @@ export default function AIOverviewCard() {
                 padding: '8px 12px',
                 maxWidth: '200px',
               }}>
-                <div style={{ fontSize: '10px', color: '#6366F1', fontWeight: '600', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <div style={{ fontSize: '10px', color: '#6366F1', fontWeight: '600', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  {overview.briefingHealth && (
+                    <span style={{
+                      display: 'inline-block',
+                      width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0,
+                      background: overview.briefingHealth === 'green' ? '#22C55E' : overview.briefingHealth === 'amber' ? '#F59E0B' : '#EF4444',
+                      boxShadow: overview.briefingHealth === 'green'
+                        ? '0 0 5px rgba(34,197,94,0.6)'
+                        : overview.briefingHealth === 'amber'
+                        ? '0 0 5px rgba(245,158,11,0.6)'
+                        : '0 0 5px rgba(239,68,68,0.6)',
+                    }} />
+                  )}
                   Pipeline Health
                 </div>
                 <div style={{ fontSize: '12px', color: '#F0EEFF', fontWeight: '600', lineHeight: '1.3' }}>
@@ -294,6 +306,73 @@ export default function AIOverviewCard() {
                       </button>
                     )
                   })}
+                </div>
+              </div>
+            )}
+
+            {/* Single Most Important Action */}
+            {overview.singleMostImportantAction && (
+              <div style={{
+                borderLeft: '3px solid #818CF8',
+                paddingLeft: '12px',
+                paddingTop: '6px',
+                paddingBottom: '6px',
+                paddingRight: '10px',
+                background: 'rgba(99,102,241,0.06)',
+                borderRadius: '0 8px 8px 0',
+              }}>
+                <div style={{
+                  fontSize: '10px', color: '#818CF8', fontWeight: '700',
+                  textTransform: 'uppercase', letterSpacing: '0.06em',
+                  marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '5px',
+                }}>
+                  <Target size={10} color="#818CF8" /> Top priority
+                </div>
+                <div style={{ fontSize: '13px', color: '#F0EEFF', fontWeight: '600', lineHeight: '1.45' }}>
+                  {overview.singleMostImportantAction}
+                </div>
+              </div>
+            )}
+
+            {/* Needs Attention deals */}
+            {overview.topAttentionDeals && overview.topAttentionDeals.length > 0 && (
+              <div style={{
+                background: 'rgba(239,68,68,0.04)',
+                border: '1px solid rgba(239,68,68,0.14)',
+                borderRadius: '10px',
+                padding: '10px 14px',
+              }}>
+                <div style={{
+                  fontSize: '10px', color: '#F87171', fontWeight: '700',
+                  textTransform: 'uppercase', letterSpacing: '0.06em',
+                  marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px',
+                }}>
+                  <AlertTriangle size={10} color="#F87171" /> Needs Attention
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {overview.topAttentionDeals.map((deal, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <span style={{
+                        display: 'inline-block', flexShrink: 0, marginTop: '3px',
+                        width: '6px', height: '6px', borderRadius: '50%',
+                        background: deal.urgency === 'high' ? '#EF4444' : '#F59E0B',
+                        boxShadow: deal.urgency === 'high' ? '0 0 4px rgba(239,68,68,0.7)' : '0 0 4px rgba(245,158,11,0.7)',
+                      }} />
+                      <div>
+                        <span style={{ fontSize: '12px', color: '#F0EEFF', fontWeight: '600' }}>
+                          {deal.dealName}
+                        </span>
+                        {deal.company && (
+                          <span style={{ fontSize: '11px', color: '#6B7280', marginLeft: '5px' }}>
+                            {deal.company}
+                          </span>
+                        )}
+                        <div style={{ fontSize: '11px', color: '#FCA5A5', marginTop: '1px' }}>
+                          {deal.reason}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

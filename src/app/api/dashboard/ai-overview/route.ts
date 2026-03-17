@@ -16,6 +16,9 @@ export type AIOverview = {
   momentum: string | null
   topRisk: string | null
   generatedAt: string
+  briefingHealth: 'green' | 'amber' | 'red'
+  topAttentionDeals: { dealId: string; dealName: string; company: string; reason: string; urgency: 'high' | 'medium' }[]
+  singleMostImportantAction: string
 }
 
 // Run once per cold start to add new columns if they don't exist yet
@@ -142,6 +145,64 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
     catch { /* non-fatal: stale/corrupt brain snapshot */ }
   }
 
+  // --- Deterministic: topAttentionDeals ---
+  const predictions = brain?.mlPredictions ?? []
+  type AttentionDeal = { dealId: string; dealName: string; company: string; reason: string; urgency: 'high' | 'medium'; _sortKey: number }
+  const nowMs = Date.now()
+  const attentionDeals: AttentionDeal[] = []
+  for (const d of openDeals) {
+    const pred = predictions.find(p => p.dealId === d.id)
+    const churnRisk = pred?.churnRisk ?? 0
+    const score = d.conversionScore ?? 100
+    const closeDateMs = d.closeDate ? new Date(d.closeDate).getTime() : null
+    const daysToClose = closeDateMs != null ? Math.round((closeDateMs - nowMs) / 86400000) : null
+    const closeSoon = daysToClose != null && daysToClose <= 14 && !['negotiation', 'closed_won', 'closed_lost'].includes(d.stage)
+
+    if (churnRisk >= 65 || score <= 30 || closeSoon) {
+      let reason: string
+      let urgency: 'high' | 'medium'
+      let sortKey: number
+
+      if (churnRisk >= 65) {
+        const overdue = pred?.churnDaysOverdue ?? 0
+        reason = `${churnRisk}% churn risk — ${overdue}d overdue`
+        urgency = churnRisk >= 65 ? 'high' : 'medium'
+        sortKey = churnRisk * 1000
+      } else if (score <= 30) {
+        reason = `Low score (${score}/100) — deal at risk`
+        urgency = score <= 20 ? 'high' : 'medium'
+        sortKey = (100 - score) * 100
+      } else {
+        reason = `Close date in ${daysToClose}d — needs acceleration`
+        urgency = 'medium'
+        sortKey = daysToClose != null ? (14 - daysToClose) * 10 : 0
+      }
+
+      attentionDeals.push({
+        dealId: d.id,
+        dealName: d.dealName,
+        company: d.prospectCompany ?? '',
+        reason,
+        urgency,
+        _sortKey: sortKey,
+      })
+    }
+  }
+  attentionDeals.sort((a, b) => b._sortKey - a._sortKey)
+  const topAttentionDeals = attentionDeals.slice(0, 3).map(({ _sortKey: _sk, ...rest }) => rest)
+
+  // --- Deterministic: briefingHealth ---
+  const allPreds = predictions
+  const hasRed = openDeals.some(d => {
+    const pred = allPreds.find(p => p.dealId === d.id)
+    return (pred?.churnRisk ?? 0) >= 80 || (d.conversionScore ?? 100) <= 15
+  })
+  const hasAmber = openDeals.some(d => {
+    const pred = allPreds.find(p => p.dealId === d.id)
+    return (pred?.churnRisk ?? 0) >= 50 || (d.conversionScore ?? 100) <= 30
+  })
+  const briefingHealth: 'green' | 'amber' | 'red' = hasRed ? 'red' : hasAmber ? 'amber' : 'green'
+
   const msg = await anthropic.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 1500,
@@ -150,7 +211,8 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
 - "keyActions": string[] — exactly 3–5 specific, actionable items the rep should do TODAY. Each must start with a verb and be under 15 words. Prioritise by urgency/value.
 - "pipelineHealth": string — a short phrase rating overall health (e.g. "Strong — 3 deals in late stage", "Caution — pipeline stagnating", "Healthy — £120k in negotiation").
 - "momentum": string | null — one short positive signal or win to note, or null if there is none.
-- "topRisk": string | null — the single biggest risk or blocker across the pipeline, or null if pipeline is empty or risk-free.`,
+- "topRisk": string | null — the single biggest risk or blocker across the pipeline, or null if pipeline is empty or risk-free.
+- "singleMostImportantAction": string — one sentence describing the single most impactful action the rep should take today, chosen from the full context. Must be specific, start with a verb, and be under 20 words.`,
     messages: [{ role: 'user', content: `Pipeline data for ${today}:\n\n${contextStr}${brainContext}` }],
   })
 
@@ -166,6 +228,9 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
     momentum: parsed.momentum ? String(parsed.momentum) : null,
     topRisk: parsed.topRisk ? String(parsed.topRisk) : null,
     generatedAt: new Date().toISOString(),
+    briefingHealth,
+    topAttentionDeals,
+    singleMostImportantAction: String(parsed.singleMostImportantAction ?? ''),
   }
 }
 

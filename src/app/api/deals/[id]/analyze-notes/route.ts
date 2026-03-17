@@ -5,6 +5,7 @@ import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { and, eq, sql } from 'drizzle-orm'
 import Anthropic from '@anthropic-ai/sdk'
+import { z } from 'zod'
 import { db } from '@/lib/db'
 import { dealLogs, productGaps, companyProfiles, workspaces } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
@@ -15,6 +16,27 @@ import { extractTextSignals, heuristicScore } from '@/lib/text-signals'
 import { buildDealBriefing, scoreNarrationPrompt } from '@/lib/brain-narrator'
 
 const anthropic = new Anthropic()
+
+// ── Zod schema for LLM output validation ──────────────────────────────────────
+const AnalyzeNotesSchema = z.object({
+  summary: z.string().nullable().optional(),
+  risks: z.array(z.string()).default([]),
+  todos: z.array(z.object({ text: z.string() })).default([]),
+  obsoleteTodoIds: z.array(z.string()).default([]),
+  productGaps: z.array(z.object({
+    title: z.string(),
+    description: z.string().optional().default(''),
+    priority: z.enum(['critical', 'high', 'medium', 'low']).default('medium'),
+  })).default([]),
+  competitors: z.array(z.string()).default([]),
+  intentSignals: z.object({
+    championStatus: z.enum(['confirmed', 'suspected', 'none']).default('none'),
+    budgetStatus: z.enum(['approved', 'awaiting', 'not_discussed', 'blocked']).default('not_discussed'),
+    decisionTimeline: z.string().nullable().optional(),
+    nextMeetingBooked: z.boolean().default(false),
+  }).optional(),
+})
+type AnalyzeNotesOutput = z.infer<typeof AnalyzeNotesSchema>
 
 // Ensure intent_signals column exists — runs once per process lifetime
 let intentSignalsMigrated = false
@@ -139,20 +161,54 @@ priority: critical | high | medium | low` }],
     // Strip markdown fences and any leading/trailing text before the JSON object
     function stripToJson(raw: string): string {
       const fenceStripped = raw.replace(/^```json?\n?/i, '').replace(/\n?```$/i, '').trim()
-      // If there's text before the opening brace, trim it
       const braceIdx = fenceStripped.indexOf('{')
       return braceIdx > 0 ? fenceStripped.slice(braceIdx) : fenceStripped
     }
-    let parsed: any = {}
-    let parseOk = false
-    try {
-      const raw = (msg.content[0] as any).text.trim()
-      parsed = JSON.parse(stripToJson(raw))
-      parseOk = true
-    } catch {
-      // JSON parsing failed — don't corrupt existing fields with raw text
-      parsed = { summary: null, conversionScore: null, conversionInsights: null, risks: [], todos: [], productGaps: [] }
+
+    // Zod validation + retry logic — attempt 1 uses the initial LLM response;
+    // on validation failure we retry once with an explicit correction prompt.
+    async function parseAndValidate(rawText: string, attempt = 1): Promise<{ parsed: AnalyzeNotesOutput; parseOk: boolean }> {
+      try {
+        const jsonStr = stripToJson(rawText)
+        const rawObj = JSON.parse(jsonStr)
+        const result = AnalyzeNotesSchema.safeParse(rawObj)
+        if (result.success) return { parsed: result.data, parseOk: true }
+
+        // Validation failed — if first attempt, ask Claude to fix it
+        if (attempt === 1) {
+          const issues = result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')
+          const retryMsg = await anthropic.messages.create({
+            model: 'claude-sonnet-4-6', max_tokens: 2000,
+            messages: [
+              { role: 'user', content: `Return ONLY valid JSON matching the exact schema. No markdown, no explanation.\n\nOriginal output:\n${rawText}\n\nValidation errors: ${issues}\n\nFix the JSON and return only the corrected object.` },
+            ],
+          })
+          const retryRaw = (retryMsg.content[0] as any).text.trim()
+          return parseAndValidate(retryRaw, 2)
+        }
+
+        // Second attempt still invalid — use safe defaults
+        console.warn('[analyze-notes] Zod validation failed after retry:', result.error.issues)
+        return { parsed: AnalyzeNotesSchema.parse({}), parseOk: false }
+      } catch {
+        if (attempt === 1) {
+          // JSON parse error — retry with explicit correction prompt
+          const retryMsg = await anthropic.messages.create({
+            model: 'claude-sonnet-4-6', max_tokens: 2000,
+            messages: [
+              { role: 'user', content: `The following response is not valid JSON. Return ONLY the corrected JSON object with no markdown fences, no explanation:\n\n${rawText}` },
+            ],
+          })
+          const retryRaw = (retryMsg.content[0] as any).text.trim()
+          return parseAndValidate(retryRaw, 2)
+        }
+        // Both attempts failed — return safe defaults
+        return { parsed: AnalyzeNotesSchema.parse({}), parseOk: false }
+      }
     }
+
+    const rawText = (msg.content[0] as any).text.trim()
+    const { parsed, parseOk } = await parseAndValidate(rawText)
     const newTodos = (parsed.todos ?? []).map((t: any) => ({ id: crypto.randomUUID(), text: t.text, done: false, createdAt: new Date().toISOString() }))
     const obsoleteIds = new Set<string>(parsed.obsoleteTodoIds ?? [])
     const dateStamp = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })

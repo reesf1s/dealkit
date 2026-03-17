@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   LayoutDashboard, Swords, BookOpen, TrendingUp,
   FileText, Building2, Settings, Plus, Zap,
-  Sparkles, ArrowRight, CornerDownLeft, Loader2,
+  Sparkles, CornerDownLeft, Loader2,
 } from 'lucide-react'
 
 interface CommandItem {
@@ -31,6 +31,40 @@ const ALL_ITEMS: CommandItem[] = [
   { id: 'gen-collateral', label: 'Generate collateral',  section: 'actions',  icon: Zap,              href: '/collateral' },
 ]
 
+// ── Intent classifier ─────────────────────────────────────────────────────────
+// Determines if the query is a question for AI or a navigation command.
+// Rules are ordered by specificity — first match wins.
+const AI_PREFIXES = [
+  'how', 'why', 'what', 'when', 'which', 'who', 'where',
+  'is ', 'are ', 'can ', 'should ', 'will ', 'do i', 'does',
+  'help', 'tell ', 'explain', 'analyze', 'analyse', 'summarize',
+  'show me', 'find my', 'give me', 'list my', 'compare',
+  'battlecard', 'draft', 'write me', 'create a report',
+]
+
+function classifyIntent(q: string): 'ai' | 'nav' {
+  if (!q.trim() || q.trim().length <= 2) return 'nav'
+  const lower = q.toLowerCase().trim()
+
+  // Explicit question marker — always AI
+  if (lower.endsWith('?')) return 'ai'
+
+  // Starts with known AI prefix
+  if (AI_PREFIXES.some(p => lower.startsWith(p))) return 'ai'
+
+  // 5+ word queries are almost certainly questions, not nav commands
+  if (lower.split(/\s+/).length >= 5) return 'ai'
+
+  // Nav match check — if any nav item label closely matches, prefer nav
+  const hasStrongNavMatch = ALL_ITEMS.some(item =>
+    item.label.toLowerCase().includes(lower) || lower.includes(item.label.toLowerCase().split(' ')[0])
+  )
+  // 3-4 word queries with no nav match → AI
+  if (lower.split(/\s+/).length >= 3 && !hasStrongNavMatch) return 'ai'
+
+  return 'nav'
+}
+
 type PaletteMode = 'nav' | 'ai'
 
 export default function CommandPalette() {
@@ -50,23 +84,38 @@ export default function CommandPalette() {
   const listRef = useRef<HTMLDivElement>(null)
   const answerRef = useRef<HTMLDivElement>(null)
 
+  // Classify intent on every query change
+  const intent = useMemo(() => classifyIntent(query), [query])
+
   const filtered = query.trim() === ''
     ? ALL_ITEMS
     : ALL_ITEMS.filter(item =>
         item.label.toLowerCase().includes(query.toLowerCase())
       )
 
-  // Group filtered items by section, preserving order
   const navigateItems = filtered.filter(i => i.section === 'navigate')
   const actionItems   = filtered.filter(i => i.section === 'actions')
-  const navFlat = [...navigateItems, ...actionItems]
 
-  // "Ask AI" synthetic item — shown when query has content and isn't a perfect nav match
+  // When intent is AI: show Ask AI row first, then any nav matches below
+  // When intent is nav: show nav items first, Ask AI last
   const showAskAI = query.trim().length > 2
 
-  // In nav mode: nav items + ask AI row
-  const totalItems = navFlat.length + (showAskAI ? 1 : 0)
-  const askAIIndex = navFlat.length // always last in nav mode
+  // In AI-intent mode: Ask AI is index 0, nav items follow
+  // In nav-intent mode: nav items first, Ask AI is last
+  const askAIFirst = intent === 'ai' && showAskAI
+  const navFlat = [...navigateItems, ...actionItems]
+
+  let totalItems: number
+  let askAIIndex: number
+  if (askAIFirst) {
+    // AI row at top (index 0), nav items after
+    askAIIndex = 0
+    totalItems = 1 + navFlat.length
+  } else {
+    // Nav items first, AI row at end
+    askAIIndex = navFlat.length
+    totalItems = navFlat.length + (showAskAI ? 1 : 0)
+  }
 
   const openPalette = useCallback(() => {
     setOpen(true)
@@ -94,7 +143,7 @@ export default function CommandPalette() {
     closePalette()
   }, [router, closePalette])
 
-  // Ask the AI and stream response
+  // Ask the AI — hits the fast palette endpoint (brain snapshot only, ~1 DB query)
   const askAI = useCallback(async (question: string) => {
     if (!question.trim()) return
     abortRef.current?.abort()
@@ -106,18 +155,15 @@ export default function CommandPalette() {
     setAiDone(false)
 
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetch('/api/chat/palette', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [{ role: 'user', content: question }],
-          currentPage: typeof window !== 'undefined' ? window.location.pathname : '/',
-        }),
+        body: JSON.stringify({ question }),
         signal: abortRef.current.signal,
       })
 
       if (!res.ok || !res.body) {
-        setAiAnswer('Sorry, something went wrong. Try again.')
+        setAiAnswer('Something went wrong. Try again.')
         setAiDone(true)
         setAiLoading(false)
         return
@@ -139,7 +185,6 @@ export default function CommandPalette() {
             const payload = JSON.parse(line.slice(6))
             if (payload.t) {
               setAiAnswer(prev => prev + payload.t)
-              // Auto-scroll answer
               requestAnimationFrame(() => {
                 if (answerRef.current) {
                   answerRef.current.scrollTop = answerRef.current.scrollHeight
@@ -192,7 +237,7 @@ export default function CommandPalette() {
     if (open) requestAnimationFrame(() => inputRef.current?.focus())
   }, [open])
 
-  // Arrow key navigation inside palette (nav mode only)
+  // Arrow key navigation + Enter (nav mode only)
   useEffect(() => {
     if (!open || mode === 'ai') return
     const handler = (e: KeyboardEvent) => {
@@ -206,14 +251,16 @@ export default function CommandPalette() {
         e.preventDefault()
         if (showAskAI && activeIndex === askAIIndex) {
           askAI(query)
-        } else if (navFlat[activeIndex]) {
-          selectNavItem(navFlat[activeIndex])
+        } else {
+          // Adjust nav item index based on whether AI row is first or not
+          const navIndex = askAIFirst ? activeIndex - 1 : activeIndex
+          if (navFlat[navIndex]) selectNavItem(navFlat[navIndex])
         }
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [open, mode, navFlat, activeIndex, selectNavItem, showAskAI, askAIIndex, query, askAI, totalItems])
+  }, [open, mode, navFlat, activeIndex, selectNavItem, showAskAI, askAIIndex, askAIFirst, query, askAI, totalItems])
 
   // Scroll active item into view
   useEffect(() => {
@@ -222,10 +269,22 @@ export default function CommandPalette() {
     el?.scrollIntoView({ block: 'nearest' })
   }, [activeIndex])
 
-  // Reset activeIndex when query changes
-  useEffect(() => { setActiveIndex(0) }, [query])
+  // Auto-select Ask AI row when intent flips to 'ai'
+  useEffect(() => {
+    if (mode === 'nav' && intent === 'ai' && showAskAI) {
+      setActiveIndex(0) // Ask AI is always index 0 in AI-intent mode
+    }
+  }, [intent, showAskAI, mode])
 
-  // When entering AI mode, reset to nav mode if query is cleared
+  // Reset activeIndex when query changes in nav mode
+  useEffect(() => {
+    if (mode === 'nav') {
+      setActiveIndex(intent === 'ai' && showAskAI ? 0 : 0)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query])
+
+  // When in AI mode and user clears the query, go back to nav
   useEffect(() => {
     if (mode === 'ai' && query.trim() === '') {
       setMode('nav')
@@ -237,6 +296,9 @@ export default function CommandPalette() {
   }, [query, mode])
 
   if (!open) return null
+
+  // Compute nav item's data-index offset based on whether Ask AI is first
+  const navItemIndex = (i: number) => askAIFirst ? i + 1 : i
 
   const renderNavSection = (label: string, items: CommandItem[], offset: number) => {
     if (items.length === 0) return null
@@ -250,7 +312,7 @@ export default function CommandPalette() {
           {label}
         </div>
         {items.map((item, i) => {
-          const globalIndex = offset + i
+          const globalIndex = navItemIndex(offset + i)
           const isActive = globalIndex === activeIndex
           const Icon = item.icon
           return (
@@ -277,6 +339,59 @@ export default function CommandPalette() {
             </div>
           )
         })}
+      </div>
+    )
+  }
+
+  const AskAIRow = ({ atTop }: { atTop: boolean }) => {
+    if (!showAskAI) return null
+    const isActive = activeIndex === askAIIndex
+    return (
+      <div>
+        {!atTop && navFlat.length > 0 && (
+          <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', margin: '6px 12px' }} />
+        )}
+        {atTop && (
+          <div style={{
+            fontSize: '11px', color: '#555', fontWeight: 700,
+            letterSpacing: '0.06em', textTransform: 'uppercase',
+            padding: '8px 12px 4px',
+          }}>
+            Ask AI
+          </div>
+        )}
+        <div
+          data-index={askAIIndex}
+          onClick={() => askAI(query)}
+          onMouseEnter={() => setActiveIndex(askAIIndex)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            height: '44px', padding: '0 12px',
+            cursor: 'pointer', borderRadius: '8px', margin: '0 6px',
+            backgroundColor: isActive ? 'rgba(99,102,241,0.12)' : 'transparent',
+            border: isActive ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent',
+            transition: 'all 0.05s',
+          }}
+        >
+          <div style={{
+            width: '26px', height: '26px', borderRadius: '7px',
+            background: 'rgba(99,102,241,0.15)',
+            border: '1px solid rgba(99,102,241,0.25)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <Sparkles size={13} color="#818CF8" />
+          </div>
+          <span style={{ flex: 1, fontSize: '13px', color: '#E2E0F0', letterSpacing: '-0.01em' }}>
+            {atTop
+              ? <><span style={{ color: '#A5B4FC' }}>{query}</span></>
+              : <>Ask AI: <span style={{ color: '#A5B4FC' }}>{query}</span></>
+            }
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#555' }}>
+            <CornerDownLeft size={11} />
+          </div>
+        </div>
       </div>
     )
   }
@@ -311,10 +426,9 @@ export default function CommandPalette() {
       >
         {/* Search input */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
-          {/* Icon */}
           <div style={{
             position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)',
-            color: mode === 'ai' ? '#818CF8' : '#555',
+            color: mode === 'ai' || intent === 'ai' ? '#818CF8' : '#555',
             display: 'flex', alignItems: 'center',
             transition: 'color 0.15s',
           }}>
@@ -329,7 +443,6 @@ export default function CommandPalette() {
             value={query}
             onChange={e => {
               setQuery(e.target.value)
-              // If in AI mode and user changes query, go back to nav
               if (mode === 'ai' && !aiLoading) {
                 setMode('nav')
                 setAiAnswer('')
@@ -337,7 +450,6 @@ export default function CommandPalette() {
               }
             }}
             onKeyDown={e => {
-              // Prevent arrow keys from moving cursor in AI mode
               if (mode === 'ai' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
                 e.preventDefault()
               }
@@ -354,21 +466,29 @@ export default function CommandPalette() {
               caretColor: '#6366F1',
             }}
           />
-          {/* Ask AI hint */}
+          {/* Intent hint */}
           {mode === 'nav' && showAskAI && (
             <div style={{
               position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
               display: 'flex', alignItems: 'center', gap: '4px',
               fontSize: '11px', color: '#555',
             }}>
-              <CornerDownLeft size={11} />
-              ask AI
+              {intent === 'ai'
+                ? <span style={{ color: '#818CF8' }}>↵ ask AI</span>
+                : <><CornerDownLeft size={11} /> ask AI</>
+              }
             </div>
           )}
-          {/* "New question" button in AI mode */}
+          {/* New question button */}
           {mode === 'ai' && aiDone && (
             <button
-              onClick={() => { setMode('nav'); setAiAnswer(''); setAiDone(false); setQuery(''); requestAnimationFrame(() => inputRef.current?.focus()) }}
+              onClick={() => {
+                setMode('nav')
+                setAiAnswer('')
+                setAiDone(false)
+                setQuery('')
+                requestAnimationFrame(() => inputRef.current?.focus())
+              }}
               style={{
                 position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
                 fontSize: '11px', color: '#818CF8', background: 'none', border: 'none', cursor: 'pointer',
@@ -383,22 +503,14 @@ export default function CommandPalette() {
         {/* Divider */}
         <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', flexShrink: 0 }} />
 
-        {/* AI response area */}
+        {/* AI response */}
         {mode === 'ai' && (
           <div
             ref={answerRef}
-            style={{
-              flex: 1,
-              overflowY: 'auto',
-              padding: '16px 18px',
-              minHeight: '80px',
-            }}
+            style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', minHeight: '80px' }}
           >
             {aiLoading && !aiAnswer && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                fontSize: '13px', color: '#555',
-              }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#555' }}>
                 <Loader2 size={14} style={{ animation: 'spin 0.8s linear infinite', color: '#818CF8' }} />
                 Thinking…
               </div>
@@ -406,11 +518,8 @@ export default function CommandPalette() {
             {aiAnswer && (
               <div style={{
                 fontSize: '13px', color: '#E2E0F0',
-                lineHeight: '1.65',
-                letterSpacing: '-0.01em',
-                whiteSpace: 'pre-wrap',
+                lineHeight: '1.65', letterSpacing: '-0.01em', whiteSpace: 'pre-wrap',
               }}>
-                {/* Render basic markdown: **bold**, bullet points */}
                 {renderMarkdown(aiAnswer)}
                 {!aiDone && (
                   <span style={{
@@ -425,12 +534,9 @@ export default function CommandPalette() {
           </div>
         )}
 
-        {/* Nav results (only in nav mode) */}
+        {/* Nav results */}
         {mode === 'nav' && (
-          <div
-            ref={listRef}
-            style={{ flex: 1, overflowY: 'auto', padding: '6px 0 8px' }}
-          >
+          <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '6px 0 8px' }}>
             {navFlat.length === 0 && !showAskAI ? (
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -440,50 +546,22 @@ export default function CommandPalette() {
               </div>
             ) : (
               <>
-                {renderNavSection('Navigate', navigateItems, 0)}
-                {renderNavSection('Actions', actionItems, navigateItems.length)}
+                {/* Ask AI first when intent is AI */}
+                {askAIFirst && <AskAIRow atTop={true} />}
 
-                {/* Ask AI row */}
-                {showAskAI && (
-                  <div>
-                    {navFlat.length > 0 && (
+                {/* Nav items */}
+                {navFlat.length > 0 && (
+                  <>
+                    {askAIFirst && navFlat.length > 0 && (
                       <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', margin: '6px 12px' }} />
                     )}
-                    <div
-                      data-index={askAIIndex}
-                      onClick={() => askAI(query)}
-                      onMouseEnter={() => setActiveIndex(askAIIndex)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '10px',
-                        height: '44px', padding: '0 12px',
-                        cursor: 'pointer', borderRadius: '8px', margin: '0 6px',
-                        backgroundColor: activeIndex === askAIIndex
-                          ? 'rgba(99,102,241,0.12)'
-                          : 'transparent',
-                        border: activeIndex === askAIIndex
-                          ? '1px solid rgba(99,102,241,0.2)'
-                          : '1px solid transparent',
-                        transition: 'all 0.05s',
-                      }}
-                    >
-                      <div style={{
-                        width: '26px', height: '26px', borderRadius: '7px',
-                        background: 'rgba(99,102,241,0.15)',
-                        border: '1px solid rgba(99,102,241,0.25)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        flexShrink: 0,
-                      }}>
-                        <Sparkles size={13} color="#818CF8" />
-                      </div>
-                      <span style={{ flex: 1, fontSize: '13px', color: '#E2E0F0', letterSpacing: '-0.01em' }}>
-                        Ask AI: <span style={{ color: '#A5B4FC' }}>{query}</span>
-                      </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <ArrowRight size={13} color="#555" />
-                      </div>
-                    </div>
-                  </div>
+                    {renderNavSection('Navigate', navigateItems, 0)}
+                    {renderNavSection('Actions', actionItems, navigateItems.length)}
+                  </>
                 )}
+
+                {/* Ask AI last when intent is nav */}
+                {!askAIFirst && <AskAIRow atTop={false} />}
               </>
             )}
           </div>
@@ -503,7 +581,7 @@ export default function CommandPalette() {
             </span>
             <span style={{ fontSize: '11px', color: '#333', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <kbd style={{ fontSize: '10px', color: '#444', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '1px 5px' }}>↵</kbd>
-              {mode === 'ai' ? 'ask' : 'select'}
+              {mode === 'ai' ? 'ask' : intent === 'ai' && showAskAI ? 'ask AI' : 'select'}
             </span>
             <span style={{ fontSize: '11px', color: '#333', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <kbd style={{ fontSize: '10px', color: '#444', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '1px 5px' }}>esc</kbd>
@@ -525,12 +603,11 @@ export default function CommandPalette() {
   )
 }
 
-// Minimal markdown renderer: bold, bullets, line breaks
+// Minimal markdown renderer: bold, bullets, headings
 function renderMarkdown(text: string): React.ReactNode {
   const lines = text.split('\n')
   return lines.map((line, i) => {
     const key = i
-    // Bullet point
     if (/^[•\-\*] /.test(line)) {
       const content = line.replace(/^[•\-\*] /, '')
       return (
@@ -540,7 +617,6 @@ function renderMarkdown(text: string): React.ReactNode {
         </div>
       )
     }
-    // Heading (## or ###)
     if (/^##+ /.test(line)) {
       const content = line.replace(/^##+ /, '')
       return (
@@ -549,15 +625,12 @@ function renderMarkdown(text: string): React.ReactNode {
         </div>
       )
     }
-    // Blank line
     if (line.trim() === '') return <div key={key} style={{ height: '6px' }} />
-    // Regular line
     return <div key={key} style={{ marginBottom: '2px' }}>{renderInline(line)}</div>
   })
 }
 
 function renderInline(text: string): React.ReactNode {
-  // Bold: **text**
   const parts = text.split(/(\*\*[^*]+\*\*)/)
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {

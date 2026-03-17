@@ -354,7 +354,13 @@ ${closeDateLine}
 ${stakeholderLine}
 Primary recommendation: ${briefing.recommendation}
 
-Write exactly 3 short bullet points for the sales rep — what the score means, the most important signal (positive or risk), and the most important action. Be specific and direct. Use "your pipeline" not "the algorithm". Do not use JSON. Do not say "AI" or "model". Max 20 words per bullet.`
+GROUNDING RULES — read carefully before writing:
+1. Cite ONLY the signals listed above. Do not invent claims, infer motives, or reference information not explicitly provided.
+2. Lead with the single highest-impact signal in this priority order: ML win probability > stall warning > top risk > top positive signal.
+3. Every sentence must be traceable to a specific listed signal or fact. If a signal is absent, do not mention its category.
+4. Write 2–3 sentences total (not bullets). Plain prose. No headers, no JSON, no markdown.
+5. Never say "AI", "model", "algorithm", or "scoring engine". Use "your pipeline" or "this deal".
+6. End with one concrete, specific next action grounded in the recommendation above.`
 }
 
 export function overviewNarrationPrompt(briefing: OverviewBriefing, dateStr: string): string {
