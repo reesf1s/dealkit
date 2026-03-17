@@ -269,15 +269,18 @@ export const create_deal = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const update_deal = {
-  description: 'Update fields on an existing deal such as stage, value, close date, next steps, or notes.',
+  description: 'Update fields on an existing deal. Preserve the user\'s exact wording for notes and next steps — do not rephrase.',
   parameters: z.object({
     dealId: z.string().describe('The UUID of the deal to update'),
     stage: stageEnum.optional().describe('New deal stage'),
     dealValue: z.number().optional().describe('Updated deal value in dollars'),
     closeDate: z.string().optional().describe('Expected close date (ISO format or natural date)'),
-    nextSteps: z.string().optional().describe('Next steps for the deal'),
-    notes: z.string().optional().describe('Additional notes to append'),
+    nextSteps: z.string().optional().describe('Next steps for the deal — preserve user\'s exact wording'),
+    notes: z.string().optional().describe('Additional notes to append — preserve user\'s exact wording'),
     lostReason: z.string().optional().describe('Reason deal was lost (only for closed_lost)'),
+    aiSummary: z.string().optional().describe('Replace the AI-generated deal summary'),
+    dealRisks: z.array(z.string()).optional().describe('Replace the deal risks array entirely'),
+    competitors: z.array(z.string()).optional().describe('Replace the competitors array entirely'),
   }),
   execute: async (
     params: {
@@ -288,6 +291,9 @@ export const update_deal = {
       nextSteps?: string
       notes?: string
       lostReason?: string
+      aiSummary?: string
+      dealRisks?: string[]
+      competitors?: string[]
     },
     ctx: ToolContext,
   ): Promise<ToolResult> => {
@@ -330,6 +336,18 @@ export const update_deal = {
     if (params.lostReason) {
       updateFields.lostReason = params.lostReason
       changes.push(`Lost reason: ${params.lostReason}`)
+    }
+    if (params.aiSummary) {
+      updateFields.aiSummary = params.aiSummary
+      changes.push('Summary updated')
+    }
+    if (params.dealRisks) {
+      updateFields.dealRisks = params.dealRisks
+      changes.push(`Risks replaced (${params.dealRisks.length} total)`)
+    }
+    if (params.competitors) {
+      updateFields.competitors = params.competitors
+      changes.push(`Competitors replaced (${params.competitors.length} total)`)
     }
 
     if (changes.length === 0) {
@@ -458,20 +476,21 @@ export const manage_todos = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const add_contact = {
-  description: 'Add a contact person to a deal.',
+  description: 'Add a contact person to a deal. Adding a contact does NOT change anything else about the deal.',
   parameters: z.object({
     dealId: z.string().describe('The UUID of the deal'),
     name: z.string().describe('Contact name'),
     title: z.string().optional().describe('Job title or role'),
     email: z.string().optional().describe('Email address'),
     phone: z.string().optional().describe('Phone number'),
+    role: z.string().optional().describe('Role in the deal (e.g., "Champion", "Decision Maker", "Internal Sales Rep")'),
   }),
   execute: async (
-    params: { dealId: string; name: string; title?: string; email?: string; phone?: string },
+    params: { dealId: string; name: string; title?: string; email?: string; phone?: string; role?: string },
     ctx: ToolContext,
   ): Promise<ToolResult> => {
     const [deal] = await db
-      .select({ id: dealLogs.id, dealName: dealLogs.dealName, contacts: dealLogs.contacts })
+      .select({ id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany, stage: dealLogs.stage, contacts: dealLogs.contacts })
       .from(dealLogs)
       .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
       .limit(1)
@@ -486,12 +505,14 @@ export const add_contact = {
     if (params.title) newContact.title = params.title
     if (params.email) newContact.email = params.email
     if (params.phone) newContact.phone = params.phone
+    if (params.role) newContact.role = params.role
 
     contacts.push(newContact)
     await db.update(dealLogs).set({ contacts, updatedAt: new Date() }).where(eq(dealLogs.id, params.dealId))
 
+    const totalContacts = contacts.length
     return {
-      result: `Added contact **${params.name}**${params.title ? ` (${params.title})` : ''} to deal **${deal.dealName}**.`,
+      result: `Added **${params.name}**${params.title ? ` (${params.title})` : ''}${params.role ? ` as ${params.role}` : ''} to **${deal.dealName}** (${deal.prospectCompany}, ${deal.stage}). Deal now has ${totalContacts} contact(s).`,
       actions: [{
         type: 'deal_updated',
         dealId: params.dealId,
@@ -649,7 +670,12 @@ export const process_meeting_notes = {
       max_tokens: 2000,
       messages: [{
         role: 'user',
-        content: `You are extracting structured data from B2B sales meeting notes. Return ONLY valid JSON, no markdown, no analysis.
+        content: `Extract structured data from these sales meeting notes. Return ONLY valid JSON.
+
+DEFINITIONS — read these carefully:
+- DEAL RISKS: Concerns about whether this deal will CLOSE. Examples: budget freeze, champion leaving, competitor preferred, timeline slipping, decision-maker disengaged. NOT about product features.
+- PRODUCT GAPS: Features/capabilities that OUR PRODUCT is MISSING that the prospect explicitly said they need. Only if they said "your product can't do X" or "we need X and you don't have it". NOT general concerns or nice-to-haves.
+- ACTION ITEMS: Specific things someone needs to DO. Preserve exact wording — if they said "send the pricing deck to Sarah by Friday", that's the todo text.
 
 ${previousContext ? `${previousContext}\n\n---\n\n` : ''}NEW MEETING NOTES:
 ${params.notes}
@@ -658,11 +684,11 @@ Deal: ${deal.dealName} with ${deal.prospectCompany}${capabilitiesContext}${exist
 
 Return this exact JSON:
 {
-  "summary": "2-3 sentence factual summary of deal status and trajectory",
-  "risks": ["direct observation from THESE notes only (max 10 words each, max 4)"],
-  "todos": [{"text": "specific action item"}],
+  "summary": "2-4 sentence factual summary preserving key specifics: names, dates, numbers, decisions, and exact requirements discussed",
+  "risks": ["Specific deal-closing risk with context — e.g. 'VP of Engineering prefers Competitor X based on existing integration'"],
+  "todos": [{"text": "Exact action item preserving original wording, names, and deadlines"}],
   "obsoleteTodoIds": ["id-of-existing-todo-now-done-or-irrelevant"],
-  "productGaps": [{"title": "gap title", "description": "what is missing", "priority": "high"}],
+  "productGaps": [{"title": "Missing feature name", "description": "What our product cannot do that prospect explicitly said they need", "priority": "high"}],
   "competitors": ["competitor name only if explicitly mentioned as being evaluated"],
   "intentSignals": {
     "championStatus": "confirmed|suspected|none",
@@ -673,11 +699,13 @@ Return this exact JSON:
 }
 
 Rules:
-- risks: deal-level signals only, not feature requests. Max 4. Return [] if none.
-- todos: new items only. No duplicates. Return [] if none.
-- productGaps: only if prospect EXPLICITLY said your product lacks something. Return [] otherwise.
-- competitors: max 4, only if named as an explicit alternative. Return [] if none.
-- intentSignals: extract ONLY what is explicitly stated.`,
+- PRESERVE EXACT WORDING from the notes. If someone said "we need to demo desk utilization by team", that exact phrase goes in todos — not "prepare desk analytics demo".
+- risks: Deal-closing risks ONLY (max 6). "Need better reporting" is a product gap, NOT a risk. "Budget not approved" IS a risk. Return [] if none.
+- todos: New items only, no duplicates. Include who is responsible and deadlines if mentioned. Return [] if none.
+- productGaps: ONLY if prospect explicitly said our product lacks something. General concerns are risks, not gaps. Return [] if no explicit product gaps.
+- competitors: Only if named as an explicit alternative being evaluated. Return [] if none.
+- intentSignals: Extract ONLY what is explicitly stated, never infer.
+- DO NOT infer things that weren't said. If the notes don't mention budget, leave budgetStatus as "not_discussed".`,
       }],
     })
 
@@ -1160,6 +1188,126 @@ export const update_success_criteria = {
         dealId: params.dealId,
         dealName: deal.dealName,
         changes,
+      }],
+      uiHint: 'refresh_deals',
+    }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// correct_deal_data
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const correct_deal_data = {
+  description: 'Correct or override specific data on a deal. Use when the user says something is wrong and needs fixing — risks, contacts, summary, competitors, or any field. Applies the correction immediately without questioning.',
+  parameters: z.object({
+    dealId: z.string().describe('The UUID of the deal'),
+    replaceRisks: z.array(z.string()).optional().describe('Complete replacement for deal risks. Pass [] to clear all risks.'),
+    replaceSummary: z.string().optional().describe('New AI summary to replace the current one'),
+    replaceNextSteps: z.string().optional().describe('New next steps'),
+    replaceCompetitors: z.array(z.string()).optional().describe('Complete replacement for competitors array'),
+    removeContactIds: z.array(z.string()).optional().describe('Contact IDs to remove'),
+    updateContact: z.object({
+      contactId: z.string(),
+      name: z.string().optional(),
+      title: z.string().optional(),
+      email: z.string().optional(),
+      phone: z.string().optional(),
+      role: z.string().optional(),
+    }).optional().describe('Update a specific contact\'s details'),
+    correctionNote: z.string().optional().describe('Why this correction was made — appended to meeting notes for audit trail'),
+  }),
+  execute: async (
+    params: {
+      dealId: string
+      replaceRisks?: string[]
+      replaceSummary?: string
+      replaceNextSteps?: string
+      replaceCompetitors?: string[]
+      removeContactIds?: string[]
+      updateContact?: { contactId: string; name?: string; title?: string; email?: string; phone?: string; role?: string }
+      correctionNote?: string
+    },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const [deal] = await db
+      .select()
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .limit(1)
+
+    if (!deal) return { result: 'Deal not found.' }
+
+    const updateFields: Record<string, unknown> = { updatedAt: new Date() }
+    const corrections: string[] = []
+
+    if (params.replaceRisks !== undefined) {
+      updateFields.dealRisks = params.replaceRisks
+      corrections.push(`Risks replaced (${params.replaceRisks.length} total)`)
+    }
+    if (params.replaceSummary) {
+      updateFields.aiSummary = params.replaceSummary
+      corrections.push('Summary corrected')
+    }
+    if (params.replaceNextSteps) {
+      updateFields.nextSteps = params.replaceNextSteps
+      corrections.push('Next steps corrected')
+    }
+    if (params.replaceCompetitors !== undefined) {
+      updateFields.competitors = params.replaceCompetitors
+      corrections.push(`Competitors corrected (${params.replaceCompetitors.length} total)`)
+    }
+
+    // Remove contacts
+    if (params.removeContactIds?.length) {
+      const removeSet = new Set(params.removeContactIds)
+      const contacts = ((deal.contacts as any[]) ?? []).filter((c: any) => !removeSet.has(c.id))
+      updateFields.contacts = contacts
+      corrections.push(`Removed ${params.removeContactIds.length} contact(s)`)
+    }
+
+    // Update a contact
+    if (params.updateContact) {
+      const { contactId, ...updates } = params.updateContact
+      const contacts = ((deal.contacts as any[]) ?? []).map((c: any) => {
+        if (c.id !== contactId) return c
+        const upd = { ...c }
+        if (updates.name) upd.name = updates.name
+        if (updates.title) upd.title = updates.title
+        if (updates.email) upd.email = updates.email
+        if (updates.phone) upd.phone = updates.phone
+        if (updates.role) upd.role = updates.role
+        return upd
+      })
+      updateFields.contacts = contacts
+      corrections.push('Contact details updated')
+    }
+
+    // Append correction note to meeting notes for audit trail
+    if (params.correctionNote) {
+      const dateStamp = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+      const correctionEntry = `[${dateStamp}] CORRECTION: ${params.correctionNote}`
+      const existingNotes = (deal.meetingNotes as string) ?? ''
+      updateFields.meetingNotes = existingNotes ? `${existingNotes}\n${correctionEntry}` : correctionEntry
+    }
+
+    if (corrections.length === 0) {
+      return { result: 'No corrections specified.' }
+    }
+
+    await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, params.dealId))
+
+    after(async () => {
+      try { await rebuildWorkspaceBrain(ctx.workspaceId) } catch { /* non-fatal */ }
+    })
+
+    return {
+      result: `Corrected **${deal.dealName}**:\n${corrections.map(c => `- ${c}`).join('\n')}`,
+      actions: [{
+        type: 'deal_updated',
+        dealId: params.dealId,
+        dealName: deal.dealName,
+        changes: corrections,
       }],
       uiHint: 'refresh_deals',
     }

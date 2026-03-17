@@ -24,6 +24,7 @@ export {
   process_meeting_notes,
   update_project_plan,
   update_success_criteria,
+  correct_deal_data,
 } from './deal-tools'
 
 // Content generation tools
@@ -85,6 +86,7 @@ export const allTools = {
   process_meeting_notes: dealTools.process_meeting_notes,
   update_project_plan: dealTools.update_project_plan,
   update_success_criteria: dealTools.update_success_criteria,
+  correct_deal_data: dealTools.correct_deal_data,
 
   // Content generation
   generate_content: contentTools.generate_content,
