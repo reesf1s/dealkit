@@ -51,6 +51,10 @@ export {
   get_competitor_intel,
   search_workspace,
   get_workspace_overview,
+  get_deal_intelligence,
+  get_win_playbook,
+  get_rep_performance,
+  get_pipeline_forecast,
 } from './analytics-tools'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -108,4 +112,8 @@ export const allTools = {
   get_competitor_intel: analyticsTools.get_competitor_intel,
   search_workspace: analyticsTools.search_workspace,
   get_workspace_overview: analyticsTools.get_workspace_overview,
+  get_deal_intelligence: analyticsTools.get_deal_intelligence,
+  get_win_playbook: analyticsTools.get_win_playbook,
+  get_rep_performance: analyticsTools.get_rep_performance,
+  get_pipeline_forecast: analyticsTools.get_pipeline_forecast,
 } as const

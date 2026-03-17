@@ -228,6 +228,349 @@ export const search_workspace = {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// get_deal_intelligence
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const get_deal_intelligence = {
+  description: 'Get deep ML intelligence for a deal — win probability, score drivers, churn risk, archetype, competitive patterns, stage velocity, and predicted close date. This is the brain\'s full analysis.',
+  parameters: z.object({
+    dealId: z.string().describe('The UUID of the deal'),
+  }),
+  execute: async (params: { dealId: string }, ctx: ToolContext): Promise<ToolResult> => {
+    const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
+    if (!brain) return { result: 'No workspace intelligence available yet. Log some deals first.' }
+
+    const pred = brain.mlPredictions?.find(p => p.dealId === params.dealId)
+    if (!pred) return { result: 'No ML prediction available for this deal. It may be newly created — intelligence builds after brain rebuild.' }
+
+    const lines: string[] = []
+
+    // Core prediction
+    lines.push(`**Win Probability:** ${(pred.winProbability * 100).toFixed(0)}%${pred.compositeScore != null ? ` (composite: ${(pred.compositeScore * 100).toFixed(0)}%)` : ''}`)
+    lines.push(`**Confidence:** ${pred.confidence}`)
+
+    // Score drivers
+    if (pred.scoreDrivers?.length) {
+      lines.push('\n**Score Drivers** (what\'s moving this score):')
+      for (const d of pred.scoreDrivers) {
+        const arrow = d.direction === 'positive' ? '+' : '-'
+        lines.push(`  ${arrow} **${d.label}**: ${d.value?.toFixed?.(2) ?? d.value} (${d.contribution > 0 ? '+' : ''}${(d.contribution * 100).toFixed(1)}pp)`)
+      }
+    }
+
+    // Churn risk
+    if (pred.churnRisk != null) {
+      lines.push(`\n**Churn Risk:** ${pred.churnRisk.toFixed(0)}% probability of going silent`)
+      if (pred.churnDaysOverdue) lines.push(`  Days overdue for follow-up: ${pred.churnDaysOverdue}`)
+    }
+
+    // Archetype
+    if (pred.archetypeId != null && brain.dealArchetypes?.length) {
+      const arch = brain.dealArchetypes.find(a => a.id === pred.archetypeId)
+      if (arch) {
+        lines.push(`\n**Deal Archetype:** ${arch.label} (win rate: ${arch.winRate.toFixed(0)}%, ${arch.dealCount} similar deals)`)
+        if (arch.winningCharacteristic) lines.push(`  Winning characteristic: ${arch.winningCharacteristic}`)
+      }
+    }
+
+    // Predicted close
+    if (pred.predictedDaysToClose != null) {
+      lines.push(`\n**Predicted Close:** ~${pred.predictedDaysToClose} days`)
+    }
+
+    // Similar deals (KNN)
+    if (pred.similarWins?.length) {
+      lines.push('\n**Most Similar Wins:**')
+      for (const sw of pred.similarWins.slice(0, 3)) {
+        lines.push(`  - ${sw.company} (${(sw.similarity * 100).toFixed(0)}% similar)`)
+      }
+    }
+    if (pred.similarLosses?.length) {
+      lines.push('**Most Similar Losses:**')
+      for (const sl of pred.similarLosses.slice(0, 3)) {
+        lines.push(`  - ${sl.company} (${(sl.similarity * 100).toFixed(0)}% similar)`)
+      }
+    }
+
+    // Risk flags
+    if (pred.riskFlags?.length) {
+      lines.push('\n**ML Risk Flags:**')
+      for (const flag of pred.riskFlags) {
+        lines.push(`  - ${flag}`)
+      }
+    }
+
+    // Stage velocity alerts for this deal
+    const stageAlerts = brain.stageVelocityIntel?.stageAlerts?.filter(a => a.dealId === params.dealId) ?? []
+    if (stageAlerts.length > 0) {
+      lines.push('\n**Stage Velocity Alerts:**')
+      for (const alert of stageAlerts) {
+        lines.push(`  [${alert.severity}] ${alert.stage}: ${alert.currentAgeDays}d in stage (expected max: ${alert.expectedMaxDays}d)`)
+      }
+    }
+
+    // Deterioration alerts for this deal
+    const detAlert = brain.deteriorationAlerts?.find(a => a.dealId === params.dealId)
+    if (detAlert) {
+      lines.push(`\n**Deterioration Warning:** ${detAlert.warning}`)
+      lines.push(`  Sentiment: ${detAlert.earlySentiment.toFixed(2)} -> ${detAlert.recentSentiment.toFixed(2)} (delta: ${detAlert.delta.toFixed(2)})`)
+    }
+
+    // Competitive patterns — look up deal's competitors from dealLogs
+    const dealRow = await db
+      .select({ competitors: dealLogs.competitors })
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .limit(1)
+    const dealComps = (dealRow[0]?.competitors as string[]) ?? []
+    if (dealComps.length > 0 && brain.competitivePatterns?.length) {
+      lines.push('\n**Competitive Intelligence:**')
+      for (const compName of dealComps) {
+        const pattern = brain.competitivePatterns.find(p => p.competitor?.toLowerCase() === compName?.toLowerCase())
+        if (pattern) {
+          lines.push(`  **vs ${compName}:** ${pattern.winRate.toFixed(0)}% win rate (${pattern.totalDeals} deals)`)
+          if (pattern.topWinCondition) lines.push(`    Win condition: ${pattern.topWinCondition}`)
+          if (pattern.topLossRisk) lines.push(`    Loss risk: ${pattern.topLossRisk}`)
+        }
+      }
+    }
+
+    return { result: lines.join('\n') }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// get_win_playbook
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const get_win_playbook = {
+  description: 'Get the workspace\'s winning patterns — what works in your deals. Includes champion effect, fastest close patterns, objection win rates, and per-competitor strategies.',
+  parameters: z.object({
+    competitor: z.string().optional().describe('Focus on a specific competitor'),
+  }),
+  execute: async (params: { competitor?: string }, ctx: ToolContext): Promise<ToolResult> => {
+    const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
+    if (!brain) return { result: 'No workspace intelligence available yet.' }
+
+    const lines: string[] = ['**Winning Playbook**']
+
+    // Win playbook data
+    if (brain.winPlaybook) {
+      const wp = brain.winPlaybook
+
+      if (wp.championPattern) {
+        lines.push('\n**Champion Effect:**')
+        if (wp.championPattern.winRateWithChampion != null) {
+          lines.push(`  With champion: ${wp.championPattern.winRateWithChampion.toFixed(0)}% win rate`)
+        }
+        if (wp.championPattern.winRateNoChampion != null) {
+          lines.push(`  Without champion: ${wp.championPattern.winRateNoChampion.toFixed(0)}% win rate`)
+        }
+        if (wp.championPattern.championLift != null) {
+          lines.push(`  Champion lift: +${wp.championPattern.championLift.toFixed(0)}pp`)
+        }
+        lines.push(`  Sample size: ${wp.championPattern.sampleSize} deals`)
+      }
+
+      if (wp.fastestClosePattern) {
+        lines.push('\n**Fastest Close Pattern:**')
+        lines.push(`  Avg days to close: ${wp.fastestClosePattern.avgDaysToClose}`)
+        lines.push(`  Sample size: ${wp.fastestClosePattern.sampleSize} deals`)
+        if (wp.fastestClosePattern.commonSignals?.length) {
+          lines.push(`  Common signals: ${wp.fastestClosePattern.commonSignals.join(', ')}`)
+        }
+      }
+
+      if (wp.topObjectionWinPatterns?.length) {
+        lines.push('\n**How We Beat Objections:**')
+        for (const p of wp.topObjectionWinPatterns) {
+          lines.push(`  - **${p.theme}**: ${p.winRateWithTheme.toFixed(0)}% win rate (${p.winsWithTheme} wins)`)
+          if (p.howBeaten) lines.push(`    How beaten: ${p.howBeaten}`)
+        }
+      }
+
+      // Per-competitor win conditions from playbook
+      if (params.competitor && wp.perCompetitorWinCondition?.length) {
+        const match = wp.perCompetitorWinCondition.find(c =>
+          c.competitor?.toLowerCase().includes(params.competitor!.toLowerCase())
+        )
+        if (match) {
+          lines.push(`\n**vs ${match.competitor} (Playbook):**`)
+          lines.push(`  Win rate: ${match.winRate.toFixed(0)}%`)
+          lines.push(`  Win condition: ${match.winCondition}`)
+          lines.push(`  Sample size: ${match.sampleSize} deals`)
+        }
+      }
+    }
+
+    // Objection win map (broader dataset)
+    if (brain.objectionWinMap?.length) {
+      lines.push('\n**Objection Win Rates** (when we face these objections):')
+      for (const obj of brain.objectionWinMap) {
+        const globalNote = obj.globalWinRate != null ? ` (industry: ${obj.globalWinRate.toFixed(0)}%)` : ''
+        lines.push(`  - ${obj.theme}: ${obj.winRateWithTheme.toFixed(0)}% win rate (${obj.dealsWithTheme} deals)${globalNote}`)
+      }
+    }
+
+    // Conditional objection model (champion lift per theme)
+    if (brain.objectionConditionalWins?.length) {
+      lines.push('\n**Champion Lift by Objection:**')
+      for (const oc of brain.objectionConditionalWins) {
+        if (oc.championLiftAvg != null) {
+          lines.push(`  - ${oc.theme}: +${oc.championLiftAvg.toFixed(0)}pp with champion (${oc.dealsWithTheme} deals)`)
+        }
+      }
+    }
+
+    // Competitor-specific patterns from ML
+    if (params.competitor && brain.competitivePatterns?.length) {
+      const pattern = brain.competitivePatterns.find(p =>
+        p.competitor?.toLowerCase().includes(params.competitor!.toLowerCase())
+      )
+      if (pattern) {
+        lines.push(`\n**vs ${pattern.competitor} (ML Pattern):**`)
+        lines.push(`  Win rate: ${pattern.winRate.toFixed(0)}% (${pattern.totalDeals} deals)`)
+        if (pattern.topWinCondition) lines.push(`  Win condition: ${pattern.topWinCondition}`)
+        if (pattern.topLossRisk) lines.push(`  Loss risk: ${pattern.topLossRisk}`)
+      }
+    } else if (brain.competitivePatterns?.length) {
+      lines.push('\n**Competitor Records (ML):**')
+      for (const cp of brain.competitivePatterns.slice(0, 8)) {
+        lines.push(`  - vs ${cp.competitor}: ${cp.winRate.toFixed(0)}% win rate (${cp.totalDeals} deals)`)
+      }
+    }
+
+    // Collateral effectiveness
+    if (brain.collateralEffectiveness?.length) {
+      lines.push('\n**Collateral Impact on Win Rate:**')
+      for (const ce of brain.collateralEffectiveness) {
+        lines.push(`  - ${ce.type}: ${ce.winRate.toFixed(0)}% win rate when used (${ce.totalUsed} deals)`)
+      }
+    }
+
+    return { result: lines.join('\n') }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// get_rep_performance
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const get_rep_performance = {
+  description: 'Get sales rep performance analytics — win rates, activity levels, behavioural patterns. Helps identify coaching opportunities.',
+  parameters: z.object({
+    repId: z.string().optional().describe('Focus on a specific rep by user ID'),
+  }),
+  execute: async (params: { repId?: string }, ctx: ToolContext): Promise<ToolResult> => {
+    const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
+    if (!brain?.repIntel?.length) return { result: 'No rep performance data available yet. Need closed deals to analyse patterns.' }
+
+    const lines: string[] = ['**Rep Performance Analytics**']
+
+    const reps = params.repId
+      ? brain.repIntel.filter(r => r.userId === params.repId)
+      : brain.repIntel
+
+    if (reps.length === 0) return { result: `No rep data found${params.repId ? ` for user ${params.repId}` : ''}.` }
+
+    for (const rep of reps) {
+      lines.push(`\n**${rep.userId}**`)
+      lines.push(`  Win rate: ${rep.winRate.toFixed(0)}% (${rep.wonDeals}W / ${rep.closedDeals} closed, ${rep.totalDeals} total)`)
+      lines.push(`  Todo completion: ${rep.avgTodoCompletionRate.toFixed(0)}%`)
+      lines.push(`  Next-step coverage: ${rep.dealsWithNextStepPct.toFixed(0)}%`)
+      lines.push(`  Avg days since last note: ${rep.avgDaysSinceLastNote.toFixed(0)}`)
+    }
+
+    return { result: lines.join('\n') }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// get_pipeline_forecast
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const get_pipeline_forecast = {
+  description: 'Get ML-powered pipeline forecast — probability-weighted revenue, best case scenarios, risk-adjusted predictions by month, pipeline health index, and trend analysis.',
+  parameters: z.object({}),
+  execute: async (_params: Record<string, never>, ctx: ToolContext): Promise<ToolResult> => {
+    const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
+    if (!brain) return { result: 'No workspace intelligence available yet.' }
+
+    const lines: string[] = ['**Pipeline Forecast**']
+
+    // Pipeline snapshot
+    lines.push(`\nActive pipeline: ${brain.pipeline.totalActive} deals, $${brain.pipeline.totalValue.toLocaleString()}`)
+    if (brain.pipeline.avgConversionScore != null) {
+      lines.push(`Avg conversion score: ${brain.pipeline.avgConversionScore}%`)
+    }
+
+    // Weighted forecast from dealVelocity
+    if (brain.dealVelocity) {
+      lines.push(`\n**Weighted Forecast:** $${brain.dealVelocity.weightedForecast.toLocaleString()} (${brain.dealVelocity.forecastDealCount} deals)`)
+      if (brain.dealVelocity.avgDaysToClose > 0) {
+        lines.push(`Avg days to close: ${brain.dealVelocity.avgDaysToClose}`)
+      }
+    }
+
+    // Revenue forecasts by month
+    if (brain.revenueForecasts?.length) {
+      lines.push('\n**Monthly Forecast (probability-weighted):**')
+      for (const f of brain.revenueForecasts) {
+        lines.push(`  ${f.month}: $${f.expectedRevenue.toLocaleString()} expected | $${f.bestCase.toLocaleString()} best case (${f.dealCount} deals, ${f.avgConfidence.toFixed(0)}% avg confidence)`)
+      }
+    }
+
+    // ML trends
+    if (brain.mlTrends) {
+      const t = brain.mlTrends
+      lines.push('\n**Trends:**')
+      if (t.winRate) {
+        lines.push(`  Win rate: ${t.winRate.direction} (${t.winRate.slopePctPerMonth > 0 ? '+' : ''}${t.winRate.slopePctPerMonth.toFixed(1)}%/mo, recent: ${t.winRate.recentPct.toFixed(0)}%, prior: ${t.winRate.priorPct.toFixed(0)}%)`)
+      }
+      if (t.dealVelocity) {
+        lines.push(`  Deal velocity: ${t.dealVelocity.direction} (recent: ${t.dealVelocity.recentAvgDays.toFixed(0)}d, prior: ${t.dealVelocity.priorAvgDays.toFixed(0)}d)`)
+      }
+      if (t.competitorThreats?.length) {
+        lines.push('  Competitor threats:')
+        for (const ct of t.competitorThreats) {
+          lines.push(`    - ${ct.name}: ${ct.direction} (recent: ${ct.recentWinRatePct.toFixed(0)}%, all-time: ${ct.allTimeWinRatePct.toFixed(0)}%)`)
+        }
+      }
+    }
+
+    // Pipeline health
+    if (brain.pipelineHealthIndex) {
+      const phi = brain.pipelineHealthIndex
+      lines.push(`\n**Pipeline Health Index:** ${phi.score.toFixed(0)}/100 (${phi.interpretation})`)
+      lines.push(`  Stage depth: ${phi.stageDepth.toFixed(0)} | Velocity: ${phi.velocityHealth.toFixed(0)} | Conversion: ${phi.conversionConfidence.toFixed(0)} | Momentum: ${phi.momentumScore.toFixed(0)}`)
+      if (phi.keyInsight) lines.push(`  Insight: ${phi.keyInsight}`)
+    }
+
+    // Stage velocity overview
+    if (brain.stageVelocityIntel) {
+      const sv = brain.stageVelocityIntel
+      lines.push(`\n**Stage Velocity:** Median ${sv.medianDaysToClose}d to close (p75: ${sv.p75DaysToClose}d)`)
+      if (sv.stageAlerts?.length) {
+        lines.push(`  ${sv.stageAlerts.length} deal(s) stalling:`)
+        for (const a of sv.stageAlerts.slice(0, 5)) {
+          lines.push(`    [${a.severity}] ${a.company}: ${a.currentAgeDays}d in ${a.stage} (max expected: ${a.expectedMaxDays}d)`)
+        }
+      }
+    }
+
+    // Global benchmarks
+    if (brain.globalPrior) {
+      lines.push(`\n**Industry Benchmark:** ${brain.globalPrior.globalWinRate.toFixed(0)}% win rate (${brain.globalPrior.trainingSize} deals in pool)`)
+      if (brain.globalPrior.usingPrior) {
+        lines.push(`  Blending: ${brain.globalPrior.localWeight}% local / ${(100 - brain.globalPrior.localWeight)}% global`)
+      }
+    }
+
+    return { result: lines.join('\n') }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // get_workspace_overview
 // ─────────────────────────────────────────────────────────────────────────────
 

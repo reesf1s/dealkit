@@ -806,6 +806,18 @@ const MeetingNotesSchema = z.object({
   risks: z.array(z.string()).default([]),
   todos: z.array(z.object({ text: z.string() })).default([]),
   obsoleteTodoIds: z.array(z.string()).default([]),
+  criteriaUpdates: z.array(z.object({
+    criterionId: z.string(),
+    achieved: z.boolean(),
+    note: z.string().optional(),
+  })).default([]),
+  projectPlanUpdates: z.array(z.object({
+    taskId: z.string(),
+    status: z.enum(['not_started', 'in_progress', 'complete']),
+    note: z.string().optional(),
+  })).default([]),
+  suggestedStage: z.enum(['prospecting', 'qualification', 'discovery', 'proposal', 'negotiation', 'closed_won', 'closed_lost']).nullable().optional(),
+  stageReason: z.string().nullable().optional(),
   productGaps: z.array(z.object({
     title: z.string(),
     description: z.string().optional().default(''),
@@ -821,7 +833,7 @@ const MeetingNotesSchema = z.object({
 })
 
 export const process_meeting_notes = {
-  description: 'Process meeting notes or transcript for a deal. Extracts summary, action items, risks, product gaps, competitors, and intent signals. Updates the deal automatically.',
+  description: 'Process meeting notes or transcript for a deal. Holistic deal update: extracts summary, action items, risks, product gaps, competitors, and intent signals. Cross-references success criteria, project plan tasks, and existing todos. Suggests stage changes when warranted. Updates the deal automatically.',
   parameters: z.object({
     notes: z.string().describe('The meeting notes or transcript text'),
     dealId: z.string().optional().describe('The UUID of the deal these notes relate to. If omitted, the active deal context is used.'),
@@ -878,6 +890,30 @@ export const process_meeting_notes = {
       ? `\n\nEXISTING OPEN ACTION ITEMS:\n${openTodos.map((t: any) => `- [${t.id}] ${t.text}`).join('\n')}\n\nRules:\n- Do NOT add duplicates of existing items\n- Return obsoleteTodoIds: IDs of items now done, superseded, or irrelevant`
       : ''
 
+    // Build success criteria context
+    const criteria = (deal.successCriteriaTodos as any[]) ?? []
+    const openCriteria = criteria.filter((c: any) => !c.achieved)
+    const existingCriteriaContext = openCriteria.length > 0
+      ? `\n\nOPEN SUCCESS CRITERIA (mark achieved if meeting notes confirm they were demonstrated/met):\n${openCriteria.map((c: any) => `- [${c.id}] ${c.text} (${c.category})`).join('\n')}`
+      : ''
+
+    // Build project plan context
+    const projectPlan = deal.projectPlan as any
+    let existingProjectPlanContext = ''
+    if (projectPlan?.phases?.length > 0) {
+      const taskLines: string[] = []
+      for (const phase of projectPlan.phases) {
+        for (const task of (phase.tasks ?? [])) {
+          if (task.status !== 'complete') {
+            taskLines.push(`- [${task.id}] ${task.text} (${phase.name}, status: ${task.status})`)
+          }
+        }
+      }
+      if (taskLines.length > 0) {
+        existingProjectPlanContext = `\n\nOPEN PROJECT PLAN TASKS (update status if meeting notes indicate progress):\n${taskLines.join('\n')}`
+      }
+    }
+
     // Phase 1: LLM extraction (no scoring)
     const extractionMsg = await anthropic.messages.create({
       model: 'claude-sonnet-4-6',
@@ -894,7 +930,7 @@ DEFINITIONS — read these carefully:
 ${previousContext ? `${previousContext}\n\n---\n\n` : ''}NEW MEETING NOTES:
 ${params.notes}
 
-Deal: ${deal.dealName} with ${deal.prospectCompany}${capabilitiesContext}${existingTodosContext}
+Deal: ${deal.dealName} with ${deal.prospectCompany} (current stage: ${deal.stage})${capabilitiesContext}${existingTodosContext}${existingCriteriaContext}${existingProjectPlanContext}
 
 Return this exact JSON:
 {
@@ -909,7 +945,11 @@ Return this exact JSON:
     "budgetStatus": "approved|awaiting|not_discussed|blocked",
     "decisionTimeline": "e.g. Q2 2026 or null if not mentioned",
     "nextMeetingBooked": false
-  }
+  },
+  "criteriaUpdates": [{"criterionId": "id", "achieved": true, "note": "Demonstrated in meeting"}],
+  "projectPlanUpdates": [{"taskId": "id", "status": "in_progress", "note": "Started during demo"}],
+  "suggestedStage": "proposal or null if no stage change implied",
+  "stageReason": "reason for stage change or null"
 }
 
 Rules:
@@ -919,6 +959,9 @@ Rules:
 - productGaps: ONLY if prospect explicitly said our product lacks something. General concerns are risks, not gaps. Return [] if no explicit product gaps.
 - competitors: Only if named as an explicit alternative being evaluated. Return [] if none.
 - intentSignals: Extract ONLY what is explicitly stated, never infer.
+- criteriaUpdates: ONLY if the meeting notes clearly demonstrate a criterion was met. Don't guess. Return [] if none confirmed.
+- projectPlanUpdates: ONLY if meeting notes mention specific task progress. Return [] if none.
+- suggestedStage: ONLY if notes clearly imply a stage transition (e.g., "sent proposal" = proposal, "received signed contract" = closed_won). Return null if current stage still appropriate.
 - DO NOT infer things that weren't said. If the notes don't mention budget, leave budgetStatus as "not_discussed".`,
       }],
     })
@@ -993,6 +1036,52 @@ Rules:
     if (mergedCompetitors) updateFields.competitors = mergedCompetitors
     if (parsed.summary) updateFields.aiSummary = parsed.summary
     if (parsed.intentSignals) updateFields.intentSignals = parsed.intentSignals
+
+    // Apply success criteria updates
+    if (parsed.criteriaUpdates?.length) {
+      const criteriaUpdateMap = new Map(parsed.criteriaUpdates.map(u => [u.criterionId, u]))
+      const existingCriteria = ((deal.successCriteriaTodos as any[]) ?? []).slice()
+      const updatedCriteria = existingCriteria.map((c: any) => {
+        const update = criteriaUpdateMap.get(c.id)
+        if (!update) return c
+        return {
+          ...c,
+          ...(update.achieved !== undefined ? { achieved: update.achieved } : {}),
+          ...(update.note ? { note: (c.note ? `${c.note}\n${update.note}` : update.note) } : {}),
+        }
+      })
+      updateFields.successCriteriaTodos = updatedCriteria
+    }
+
+    // Apply project plan task updates
+    if (parsed.projectPlanUpdates?.length) {
+      const taskUpdateMap = new Map(parsed.projectPlanUpdates.map(u => [u.taskId, u]))
+      const existingPlan = (deal.projectPlan as any) ?? { phases: [] }
+      const updatedPlan = {
+        ...existingPlan,
+        updatedAt: new Date().toISOString(),
+        phases: (existingPlan.phases ?? []).map((phase: any) => ({
+          ...phase,
+          tasks: (phase.tasks ?? []).map((task: any) => {
+            const update = taskUpdateMap.get(task.id)
+            if (!update) return task
+            return {
+              ...task,
+              status: update.status ?? task.status,
+              notes: update.note ? (task.notes ? `${task.notes}\n${update.note}` : update.note) : task.notes,
+            }
+          }),
+        })),
+      }
+      updateFields.projectPlan = updatedPlan
+    }
+
+    // Apply suggested stage change
+    if (parsed.suggestedStage && parsed.suggestedStage !== deal.stage) {
+      updateFields.stage = parsed.suggestedStage
+      if (parsed.suggestedStage === 'closed_won') updateFields.wonDate = new Date()
+      if (parsed.suggestedStage === 'closed_lost') updateFields.lostDate = new Date()
+    }
 
     // Phase 2: Score computation (brain-driven, not LLM)
     try {
@@ -1084,6 +1173,18 @@ Rules:
     }
     if (newComps.length > 0) {
       resultLines.push(`\n**New competitors detected:** ${newComps.join(', ')}`)
+    }
+    if (parsed.criteriaUpdates?.length) {
+      const achievedCount = parsed.criteriaUpdates.filter(u => u.achieved).length
+      if (achievedCount > 0) {
+        resultLines.push(`\n**Success criteria:** ${achievedCount} marked as achieved`)
+      }
+    }
+    if (parsed.projectPlanUpdates?.length) {
+      resultLines.push(`\n**Project plan:** ${parsed.projectPlanUpdates.length} task(s) updated`)
+    }
+    if (parsed.suggestedStage && parsed.suggestedStage !== deal.stage) {
+      resultLines.push(`\n**Stage changed:** ${deal.stage} → ${parsed.suggestedStage}${parsed.stageReason ? ` (${parsed.stageReason})` : ''}`)
     }
     if (updateFields.conversionScore != null) {
       resultLines.push(`\n**Updated conversion score:** ${updateFields.conversionScore}%`)
