@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { and, count, eq, ilike, or, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import {
-  companyProfiles, competitors, caseStudies, dealLogs, productGaps, collateral, events,
+  companyProfiles, competitors, caseStudies, dealLogs, productGaps, collateral, events, workspaces,
 } from '@/lib/db/schema'
 import Anthropic from '@anthropic-ai/sdk'
 import { getWorkspaceContext } from '@/lib/workspace'
@@ -1788,6 +1788,20 @@ export async function POST(req: NextRequest) {
 
     // ── Q&A: full-knowledge context load ─────────────────────────────────────
     // Load everything in parallel — no limits on competitors, case studies, gaps
+    // Load pipeline stage labels for custom stage name resolution
+    let chatStageLabels: Record<string, string> = {}
+    try {
+      const [wsRow] = await db
+        .select({ pipelineConfig: workspaces.pipelineConfig })
+        .from(workspaces)
+        .where(eq(workspaces.id, workspaceId))
+        .limit(1)
+      const pConfig = wsRow?.pipelineConfig as any
+      if (pConfig?.stages?.length) {
+        for (const s of pConfig.stages) chatStageLabels[s.id] = s.label
+      }
+    } catch { /* non-fatal */ }
+
     const [profileRows, allCompetitorRows, allCaseStudyRows, allGapRows, allCollateralRows, brain] = await Promise.all([
       db.select().from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)).limit(1),
       db.select().from(competitors).where(eq(competitors.workspaceId, workspaceId)),
@@ -1918,13 +1932,14 @@ When user says "this deal", "this company", "here", "this prospect" → they mea
     // ── Brain pipeline intelligence ──
     let brainSection = ''
     if (brain) {
-      try { brainSection = `\n\n## PIPELINE INTELLIGENCE\n${formatBrainContext(brain)}` }
+      try { brainSection = `\n\n## PIPELINE INTELLIGENCE\n${formatBrainContext(brain, Object.keys(chatStageLabels).length > 0 ? chatStageLabels : undefined)}` }
       catch { /* non-fatal */ }
     } else if (dealFallbackRows.length > 0) {
       const open = dealFallbackRows.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+      const csl = (id: string) => chatStageLabels[id] ?? id
       brainSection = `\n\n## OPEN DEALS (${open.length})\n` + open.map(d => {
         const pending = ((d.todos as any[]) ?? []).filter((t: any) => !t.done)
-        return `  • ${d.dealName} (${d.prospectCompany}) — ${d.stage}${d.dealValue ? ` £${d.dealValue.toLocaleString()}` : ''}${pending.length > 0 ? ` | ${pending.length} todos` : ''}`
+        return `  • ${d.dealName} (${d.prospectCompany}) — ${csl(d.stage)}${d.dealValue ? ` £${d.dealValue.toLocaleString()}` : ''}${pending.length > 0 ? ` | ${pending.length} todos` : ''}`
       }).join('\n')
     }
 

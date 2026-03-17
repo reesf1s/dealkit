@@ -301,7 +301,6 @@ export async function POST(req: NextRequest) {
 
     // ── Load workspace brain + active deal context ───────────────────────────
     const brain = await getWorkspaceBrain(wsCtx.workspaceId)
-    const brainContext = brain ? formatBrainContext(brain) : 'No workspace data loaded yet.'
 
     let activeDealContext = ''
     if (activeDealId && brain?.deals) {
@@ -318,6 +317,7 @@ export async function POST(req: NextRequest) {
 
     // Load pipeline config for custom stage awareness
     let pipelineStageContext = ''
+    let stageLabels: Record<string, string> = {}
     try {
       const [ws] = await db
         .select({ pipelineConfig: workspaces.pipelineConfig })
@@ -332,10 +332,18 @@ export async function POST(req: NextRequest) {
           .map((s: any) => `${s.id} → "${s.label}"`)
           .join(', ')
         pipelineStageContext = `\n\nPIPELINE STAGES (user's custom configuration):\n${stageList}\n\nWhen the user references a stage by its display label (e.g., "Verbal Commit"), map it to the correct stage ID. When describing deal stages, use the display label the user sees, not the internal ID.`
+        // Build stage ID → label map for tools and brain context
+        for (const s of pConfig.stages) {
+          stageLabels[s.id] = s.label
+        }
       }
     } catch { /* non-fatal */ }
 
-    const systemPrompt = buildSystemPrompt(brainContext, activeDealContext, pipelineStageContext)
+    // Re-format brain context with stage labels so the AI sees custom names
+    const brainContextWithLabels = brain
+      ? formatBrainContext(brain, Object.keys(stageLabels).length > 0 ? stageLabels : undefined)
+      : 'No workspace data loaded yet.'
+    const systemPrompt = buildSystemPrompt(brainContextWithLabels, activeDealContext, pipelineStageContext)
 
     // ── Build tool context for tool execute() calls ──────────────────────────
     const toolContext = {
@@ -344,6 +352,7 @@ export async function POST(req: NextRequest) {
       plan: wsCtx.plan,
       brain: brain ?? null,
       activeDealId: activeDealId ?? null,
+      stageLabels: Object.keys(stageLabels).length > 0 ? stageLabels : undefined,
     }
 
     // ── Convert tools to Vercel AI SDK format ────────────────────────────────
@@ -425,11 +434,19 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err)
     console.error('[agent] Error:', errMsg, err)
-    // Return as a text stream error so useChat can display it
-    return new Response(
-      JSON.stringify({ error: errMsg }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } },
-    )
+    // Return as a proper data stream so useChat can parse and display the error
+    // useChat expects text/plain data stream format, not JSON
+    const errorStream = new ReadableStream({
+      start(controller) {
+        // AI SDK data stream protocol: '3:' prefix = error message
+        controller.enqueue(new TextEncoder().encode(`3:"${errMsg.replace(/"/g, '\\"')}"\n`))
+        controller.close()
+      },
+    })
+    return new Response(errorStream, {
+      status: 200, // useChat ignores non-200 responses entirely; must be 200 with error in stream
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    })
   }
 }
 

@@ -29,10 +29,10 @@ const stageEnum = z.string().describe('Deal stage: prospecting, qualification, d
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-function formatDealSummary(deal: any): string {
+function formatDealSummary(deal: any, stageLabels?: Record<string, string>): string {
   const lines = [
     `**${deal.dealName}** (${deal.prospectCompany})`,
-    `- Stage: ${deal.stage}`,
+    `- Stage: ${stageLabels?.[deal.stage] ?? deal.stage}`,
   ]
   if (deal.dealValue != null) lines.push(`- Value: $${deal.dealValue.toLocaleString()}`)
   if (deal.conversionScore != null) lines.push(`- Score: ${deal.conversionScore}%`)
@@ -41,11 +41,11 @@ function formatDealSummary(deal: any): string {
   return lines.join('\n')
 }
 
-function formatDealDetailed(deal: any): string {
+function formatDealDetailed(deal: any, stageLabels?: Record<string, string>): string {
   const lines = [
     `# ${deal.dealName}`,
     `**Company:** ${deal.prospectCompany}`,
-    `**Stage:** ${deal.stage}`,
+    `**Stage:** ${stageLabels?.[deal.stage] ?? deal.stage}`,
   ]
   if (deal.dealValue != null) lines.push(`**Value:** $${deal.dealValue.toLocaleString()}`)
   if (deal.conversionScore != null) lines.push(`**Conversion Score:** ${deal.conversionScore}%`)
@@ -171,7 +171,7 @@ export const search_deals = {
       return { result: 'No deals found matching your search criteria.' }
     }
 
-    const summaries = deals.map(formatDealSummary)
+    const summaries = deals.map(d => formatDealSummary(d, ctx.stageLabels))
     return {
       result: `Found **${deals.length}** deal${deals.length === 1 ? '' : 's'}:\n\n${summaries.join('\n\n')}`,
     }
@@ -198,7 +198,7 @@ export const get_deal_details = {
       return { result: 'Deal not found. It may have been deleted or belongs to a different workspace.' }
     }
 
-    return { result: formatDealDetailed(deal) }
+    return { result: formatDealDetailed(deal, ctx.stageLabels) }
   },
 }
 

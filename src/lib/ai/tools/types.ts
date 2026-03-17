@@ -6,6 +6,8 @@ export interface ToolContext {
   plan: string
   brain: WorkspaceBrain | null
   activeDealId: string | null
+  /** Map of stage ID → display label from pipeline config (e.g. { negotiation: 'Verbal Commit' }) */
+  stageLabels?: Record<string, string>
 }
 
 export interface ToolResult {

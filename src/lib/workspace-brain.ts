@@ -1606,10 +1606,11 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
 }
 
 /** Format the brain as a compact context string for LLM prompts. */
-export function formatBrainContext(brain: WorkspaceBrain): string {
+export function formatBrainContext(brain: WorkspaceBrain, stageLabels?: Record<string, string>): string {
   // Defensive: old DB snapshots may have missing/null fields — guard every access
   const lines: string[] = []
   const fmt = (v: number) => v >= 1000 ? `£${(v / 1000).toFixed(0)}k` : `£${v}`
+  const sl = (stageId: string) => stageLabels?.[stageId] ?? stageId
 
   const pipeline = brain.pipeline ?? { totalActive: 0, totalValue: 0, avgConversionScore: null, stageBreakdown: {} }
   const deals = brain.deals ?? []
@@ -1628,7 +1629,7 @@ export function formatBrainContext(brain: WorkspaceBrain): string {
       const scoreStr = d.conversionScore != null ? ` | ${d.conversionScore}%` : ''
       const valueStr = d.dealValue ? ` | ${fmt(d.dealValue)}` : ''
       const closeDateStr = d.closeDate ? ` | Close: ${new Date(d.closeDate).toLocaleDateString('en-GB')}` : ''
-      lines.push(`• ${d.name} (${d.company}) — ${d.stage}${valueStr}${scoreStr}${closeDateStr}`)
+      lines.push(`• ${d.name} (${d.company}) — ${sl(d.stage)}${valueStr}${scoreStr}${closeDateStr}`)
       if (d.summary) lines.push(`  Summary: ${d.summary}`)
       if (!isClosed && (d.risks ?? []).length > 0) lines.push(`  Risks: ${d.risks.slice(0, 2).join(' | ')}`)
       if (!isClosed && (d.pendingTodos ?? []).length > 0) lines.push(`  Todos (${d.pendingTodos.length}): ${d.pendingTodos.slice(0, 3).join(' | ')}${d.pendingTodos.length > 3 ? ` +${d.pendingTodos.length - 3} more` : ''}`)

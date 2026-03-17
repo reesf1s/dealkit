@@ -9,6 +9,24 @@ import { anthropic } from '@/lib/ai/client'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getWorkspaceBrain, formatBrainContext } from '@/lib/workspace-brain'
 
+// Helper to load pipeline stage labels
+async function loadStageLabels(workspaceId: string): Promise<Record<string, string>> {
+  try {
+    const [ws] = await db
+      .select({ pipelineConfig: workspaces.pipelineConfig })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId))
+      .limit(1)
+    const pConfig = ws?.pipelineConfig as any
+    if (pConfig?.stages?.length) {
+      const labels: Record<string, string> = {}
+      for (const s of pConfig.stages) labels[s.id] = s.label
+      return labels
+    }
+  } catch { /* non-fatal */ }
+  return {}
+}
+
 export type AIOverview = {
   summary: string
   keyActions: string[]
@@ -38,11 +56,13 @@ async function ensureColumns() {
 }
 
 async function generateOverview(workspaceId: string): Promise<AIOverview> {
-  const [deals, companyRows, comps] = await Promise.all([
+  const [deals, companyRows, comps, stageLabels] = await Promise.all([
     db.select().from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)),
     db.select().from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)).limit(1),
     db.select().from(competitors).where(eq(competitors.workspaceId, workspaceId)),
+    loadStageLabels(workspaceId),
   ])
+  const sl = (stageId: string) => stageLabels[stageId] ?? stageId
 
   const openDeals = deals.filter(d => !['closed_won', 'closed_lost'].includes(d.stage))
   const wonDeals = deals.filter(d => d.stage === 'closed_won')
@@ -64,7 +84,7 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
   const allTodos = openDeals.flatMap(d =>
     ((d.todos as Todo[]) ?? [])
       .filter(t => !t.done)
-      .map(t => ({ text: t.text, deal: d.dealName, stage: d.stage }))
+      .map(t => ({ text: t.text, deal: d.dealName, stage: sl(d.stage) }))
   )
 
   // Risks across open deals
@@ -89,12 +109,12 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
     '',
     'STAGE BREAKDOWN:',
     ...Object.entries(stageMap).map(([stage, { count, value }]) =>
-      `- ${stage}: ${count} deal${count > 1 ? 's' : ''} (${fmt(value)})`
+      `- ${sl(stage)}: ${count} deal${count > 1 ? 's' : ''} (${fmt(value)})`
     ),
     '',
     'OPEN DEALS (top 12):',
     ...openDeals.slice(0, 12).map(d =>
-      `- "${d.dealName}" @ ${d.prospectCompany} | Stage: ${d.stage} | Value: ${fmt(d.dealValue ?? 0)} | Score: ${d.conversionScore ?? 'N/A'} | Close: ${d.closeDate ? new Date(d.closeDate).toLocaleDateString('en-GB') : 'TBD'} | Competitors: ${((d.competitors as string[]) ?? []).join(', ') || 'none'}`
+      `- "${d.dealName}" @ ${d.prospectCompany} | Stage: ${sl(d.stage)} | Value: ${fmt(d.dealValue ?? 0)} | Score: ${d.conversionScore ?? 'N/A'} | Close: ${d.closeDate ? new Date(d.closeDate).toLocaleDateString('en-GB') : 'TBD'} | Competitors: ${((d.competitors as string[]) ?? []).join(', ') || 'none'}`
     ),
     '',
     'PENDING TODOS (top 10):',
@@ -116,7 +136,7 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
   let brainContext = ''
   if (brain) {
     try {
-      const baseBrainCtx = formatBrainContext(brain)
+      const baseBrainCtx = formatBrainContext(brain, Object.keys(stageLabels).length > 0 ? stageLabels : undefined)
 
       // Churn risk alerts — deals overdue for follow-up
       const churnAlerts = (brain.mlPredictions ?? [])

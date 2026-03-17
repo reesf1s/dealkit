@@ -182,21 +182,21 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     // Delete a task
     if (deleteTaskId) {
-      updated.phases = updated.phases.map((p: any) => ({
+      updated.phases = (updated.phases ?? []).map((p: any) => ({
         ...p,
-        tasks: p.tasks.filter((t: any) => t.id !== deleteTaskId),
+        tasks: (p.tasks ?? []).filter((t: any) => t.id !== deleteTaskId),
       }))
     }
 
     // Delete a phase
     else if (deletePhaseId) {
-      updated.phases = updated.phases.filter((p: any) => p.id !== deletePhaseId)
+      updated.phases = (updated.phases ?? []).filter((p: any) => p.id !== deletePhaseId)
       updated.phases = updated.phases.map((p: any, i: number) => ({ ...p, order: i + 1 }))
     }
 
     // Add a task to a phase
     else if (addTask && phaseId) {
-      updated.phases = updated.phases.map((p: any) =>
+      updated.phases = (updated.phases ?? []).map((p: any) =>
         p.id === phaseId
           ? { ...p, tasks: [...(p.tasks ?? []), { id: crypto.randomUUID(), text: addTask, status: 'not_started', ...body.taskData }] }
           : p
@@ -205,6 +205,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     // Add a new phase
     else if (addPhase) {
+      if (!updated.phases) updated.phases = []
       updated.phases.push({
         id: crypto.randomUUID(),
         name: addPhase.name || 'New Phase',
@@ -217,16 +218,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     // Reorder phases
     else if (reorderPhases) {
       const orderMap = new Map(reorderPhases.map((id: string, i: number) => [id, i + 1]))
-      updated.phases = updated.phases
+      updated.phases = (updated.phases ?? [])
         .map((p: any) => ({ ...p, order: orderMap.get(p.id) ?? p.order }))
         .sort((a: any, b: any) => a.order - b.order)
     }
 
     // Update a specific task
     else if (taskId) {
-      updated.phases = updated.phases.map((p: any) => ({
+      updated.phases = (updated.phases ?? []).map((p: any) => ({
         ...p,
-        tasks: p.tasks.map((t: any) => {
+        tasks: (p.tasks ?? []).map((t: any) => {
           if (t.id !== taskId) return t
           const upd = { ...t }
           if (status !== undefined) upd.status = status
@@ -241,7 +242,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     // Update a phase
     else if (phaseId) {
-      updated.phases = updated.phases.map((p: any) => {
+      updated.phases = (updated.phases ?? []).map((p: any) => {
         if (p.id !== phaseId) return p
         const upd = { ...p }
         if (phaseName !== undefined) upd.name = phaseName

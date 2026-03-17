@@ -30,12 +30,13 @@ export const query_pipeline = {
       lines.push(`**Avg Conversion Score:** ${brain.pipeline.avgConversionScore}%`)
     }
 
-    // Stage breakdown
+    // Stage breakdown — use custom labels when available
     const stages = brain.pipeline.stageBreakdown
+    const sl = (id: string) => ctx.stageLabels?.[id] ?? id
     if (Object.keys(stages).length > 0) {
       lines.push('\n**Stage Breakdown:**')
       for (const [stage, count] of Object.entries(stages)) {
-        lines.push(`- ${stage}: ${count} deal${count === 1 ? '' : 's'}`)
+        lines.push(`- ${sl(stage)}: ${count} deal${count === 1 ? '' : 's'}`)
       }
     }
 
@@ -208,7 +209,8 @@ export const search_workspace = {
 
     if (deals.length > 0) {
       lines.push('\n**Deals:**')
-      deals.forEach(d => lines.push(`- ${d.dealName} (${d.prospectCompany}) — ${d.stage} [ID: ${d.id}]`))
+      const slabel = (id: string) => ctx.stageLabels?.[id] ?? id
+      deals.forEach(d => lines.push(`- ${d.dealName} (${d.prospectCompany}) — ${slabel(d.stage)} [ID: ${d.id}]`))
     }
     if (comps.length > 0) {
       lines.push('\n**Competitors:**')

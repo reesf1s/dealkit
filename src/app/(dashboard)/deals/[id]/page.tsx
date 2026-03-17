@@ -1687,18 +1687,24 @@ function ProjectPlanTab({ dealId, deal, onUpdate }: { dealId: string; deal: any;
   }
 
   const deleteTask = async (taskId: string) => {
-    await fetch(`/api/deals/${dealId}/project-plan`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deleteTaskId: taskId }),
-    })
+    try {
+      const res = await fetch(`/api/deals/${dealId}/project-plan`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteTaskId: taskId }),
+      })
+      if (!res.ok) console.error('Failed to delete task:', await res.text())
+    } catch (e) { console.error('Failed to delete task:', e) }
     onUpdate()
   }
 
   const deletePhase = async (phaseId: string) => {
-    await fetch(`/api/deals/${dealId}/project-plan`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deletePhaseId: phaseId }),
-    })
+    try {
+      const res = await fetch(`/api/deals/${dealId}/project-plan`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deletePhaseId: phaseId }),
+      })
+      if (!res.ok) console.error('Failed to delete phase:', await res.text())
+    } catch (e) { console.error('Failed to delete phase:', e) }
     onUpdate()
   }
 
@@ -1737,7 +1743,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate }: { dealId: string; deal: any;
       )}
 
       {/* Phases */}
-      {phases.sort((a: any, b: any) => a.order - b.order).map((phase: any) => {
+      {[...phases].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0)).map((phase: any) => {
         const phaseTasks = phase.tasks ?? []
         const phaseComplete = phaseTasks.filter((t: any) => t.status === 'complete').length
         return (

@@ -697,8 +697,11 @@ export default function PipelinePage() {
               const pendingTodos: any[] = (deal.todos ?? []).filter((t: any) => !t.done)
               const urgentTodo = pendingTodos[0]
               // Detect risk signals from insights (look for negative/warning language)
+              // Filter out score-summary insights (e.g. "rates X at 82/100") to avoid showing conflicting scores
               const riskInsight = (deal.conversionInsights ?? []).find((ins: string) =>
                 /risk|danger|concern|warn|block|stall|compet|objection|overdue|miss|lost|slow|churn|cancel|threat/i.test(ins)
+                && !/rates .+ at \d+\/100/i.test(ins)
+                && !/\d+\/100/i.test(ins)
               )
               const topScore = mlMap[deal.id]?.winProb ?? deal.conversionScore ?? 0
               const scoreColor = topScore >= 70 ? '#22C55E' : topScore >= 40 ? '#F59E0B' : '#EF4444'
