@@ -219,7 +219,7 @@ export default function SettingsPage() {
     try {
       const res = await fetch('/api/integrations/hubspot/disconnect', { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to disconnect')
-      toast('HubSpot disconnected. Your imported deals remain in DealKit.', 'success')
+      toast('HubSpot disconnected. Your imported deals remain in SellSight.', 'success')
       mutateHubspot()
     } catch (e: unknown) {
       toast(e instanceof Error ? e.message : 'Failed to disconnect', 'error')
@@ -237,7 +237,7 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `dealkit-export-${new Date().toISOString().split('T')[0]}.json`
+      a.download = `sellsight-export-${new Date().toISOString().split('T')[0]}.json`
       a.click()
       URL.revokeObjectURL(url)
       toast('Data exported successfully', 'success')
@@ -681,7 +681,7 @@ export default function SettingsPage() {
                     </div>
                   ) : (
                     <div style={{ fontSize: '11px', color: '#666' }}>
-                      Import your entire HubSpot pipeline — deals, stages, contacts, and values — directly into DealKit.
+                      Import your entire HubSpot pipeline — deals, stages, contacts, and values — directly into SellSight.
                     </div>
                   )}
                 </div>
@@ -736,7 +736,7 @@ export default function SettingsPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
                   {[
                     { n: '1', text: 'Click the link above to open HubSpot Private Apps (or go to Settings → Integrations → Private Apps)' },
-                    { n: '2', text: 'Click Create a private app, give it a name like "DealKit"' },
+                    { n: '2', text: 'Click Create a private app, give it a name like "SellSight"' },
                     { n: '3', text: 'On the Scopes tab, enable these 3 read scopes:' },
                     { n: '4', text: 'Click Create app, then copy the access token and paste it below' },
                   ].map(({ n, text }) => (
@@ -802,7 +802,7 @@ export default function SettingsPage() {
             {/* Explainer */}
             <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.14)' }}>
               <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0, lineHeight: 1.7 }}>
-                When enabled, DealKit contributes <strong style={{ color: '#EBEBEB' }}>10 anonymised behavioural signals</strong> per closed deal to a shared learning pool.
+                When enabled, SellSight contributes <strong style={{ color: '#EBEBEB' }}>10 anonymised behavioural signals</strong> per closed deal to a shared learning pool.
                 In return, your predictions are benchmarked against industry data and new workspaces start with a pre-calibrated model instead of a 50/50 coin flip.
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '10px' }}>
@@ -869,7 +869,7 @@ export default function SettingsPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Privacy & compliance" description="How DealKit handles your data">
+        <SectionCard title="Privacy & compliance" description="How SellSight handles your data">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
             {/* Key facts */}
@@ -916,7 +916,7 @@ export default function SettingsPage() {
             <div style={{ padding: '10px 14px', borderRadius: '9px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)' }}>
               <p style={{ fontSize: '11px', color: '#818CF8', fontWeight: 600, margin: '0 0 6px' }}>Your rights (GDPR / CCPA)</p>
               <p style={{ fontSize: '12px', color: '#777', margin: 0, lineHeight: 1.6 }}>
-                Access, correct, export, or delete your data at any time using the buttons below, or email <a href="mailto:privacy@dealkit.io" style={{ color: '#818CF8' }}>privacy@dealkit.io</a>. We respond within 30 days.
+                Access, correct, export, or delete your data at any time using the buttons below, or email <a href="mailto:privacy@sellsight.io" style={{ color: '#818CF8' }}>privacy@sellsight.io</a>. We respond within 30 days.
               </p>
             </div>
 

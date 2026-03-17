@@ -13,7 +13,7 @@ export default function SignInPage() {
           <div style={{ width: '32px', height: '32px', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 16px rgba(99,102,241,0.45)' }}>
             <FileText size={15} color="#fff" strokeWidth={2.5} />
           </div>
-          <span style={{ fontWeight: '700', fontSize: '17px', letterSpacing: '-0.03em', color: '#EBEBEB' }}>DealKit</span>
+          <span style={{ fontWeight: '700', fontSize: '17px', letterSpacing: '-0.03em', color: '#EBEBEB' }}>SellSight</span>
         </div>
 
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>

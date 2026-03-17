@@ -2,14 +2,14 @@
  * HubSpot CRM Integration — Private App token auth
  *
  * Uses HubSpot Private Apps (long-lived token, no OAuth needed).
- * Users create a private app inside their HubSpot account → copy the token → paste into DealKit.
+ * Users create a private app inside their HubSpot account → copy the token → paste into SellSight.
  *
  * How to get a token:
  *   HubSpot CRM → Settings (gear icon) → Integrations → Private Apps → Create private app
  *   Required scopes: crm.objects.deals.read, crm.objects.contacts.read, crm.objects.companies.read
- *   Copy the access token and paste it into DealKit Settings → Integrations.
+ *   Copy the access token and paste it into SellSight Settings → Integrations.
  *
- * Stage mapping (HubSpot default pipeline → DealKit):
+ * Stage mapping (HubSpot default pipeline → SellSight):
  *   appointmentscheduled  → discovery
  *   qualifiedtobuy        → qualification
  *   presentationscheduled → proposal

@@ -2,12 +2,12 @@ import Link from 'next/link'
 import { FileText } from 'lucide-react'
 
 export const metadata = {
-  title: 'Terms of Service — DealKit',
-  description: 'Terms and conditions for using the DealKit platform.',
+  title: 'Terms of Service — SellSight',
+  description: 'Terms and conditions for using the SellSight platform.',
 }
 
 const EFFECTIVE_DATE = '11 March 2025'
-const COMPANY_EMAIL = 'legal@dealkit.io'
+const COMPANY_EMAIL = 'legal@sellsight.io'
 
 export default function TermsPage() {
   return (
@@ -19,7 +19,7 @@ export default function TermsPage() {
           <div style={{ width: '28px', height: '28px', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileText size={13} color="#fff" />
           </div>
-          <span style={{ fontWeight: '700', fontSize: '14px', color: '#F0EEFF' }}>DealKit</span>
+          <span style={{ fontWeight: '700', fontSize: '14px', color: '#F0EEFF' }}>SellSight</span>
         </Link>
         <Link href="/" style={{ fontSize: '13px', color: '#9CA3AF', textDecoration: 'none' }}>← Back to home</Link>
       </nav>
@@ -32,17 +32,17 @@ export default function TermsPage() {
 
         <div style={{ background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '10px', padding: '16px 20px', marginBottom: '32px' }}>
           <p style={{ fontSize: '13px', color: '#A78BFA', lineHeight: '1.7' }}>
-            <strong>Summary:</strong> By using DealKit you agree to these terms. We provide a sales intelligence platform on a subscription basis. You own your data. We may suspend accounts that violate these terms. You can cancel any time.
+            <strong>Summary:</strong> By using SellSight you agree to these terms. We provide a sales intelligence platform on a subscription basis. You own your data. We may suspend accounts that violate these terms. You can cancel any time.
           </p>
         </div>
 
         <Section title="1. Acceptance of terms">
-          <P>By creating an account or using any part of the DealKit platform (&quot;Service&quot;), you agree to be bound by these Terms of Service (&quot;Terms&quot;) and our Privacy Policy. If you are using the Service on behalf of a company or other legal entity, you represent that you have authority to bind that entity to these Terms.</P>
+          <P>By creating an account or using any part of the SellSight platform (&quot;Service&quot;), you agree to be bound by these Terms of Service (&quot;Terms&quot;) and our Privacy Policy. If you are using the Service on behalf of a company or other legal entity, you represent that you have authority to bind that entity to these Terms.</P>
           <P>If you do not agree to these Terms, do not use the Service.</P>
         </Section>
 
         <Section title="2. Description of service">
-          <P>DealKit is a B2B sales intelligence platform that provides AI-powered sales collateral generation, competitor tracking, deal management, meeting preparation, and related tools for sales teams.</P>
+          <P>SellSight is a B2B sales intelligence platform that provides AI-powered sales collateral generation, competitor tracking, deal management, meeting preparation, and related tools for sales teams.</P>
           <P>We reserve the right to modify, suspend, or discontinue any part of the Service with reasonable notice. We will provide at least 30 days&apos; notice before discontinuing the Service entirely.</P>
         </Section>
 
@@ -76,13 +76,13 @@ export default function TermsPage() {
         </Section>
 
         <Section title="6. Your content and data">
-          <P>You retain all ownership rights to the data and content you upload to DealKit (&quot;Your Content&quot;). By using the Service, you grant us a limited, non-exclusive licence to process Your Content solely to provide and improve the Service.</P>
+          <P>You retain all ownership rights to the data and content you upload to SellSight (&quot;Your Content&quot;). By using the Service, you grant us a limited, non-exclusive licence to process Your Content solely to provide and improve the Service.</P>
           <P>You are responsible for ensuring you have the right to upload and process any data you enter into the Service, including data about third parties (prospects, competitors, etc.).</P>
           <P>We will not use Your Content to train AI models or share it with third parties except as described in our Privacy Policy and as strictly necessary to provide the Service.</P>
         </Section>
 
         <Section title="7. AI-generated content">
-          <P>DealKit uses AI (powered by Anthropic&apos;s Claude) to generate sales materials, analyses, and recommendations. You acknowledge that:</P>
+          <P>SellSight uses AI (powered by Anthropic&apos;s Claude) to generate sales materials, analyses, and recommendations. You acknowledge that:</P>
           <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', color: '#9CA3AF', fontSize: '14px', lineHeight: '1.7' }}>
             <li>AI-generated content may contain inaccuracies and should be reviewed before use</li>
             <li>You are responsible for verifying the accuracy of AI-generated content</li>
@@ -92,7 +92,7 @@ export default function TermsPage() {
         </Section>
 
         <Section title="8. Intellectual property">
-          <P>The DealKit platform, including its software, design, and documentation, is owned by us and protected by copyright, trademark, and other intellectual property laws. These Terms do not grant you any rights to use our trademarks, logos, or brand names.</P>
+          <P>The SellSight platform, including its software, design, and documentation, is owned by us and protected by copyright, trademark, and other intellectual property laws. These Terms do not grant you any rights to use our trademarks, logos, or brand names.</P>
           <P>Subject to your compliance with these Terms and payment of applicable fees, we grant you a limited, non-exclusive, non-transferable licence to use the Service during your subscription term.</P>
         </Section>
 

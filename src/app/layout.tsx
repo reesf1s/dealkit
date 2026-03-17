@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import { Toaster } from '@/components/shared/Toast'
 import CookieBanner from '@/components/shared/CookieBanner'
+import { ThemeProvider } from '@/components/layout/ThemeContext'
 import './globals.css'
 
 const geistSans = Geist({
@@ -16,8 +17,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'DealKit',
-  description: "Your sales team's unfair advantage",
+  title: 'SellSight',
+  description: 'Autonomous sales intelligence',
 }
 
 export default function RootLayout({
@@ -27,15 +28,14 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en" className="dark">
-        <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-          style={{ backgroundColor: '#0A0A0A', color: '#EBEBEB' }}
-        >
-          <Toaster>
-            {children}
-          </Toaster>
-          <CookieBanner />
+      <html lang="en" suppressHydrationWarning>
+        <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+          <ThemeProvider>
+            <Toaster>
+              {children}
+            </Toaster>
+            <CookieBanner />
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>

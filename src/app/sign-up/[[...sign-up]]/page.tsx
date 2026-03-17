@@ -25,7 +25,7 @@ export default function SignUpPage() {
           <div style={{ width: '36px', height: '36px', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(99,102,241,0.5)' }}>
             <FileText size={17} color="#fff" strokeWidth={2.5} />
           </div>
-          <span style={{ fontWeight: '700', fontSize: '18px', letterSpacing: '-0.03em', color: '#EBEBEB' }}>DealKit</span>
+          <span style={{ fontWeight: '700', fontSize: '18px', letterSpacing: '-0.03em', color: '#EBEBEB' }}>SellSight</span>
         </div>
 
         {/* Headline */}
@@ -54,11 +54,11 @@ export default function SignUpPage() {
         {/* Founder note */}
         <div style={{ marginTop: '48px', padding: '16px 20px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '10px', maxWidth: '360px' }}>
           <div style={{ fontSize: '13px', color: '#888', fontStyle: 'italic', lineHeight: '1.6', marginBottom: '10px' }}>
-            &ldquo;I built DealKit because we kept losing deals to competitors we couldn&apos;t track. Two hours of prep per call. I wanted that time back.&rdquo;
+            &ldquo;I built SellSight because we kept losing deals to competitors we couldn&apos;t track. Two hours of prep per call. I wanted that time back.&rdquo;
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', border: '1px solid rgba(139,92,246,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff' }}>R</div>
-            <span style={{ fontSize: '12px', color: '#555' }}>Rees Foulkes · Founder, DealKit</span>
+            <span style={{ fontSize: '12px', color: '#555' }}>Rees Foulkes · Founder, SellSight</span>
           </div>
         </div>
       </div>

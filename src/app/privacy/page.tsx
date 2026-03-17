@@ -2,13 +2,13 @@ import Link from 'next/link'
 import { FileText } from 'lucide-react'
 
 export const metadata = {
-  title: 'Privacy Policy — DealKit',
-  description: 'How DealKit collects, uses, and protects your personal data.',
+  title: 'Privacy Policy — SellSight',
+  description: 'How SellSight collects, uses, and protects your personal data.',
 }
 
 const EFFECTIVE_DATE = '11 March 2025'
-const COMPANY_EMAIL = 'privacy@dealkit.io'
-const COMPANY_NAME = 'DealKit'
+const COMPANY_EMAIL = 'privacy@sellsight.io'
+const COMPANY_NAME = 'SellSight'
 const COMPANY_JURISDICTION = 'England & Wales'
 
 export default function PrivacyPage() {
@@ -21,7 +21,7 @@ export default function PrivacyPage() {
           <div style={{ width: '28px', height: '28px', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileText size={13} color="#fff" />
           </div>
-          <span style={{ fontWeight: '700', fontSize: '14px', color: '#F0EEFF' }}>DealKit</span>
+          <span style={{ fontWeight: '700', fontSize: '14px', color: '#F0EEFF' }}>SellSight</span>
         </Link>
         <Link href="/" style={{ fontSize: '13px', color: '#9CA3AF', textDecoration: 'none' }}>← Back to home</Link>
       </nav>
@@ -33,7 +33,7 @@ export default function PrivacyPage() {
         </div>
 
         <Section title="1. Who we are">
-          <P>{COMPANY_NAME} (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) operates the DealKit sales intelligence platform at dealkit.vercel.app. We are registered in {COMPANY_JURISDICTION}.</P>
+          <P>{COMPANY_NAME} (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) operates the SellSight sales intelligence platform at sellsight.vercel.app. We are registered in {COMPANY_JURISDICTION}.</P>
           <P>We act as the <strong>data controller</strong> for personal data processed through our platform. For questions about this policy or to exercise your rights, contact us at <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: '#818CF8' }}>{COMPANY_EMAIL}</a>.</P>
         </Section>
 
@@ -57,7 +57,7 @@ export default function PrivacyPage() {
 
         <Section title="4. How we use your data">
           <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', color: '#9CA3AF', fontSize: '14px', lineHeight: '1.7' }}>
-            <li>Provide and operate the DealKit platform</li>
+            <li>Provide and operate the SellSight platform</li>
             <li>Generate AI-powered sales collateral, meeting prep, and deal scoring</li>
             <li>Process subscription payments and manage your billing</li>
             <li>Send transactional emails (account confirmation, invoices, password reset)</li>
@@ -170,7 +170,7 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="11. Children's privacy">
-          <P>DealKit is a B2B product intended for users aged 18 and over. We do not knowingly collect data from children under 16 (EU) or 13 (US). If we become aware of such collection, we will delete it promptly.</P>
+          <P>SellSight is a B2B product intended for users aged 18 and over. We do not knowingly collect data from children under 16 (EU) or 13 (US). If we become aware of such collection, we will delete it promptly.</P>
         </Section>
 
         <Section title="12. Changes to this policy">

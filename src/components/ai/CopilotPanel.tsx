@@ -296,7 +296,7 @@ export default function CopilotPanel() {
             fontSize: '13.5px', fontWeight: 700, color: 'rgba(200,196,255,0.9)',
             letterSpacing: '0.01em', flex: 1,
           }}>
-            DealKit Brain
+            SellSight Brain
           </span>
 
           {/* Clear chat */}

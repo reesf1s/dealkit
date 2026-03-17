@@ -8,9 +8,10 @@ import {
   LayoutDashboard, Building2, Swords,
   FileText, Settings, LogOut, Search,
   Kanban, ChevronLeft, ChevronRight,
-  X, Brain, Zap, Activity, MessageSquare,
+  X, Brain, Zap, Activity, MessageSquare, Sun, Moon,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
+import { useTheme } from './ThemeContext'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -31,6 +32,7 @@ export default function Sidebar() {
   const { signOut } = useClerk()
   const { user } = useUser()
   const { collapsed, mobileOpen, toggleCollapsed, closeMobile, toggleCopilot } = useSidebar()
+  const { theme, toggleTheme } = useTheme()
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false, dedupingInterval: 30000 })
   const brain = brainRes?.data
   const urgentCount = brain?.urgentDeals?.length ?? 0
@@ -66,18 +68,18 @@ export default function Sidebar() {
           height: '32px', borderRadius: '7px',
           marginBottom: '1px', textDecoration: 'none',
           fontSize: '13px', fontWeight: active ? '500' : '400',
-          color: active ? '#E5E7EB' : '#6B7280',
-          background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
+          color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+          background: active ? 'var(--accent-subtle)' : 'transparent',
           transition: 'all 0.1s',
           position: 'relative',
         }}
         onMouseEnter={e => { if (!active) {
-          (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'
-          ;(e.currentTarget as HTMLElement).style.color = '#D1D5DB'
+          (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'
+          ;(e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'
         }}}
         onMouseLeave={e => { if (!active) {
           (e.currentTarget as HTMLElement).style.background = 'transparent'
-          ;(e.currentTarget as HTMLElement).style.color = '#6B7280'
+          ;(e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'
         }}}
       >
         {active && !collapsed && (
@@ -122,7 +124,7 @@ export default function Sidebar() {
   function SectionLabel({ children }: { children: string }) {
     if (collapsed) return <div style={{ height: '16px' }} />
     return (
-      <div style={{ padding: '10px 10px 4px', fontSize: '10px', fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+      <div style={{ padding: '10px 10px 4px', fontSize: '10px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
         {children}
       </div>
     )
@@ -131,9 +133,10 @@ export default function Sidebar() {
   const SidebarContent = (
     <aside style={{
       position: 'fixed', left: 0, top: 0, bottom: 0, width: w,
-      background: 'rgba(12,12,14,0.85)',
-      backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-      borderRight: '1px solid rgba(255,255,255,0.07)',
+      background: 'var(--sidebar-bg)',
+      backdropFilter: 'blur(var(--glass-blur))', WebkitBackdropFilter: 'blur(var(--glass-blur))',
+      borderRight: '1px solid var(--border)',
+      boxShadow: 'var(--shadow)',
       display: 'flex', flexDirection: 'column', zIndex: 40,
       transition: 'width 0.2s cubic-bezier(0.4,0,0.2,1)',
       overflow: 'hidden',
@@ -152,7 +155,7 @@ export default function Sidebar() {
             }}>
               <Brain size={13} color="#fff" strokeWidth={2.5} />
             </div>
-            <span style={{ fontWeight: '700', fontSize: '14px', letterSpacing: '-0.02em', color: '#F0EEFF' }}>DealKit</span>
+            <span style={{ fontWeight: '700', fontSize: '14px', letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>SellSight</span>
           </div>
         )}
         {collapsed && (
@@ -264,13 +267,53 @@ export default function Sidebar() {
         <SectionLabel>Intelligence</SectionLabel>
         {INTEL_ITEMS.map(item => <NavItem key={item.href} {...item} />)}
 
-        <div style={{ margin: '8px 4px', height: '1px', background: 'rgba(255,255,255,0.05)' }} />
+        <div style={{ margin: '8px 4px', height: '1px', background: 'var(--border)' }} />
 
         <NavItem href="/settings" icon={Settings} label="Settings" />
+
+        {/* Theme toggle */}
+        {!collapsed ? (
+          <button
+            onClick={toggleTheme}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '9px',
+              padding: '0 10px', height: '32px', borderRadius: '7px',
+              marginBottom: '1px', border: 'none',
+              fontSize: '13px', fontWeight: '400',
+              color: 'var(--text-secondary)',
+              background: 'transparent',
+              cursor: 'pointer', width: '100%',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'
+              ;(e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = 'transparent'
+              ;(e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'
+            }}
+          >
+            {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
+            <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
+          </button>
+        ) : (
+          <button
+            onClick={toggleTheme}
+            title={theme === 'light' ? 'Dark mode' : 'Light mode'}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              height: '32px', width: '100%', borderRadius: '7px',
+              border: 'none', background: 'transparent',
+              color: 'var(--text-secondary)', cursor: 'pointer',
+            }}
+          >
+            {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
+          </button>
+        )}
       </nav>
 
       {/* Brain status + user */}
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '8px 8px 10px' }}>
+      <div style={{ borderTop: '1px solid var(--border)', padding: '8px 8px 10px' }}>
         {/* Brain health indicator — pulsing when active */}
         {!collapsed && (
           <div style={{

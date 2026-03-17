@@ -33,7 +33,7 @@ function getPageInfo(pathname: string) {
   for (const [key, val] of Object.entries(PAGE_MAP)) {
     if (pathname.startsWith(key + '/')) return val
   }
-  return { label: 'DealKit', Icon: LayoutDashboard }
+  return { label: 'SellSight', Icon: LayoutDashboard }
 }
 
 export default function TopNav() {
@@ -67,10 +67,11 @@ export default function TopNav() {
       right: 0,
       height: '56px',
       zIndex: 30,
-      background: 'rgba(11,7,22,0.92)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      borderBottom: '1px solid rgba(139,92,246,0.12)',
+      background: 'var(--topnav-bg)',
+      backdropFilter: 'blur(var(--glass-blur))',
+      WebkitBackdropFilter: 'blur(var(--glass-blur))',
+      borderBottom: '1px solid var(--border)',
+      boxShadow: 'var(--shadow-sm)',
       display: 'flex',
       alignItems: 'center',
       padding: '0 24px',
@@ -92,11 +93,11 @@ export default function TopNav() {
           <Menu size={15} color="#9CA3AF" />
         </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '12px', color: '#4B5563', fontWeight: '500' }}>DealKit</span>
-          <span style={{ fontSize: '12px', color: '#4B5563' }}>/</span>
+          <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontWeight: '500' }}>SellSight</span>
+          <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>/</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Icon size={13} color="#A78BFA" strokeWidth={2} />
-            <span style={{ fontSize: '13px', color: '#F0EEFF', fontWeight: '600' }}>{label}</span>
+            <Icon size={13} color="var(--accent)" strokeWidth={2} />
+            <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600' }}>{label}</span>
           </div>
         </div>
       </div>
@@ -112,8 +113,8 @@ export default function TopNav() {
         style={{
           width: '280px',
           height: '34px',
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
           borderRadius: '100px',
           display: 'flex',
           alignItems: 'center',
@@ -124,20 +125,20 @@ export default function TopNav() {
           flexShrink: 0,
         }}
         onMouseEnter={e => {
-          (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'
-          ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(139,92,246,0.25)'
+          (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'
+          ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'
         }}
         onMouseLeave={e => {
-          (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'
-          ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'
+          (e.currentTarget as HTMLElement).style.background = 'var(--surface)'
+          ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
         }}
       >
-        <Search size={13} color="#4B5563" strokeWidth={2} />
-        <span style={{ fontSize: '13px', color: '#4B5563', flex: 1, textAlign: 'left' }}>Search...</span>
+        <Search size={13} color="var(--text-tertiary)" strokeWidth={2} />
+        <span style={{ fontSize: '13px', color: 'var(--text-tertiary)', flex: 1, textAlign: 'left' }}>Search...</span>
         <span style={{
-          fontSize: '10px', color: '#4B5563',
-          background: 'rgba(255,255,255,0.06)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          fontSize: '10px', color: 'var(--text-tertiary)',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
           padding: '2px 6px', borderRadius: '5px',
           letterSpacing: '0.02em',
         }}>⌘P</span>

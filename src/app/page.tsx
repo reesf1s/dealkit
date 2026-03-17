@@ -60,7 +60,7 @@ export default function LandingPage() {
           <div style={{ width: '26px', height: '26px', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileText size={13} color="#fff" />
           </div>
-          <span style={{ fontWeight: '700', fontSize: '15px', letterSpacing: '-0.02em', color: '#F0EEFF' }}>DealKit</span>
+          <span style={{ fontWeight: '700', fontSize: '15px', letterSpacing: '-0.02em', color: '#F0EEFF' }}>SellSight</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <a href="#how-it-works" style={{ padding: '6px 14px', borderRadius: '6px', color: '#888', fontSize: '13px', textDecoration: 'none' }}>How it works</a>
@@ -83,7 +83,7 @@ export default function LandingPage() {
           An AI brain that runs<br />your sales intelligence
         </h1>
         <p style={{ fontSize: '18px', color: '#7E7A9A', lineHeight: '1.7', marginBottom: '36px', maxWidth: '560px', margin: '0 auto 36px' }}>
-          DealKit learns from every deal you close, identifies risks and opportunities autonomously, and creates the collateral your team needs — before they ask for it.
+          SellSight learns from every deal you close, identifies risks and opportunities autonomously, and creates the collateral your team needs — before they ask for it.
         </p>
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/sign-up" style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '12px 24px', background: 'linear-gradient(135deg, #6366F1, #7C3AED)', boxShadow: '0 0 24px rgba(99,102,241,0.4), 0 4px 16px rgba(0,0,0,0.3)', borderRadius: '9px', color: '#fff', fontSize: '14px', fontWeight: '700', textDecoration: 'none' }}>
@@ -103,14 +103,14 @@ export default function LandingPage() {
             <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
             <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
             <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
-            <div style={{ marginLeft: '8px', fontSize: '11px', color: '#4B4565' }}>dealkit.app/dashboard</div>
+            <div style={{ marginLeft: '8px', fontSize: '11px', color: '#4B4565' }}>sellsight.app/dashboard</div>
           </div>
           <div style={{ display: 'flex', height: '500px' }}>
             {/* Sidebar */}
             <div style={{ width: '188px', padding: '12px 8px', borderRight: '1px solid rgba(255,255,255,0.05)', flexShrink: 0, background: 'rgba(255,255,255,0.01)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
               <div style={{ padding: '6px 10px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div style={{ width: '22px', height: '22px', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', borderRadius: '6px', flexShrink: 0 }} />
-                <span style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF', letterSpacing: '-0.02em' }}>DealKit</span>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF', letterSpacing: '-0.02em' }}>SellSight</span>
               </div>
               {[['Dashboard', true], ['Pipeline', false], ['Collateral', false], ['Intelligence', false], ['Company', false]].map(([label, active]) => (
                 <div key={String(label)} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '12px', color: active ? '#C4B5FD' : '#4A4A5A', background: active ? 'rgba(99,102,241,0.12)' : 'transparent', border: active ? '1px solid rgba(99,102,241,0.2)' : '1px solid transparent', display: 'flex', alignItems: 'center', gap: '7px' }}>
@@ -233,7 +233,7 @@ export default function LandingPage() {
               Paste your notes.<br />Get a scored deal back.
             </h2>
             <p style={{ fontSize: '14px', color: '#7E7A9A', lineHeight: '1.7', marginBottom: '20px' }}>
-              After every meeting, paste your notes into DealKit. The brain extracts action items, surfaces risks, identifies product gaps, and scores the deal — using models trained on your own win history.
+              After every meeting, paste your notes into SellSight. The brain extracts action items, surfaces risks, identifies product gaps, and scores the deal — using models trained on your own win history.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {[
@@ -270,7 +270,7 @@ export default function LandingPage() {
             {/* Score insights */}
             <div style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: '8px', padding: '10px 12px' }}>
               <div style={{ fontSize: '9px', color: '#4ADE80', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Score Insights</div>
-              {['Champion confirmed: Sarah advocating internally for DealKit', 'Budget approved — finance sign-off confirmed in last call', 'Evaluating Salesforce: our win rate vs Salesforce is 70%'].map((ins, i) => (
+              {['Champion confirmed: Sarah advocating internally for SellSight', 'Budget approved — finance sign-off confirmed in last call', 'Evaluating Salesforce: our win rate vs Salesforce is 70%'].map((ins, i) => (
                 <div key={i} style={{ fontSize: '10px', color: '#C4B5FD', lineHeight: '1.4', marginBottom: i < 2 ? '4px' : 0 }}>• {ins}</div>
               ))}
             </div>
@@ -659,7 +659,7 @@ export default function LandingPage() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div style={{ background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '12px', padding: '28px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '700', color: '#EF4444', marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Without DealKit</div>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: '#EF4444', marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Without SellSight</div>
             {[
               'Battlecards in a Google Doc no one updates',
               'No idea which deals are about to go cold',
@@ -673,7 +673,7 @@ export default function LandingPage() {
             ))}
           </div>
           <div style={{ background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '12px', padding: '28px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '700', color: '#22C55E', marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>With DealKit</div>
+            <div style={{ fontSize: '12px', fontWeight: '700', color: '#22C55E', marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>With SellSight</div>
             {[
               'Battlecards that regenerate autonomously when competitive patterns shift',
               'Every morning: which deals need you, why, and what to do',
@@ -725,11 +725,11 @@ export default function LandingPage() {
         <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: '16px', padding: '40px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
           <div style={{ fontSize: '36px', color: 'rgba(139,92,246,0.4)', marginBottom: '12px', lineHeight: 1 }}>&ldquo;</div>
           <p style={{ fontSize: '16px', lineHeight: '1.7', color: '#C4B5FD', fontStyle: 'italic', marginBottom: '20px' }}>
-            I built DealKit after watching us lose deals we should have won — because our battlecards were outdated and nobody could tell which deals were genuinely at risk until it was too late. The insight was simple: our institutional knowledge was the asset. DealKit makes it work.
+            I built SellSight after watching us lose deals we should have won — because our battlecards were outdated and nobody could tell which deals were genuinely at risk until it was too late. The insight was simple: our institutional knowledge was the asset. SellSight makes it work.
           </p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
             <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', border: '2px solid rgba(139,92,246,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: '#fff' }}>R</div>
-            <span style={{ fontSize: '12px', color: '#7E7A9A' }}>Rees Foulkes, Founder · DealKit</span>
+            <span style={{ fontSize: '12px', color: '#7E7A9A' }}>Rees Foulkes, Founder · SellSight</span>
           </div>
         </div>
       </section>
@@ -758,10 +758,10 @@ export default function LandingPage() {
           <div style={{ width: '22px', height: '22px', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileText size={11} color="#fff" />
           </div>
-          <span style={{ fontWeight: '700', fontSize: '13px', color: '#F0EEFF' }}>DealKit</span>
+          <span style={{ fontWeight: '700', fontSize: '13px', color: '#F0EEFF' }}>SellSight</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <span style={{ fontSize: '12px', color: '#4B4565' }}>&copy; 2026 DealKit. All rights reserved.</span>
+          <span style={{ fontSize: '12px', color: '#4B4565' }}>&copy; 2026 SellSight. All rights reserved.</span>
           <a href="/privacy" style={{ fontSize: '12px', color: '#4B4565', textDecoration: 'none' }}>Privacy Policy</a>
           <a href="/terms" style={{ fontSize: '12px', color: '#4B4565', textDecoration: 'none' }}>Terms of Service</a>
         </div>

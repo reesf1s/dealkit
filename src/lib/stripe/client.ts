@@ -6,7 +6,7 @@ export function getStripe(): Stripe {
   return new Stripe(key, {
     apiVersion: '2026-02-25.clover',
     appInfo: {
-      name: 'DealKit',
+      name: 'SellSight',
       url: process.env.NEXT_PUBLIC_APP_URL?.trim(),
     },
   })

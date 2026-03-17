@@ -15,5 +15,5 @@ export async function GET() {
   const dealRows = await db.select().from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)).orderBy(dealLogs.createdAt)
   const collateralRows = await db.select({ id: collateral.id, type: collateral.type, title: collateral.title, status: collateral.status, sourceCompetitorId: collateral.sourceCompetitorId, sourceCaseStudyId: collateral.sourceCaseStudyId, sourceDealLogId: collateral.sourceDealLogId, generatedAt: collateral.generatedAt, createdAt: collateral.createdAt, updatedAt: collateral.updatedAt }).from(collateral).where(eq(collateral.workspaceId, workspaceId)).orderBy(collateral.createdAt)
   const payload = JSON.stringify({ exportedAt: new Date().toISOString(), company: company ?? null, competitors: competitorRows, caseStudies: caseStudyRows, deals: dealRows, collateral: collateralRows }, null, 2)
-  return new NextResponse(payload, { headers: { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename="dealkit-export.json"' } })
+  return new NextResponse(payload, { headers: { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename="sellsight-export.json"' } })
 }

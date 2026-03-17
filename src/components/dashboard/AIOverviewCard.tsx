@@ -17,7 +17,7 @@ function formatAge(iso: string): string {
 }
 
 function getStorageKey(generatedAt: string) {
-  return `dealkit_actions_done_${generatedAt}`
+  return `sellsight_actions_done_${generatedAt}`
 }
 
 export default function AIOverviewCard() {
@@ -92,13 +92,13 @@ export default function AIOverviewCard() {
     <div
       style={{
         position: 'relative',
-        background: 'linear-gradient(135deg, rgba(18,12,38,0.95) 0%, rgba(22,12,44,0.95) 100%)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        border: '1px solid rgba(139,92,246,0.3)',
+        background: 'var(--card-bg)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        border: '1px solid var(--card-border)',
         borderRadius: '16px',
         overflow: 'hidden',
-        boxShadow: '0 0 40px rgba(99,102,241,0.12), inset 0 1px 0 rgba(139,92,246,0.15)',
+        boxShadow: 'var(--shadow-lg)',
       }}
     >
       {/* Ambient glow */}

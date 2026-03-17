@@ -229,7 +229,7 @@ export default function DashboardPage() {
       {/* ── Zone 1: Header + KPI strip ──────────────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: '600', letterSpacing: '-0.03em', color: '#F1F1F3', margin: '0 0 2px' }}>
+          <h1 style={{ fontSize: '20px', fontWeight: '600', letterSpacing: '-0.03em', color: 'var(--text-primary)', margin: '0 0 2px' }}>
             {greeting}
           </h1>
           <p style={{ fontSize: '12px', color: '#4B5563', margin: 0 }}>
@@ -1111,12 +1111,13 @@ export default function DashboardPage() {
 // ─── Shared style helpers ────────────────────────────────────────────────────
 
 const card: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.03)',
-  backdropFilter: 'blur(12px)',
-  WebkitBackdropFilter: 'blur(12px)',
-  border: '1px solid rgba(255,255,255,0.07)',
-  borderRadius: '12px',
+  background: 'var(--card-bg)',
+  backdropFilter: 'blur(16px)',
+  WebkitBackdropFilter: 'blur(16px)',
+  border: '1px solid var(--card-border)',
+  borderRadius: '14px',
   overflow: 'hidden',
+  boxShadow: 'var(--shadow-sm)',
 }
 
 function listRow(hasBorder: boolean): React.CSSProperties {
@@ -1136,19 +1137,19 @@ function quickBtn(primary: boolean): React.CSSProperties {
     padding: '6px 12px', borderRadius: '7px',
     fontSize: '12px', fontWeight: primary ? '600' : '500',
     textDecoration: 'none',
-    color: primary ? '#fff' : '#9CA3AF',
-    background: primary ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : 'transparent',
-    border: primary ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(255,255,255,0.08)',
-    boxShadow: primary ? '0 0 16px rgba(99,102,241,0.3)' : 'none',
+    color: primary ? '#fff' : 'var(--text-secondary)',
+    background: primary ? 'linear-gradient(135deg, #4F46E5, #7C3AED)' : 'var(--surface)',
+    border: primary ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)',
+    boxShadow: primary ? '0 2px 12px rgba(99,102,241,0.25)' : 'var(--shadow-sm)',
   }
 }
 
 function SectionHeader({ label, count, href }: { label: string; count?: number; href?: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#6366F1' }} />
-      <span style={{ fontSize: '11px', fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{label}</span>
-      {count !== undefined && <span style={{ fontSize: '11px', color: '#374151', marginLeft: 'auto' }}>{count}</span>}
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--accent)' }} />
+      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{label}</span>
+      {count !== undefined && <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginLeft: 'auto' }}>{count}</span>}
       {href && (
         <Link href={href} style={{ fontSize: '11px', color: '#4B5563', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}>
           <ArrowUpRight size={10} />

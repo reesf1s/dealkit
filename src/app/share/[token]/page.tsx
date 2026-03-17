@@ -85,7 +85,7 @@ export default async function SharePage({ params }: SharePageProps) {
               letterSpacing: '-0.03em',
             }}
           >
-            DealKit
+            SellSight
           </span>
           <span
             style={{
@@ -101,7 +101,7 @@ export default async function SharePage({ params }: SharePageProps) {
               border: '1px solid rgba(255,255,255,0.08)',
             }}
           >
-            Powered by DealKit
+            Powered by SellSight
           </span>
         </div>
 
@@ -149,12 +149,12 @@ export default async function SharePage({ params }: SharePageProps) {
           <p style={{ fontSize: '12px', color: '#555', margin: 0 }}>
             Create your own AI sales collateral at{' '}
             <a
-              href="https://dealkit.vercel.app"
+              href="https://sellsight.vercel.app"
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: '#6366F1', textDecoration: 'none' }}
             >
-              dealkit.vercel.app
+              sellsight.vercel.app
             </a>
           </p>
         </div>

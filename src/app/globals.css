@@ -1,49 +1,111 @@
 @import "tailwindcss";
 
+/* ── Light mode (default) — Apple-inspired glass aesthetic ─────────── */
 :root {
-  --bg: #0A0A0A;
-  --surface: #141414;
-  --surface-hover: #1A1A1A;
-  --elevated: #1F1F1F;
-  --border: rgba(255, 255, 255, 0.06);
-  --border-strong: rgba(255, 255, 255, 0.10);
-  --text-primary: #EBEBEB;
-  --text-secondary: #888888;
-  --text-tertiary: #555555;
+  --bg: #F5F5F7;
+  --bg-secondary: #FFFFFF;
+  --surface: rgba(255, 255, 255, 0.72);
+  --surface-hover: rgba(255, 255, 255, 0.85);
+  --elevated: rgba(255, 255, 255, 0.9);
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.12);
+  --text-primary: #1D1D1F;
+  --text-secondary: #6E6E73;
+  --text-tertiary: #86868B;
   --accent: #6366F1;
-  --accent-hover: #818CF8;
+  --accent-hover: #4F46E5;
+  --accent-subtle: rgba(99, 102, 241, 0.08);
+  --accent-text: #6366F1;
+  --success: #34C759;
+  --warning: #FF9F0A;
+  --danger: #FF3B30;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow: 0 2px 8px rgba(0,0,0,0.06), 0 0 1px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.08), 0 0 1px rgba(0,0,0,0.06);
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-blur: 20px;
+  --sidebar-bg: rgba(255, 255, 255, 0.65);
+  --topnav-bg: rgba(255, 255, 255, 0.72);
+  --card-bg: rgba(255, 255, 255, 0.6);
+  --card-border: rgba(0, 0, 0, 0.06);
+  --input-bg: rgba(255, 255, 255, 0.8);
+  --badge-bg: rgba(99, 102, 241, 0.08);
+  --scrollbar-thumb: rgba(0,0,0,0.15);
+  --skeleton-from: #F0F0F0;
+  --skeleton-mid: #E8E8E8;
+  --row-hover: rgba(0,0,0,0.02);
+  --copilot-bg: rgba(255, 255, 255, 0.92);
+  --copilot-msg-bg: rgba(0, 0, 0, 0.03);
+  --copilot-user-bg: rgba(99, 102, 241, 0.08);
+}
+
+/* ── Dark mode ─────────────────────────────────────────────────────── */
+.dark {
+  --bg: #0A0A0C;
+  --bg-secondary: #111114;
+  --surface: rgba(255, 255, 255, 0.03);
+  --surface-hover: rgba(255, 255, 255, 0.06);
+  --elevated: rgba(255, 255, 255, 0.05);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --text-primary: #F1F1F3;
+  --text-secondary: #9CA3AF;
+  --text-tertiary: #6B7280;
+  --accent: #818CF8;
+  --accent-hover: #A5B4FC;
   --accent-subtle: rgba(99, 102, 241, 0.12);
+  --accent-text: #818CF8;
   --success: #22C55E;
   --warning: #EAB308;
   --danger: #EF4444;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+  --shadow: 0 2px 8px rgba(0,0,0,0.3), 0 0 1px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.4), 0 0 1px rgba(0,0,0,0.3);
+  --glass: rgba(18, 18, 24, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: 20px;
+  --sidebar-bg: rgba(12, 12, 14, 0.85);
+  --topnav-bg: rgba(11, 7, 22, 0.92);
+  --card-bg: rgba(255, 255, 255, 0.03);
+  --card-border: rgba(255, 255, 255, 0.07);
+  --input-bg: rgba(255, 255, 255, 0.04);
+  --badge-bg: rgba(99, 102, 241, 0.12);
+  --scrollbar-thumb: rgba(255,255,255,0.1);
+  --skeleton-from: #1a1a1a;
+  --skeleton-mid: #222;
+  --row-hover: rgba(255,255,255,0.02);
+  --copilot-bg: rgba(7, 5, 15, 0.95);
+  --copilot-msg-bg: rgba(15, 12, 30, 0.8);
+  --copilot-user-bg: rgba(99,102,241,0.12);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Prevent browser UA stylesheet from making dialogs white */
 dialog { background: transparent; border: none; padding: 0; }
 
 html, body {
   background: var(--bg);
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Geist", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Geist", sans-serif;
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
 
-::selection { background: rgba(99,102,241,0.3); color: #fff; }
+::selection { background: rgba(99,102,241,0.2); color: var(--text-primary); }
 
 @keyframes shimmer {
   0% { background-position: -400px 0; }
   100% { background-position: 400px 0; }
 }
 .skeleton {
-  background: linear-gradient(90deg, #1a1a1a 25%, #222 50%, #1a1a1a 75%);
+  background: linear-gradient(90deg, var(--skeleton-from) 25%, var(--skeleton-mid) 50%, var(--skeleton-from) 75%);
   background-size: 800px 100%;
   animation: shimmer 1.4s ease-in-out infinite;
   border-radius: 6px;
@@ -53,10 +115,7 @@ html, body {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes scale-in {
   from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
   to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
@@ -64,14 +123,14 @@ html, body {
 .animate-in { animation: fadeIn 0.15s ease-out forwards; }
 
 input, textarea, select {
-  background: var(--surface);
+  background: var(--input-bg);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  border-radius: 6px;
-  padding: 7px 10px;
+  border-radius: 8px;
+  padding: 8px 12px;
   font-size: 13px;
   font-family: inherit;
-  transition: border-color 0.1s;
+  transition: border-color 0.15s, box-shadow 0.15s;
   width: 100%;
   outline: none;
 }
@@ -82,7 +141,7 @@ input:focus, textarea:focus, select:focus {
 input::placeholder, textarea::placeholder { color: var(--text-tertiary); }
 input:hover:not(:focus), textarea:hover:not(:focus) { border-color: var(--border-strong); }
 
-button { cursor: pointer; font-family: inherit; font-size: 13px; transition: all 0.1s; }
+button { cursor: pointer; font-family: inherit; font-size: 13px; transition: all 0.15s; }
 button:active:not(:disabled) { transform: scale(0.98); }
 button:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -90,12 +149,12 @@ table { width: 100%; border-collapse: collapse; }
 thead th {
   text-align: left;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-tertiary);
   padding: 0 12px 10px;
 }
 tbody tr { border-top: 1px solid var(--border); transition: background 0.08s; }
-tbody tr:hover { background: rgba(255,255,255,0.02); }
+tbody tr:hover { background: var(--row-hover); }
 tbody td { padding: 10px 12px; font-size: 13px; color: var(--text-primary); }

@@ -145,7 +145,7 @@ function buildActiveDealContext(
 // ── System prompt builder ────────────────────────────────────────────────────
 
 function buildSystemPrompt(brainContext: string, activeDealContext: string, pipelineStageContext: string = ''): string {
-  return `You are DealKit AI — a sales copilot with complete CRM access. You are the interface between the user and their pipeline intelligence brain.
+  return `You are SellSight AI — a sales copilot with complete CRM access. You are the interface between the user and their pipeline intelligence brain.
 
 ═══ CORE DIRECTIVE: ACT FIRST, EXPLAIN AFTER ═══
 

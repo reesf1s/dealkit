@@ -49,7 +49,7 @@ export async function GET() {
     }
 
     const json = JSON.stringify(exportData, null, 2)
-    const filename = `dealkit-export-${new Date().toISOString().split('T')[0]}.json`
+    const filename = `sellsight-export-${new Date().toISOString().split('T')[0]}.json`
 
     return new NextResponse(json, {
       status: 200,

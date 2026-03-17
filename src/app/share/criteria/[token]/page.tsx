@@ -62,9 +62,9 @@ export default async function ShareCriteriaPage({ params }: Props) {
 
         {/* Top bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '48px' }}>
-          <span style={{ fontSize: '16px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em' }}>DealKit</span>
+          <span style={{ fontSize: '16px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em' }}>SellSight</span>
           <span style={{ display: 'inline-flex', alignItems: 'center', height: '22px', padding: '0 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 600, color: '#888', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            Powered by DealKit
+            Powered by SellSight
           </span>
         </div>
 
@@ -143,8 +143,8 @@ export default async function ShareCriteriaPage({ params }: Props) {
         <div style={{ marginTop: '64px', paddingTop: '24px', borderTop: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
           <p style={{ fontSize: '12px', color: '#555', margin: 0 }}>
             Track your deals with AI at{' '}
-            <a href="https://dealkit.vercel.app" target="_blank" rel="noopener noreferrer" style={{ color: '#6366F1', textDecoration: 'none' }}>
-              dealkit.vercel.app
+            <a href="https://sellsight.vercel.app" target="_blank" rel="noopener noreferrer" style={{ color: '#6366F1', textDecoration: 'none' }}>
+              sellsight.vercel.app
             </a>
           </p>
         </div>

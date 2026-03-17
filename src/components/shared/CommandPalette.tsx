@@ -589,7 +589,7 @@ export default function CommandPalette() {
             </span>
           </div>
           <div style={{ fontSize: '11px', color: '#2D2A40', letterSpacing: '-0.01em' }}>
-            DealKit AI
+            SellSight AI
           </div>
         </div>
       </div>
