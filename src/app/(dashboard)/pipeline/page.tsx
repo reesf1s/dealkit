@@ -504,7 +504,7 @@ function PipelineSettings({
 }
 
 export default function PipelinePage() {
-  const { sidebarWidth, aiSidebarWidth } = useSidebar()
+  const { sidebarWidth } = useSidebar()
   const { data: dealsData, isLoading } = useSWR('/api/deals', fetcher)
   const deals: any[] = dealsData?.data ?? []
   const { urgentMap, staleMap, mlMap, daysInStageMap, momentumMap } = useDealFlags(deals)
@@ -773,7 +773,7 @@ export default function PipelinePage() {
       })()}
 
       {/* Kanban board */}
-      <div style={{ overflowX: 'auto', paddingBottom: '8px', maxWidth: `calc(100vw - ${sidebarWidth}px - ${aiSidebarWidth}px - 48px)` }}>
+      <div style={{ overflowX: 'auto', paddingBottom: '8px', maxWidth: `calc(100vw - ${sidebarWidth}px - 48px)` }}>
         <div style={{ display: 'flex', gap: '12px', minWidth: 'max-content' }}>
           {activeStages.map((stage: any) => {
             const stageDeals = deals.filter((d: any) => d.stage === stage.id)

@@ -212,7 +212,7 @@ export default function CommandPalette() {
   // Global keydown handler
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
         e.preventDefault()
         setOpen(prev => {
           if (prev) { closePalette(); return false }

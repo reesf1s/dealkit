@@ -2,13 +2,12 @@
 
 import Sidebar from '@/components/layout/Sidebar'
 import TopNav from '@/components/layout/TopNav'
-import AiChatSidebar from '@/components/layout/AiChatSidebar'
+import CopilotPanel from '@/components/ai/CopilotPanel'
 import CommandPalette from '@/components/shared/CommandPalette'
 import { SidebarProvider, useSidebar } from '@/components/layout/SidebarContext'
 
 function LayoutShell({ children }: { children: React.ReactNode }) {
-  const { sidebarWidth, aiCollapsed } = useSidebar()
-  const bottomPad = aiCollapsed ? 72 : 476
+  const { sidebarWidth } = useSidebar()
 
   return (
     <div style={{
@@ -51,12 +50,12 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
         paddingTop: '56px',
         transition: 'margin-left 0.22s cubic-bezier(0.4,0,0.2,1)',
       }}>
-        <div style={{ flex: 1, padding: '24px', width: '100%', boxSizing: 'border-box', paddingBottom: `${bottomPad}px`, transition: 'padding-bottom 0.25s cubic-bezier(0.4,0,0.2,1)' }}>
+        <div style={{ flex: 1, padding: '24px', width: '100%', boxSizing: 'border-box' }}>
           {children}
         </div>
       </main>
 
-      <AiChatSidebar />
+      <CopilotPanel />
 
       <style>{`
         @media (max-width: 900px) {

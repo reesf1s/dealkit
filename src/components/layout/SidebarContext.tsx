@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 
 export interface ActiveDeal {
   id: string
@@ -16,10 +16,10 @@ interface SidebarCtx {
   openMobile: () => void
   closeMobile: () => void
   sidebarWidth: number
-  // AI sidebar
-  aiCollapsed: boolean
-  toggleAiCollapsed: () => void
-  aiSidebarWidth: number
+  // Copilot panel
+  copilotOpen: boolean
+  toggleCopilot: () => void
+  setCopilotOpen: (open: boolean) => void
   // Active deal context — set by deal detail page so AI chat knows what you're looking at
   activeDeal: ActiveDeal | null
   setActiveDeal: (deal: ActiveDeal | null) => void
@@ -32,9 +32,9 @@ const Ctx = createContext<SidebarCtx>({
   openMobile: () => {},
   closeMobile: () => {},
   sidebarWidth: 220,
-  aiCollapsed: true,
-  toggleAiCollapsed: () => {},
-  aiSidebarWidth: 0,
+  copilotOpen: false,
+  toggleCopilot: () => {},
+  setCopilotOpen: () => {},
   activeDeal: null,
   setActiveDeal: () => {},
 })
@@ -43,15 +43,12 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
-  const [aiCollapsed, setAiCollapsed] = useState(true)
+  const [copilotOpen, setCopilotOpen] = useState(false)
   const [activeDeal, setActiveDeal] = useState<ActiveDeal | null>(null)
 
   useEffect(() => {
     const stored = localStorage.getItem('sidebar-collapsed')
     if (stored === 'true') setCollapsed(true)
-
-    const storedAi = localStorage.getItem('ai-bar-expanded')
-    if (storedAi === 'true') setAiCollapsed(false)
 
     const mq = window.matchMedia('(max-width: 768px)')
     setIsMobile(mq.matches)
@@ -67,15 +64,11 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  const toggleAiCollapsed = () => {
-    setAiCollapsed(p => {
-      localStorage.setItem('ai-bar-expanded', String(p)) // store whether it WAS expanded (now toggling to collapsed)
-      return !p
-    })
-  }
+  const toggleCopilot = useCallback(() => {
+    setCopilotOpen(p => !p)
+  }, [])
 
   const sidebarWidth = isMobile ? 0 : collapsed ? 64 : 220
-  const aiSidebarWidth = 0
 
   return (
     <Ctx.Provider value={{
@@ -85,9 +78,9 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
       openMobile: () => setMobileOpen(true),
       closeMobile: () => setMobileOpen(false),
       sidebarWidth,
-      aiCollapsed,
-      toggleAiCollapsed,
-      aiSidebarWidth,
+      copilotOpen,
+      toggleCopilot,
+      setCopilotOpen,
       activeDeal,
       setActiveDeal,
     }}>

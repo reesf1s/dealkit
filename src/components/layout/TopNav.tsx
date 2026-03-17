@@ -39,7 +39,7 @@ function getPageInfo(pathname: string) {
 export default function TopNav() {
   const pathname = usePathname()
   const { user } = useUser()
-  const { sidebarWidth, aiSidebarWidth, openMobile } = useSidebar()
+  const { sidebarWidth, openMobile } = useSidebar()
 
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
   const brain = brainRes?.data
@@ -64,7 +64,7 @@ export default function TopNav() {
       position: 'fixed',
       top: 0,
       left: `${sidebarWidth}px`,
-      right: `${aiSidebarWidth}px`,
+      right: 0,
       height: '56px',
       zIndex: 30,
       background: 'rgba(11,7,22,0.92)',
@@ -140,7 +140,7 @@ export default function TopNav() {
           border: '1px solid rgba(255,255,255,0.08)',
           padding: '2px 6px', borderRadius: '5px',
           letterSpacing: '0.02em',
-        }}>⌘K</span>
+        }}>⌘P</span>
       </button>
 
       {/* Right: Brain status + Avatar */}

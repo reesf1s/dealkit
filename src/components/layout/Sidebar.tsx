@@ -191,7 +191,7 @@ export default function Sidebar() {
           >
             <Search size={11} color="#4B5563" strokeWidth={2} />
             <span style={{ flex: 1, fontSize: '12px', color: '#4B5563', textAlign: 'left' }}>Search</span>
-            <span style={{ fontSize: '10px', color: '#374151', background: 'rgba(255,255,255,0.05)', padding: '1px 4px', borderRadius: '3px', border: '1px solid rgba(255,255,255,0.06)' }}>⌘K</span>
+            <span style={{ fontSize: '10px', color: '#374151', background: 'rgba(255,255,255,0.05)', padding: '1px 4px', borderRadius: '3px', border: '1px solid rgba(255,255,255,0.06)' }}>⌘P</span>
           </button>
         </div>
       ) : (

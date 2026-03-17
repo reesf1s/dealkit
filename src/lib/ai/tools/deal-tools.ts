@@ -1,0 +1,840 @@
+import { z } from 'zod'
+import { eq, and, or, ilike, sql } from 'drizzle-orm'
+import { after } from 'next/server'
+import { db } from '@/lib/db'
+import { dealLogs, productGaps, companyProfiles } from '@/lib/db/schema'
+import { anthropic } from '@/lib/ai/client'
+import { rebuildWorkspaceBrain, getWorkspaceBrain } from '@/lib/workspace-brain'
+import { extractTextSignals, heuristicScore } from '@/lib/text-signals'
+import { computeCompositeScore } from '@/lib/deal-ml'
+import type { ToolContext, ToolResult } from './types'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DEAL_STAGES = [
+  'prospecting',
+  'qualification',
+  'discovery',
+  'proposal',
+  'negotiation',
+  'closed_won',
+  'closed_lost',
+] as const
+
+const stageEnum = z.enum(DEAL_STAGES)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+function formatDealSummary(deal: any): string {
+  const lines = [
+    `**${deal.dealName}** (${deal.prospectCompany})`,
+    `- Stage: ${deal.stage}`,
+  ]
+  if (deal.dealValue != null) lines.push(`- Value: $${deal.dealValue.toLocaleString()}`)
+  if (deal.conversionScore != null) lines.push(`- Score: ${deal.conversionScore}%`)
+  if (deal.closeDate) lines.push(`- Close date: ${new Date(deal.closeDate).toLocaleDateString()}`)
+  if (deal.aiSummary) lines.push(`- Summary: ${deal.aiSummary}`)
+  return lines.join('\n')
+}
+
+function formatDealDetailed(deal: any): string {
+  const lines = [
+    `# ${deal.dealName}`,
+    `**Company:** ${deal.prospectCompany}`,
+    `**Stage:** ${deal.stage}`,
+  ]
+  if (deal.dealValue != null) lines.push(`**Value:** $${deal.dealValue.toLocaleString()}`)
+  if (deal.conversionScore != null) lines.push(`**Conversion Score:** ${deal.conversionScore}%`)
+  if (deal.prospectName) lines.push(`**Contact:** ${deal.prospectName}${deal.prospectTitle ? ` (${deal.prospectTitle})` : ''}`)
+  if (deal.closeDate) lines.push(`**Close Date:** ${new Date(deal.closeDate).toLocaleDateString()}`)
+  if (deal.nextSteps) lines.push(`**Next Steps:** ${deal.nextSteps}`)
+  if (deal.aiSummary) lines.push(`\n**AI Summary:** ${deal.aiSummary}`)
+  if (deal.notes) lines.push(`\n**Notes:** ${deal.notes}`)
+
+  const risks = (deal.dealRisks as string[]) ?? []
+  if (risks.length > 0) {
+    lines.push('\n**Risks:**')
+    risks.forEach((r: string) => lines.push(`- ${r}`))
+  }
+
+  const todos = (deal.todos as any[]) ?? []
+  const openTodos = todos.filter((t: any) => !t.done)
+  const doneTodos = todos.filter((t: any) => t.done)
+  if (openTodos.length > 0) {
+    lines.push('\n**Open Action Items:**')
+    openTodos.forEach((t: any) => lines.push(`- [ ] ${t.text}`))
+  }
+  if (doneTodos.length > 0) {
+    lines.push('\n**Completed Items:**')
+    doneTodos.forEach((t: any) => lines.push(`- [x] ${t.text}`))
+  }
+
+  const contacts = (deal.contacts as any[]) ?? []
+  if (contacts.length > 0) {
+    lines.push('\n**Contacts:**')
+    contacts.forEach((c: any) => {
+      const parts = [c.name]
+      if (c.title) parts.push(c.title)
+      if (c.email) parts.push(c.email)
+      lines.push(`- ${parts.join(' | ')}`)
+    })
+  }
+
+  const comps = (deal.competitors as string[]) ?? []
+  if (comps.length > 0) {
+    lines.push(`\n**Competitors:** ${comps.join(', ')}`)
+  }
+
+  if (deal.lostReason) lines.push(`\n**Lost Reason:** ${deal.lostReason}`)
+
+  lines.push(`\n*Created: ${new Date(deal.createdAt).toLocaleDateString()} | Updated: ${new Date(deal.updatedAt).toLocaleDateString()}*`)
+  return lines.join('\n')
+}
+
+function normalize(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 60)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// search_deals
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const search_deals = {
+  description: 'Search for deals by name, company, or stage. Returns a concise list of matching deals with key metrics.',
+  parameters: z.object({
+    query: z.string().optional().describe('Search term to match against deal name or company'),
+    stage: stageEnum.optional().describe('Filter by deal stage'),
+  }),
+  execute: async (params: { query?: string; stage?: string }, ctx: ToolContext): Promise<ToolResult> => {
+    const conditions = [eq(dealLogs.workspaceId, ctx.workspaceId)]
+
+    if (params.stage) {
+      conditions.push(eq(dealLogs.stage, params.stage as any))
+    }
+
+    if (params.query) {
+      const pattern = `%${params.query}%`
+      conditions.push(
+        or(
+          ilike(dealLogs.dealName, pattern),
+          ilike(dealLogs.prospectCompany, pattern),
+        )!,
+      )
+    }
+
+    const deals = await db
+      .select()
+      .from(dealLogs)
+      .where(and(...conditions))
+      .orderBy(dealLogs.updatedAt)
+      .limit(20)
+
+    if (deals.length === 0) {
+      return { result: 'No deals found matching your search criteria.' }
+    }
+
+    const summaries = deals.map(formatDealSummary)
+    return {
+      result: `Found **${deals.length}** deal${deals.length === 1 ? '' : 's'}:\n\n${summaries.join('\n\n')}`,
+    }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// get_deal_details
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const get_deal_details = {
+  description: 'Get full details of a specific deal including todos, contacts, notes, risks, and project plan.',
+  parameters: z.object({
+    dealId: z.string().describe('The UUID of the deal to retrieve'),
+  }),
+  execute: async (params: { dealId: string }, ctx: ToolContext): Promise<ToolResult> => {
+    const [deal] = await db
+      .select()
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .limit(1)
+
+    if (!deal) {
+      return { result: 'Deal not found. It may have been deleted or belongs to a different workspace.' }
+    }
+
+    return { result: formatDealDetailed(deal) }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// create_deal
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const create_deal = {
+  description: 'Create a new deal in the pipeline. Returns the created deal details.',
+  parameters: z.object({
+    dealName: z.string().describe('Name of the deal'),
+    prospectCompany: z.string().describe('Company name of the prospect'),
+    prospectName: z.string().optional().describe('Name of the main contact'),
+    prospectTitle: z.string().optional().describe('Title/role of the main contact'),
+    dealValue: z.number().optional().describe('Estimated deal value in dollars'),
+    stage: stageEnum.optional().describe('Initial deal stage (defaults to prospecting)'),
+    competitors: z.array(z.string()).optional().describe('List of competitor names'),
+    notes: z.string().optional().describe('Initial notes for the deal'),
+  }),
+  execute: async (
+    params: {
+      dealName: string
+      prospectCompany: string
+      prospectName?: string
+      prospectTitle?: string
+      dealValue?: number
+      stage?: string
+      competitors?: string[]
+      notes?: string
+    },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const [created] = await db
+      .insert(dealLogs)
+      .values({
+        workspaceId: ctx.workspaceId,
+        userId: ctx.userId,
+        dealName: params.dealName,
+        prospectCompany: params.prospectCompany,
+        prospectName: params.prospectName ?? null,
+        prospectTitle: params.prospectTitle ?? null,
+        dealValue: params.dealValue ?? null,
+        stage: (params.stage as any) ?? 'prospecting',
+        competitors: params.competitors ?? [],
+        notes: params.notes ?? null,
+      })
+      .returning()
+
+    after(async () => {
+      try { await rebuildWorkspaceBrain(ctx.workspaceId) } catch { /* non-fatal */ }
+    })
+
+    return {
+      result: `Deal **${created.dealName}** with ${created.prospectCompany} created successfully in **${created.stage}** stage.${params.dealValue ? ` Value: $${params.dealValue.toLocaleString()}.` : ''}`,
+      actions: [{
+        type: 'deal_created',
+        dealId: created.id,
+        dealName: created.dealName,
+        company: created.prospectCompany,
+      }],
+      uiHint: 'refresh_deals',
+    }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// update_deal
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const update_deal = {
+  description: 'Update fields on an existing deal such as stage, value, close date, next steps, or notes.',
+  parameters: z.object({
+    dealId: z.string().describe('The UUID of the deal to update'),
+    stage: stageEnum.optional().describe('New deal stage'),
+    dealValue: z.number().optional().describe('Updated deal value in dollars'),
+    closeDate: z.string().optional().describe('Expected close date (ISO format or natural date)'),
+    nextSteps: z.string().optional().describe('Next steps for the deal'),
+    notes: z.string().optional().describe('Additional notes to append'),
+    lostReason: z.string().optional().describe('Reason deal was lost (only for closed_lost)'),
+  }),
+  execute: async (
+    params: {
+      dealId: string
+      stage?: string
+      dealValue?: number
+      closeDate?: string
+      nextSteps?: string
+      notes?: string
+      lostReason?: string
+    },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const [existing] = await db
+      .select()
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .limit(1)
+
+    if (!existing) {
+      return { result: 'Deal not found.' }
+    }
+
+    const updateFields: Record<string, unknown> = { updatedAt: new Date() }
+    const changes: string[] = []
+
+    if (params.stage) {
+      updateFields.stage = params.stage
+      changes.push(`Stage: ${existing.stage} -> ${params.stage}`)
+      if (params.stage === 'closed_won') updateFields.wonDate = new Date()
+      if (params.stage === 'closed_lost') updateFields.lostDate = new Date()
+    }
+    if (params.dealValue !== undefined) {
+      updateFields.dealValue = params.dealValue
+      changes.push(`Value: $${params.dealValue.toLocaleString()}`)
+    }
+    if (params.closeDate) {
+      updateFields.closeDate = new Date(params.closeDate)
+      changes.push(`Close date: ${params.closeDate}`)
+    }
+    if (params.nextSteps) {
+      updateFields.nextSteps = params.nextSteps
+      changes.push(`Next steps updated`)
+    }
+    if (params.notes) {
+      const existingNotes = existing.notes ?? ''
+      updateFields.notes = existingNotes ? `${existingNotes}\n\n${params.notes}` : params.notes
+      changes.push('Notes appended')
+    }
+    if (params.lostReason) {
+      updateFields.lostReason = params.lostReason
+      changes.push(`Lost reason: ${params.lostReason}`)
+    }
+
+    if (changes.length === 0) {
+      return { result: 'No changes specified.' }
+    }
+
+    await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, params.dealId))
+
+    after(async () => {
+      try { await rebuildWorkspaceBrain(ctx.workspaceId) } catch { /* non-fatal */ }
+    })
+
+    return {
+      result: `Updated **${existing.dealName}**:\n${changes.map(c => `- ${c}`).join('\n')}`,
+      actions: [{
+        type: 'deal_updated',
+        dealId: params.dealId,
+        dealName: existing.dealName,
+        changes,
+      }],
+      uiHint: 'refresh_deals',
+    }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// manage_todos
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const manage_todos = {
+  description: 'Add, complete, or remove action items (todos) on a deal. Uses fuzzy matching for completion/removal.',
+  parameters: z.object({
+    dealId: z.string().describe('The UUID of the deal'),
+    add: z.array(z.string()).optional().describe('New todo texts to add'),
+    completeTexts: z.array(z.string()).optional().describe('Todo texts to mark as completed (fuzzy matched)'),
+    removeTexts: z.array(z.string()).optional().describe('Todo texts to remove entirely (fuzzy matched)'),
+  }),
+  execute: async (
+    params: {
+      dealId: string
+      add?: string[]
+      completeTexts?: string[]
+      removeTexts?: string[]
+    },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const [deal] = await db
+      .select({ id: dealLogs.id, dealName: dealLogs.dealName, todos: dealLogs.todos })
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .limit(1)
+
+    if (!deal) return { result: 'Deal not found.' }
+
+    let todos = ((deal.todos as any[]) ?? []).slice()
+    let added = 0, completed = 0, removed = 0
+
+    // Fuzzy match helper: find best matching todo by normalized text
+    function fuzzyFind(text: string): any | undefined {
+      const norm = normalize(text)
+      return todos.find((t: any) => normalize(t.text).includes(norm) || norm.includes(normalize(t.text)))
+    }
+
+    // Complete todos
+    if (params.completeTexts) {
+      for (const text of params.completeTexts) {
+        const match = fuzzyFind(text)
+        if (match && !match.done) {
+          match.done = true
+          match.completedAt = new Date().toISOString()
+          completed++
+        }
+      }
+    }
+
+    // Remove todos
+    if (params.removeTexts) {
+      for (const text of params.removeTexts) {
+        const match = fuzzyFind(text)
+        if (match) {
+          todos = todos.filter((t: any) => t.id !== match.id)
+          removed++
+        }
+      }
+    }
+
+    // Add new todos (dedup against existing)
+    if (params.add) {
+      const existingKeys = new Set(todos.map((t: any) => normalize(t.text)))
+      for (const text of params.add) {
+        if (!existingKeys.has(normalize(text))) {
+          todos.push({
+            id: crypto.randomUUID(),
+            text,
+            done: false,
+            createdAt: new Date().toISOString(),
+          })
+          added++
+        }
+      }
+    }
+
+    await db.update(dealLogs).set({ todos, updatedAt: new Date() }).where(eq(dealLogs.id, params.dealId))
+
+    const parts: string[] = []
+    if (added > 0) parts.push(`${added} added`)
+    if (completed > 0) parts.push(`${completed} completed`)
+    if (removed > 0) parts.push(`${removed} removed`)
+
+    return {
+      result: `Todos updated on **${deal.dealName}**: ${parts.join(', ')}.`,
+      actions: [{
+        type: 'todos_updated',
+        added,
+        removed,
+        completed,
+        dealName: deal.dealName,
+      }],
+      uiHint: 'refresh_deals',
+    }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// add_contact
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const add_contact = {
+  description: 'Add a contact person to a deal.',
+  parameters: z.object({
+    dealId: z.string().describe('The UUID of the deal'),
+    name: z.string().describe('Contact name'),
+    title: z.string().optional().describe('Job title or role'),
+    email: z.string().optional().describe('Email address'),
+    phone: z.string().optional().describe('Phone number'),
+  }),
+  execute: async (
+    params: { dealId: string; name: string; title?: string; email?: string; phone?: string },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const [deal] = await db
+      .select({ id: dealLogs.id, dealName: dealLogs.dealName, contacts: dealLogs.contacts })
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .limit(1)
+
+    if (!deal) return { result: 'Deal not found.' }
+
+    const contacts = ((deal.contacts as any[]) ?? []).slice()
+    const newContact: Record<string, string> = {
+      id: crypto.randomUUID(),
+      name: params.name,
+    }
+    if (params.title) newContact.title = params.title
+    if (params.email) newContact.email = params.email
+    if (params.phone) newContact.phone = params.phone
+
+    contacts.push(newContact)
+    await db.update(dealLogs).set({ contacts, updatedAt: new Date() }).where(eq(dealLogs.id, params.dealId))
+
+    return {
+      result: `Added contact **${params.name}**${params.title ? ` (${params.title})` : ''} to deal **${deal.dealName}**.`,
+      actions: [{
+        type: 'deal_updated',
+        dealId: params.dealId,
+        dealName: deal.dealName,
+        changes: [`Contact added: ${params.name}`],
+      }],
+      uiHint: 'refresh_deals',
+    }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// delete_deal
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const delete_deal = {
+  description: 'Delete a deal from the pipeline. Requires confirmation from the user before proceeding.',
+  parameters: z.object({
+    dealId: z.string().describe('The UUID of the deal to delete'),
+  }),
+  execute: async (params: { dealId: string }, ctx: ToolContext): Promise<ToolResult> => {
+    const [deal] = await db
+      .select({ id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany })
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .limit(1)
+
+    if (!deal) return { result: 'Deal not found.' }
+
+    return {
+      result: `Are you sure you want to delete the deal **${deal.dealName}** (${deal.prospectCompany})? This action cannot be undone. Reply "yes" to confirm.`,
+      confirmationRequired: true,
+      pendingAction: {
+        tool: 'delete_deal_confirmed',
+        dealId: params.dealId,
+        dealName: deal.dealName,
+      },
+    }
+  },
+}
+
+// Internal: actually deletes the deal after confirmation
+export const delete_deal_confirmed = {
+  description: 'Internal: Execute a confirmed deal deletion. Do not call directly — called after user confirms delete_deal.',
+  parameters: z.object({
+    dealId: z.string().describe('The UUID of the deal to delete'),
+  }),
+  execute: async (params: { dealId: string }, ctx: ToolContext): Promise<ToolResult> => {
+    const [deal] = await db
+      .select({ id: dealLogs.id, dealName: dealLogs.dealName })
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .limit(1)
+
+    if (!deal) return { result: 'Deal not found.' }
+
+    await db.delete(dealLogs).where(eq(dealLogs.id, params.dealId))
+
+    after(async () => {
+      try { await rebuildWorkspaceBrain(ctx.workspaceId) } catch { /* non-fatal */ }
+    })
+
+    return {
+      result: `Deal **${deal.dealName}** has been permanently deleted.`,
+      actions: [{ type: 'deal_deleted', dealId: params.dealId, dealName: deal.dealName }],
+      uiHint: 'refresh_deals',
+    }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// process_meeting_notes
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MeetingNotesSchema = z.object({
+  summary: z.string().nullable().optional(),
+  risks: z.array(z.string()).default([]),
+  todos: z.array(z.object({ text: z.string() })).default([]),
+  obsoleteTodoIds: z.array(z.string()).default([]),
+  productGaps: z.array(z.object({
+    title: z.string(),
+    description: z.string().optional().default(''),
+    priority: z.enum(['critical', 'high', 'medium', 'low']).default('medium'),
+  })).default([]),
+  competitors: z.array(z.string()).default([]),
+  intentSignals: z.object({
+    championStatus: z.enum(['confirmed', 'suspected', 'none']).default('none'),
+    budgetStatus: z.enum(['approved', 'awaiting', 'not_discussed', 'blocked']).default('not_discussed'),
+    decisionTimeline: z.string().nullable().optional(),
+    nextMeetingBooked: z.boolean().default(false),
+  }).optional(),
+})
+
+export const process_meeting_notes = {
+  description: 'Process meeting notes or transcript for a deal. Extracts summary, action items, risks, product gaps, competitors, and intent signals. Updates the deal automatically.',
+  parameters: z.object({
+    notes: z.string().describe('The meeting notes or transcript text'),
+    dealId: z.string().optional().describe('The UUID of the deal these notes relate to. If omitted, the active deal context is used.'),
+  }),
+  execute: async (
+    params: { notes: string; dealId?: string },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const dealId = params.dealId ?? ctx.activeDealId
+    if (!dealId) {
+      return { result: 'No deal specified. Please provide a dealId or navigate to a deal first.' }
+    }
+
+    const [deal] = await db
+      .select()
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .limit(1)
+
+    if (!deal) return { result: 'Deal not found.' }
+
+    // Fetch known capabilities to prevent false product gap detection
+    const [profile] = await db
+      .select({ knownCapabilities: companyProfiles.knownCapabilities })
+      .from(companyProfiles)
+      .where(eq(companyProfiles.workspaceId, ctx.workspaceId))
+      .limit(1)
+    const knownCapabilities = (profile?.knownCapabilities as string[]) ?? []
+    const capabilitiesContext = knownCapabilities.length > 0
+      ? `\n\nCONFIRMED PRODUCT CAPABILITIES (do NOT flag these as product gaps):\n${knownCapabilities.map(c => `- ${c}`).join('\n')}`
+      : ''
+
+    // Compress meeting history to last 5 entries
+    function compressMeetingHistory(raw: string | null): string {
+      if (!raw) return ''
+      const entries = raw.split('\n').reduce<string[]>((acc, line) => {
+        if (/^\[\d/.test(line)) acc.push(line)
+        else if (acc.length > 0) acc[acc.length - 1] += ' ' + line.trim()
+        return acc
+      }, [])
+      return entries.slice(-5).join('\n')
+    }
+
+    const compressedHistory = compressMeetingHistory(deal.meetingNotes as string | null)
+    const previousContext = [
+      compressedHistory ? `MEETING HISTORY (last 5 updates):\n${compressedHistory}` : '',
+      deal.aiSummary ? `CURRENT DEAL SUMMARY: ${deal.aiSummary}` : '',
+      (deal.dealRisks as string[])?.length ? `KNOWN RISKS: ${(deal.dealRisks as string[]).join('; ')}` : '',
+    ].filter(Boolean).join('\n\n')
+
+    const existingTodos = (deal.todos as any[]) ?? []
+    const openTodos = existingTodos.filter((t: any) => !t.done)
+    const existingTodosContext = openTodos.length > 0
+      ? `\n\nEXISTING OPEN ACTION ITEMS:\n${openTodos.map((t: any) => `- [${t.id}] ${t.text}`).join('\n')}\n\nRules:\n- Do NOT add duplicates of existing items\n- Return obsoleteTodoIds: IDs of items now done, superseded, or irrelevant`
+      : ''
+
+    // Phase 1: LLM extraction (no scoring)
+    const extractionMsg = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2000,
+      messages: [{
+        role: 'user',
+        content: `You are extracting structured data from B2B sales meeting notes. Return ONLY valid JSON, no markdown, no analysis.
+
+${previousContext ? `${previousContext}\n\n---\n\n` : ''}NEW MEETING NOTES:
+${params.notes}
+
+Deal: ${deal.dealName} with ${deal.prospectCompany}${capabilitiesContext}${existingTodosContext}
+
+Return this exact JSON:
+{
+  "summary": "2-3 sentence factual summary of deal status and trajectory",
+  "risks": ["direct observation from THESE notes only (max 10 words each, max 4)"],
+  "todos": [{"text": "specific action item"}],
+  "obsoleteTodoIds": ["id-of-existing-todo-now-done-or-irrelevant"],
+  "productGaps": [{"title": "gap title", "description": "what is missing", "priority": "high"}],
+  "competitors": ["competitor name only if explicitly mentioned as being evaluated"],
+  "intentSignals": {
+    "championStatus": "confirmed|suspected|none",
+    "budgetStatus": "approved|awaiting|not_discussed|blocked",
+    "decisionTimeline": "e.g. Q2 2026 or null if not mentioned",
+    "nextMeetingBooked": false
+  }
+}
+
+Rules:
+- risks: deal-level signals only, not feature requests. Max 4. Return [] if none.
+- todos: new items only. No duplicates. Return [] if none.
+- productGaps: only if prospect EXPLICITLY said your product lacks something. Return [] otherwise.
+- competitors: max 4, only if named as an explicit alternative. Return [] if none.
+- intentSignals: extract ONLY what is explicitly stated.`,
+      }],
+    })
+
+    const rawText = ((extractionMsg.content[0] as any).text ?? '').trim()
+
+    // Parse with retry
+    let parsed: z.infer<typeof MeetingNotesSchema>
+    try {
+      const jsonStr = rawText.replace(/^```json?\n?/i, '').replace(/\n?```$/i, '').trim()
+      const braceIdx = jsonStr.indexOf('{')
+      const cleanJson = braceIdx > 0 ? jsonStr.slice(braceIdx) : jsonStr
+      const result = MeetingNotesSchema.safeParse(JSON.parse(cleanJson))
+      if (result.success) {
+        parsed = result.data
+      } else {
+        // Retry with correction
+        const retryMsg = await anthropic.messages.create({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 2000,
+          messages: [{
+            role: 'user',
+            content: `Return ONLY valid JSON. No markdown.\n\nOriginal:\n${rawText}\n\nErrors: ${result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')}\n\nFix and return only the corrected object.`,
+          }],
+        })
+        const retryRaw = ((retryMsg.content[0] as any).text ?? '').trim()
+        const retryClean = retryRaw.replace(/^```json?\n?/i, '').replace(/\n?```$/i, '').trim()
+        const retryBrace = retryClean.indexOf('{')
+        parsed = MeetingNotesSchema.parse(JSON.parse(retryBrace > 0 ? retryClean.slice(retryBrace) : retryClean))
+      }
+    } catch {
+      parsed = MeetingNotesSchema.parse({})
+    }
+
+    // Build update fields
+    const newTodos = (parsed.todos ?? []).map(t => ({
+      id: crypto.randomUUID(),
+      text: t.text,
+      done: false,
+      createdAt: new Date().toISOString(),
+    }))
+
+    const obsoleteIds = new Set(parsed.obsoleteTodoIds ?? [])
+    const dateStamp = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+    const risksLine = (parsed.risks ?? []).length > 0 ? ` Risks: ${parsed.risks.join('; ')}.` : ''
+    const actionLine = newTodos.length > 0 ? ` Actions: ${newTodos.map(t => t.text).join('; ')}.` : ''
+    const compactEntry = parsed.summary
+      ? `[${dateStamp}] ${parsed.summary}${risksLine}${actionLine}`
+      : `[${dateStamp}] Meeting notes processed.${actionLine}`
+
+    const appendedNotes = deal.meetingNotes ? `${deal.meetingNotes}\n${compactEntry}` : compactEntry
+
+    // Merge todos: remove obsolete, dedup, append new
+    const existingKept = existingTodos.filter((t: any) => !obsoleteIds.has(t.id))
+    const existingKeys = new Set(existingKept.map((t: any) => normalize(t.text)))
+    const dedupedNew = newTodos.filter(t => !existingKeys.has(normalize(t.text)))
+    const mergedTodos = [...existingKept, ...dedupedNew]
+
+    // Merge competitors
+    const extractedComps = (parsed.competitors ?? []).filter(c => typeof c === 'string' && c.trim())
+    const existingComps = (deal.competitors as string[]) ?? []
+    const existingCompKeys = new Set(existingComps.map(c => c.toLowerCase()))
+    const newComps = extractedComps.filter(c => !existingCompKeys.has(c.toLowerCase()))
+    const mergedCompetitors = newComps.length > 0 ? [...existingComps, ...newComps] : undefined
+
+    const updateFields: Record<string, unknown> = {
+      meetingNotes: appendedNotes,
+      dealRisks: parsed.risks ?? [],
+      todos: mergedTodos,
+      updatedAt: new Date(),
+    }
+    if (mergedCompetitors) updateFields.competitors = mergedCompetitors
+    if (parsed.summary) updateFields.aiSummary = parsed.summary
+    if (parsed.intentSignals) updateFields.intentSignals = parsed.intentSignals
+
+    // Phase 2: Score computation (brain-driven, not LLM)
+    try {
+      const signals = extractTextSignals(appendedNotes, deal.createdAt ?? new Date(), new Date())
+      const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
+      const mlPred = brain?.mlPredictions?.find(p => p.dealId === dealId)
+
+      let finalScore: number
+      if (mlPred && brain?.mlModel) {
+        const { composite } = computeCompositeScore(
+          heuristicScore(signals, 0.5),
+          mlPred.winProbability,
+          brain.mlModel.trainingSize,
+        )
+        finalScore = composite
+      } else {
+        finalScore = heuristicScore(signals, 0.5)
+      }
+
+      // Intent signal adjustments
+      if (parsed.intentSignals) {
+        const is = parsed.intentSignals
+        if (is.championStatus === 'confirmed') finalScore = Math.min(100, finalScore + 6)
+        if (is.championStatus === 'suspected') finalScore = Math.min(100, finalScore + 3)
+        if (is.budgetStatus === 'approved') finalScore = Math.min(100, finalScore + 8)
+        if (is.budgetStatus === 'awaiting') finalScore = Math.min(100, finalScore + 2)
+        if (is.budgetStatus === 'blocked') finalScore = Math.max(0, finalScore - 8)
+        if (is.nextMeetingBooked) finalScore = Math.min(100, finalScore + 3)
+      }
+
+      updateFields.conversionScore = finalScore
+    } catch { /* non-fatal */ }
+
+    await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, dealId))
+
+    // Create product gaps
+    const createdGaps: string[] = []
+    for (const gap of (parsed.productGaps ?? [])) {
+      if (!gap.title) continue
+      const [existing] = await db
+        .select()
+        .from(productGaps)
+        .where(and(eq(productGaps.workspaceId, ctx.workspaceId), eq(productGaps.title, gap.title)))
+        .limit(1)
+
+      if (existing) {
+        await db.update(productGaps).set({
+          frequency: (existing.frequency ?? 1) + 1,
+          sourceDeals: [...((existing.sourceDeals as string[]) ?? []), dealId],
+          updatedAt: new Date(),
+        }).where(eq(productGaps.id, existing.id))
+      } else {
+        await db.insert(productGaps).values({
+          workspaceId: ctx.workspaceId,
+          userId: ctx.userId,
+          title: gap.title,
+          description: gap.description ?? '',
+          priority: gap.priority ?? 'medium',
+          frequency: 1,
+          sourceDeals: [dealId],
+          status: 'open',
+          affectedRevenue: deal.dealValue ?? null,
+        })
+      }
+      createdGaps.push(gap.title)
+    }
+
+    after(async () => {
+      try { await rebuildWorkspaceBrain(ctx.workspaceId) } catch { /* non-fatal */ }
+    })
+
+    // Build response
+    const resultLines = [`Meeting notes processed for **${deal.dealName}**.`]
+    if (parsed.summary) resultLines.push(`\n**Summary:** ${parsed.summary}`)
+    if (parsed.risks.length > 0) {
+      resultLines.push(`\n**Risks identified:**`)
+      parsed.risks.forEach(r => resultLines.push(`- ${r}`))
+    }
+    if (dedupedNew.length > 0) {
+      resultLines.push(`\n**New action items:**`)
+      dedupedNew.forEach(t => resultLines.push(`- ${t.text}`))
+    }
+    if (obsoleteIds.size > 0) {
+      resultLines.push(`\n*${obsoleteIds.size} obsolete todo(s) removed.*`)
+    }
+    if (createdGaps.length > 0) {
+      resultLines.push(`\n**Product gaps logged:**`)
+      createdGaps.forEach(g => resultLines.push(`- ${g}`))
+    }
+    if (newComps.length > 0) {
+      resultLines.push(`\n**New competitors detected:** ${newComps.join(', ')}`)
+    }
+    if (updateFields.conversionScore != null) {
+      resultLines.push(`\n**Updated conversion score:** ${updateFields.conversionScore}%`)
+    }
+
+    const actions: any[] = []
+    if (dedupedNew.length > 0 || obsoleteIds.size > 0) {
+      actions.push({
+        type: 'todos_updated',
+        added: dedupedNew.length,
+        removed: obsoleteIds.size,
+        completed: 0,
+        dealName: deal.dealName,
+      })
+    }
+    if (createdGaps.length > 0) {
+      actions.push({
+        type: 'gaps_logged',
+        gaps: createdGaps,
+        count: createdGaps.length,
+      })
+    }
+
+    return {
+      result: resultLines.join('\n'),
+      actions,
+      uiHint: 'refresh_deals',
+    }
+  },
+}
