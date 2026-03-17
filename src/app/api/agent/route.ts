@@ -251,14 +251,28 @@ export async function POST(req: NextRequest) {
     const accumulatedActions: Record<string, unknown>[] = []
 
     // Helper: convert zod v4 schema to AI SDK compatible format
-    function zodToAiSchema(zodSchema: z.ZodType) {
+    function zodToAiSchema(zodSchema: z.ZodType, toolName: string) {
       try {
         // Zod v4 has built-in JSON Schema conversion
-        const json = (z as any).toJSONSchema(zodSchema)
+        const json = (z as any).toJSONSchema(zodSchema, {
+          unrepresentable: 'any',  // Don't throw on edge-case types
+          target: 'draft-07',       // Most compatible with AI providers
+        })
         return jsonSchema(json)
-      } catch {
-        // Fallback: use the raw zod schema and hope ai SDK handles it
-        return zodSchema
+      } catch (e) {
+        console.error(`[agent] zodToAiSchema failed for tool "${toolName}":`, e)
+        // Last resort: build a permissive JSON schema from the zod shape
+        try {
+          const shape = (zodSchema as any)._zod?.def?.shape
+          if (shape) {
+            const properties: Record<string, any> = {}
+            for (const [key, val] of Object.entries(shape)) {
+              properties[key] = {} // Accept anything
+            }
+            return jsonSchema({ type: 'object', properties, additionalProperties: true })
+          }
+        } catch { /* ignore */ }
+        return jsonSchema({ type: 'object', properties: {}, additionalProperties: true })
       }
     }
 
@@ -267,16 +281,22 @@ export async function POST(req: NextRequest) {
         name,
         tool({
           description: t.description,
-          parameters: zodToAiSchema(t.parameters) as any,
+          parameters: zodToAiSchema(t.parameters, name) as any,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           execute: async (params: any) => {
-            // Validate params through the original zod schema
-            const validated = t.parameters.parse(params) as any
-            const result = await (t.execute as any)(validated, toolContext)
-            if (result.actions?.length) {
-              accumulatedActions.push(...result.actions)
+            try {
+              // Validate params through the original zod schema
+              const validated = t.parameters.parse(params) as any
+              const result = await (t.execute as any)(validated, toolContext)
+              if (result.actions?.length) {
+                accumulatedActions.push(...result.actions)
+              }
+              return result.result
+            } catch (toolErr) {
+              const msg = toolErr instanceof Error ? toolErr.message : String(toolErr)
+              console.error(`[agent] Tool "${name}" failed:`, msg, toolErr)
+              return `Error executing ${name}: ${msg}`
             }
-            return result.result
           },
         }),
       ]),
