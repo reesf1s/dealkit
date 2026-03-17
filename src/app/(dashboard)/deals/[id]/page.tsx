@@ -448,7 +448,7 @@ const STAGE_PLAYBOOK: Record<string, string[]> = {
   ],
 }
 
-function MeetingPrepTab({ dealId, deal }: { dealId: string; deal: any }) {
+function MeetingPrepTab({ dealId, deal, objectionWinMap = [] }: { dealId: string; deal: any; objectionWinMap?: any[] }) {
   const [prep, setPrep] = useState('')
   const [loading, setLoading] = useState(false)
   const [fullBriefShown, setFullBriefShown] = useState(false)
@@ -553,6 +553,30 @@ function MeetingPrepTab({ dealId, deal }: { dealId: string; deal: any }) {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Objections you've beaten before — from closed deal history */}
+      {objectionWinMap.filter((o: any) => o.winsWithTheme > 0).length > 0 && (
+        <div style={cardStyle}>
+          {sectionTitle('Objections You\'ve Beaten Before', '#22C55E')}
+          <div style={{ fontSize: '11px', color: '#555', marginBottom: '10px', lineHeight: 1.5 }}>
+            These objection types appeared in past deals that still closed — use this when they surface.
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {objectionWinMap.filter((o: any) => o.winsWithTheme > 0).slice(0, 4).map((o: any, i: number) => {
+              const color = o.winRateWithTheme >= 60 ? '#22C55E' : o.winRateWithTheme >= 40 ? '#F59E0B' : '#EF4444'
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: `${color}06`, border: `1px solid ${color}18`, borderRadius: '8px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 800, color, minWidth: '38px', textAlign: 'right', flexShrink: 0 }}>{o.winRateWithTheme}%</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', color: '#E5E7EB', fontWeight: 600, textTransform: 'capitalize' }}>{o.theme.replace(/_/g, ' ')}</div>
+                    <div style={{ fontSize: '11px', color: '#555', marginTop: '1px' }}>{o.winsWithTheme}/{o.dealsWithTheme} deals closed despite this objection</div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -2111,6 +2135,7 @@ export default function DealDetailPage() {
   const currencySymbol: string = configData?.data?.currency ?? '$'
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
   const mlPrediction = (brainRes?.data?.mlPredictions ?? []).find((p: any) => p.dealId === id) ?? null
+  const objectionWinMap: any[] = brainRes?.data?.objectionWinMap ?? []
   const { setActiveDeal } = useSidebar()
 
   const [activeTab, setActiveTab] = useState<'overview' | 'meeting-notes' | 'prep' | 'todos' | 'project-plan' | 'success'>('overview')
@@ -2249,7 +2274,7 @@ export default function DealDetailPage() {
           {activeTab === 'meeting-notes' && (
             <MeetingNotesTab dealId={id} deal={deal} onUpdate={() => mutate()} onSwitchToPrep={() => setActiveTab('prep')} />
           )}
-          {activeTab === 'prep' && <MeetingPrepTab dealId={id} deal={deal} />}
+          {activeTab === 'prep' && <MeetingPrepTab dealId={id} deal={deal} objectionWinMap={objectionWinMap} />}
           {activeTab === 'todos' && (
             <TodosTab dealId={id} deal={deal} onUpdate={() => mutate()} />
           )}

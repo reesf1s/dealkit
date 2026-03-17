@@ -739,6 +739,52 @@ export default function DashboardPage() {
                 )
               })()}
 
+              {/* Product gap revenue priority */}
+              {(brain?.productGapPriority ?? []).some((g: any) => g.revenueAtRisk > 0 || g.dealsBlocked > 0) && (
+                <div style={{ background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.12)', borderRadius: '12px', padding: '14px 16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Revenue at Risk by Gap</div>
+                    <Link href="/product-gaps" style={{ fontSize: '10px', color: '#EF4444', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      View all <ArrowUpRight size={9} />
+                    </Link>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {(brain!.productGapPriority!).filter((g: any) => g.revenueAtRisk > 0 || g.dealsBlocked > 0).slice(0, 4).map((g: any, gi: number) => (
+                      <div key={gi} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '11px', color: '#9CA3AF', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.title}</span>
+                        {g.revenueAtRisk > 0 && (
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#EF4444', flexShrink: 0 }}>{fmt(g.revenueAtRisk, currencySymbol)}</span>
+                        )}
+                        <span style={{ fontSize: '10px', color: '#374151', flexShrink: 0 }}>{g.dealsBlocked} deal{g.dealsBlocked !== 1 ? 's' : ''}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Collateral effectiveness */}
+              {(brain?.collateralEffectiveness ?? []).length >= 2 && (
+                <div style={{ background: 'rgba(99,102,241,0.04)', border: '1px solid rgba(99,102,241,0.12)', borderRadius: '12px', padding: '14px 16px' }}>
+                  <div style={{ fontSize: '10px', color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '10px' }}>Collateral Win Rates</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    {(brain!.collateralEffectiveness!).slice(0, 5).map((c: any, ci: number) => {
+                      const color = c.winRate >= 60 ? '#22C55E' : c.winRate >= 40 ? '#F59E0B' : '#EF4444'
+                      return (
+                        <div key={ci} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '11px', color: '#9CA3AF', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {c.type.replace(/_/g, ' ')}
+                          </span>
+                          <div style={{ width: '40px', height: '4px', background: 'rgba(255,255,255,0.04)', borderRadius: '2px', overflow: 'hidden', flexShrink: 0 }}>
+                            <div style={{ height: '100%', width: `${c.winRate}%`, background: color, borderRadius: '2px' }} />
+                          </div>
+                          <span style={{ fontSize: '11px', color, fontWeight: 700, width: '30px', textAlign: 'right', flexShrink: 0 }}>{c.winRate}%</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
         )

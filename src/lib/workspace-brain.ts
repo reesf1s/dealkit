@@ -13,7 +13,7 @@
  * - keyPatterns: recurring risk/objection themes across the pipeline
  */
 import { db } from '@/lib/db'
-import { dealLogs, competitors as competitorRecords } from '@/lib/db/schema'
+import { dealLogs, competitors as competitorRecords, productGaps as productGapsTable, collateral as collateralTable } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import { runMLEngine, computeCompositeScore, type TrainedMLModel, type DealMLPrediction, type MLTrends, type DealArchetype, type StageVelocityIntel, type CompetitivePattern, type ScoreCalibrationPoint, type CloseDateModel, ML_MIN_TRAINING_DEALS } from '@/lib/deal-ml'
 import { extractTextSignals, analyzeDeterioration, parseMeetingEntries, type TextSignals } from '@/lib/text-signals'
@@ -130,6 +130,28 @@ export interface WorkspaceBrain {
   // ── Tier 1 intelligence ─────────────────────────────────────────────────────
   followUpIntel?: FollowUpCadenceIntel             // per-stage optimal follow-up cadence + alerts
   repIntel?: RepIntelStats[]                       // per-rep behavioural stats
+  // ── Tier 2 intelligence ─────────────────────────────────────────────────────
+  objectionWinMap?: {                              // risk themes that still led to wins — "we've beaten this"
+    theme: string
+    dealsWithTheme: number
+    winsWithTheme: number
+    winRateWithTheme: number                       // 0-100
+  }[]
+  productGapPriority?: {                           // gaps ranked by open pipeline revenue at risk
+    gapId: string
+    title: string
+    priority: string
+    status: string
+    revenueAtRisk: number
+    dealsBlocked: number
+  }[]
+  collateralEffectiveness?: {                      // win rate per collateral type used in closed deals
+    type: string
+    totalUsed: number
+    wins: number
+    losses: number
+    winRate: number                                // 0-100
+  }[]
 }
 
 export interface PipelineHealthIndex {
@@ -251,6 +273,22 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     })
     .from(dealLogs)
     .where(eq(dealLogs.workspaceId, workspaceId))
+
+  // ── Tier 2: parallel fetch of product gaps + collateral ───────────────────
+  const [gaps, collateralRows] = await Promise.all([
+    db.select({
+      id: productGapsTable.id,
+      title: productGapsTable.title,
+      priority: productGapsTable.priority,
+      status: productGapsTable.status,
+      sourceDeals: productGapsTable.sourceDeals,
+    }).from(productGapsTable).where(eq(productGapsTable.workspaceId, workspaceId)),
+    db.select({
+      type: collateralTable.type,
+      status: collateralTable.status,
+      sourceDealLogId: collateralTable.sourceDealLogId,
+    }).from(collateralTable).where(eq(collateralTable.workspaceId, workspaceId)),
+  ])
 
   const now = new Date()
   const activeDeals = deals.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
@@ -514,6 +552,69 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
       })
     }
   }
+
+  // ── Tier 2: Objection → Win Condition Mapping ─────────────────────────────
+  // For risk themes that appear in CLOSED deals, compute how often the deal still won.
+  // "We had [budget concern] on 6 deals and still closed 4 of them" = proven solvable.
+  const closedDeals = deals.filter(d => d.stage === 'closed_won' || d.stage === 'closed_lost')
+  const objectionWinMap: NonNullable<WorkspaceBrain['objectionWinMap']> = []
+  if (closedDeals.length >= 4) {
+    for (const theme of riskWords) {
+      const withTheme = closedDeals.filter(d => {
+        const allText = ((d.dealRisks as string[]) ?? []).join(' ').toLowerCase()
+        return theme.keywords.some(kw => allText.includes(kw))
+      })
+      if (withTheme.length < 2) continue
+      const wins = withTheme.filter(d => d.stage === 'closed_won').length
+      objectionWinMap.push({
+        theme: theme.label,
+        dealsWithTheme: withTheme.length,
+        winsWithTheme: wins,
+        winRateWithTheme: Math.round((wins / withTheme.length) * 100),
+      })
+    }
+    objectionWinMap.sort((a, b) => b.winsWithTheme - a.winsWithTheme)
+  }
+
+  // ── Tier 2: Product Gap Revenue Priority ───────────────────────────────────
+  // For each active gap, compute how much open pipeline revenue is at risk
+  // by joining sourceDeals[] against active deals with a deal value.
+  const productGapPriority: NonNullable<WorkspaceBrain['productGapPriority']> = []
+  for (const gap of gaps) {
+    if (gap.status === 'shipped' || gap.status === 'wont_fix') continue
+    const sourceDealIds: string[] = (gap.sourceDeals as string[]) ?? []
+    const openGapDeals = activeDeals.filter(d => sourceDealIds.includes(d.id))
+    const revenueAtRisk = openGapDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
+    productGapPriority.push({
+      gapId:         gap.id,
+      title:         gap.title,
+      priority:      gap.priority,
+      status:        gap.status,
+      revenueAtRisk,
+      dealsBlocked:  openGapDeals.length,
+    })
+  }
+  productGapPriority.sort((a, b) => b.revenueAtRisk - a.revenueAtRisk || b.dealsBlocked - a.dealsBlocked)
+
+  // ── Tier 2: Collateral Effectiveness Scoring ───────────────────────────────
+  // Map each collateral type → closed deal outcomes to compute win rate per type.
+  // Only counts "ready" collateral that was generated for a specific deal.
+  const effectivenessMap = new Map<string, { wins: number; losses: number }>()
+  for (const item of collateralRows) {
+    if (item.status !== 'ready' || !item.sourceDealLogId) continue
+    const deal = deals.find(d => d.id === item.sourceDealLogId)
+    if (!deal || (deal.stage !== 'closed_won' && deal.stage !== 'closed_lost')) continue
+    const cur = effectivenessMap.get(item.type) ?? { wins: 0, losses: 0 }
+    if (deal.stage === 'closed_won') cur.wins++ else cur.losses++
+    effectivenessMap.set(item.type, cur)
+  }
+  const collateralEffectiveness: NonNullable<WorkspaceBrain['collateralEffectiveness']> = []
+  for (const [type, { wins, losses }] of effectivenessMap.entries()) {
+    const total = wins + losses
+    if (total < 2) continue
+    collateralEffectiveness.push({ type, totalUsed: total, wins, losses, winRate: Math.round((wins / total) * 100) })
+  }
+  collateralEffectiveness.sort((a, b) => b.winRate - a.winRate)
 
   // ── Auto-create competitor stubs for any named competitors in active deals ─
   // This ensures every competitor mentioned in a deal appears in the Intelligence hub.
@@ -1106,8 +1207,11 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
     pipelineHealthIndex: activeDeals.length > 0 ? pipelineHealthIndex : undefined,
     revenueForecasts:    revenueForecasts.length > 0 ? revenueForecasts : undefined,
     deteriorationAlerts: deteriorationAlerts.length > 0 ? deteriorationAlerts : undefined,
-    followUpIntel:       (followUpStageStats.length > 0 || followUpAlerts.length > 0) ? followUpIntel : undefined,
-    repIntel:            repIntel.length > 0 ? repIntel : undefined,
+    followUpIntel:          (followUpStageStats.length > 0 || followUpAlerts.length > 0) ? followUpIntel : undefined,
+    repIntel:               repIntel.length > 0 ? repIntel : undefined,
+    objectionWinMap:        objectionWinMap.length > 0 ? objectionWinMap : undefined,
+    productGapPriority:     productGapPriority.length > 0 ? productGapPriority : undefined,
+    collateralEffectiveness: collateralEffectiveness.length > 0 ? collateralEffectiveness : undefined,
   }
 
   await db.execute(sql`
