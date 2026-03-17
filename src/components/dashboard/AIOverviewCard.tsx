@@ -105,7 +105,7 @@ export default function AIOverviewCard() {
       <div style={{
         position: 'absolute', top: 0, right: 0,
         width: '300px', height: '200px',
-        background: 'radial-gradient(ellipse at top right, rgba(99,102,241,0.12), transparent 65%)',
+        background: 'radial-gradient(ellipse at top right, var(--accent-subtle), transparent 65%)',
         pointerEvents: 'none',
       }} />
 
@@ -113,26 +113,26 @@ export default function AIOverviewCard() {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '14px 18px',
-        borderBottom: '1px solid rgba(139,92,246,0.1)',
+        borderBottom: '1px solid var(--accent-subtle)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{
             width: '28px', height: '28px', borderRadius: '8px',
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2))',
-            border: '1px solid rgba(139,92,246,0.3)',
+            background: 'var(--accent-subtle)',
+            border: '1px solid var(--accent-subtle)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 12px rgba(99,102,241,0.2)',
+            boxShadow: '0 0 12px var(--accent-subtle)',
           }}>
-            <Sparkles size={14} color="#A78BFA" />
+            <Sparkles size={14} style={{ color: 'var(--text-secondary)' }} />
           </div>
-          <span style={{ fontSize: '13px', fontWeight: '700', color: '#F0EEFF', letterSpacing: '-0.01em' }}>
+          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
             Brain Briefing
           </span>
           {allDone && (
             <span style={{
-              fontSize: '10px', color: '#22C55E',
-              background: 'rgba(34,197,94,0.1)',
-              border: '1px solid rgba(34,197,94,0.2)',
+              fontSize: '10px', color: 'var(--success)',
+              background: 'color-mix(in srgb, var(--success) 10%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)',
               padding: '2px 8px', borderRadius: '100px', fontWeight: '600',
             }}>
               All done ✓
@@ -142,7 +142,7 @@ export default function AIOverviewCard() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           {overview?.generatedAt && (
-            <span style={{ fontSize: '11px', color: '#555' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
               Updated {formatAge(overview.generatedAt)}
             </span>
           )}
@@ -152,17 +152,17 @@ export default function AIOverviewCard() {
             style={{
               display: 'flex', alignItems: 'center', gap: '5px',
               padding: '5px 11px', borderRadius: '7px',
-              background: 'rgba(99,102,241,0.08)',
-              border: '1px solid rgba(99,102,241,0.2)',
-              color: refreshing ? '#555' : '#818CF8',
+              background: 'var(--accent-subtle)',
+              border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)',
+              color: refreshing ? 'var(--text-tertiary)' : 'var(--accent)',
               fontSize: '11px', fontWeight: '600', cursor: refreshing ? 'not-allowed' : 'pointer',
               transition: 'all 0.15s',
             }}
             onMouseEnter={e => {
-              if (!refreshing) (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.14)'
+              if (!refreshing) (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--accent) 14%, transparent)'
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.08)'
+              (e.currentTarget as HTMLElement).style.background = 'var(--accent-subtle)'
             }}
           >
             <RefreshCw size={11} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
@@ -180,7 +180,7 @@ export default function AIOverviewCard() {
             {[90, 70, 55].map((w, i) => (
               <div key={i} style={{
                 height: '12px', borderRadius: '6px', width: `${w}%`,
-                background: 'rgba(255,255,255,0.05)',
+                background: 'var(--accent-subtle)',
                 animation: 'pulse 1.5s ease-in-out infinite',
               }} />
             ))}
@@ -189,14 +189,14 @@ export default function AIOverviewCard() {
 
         {/* Auto-generate failed (one-shot) — show prompt to retry manually */}
         {autoFailed && !overview && !refreshing && (
-          <div style={{ fontSize: '13px', color: '#9CA3AF', padding: '4px 0' }}>
-            Couldn&apos;t generate overview automatically. Hit <strong style={{ color: '#818CF8' }}>Refresh</strong> to try again.
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', padding: '4px 0' }}>
+            Couldn&apos;t generate overview automatically. Hit <strong style={{ color: 'var(--accent)' }}>Refresh</strong> to try again.
           </div>
         )}
 
         {/* SWR fetch error */}
         {error && !dbNotConnected && (
-          <div style={{ fontSize: '13px', color: '#9CA3AF', padding: '4px 0' }}>
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', padding: '4px 0' }}>
             Could not load AI overview. Hit refresh to try again.
           </div>
         )}
@@ -207,7 +207,7 @@ export default function AIOverviewCard() {
             <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
                 <p style={{
-                  fontSize: '13px', color: '#C4B5FD', lineHeight: '1.65',
+                  fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.65',
                   margin: 0, fontWeight: '400',
                 }}>
                   {overview.summary}
@@ -216,28 +216,28 @@ export default function AIOverviewCard() {
 
               <div style={{
                 flexShrink: 0,
-                background: 'rgba(99,102,241,0.08)',
-                border: '1px solid rgba(99,102,241,0.2)',
+                background: 'var(--accent-subtle)',
+                border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)',
                 borderRadius: '10px',
                 padding: '8px 12px',
                 maxWidth: '200px',
               }}>
-                <div style={{ fontSize: '10px', color: '#6366F1', fontWeight: '600', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--accent)', fontWeight: '600', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   {overview.briefingHealth && (
                     <span style={{
                       display: 'inline-block',
                       width: '7px', height: '7px', borderRadius: '50%', flexShrink: 0,
-                      background: overview.briefingHealth === 'green' ? '#22C55E' : overview.briefingHealth === 'amber' ? '#F59E0B' : '#EF4444',
+                      background: overview.briefingHealth === 'green' ? 'var(--success)' : overview.briefingHealth === 'amber' ? 'var(--warning)' : 'var(--danger)',
                       boxShadow: overview.briefingHealth === 'green'
-                        ? '0 0 5px rgba(34,197,94,0.6)'
+                        ? '0 0 5px color-mix(in srgb, var(--success) 60%, transparent)'
                         : overview.briefingHealth === 'amber'
-                        ? '0 0 5px rgba(245,158,11,0.6)'
-                        : '0 0 5px rgba(239,68,68,0.6)',
+                        ? '0 0 5px color-mix(in srgb, var(--warning) 60%, transparent)'
+                        : '0 0 5px color-mix(in srgb, var(--danger) 60%, transparent)',
                     }} />
                   )}
                   Pipeline Health
                 </div>
-                <div style={{ fontSize: '12px', color: '#F0EEFF', fontWeight: '600', lineHeight: '1.3' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: '600', lineHeight: '1.3' }}>
                   {overview.pipelineHealth}
                 </div>
               </div>
@@ -246,17 +246,17 @@ export default function AIOverviewCard() {
             {/* Key Actions — tickable */}
             {overview.keyActions.length > 0 && (
               <div style={{
-                background: 'rgba(99,102,241,0.05)',
-                border: '1px solid rgba(99,102,241,0.12)',
+                background: 'var(--accent-subtle)',
+                border: '1px solid color-mix(in srgb, var(--accent) 12%, transparent)',
                 borderRadius: '10px',
                 padding: '10px 14px',
               }}>
                 <div style={{
-                  fontSize: '10px', color: '#818CF8', fontWeight: '700',
+                  fontSize: '10px', color: 'var(--accent)', fontWeight: '700',
                   textTransform: 'uppercase', letterSpacing: '0.06em',
                   marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px',
                 }}>
-                  <Zap size={10} color="#818CF8" /> Actions for today
+                  <Zap size={10} style={{ color: 'var(--accent)' }} /> Actions for today
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {overview.keyActions.map((action, i) => {
@@ -273,7 +273,7 @@ export default function AIOverviewCard() {
                           transition: 'background 0.1s',
                         }}
                         onMouseEnter={e => {
-                          (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.07)'
+                          (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--accent) 7%, transparent)'
                         }}
                         onMouseLeave={e => {
                           (e.currentTarget as HTMLElement).style.background = 'none'
@@ -283,20 +283,20 @@ export default function AIOverviewCard() {
                         <div style={{
                           width: '15px', height: '15px', borderRadius: '4px', flexShrink: 0,
                           marginTop: '1px',
-                          border: done ? '1.5px solid #6366F1' : '1.5px solid rgba(99,102,241,0.35)',
-                          background: done ? 'rgba(99,102,241,0.25)' : 'transparent',
+                          border: done ? '1.5px solid var(--accent)' : '1.5px solid color-mix(in srgb, var(--accent) 35%, transparent)',
+                          background: done ? 'color-mix(in srgb, var(--accent) 25%, transparent)' : 'transparent',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           transition: 'all 0.15s',
                         }}>
                           {done && (
                             <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
-                              <path d="M1 3.5L3.5 6L8 1" stroke="#818CF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              <path d="M1 3.5L3.5 6L8 1" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                           )}
                         </div>
                         <span style={{
                           fontSize: '12px',
-                          color: done ? '#4B5563' : '#E0D9FF',
+                          color: done ? 'var(--text-tertiary)' : 'var(--text-primary)',
                           lineHeight: '1.5',
                           textDecoration: done ? 'line-through' : 'none',
                           transition: 'all 0.15s',
@@ -313,22 +313,22 @@ export default function AIOverviewCard() {
             {/* Single Most Important Action */}
             {overview.singleMostImportantAction && (
               <div style={{
-                borderLeft: '3px solid #818CF8',
+                borderLeft: '3px solid var(--accent)',
                 paddingLeft: '12px',
                 paddingTop: '6px',
                 paddingBottom: '6px',
                 paddingRight: '10px',
-                background: 'rgba(99,102,241,0.06)',
+                background: 'var(--accent-subtle)',
                 borderRadius: '0 8px 8px 0',
               }}>
                 <div style={{
-                  fontSize: '10px', color: '#818CF8', fontWeight: '700',
+                  fontSize: '10px', color: 'var(--accent)', fontWeight: '700',
                   textTransform: 'uppercase', letterSpacing: '0.06em',
                   marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '5px',
                 }}>
-                  <Target size={10} color="#818CF8" /> Top priority
+                  <Target size={10} style={{ color: 'var(--accent)' }} /> Top priority
                 </div>
-                <div style={{ fontSize: '13px', color: '#F0EEFF', fontWeight: '600', lineHeight: '1.45' }}>
+                <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600', lineHeight: '1.45' }}>
                   {overview.singleMostImportantAction}
                 </div>
               </div>
@@ -337,17 +337,17 @@ export default function AIOverviewCard() {
             {/* Needs Attention deals */}
             {overview.topAttentionDeals && overview.topAttentionDeals.length > 0 && (
               <div style={{
-                background: 'rgba(239,68,68,0.04)',
-                border: '1px solid rgba(239,68,68,0.14)',
+                background: 'color-mix(in srgb, var(--danger) 4%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--danger) 14%, transparent)',
                 borderRadius: '10px',
                 padding: '10px 14px',
               }}>
                 <div style={{
-                  fontSize: '10px', color: '#F87171', fontWeight: '700',
+                  fontSize: '10px', color: 'var(--danger)', fontWeight: '700',
                   textTransform: 'uppercase', letterSpacing: '0.06em',
                   marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px',
                 }}>
-                  <AlertTriangle size={10} color="#F87171" /> Needs Attention
+                  <AlertTriangle size={10} style={{ color: 'var(--danger)' }} /> Needs Attention
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {overview.topAttentionDeals.map((deal, i) => (
@@ -355,19 +355,19 @@ export default function AIOverviewCard() {
                       <span style={{
                         display: 'inline-block', flexShrink: 0, marginTop: '3px',
                         width: '6px', height: '6px', borderRadius: '50%',
-                        background: deal.urgency === 'high' ? '#EF4444' : '#F59E0B',
-                        boxShadow: deal.urgency === 'high' ? '0 0 4px rgba(239,68,68,0.7)' : '0 0 4px rgba(245,158,11,0.7)',
+                        background: deal.urgency === 'high' ? 'var(--danger)' : 'var(--warning)',
+                        boxShadow: deal.urgency === 'high' ? '0 0 4px color-mix(in srgb, var(--danger) 70%, transparent)' : '0 0 4px color-mix(in srgb, var(--warning) 70%, transparent)',
                       }} />
                       <div>
-                        <span style={{ fontSize: '12px', color: '#F0EEFF', fontWeight: '600' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: '600' }}>
                           {deal.dealName}
                         </span>
                         {deal.company && (
-                          <span style={{ fontSize: '11px', color: '#6B7280', marginLeft: '5px' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginLeft: '5px' }}>
                             {deal.company}
                           </span>
                         )}
-                        <div style={{ fontSize: '11px', color: '#FCA5A5', marginTop: '1px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--danger)', marginTop: '1px' }}>
                           {deal.reason}
                         </div>
                       </div>
@@ -384,16 +384,16 @@ export default function AIOverviewCard() {
                   <div style={{
                     flex: 1,
                     display: 'flex', alignItems: 'flex-start', gap: '8px',
-                    background: 'rgba(34,197,94,0.05)',
-                    border: '1px solid rgba(34,197,94,0.12)',
+                    background: 'color-mix(in srgb, var(--success) 5%, transparent)',
+                    border: '1px solid color-mix(in srgb, var(--success) 12%, transparent)',
                     borderRadius: '9px', padding: '8px 12px',
                   }}>
-                    <TrendingUp size={13} color="#22C55E" style={{ marginTop: '1px', flexShrink: 0 }} />
+                    <TrendingUp size={13} style={{ color: 'var(--success)', marginTop: '1px', flexShrink: 0 }} />
                     <div>
-                      <div style={{ fontSize: '10px', color: '#22C55E', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--success)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>
                         Momentum
                       </div>
-                      <div style={{ fontSize: '12px', color: '#D1FAE5', lineHeight: '1.4' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
                         {overview.momentum}
                       </div>
                     </div>
@@ -403,16 +403,16 @@ export default function AIOverviewCard() {
                   <div style={{
                     flex: 1,
                     display: 'flex', alignItems: 'flex-start', gap: '8px',
-                    background: 'rgba(239,68,68,0.05)',
-                    border: '1px solid rgba(239,68,68,0.12)',
+                    background: 'color-mix(in srgb, var(--danger) 5%, transparent)',
+                    border: '1px solid color-mix(in srgb, var(--danger) 12%, transparent)',
                     borderRadius: '9px', padding: '8px 12px',
                   }}>
-                    <AlertTriangle size={13} color="#EF4444" style={{ marginTop: '1px', flexShrink: 0 }} />
+                    <AlertTriangle size={13} style={{ color: 'var(--danger)', marginTop: '1px', flexShrink: 0 }} />
                     <div>
-                      <div style={{ fontSize: '10px', color: '#EF4444', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--danger)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>
                         Top Risk
                       </div>
-                      <div style={{ fontSize: '12px', color: '#FECACA', lineHeight: '1.4' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
                         {overview.topRisk}
                       </div>
                     </div>

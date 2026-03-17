@@ -2764,6 +2764,11 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sd.dealName}</div>
                           <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{sd.prospectCompany}</div>
+                          {sd.reason && (
+                            <div style={{ fontSize: '10px', color: 'var(--accent)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {sd.reason}
+                            </div>
+                          )}
                         </div>
                         <span style={{
                           fontSize: '10px', fontWeight: 600,
