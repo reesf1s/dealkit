@@ -22,6 +22,8 @@ export {
   delete_deal,
   delete_deal_confirmed,
   process_meeting_notes,
+  update_project_plan,
+  update_success_criteria,
 } from './deal-tools'
 
 // Content generation tools
@@ -81,6 +83,8 @@ export const allTools = {
   delete_deal: dealTools.delete_deal,
   delete_deal_confirmed: dealTools.delete_deal_confirmed,
   process_meeting_notes: dealTools.process_meeting_notes,
+  update_project_plan: dealTools.update_project_plan,
+  update_success_criteria: dealTools.update_success_criteria,
 
   // Content generation
   generate_content: contentTools.generate_content,

@@ -60,10 +60,11 @@ ${dealContext}
 PROPOSAL TEXT:
 ${text.trim()}
 
-Return a JSON array of criteria objects. Each object: {"text": "concise requirement (max 15 words)", "category": "theme label"}
+Return a JSON array of criteria objects. Each object: {"text": "the specific requirement — preserve the original wording as closely as possible", "category": "theme label"}
 - 3–15 items depending on complexity
-- category examples: Security, Integration, Reporting, Performance, Compliance, Onboarding
-- Each criterion must be a single, specific, measurable requirement` }],
+- category examples: Security, Integration, Reporting, Performance, Compliance, Onboarding, Demo
+- Each criterion must preserve the SPECIFIC language used in the proposal. Do NOT over-summarize or abstract away detail.
+- If the original text contains specific questions or demo requests, keep the full question as the criterion text` }],
     })
 
     let items: any[] = []

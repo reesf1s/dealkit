@@ -91,6 +91,40 @@ function formatDealDetailed(deal: any): string {
 
   if (deal.lostReason) lines.push(`\n**Lost Reason:** ${deal.lostReason}`)
 
+  // Project plan
+  const projectPlan = deal.projectPlan as any
+  if (projectPlan?.phases?.length > 0) {
+    lines.push('\n**Project Plan:**')
+    for (const phase of projectPlan.phases) {
+      const tasks = phase.tasks ?? []
+      const done = tasks.filter((t: any) => t.status === 'complete').length
+      lines.push(`\n  **${phase.name}** (${done}/${tasks.length} complete)${phase.targetDate ? ` — due ${phase.targetDate}` : ''}`)
+      if (phase.description) lines.push(`  _${phase.description}_`)
+      for (const t of tasks) {
+        const status = t.status === 'complete' ? '✅' : t.status === 'in_progress' ? '🔄' : '⬜'
+        const ownerStr = t.owner ? ` [${t.owner}]` : ''
+        const dueStr = t.dueDate ? ` (due ${t.dueDate})` : ''
+        lines.push(`  ${status} ${t.text}${ownerStr}${dueStr}`)
+        if (t.notes) lines.push(`    _Note: ${t.notes}_`)
+      }
+    }
+  }
+
+  // Success criteria
+  const criteria = (deal.successCriteriaTodos as any[]) ?? []
+  if (criteria.length > 0) {
+    const achieved = criteria.filter((c: any) => c.achieved).length
+    lines.push(`\n**Success Criteria** (${achieved}/${criteria.length} met):`)
+    const categories = [...new Set(criteria.map((c: any) => c.category ?? 'General'))]
+    for (const cat of categories) {
+      lines.push(`\n  _${cat}:_`)
+      for (const c of criteria.filter((c: any) => (c.category ?? 'General') === cat)) {
+        lines.push(`  ${c.achieved ? '✅' : '⬜'} ${c.text}`)
+        if (c.note) lines.push(`    _Note: ${c.note}_`)
+      }
+    }
+  }
+
   lines.push(`\n*Created: ${new Date(deal.createdAt).toLocaleDateString()} | Updated: ${new Date(deal.updatedAt).toLocaleDateString()}*`)
   return lines.join('\n')
 }
@@ -834,6 +868,299 @@ Rules:
     return {
       result: resultLines.join('\n'),
       actions,
+      uiHint: 'refresh_deals',
+    }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// update_project_plan
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const update_project_plan = {
+  description: 'Add tasks or phases to a deal\'s project plan. Preserves the EXACT text provided — do not summarize or rephrase the user\'s words. Can also update task status or remove tasks.',
+  parameters: z.object({
+    dealId: z.string().describe('The UUID of the deal'),
+    addPhase: z.object({
+      name: z.string().describe('Phase name'),
+      description: z.string().optional().describe('Phase description'),
+      targetDate: z.string().optional().describe('Target date YYYY-MM-DD'),
+      tasks: z.array(z.object({
+        text: z.string().describe('EXACT task text — preserve the user\'s wording verbatim'),
+        owner: z.string().optional().describe('Owner/assignee'),
+        dueDate: z.string().optional().describe('Due date YYYY-MM-DD'),
+        notes: z.string().optional().describe('Additional context or notes'),
+      })).describe('Tasks in this phase'),
+    }).optional().describe('Add a new phase with tasks'),
+    addTasks: z.object({
+      phaseId: z.string().optional().describe('Phase ID to add tasks to (if omitted, adds to first/default phase)'),
+      phaseName: z.string().optional().describe('Phase name to find or create'),
+      tasks: z.array(z.object({
+        text: z.string().describe('EXACT task text — preserve the user\'s wording verbatim'),
+        owner: z.string().optional().describe('Owner/assignee'),
+        dueDate: z.string().optional().describe('Due date YYYY-MM-DD'),
+        notes: z.string().optional().describe('Additional context'),
+      })).describe('Tasks to add'),
+    }).optional().describe('Add tasks to an existing phase'),
+    updateTask: z.object({
+      taskId: z.string().describe('Task ID to update'),
+      status: z.enum(['not_started', 'in_progress', 'complete']).optional(),
+      text: z.string().optional(),
+      owner: z.string().optional(),
+      notes: z.string().optional(),
+    }).optional().describe('Update a specific task'),
+    removeTaskId: z.string().optional().describe('Task ID to remove'),
+  }),
+  execute: async (
+    params: {
+      dealId: string
+      addPhase?: { name: string; description?: string; targetDate?: string; tasks: { text: string; owner?: string; dueDate?: string; notes?: string }[] }
+      addTasks?: { phaseId?: string; phaseName?: string; tasks: { text: string; owner?: string; dueDate?: string; notes?: string }[] }
+      updateTask?: { taskId: string; status?: string; text?: string; owner?: string; notes?: string }
+      removeTaskId?: string
+    },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const [deal] = await db
+      .select({ id: dealLogs.id, dealName: dealLogs.dealName, projectPlan: dealLogs.projectPlan })
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .limit(1)
+
+    if (!deal) return { result: 'Deal not found.' }
+
+    const now = new Date().toISOString()
+    const existing = (deal.projectPlan as any) ?? { title: `Project Plan — ${deal.dealName}`, createdAt: now, phases: [] }
+    let plan = { ...existing, updatedAt: now }
+    const changes: string[] = []
+
+    // Add a new phase
+    if (params.addPhase) {
+      const newPhase = {
+        id: `p${(plan.phases?.length ?? 0) + 1}_${Date.now()}`,
+        name: params.addPhase.name,
+        description: params.addPhase.description || '',
+        order: (plan.phases?.length ?? 0) + 1,
+        targetDate: params.addPhase.targetDate || null,
+        tasks: params.addPhase.tasks.map((t, i) => ({
+          id: `t${i + 1}_${Date.now()}`,
+          text: t.text,
+          status: 'not_started',
+          owner: t.owner || null,
+          dueDate: t.dueDate || null,
+          notes: t.notes || null,
+          linkedTodoId: null,
+        })),
+      }
+      plan.phases = [...(plan.phases ?? []), newPhase]
+      changes.push(`Added phase "${params.addPhase.name}" with ${params.addPhase.tasks.length} task(s)`)
+    }
+
+    // Add tasks to existing phase
+    if (params.addTasks) {
+      let targetPhase: any = null
+
+      if (params.addTasks.phaseId) {
+        targetPhase = plan.phases?.find((p: any) => p.id === params.addTasks!.phaseId)
+      }
+      if (!targetPhase && params.addTasks.phaseName) {
+        targetPhase = plan.phases?.find((p: any) =>
+          p.name.toLowerCase().includes(params.addTasks!.phaseName!.toLowerCase())
+        )
+        // Create phase if not found
+        if (!targetPhase) {
+          targetPhase = {
+            id: `p${(plan.phases?.length ?? 0) + 1}_${Date.now()}`,
+            name: params.addTasks.phaseName,
+            description: '',
+            order: (plan.phases?.length ?? 0) + 1,
+            targetDate: null,
+            tasks: [],
+          }
+          plan.phases = [...(plan.phases ?? []), targetPhase]
+        }
+      }
+      if (!targetPhase && plan.phases?.length > 0) {
+        targetPhase = plan.phases[0]
+      }
+      if (!targetPhase) {
+        targetPhase = {
+          id: `p1_${Date.now()}`,
+          name: 'Tasks',
+          description: '',
+          order: 1,
+          targetDate: null,
+          tasks: [],
+        }
+        plan.phases = [targetPhase]
+      }
+
+      const newTasks = params.addTasks.tasks.map((t, i) => ({
+        id: `t${(targetPhase.tasks?.length ?? 0) + i + 1}_${Date.now()}`,
+        text: t.text,
+        status: 'not_started' as const,
+        owner: t.owner || null,
+        dueDate: t.dueDate || null,
+        notes: t.notes || null,
+        linkedTodoId: null,
+      }))
+
+      // Mutate in-place within the phases array
+      plan.phases = plan.phases.map((p: any) =>
+        p.id === targetPhase.id
+          ? { ...p, tasks: [...(p.tasks ?? []), ...newTasks] }
+          : p
+      )
+      changes.push(`Added ${newTasks.length} task(s) to "${targetPhase.name}"`)
+    }
+
+    // Update a task
+    if (params.updateTask) {
+      const { taskId, ...updates } = params.updateTask
+      plan.phases = plan.phases.map((p: any) => ({
+        ...p,
+        tasks: (p.tasks ?? []).map((t: any) => {
+          if (t.id !== taskId) return t
+          const upd = { ...t }
+          if (updates.status) upd.status = updates.status
+          if (updates.text) upd.text = updates.text
+          if (updates.owner) upd.owner = updates.owner
+          if (updates.notes !== undefined) upd.notes = updates.notes
+          return upd
+        }),
+      }))
+      changes.push(`Updated task ${taskId}`)
+    }
+
+    // Remove a task
+    if (params.removeTaskId) {
+      plan.phases = plan.phases.map((p: any) => ({
+        ...p,
+        tasks: (p.tasks ?? []).filter((t: any) => t.id !== params.removeTaskId),
+      }))
+      changes.push(`Removed task ${params.removeTaskId}`)
+    }
+
+    await db.update(dealLogs)
+      .set({ projectPlan: plan, updatedAt: new Date() } as any)
+      .where(eq(dealLogs.id, params.dealId))
+
+    after(async () => {
+      try { await rebuildWorkspaceBrain(ctx.workspaceId) } catch { /* non-fatal */ }
+    })
+
+    return {
+      result: `Project plan updated on **${deal.dealName}**:\n${changes.map(c => `- ${c}`).join('\n')}`,
+      actions: [{
+        type: 'deal_updated',
+        dealId: params.dealId,
+        dealName: deal.dealName,
+        changes,
+      }],
+      uiHint: 'refresh_deals',
+    }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// update_success_criteria
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const update_success_criteria = {
+  description: 'Add, update, or remove success criteria on a deal. Preserves the EXACT text provided — do not summarize or rephrase. Each criterion should capture the specific requirement the customer stated.',
+  parameters: z.object({
+    dealId: z.string().describe('The UUID of the deal'),
+    add: z.array(z.object({
+      text: z.string().describe('EXACT criterion text — preserve the user/customer\'s wording verbatim. Include the full specific question or requirement.'),
+      category: z.string().optional().describe('Category/theme (e.g., Reporting, Integration, Security, Demo)'),
+      note: z.string().optional().describe('Additional context (e.g., who requested it, when)'),
+    })).optional().describe('Criteria to add'),
+    achieve: z.array(z.string()).optional().describe('Criterion IDs to mark as achieved'),
+    remove: z.array(z.string()).optional().describe('Criterion IDs to remove'),
+    updateNote: z.object({
+      criterionId: z.string(),
+      note: z.string(),
+    }).optional().describe('Update the note on a specific criterion'),
+  }),
+  execute: async (
+    params: {
+      dealId: string
+      add?: { text: string; category?: string; note?: string }[]
+      achieve?: string[]
+      remove?: string[]
+      updateNote?: { criterionId: string; note: string }
+    },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const [deal] = await db
+      .select({ id: dealLogs.id, dealName: dealLogs.dealName, successCriteriaTodos: dealLogs.successCriteriaTodos })
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .limit(1)
+
+    if (!deal) return { result: 'Deal not found.' }
+
+    let criteria = ((deal.successCriteriaTodos as any[]) ?? []).slice()
+    const changes: string[] = []
+
+    // Add new criteria
+    if (params.add?.length) {
+      for (const item of params.add) {
+        criteria.push({
+          id: crypto.randomUUID(),
+          text: item.text,
+          category: item.category || 'General',
+          achieved: false,
+          note: item.note || '',
+          createdAt: new Date().toISOString(),
+        })
+      }
+      changes.push(`Added ${params.add.length} criterion/criteria`)
+    }
+
+    // Mark as achieved
+    if (params.achieve?.length) {
+      const achieveSet = new Set(params.achieve)
+      criteria = criteria.map((c: any) =>
+        achieveSet.has(c.id) ? { ...c, achieved: true } : c
+      )
+      changes.push(`Marked ${params.achieve.length} as achieved`)
+    }
+
+    // Remove criteria
+    if (params.remove?.length) {
+      const removeSet = new Set(params.remove)
+      criteria = criteria.filter((c: any) => !removeSet.has(c.id))
+      changes.push(`Removed ${params.remove.length} criterion/criteria`)
+    }
+
+    // Update note
+    if (params.updateNote) {
+      criteria = criteria.map((c: any) =>
+        c.id === params.updateNote!.criterionId
+          ? { ...c, note: params.updateNote!.note }
+          : c
+      )
+      changes.push('Updated criterion note')
+    }
+
+    await db.update(dealLogs)
+      .set({ successCriteriaTodos: criteria, updatedAt: new Date() })
+      .where(eq(dealLogs.id, params.dealId))
+
+    after(async () => {
+      try { await rebuildWorkspaceBrain(ctx.workspaceId) } catch { /* non-fatal */ }
+    })
+
+    const achieved = criteria.filter((c: any) => c.achieved).length
+    return {
+      result: `Success criteria updated on **${deal.dealName}** (${achieved}/${criteria.length} met):\n${changes.map(c => `- ${c}`).join('\n')}`,
+      actions: [{
+        type: 'deal_updated',
+        dealId: params.dealId,
+        dealName: deal.dealName,
+        changes,
+      }],
       uiHint: 'refresh_deals',
     }
   },
