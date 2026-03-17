@@ -51,9 +51,8 @@ export default function CommandPalette() {
   const answerRef = useRef<HTMLDivElement>(null)
 
   const filtered = query.trim() === ''
-    ? ALL_ITEMS.filter(i => i.section !== 'icon')
+    ? ALL_ITEMS
     : ALL_ITEMS.filter(item =>
-        item.section !== 'icon' &&
         item.label.toLowerCase().includes(query.toLowerCase())
       )
 
