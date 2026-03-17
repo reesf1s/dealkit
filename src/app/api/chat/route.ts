@@ -1575,7 +1575,7 @@ Request: ${text.slice(0, 500)}`
 
   const updatePayload: Record<string, unknown> = { updatedAt: new Date() }
   const changes: string[] = []
-  if (extracted.action === 'resolve' || extracted.action === 'close') { updatePayload.status = 'resolved'; changes.push('marked resolved') }
+  if (extracted.action === 'resolve' || extracted.action === 'close') { updatePayload.status = 'shipped'; changes.push('marked resolved') }
   if (extracted.action === 'reopen') { updatePayload.status = 'open'; changes.push('reopened') }
   if (extracted.newPriority && ['critical','high','medium','low'].includes(extracted.newPriority)) { updatePayload.priority = extracted.newPriority; changes.push(`priority → ${extracted.newPriority}`) }
 
@@ -1852,8 +1852,8 @@ ${products.length > 0 ? `Products:\n${products.map((p: any) => `  - ${p.name}: $
     // ── Build product gaps section ──
     let gapSection = ''
     if (allGapRows.length > 0) {
-      const openGaps = allGapRows.filter(g => g.status !== 'resolved')
-      const resolvedGaps = allGapRows.filter(g => g.status === 'resolved')
+      const openGaps = allGapRows.filter(g => g.status === 'open')
+      const resolvedGaps = allGapRows.filter(g => g.status !== 'open')
       gapSection = `## PRODUCT GAPS (${openGaps.length} open, ${resolvedGaps.length} resolved)\n` +
         openGaps.map(g => `  • [${g.priority?.toUpperCase()}] ${g.title} — seen ${g.frequency ?? 1}x | ${g.description ?? ''}`).join('\n')
     }
