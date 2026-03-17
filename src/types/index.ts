@@ -134,10 +134,14 @@ export interface DealLog {
   dealType: 'one_off' | 'recurring'
   recurringInterval: 'monthly' | 'quarterly' | 'annual' | null
   links: DealLink[]
+  parentDealId?: string | null
+  expansionType?: ExpansionType | null
   projectPlan?: ProjectPlan | null
   createdAt: Date
   updatedAt: Date
 }
+
+export type ExpansionType = 'upsell' | 'cross_sell' | 'renewal' | 'expansion'
 
 export type DealStage =
   | 'prospecting'

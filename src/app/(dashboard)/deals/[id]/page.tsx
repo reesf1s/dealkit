@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 
 import useSWR from 'swr'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import * as Dialog from '@radix-ui/react-dialog'
@@ -12,7 +12,8 @@ import {
   User, UserPlus, Edit, Trash2, CheckCircle, X, Link2, Check,
   Mail, Sword, Zap, Layers,
   Globe, FileText, Database, BookOpen, Github, Cloud,
-  ExternalLink, ChevronDown, ChevronRight, PenTool
+  ExternalLink, ChevronDown, ChevronRight, PenTool,
+  TrendingUp, ArrowUpRight, RefreshCw
 } from 'lucide-react'
 import type { DealContact, DealLink as DealLinkType, DealLinkType as LinkTypeEnum } from '@/types'
 import { useSidebar } from '@/components/layout/SidebarContext'
@@ -2439,6 +2440,10 @@ function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; o
 }
 
 function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', mlPrediction = null, globalPrior = null }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void; currencySymbol?: string; mlPrediction?: any; globalPrior?: any }) {
+  const router = useRouter()
+  const [expandingType, setExpandingType] = useState<string | null>(null)
+  const { data: allDealsRes } = useSWR('/api/deals', fetcher)
+  const expansionDeals = (allDealsRes?.data ?? []).filter((d: any) => d.parentDealId === deal.id)
   const [editingSummary, setEditingSummary] = useState(false)
   const [summaryDraft, setSummaryDraft] = useState('')
   const [resetAIConfirm, setResetAIConfirm] = useState(false)
@@ -2477,8 +2482,140 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
     setResetAIConfirm(false)
   }
 
+  const handleExpand = async (expansionType: string) => {
+    setExpandingType(expansionType)
+    try {
+      const res = await fetch(`/api/deals/${dealId}/expand`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expansionType }),
+      })
+      const result = await res.json()
+      if (result?.data?.id) {
+        router.push(`/deals/${result.data.id}`)
+      }
+    } finally {
+      setExpandingType(null)
+    }
+  }
+
+  const expansionTypeColors: Record<string, string> = {
+    upsell: 'var(--accent)',
+    cross_sell: '#A78BFA',
+    renewal: 'var(--success)',
+    expansion: 'var(--warning)',
+  }
+
+  const expansionTypeLabels: Record<string, string> = {
+    upsell: 'Upsell',
+    cross_sell: 'Cross-sell',
+    renewal: 'Renewal',
+    expansion: 'Expansion',
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+      {/* Grow This Account — shown for closed_won deals */}
+      {deal.stage === 'closed_won' && (
+        <div style={{
+          background: 'var(--card-bg)', border: '1px solid var(--border)',
+          borderRadius: '12px', overflow: 'hidden', backdropFilter: 'blur(20px)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+            <TrendingUp size={14} color="var(--success)" />
+            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--success)' }}>Grow This Account</span>
+          </div>
+          <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+              Create an expansion opportunity to grow this customer relationship
+            </p>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {([
+                { type: 'upsell', label: 'Upsell', icon: <ArrowUpRight size={12} /> },
+                { type: 'cross_sell', label: 'Cross-sell', icon: <Layers size={12} /> },
+                { type: 'renewal', label: 'Renewal', icon: <RefreshCw size={12} /> },
+                { type: 'expansion', label: 'Expansion', icon: <Plus size={12} /> },
+              ] as const).map(({ type, label, icon }) => {
+                const color = expansionTypeColors[type]
+                const isLoading = expandingType === type
+                return (
+                  <button
+                    key={type}
+                    onClick={() => handleExpand(type)}
+                    disabled={!!expandingType}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      padding: '6px 14px', borderRadius: '100px',
+                      background: `${color}14`, border: `1px solid ${color}30`,
+                      color, fontSize: '12px', fontWeight: 600, cursor: expandingType ? 'not-allowed' : 'pointer',
+                      opacity: expandingType && !isLoading ? 0.5 : 1,
+                      transition: 'all 0.15s ease',
+                    }}
+                    onMouseEnter={e => { if (!expandingType) { e.currentTarget.style.background = `${color}25`; e.currentTarget.style.borderColor = `${color}50` } }}
+                    onMouseLeave={e => { e.currentTarget.style.background = `${color}14`; e.currentTarget.style.borderColor = `${color}30` }}
+                  >
+                    {isLoading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : icon}
+                    {isLoading ? 'Creating...' : label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Existing expansion deals */}
+            {expansionDeals.length > 0 && (
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
+                  Expansion Deals ({expansionDeals.length})
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {expansionDeals.map((ed: any) => {
+                    const eColor = expansionTypeColors[ed.expansionType] ?? 'var(--text-tertiary)'
+                    const eLabel = expansionTypeLabels[ed.expansionType] ?? ed.expansionType
+                    const stColor = (STAGE_COLORS as any)[ed.stage] ?? 'var(--text-tertiary)'
+                    return (
+                      <Link
+                        key={ed.id}
+                        href={`/deals/${ed.id}`}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '10px',
+                          padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)',
+                          borderRadius: '8px', textDecoration: 'none', transition: 'border-color 150ms ease',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)' }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {ed.dealName}
+                          </div>
+                        </div>
+                        <span style={{
+                          fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '100px',
+                          background: `${stColor}18`, color: stColor, border: `1px solid ${stColor}35`,
+                        }}>
+                          {ed.stage?.replace(/_/g, ' ')}
+                        </span>
+                        {ed.dealValue && (
+                          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--success)' }}>
+                            {currencySymbol}{Number(ed.dealValue).toLocaleString()}
+                          </span>
+                        )}
+                        <span style={{
+                          fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '100px',
+                          background: `${eColor}14`, color: eColor, border: `1px solid ${eColor}30`,
+                        }}>
+                          {eLabel}
+                        </span>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* AI Analysis card — shown first if any AI data exists */}
       {(deal.aiSummary || deal.conversionScore != null || (deal.conversionInsights as string[])?.length > 0 || (deal.dealRisks as string[])?.length > 0) && (
@@ -2886,6 +3023,28 @@ export default function DealDetailPage() {
   const { setActiveDeal } = useSidebar()
   const workspaceMembers = useWorkspaceMembers()
 
+  // Fetch parent deal if this is an expansion deal
+  const { data: parentDealRes } = useSWR(
+    deal?.parentDealId ? `/api/deals/${deal.parentDealId}` : null,
+    fetcher,
+    { revalidateOnFocus: false }
+  )
+  const parentDeal = parentDealRes?.data ?? parentDealRes
+
+  const expansionTypeLabels: Record<string, string> = {
+    upsell: 'Upsell',
+    cross_sell: 'Cross-sell',
+    renewal: 'Renewal',
+    expansion: 'Expansion',
+  }
+
+  const expansionTypeColors: Record<string, string> = {
+    upsell: 'var(--accent)',
+    cross_sell: '#A78BFA',
+    renewal: 'var(--success)',
+    expansion: 'var(--warning)',
+  }
+
   const [activeTab, setActiveTab] = useState<'overview' | 'meeting-notes' | 'prep' | 'todos' | 'project-plan' | 'success'>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [winStoryOpen, setWinStoryOpen] = useState(false)
@@ -2927,6 +3086,37 @@ export default function DealDetailPage() {
         >
           <ArrowLeft size={13} /> Back to deals
         </Link>
+
+        {/* Parent deal breadcrumb for expansion deals */}
+        {deal?.parentDealId && parentDeal && (() => {
+          const eType = deal.expansionType as string | undefined
+          const eColor = eType ? (expansionTypeColors[eType] ?? 'var(--text-tertiary)') : 'var(--text-tertiary)'
+          const eLabel = eType ? (expansionTypeLabels[eType] ?? eType) : 'Expansion'
+          return (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px',
+              fontSize: '12px', color: 'var(--text-tertiary)',
+            }}>
+              <span>Expansion from:</span>
+              <Link
+                href={`/deals/${deal.parentDealId}`}
+                style={{
+                  color: 'var(--accent)', textDecoration: 'none', fontWeight: 600,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
+                onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
+              >
+                {parentDeal.prospectCompany ?? parentDeal.dealName ?? 'Parent Deal'}
+              </Link>
+              <span style={{
+                fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '100px',
+                background: `${eColor}14`, color: eColor, border: `1px solid ${eColor}30`,
+              }}>
+                {eLabel}
+              </span>
+            </div>
+          )
+        })()}
 
         {deal ? (
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>

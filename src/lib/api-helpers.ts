@@ -30,13 +30,18 @@ export function dbNotConfigured(): NextResponse {
   )
 }
 
-/** Ensure the `links` column exists on deal_logs (idempotent, cached per cold-start) */
+/** Ensure new columns exist on deal_logs (idempotent, cached per cold-start) */
 let _linksMigrated = false
 export async function ensureLinksColumn() {
   if (_linksMigrated) return
   try {
-    await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS links jsonb NOT NULL DEFAULT '[]'::jsonb`)
-  } catch { /* column already exists */ }
+    await db.execute(sql`
+      ALTER TABLE deal_logs
+      ADD COLUMN IF NOT EXISTS links jsonb NOT NULL DEFAULT '[]'::jsonb,
+      ADD COLUMN IF NOT EXISTS parent_deal_id uuid,
+      ADD COLUMN IF NOT EXISTS expansion_type text
+    `)
+  } catch { /* columns already exist */ }
   _linksMigrated = true
 }
 

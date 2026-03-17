@@ -22,7 +22,9 @@ async function ensureDealColumns() {
       ADD COLUMN IF NOT EXISTS contacts jsonb NOT NULL DEFAULT '[]'::jsonb,
       ADD COLUMN IF NOT EXISTS description text,
       ADD COLUMN IF NOT EXISTS project_plan jsonb,
-      ADD COLUMN IF NOT EXISTS links jsonb NOT NULL DEFAULT '[]'::jsonb
+      ADD COLUMN IF NOT EXISTS links jsonb NOT NULL DEFAULT '[]'::jsonb,
+      ADD COLUMN IF NOT EXISTS parent_deal_id uuid,
+      ADD COLUMN IF NOT EXISTS expansion_type text
     `)
   } catch { /* columns may already exist */ }
   try {
