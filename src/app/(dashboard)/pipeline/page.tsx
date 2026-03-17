@@ -10,7 +10,7 @@ import {
   CheckSquare, MoreHorizontal, Target, Zap, ArrowUpRight,
   Star, AlertTriangle, Clock,
   Settings, Edit, X, Trash2, Check,
-  Kanban, List,
+  Kanban, List, ChevronUp, ChevronDown,
 } from 'lucide-react'
 import { PageTabs } from '@/components/shared/PageTabs'
 
@@ -115,6 +115,7 @@ function DealCard({
   daysInStage,
   momentum,
   currencySymbol = '$',
+  allStages,
 }: {
   deal: any
   onMoveStage: (id: string, stage: string) => void
@@ -127,10 +128,11 @@ function DealCard({
   daysInStage?: number
   momentum?: 'hot' | 'cooling' | null
   currencySymbol?: string
+  allStages?: { id: string; label: string; color: string }[]
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
-  const nextStages = STAGES.filter(s => s.id !== deal.stage && s.id !== 'closed_won' && s.id !== 'closed_lost')
-  const stageConfig = STAGES.find(s => s.id === deal.stage)
+  const nextStages = (allStages ?? STAGES).filter(s => s.id !== deal.stage && s.id !== 'closed_won' && s.id !== 'closed_lost')
+  const stageConfig = (allStages ?? STAGES).find(s => s.id === deal.stage)
 
   const todos: any[] = deal.todos ?? []
   const doneTodos = todos.filter((t: any) => t.done).length
@@ -302,7 +304,7 @@ function DealCard({
           WebkitBackdropFilter: 'blur(8px)',
         }}>
           <Sparkles size={11} color="#A78BFA" style={{ marginTop: '1px', flexShrink: 0 }} />
-          <span style={{ fontSize: '11px', color: '#A78BFA', lineHeight: '1.5' }}>{deal.conversionInsights[0]}</span>
+          <span style={{ fontSize: '11px', color: '#A78BFA', lineHeight: '1.5', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>{deal.conversionInsights[0]}</span>
         </div>
       )}
 
@@ -391,6 +393,24 @@ function PipelineSettings({
     onUpdate()
   }
 
+  const moveStageOrder = async (stageId: string, direction: 'up' | 'down') => {
+    const nonHidden = stages.filter((s: any) => !s.isHidden)
+    const idx = stages.findIndex((s: any) => s.id === stageId)
+    if (idx < 0) return
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (swapIdx < 0 || swapIdx >= stages.length) return
+    // Don't swap past closed stages
+    if (stages[swapIdx].id === 'closed_won' || stages[swapIdx].id === 'closed_lost') return
+    if (stages[idx].id === 'closed_won' || stages[idx].id === 'closed_lost') return
+    const newOrder = stages.map((s: any) => s.id)
+    ;[newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]]
+    await fetch('/api/pipeline-config', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reorderStages: newOrder }),
+    })
+    onUpdate()
+  }
+
   const PRESET_COLORS = ['#6B7280', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444', '#22C55E', '#EC4899', '#14B8A6', '#F97316']
 
   return (
@@ -455,6 +475,20 @@ function PipelineSettings({
                   <>
                     <span style={{ flex: 1, fontSize: '13px', color: '#EBEBEB', fontWeight: 500 }}>{s.label}</span>
                     {s.isDefault && <span style={{ fontSize: '9px', color: '#444', background: 'rgba(255,255,255,0.04)', borderRadius: '3px', padding: '1px 5px' }}>default</span>}
+                    {s.id !== 'closed_won' && s.id !== 'closed_lost' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', marginLeft: 'auto' }}>
+                        <button onClick={() => moveStageOrder(s.id, 'up')}
+                          style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '0', display: 'flex', lineHeight: 1 }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#818CF8'}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#444'}
+                        ><ChevronUp size={12} /></button>
+                        <button onClick={() => moveStageOrder(s.id, 'down')}
+                          style={{ background: 'none', border: 'none', color: '#444', cursor: 'pointer', padding: '0', display: 'flex', lineHeight: 1 }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#818CF8'}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#444'}
+                        ><ChevronDown size={12} /></button>
+                      </div>
+                    )}
                     <button onClick={() => { setEditingId(s.id); setEditLabel(s.label) }} style={{ background: 'none', border: 'none', color: '#333', cursor: 'pointer', padding: '2px', display: 'flex' }}
                       onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#818CF8'}
                       onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#333'}
@@ -558,10 +592,14 @@ export default function PipelinePage() {
   const totalPipeline = deals
     .filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
     .reduce((sum: number, d: any) => sum + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
-  // Only show active (non-closed) deals in Brain's Top Picks
+  // Brain's Top Picks: prefer ML win probability, fall back to conversion score
   const topDeals = deals
-    .filter((d: any) => d.conversionScore && d.stage !== 'closed_won' && d.stage !== 'closed_lost')
-    .sort((a: any, b: any) => (b.conversionScore ?? 0) - (a.conversionScore ?? 0))
+    .filter((d: any) => (mlMap[d.id]?.winProb || d.conversionScore) && d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+    .sort((a: any, b: any) => {
+      const aScore = mlMap[a.id]?.winProb ?? a.conversionScore ?? 0
+      const bScore = mlMap[b.id]?.winProb ?? b.conversionScore ?? 0
+      return bScore - aScore
+    })
     .slice(0, 3)
 
   const urgentCount = Object.keys(urgentMap).length
@@ -662,7 +700,8 @@ export default function PipelinePage() {
               const riskInsight = (deal.conversionInsights ?? []).find((ins: string) =>
                 /risk|danger|concern|warn|block|stall|compet|objection|overdue|miss|lost|slow|churn|cancel|threat/i.test(ins)
               )
-              const scoreColor = deal.conversionScore >= 70 ? '#22C55E' : deal.conversionScore >= 40 ? '#F59E0B' : '#EF4444'
+              const topScore = mlMap[deal.id]?.winProb ?? deal.conversionScore ?? 0
+              const scoreColor = topScore >= 70 ? '#22C55E' : topScore >= 40 ? '#F59E0B' : '#EF4444'
 
               return (
                 <Link key={deal.id} href={`/deals/${deal.id}`} style={{
@@ -682,12 +721,12 @@ export default function PipelinePage() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.prospectCompany}</div>
                       <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px' }}>
-                        {STAGES.find(s => s.id === deal.stage)?.label}
+                        {configStages.find((s: any) => s.id === deal.stage)?.label ?? deal.stage}
                         {deal.dealValue && ` · ${dealValueLabel(deal.dealValue, deal.dealType, deal.recurringInterval, currencySymbol)}`}
                       </div>
                     </div>
                     <div style={{ fontSize: '17px', fontWeight: '800', color: scoreColor, flexShrink: 0 }}>
-                      {deal.conversionScore}%
+                      {mlMap[deal.id]?.winProb ?? deal.conversionScore}%
                     </div>
                   </div>
 
@@ -822,7 +861,7 @@ export default function PipelinePage() {
                 {stageValue > 0 && (
                   <div style={{ fontSize: '11px', color: '#9CA3AF', padding: '0 4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <TrendingUp size={10} />
-                    ${stageValue.toLocaleString()} annualised
+                    {currencySymbol}{stageValue.toLocaleString()} annualised
                   </div>
                 )}
 
@@ -858,6 +897,7 @@ export default function PipelinePage() {
                       daysInStage={daysInStageMap[deal.id]}
                       momentum={momentumMap[deal.id]}
                       currencySymbol={currencySymbol}
+                      allStages={configStages}
                     />
                   ))
                 )}
@@ -933,7 +973,7 @@ export default function PipelinePage() {
                     <span style={{ fontSize: '12px', fontWeight: '600', color: '#F0EEFF' }}>{s.label}</span>
                     <span style={{ fontSize: '11px', color: '#9CA3AF', background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.15)', padding: '1px 7px', borderRadius: '100px', marginLeft: 'auto' }}>{stageDeals.length}</span>
                   </div>
-                  {val > 0 && <div style={{ fontSize: '18px', fontWeight: '700', color: s.color }}>${val.toLocaleString()}</div>}
+                  {val > 0 && <div style={{ fontSize: '18px', fontWeight: '700', color: s.color }}>{currencySymbol}{val.toLocaleString()}</div>}
                   {stageDeals.length === 0 && (
                     <div style={{ fontSize: '11px', color: isDropTarget ? s.color : '#4B5563' }}>
                       {isDropTarget ? 'Drop to close' : 'No deals yet'}

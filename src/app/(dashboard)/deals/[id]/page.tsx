@@ -156,7 +156,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
                   <button
                     onClick={e => { e.stopPropagation(); setClearConfirm(true) }}
                     style={{ fontSize: '11px', color: '#555', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: '4px' }}
-                    title="Clear all meeting notes for this deal"
+                    title="Clear all notes for this deal"
                   >Clear all</button>
                 )}
                 <span style={{ fontSize: '11px', color: '#555' }}>{historyExpanded ? 'Hide ↑' : 'Show ↓'}</span>
@@ -201,7 +201,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Clipboard size={14} color="#818CF8" />
             <span style={{ fontSize: '13px', fontWeight: '600', color: '#EBEBEB' }}>
-              {deal?.meetingNotes ? 'New Meeting Notes' : 'Meeting Notes'}
+              {deal?.meetingNotes ? 'New Update' : 'Add Update'}
             </span>
           </div>
           <button onClick={analyze} disabled={loading || !notes.trim()} style={{
@@ -219,8 +219,8 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
           value={notes}
           onChange={e => setNotes(e.target.value)}
           placeholder={deal?.meetingNotes
-            ? 'Paste notes from your latest meeting — AI will analyze these in context of all previous meetings...'
-            : 'Paste your meeting notes here — AI will extract action items, score conversion probability, and identify product gaps...'}
+            ? 'Paste notes from your latest meeting or log a deal update — AI will analyze in context of all previous entries...'
+            : 'Paste meeting notes, call summaries, or deal updates — AI will extract action items, score conversion probability, and identify trends...'}
           rows={10}
           style={{
             width: '100%', resize: 'vertical', background: 'rgba(255,255,255,0.02)',
@@ -814,7 +814,7 @@ function TodosTab({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpd
       {/* Pending todos */}
       {pending.length === 0 && done.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '32px', color: '#444', fontSize: '13px' }}>
-          No action items yet. Analyze meeting notes to auto-generate them.
+          No action items yet. Add updates or meeting notes and analyze to auto-generate them.
         </div>
       ) : (
         <>
@@ -1962,7 +1962,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
                   style={{ opacity: 0, position: 'absolute', top: 0, right: 0, fontSize: '10px', color: '#555', background: 'none', border: 'none', cursor: 'pointer', transition: 'opacity 0.15s', padding: '2px 4px' }}>✎ edit</button>
               </div>
             ) : (
-              <p style={{ fontSize: '12px', color: '#374151', margin: 0, fontStyle: 'italic' }}>No AI summary yet — paste meeting notes and click Analyze to generate.</p>
+              <p style={{ fontSize: '12px', color: '#374151', margin: 0, fontStyle: 'italic' }}>No AI summary yet — add notes or updates and click Analyze to generate.</p>
             )}
 
             {/* Insights */}
@@ -2095,7 +2095,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
               )
             })()}
 
-            {/* Intent Signals — extracted by AI from meeting notes */}
+            {/* Intent Signals — extracted by AI from deal updates */}
             {deal.intentSignals && (() => {
               const is = deal.intentSignals as { championStatus?: string; budgetStatus?: string; decisionTimeline?: string | null; nextMeetingBooked?: boolean }
               const champColor = is.championStatus === 'confirmed' ? '#22C55E' : is.championStatus === 'suspected' ? '#F59E0B' : '#374151'
@@ -2133,7 +2133,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
                 <div style={{ fontSize: '11px', fontWeight: 700, color: '#6366F1', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>What to focus on</div>
                 {deal.conversionScore == null ? (
                   <div style={{ fontSize: '12px', color: '#6B7280', lineHeight: 1.6 }}>
-                    Add meeting notes and run AI analysis to get a health score and specific recommendations for this deal.
+                    Add deal updates and run AI analysis to get a health score and specific recommendations for this deal.
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
@@ -2371,7 +2371,7 @@ export default function DealDetailPage() {
       <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '0' }}>
         {[
           { id: 'overview', label: 'Overview' },
-          { id: 'meeting-notes', label: 'Meeting Notes + AI' },
+          { id: 'meeting-notes', label: 'Updates + Notes' },
           { id: 'prep', label: 'Meeting Prep' },
           { id: 'todos', label: `To-Dos ${deal?.todos?.length > 0 ? `(${deal.todos.filter((t: any) => !t.done).length})` : ''}` },
           { id: 'project-plan', label: `Project Plan${(deal?.projectPlan as any)?.phases?.length > 0 ? ` (${(deal.projectPlan as any).phases.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete').length} open)` : ''}` },

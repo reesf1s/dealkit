@@ -17,7 +17,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const body = await req.json()
     const { stage, kanbanOrder } = body
     const validStages = ['prospecting','qualification','discovery','proposal','negotiation','closed_won','closed_lost']
-    if (!validStages.includes(stage)) return NextResponse.json({ error: 'Invalid stage' }, { status: 400 })
+    // Also accept custom stage IDs (format: custom_slug_timestamp)
+    if (!validStages.includes(stage) && !stage?.startsWith('custom_')) return NextResponse.json({ error: 'Invalid stage' }, { status: 400 })
     const update: Record<string, unknown> = { stage, updatedAt: new Date() }
     if (kanbanOrder !== undefined) update.kanbanOrder = kanbanOrder
     if (stage === 'closed_won') update.wonDate = new Date()

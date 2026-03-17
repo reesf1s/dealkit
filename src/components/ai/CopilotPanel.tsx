@@ -32,7 +32,7 @@ function getQuickActions(activeDealCompany?: string, currentPage?: string): Quic
     ]
   }
   return [
-    { label: 'Process meeting notes', prompt: 'Here are my meeting notes:\n\n', partial: true },
+    { label: 'Process deal update', prompt: 'Here are my latest notes:\n\n', partial: true },
     { label: 'Add competitor', prompt: 'Add a new competitor: ', partial: true },
     { label: 'Create deal', prompt: 'Create a new deal for ', partial: true },
   ]
@@ -481,7 +481,7 @@ export default function CopilotPanel() {
                 lineHeight: '1.7',
               }}>
                 <span style={{ color: '#6366F1', fontWeight: 600 }}>Ask anything:</span>{' '}
-                pipeline overview &middot; deal analysis &middot; competitor intel &middot; generate assets &middot; manage todos &middot; process meeting notes &middot; update deals
+                pipeline overview &middot; deal analysis &middot; competitor intel &middot; generate assets &middot; manage todos &middot; process updates &middot; update deals
               </div>
             </div>
           )}

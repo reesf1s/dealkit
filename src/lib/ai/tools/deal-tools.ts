@@ -23,7 +23,7 @@ const DEAL_STAGES = [
   'closed_lost',
 ] as const
 
-const stageEnum = z.enum(DEAL_STAGES)
+const stageEnum = z.string().describe('Deal stage: prospecting, qualification, discovery, proposal, negotiation, closed_won, closed_lost, or any custom stage ID')
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -472,6 +472,295 @@ export const import_deal = {
         dealId: created.id,
         dealName: created.dealName,
         company: created.prospectCompany,
+      }],
+      uiHint: 'refresh_deals',
+    }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// enrich_deal
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const enrich_deal = {
+  description: 'Comprehensively enrich an existing deal with contacts, meeting history, todos, success criteria, project plan, risks, and more — all in one operation. Use this when the user pastes detailed information about a deal that already exists. Merges new data with existing data.',
+  parameters: z.object({
+    dealId: z.string().describe('The UUID of the existing deal to enrich'),
+    contacts: z.array(z.object({
+      name: z.string(),
+      title: z.string().optional(),
+      email: z.string().optional(),
+      phone: z.string().optional(),
+      role: z.string().optional().describe('e.g. Champion, Decision Maker, Technical Evaluator, Internal Sales Rep'),
+    })).optional().describe('Contacts to add (merged with existing, deduped by name)'),
+    todos: z.array(z.string()).optional().describe('Action items to add (exact user wording, merged with existing)'),
+    meetingNotes: z.string().optional().describe('Meeting/interaction history to add (prepended with date header)'),
+    notes: z.string().optional().describe('General notes to append'),
+    aiSummary: z.string().optional().describe('Updated deal summary (replaces existing)'),
+    nextSteps: z.string().optional().describe('Next steps (replaces existing)'),
+    dealRisks: z.array(z.string()).optional().describe('Risks to add (merged with existing)'),
+    competitors: z.array(z.string()).optional().describe('Competitors to add (merged with existing)'),
+    successCriteria: z.array(z.object({
+      text: z.string(),
+      category: z.string().optional(),
+    })).optional().describe('Success criteria to add'),
+    projectPlan: z.object({
+      phases: z.array(z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        targetDate: z.string().optional(),
+        tasks: z.array(z.object({
+          text: z.string(),
+          status: z.enum(['pending', 'in_progress', 'complete']).optional(),
+          owner: z.string().optional(),
+        })).optional(),
+      })),
+    }).optional().describe('Project plan phases/tasks to add or merge'),
+    stage: z.string().optional().describe('Update deal stage'),
+    dealValue: z.number().optional().describe('Update deal value'),
+    closeDate: z.string().optional().describe('Update close date'),
+    dealType: z.enum(['one_off', 'recurring']).optional(),
+    recurringInterval: z.enum(['monthly', 'quarterly', 'annual']).optional(),
+  }),
+  execute: async (
+    params: {
+      dealId: string
+      contacts?: { name: string; title?: string; email?: string; phone?: string; role?: string }[]
+      todos?: string[]
+      meetingNotes?: string
+      notes?: string
+      aiSummary?: string
+      nextSteps?: string
+      dealRisks?: string[]
+      competitors?: string[]
+      successCriteria?: { text: string; category?: string }[]
+      projectPlan?: { phases: { name: string; description?: string; targetDate?: string; tasks?: { text: string; status?: string; owner?: string }[] }[] }
+      stage?: string
+      dealValue?: number
+      closeDate?: string
+      dealType?: string
+      recurringInterval?: string
+    },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const [existing] = await db
+      .select()
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .limit(1)
+
+    if (!existing) return { result: 'Deal not found.' }
+
+    const updateFields: Record<string, unknown> = { updatedAt: new Date() }
+    const changes: string[] = []
+
+    // Merge contacts (dedup by name)
+    if (params.contacts?.length) {
+      const existingContacts = ((existing.contacts as any[]) ?? []).slice()
+      const existingNames = new Set(existingContacts.map((c: any) => c.name?.toLowerCase()))
+      let added = 0
+      for (const c of params.contacts) {
+        if (!existingNames.has(c.name.toLowerCase())) {
+          existingContacts.push({
+            id: crypto.randomUUID(),
+            name: c.name,
+            ...(c.title ? { title: c.title } : {}),
+            ...(c.email ? { email: c.email } : {}),
+            ...(c.phone ? { phone: c.phone } : {}),
+            ...(c.role ? { role: c.role } : {}),
+          })
+          existingNames.add(c.name.toLowerCase())
+          added++
+        }
+      }
+      if (added > 0) {
+        updateFields.contacts = existingContacts
+        changes.push(`${added} contact(s) added`)
+      }
+    }
+
+    // Merge todos (dedup by normalized text)
+    if (params.todos?.length) {
+      const existingTodos = ((existing.todos as any[]) ?? []).slice()
+      const existingTexts = new Set(existingTodos.map((t: any) => t.text?.toLowerCase().trim()))
+      let added = 0
+      for (const text of params.todos) {
+        if (!existingTexts.has(text.toLowerCase().trim())) {
+          existingTodos.push({
+            id: crypto.randomUUID(),
+            text,
+            done: false,
+            createdAt: new Date().toISOString(),
+          })
+          added++
+        }
+      }
+      if (added > 0) {
+        updateFields.todos = existingTodos
+        changes.push(`${added} action item(s) added`)
+      }
+    }
+
+    // Prepend meeting notes
+    if (params.meetingNotes) {
+      const dateHeader = `[${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}]`
+      const newEntry = `${dateHeader} ${params.meetingNotes}`
+      const existingNotes = existing.meetingNotes ?? ''
+      updateFields.meetingNotes = existingNotes ? `${newEntry}\n---\n${existingNotes}` : newEntry
+      changes.push('meeting history added')
+    }
+
+    // Append notes
+    if (params.notes) {
+      const existingNotes = existing.notes ?? ''
+      updateFields.notes = existingNotes ? `${existingNotes}\n\n${params.notes}` : params.notes
+      changes.push('notes appended')
+    }
+
+    // Merge risks
+    if (params.dealRisks?.length) {
+      const existingRisks = ((existing.dealRisks as string[]) ?? []).slice()
+      const existingSet = new Set(existingRisks.map(r => r.toLowerCase()))
+      let added = 0
+      for (const risk of params.dealRisks) {
+        if (!existingSet.has(risk.toLowerCase())) {
+          existingRisks.push(risk)
+          added++
+        }
+      }
+      if (added > 0) {
+        updateFields.dealRisks = existingRisks
+        changes.push(`${added} risk(s) added`)
+      }
+    }
+
+    // Merge competitors
+    if (params.competitors?.length) {
+      const existingComps = ((existing.competitors as string[]) ?? []).slice()
+      const existingSet = new Set(existingComps.map(c => c.toLowerCase()))
+      let added = 0
+      for (const comp of params.competitors) {
+        if (!existingSet.has(comp.toLowerCase())) {
+          existingComps.push(comp)
+          added++
+        }
+      }
+      if (added > 0) {
+        updateFields.competitors = existingComps
+        changes.push(`${added} competitor(s) added`)
+      }
+    }
+
+    // Add success criteria
+    if (params.successCriteria?.length) {
+      const existingCriteria = ((existing.successCriteriaTodos as any[]) ?? []).slice()
+      for (const c of params.successCriteria) {
+        existingCriteria.push({
+          id: crypto.randomUUID(),
+          text: c.text,
+          category: c.category ?? 'General',
+          achieved: false,
+          note: '',
+          createdAt: new Date().toISOString(),
+        })
+      }
+      updateFields.successCriteriaTodos = existingCriteria
+      changes.push(`${params.successCriteria.length} success criteria added`)
+    }
+
+    // Merge project plan
+    if (params.projectPlan?.phases?.length) {
+      const existingPlan = (existing.projectPlan as any) ?? { phases: [] }
+      const existingPhases = existingPlan.phases?.slice() ?? []
+
+      for (const newPhase of params.projectPlan.phases) {
+        const existingPhase = existingPhases.find((p: any) => p.name?.toLowerCase() === newPhase.name.toLowerCase())
+        if (existingPhase) {
+          // Add tasks to existing phase
+          const existingTaskTexts = new Set((existingPhase.tasks ?? []).map((t: any) => t.text?.toLowerCase()))
+          for (const task of (newPhase.tasks ?? [])) {
+            if (!existingTaskTexts.has(task.text.toLowerCase())) {
+              existingPhase.tasks = existingPhase.tasks ?? []
+              existingPhase.tasks.push({
+                id: crypto.randomUUID(),
+                text: task.text,
+                status: task.status ?? 'pending',
+                owner: task.owner ?? null,
+                dueDate: null,
+                notes: '',
+                createdAt: new Date().toISOString(),
+              })
+            }
+          }
+        } else {
+          // Add new phase
+          existingPhases.push({
+            name: newPhase.name,
+            description: newPhase.description ?? '',
+            targetDate: newPhase.targetDate ?? null,
+            tasks: (newPhase.tasks ?? []).map(t => ({
+              id: crypto.randomUUID(),
+              text: t.text,
+              status: t.status ?? 'pending',
+              owner: t.owner ?? null,
+              dueDate: null,
+              notes: '',
+              createdAt: new Date().toISOString(),
+            })),
+          })
+        }
+      }
+      updateFields.projectPlan = { phases: existingPhases }
+      changes.push('project plan updated')
+    }
+
+    // Simple field replacements
+    if (params.aiSummary) {
+      updateFields.aiSummary = params.aiSummary
+      changes.push('summary updated')
+    }
+    if (params.nextSteps) {
+      updateFields.nextSteps = params.nextSteps
+      changes.push('next steps updated')
+    }
+    if (params.stage) {
+      updateFields.stage = params.stage
+      changes.push(`stage → ${params.stage}`)
+      if (params.stage === 'closed_won') updateFields.wonDate = new Date()
+      if (params.stage === 'closed_lost') updateFields.lostDate = new Date()
+    }
+    if (params.dealValue !== undefined) {
+      updateFields.dealValue = params.dealValue
+      changes.push(`value → $${params.dealValue.toLocaleString()}`)
+    }
+    if (params.closeDate) {
+      try { updateFields.closeDate = new Date(params.closeDate) } catch {}
+      changes.push(`close date → ${params.closeDate}`)
+    }
+    if (params.dealType) {
+      updateFields.dealType = params.dealType
+    }
+    if (params.recurringInterval) {
+      updateFields.recurringInterval = params.recurringInterval
+    }
+
+    if (changes.length === 0) {
+      return { result: 'No new data to add.' }
+    }
+
+    await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, params.dealId))
+
+    after(async () => {
+      try { await rebuildWorkspaceBrain(ctx.workspaceId) } catch {}
+    })
+
+    return {
+      result: `Enriched **${existing.dealName}** (${existing.prospectCompany}):\n${changes.map(c => `- ${c}`).join('\n')}`,
+      actions: [{
+        type: 'deal_updated',
+        dealId: params.dealId,
+        dealName: existing.dealName,
+        changes,
       }],
       uiHint: 'refresh_deals',
     }

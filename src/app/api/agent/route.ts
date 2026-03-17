@@ -10,7 +10,7 @@ import { createAnthropic } from '@ai-sdk/anthropic'
 import { z } from 'zod'
 
 import { db } from '@/lib/db'
-import { dealLogs } from '@/lib/db/schema'
+import { dealLogs, workspaces } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { getWorkspaceBrain, formatBrainContext, rebuildWorkspaceBrain } from '@/lib/workspace-brain'
 import type { DealSnapshot } from '@/lib/workspace-brain'
@@ -144,7 +144,7 @@ function buildActiveDealContext(
 
 // ── System prompt builder ────────────────────────────────────────────────────
 
-function buildSystemPrompt(brainContext: string, activeDealContext: string): string {
+function buildSystemPrompt(brainContext: string, activeDealContext: string, pipelineStageContext: string = ''): string {
   return `You are DealKit AI — a sales copilot with complete CRM access. You are the interface between the user and their pipeline intelligence brain.
 
 ═══ CORE DIRECTIVE: ACT FIRST, EXPLAIN AFTER ═══
@@ -177,9 +177,22 @@ This applies to: manage_todos add[], update_success_criteria add[].text, update_
 "Process these notes" → process_meeting_notes (use activeDealId)
 "Fix/correct X" → correct_deal_data
 "Create a deal" → create_deal (simple) or import_deal (with contacts/notes/history)
+"Here's an update on X" / "[person] said [thing]" → search_deals (if needed) → update_deal with notes (log the user's EXACT words as a note)
+"Enrich/update this deal with [rich data]" → search_deals (if needed) → enrich_deal (for adding contacts, todos, meeting history, risks, etc. to an existing deal)
 
 IMPORTING LARGE DEALS:
 When the user pastes a large block of deal info (contacts, interaction history, contract details, action items, etc.), ALWAYS use import_deal — NOT create_deal. import_deal handles contacts, notes, meeting history, todos, risks, success criteria, and project plan in ONE operation. Do NOT chain create_deal → add_contact → update_deal — use import_deal once.
+
+ENRICHING EXISTING DEALS:
+When the user pastes detailed info (contacts, history, action items) for a deal that ALREADY EXISTS, use enrich_deal — NOT import_deal. enrich_deal merges new data with existing data (contacts, todos, risks, etc.) without creating a duplicate.
+
+LOGGING DEAL UPDATES:
+When the user casually mentions something about a deal (e.g., "Tommy said he'd try it", "they pushed the meeting to next week"), this IS deal intelligence. ALWAYS log it:
+1. Search for the deal if needed
+2. Use update_deal with notes to append the user's exact words as a timestamped note
+3. If the update implies action items, also call manage_todos
+4. If it implies a stage change, also update the stage
+Never just acknowledge the update without recording it.
 
 When importing, preserve ALL detail from the user's paste:
 - Interaction history → meetingNotes (keep dates, names, specifics)
@@ -201,6 +214,7 @@ ${activeDealContext ? 'The active deal ID is available to ALL tools. Use it dire
 ═══ WORKSPACE INTELLIGENCE ═══
 
 ${brainContext}
+${pipelineStageContext}
 
 ═══ MULTI-AGENT INTELLIGENCE ═══
 
@@ -302,7 +316,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const systemPrompt = buildSystemPrompt(brainContext, activeDealContext)
+    // Load pipeline config for custom stage awareness
+    let pipelineStageContext = ''
+    try {
+      const [ws] = await db
+        .select({ pipelineConfig: workspaces.pipelineConfig })
+        .from(workspaces)
+        .where(eq(workspaces.id, wsCtx.workspaceId))
+        .limit(1)
+      const pConfig = ws?.pipelineConfig as any
+      if (pConfig?.stages?.length) {
+        const stageList = pConfig.stages
+          .filter((s: any) => !s.isHidden)
+          .sort((a: any, b: any) => a.order - b.order)
+          .map((s: any) => `${s.id} → "${s.label}"`)
+          .join(', ')
+        pipelineStageContext = `\n\nPIPELINE STAGES (user's custom configuration):\n${stageList}\n\nWhen the user references a stage by its display label (e.g., "Verbal Commit"), map it to the correct stage ID. When describing deal stages, use the display label the user sees, not the internal ID.`
+      }
+    } catch { /* non-fatal */ }
+
+    const systemPrompt = buildSystemPrompt(brainContext, activeDealContext, pipelineStageContext)
 
     // ── Build tool context for tool execute() calls ──────────────────────────
     const toolContext = {
