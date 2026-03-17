@@ -177,8 +177,9 @@ This applies to: manage_todos add[], update_success_criteria add[].text, update_
 "Process these notes" → process_meeting_notes (use activeDealId)
 "Fix/correct X" → correct_deal_data
 "Create a deal" → create_deal (simple) or import_deal (with contacts/notes/history)
-"Here's an update on X" / "[person] said [thing]" → search_deals (if needed) → update_deal with notes (log the user's EXACT words as a note)
+"Here's an update on X" / "[person] said [thing]" → search_deals (if needed) → update_deal with meetingNotes (log the user's EXACT words to the Activity Log)
 "Enrich/update this deal with [rich data]" → search_deals (if needed) → enrich_deal (for adding contacts, todos, meeting history, risks, etc. to an existing deal)
+"Create a timeline / document / output" → generate_content (can create ANY type of content — timelines, plans, proposals, risk assessments, anything)
 
 IMPORTING LARGE DEALS:
 When the user pastes a large block of deal info (contacts, interaction history, contract details, action items, etc.), ALWAYS use import_deal — NOT create_deal. import_deal handles contacts, notes, meeting history, todos, risks, success criteria, and project plan in ONE operation. Do NOT chain create_deal → add_contact → update_deal — use import_deal once.

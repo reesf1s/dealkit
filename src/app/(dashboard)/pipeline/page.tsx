@@ -293,20 +293,23 @@ function DealCard({
         </div>
       )}
 
-      {/* AI Insights */}
-      {deal.conversionInsights?.[0] && (
-        <div style={{
-          background: 'rgba(124,58,237,0.08)',
-          border: '1px solid rgba(139,92,246,0.2)',
-          borderRadius: '9px', padding: '8px 10px', marginBottom: '10px',
-          display: 'flex', gap: '6px', alignItems: 'flex-start',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
-        }}>
-          <Sparkles size={11} color="#A78BFA" style={{ marginTop: '1px', flexShrink: 0 }} />
-          <span style={{ fontSize: '11px', color: '#A78BFA', lineHeight: '1.5', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>{deal.conversionInsights[0]}</span>
-        </div>
-      )}
+      {/* AI Insights — filter out score-summary insights to avoid conflicting with ML % badge */}
+      {(() => {
+        const firstInsight = (deal.conversionInsights ?? []).find((ins: string) => !/\d+\s*\/\s*100/i.test(ins))
+        return firstInsight ? (
+          <div style={{
+            background: 'rgba(124,58,237,0.08)',
+            border: '1px solid rgba(139,92,246,0.2)',
+            borderRadius: '9px', padding: '8px 10px', marginBottom: '10px',
+            display: 'flex', gap: '6px', alignItems: 'flex-start',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+          }}>
+            <Sparkles size={11} color="#A78BFA" style={{ marginTop: '1px', flexShrink: 0 }} />
+            <span style={{ fontSize: '11px', color: '#A78BFA', lineHeight: '1.5', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>{firstInsight}</span>
+          </div>
+        ) : null
+      })()}
 
       {/* Deal value + todos */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

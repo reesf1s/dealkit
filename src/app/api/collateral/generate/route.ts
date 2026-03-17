@@ -7,7 +7,7 @@ import { and, count, eq, ilike, isNull, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { collateral, companyProfiles, competitors, dealLogs, events } from '@/lib/db/schema'
 import { PLAN_LIMITS, isWithinLimit } from '@/lib/stripe/plans'
-import { generateCollateral } from '@/lib/ai/generate'
+import { generateCollateral, generateFreeformCollateral } from '@/lib/ai/generate'
 import type { CollateralType } from '@/types'
 import { dbErrResponse } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
@@ -46,13 +46,14 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { type, competitorId: rawCompetitorId, caseStudyId, productName, buyerRole, customPrompt, dealId }: {
+    const { type, competitorId: rawCompetitorId, caseStudyId, productName, buyerRole, customPrompt, dealId, title: customTitle, description: customDescription }: {
       type: CollateralType; competitorId?: string; caseStudyId?: string
       productName?: string; buyerRole?: string; customPrompt?: string; dealId?: string
+      title?: string; description?: string
     } = body
     let competitorId = rawCompetitorId
 
-    const validTypes: CollateralType[] = ['battlecard','case_study_doc','one_pager','objection_handler','talk_track','email_sequence']
+    const validTypes: CollateralType[] = ['battlecard','case_study_doc','one_pager','objection_handler','talk_track','email_sequence','custom']
     if (!type || !validTypes.includes(type))
       return NextResponse.json({ error: `type must be one of: ${validTypes.join(', ')}` }, { status: 400 })
     if (type === 'battlecard' && !competitorId)
@@ -131,10 +132,21 @@ export async function POST(req: NextRequest) {
 
     // Run synchronously — Haiku at 1024 tokens typically completes in 3-8s, well within maxDuration=60
     try {
-      const result = await generateCollateral({ workspaceId, type, competitorId, caseStudyId, productName, buyerRole, customPrompt, dealContext })
+      const result = type === 'custom'
+        ? await generateFreeformCollateral({
+            workspaceId,
+            title: customTitle ?? 'Custom Content',
+            description: customDescription ?? customPrompt ?? 'Generate content',
+            dealContext,
+            customPrompt,
+          })
+        : await generateCollateral({ workspaceId, type, competitorId, caseStudyId, productName, buyerRole, customPrompt, dealContext })
       const generatedAt = new Date()
       const [updated] = await db.update(collateral)
-        .set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt })
+        .set({
+          title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt, updatedAt: generatedAt,
+          ...(type === 'custom' && customTitle ? { customTypeName: customTitle } : {}),
+        })
         .where(eq(collateral.id, record.id))
         .returning()
       await logEvent(workspaceId, userId, 'collateral.generated', { collateralId: updated.id, collateralType: updated.type, title: updated.title })

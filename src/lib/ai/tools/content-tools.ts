@@ -43,7 +43,7 @@ async function buildDealContext(dealId: string, workspaceId: string): Promise<st
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const generate_content = {
-  description: 'Generate sales content or collateral (proposals, one-pagers, battle plans, etc.). The content is saved to the collateral library.',
+  description: 'Generate ANY type of sales content, collateral, or business document — timelines, integration plans, proposals, one-pagers, battle plans, project briefs, risk assessments, executive summaries, or any freeform output. The content is saved to the collateral library. Use this for any content generation request.',
   parameters: z.object({
     title: z.string().describe('Title for the content piece'),
     description: z.string().describe('Description of what to generate and its purpose'),
