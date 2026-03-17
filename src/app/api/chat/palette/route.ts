@@ -31,47 +31,46 @@ export async function POST(req: NextRequest) {
     const contextLines: string[] = []
 
     if (brain) {
-      const openDeals = brain.dealSummaries?.filter(d => !['closed_won', 'closed_lost'].includes(d.stage)) ?? []
-      const totalValue = openDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
-      const winRate = brain.winRate != null ? `${brain.winRate}%` : 'N/A'
+      const { pipeline, urgentDeals, staleDeals, keyPatterns, winLossIntel, deals, productGapPriority, winPlaybook } = brain
 
-      contextLines.push(`Pipeline: ${openDeals.length} open deals, £${totalValue.toLocaleString()} total value, ${winRate} win rate.`)
+      const winRate = winLossIntel?.winRate != null ? `${winLossIntel.winRate}%` : 'N/A'
+      contextLines.push(`Pipeline: ${pipeline.totalActive} open deals, £${pipeline.totalValue.toLocaleString()} total value, ${winRate} win rate.`)
 
-      if (brain.urgentDeals?.length) {
-        contextLines.push(`Urgent: ${brain.urgentDeals.slice(0, 3).map(d => `${d.dealName} (${d.stage})`).join(', ')}.`)
+      if (urgentDeals?.length) {
+        contextLines.push(`Urgent: ${urgentDeals.slice(0, 3).map(d => d.dealName).join(', ')}.`)
       }
-      if (brain.staleDeals?.length) {
-        contextLines.push(`Stale: ${brain.staleDeals.slice(0, 3).map(d => `${d.dealName}`).join(', ')}.`)
+      if (staleDeals?.length) {
+        contextLines.push(`Stale (no activity 14+ days): ${staleDeals.slice(0, 3).map(d => d.dealName).join(', ')}.`)
       }
-      if (brain.keyPatterns?.length) {
-        contextLines.push(`Common risks: ${brain.keyPatterns.slice(0, 4).join('; ')}.`)
+      if (keyPatterns?.length) {
+        contextLines.push(`Common risk themes: ${keyPatterns.slice(0, 4).map(p => p.label).join('; ')}.`)
       }
-      if (brain.topCompetitors?.length) {
-        contextLines.push(`Active competitors: ${brain.topCompetitors.slice(0, 5).map(c => c.name).join(', ')}.`)
+      if (winLossIntel?.competitorRecord?.length) {
+        contextLines.push(`Active competitors: ${winLossIntel.competitorRecord.slice(0, 5).map(c => `${c.name} (${c.winRate}% win rate)`).join(', ')}.`)
       }
 
       // Top deals by score
-      const topDeals = openDeals
-        .filter(d => d.conversionScore != null)
+      const topDeals = (deals ?? [])
+        .filter(d => !['closed_won', 'closed_lost'].includes(d.stage) && d.conversionScore != null)
         .sort((a, b) => (b.conversionScore ?? 0) - (a.conversionScore ?? 0))
         .slice(0, 8)
 
       if (topDeals.length) {
-        contextLines.push('\nTop deals:')
+        contextLines.push('\nTop open deals:')
         for (const d of topDeals) {
-          contextLines.push(`- ${d.dealName} @ ${d.prospectCompany} | ${d.stage} | £${(d.dealValue ?? 0).toLocaleString()} | Score: ${d.conversionScore ?? 'N/A'}`)
+          contextLines.push(`- ${d.name} @ ${d.company} | ${d.stage} | £${(d.dealValue ?? 0).toLocaleString()} | Score: ${d.conversionScore ?? 'N/A'}`)
         }
       }
 
       // Product gap summary
-      if (brain.productGapPriority?.length) {
-        contextLines.push(`\nTop product gaps: ${brain.productGapPriority.slice(0, 4).map(g => g.title).join(', ')}.`)
+      if (productGapPriority?.length) {
+        contextLines.push(`\nTop product gaps: ${productGapPriority.slice(0, 4).map(g => g.title).join(', ')}.`)
       }
 
-      // ML win playbook if available
-      if (brain.winPlaybook?.championPattern?.championLift != null) {
-        const lift = Math.round(brain.winPlaybook.championPattern.championLift * 100)
-        contextLines.push(`Champion lift: +${lift}pts win rate improvement with a champion vs without.`)
+      // Champion lift from win playbook
+      if (winPlaybook?.championPattern?.championLift != null) {
+        const lift = Math.round(winPlaybook.championPattern.championLift * 100)
+        contextLines.push(`Champion lift: +${lift}pts win rate with a champion vs without.`)
       }
     } else {
       contextLines.push('No pipeline data available yet.')
