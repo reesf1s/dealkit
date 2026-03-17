@@ -5,8 +5,9 @@ import { after } from 'next/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { and, eq } from 'drizzle-orm'
-import { streamText, tool } from 'ai'
+import { streamText, tool, jsonSchema } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
+import { z } from 'zod'
 
 import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
@@ -236,17 +237,33 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Convert tools to Vercel AI SDK format ────────────────────────────────
+    // Zod v4 schemas need to be converted to JSON Schema for the AI SDK.
+    // We use zod v4's built-in toJSONSchema, then wrap with the AI SDK's jsonSchema() helper.
     const accumulatedActions: Record<string, unknown>[] = []
+
+    // Helper: convert zod v4 schema to AI SDK compatible format
+    function zodToAiSchema(zodSchema: z.ZodType) {
+      try {
+        // Zod v4 has built-in JSON Schema conversion
+        const json = (z as any).toJSONSchema(zodSchema)
+        return jsonSchema(json)
+      } catch {
+        // Fallback: use the raw zod schema and hope ai SDK handles it
+        return zodSchema
+      }
+    }
 
     const sdkTools = Object.fromEntries(
       Object.entries(allTools).map(([name, t]) => [
         name,
         tool({
           description: t.description,
-          parameters: t.parameters,
+          parameters: zodToAiSchema(t.parameters) as any,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           execute: async (params: any) => {
-            const result = await t.execute(params, toolContext)
+            // Validate params through the original zod schema
+            const validated = t.parameters.parse(params)
+            const result = await t.execute(validated, toolContext)
             if (result.actions?.length) {
               accumulatedActions.push(...result.actions)
             }
@@ -276,10 +293,12 @@ export async function POST(req: NextRequest) {
 
     return result.toDataStreamResponse()
   } catch (err) {
-    console.error('[agent] Error:', err)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 },
+    const errMsg = err instanceof Error ? err.message : String(err)
+    console.error('[agent] Error:', errMsg, err)
+    // Return as a text stream error so useChat can display it
+    return new Response(
+      JSON.stringify({ error: errMsg }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
     )
   }
 }

@@ -67,6 +67,8 @@ export default function CopilotPanel() {
   const pathname = usePathname()
   const { copilotOpen, toggleCopilot, setCopilotOpen, activeDeal } = useSidebar()
 
+  const [chatError, setChatError] = useState<string | null>(null)
+
   const {
     messages,
     input,
@@ -76,9 +78,17 @@ export default function CopilotPanel() {
     setInput,
     setMessages,
     stop,
+    error,
   } = useChat({
     api: '/api/agent',
     body: { activeDealId: activeDeal?.id ?? null, currentPage: pathname },
+    onError: (err) => {
+      console.error('[CopilotPanel] Chat error:', err)
+      setChatError(err.message || 'Something went wrong. Please try again.')
+    },
+    onResponse: () => {
+      setChatError(null)
+    },
   })
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -589,6 +599,22 @@ export default function CopilotPanel() {
                   {action.label}
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* Error display */}
+          {(chatError || error) && (
+            <div style={{
+              margin: '8px 0',
+              padding: '10px 14px',
+              background: 'rgba(239,68,68,0.1)',
+              border: '1px solid rgba(239,68,68,0.2)',
+              borderRadius: '8px',
+              color: '#FCA5A5',
+              fontSize: '12px',
+              lineHeight: '1.5',
+            }}>
+              <strong>Error:</strong> {chatError || error?.message || 'Something went wrong'}
             </div>
           )}
 
