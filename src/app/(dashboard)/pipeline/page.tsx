@@ -576,9 +576,9 @@ function PipelineSettings({
 }
 
 // ── Insights View ────────────────────────────────────────────────────────────
-function InsightsView({ brainData, deals, currencySymbol, mlMap }: {
+function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
   brainData: any; deals: any[]; currencySymbol: string
-  mlMap: Record<string, { churnRisk?: number; winProb?: number }>
+  onAsk: (q: string) => void
 }) {
   if (!brainData) {
     return (
@@ -588,15 +588,16 @@ function InsightsView({ brainData, deals, currencySymbol, mlMap }: {
     )
   }
 
-  const dispatchAI = (query: string) => {
-    window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query } }))
-  }
-
   const wl = brainData.winLossIntel
-  const phi = brainData.pipelineHealthIndex
-  const rf = brainData.revenueForecasts
+  // pipelineHealthIndex is an object {score, interpretation, keyInsight, ...}
+  const phiObj = brainData.pipelineHealthIndex
+  const phiScore: number | undefined = phiObj?.score
+  // revenueForecasts is RevenueForecast[] — aggregate for display
+  const rfArr: any[] = brainData.revenueForecasts ?? []
+  const rfNextMonth = rfArr[0]?.expectedRevenue
+  const rfQuarter = rfArr.reduce((s: number, r: any) => s + (r.expectedRevenue ?? 0), 0) || undefined
+  const rfConfidence = rfArr.length > 0 ? Math.round(rfArr.reduce((s: number, r: any) => s + (r.avgConfidence ?? 0), 0) / rfArr.length) : undefined
   const ml = brainData.mlModel
-  const ct = brainData.calibrationTimeline
   const archetypes: any[] = brainData.dealArchetypes ?? []
   const patterns: any[] = brainData.competitivePatterns ?? []
   const scoreTrends: any[] = brainData.scoreTrendAlerts ?? []
@@ -631,21 +632,21 @@ function InsightsView({ brainData, deals, currencySymbol, mlMap }: {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
 
         {/* Pipeline Health Index */}
-        {phi != null && (
+        {phiScore != null && (
           <div style={cardStyle}>
             <div style={labelStyle}>Pipeline Health</div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
               <div style={{
                 fontSize: '42px', fontWeight: '800', lineHeight: 1,
-                color: phi >= 70 ? 'var(--success)' : phi >= 40 ? 'var(--warning)' : 'var(--danger)',
-              }}>{phi}</div>
+                color: phiScore >= 70 ? 'var(--success)' : phiScore >= 40 ? 'var(--warning)' : 'var(--danger)',
+              }}>{phiScore}</div>
               <div style={{ fontSize: '13px', color: 'var(--text-secondary)', paddingBottom: '4px' }}>/100</div>
             </div>
             <div style={{ height: '4px', borderRadius: '2px', background: 'var(--border)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${phi}%`, borderRadius: '2px', background: phi >= 70 ? 'var(--success)' : phi >= 40 ? 'var(--warning)' : 'var(--danger)', transition: 'width 0.4s' }} />
+              <div style={{ height: '100%', width: `${phiScore}%`, borderRadius: '2px', background: phiScore >= 70 ? 'var(--success)' : phiScore >= 40 ? 'var(--warning)' : 'var(--danger)', transition: 'width 0.4s' }} />
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-              {phi >= 70 ? 'Pipeline is healthy and on track' : phi >= 40 ? 'Some areas need attention' : 'Pipeline needs significant work'}
+              {phiObj?.keyInsight ?? (phiScore >= 70 ? 'Pipeline is healthy and on track' : phiScore >= 40 ? 'Some areas need attention' : 'Pipeline needs significant work')}
             </div>
           </div>
         )}
@@ -656,52 +657,50 @@ function InsightsView({ brainData, deals, currencySymbol, mlMap }: {
             <div style={labelStyle}>Win / Loss Record</div>
             <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
               <div>
-                <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--success)', lineHeight: 1 }}>{wl.wins ?? 0}W</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{wl.wonValue != null ? `${currencySymbol}${(wl.wonValue).toLocaleString()}` : ''}</div>
+                <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--success)', lineHeight: 1 }}>{wl.winCount ?? 0}W</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{wl.avgWonValue ? `avg ${currencySymbol}${Math.round(wl.avgWonValue).toLocaleString()}` : ''}</div>
               </div>
-              <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--danger)', lineHeight: 1, paddingBottom: '2px' }}>{wl.losses ?? 0}L</div>
+              <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--danger)', lineHeight: 1, paddingBottom: '2px' }}>{wl.lossCount ?? 0}L</div>
             </div>
             {wl.winRate != null && (
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                 {wl.winRate}% win rate
-                {wl.winRateChange != null && (
-                  <span style={{ marginLeft: '8px', color: wl.winRateChange >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: '600' }}>
-                    {wl.winRateChange >= 0 ? '↑' : '↓'} {Math.abs(wl.winRateChange)}%
-                  </span>
+                {wl.avgDaysToClose != null && (
+                  <span style={{ marginLeft: '8px', color: 'var(--text-tertiary)' }}>· avg {Math.round(wl.avgDaysToClose)}d to close</span>
                 )}
               </div>
             )}
-            {wl.topWinDrivers?.length > 0 && (
+            {wl.topLossReasons?.length > 0 && (
               <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                Top win factor: {wl.topWinDrivers[0]}
+                Top loss reason: {String(wl.topLossReasons[0])}
               </div>
             )}
           </div>
         )}
 
         {/* Revenue Forecast */}
-        {rf && (
+        {rfArr.length > 0 && (
           <div style={cardStyle}>
             <div style={labelStyle}>Revenue Forecast</div>
-            {rf.nextMonthForecast != null && (
+            {rfNextMonth != null && (
               <div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Next 30 days</div>
                 <div style={{ fontSize: '26px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>
-                  {currencySymbol}{rf.nextMonthForecast.toLocaleString()}
+                  {currencySymbol}{Math.round(rfNextMonth).toLocaleString()}
                 </div>
               </div>
             )}
-            {rf.quarterForecast != null && (
+            {rfQuarter != null && rfArr.length > 1 && (
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>This quarter</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Next {rfArr.length} months</div>
                 <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-secondary)', lineHeight: 1 }}>
-                  {currencySymbol}{rf.quarterForecast.toLocaleString()}
+                  {currencySymbol}{Math.round(rfQuarter).toLocaleString()}
                 </div>
               </div>
             )}
-            {rf.confidence != null && (
+            {rfConfidence != null && (
               <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                {rf.confidence}% confidence
+                {rfConfidence}% avg confidence
               </div>
             )}
           </div>
@@ -711,20 +710,20 @@ function InsightsView({ brainData, deals, currencySymbol, mlMap }: {
         {ml && (
           <div style={cardStyle}>
             <div style={labelStyle}>ML Model</div>
-            {ml.accuracy != null && (
+            {ml.looAccuracy != null && (
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
-                <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--accent)', lineHeight: 1 }}>{ml.accuracy}%</div>
+                <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--accent)', lineHeight: 1 }}>{Math.round(ml.looAccuracy * 100)}%</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', paddingBottom: '4px' }}>accuracy</div>
               </div>
             )}
-            {ml.trainingDeals != null && (
+            {ml.trainingSize != null && (
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                Trained on {ml.trainingDeals} deals
+                Trained on {ml.trainingSize} deals
               </div>
             )}
-            {ct && (
+            {ml.usingGlobalPrior && (
               <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                {ct.message ?? `Next calibration: ${ct.nextCalibration ?? 'soon'}`}
+                Bayesian blend with global prior
               </div>
             )}
           </div>
@@ -740,21 +739,21 @@ function InsightsView({ brainData, deals, currencySymbol, mlMap }: {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {scoreTrends.map((t: any, i: number) => {
-              const isDown = t.trend === 'declining' || t.direction === 'down' || (t.change ?? 0) < 0
+              const isDown = t.trend === 'declining' || (t.delta ?? 0) < 0
               return (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 12px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
                   {isDown ? <TrendingUp size={13} style={{ color: 'var(--danger)', flexShrink: 0, transform: 'scaleY(-1)' }} /> : <TrendingUp size={13} style={{ color: 'var(--success)', flexShrink: 0 }} />}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{t.dealName ?? t.company}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.reason ?? t.detail ?? (isDown ? 'Win probability declining' : 'Score improving')}</div>
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{t.company ?? t.dealName}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(t.message ?? (isDown ? 'Win probability declining' : 'Score improving'))}</div>
                   </div>
-                  {t.change != null && (
+                  {t.delta != null && (
                     <div style={{ fontSize: '12px', fontWeight: '700', color: isDown ? 'var(--danger)' : 'var(--success)', flexShrink: 0 }}>
-                      {isDown ? '' : '+'}{t.change}%
+                      {t.delta > 0 ? '+' : ''}{Math.round(t.delta)}
                     </div>
                   )}
                   <button
-                    onClick={() => dispatchAI(`The ${t.dealName} deal score is ${isDown ? 'declining' : 'improving'}: ${t.reason ?? ''}. What should I do?`)}
+                    onClick={() => onAsk(`The ${t.dealName} deal score is ${isDown ? 'declining' : 'improving'}: ${t.message ?? ''}. Review the deal and tell me what's driving this and what I should do now.`)}
                     style={{ flexShrink: 0, padding: '4px 10px', borderRadius: '6px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)', fontSize: '10px', fontWeight: '600', cursor: 'pointer' }}
                   >
                     Ask AI
@@ -780,9 +779,9 @@ function InsightsView({ brainData, deals, currencySymbol, mlMap }: {
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 10px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
                   <div style={{ flexShrink: 0, width: '22px', height: '22px', borderRadius: '6px', background: 'var(--accent-subtle)', border: '1px solid var(--border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--accent)' }}>{i + 1}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{a.name ?? a.type}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{a.description ?? a.pattern ?? ''}</div>
-                    {a.winRate != null && <div style={{ fontSize: '11px', color: 'var(--success)', marginTop: '2px' }}>{a.winRate}% win rate</div>}
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{a.label ?? a.name ?? `Archetype ${a.id ?? i + 1}`}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{String(a.winningCharacteristic ?? a.description ?? '')}</div>
+                    {a.winRate != null && <div style={{ fontSize: '11px', color: 'var(--success)', marginTop: '2px' }}>{a.winRate}% win rate · {a.dealCount ?? 0} deals</div>}
                   </div>
                 </div>
               ))}
@@ -807,12 +806,12 @@ function InsightsView({ brainData, deals, currencySymbol, mlMap }: {
                       </div>
                     )}
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{p.pattern ?? p.insight ?? ''}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{String(p.topLossRisk ?? p.topWinCondition ?? '')}</div>
                 </div>
               ))}
             </div>
             <button
-              onClick={() => dispatchAI('Analyse our competitive win/loss patterns and give me specific recommendations for how to beat each competitor we face.')}
+              onClick={() => onAsk('Analyse our competitive win/loss patterns and give me specific recommendations for how to beat each competitor we face.')}
               style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
             >
               <Sparkles size={10} /> Competitive Strategy
@@ -829,40 +828,39 @@ function InsightsView({ brainData, deals, currencySymbol, mlMap }: {
             <div style={labelStyle}>Pipeline Trends</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
-            {mlTrends.avgDealCycle != null && (
+            {mlTrends.dealVelocity?.recentAvgDays != null && (
               <div>
                 <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Avg deal cycle</div>
-                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' }}>{mlTrends.avgDealCycle}d</div>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' }}>{Math.round(mlTrends.dealVelocity.recentAvgDays)}d</div>
+                {mlTrends.dealVelocity.direction !== 'stable' && (
+                  <div style={{ fontSize: '10px', color: mlTrends.dealVelocity.direction === 'faster' ? 'var(--success)' : 'var(--warning)' }}>
+                    {mlTrends.dealVelocity.direction === 'faster' ? '↑ Faster' : '↓ Slower'} vs prior
+                  </div>
+                )}
               </div>
             )}
-            {mlTrends.avgDealValue != null && (
+            {mlTrends.winRate?.recentPct != null && (
               <div>
-                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Avg deal value</div>
-                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' }}>{currencySymbol}{mlTrends.avgDealValue.toLocaleString()}</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Win rate (recent)</div>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' }}>{Math.round(mlTrends.winRate.recentPct)}%</div>
+                {mlTrends.winRate.direction !== 'stable' && (
+                  <div style={{ fontSize: '10px', color: mlTrends.winRate.direction === 'improving' ? 'var(--success)' : 'var(--danger)' }}>
+                    {mlTrends.winRate.direction === 'improving' ? '↑ Improving' : '↓ Declining'}
+                  </div>
+                )}
               </div>
             )}
-            {mlTrends.conversionRate != null && (
+            {mlTrends.winRate?.slopePctPerMonth != null && Math.abs(mlTrends.winRate.slopePctPerMonth) >= 1 && (
               <div>
-                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Conversion rate</div>
-                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' }}>{mlTrends.conversionRate}%</div>
-              </div>
-            )}
-            {mlTrends.winRateChange != null && (
-              <div>
-                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Win rate change</div>
-                <div style={{ fontSize: '20px', fontWeight: '700', color: mlTrends.winRateChange >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                  {mlTrends.winRateChange >= 0 ? '+' : ''}{mlTrends.winRateChange}%
+                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Win rate trend</div>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: mlTrends.winRate.slopePctPerMonth >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                  {mlTrends.winRate.slopePctPerMonth >= 0 ? '+' : ''}{mlTrends.winRate.slopePctPerMonth.toFixed(1)}%/mo
                 </div>
               </div>
             )}
           </div>
-          {mlTrends.trendSummary && (
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-              {mlTrends.trendSummary}
-            </div>
-          )}
           <button
-            onClick={() => dispatchAI('Analyse my pipeline trends and tell me what\'s changed, what the data says about where my revenue will come from this quarter, and what I should do differently.')}
+            onClick={() => onAsk('Analyse my pipeline trends and tell me what\'s changed, what the data says about where my revenue will come from this quarter, and what I should do differently.')}
             style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 14px', borderRadius: '8px', background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10))', border: '1px solid rgba(99,102,241,0.25)', color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
           >
             <Sparkles size={10} /> Deep Analysis
@@ -871,7 +869,7 @@ function InsightsView({ brainData, deals, currencySymbol, mlMap }: {
       )}
 
       {/* Empty state when brain has no insights yet */}
-      {!wl && !phi && !rf && !ml && archetypes.length === 0 && scoreTrends.length === 0 && (
+      {!wl && !phiScore && !rfArr.length && !ml && archetypes.length === 0 && scoreTrends.length === 0 && (
         <div style={{ textAlign: 'center', padding: '60px 20px' }}>
           <div style={{ fontSize: '40px', marginBottom: '12px' }}>🧠</div>
           <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>Building your ML model</div>
@@ -889,7 +887,45 @@ type CalEvent = {
   subtitle: string
   date: Date
   dealId: string
-  type: 'close' | 'contract_start' | 'contract_end' | 'follow_up' | 'urgent' | 'task' | 'phase'
+  type: 'close' | 'contract_start' | 'contract_end' | 'follow_up' | 'urgent' | 'task' | 'phase' | 'mention'
+}
+
+// Extract dates mentioned in free-form text (meeting notes, descriptions, todos, etc.)
+function extractDatesFromText(text: string, currentYear: number): { date: Date; snippet: string }[] {
+  if (!text) return []
+  const results: { date: Date; snippet: string }[] = []
+  const seen = new Set<string>()
+  const MONTHS: Record<string, number> = {
+    january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+    july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
+    jan: 0, feb: 1, mar: 2, apr: 3, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+  }
+  const push = (day: number, monthIdx: number, yr: number, idx: number) => {
+    if (day < 1 || day > 31 || monthIdx < 0 || monthIdx > 11) return
+    const d = new Date(yr, monthIdx, day)
+    if (isNaN(d.getTime())) return
+    // Only show dates within -60 to +365 days
+    const now = Date.now()
+    const diff = d.getTime() - now
+    if (diff < -60 * 86_400_000 || diff > 365 * 86_400_000) return
+    const key = d.toDateString()
+    if (seen.has(key)) return
+    seen.add(key)
+    const start = Math.max(0, idx - 40)
+    const end = Math.min(text.length, idx + 60)
+    const snippet = text.slice(start, end).replace(/\s+/g, ' ').trim()
+    results.push({ date: d, snippet: snippet.length > 80 ? snippet.slice(0, 77) + '…' : snippet })
+  }
+  // "19th March" / "19 March" / "19 March 2026"
+  const p1 = /(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)(?:\s+(\d{4}))?/gi
+  let m: RegExpExecArray | null
+  while ((m = p1.exec(text)) !== null)
+    push(+m[1], MONTHS[m[2].toLowerCase()], m[3] ? +m[3] : currentYear, m.index)
+  // "March 19th" / "March 19 2026"
+  const p2 = /(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{4}))?/gi
+  while ((m = p2.exec(text)) !== null)
+    push(+m[2], MONTHS[m[1].toLowerCase()], m[3] ? +m[3] : currentYear, m.index)
+  return results
 }
 
 function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
@@ -995,6 +1031,31 @@ function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
     })
   }
 
+  // Extract dates from free-form text fields (meeting notes, description, todos, success criteria)
+  const currentYear = today.getFullYear()
+  for (const deal of deals) {
+    const textSources: string[] = [
+      deal.meetingNotes ?? '',
+      deal.description ?? '',
+      deal.successCriteria ?? '',
+      // todos is a jsonb array of {text, done} objects
+      Array.isArray(deal.todos) ? deal.todos.map((t: any) => t.text ?? t ?? '').join(' ') : '',
+      Array.isArray(deal.successCriteriaTodos) ? deal.successCriteriaTodos.map((t: any) => t.text ?? t ?? '').join(' ') : '',
+    ]
+    const combinedText = textSources.join('\n')
+    const extracted = extractDatesFromText(combinedText, currentYear)
+    for (const { date, snippet } of extracted) {
+      events.push({
+        id: `${deal.id}-mention-${date.toDateString().replace(/\s/g, '')}`,
+        title: deal.prospectCompany,
+        subtitle: snippet,
+        date,
+        dealId: deal.id,
+        type: 'mention',
+      })
+    }
+  }
+
   const eventColor = (type: CalEvent['type']) => {
     if (type === 'close') return 'var(--danger)'
     if (type === 'follow_up') return 'var(--warning)'
@@ -1003,6 +1064,7 @@ function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
     if (type === 'contract_end') return 'var(--accent)'
     if (type === 'task') return '#8B5CF6'
     if (type === 'phase') return '#06B6D4'
+    if (type === 'mention') return '#F59E0B'
     return 'var(--text-secondary)'
   }
 
@@ -1169,7 +1231,7 @@ function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
 }
 
 export default function PipelinePage() {
-  const { sidebarWidth } = useSidebar()
+  const { sidebarWidth, sendToCopilot } = useSidebar()
   const { data: dealsData, isLoading } = useSWR('/api/deals', fetcher)
   const deals: any[] = dealsData?.data ?? []
   const { urgentMap, staleMap, mlMap, daysInStageMap, momentumMap } = useDealFlags(deals)
@@ -1283,13 +1345,14 @@ export default function PipelinePage() {
 
     // ML pipeline trend (overall win rate change)
     const trend = brainData.mlTrends
-    if (trend?.winRateChange != null && Math.abs(trend.winRateChange) >= 5) {
-      const down = trend.winRateChange < 0
+    const slopePct = trend?.winRate?.slopePctPerMonth
+    if (slopePct != null && Math.abs(slopePct) >= 2) {
+      const down = slopePct < 0
       alerts.push({
-        headline: `Win rate ${down ? 'down' : 'up'} ${Math.abs(trend.winRateChange)}%`,
-        detail: trend.trendSummary ?? (down ? 'Conversion declining vs prior period' : 'Pipeline momentum improving'),
+        headline: `Win rate ${down ? 'declining' : 'improving'} ${Math.abs(slopePct).toFixed(1)}%/mo`,
+        detail: down ? 'Conversion rate falling vs prior period' : 'Pipeline momentum improving',
         severity: down ? 'high' : 'low',
-        prompt: `Our win rate has ${down ? 'dropped' : 'improved'} by ${Math.abs(trend.winRateChange)}% recently. ${trend.trendSummary ?? ''}. Analyse what's driving this and what we should change.`,
+        prompt: `Our win rate is ${down ? 'declining' : 'improving'} by ${Math.abs(slopePct).toFixed(1)}% per month. Analyse what's driving this and what we should change.`,
       })
     }
 
@@ -1373,7 +1436,7 @@ export default function PipelinePage() {
 
   const dispatchAI = (query: string) => {
     if (!query.trim()) return
-    window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query } }))
+    sendToCopilot(query)
     setAiInput('')
   }
 
@@ -1972,7 +2035,7 @@ export default function PipelinePage() {
 
       {/* ── INSIGHTS VIEW ───────────────────────────────────────────────────── */}
       {view === 'insights' && (
-        <InsightsView brainData={brainData} deals={deals} currencySymbol={currencySymbol} mlMap={mlMap} />
+        <InsightsView brainData={brainData} deals={deals} currencySymbol={currencySymbol} onAsk={dispatchAI} />
       )}
 
       <PipelineSettings
