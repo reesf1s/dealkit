@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useUser } from '@clerk/nextjs'
 import useSWR from 'swr'
 import { useState, useEffect } from 'react'
-import { CheckCircle, AlertTriangle, ExternalLink, Download, Trash2, Copy, LogOut, RefreshCw, Plug, Unplug } from 'lucide-react'
+import { CheckCircle, AlertTriangle, ExternalLink, Download, Trash2, Copy, LogOut, RefreshCw, Plug, Unplug, Mail } from 'lucide-react'
 import { SkeletonCard } from '@/components/shared/SkeletonCard'
 import { ConfirmModal } from '@/components/shared/ConfirmModal'
 import { useToast } from '@/components/shared/Toast'
@@ -99,12 +99,15 @@ export default function SettingsPage() {
   const [globalConsent, setGlobalConsent] = useState<boolean | null>(null)
   const [consentLoading, setConsentLoading] = useState(false)
   const [eraseLoading, setEraseLoading] = useState(false)
+  const [inboundEmailCopied, setInboundEmailCopied] = useState(false)
+  const [regeneratingInbound, setRegeneratingInbound] = useState(false)
 
   const { data: userRes, isLoading: loadingUser } = useSWR<{ data: DbUser }>('/api/user', fetcher)
   const { data: membersRes, isLoading: loadingMembers, mutate: mutateMembers } = useSWR<{ data: Member[] }>('/api/workspaces/members', fetcher)
   const { data: hubspotRes, mutate: mutateHubspot } = useSWR<{ data: HubspotStatus }>('/api/integrations/hubspot/status', fetcher, { revalidateOnFocus: false })
   const { data: configData, mutate: mutateConfig } = useSWR('/api/pipeline-config', fetcher, { revalidateOnFocus: false })
   const { data: consentRes } = useSWR<{ consented: boolean }>('/api/global/consent', fetcher, { revalidateOnFocus: false })
+  const { data: inboundEmailRes, mutate: mutateInboundEmail } = useSWR<{ data: { email: string; token: string } }>('/api/workspace/inbound-email', fetcher, { revalidateOnFocus: false })
   const hubspot = hubspotRes?.data
   const dbUser = userRes?.data
 
@@ -350,6 +353,31 @@ export default function SettingsPage() {
     if (!dbUser?.workspaceSlug) return
     navigator.clipboard.writeText(dbUser.workspaceSlug)
     toast('Join code copied!', 'success')
+  }
+
+  function handleCopyInboundEmail() {
+    const email = inboundEmailRes?.data?.email
+    if (!email) return
+    navigator.clipboard.writeText(email)
+    setInboundEmailCopied(true)
+    toast('Inbound email address copied!', 'success')
+    setTimeout(() => setInboundEmailCopied(false), 2000)
+  }
+
+  async function handleRegenerateInboundEmail() {
+    if (!confirm('Regenerate your inbound email address? The old address will stop working immediately.')) return
+    setRegeneratingInbound(true)
+    try {
+      const res = await fetch('/api/workspace/regenerate-inbound-email', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to regenerate')
+      await mutateInboundEmail()
+      toast('New inbound email address generated', 'success')
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : 'Failed to regenerate', 'error')
+    } finally {
+      setRegeneratingInbound(false)
+    }
   }
 
   const currentPlan = dbUser?.plan ?? 'free'
@@ -791,6 +819,78 @@ export default function SettingsPage() {
             <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: 0, lineHeight: 1.5 }}>
               More integrations coming — Salesforce, Pipedrive, and Close are on the roadmap.
             </p>
+          </div>
+        </SectionCard>
+
+        {/* Email Forwarding */}
+        <SectionCard title="Email Forwarding" description="Auto-link customer emails to deals by BCC'ing your unique inbound address">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+            {/* Explainer */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 14px', borderRadius: '10px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.14)' }}>
+              <Mail size={14} strokeWidth={2} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: '1px' }} />
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.7 }}>
+                BCC this address on emails to/from customers. SellSight will automatically match them to the right deal using contact email addresses and append the email to the deal&apos;s notes.
+              </p>
+            </div>
+
+            {/* Address display */}
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>Your inbound address</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input
+                  readOnly
+                  value={inboundEmailRes?.data?.email ?? 'Loading…'}
+                  style={{
+                    flex: 1, height: '32px', padding: '0 10px', borderRadius: '7px', fontSize: '12px',
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    color: 'var(--text-primary)', fontFamily: 'monospace', outline: 'none',
+                  }}
+                />
+                <button
+                  onClick={handleCopyInboundEmail}
+                  disabled={!inboundEmailRes?.data?.email}
+                  title="Copy inbound email address"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    height: '32px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
+                    color: inboundEmailCopied ? 'var(--success)' : 'var(--text-primary)',
+                    background: inboundEmailCopied ? 'rgba(34,197,94,0.1)' : 'var(--surface-hover)',
+                    border: inboundEmailCopied ? '1px solid rgba(34,197,94,0.3)' : '1px solid var(--border-strong)',
+                    cursor: !inboundEmailRes?.data?.email ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.15s', whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Copy size={11} />
+                  {inboundEmailCopied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+            </div>
+
+            {/* Regenerate */}
+            {(isOwner || dbUser?.role === 'admin') && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '10px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                <div>
+                  <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>Regenerate address</p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '2px 0 0' }}>Creates a new address — the old one will stop working immediately</p>
+                </div>
+                <button
+                  onClick={handleRegenerateInboundEmail}
+                  disabled={regeneratingInbound}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
+                    color: 'var(--text-secondary)', background: 'var(--surface)', border: '1px solid var(--border-strong)',
+                    cursor: regeneratingInbound ? 'not-allowed' : 'pointer', opacity: regeneratingInbound ? 0.6 : 1,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <RefreshCw size={11} style={{ animation: regeneratingInbound ? 'spin 1s linear infinite' : 'none' }} />
+                  {regeneratingInbound ? 'Regenerating…' : 'Regenerate'}
+                </button>
+              </div>
+            )}
+
           </div>
         </SectionCard>
 

@@ -83,6 +83,7 @@ export const workspaces = pgTable('workspaces', {
   workspaceBrain: jsonb('workspace_brain'),                // compressed org knowledge — updated after every deal analysis
   pipelineConfig: jsonb('pipeline_config'),                    // PipelineConfig JSON — custom stages, labels, industry preset
   embeddingCache: jsonb('embedding_cache'),                    // Semantic embedding vectors for deals, competitors, collateral
+  inboundEmailToken: text('inbound_email_token'),              // 8-char hex token for email forwarding ingest
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
