@@ -2220,23 +2220,39 @@ export default function PipelinePage() {
           {/* H. Model Status */}
           {(() => {
             const ml = brainData?.mlModel
-            const trainingSize = ml?.trainingSize ?? 0
+            // Use whichever source gives the higher count — mlModel.trainingSize may be stale
+            // while winLossIntel correctly counts deals by both stage and outcome fields.
+            const closedCount = Math.max(
+              (brainData?.winLossIntel?.winCount ?? 0) + (brainData?.winLossIntel?.lossCount ?? 0),
+              ml?.trainingSize ?? 0
+            )
+            const winCount  = brainData?.winLossIntel?.winCount ?? 0
+            const lossCount = brainData?.winLossIntel?.lossCount ?? 0
+            const hasBothWinsAndLosses = winCount > 0 && lossCount > 0
             const accuracy = ml?.looAccuracy != null ? Math.round(ml.looAccuracy * 100) : null
             let statusLabel = 'ML Model: Building'
             let statusColor = 'var(--text-tertiary)'
             let nextMilestone = ''
-            if (trainingSize >= 10) {
+            if (closedCount === 0) {
+              statusLabel = 'ML Model: Building'
+              statusColor = 'var(--text-tertiary)'
+              nextMilestone = 'Add your first closed deal to start building your model'
+            } else if (closedCount >= 10 && hasBothWinsAndLosses) {
               statusLabel = 'ML Model: Active'
               statusColor = 'var(--success)'
               nextMilestone = accuracy != null ? `${accuracy}% prediction accuracy` : 'Predictions active'
-            } else if (trainingSize >= 5) {
+            } else if (closedCount >= 10) {
+              statusLabel = 'ML Model: Needs Loss Data'
+              statusColor = 'var(--warning)'
+              nextMilestone = 'Need both wins AND losses for ML predictions'
+            } else if (closedCount >= 5) {
               statusLabel = 'ML Model: Warming Up'
               statusColor = 'var(--warning)'
-              nextMilestone = `${10 - trainingSize} more closed deal${(10 - trainingSize) !== 1 ? 's' : ''} to activate ML predictions`
+              nextMilestone = `${10 - closedCount} more closed deal${(10 - closedCount) !== 1 ? 's' : ''} to activate velocity benchmarks`
             } else {
-              statusLabel = 'ML Model: Building'
-              statusColor = 'var(--text-tertiary)'
-              nextMilestone = `${5 - trainingSize} more closed deal${(5 - trainingSize) !== 1 ? 's' : ''} to start warming up`
+              statusLabel = 'ML Model: Warming Up'
+              statusColor = 'var(--warning)'
+              nextMilestone = `${5 - closedCount} more closed deal${(5 - closedCount) !== 1 ? 's' : ''} to activate deal similarity matching`
             }
             return (
               <div style={{
@@ -2248,7 +2264,7 @@ export default function PipelinePage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '12px', fontWeight: '700', color: statusColor }}>{statusLabel}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px' }}>
-                    {trainingSize} closed deal{trainingSize !== 1 ? 's' : ''} &middot; {nextMilestone}
+                    {closedCount} closed deal{closedCount !== 1 ? 's' : ''} &middot; {nextMilestone}
                   </div>
                 </div>
                 <Link href="/models" style={{

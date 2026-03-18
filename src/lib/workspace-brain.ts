@@ -1477,7 +1477,9 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
     return {
       id:               d.id,
       company:          d.prospectCompany,
-      stage:            d.stage,
+      // Normalise stage so ML engine sees closed_won/closed_lost regardless of which
+      // field was set — some deals use outcome='won'/'lost' without updating stage.
+      stage:            d.outcome === 'won' ? 'closed_won' : d.outcome === 'lost' ? 'closed_lost' : d.stage,
       dealValue:        d.dealValue,
       dealRisks:        (d.dealRisks as string[]) ?? [],
       dealCompetitors:  (d.dealCompetitors as string[]) ?? [],
