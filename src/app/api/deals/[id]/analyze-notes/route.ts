@@ -183,7 +183,17 @@ After the JSON above, include a signal extraction block wrapped in <extraction><
   "urgency_signals": ["end of quarter deadline"],
   "user_verified": false
 }
-</extraction>` }],
+</extraction>
+
+For objections, classify each into EXACTLY one theme:
+- "budget": price concerns, cost objections, ROI questions, affordability
+- "timing": not now, too early, waiting for something, seasonality
+- "authority": decision maker not involved, committee approval needed, no sign-off
+- "competitor": mentions of competing products, existing vendor relationships
+- "value": unclear benefit, not convinced of need, feature gaps
+- "technical": IT concerns, security, compliance, data concerns
+- "integration": specific integration requirements (Salesforce, HubSpot, etc.)
+- "other": anything that doesn't fit the above` }],
       model: 'claude-sonnet-4-6', max_tokens: 2500,
     })
     // Strip markdown fences and any leading/trailing text before the JSON object

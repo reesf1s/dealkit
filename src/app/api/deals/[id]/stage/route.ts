@@ -45,17 +45,31 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const validStages = ['prospecting','qualification','discovery','proposal','negotiation','closed_won','closed_lost']
     // Also accept custom stage IDs (format: custom_slug_timestamp)
     if (!validStages.includes(stage) && !stage?.startsWith('custom_')) return NextResponse.json({ error: 'Invalid stage' }, { status: 400 })
-    const update: Record<string, unknown> = { stage, updatedAt: new Date() }
+    const now = new Date()
+    const update: Record<string, unknown> = { stage, updatedAt: now }
     if (kanbanOrder !== undefined) update.kanbanOrder = kanbanOrder
-    if (stage === 'closed_won') update.wonDate = new Date()
-    if (stage === 'closed_lost') update.lostDate = new Date()
+    if (stage === 'closed_won') {
+      update.wonDate = now
+      update.closeDate = now
+      update.outcome = 'won'
+    }
+    if (stage === 'closed_lost') {
+      update.lostDate = now
+      update.closeDate = now
+      update.outcome = 'lost'
+    }
+
+    // Capture current stage before update (for transition log)
+    const [existing] = await db.select({ meetingNotes: dealLogs.meetingNotes, stage: dealLogs.stage }).from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
+    const fromStage = existing?.stage ?? null
 
     // Append win/loss interview data to meetingNotes if provided
     if (winLossData && (stage === 'closed_won' || stage === 'closed_lost')) {
-      const [existing] = await db.select({ meetingNotes: dealLogs.meetingNotes }).from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
       const existingNotes = (existing?.meetingNotes as string) ?? ''
       const interviewBlock = `\n\n---\n[Win/Loss Interview]\nOutcome: ${stage}\nPrimary reason: ${winLossData.primaryReason || 'Not specified'}\nCompetitor: ${winLossData.competitor || 'Not specified'}\nHardest objection: ${winLossData.hardestObjection || 'Not specified'}\nChampion present: ${winLossData.championPresent || 'unknown'}\nNotes: ${winLossData.notes || ''}`
       update.meetingNotes = existingNotes + interviewBlock
+    } else if (!winLossData) {
+      // No win/loss data — no meetingNotes update needed
     }
 
     const [deal] = await db.update(dealLogs).set(update).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).returning()
@@ -78,6 +92,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         } catch { /* non-fatal — never block deal close */ }
       })
     }
+
+    // ── Record stage transition for velocity tracking ─────────────────────────
+    after(async () => {
+      try {
+        await db.execute(sql`
+          INSERT INTO stage_transitions (deal_id, workspace_id, from_stage, to_stage, transitioned_at)
+          VALUES (${id}, ${workspaceId}, ${fromStage}, ${stage}, NOW())
+        `)
+      } catch { /* non-fatal — table may not exist yet on first run */ }
+    })
 
     after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     return NextResponse.json({ data: deal })

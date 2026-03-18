@@ -119,7 +119,7 @@ function DealCard({
   churnRisk,
   daysInStage,
   momentum,
-  currencySymbol = '$',
+  currencySymbol = '£',
   mlPrediction,
   allStages,
 }: {
@@ -469,7 +469,7 @@ function InfoTooltip({ text }: { text: string }) {
 }
 
 // ── Animated number counter ───────────────────────────────────────────────────
-function AnimatedNumber({ target, duration = 300 }: { target: number; duration?: number }) {
+function AnimatedNumber({ target, duration = 300, format = false }: { target: number; duration?: number; format?: boolean }) {
   const [val, setVal] = useState(0)
   useEffect(() => {
     if (target === 0) return
@@ -483,7 +483,7 @@ function AnimatedNumber({ target, duration = 300 }: { target: number; duration?:
     }
     requestAnimationFrame(tick)
   }, [target, duration])
-  return <>{val}</>
+  return <>{format ? val.toLocaleString('en-GB') : val}</>
 }
 
 // ── Animated progress bar ─────────────────────────────────────────────────────
@@ -538,7 +538,17 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
   const mlTrends = brainData.mlTrends
   const stageVelocityIntel = brainData.stageVelocityIntel
   const objectionWinMap: any[] = brainData.objectionWinMap ?? []
-  const competitivePatterns: any[] = brainData.competitivePatterns ?? []
+  // Use competitivePatterns (ML-derived) if available, otherwise fall back to
+  // winLossIntel.competitorRecord which has a much lower threshold (1+ closed deal)
+  const rawCompetitivePatterns: any[] = brainData.competitivePatterns ?? []
+  const fallbackCompRecord: any[] = (brainData.winLossIntel?.competitorRecord ?? []).map((c: any) => ({
+    competitor: c.name,
+    totalDeals: c.wins + c.losses,
+    wins: c.wins,
+    losses: c.losses,
+    winRate: c.winRate,
+  }))
+  const competitivePatterns: any[] = rawCompetitivePatterns.length > 0 ? rawCompetitivePatterns : fallbackCompRecord
 
   const openDeals = deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
 
@@ -839,8 +849,9 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
               {competitivePatterns.slice(0, 6).map((p: any, i: number) => {
                 const wr = p.winRate ?? 0
                 const wrColor = wr >= 60 ? '#059669' : wr >= 40 ? '#D97706' : '#DC2626'
-                const wins = p.wins ?? 0
-                const losses = p.losses ?? 0
+                // wins/losses may come from winLossIntel fallback or be derived from ML pattern
+                const wins = p.wins != null ? p.wins : Math.round((p.totalDeals ?? 0) * (wr / 100))
+                const losses = p.losses != null ? p.losses : (p.totalDeals ?? 0) - wins
                 return (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 10px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
                     <div style={{ flex: 1, fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{p.competitor}</div>
@@ -881,7 +892,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
               <div>
                 <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Weighted forecast</div>
                 <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>
-                  {currencySymbol}<AnimatedNumber target={Math.round(weightedForecast)} />
+                  {currencySymbol}<AnimatedNumber target={Math.round(weightedForecast)} format={true} />
                 </div>
               </div>
               {rfArr.length > 0 && (
@@ -1583,7 +1594,7 @@ export default function PipelinePage() {
   }
 
   // Currency symbol from workspace config (default '$')
-  const currencySymbol: string = pipelineConfig?.currency ?? '$'
+  const currencySymbol: string = pipelineConfig?.currency ?? '£'
 
   // Use custom pipeline config if available, otherwise use defaults
   const configStages = pipelineConfig?.stages ?? STAGES

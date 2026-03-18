@@ -312,7 +312,8 @@ async function ensureBrainColumn() {
       ADD COLUMN IF NOT EXISTS contract_end_date timestamptz,
       ADD COLUMN IF NOT EXISTS conversion_score_pinned boolean NOT NULL DEFAULT false,
       ADD COLUMN IF NOT EXISTS note_signals_json text,
-      ADD COLUMN IF NOT EXISTS score_breakdown text
+      ADD COLUMN IF NOT EXISTS score_breakdown text,
+      ADD COLUMN IF NOT EXISTS outcome text
     `)
   } catch { /* already exists */ }
   // Brain rebuild log — records every rebuild for debugging and ML auditability
@@ -333,6 +334,27 @@ async function ensureBrainColumn() {
         duration_ms integer,
         created_at timestamp DEFAULT now()
       )
+    `)
+  } catch { /* already exists */ }
+  // Stage transitions — history of all stage changes for velocity tracking
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS stage_transitions (
+        id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        deal_id text NOT NULL,
+        workspace_id text NOT NULL,
+        from_stage text,
+        to_stage text NOT NULL,
+        transitioned_at timestamp DEFAULT now()
+      )
+    `)
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_stage_transitions_deal
+      ON stage_transitions (deal_id, transitioned_at DESC)
+    `)
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_stage_transitions_workspace
+      ON stage_transitions (workspace_id, transitioned_at DESC)
     `)
   } catch { /* already exists */ }
   schemaMigrated = true
@@ -386,6 +408,27 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
 async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceBrain> {
   const rebuildStartMs = Date.now()
   await ensureBrainColumn()
+
+  // ── Backfill outcome field for deals closed before this column existed ───────
+  // Safe to run every rebuild — WHERE clause limits to rows that need fixing.
+  try {
+    await db.execute(sql`
+      UPDATE deal_logs
+      SET outcome = 'won',
+          close_date = COALESCE(close_date, won_date, updated_at)
+      WHERE workspace_id = ${workspaceId}
+        AND stage = 'closed_won'
+        AND outcome IS NULL
+    `)
+    await db.execute(sql`
+      UPDATE deal_logs
+      SET outcome = 'lost',
+          close_date = COALESCE(close_date, lost_date, updated_at)
+      WHERE workspace_id = ${workspaceId}
+        AND stage = 'closed_lost'
+        AND outcome IS NULL
+    `)
+  } catch { /* non-fatal — column may not exist yet on first run */ }
 
   // Load previous brain to carry forward score history
   const previousBrain = await getWorkspaceBrain(workspaceId)
@@ -773,6 +816,55 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
       })
     }
     objectionWinMap.sort((a, b) => b.winsWithTheme - a.winsWithTheme)
+  }
+
+  // ── Extraction-based objection themes (augments or replaces risk-word map) ──
+  // Reads note_signals_json from all deals (not just closed) to populate the
+  // Top Objections card even before 4+ closed deals exist.
+  // Theme labels match the LLM extraction prompt: budget|timing|authority|competitor|value|technical|integration|other
+  if (objectionWinMap.length === 0) {
+    try {
+      const extractionRows = await db.execute<{ id: string; stage: string; note_signals_json: string | null }>(
+        sql`SELECT id, stage, note_signals_json FROM deal_logs WHERE workspace_id = ${workspaceId} AND note_signals_json IS NOT NULL`
+      )
+      const themeMap = new Map<string, { dealIds: Set<string>; wins: number; losses: number }>()
+      for (const row of extractionRows) {
+        try {
+          const extraction = JSON.parse(row.note_signals_json ?? 'null')
+          if (!extraction?.objections?.length) continue
+          const isWon = row.stage === 'closed_won'
+          const isLost = row.stage === 'closed_lost'
+          for (const obj of extraction.objections as { theme?: string; text?: string }[]) {
+            const t = (obj.theme ?? 'other').toLowerCase().trim()
+            const entry = themeMap.get(t) ?? { dealIds: new Set(), wins: 0, losses: 0 }
+            if (!entry.dealIds.has(row.id)) {
+              entry.dealIds.add(row.id)
+              if (isWon) entry.wins++
+              if (isLost) entry.losses++
+            }
+            themeMap.set(t, entry)
+          }
+        } catch { /* skip malformed rows */ }
+      }
+      const themeLabels: Record<string, string> = {
+        budget: 'Budget concern', timing: 'Timing / not now', authority: 'Authority / sign-off',
+        competitor: 'Competitor pressure', value: 'Value / benefit unclear', technical: 'Technical concerns',
+        integration: 'Integration requirements', other: 'Other objections',
+      }
+      for (const [theme, data] of themeMap) {
+        if (data.dealIds.size < 1) continue
+        const total = data.dealIds.size
+        const wins = data.wins
+        const closed = data.wins + data.losses
+        objectionWinMap.push({
+          theme: themeLabels[theme] ?? theme,
+          dealsWithTheme: total,
+          winsWithTheme: wins,
+          winRateWithTheme: closed >= 2 ? Math.round((wins / closed) * 100) : 0,
+        })
+      }
+      objectionWinMap.sort((a, b) => b.dealsWithTheme - a.dealsWithTheme)
+    } catch { /* non-fatal — skip if table/column not ready */ }
   }
 
   // ── Tier 2: Objection × Stage × Champion Conditional Model ────────────────
