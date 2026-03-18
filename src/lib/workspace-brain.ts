@@ -434,6 +434,17 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
     ))
   }
 
+  // ── Deterioration pass — compute per-deal before snapshot creation ──────────
+  // analyzeDeterioration splits notes into early/recent halves and detects declining sentiment
+  const deteriorationMap = new Map<string, boolean>()
+  for (const d of deals) {
+    if (d.stage === 'closed_won' || d.stage === 'closed_lost') continue
+    try {
+      const det = analyzeDeterioration(d.meetingNotes as string | null, d.createdAt, d.updatedAt)
+      if (det.isDeteriorating) deteriorationMap.set(d.id, true)
+    } catch { /* non-fatal */ }
+  }
+
   const snapshots: DealSnapshot[] = deals.map(d => {
     const allTodos = (d.todos as { text: string; done: boolean }[]) ?? []
     const pending = allTodos.filter(t => !t.done).map(t => t.text)
@@ -465,7 +476,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
       signalSummary: sig ? {
         momentum:          sig.momentumScore,
         riskLevel:         sig.objectionCount >= 4 ? 'high' : sig.objectionCount >= 2 ? 'medium' : 'low',
-        isDeteriorating:   false,   // filled in deterioration pass below
+        isDeteriorating:   deteriorationMap.get(d.id) ?? false,
         predictedCloseDays: null,   // filled in after ML runs
         velocity:          sig.engagementVelocity,
         stakeholderDepth:  sig.stakeholderDepth,
@@ -1310,6 +1321,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
       momentumScore:    sig?.momentumScore,
       stakeholderDepth: sig?.stakeholderDepth,
       urgencyScore:     sig?.urgencyScore,
+      championStrength: sig?.championStrength,
     }
   })
 

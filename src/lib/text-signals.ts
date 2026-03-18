@@ -27,6 +27,28 @@ const POSITIVE: string[] = [
   'purchase order', 'eager', 'enthusiastic', 'very interested', 'keen to',
   'fantastic', 'excellent progress', 'really excited', 'huge opportunity',
   'strong interest', 'pushing forward', 'accelerating', 'wants to proceed',
+  // Contract & close signals — highest confidence positive
+  'contract signed', 'contracts signed', 'signed contract', 'fully executed',
+  'countersigned', 'signed and returned', 'contracts executed', 'docs signed',
+  'ready to execute', 'contracts sent', 'waiting on signature', 'signing tomorrow',
+  'signing today', 'sign tonight', 'ready to countersign', 'verbal agreement',
+  'verbal commit', 'handshake deal', 'deal agreed', 'deal done',
+  // Financial close signals
+  'po issued', 'po received', 'po sent', 'invoice approved', 'invoice sent',
+  'payment approved', 'payment processed', 'payment received', 'invoiced',
+  'budget released', 'funds released', 'budget unlocked', 'procurement approved',
+  'commercial approval', 'commercial sign-off', 'financially committed',
+  // Implementation / deployment signals
+  'implementation kicked off', 'onboarding started', 'kicked off',
+  'go-live confirmed', 'go live confirmed', 'live date confirmed', 'start date confirmed',
+  'project kicked off', 'deployment confirmed', 'onboarding scheduled',
+  'went live', 'is live', 'now live', 'deployed', 'implementation approved',
+  'project approved', 'implementation signed off',
+  // Internal momentum signals
+  'told the board', 'presented to the board', 'board presentation went well',
+  'c-suite buy-in', 'executive buy-in', 'internal approval secured',
+  'presented internally', 'internal sign-off', 'got internal approval',
+  'team is on board', 'everyone aligned', 'full alignment',
 ]
 
 const NEGATIVE: string[] = [

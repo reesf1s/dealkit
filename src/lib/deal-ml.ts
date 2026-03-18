@@ -27,7 +27,7 @@ export const ML_FEATURE_NAMES = [
   'deal_value',           // log-normalised by workspace max
   'pipeline_age',         // days / 180, capped at 1
   'risk_intensity',       // continuous: dealRisks.length / 5, capped at 1 (replaces binary has_risks)
-  'competitor_win_rate',  // historical win rate against this deal's rivals
+  'competitor_win_rate',  // min win rate across this deal's competitors (penalises strong rivals more)
   'todo_engagement',      // todos-completed / total
   'text_engagement',      // NLP composite from meeting notes (sentiment × recency × signals)
                           // Replaces ai_confidence — no circular LLM dependency.
@@ -35,6 +35,8 @@ export const ML_FEATURE_NAMES = [
   'stakeholder_depth',    // breadth of stakeholder engagement (0–1, 6 categories)
   'urgency_score',        // urgency language density from NLP (0–1)
   'rep_win_rate',         // owning rep's historical win rate across closed deals (0–1, 0.5=unknown)
+  'champion_signal',      // internal champion/sponsor/advocate strength from NLP (0–1)
+                          // Strongest single predictor of close in B2B sales — separate from text_engagement
 ] as const
 
 export const ML_MIN_TRAINING_DEALS = 4
@@ -65,6 +67,7 @@ export interface DealMLInput {
   momentumScore?: number           // 0–1 recent vs early sentiment
   stakeholderDepth?: number        // 0–1 breadth of stakeholder engagement
   urgencyScore?: number            // 0–1 urgency language density
+  championStrength?: number        // 0–1 internal champion/sponsor signal strength
 }
 
 // ─── Output types ─────────────────────────────────────────────────────────────
@@ -297,8 +300,10 @@ function extractFeatures(
   const f_risk = Math.min(deal.dealRisks.length / 5, 1)
 
   const comps = deal.dealCompetitors.filter(Boolean)
+  // Use MIN win rate (not mean) — one strong competitor should drag the score down
+  // e.g. [Oracle 20%, SAP 50%] → 0.20, not 0.35. Weak competitors don't offset strong ones.
   const f_comp = comps.length > 0
-    ? comps.reduce((s, c) => s + (competitorWinRates.get(c.toLowerCase()) ?? 0.5), 0) / comps.length
+    ? Math.min(...comps.map(c => competitorWinRates.get(c.toLowerCase()) ?? 0.5))
     : 0.5
 
   const todos = deal.todos ?? []
@@ -319,8 +324,11 @@ function extractFeatures(
   // rep_win_rate: owning rep's historical win rate; 0.5 = neutral/unknown
   const f_rep = deal.repId ? (repWinRates.get(deal.repId) ?? 0.5) : 0.5
 
+  // champion_signal: strongest single predictor of B2B close — separate from general text_engagement
+  const f_champion   = deal.championStrength ?? sig().championStrength
+
   // Order must match ML_FEATURE_NAMES exactly
-  return [f_stage, f_value, f_age, f_risk, f_comp, f_todo, f_text, f_momentum, f_stakeholder, f_urgency, f_rep]
+  return [f_stage, f_value, f_age, f_risk, f_comp, f_todo, f_text, f_momentum, f_stakeholder, f_urgency, f_rep, f_champion]
 }
 
 // ─── Logistic regression ──────────────────────────────────────────────────────

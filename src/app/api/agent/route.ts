@@ -94,16 +94,33 @@ function buildActiveDealContext(
     }
   }
 
-  // Recent notes (last 5 entries)
-  if (fullDeal?.notes) {
-    const noteEntries = fullDeal.notes.split(/\n---\n|\n\n/).filter(Boolean)
+  // Current AI summary
+  if (fullDeal?.aiSummary) {
+    lines.push(`\nSummary: ${fullDeal.aiSummary}`)
+  }
+
+  // Recent meeting history (last 5 entries from meetingNotes — structured, dated)
+  if (fullDeal?.meetingNotes) {
+    const noteEntries = (fullDeal.meetingNotes as string).split(/\n---\n/).filter(Boolean)
     const recent = noteEntries.slice(-5)
     if (recent.length > 0) {
-      lines.push('\nRecent Notes:')
+      lines.push('\nRecent Meeting History:')
       for (const n of recent) {
-        lines.push(`  ${n.trim().substring(0, 300)}`)
+        lines.push(`  ${n.trim().substring(0, 500)}`)
       }
     }
+  }
+
+  // Next steps
+  if (fullDeal?.nextSteps) {
+    lines.push(`\nNext Steps: ${fullDeal.nextSteps}`)
+  }
+
+  // Contract dates
+  if (fullDeal?.contractStartDate || fullDeal?.contractEndDate) {
+    const start = fullDeal.contractStartDate ? new Date(fullDeal.contractStartDate).toLocaleDateString('en-GB') : 'TBD'
+    const end = fullDeal.contractEndDate ? new Date(fullDeal.contractEndDate).toLocaleDateString('en-GB') : 'TBD'
+    lines.push(`\nContract: ${start} → ${end}`)
   }
 
   // Risks
@@ -146,13 +163,23 @@ function buildActiveDealContext(
     lines.push(`\nProject Plan: ${complete}/${total} tasks complete (${pct}%)`)
   }
 
+  // Score trend from history
+  if (brainDeal.scoreTrend && brainDeal.scoreTrend !== 'new') {
+    const vel = brainDeal.scoreVelocity
+    const arrow = brainDeal.scoreTrend === 'improving' ? '↑' : brainDeal.scoreTrend === 'declining' ? '↓' : '→'
+    const velStr = vel != null ? ` (${vel > 0 ? '+' : ''}${vel}pts over 14 days)` : ''
+    lines.push(`\nScore Trend: ${arrow} ${brainDeal.scoreTrend}${velStr}`)
+    if (brainDeal.scoreTrend === 'declining') lines.push(`  ⚠ Score has dropped — investigate what changed`)
+  }
+
   // Signal summary
   if (brainDeal.signalSummary) {
     const s = brainDeal.signalSummary
     lines.push('\nSignals:')
+    const champStr = s.championStrength > 0.6 ? 'strong' : s.championStrength > 0.3 ? 'moderate' : 'weak/none'
     lines.push(`  - Momentum: ${s.momentum.toFixed(2)} | Risk: ${s.riskLevel} | Velocity: ${s.velocity}`)
-    lines.push(`  - Stakeholder Depth: ${s.stakeholderDepth.toFixed(2)} | Champion Strength: ${s.championStrength.toFixed(2)}`)
-    if (s.isDeteriorating) lines.push('  - WARNING: Deal is deteriorating')
+    lines.push(`  - Stakeholder Depth: ${(s.stakeholderDepth * 100).toFixed(0)}% | Champion: ${champStr} (${s.championStrength.toFixed(2)})`)
+    if (s.isDeteriorating) lines.push('  - ⚠ WARNING: Deal sentiment is deteriorating — recent notes more negative than early notes')
     if (s.predictedCloseDays != null) lines.push(`  - Predicted close: ~${s.predictedCloseDays} days`)
   }
 
