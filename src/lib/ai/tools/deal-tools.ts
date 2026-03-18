@@ -966,6 +966,7 @@ export const update_deal = {
     // Auto-refresh score + summary when meeting notes are added
     if (params.meetingNotes) {
       try {
+        if (!(existing as any).conversionScorePinned) {
         const allText = [existing.notes, existing.meetingNotes, params.meetingNotes, existing.aiSummary].filter(Boolean).join('\n')
         if (allText.length > 20) {
           const signals = extractTextSignals(allText, existing.createdAt ?? new Date(), new Date())
@@ -998,6 +999,7 @@ export const update_deal = {
             conversionInsights: insights,
           }).where(eq(dealLogs.id, params.dealId))
         }
+        } // end conversionScorePinned check
       } catch { /* scoring is non-fatal */ }
     }
 
@@ -1544,9 +1546,8 @@ Rules:
       if (parsed.suggestedStage === 'closed_lost') updateFields.lostDate = new Date()
     }
 
-    // Phase 2: Score computation — always re-score after new notes so the
-    // conversion score reflects the latest deal state
-    {
+    // Phase 2: Score computation — re-score unless user has explicitly pinned the score
+    if (!(deal as any).conversionScorePinned) {
       try {
         const signals = extractTextSignals(appendedNotes, deal.createdAt ?? new Date(), new Date())
         const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
@@ -1717,6 +1718,18 @@ export const update_project_plan = {
       notes: z.string().optional(),
     }).optional().describe('Update a specific task'),
     removeTaskId: z.string().optional().describe('Task ID to remove'),
+    replaceEntirePlan: z.object({
+      phases: z.array(z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        targetDate: z.string().optional(),
+        tasks: z.array(z.object({
+          text: z.string(),
+          status: z.string().optional(),
+          owner: z.string().optional(),
+        })).optional(),
+      })),
+    }).optional().describe('If provided, COMPLETELY REPLACES the entire project plan. Use when user says reset/rebuild the plan. Do not use with other params.'),
   }),
   execute: async (
     params: {
@@ -1725,6 +1738,7 @@ export const update_project_plan = {
       addTasks?: { phaseId?: string; phaseName?: string; tasks: { text: string; owner?: string; dueDate?: string; notes?: string }[] }
       updateTask?: { taskId: string; status?: string; text?: string; owner?: string; notes?: string }
       removeTaskId?: string
+      replaceEntirePlan?: { phases: { name: string; description?: string; targetDate?: string; tasks?: { text: string; status?: string; owner?: string }[] }[] }
     },
     ctx: ToolContext,
   ): Promise<ToolResult> => {
@@ -1740,6 +1754,48 @@ export const update_project_plan = {
     const existing = (deal.projectPlan as any) ?? { title: `Project Plan — ${deal.dealName}`, createdAt: now, phases: [] }
     let plan = { ...existing, updatedAt: now }
     const changes: string[] = []
+
+    // Replace entire plan — skip all other operations
+    if (params.replaceEntirePlan) {
+      const newPhases = params.replaceEntirePlan.phases.map((phase, pi) => ({
+        id: `p${pi + 1}_${Date.now()}`,
+        name: phase.name,
+        description: phase.description || '',
+        order: pi + 1,
+        targetDate: phase.targetDate || null,
+        tasks: (phase.tasks ?? []).map((t, ti) => ({
+          id: `t${pi + 1}_${ti + 1}_${Date.now()}`,
+          text: t.text,
+          status: t.status ?? 'not_started',
+          owner: t.owner || null,
+          dueDate: null,
+          notes: null,
+          linkedTodoId: null,
+        })),
+      }))
+      plan = {
+        title: existing.title ?? `Project Plan — ${deal.dealName}`,
+        createdAt: existing.createdAt ?? now,
+        updatedAt: now,
+        phases: newPhases,
+      }
+      const totalTasks = newPhases.reduce((sum, p) => sum + p.tasks.length, 0)
+      changes.push(`Replaced entire plan: ${newPhases.length} phase(s), ${totalTasks} task(s)`)
+
+      await db.update(dealLogs)
+        .set({ projectPlan: plan, updatedAt: new Date() } as any)
+        .where(eq(dealLogs.id, params.dealId))
+
+      after(async () => {
+        try { await rebuildWorkspaceBrain(ctx.workspaceId) } catch { /* non-fatal */ }
+      })
+
+      return {
+        result: `Project plan replaced on **${deal.dealName}**:\n${changes.map(c => `- ${c}`).join('\n')}`,
+        actions: [{ type: 'deal_updated', dealId: params.dealId, dealName: deal.dealName, changes }],
+        uiHint: 'refresh_deals',
+      }
+    }
 
     // Add a new phase
     if (params.addPhase) {
@@ -1998,6 +2054,21 @@ export const correct_deal_data = {
     replaceConversionScore: z.number().optional().describe('Override the conversion score (0-100). Only use when the user explicitly provides a score.'),
     replaceConversionInsights: z.array(z.string()).optional().describe('Replace conversion insights entirely. Pass [] to clear.'),
     replaceMeetingNotes: z.string().optional().describe('Replace the entire meeting history (Activity Log). Use when the user says the history is wrong/corrupted.'),
+    replaceProjectPlan: z.object({
+      phases: z.array(z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        targetDate: z.string().optional(),
+        tasks: z.array(z.object({
+          text: z.string(),
+          status: z.string().optional().describe('pending, in_progress, or complete'),
+          owner: z.string().optional(),
+          dueDate: z.string().optional(),
+          notes: z.string().optional(),
+        })).optional(),
+      })),
+    }).nullable().optional().describe('Completely replace the project plan. Pass null to clear it. Use when user says "reset project plan" or "replace the project plan".'),
+    clearProjectPlan: z.boolean().optional().describe('Set true to completely wipe the project plan'),
     replaceStage: stageEnum.optional().describe('Override the deal stage'),
     correctionNote: z.string().optional().describe('Why this correction was made — appended to meeting notes for audit trail'),
   }),
@@ -2014,6 +2085,8 @@ export const correct_deal_data = {
       replaceConversionScore?: number
       replaceConversionInsights?: string[]
       replaceMeetingNotes?: string
+      replaceProjectPlan?: { phases: { name: string; description?: string; targetDate?: string; tasks?: { text: string; status?: string; owner?: string; dueDate?: string; notes?: string }[] }[] } | null
+      clearProjectPlan?: boolean
       replaceStage?: string
       correctionNote?: string
     },
@@ -2076,10 +2149,12 @@ export const correct_deal_data = {
     if (params.resetConversionScore) {
       updateFields.conversionScore = null
       updateFields.conversionInsights = []
-      corrections.push('Conversion score and insights cleared')
+      updateFields.conversionScorePinned = false  // unlock so AI can re-score
+      corrections.push('Conversion score cleared — AI will re-score on next update')
     } else if (params.replaceConversionScore !== undefined) {
-      updateFields.conversionScore = params.replaceConversionScore
-      corrections.push(`Conversion score set to ${params.replaceConversionScore}%`)
+      updateFields.conversionScore = Math.max(0, Math.min(100, params.replaceConversionScore))
+      updateFields.conversionScorePinned = true   // pin — AI must not overwrite this
+      corrections.push(`Conversion score pinned at ${params.replaceConversionScore}%`)
     }
     if (params.replaceConversionInsights !== undefined) {
       updateFields.conversionInsights = params.replaceConversionInsights
@@ -2090,6 +2165,32 @@ export const correct_deal_data = {
     if (params.replaceMeetingNotes !== undefined) {
       updateFields.meetingNotes = params.replaceMeetingNotes || null
       corrections.push('Activity log / meeting history replaced')
+    }
+
+    // Replace or clear project plan entirely
+    if (params.clearProjectPlan || params.replaceProjectPlan === null) {
+      updateFields.projectPlan = null
+      corrections.push('Project plan cleared')
+    } else if (params.replaceProjectPlan) {
+      const newPlan = {
+        phases: params.replaceProjectPlan.phases.map(phase => ({
+          name: phase.name,
+          description: phase.description ?? '',
+          targetDate: phase.targetDate ?? null,
+          tasks: (phase.tasks ?? []).map(t => ({
+            id: crypto.randomUUID(),
+            text: t.text,
+            status: t.status ?? 'pending',
+            owner: t.owner ?? null,
+            dueDate: t.dueDate ?? null,
+            notes: t.notes ?? '',
+            createdAt: new Date().toISOString(),
+          })),
+        })),
+      }
+      updateFields.projectPlan = newPlan
+      const taskCount = newPlan.phases.reduce((sum, p) => sum + p.tasks.length, 0)
+      corrections.push(`Project plan replaced: ${newPlan.phases.length} phase(s), ${taskCount} task(s)`)
     }
 
     // Override stage

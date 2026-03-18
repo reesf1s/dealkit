@@ -205,6 +205,7 @@ export const dealLogs = pgTable('deal_logs', {
   meetingNotes: text('meeting_notes'),
   aiSummary: text('ai_summary'),
   conversionScore: integer('conversion_score'),
+  conversionScorePinned: boolean('conversion_score_pinned').notNull().default(false), // true = user explicitly set, AI must not overwrite
   conversionInsights: jsonb('conversion_insights').notNull().default([]),
   dealRisks: jsonb('deal_risks').notNull().default([]),
   todos: jsonb('todos').notNull().default([]),

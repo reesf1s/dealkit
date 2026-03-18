@@ -122,8 +122,25 @@ function buildActiveDealContext(
     }
   }
 
-  // Project plan progress
-  if (brainDeal.projectPlanProgress) {
+  // Project plan — show full task list with IDs so LLM can reference them
+  if (fullDeal) {
+    const plan = (fullDeal.projectPlan as any)
+    if (plan?.phases?.length > 0) {
+      const allTasks = plan.phases.flatMap((p: any) => p.tasks ?? [])
+      const total = allTasks.length
+      const complete = allTasks.filter((t: any) => t.status === 'complete').length
+      const pct = total > 0 ? Math.round((complete / total) * 100) : 0
+      lines.push(`\nProject Plan: ${complete}/${total} tasks complete (${pct}%)`)
+      for (const phase of plan.phases) {
+        lines.push(`  Phase: ${phase.name}`)
+        for (const task of (phase.tasks ?? [])) {
+          const icon = task.status === 'complete' ? '✅' : task.status === 'in_progress' ? '🔄' : '⬜'
+          const owner = task.owner ? `, owner: ${task.owner}` : ''
+          lines.push(`  - [${task.id}] ${icon} ${task.text} (${phase.name}, status: ${task.status ?? 'pending'}${owner})`)
+        }
+      }
+    }
+  } else if (brainDeal.projectPlanProgress) {
     const { total, complete } = brainDeal.projectPlanProgress
     const pct = total > 0 ? Math.round((complete / total) * 100) : 0
     lines.push(`\nProject Plan: ${complete}/${total} tasks complete (${pct}%)`)
@@ -197,10 +214,18 @@ This applies to: manage_todos add[], update_success_criteria add[].text, update_
 "Create a deal" → create_deal (simple) or import_deal (with contacts/notes/history)
 "Here's an update on X" / "[person] said [thing]" → search_deals (if needed) → process_meeting_notes (logs the update AND refreshes Deal Intelligence — summary, score, insights)
 "Enrich/update this deal with [rich data]" → search_deals (if needed) → enrich_deal (for adding contacts, todos, meeting history, risks, etc. to an existing deal)
+"Reset/replace the project plan" → correct_deal_data with replaceProjectPlan (NOT enrich_deal — enrich MERGES, correct_deal_data REPLACES)
+"Clear the project plan" → correct_deal_data with clearProjectPlan: true
 "Create a timeline / document / output" → generate_content (can create ANY type of content — timelines, plans, proposals, risk assessments, anything)
 
 IMPORTING LARGE DEALS:
 When the user pastes a large block of deal info (contacts, interaction history, contract details, action items, etc.), ALWAYS use import_deal — NOT create_deal. import_deal handles contacts, notes, meeting history, todos, risks, success criteria, and project plan in ONE operation. Do NOT chain create_deal → add_contact → update_deal — use import_deal once.
+
+PROJECT PLAN OPERATIONS:
+- "Add tasks to project plan" / "update project plan" → update_project_plan (merges)
+- "Reset/rebuild/replace the project plan from scratch" → correct_deal_data with replaceProjectPlan (full replacement, no merge)
+- "Delete the project plan" → correct_deal_data with clearProjectPlan: true
+- NEVER use enrich_deal to replace a project plan — it always merges and will create duplicates
 
 ENRICHING EXISTING DEALS:
 When the user pastes detailed info (contacts, history, action items) for a deal that ALREADY EXISTS, use enrich_deal — NOT import_deal. enrich_deal merges new data with existing data (contacts, todos, risks, etc.) without creating a duplicate.
@@ -308,6 +333,7 @@ The brain gets smarter with every deal logged and closed. Explain this to users 
    - If the user says a score is wrong → resetConversionScore: true
    - If the user says the summary is wrong → replaceSummary with corrected version
    - If something was based on a mistyped note → also reset risks, summary, and score that were derived from it
+   - If the user says to replace/reset the project plan → use correct_deal_data.replaceProjectPlan with the new plan
    - NEVER argue with corrections. NEVER say "but the data shows...". The user is the source of truth. Just fix it.
    - After a correction, the corrected state IS the truth. Don't reference the old wrong data again.
 7. DESTRUCTIVE OPS: Only warn for deletions. All other mutations should happen immediately.
@@ -339,6 +365,12 @@ TRANSPARENCY: After any mutation, briefly state what changed. If you derived som
 - "Set stage to Discovery based on the demo call history. Change it if you see it differently."
 
 ═══ DATA INTEGRITY — CRITICAL ═══
+
+SCORE PINNING:
+- When a user explicitly sets a score via correct_deal_data.replaceConversionScore, that score is PINNED
+- AI tools will NOT overwrite a pinned score
+- When user says "reset the score", use correct_deal_data.resetConversionScore: true — this unpins it so AI can re-score
+- Pinned scores show as authoritative — tell the user "Your score is pinned at X% — I won't override it. Say 'reset score' to let AI re-score."
 
 NEVER SET CONVERSION SCORE. The conversion score (conversionScore) is computed by the ML system, not by you.
 - NEVER call update_deal or any tool to set conversionScore to a value.

@@ -41,7 +41,8 @@ export async function ensureLinksColumn() {
       ADD COLUMN IF NOT EXISTS parent_deal_id uuid,
       ADD COLUMN IF NOT EXISTS expansion_type text,
       ADD COLUMN IF NOT EXISTS contract_start_date timestamptz,
-      ADD COLUMN IF NOT EXISTS contract_end_date timestamptz
+      ADD COLUMN IF NOT EXISTS contract_end_date timestamptz,
+      ADD COLUMN IF NOT EXISTS conversion_score_pinned boolean NOT NULL DEFAULT false
     `)
   } catch { /* columns already exist */ }
   _linksMigrated = true

@@ -308,7 +308,8 @@ async function ensureBrainColumn() {
       ADD COLUMN IF NOT EXISTS parent_deal_id uuid,
       ADD COLUMN IF NOT EXISTS expansion_type text,
       ADD COLUMN IF NOT EXISTS contract_start_date timestamptz,
-      ADD COLUMN IF NOT EXISTS contract_end_date timestamptz
+      ADD COLUMN IF NOT EXISTS contract_end_date timestamptz,
+      ADD COLUMN IF NOT EXISTS conversion_score_pinned boolean NOT NULL DEFAULT false
     `)
   } catch { /* already exists */ }
   schemaMigrated = true
@@ -410,9 +411,9 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
 
   const now = new Date()
 
-  // ── Auto-fix corrupted scores (from the *100 bug) ──
+  // ── Auto-fix corrupted scores (from the *100 bug) — only if not user-pinned ──
   for (const d of deals) {
-    if (d.conversionScore != null && (d.conversionScore > 100 || d.conversionScore < 0)) {
+    if (d.conversionScore != null && (d.conversionScore > 100 || d.conversionScore < 0) && !(d as any).conversionScorePinned) {
       const fixed = Math.max(0, Math.min(100, Math.round(d.conversionScore / 100)))
       try {
         await db.update(dealLogs).set({ conversionScore: fixed, updatedAt: now }).where(eq(dealLogs.id, d.id))
