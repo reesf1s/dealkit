@@ -1235,6 +1235,7 @@ export const delete_deal_confirmed = {
 const MeetingNotesSchema = z.object({
   summary: z.string().nullable().optional(),
   risks: z.array(z.string()).default([]),
+  resolvedRisks: z.array(z.string()).default([]).describe('Substrings of existing risks that are now resolved/no longer applicable'),
   todos: z.array(z.object({ text: z.string() })).default([]),
   obsoleteTodoIds: z.array(z.string()).default([]),
   criteriaUpdates: z.array(z.object({
@@ -1297,15 +1298,11 @@ export const process_meeting_notes = {
       ? `\n\nCONFIRMED PRODUCT CAPABILITIES (do NOT flag these as product gaps):\n${knownCapabilities.map(c => `- ${c}`).join('\n')}`
       : ''
 
-    // Compress meeting history to last 5 entries
+    // Compress meeting history to last 5 entries (entries separated by \n---\n)
     function compressMeetingHistory(raw: string | null): string {
       if (!raw) return ''
-      const entries = raw.split('\n').reduce<string[]>((acc, line) => {
-        if (/^\[\d/.test(line)) acc.push(line)
-        else if (acc.length > 0) acc[acc.length - 1] += ' ' + line.trim()
-        return acc
-      }, [])
-      return entries.slice(-5).join('\n')
+      const blocks = raw.split(/\n---\n/).map(b => b.trim()).filter(Boolean)
+      return blocks.slice(-5).join('\n---\n')
     }
 
     const compressedHistory = compressMeetingHistory(deal.meetingNotes as string | null)
@@ -1366,7 +1363,8 @@ Deal: ${deal.dealName} with ${deal.prospectCompany} (current stage: ${deal.stage
 Return this exact JSON:
 {
   "summary": "2-4 sentence factual summary preserving key specifics: names, dates, numbers, decisions, and exact requirements discussed",
-  "risks": ["Specific deal-closing risk with context — e.g. 'VP of Engineering prefers Competitor X based on existing integration'"],
+  "risks": ["NEW deal-closing risks introduced in these notes only"],
+  "resolvedRisks": ["substring matching an existing risk that is now resolved — e.g. 'attendance unconfirmed' if attendance is now confirmed"],
   "todos": [{"text": "Exact action item preserving original wording, names, and deadlines"}],
   "obsoleteTodoIds": ["id-of-existing-todo-now-done-or-irrelevant"],
   "productGaps": [{"title": "Missing feature name", "description": "What our product cannot do that prospect explicitly said they need", "priority": "high"}],
@@ -1378,20 +1376,21 @@ Return this exact JSON:
     "nextMeetingBooked": false
   },
   "criteriaUpdates": [{"criterionId": "id", "achieved": true, "note": "Demonstrated in meeting"}],
-  "projectPlanUpdates": [{"taskId": "id", "status": "in_progress", "note": "Started during demo"}],
+  "projectPlanUpdates": [{"taskId": "id", "status": "complete", "note": "Completed — session confirmed for 19 Mar"}],
   "suggestedStage": "proposal or null if no stage change implied",
   "stageReason": "reason for stage change or null"
 }
 
 Rules:
 - PRESERVE EXACT WORDING from the notes. If someone said "we need to demo desk utilization by team", that exact phrase goes in todos — not "prepare desk analytics demo".
-- risks: Deal-closing risks ONLY (max 6). "Need better reporting" is a product gap, NOT a risk. "Budget not approved" IS a risk. Return [] if none.
+- risks: NEW deal-closing risks from these notes ONLY (not repeats of known risks). Return [] if no new risks.
+- resolvedRisks: CRITICAL — if a known risk is now resolved by these notes, add a short substring from it here. Examples: if "attendance unconfirmed" is a known risk and the notes say "confirmed attendance", add "attendance unconfirmed". If "session not scheduled" was a risk and notes say "session agreed for 19 Mar", add "session not scheduled". Be generous — if notes clearly indicate a risk is gone, resolve it.
 - todos: New items only, no duplicates. Include who is responsible and deadlines if mentioned. Return [] if none.
 - productGaps: ONLY if prospect explicitly said our product lacks something. General concerns are risks, not gaps. Return [] if no explicit product gaps.
 - competitors: Only if named as an explicit alternative being evaluated. Return [] if none.
 - intentSignals: Extract ONLY what is explicitly stated, never infer.
 - criteriaUpdates: ONLY if the meeting notes clearly demonstrate a criterion was met. Don't guess. Return [] if none confirmed.
-- projectPlanUpdates: ONLY if meeting notes mention specific task progress. Return [] if none.
+- projectPlanUpdates: CRITICAL — if the notes describe completing or progressing a task, match it to the task ID and set status to "complete" or "in_progress". Be smart: "agreed on plan and dates" = complete any planning tasks; "session confirmed for 19 Mar" = complete any attendance-confirmation tasks. Return [] if no task progress.
 - suggestedStage: ONLY if notes clearly imply a stage transition (e.g., "sent proposal" = proposal, "received signed contract" = closed_won). Return null if current stage still appropriate.
 - DO NOT infer things that weren't said. If the notes don't mention budget, leave budgetStatus as "not_discussed".`,
       }],
@@ -1458,9 +1457,19 @@ Rules:
     const newComps = extractedComps.filter(c => !existingCompKeys.has(c.toLowerCase()))
     const mergedCompetitors = newComps.length > 0 ? [...existingComps, ...newComps] : undefined
 
+    // Smart risk merge: keep existing unresolved risks, add new ones
+    const existingRisks = (deal.dealRisks as string[]) ?? []
+    const resolvedPatterns = (parsed.resolvedRisks ?? []).map(r => r.toLowerCase())
+    const survivingRisks = existingRisks.filter(r =>
+      !resolvedPatterns.some(pattern => r.toLowerCase().includes(pattern) || pattern.includes(r.toLowerCase().slice(0, 30)))
+    )
+    const existingRiskKeys = new Set(survivingRisks.map(r => r.toLowerCase().slice(0, 40)))
+    const newRisks = (parsed.risks ?? []).filter(r => !existingRiskKeys.has(r.toLowerCase().slice(0, 40)))
+    const mergedRisks = [...survivingRisks, ...newRisks]
+
     const updateFields: Record<string, unknown> = {
       meetingNotes: appendedNotes,
-      dealRisks: parsed.risks ?? [],
+      dealRisks: mergedRisks,
       todos: mergedTodos,
       updatedAt: new Date(),
     }
@@ -1484,17 +1493,38 @@ Rules:
       updateFields.successCriteriaTodos = updatedCriteria
     }
 
-    // Apply project plan task updates
+    // Apply project plan task updates (match by ID, fallback to text similarity)
     if (parsed.projectPlanUpdates?.length) {
       const taskUpdateMap = new Map(parsed.projectPlanUpdates.map(u => [u.taskId, u]))
       const existingPlan = (deal.projectPlan as any) ?? { phases: [] }
+
+      // Build a text→update map for fuzzy fallback matching
+      const textFallbackMap = new Map<string, typeof parsed.projectPlanUpdates[0]>()
+      for (const u of parsed.projectPlanUpdates) {
+        // Sometimes LLM returns partial task text instead of ID
+        if (!u.taskId.match(/^[0-9a-f-]{36}$/i)) {
+          textFallbackMap.set(u.taskId.toLowerCase(), u)
+        }
+      }
+
       const updatedPlan = {
         ...existingPlan,
         updatedAt: new Date().toISOString(),
         phases: (existingPlan.phases ?? []).map((phase: any) => ({
           ...phase,
           tasks: (phase.tasks ?? []).map((task: any) => {
-            const update = taskUpdateMap.get(task.id)
+            // Try ID match first
+            let update = taskUpdateMap.get(task.id)
+            // Fallback: fuzzy text match
+            if (!update && textFallbackMap.size > 0) {
+              const taskTextLower = (task.text ?? '').toLowerCase()
+              for (const [key, u] of textFallbackMap) {
+                if (taskTextLower.includes(key.slice(0, 20)) || key.includes(taskTextLower.slice(0, 20))) {
+                  update = u
+                  break
+                }
+              }
+            }
             if (!update) return task
             return {
               ...task,
@@ -1514,10 +1544,9 @@ Rules:
       if (parsed.suggestedStage === 'closed_lost') updateFields.lostDate = new Date()
     }
 
-    // Phase 2: Score computation — ONLY if deal doesn't already have a score
-    // Don't re-score on every note processing — let the brain rebuild handle scoring
-    // This prevents corrections from being overwritten by heuristic re-derivation
-    if (deal.conversionScore == null) {
+    // Phase 2: Score computation — always re-score after new notes so the
+    // conversion score reflects the latest deal state
+    {
       try {
         const signals = extractTextSignals(appendedNotes, deal.createdAt ?? new Date(), new Date())
         const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
