@@ -405,6 +405,7 @@ export const import_deal = {
     // Build project plan
     const projectPlan = params.projectPlan ? {
       phases: params.projectPlan.phases.map(phase => ({
+        id: crypto.randomUUID(),
         name: phase.name,
         description: phase.description ?? '',
         targetDate: phase.targetDate ?? null,
@@ -748,6 +749,7 @@ export const enrich_deal = {
         } else {
           // Add new phase
           existingPhases.push({
+            id: crypto.randomUUID(),
             name: newPhase.name,
             description: newPhase.description ?? '',
             targetDate: newPhase.targetDate ?? null,
@@ -2174,6 +2176,7 @@ export const correct_deal_data = {
     } else if (params.replaceProjectPlan) {
       const newPlan = {
         phases: params.replaceProjectPlan.phases.map(phase => ({
+          id: crypto.randomUUID(),
           name: phase.name,
           description: phase.description ?? '',
           targetDate: phase.targetDate ?? null,

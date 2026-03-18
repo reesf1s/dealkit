@@ -37,6 +37,21 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const { id } = await params
     const [deal] = await db.select().from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    // Backfill IDs onto any project plan phases that were created without one (legacy data fix)
+    const planData = deal.projectPlan as any
+    if (planData?.phases?.some((p: any) => !p.id)) {
+      const fixedPlan = {
+        ...planData,
+        phases: planData.phases.map((p: any) => p.id ? p : { ...p, id: crypto.randomUUID() }),
+      }
+      // Persist the fix so it's permanent
+      await db.update(dealLogs)
+        .set({ projectPlan: fixedPlan } as any)
+        .where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId)))
+      return NextResponse.json({ data: { ...deal, projectPlan: fixedPlan } })
+    }
+
     return NextResponse.json({ data: deal })
   } catch (err) { return dbErrResponse(err) }
 }

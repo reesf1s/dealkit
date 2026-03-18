@@ -182,6 +182,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     let updated = { ...plan, updatedAt: new Date().toISOString() }
 
+    // Backfill IDs onto any phases that were created without one (legacy data)
+    if (updated.phases) {
+      updated.phases = updated.phases.map((p: any) => p.id ? p : { ...p, id: crypto.randomUUID() })
+    }
+
     // Delete a task
     if (deleteTaskId) {
       updated.phases = (updated.phases ?? []).map((p: any) => ({
