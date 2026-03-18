@@ -24,7 +24,7 @@ export default function OnboardingPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Failed to join workspace')
-      router.push('/dashboard')
+      router.push('/pipeline')
     } catch (e: unknown) {
       setJoinError(e instanceof Error ? e.message : 'Failed to join. Try again.')
     } finally {
@@ -125,7 +125,7 @@ export default function OnboardingPage() {
 
         setStep('done')
       } else {
-        router.push('/dashboard?onboarded=1')
+        router.push('/pipeline?onboarded=1')
       }
     } catch {
       setStep('review')
@@ -250,7 +250,7 @@ export default function OnboardingPage() {
               <LogIn size={12} />
               Joining a team? Enter your invite code instead
             </button>
-            <button onClick={() => router.push('/dashboard')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}>
+            <button onClick={() => router.push('/pipeline')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}>
               Skip — set up manually
             </button>
           </div>
@@ -458,7 +458,7 @@ export default function OnboardingPage() {
             {[
               { icon: ClipboardList, label: 'Log your first deal', desc: 'Track a prospect and get AI deal scoring', href: '/deals', color: '#F59E0B' },
               { icon: FileText, label: 'View your battlecards', desc: 'AI-generated competitive intel is ready', href: '/collateral?type=battlecard', color: '#6366F1' },
-              { icon: Target, label: 'Open your dashboard', desc: 'See your AI briefing and pipeline intelligence', href: '/dashboard', color: '#A78BFA' },
+              { icon: Target, label: 'Open your dashboard', desc: 'See your AI briefing and pipeline intelligence', href: '/pipeline', color: '#A78BFA' },
             ].map(({ icon: Icon, label, desc, href, color }) => (
               <a key={href} href={href} style={{
                 display: 'flex', alignItems: 'center', gap: '12px',
@@ -489,7 +489,7 @@ export default function OnboardingPage() {
             ))}
           </div>
 
-          <button onClick={() => router.push('/dashboard?onboarded=1')} style={{
+          <button onClick={() => router.push('/pipeline?onboarded=1')} style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
             padding: '14px', borderRadius: '10px', border: 'none', cursor: 'pointer',
             background: 'linear-gradient(135deg, var(--accent), #7C3AED)',
