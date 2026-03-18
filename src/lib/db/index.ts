@@ -15,8 +15,6 @@ const client = postgres(connectionString, {
   max: 20,
   idle_timeout: 20,
   connect_timeout: 10,
-  // Kill long-running queries after 30 seconds to prevent connection starvation
-  connection: { statement_timeout: '30000' },
   ssl: isSupabase ? 'require' : false,
   // pgBouncer in transaction mode doesn't support prepared statements
   prepare: !isPooler,
