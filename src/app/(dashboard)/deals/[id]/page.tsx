@@ -880,7 +880,138 @@ const STAGE_PLAYBOOK: Record<string, string[]> = {
   ],
 }
 
-function MeetingPrepTab({ dealId, deal, objectionWinMap = [], objectionConditionalWins = [] }: { dealId: string; deal: any; objectionWinMap?: any[]; objectionConditionalWins?: any[] }) {
+// ─── Score Simulator ──────────────────────────────────────────────────────────
+// Pure client-side what-if modelling: toggle signals and see how the score changes.
+// Replicates computeTextSignalScore logic inline to avoid importing server-only modules.
+
+function computeSimulatedTextScore(signals: {
+  champion_identified: boolean
+  budget_confirmed: boolean
+  competitor_present: boolean
+}): number {
+  let score = 50
+  if (signals.champion_identified) score += 8
+  if (signals.budget_confirmed) score += 8
+  if (signals.competitor_present) score -= 3
+  return Math.max(0, Math.min(100, Math.round(score)))
+}
+
+function ScoreSimulator({ deal, mlPrediction, brainData }: { deal: any; mlPrediction: any; brainData: any }) {
+  const baseScore: number = deal.conversionScore ?? 50
+
+  // Detect current signal state from deal data and mlPrediction
+  const detectChampion = (): boolean => {
+    const stored = (deal.intentSignals as any)?.championStatus
+    if (stored === 'confirmed' || stored === 'suspected') return true
+    const notes: string = (deal.meetingNotes ?? '').toLowerCase()
+    return /\bchampion\b|\bsponsor\b|\badvocate\b|\binternal champion\b/.test(notes)
+  }
+  const detectBudget = (): boolean => {
+    const stored = (deal.intentSignals as any)?.budgetStatus
+    if (stored === 'confirmed') return true
+    const notes: string = (deal.meetingNotes ?? '').toLowerCase()
+    return /budget (confirmed|approved|allocated|secured|signed off)|po raised|purchase order/.test(notes)
+  }
+
+  const [overrides, setOverrides] = useState({
+    champion_identified: detectChampion(),
+    budget_confirmed: detectBudget(),
+    competitor_present: ((deal.competitors ?? deal.dealCompetitors ?? []) as string[]).length > 0,
+  })
+
+  const toggle = (key: keyof typeof overrides) => {
+    setOverrides(o => ({ ...o, [key]: !o[key] }))
+  }
+
+  const simTextScore = computeSimulatedTextScore(overrides)
+
+  // Compute composite: if ML active, blend with ML probability
+  const mlProb = mlPrediction?.winProbability as number | undefined
+  const trainingSize: number = brainData?.mlModel?.trainingSize ?? 0
+  let simScore: number
+  if (mlProb != null && trainingSize >= 10) {
+    const mlWeight = Math.min(0.70, 0.14 * Math.log(Math.max(trainingSize, 1)))
+    const momentumWeight = 0.05
+    const textWeight = Math.max(0, 1.0 - mlWeight - momentumWeight)
+    const momentumComponent = 50 // neutral if no override
+    simScore = Math.max(0, Math.min(100, Math.round(
+      simTextScore * textWeight + mlProb * 100 * mlWeight + momentumComponent * momentumWeight
+    )))
+  } else {
+    simScore = Math.max(0, Math.min(100, Math.round(simTextScore * 0.70 + 50 * 0.25 + 50 * 0.05)))
+  }
+
+  const delta = simScore - baseScore
+
+  const toggleStyle = (active: boolean): React.CSSProperties => ({
+    position: 'relative',
+    width: '40px',
+    height: '20px',
+    borderRadius: '10px',
+    background: active ? 'var(--accent)' : 'var(--border)',
+    border: 'none',
+    cursor: 'pointer',
+    flexShrink: 0,
+    transition: 'background 0.2s',
+    padding: 0,
+  })
+  const knobStyle = (active: boolean): React.CSSProperties => ({
+    position: 'absolute',
+    top: '2px',
+    left: active ? '22px' : '2px',
+    width: '16px',
+    height: '16px',
+    borderRadius: '50%',
+    background: '#fff',
+    transition: 'left 0.2s',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+  })
+
+  const items = [
+    { key: 'champion_identified' as const, label: 'Champion identified', inverted: false },
+    { key: 'budget_confirmed' as const, label: 'Budget confirmed', inverted: false },
+    { key: 'competitor_present' as const, label: 'Competitor present', inverted: true },
+  ]
+
+  return (
+    <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '16px' }}>
+      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '4px' }}>Score Simulator</div>
+      <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '14px' }}>See how toggling key signals affects this deal&apos;s score</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {items.map(({ key, label, inverted }) => {
+          const active = overrides[key]
+          const isPositiveWhenOn = !inverted
+          return (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: active ? (isPositiveWhenOn ? 'var(--success)' : 'var(--danger)') : 'var(--border)', flexShrink: 0 }} />
+                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{label}</span>
+              </div>
+              <button onClick={() => toggle(key)} style={toggleStyle(active)} aria-label={`Toggle ${label}`}>
+                <span style={knobStyle(active)} />
+              </button>
+            </div>
+          )
+        })}
+      </div>
+      <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Simulated score</span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+          <span style={{ fontSize: '22px', fontWeight: 800, fontFamily: 'monospace', color: simScore >= 70 ? 'var(--success)' : simScore >= 40 ? 'var(--warning)' : 'var(--danger)', lineHeight: 1 }}>
+            {simScore}%
+          </span>
+          {delta !== 0 && (
+            <span style={{ fontSize: '12px', fontWeight: 600, color: delta > 0 ? 'var(--success)' : 'var(--danger)' }}>
+              {delta > 0 ? '+' : ''}{delta}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MeetingPrepTab({ dealId, deal, objectionWinMap = [], objectionConditionalWins = [], mlPrediction = null, brainData = null }: { dealId: string; deal: any; objectionWinMap?: any[]; objectionConditionalWins?: any[]; mlPrediction?: any; brainData?: any }) {
   const [prep, setPrep] = useState('')
   const [loading, setLoading] = useState(false)
   const [fullBriefShown, setFullBriefShown] = useState(false)
@@ -931,6 +1062,11 @@ function MeetingPrepTab({ dealId, deal, objectionWinMap = [], objectionCondition
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+      {/* Score Simulator — only shown when deal has a score */}
+      {deal.conversionScore != null && (
+        <ScoreSimulator deal={deal} mlPrediction={mlPrediction} brainData={brainData} />
+      )}
 
       {/* Stage playbook */}
       <div style={cardStyle}>
@@ -3773,7 +3909,7 @@ export default function DealDetailPage() {
           {activeTab === 'notes' && (
             <MeetingNotesTab dealId={id} deal={deal} onUpdate={() => mutate()} onSwitchToPrep={() => setActiveTab('intelligence')} />
           )}
-          {activeTab === 'intelligence' && <MeetingPrepTab dealId={id} deal={deal} objectionWinMap={objectionWinMap} objectionConditionalWins={objectionConditionalWins} />}
+          {activeTab === 'intelligence' && <MeetingPrepTab dealId={id} deal={deal} objectionWinMap={objectionWinMap} objectionConditionalWins={objectionConditionalWins} mlPrediction={mlPrediction} brainData={brainRes?.data} />}
           {activeTab === 'actions' && (
             <ActionsTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
           )}

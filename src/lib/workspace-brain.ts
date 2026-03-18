@@ -343,6 +343,22 @@ async function ensureBrainColumn() {
   try { await db.execute(sql`ALTER TABLE brain_rebuild_log ADD COLUMN IF NOT EXISTS models_trained text`) } catch { /* exists */ }
   try { await db.execute(sql`ALTER TABLE brain_rebuild_log ADD COLUMN IF NOT EXISTS models_skipped text`) } catch { /* exists */ }
   try { await db.execute(sql`ALTER TABLE brain_rebuild_log ADD COLUMN IF NOT EXISTS tokens_used integer`) } catch { /* exists */ }
+  // Calibration history — monthly ML discrimination tracking (persistent, survives brain rebuild)
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS calibration_history (
+        id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        workspace_id text NOT NULL,
+        month text NOT NULL,
+        avg_score_won real,
+        avg_score_lost real,
+        separation real,
+        deal_count integer,
+        created_at timestamp DEFAULT now(),
+        UNIQUE(workspace_id, month)
+      )
+    `)
+  } catch { /* already exists */ }
   // Stage transitions — history of all stage changes for velocity tracking
   try {
     await db.execute(sql`
@@ -1982,6 +1998,41 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
          ${JSON.stringify(modelsTrained)}, ${JSON.stringify(modelsSkipped)}, ${null})
     `)
   } catch { /* non-fatal — log failure must never block the brain rebuild */ }
+
+  // ── Calibration history — upsert current month's ML discrimination data ────────
+  // Stores monthly calibration persistently so the /models page can show a trend line
+  // even if deals move between won/lost after the original close month.
+  try {
+    if (calibrationTimeline && calibrationTimeline.length > 0) {
+      const currentMonth = now.toISOString().slice(0, 7) // 'YYYY-MM'
+      // Aggregate all closed deals scored this month for a current-month upsert
+      const closedForCal = [...wonDeals, ...lostDeals]
+      const withScore = closedForCal.filter(d => d.conversionScore != null)
+      if (withScore.length >= 2) {
+        const wonWithScore  = withScore.filter(d => d.stage === 'closed_won' || d.outcome === 'won')
+        const lostWithScore = withScore.filter(d => d.stage === 'closed_lost' || d.outcome === 'lost')
+        const avgWon  = wonWithScore.length > 0
+          ? wonWithScore.reduce((s, d) => s + (d.conversionScore ?? 0), 0) / wonWithScore.length
+          : null
+        const avgLost = lostWithScore.length > 0
+          ? lostWithScore.reduce((s, d) => s + (d.conversionScore ?? 0), 0) / lostWithScore.length
+          : null
+        const separation = avgWon != null && avgLost != null ? avgWon - avgLost : null
+        await db.execute(sql`
+          INSERT INTO calibration_history
+            (id, workspace_id, month, avg_score_won, avg_score_lost, separation, deal_count)
+          VALUES
+            (gen_random_uuid()::text, ${workspaceId}, ${currentMonth},
+             ${avgWon}, ${avgLost}, ${separation}, ${withScore.length})
+          ON CONFLICT (workspace_id, month) DO UPDATE SET
+            avg_score_won  = EXCLUDED.avg_score_won,
+            avg_score_lost = EXCLUDED.avg_score_lost,
+            separation     = EXCLUDED.separation,
+            deal_count     = EXCLUDED.deal_count
+        `)
+      }
+    }
+  } catch { /* non-fatal — calibration history is best-effort */ }
 
   // ── Post-save background tasks ────────────────────────────────────────────────
   // Run sequentially (not concurrently) to avoid opening multiple DB connections
