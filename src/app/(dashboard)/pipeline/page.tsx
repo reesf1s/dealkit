@@ -653,6 +653,81 @@ export default function PipelinePage() {
   const staleCount = Object.keys(staleMap).length
   const churnCount = Object.values(mlMap).filter(m => (m.churnRisk ?? 0) >= 65).length
 
+  // ── Action Queue: merge stale/urgent/deteriorating/recs into one prioritised list ──────────
+  // Each item has a specific Ask AI prompt so the user can act immediately.
+  const brainData = brainRes?.data
+  const actionQueue = (() => {
+    if (!brainData) return []
+    type ActionItem = {
+      dealId: string; company: string; dealName: string
+      headline: string; detail: string
+      priority: 'high' | 'medium' | 'low'
+      actionType: string; prompt: string
+    }
+    const items: ActionItem[] = []
+    const seen = new Set<string>()
+
+    // 1. Stale deals — most actionable: no one has touched these
+    for (const s of (brainData.staleDeals ?? []).slice(0, 3)) {
+      if (seen.has(s.dealId)) continue
+      seen.add(s.dealId)
+      const deal = deals.find((d: any) => d.id === s.dealId)
+      const stageLabel = configStages.find((c: any) => c.id === deal?.stage)?.label ?? deal?.stage ?? 'unknown stage'
+      items.push({
+        dealId: s.dealId, company: s.company, dealName: s.dealName,
+        headline: `Stale — ${s.daysSinceUpdate}d`,
+        detail: `${s.company} · ${stageLabel} · no update in ${s.daysSinceUpdate} days`,
+        priority: s.daysSinceUpdate >= 21 ? 'high' : 'medium',
+        actionType: 'stale',
+        prompt: `The ${s.dealName} deal with ${s.company} has had no update for ${s.daysSinceUpdate} days (currently at ${stageLabel} stage). Review everything we know about this deal and help me: 1) assess what's likely happening, 2) identify who I should be chasing and what their likely concern is, 3) draft a short follow-up message to get this deal moving again.`,
+      })
+    }
+
+    // 2. Urgent deals — close dates, high-risk late-stage
+    for (const u of (brainData.urgentDeals ?? []).slice(0, 3)) {
+      if (seen.has(u.dealId)) continue
+      seen.add(u.dealId)
+      items.push({
+        dealId: u.dealId, company: u.company, dealName: u.dealName,
+        headline: 'Urgent',
+        detail: `${u.company} · ${u.reason}`,
+        priority: 'high',
+        actionType: 'urgent',
+        prompt: `The ${u.dealName} deal with ${u.company} needs urgent attention: ${u.reason}. Review the full deal history and tell me the single most important thing I should do right now, with a specific suggested action or message.`,
+      })
+    }
+
+    // 3. Deterioration alerts — things quietly going wrong
+    for (const d of (brainData.deteriorationAlerts ?? []).slice(0, 2)) {
+      if (seen.has(d.dealId)) continue
+      seen.add(d.dealId)
+      items.push({
+        dealId: d.dealId, company: d.company, dealName: d.dealName,
+        headline: 'Signals declining',
+        detail: `${d.company} · ${d.warning}`,
+        priority: 'high',
+        actionType: 'risk',
+        prompt: `The ${d.dealName} deal with ${d.company} is showing declining signals — ${d.warning}. Review the full deal notes and context, identify what has changed and why it may be cooling, and suggest the best approach to re-engage or address the underlying concern.`,
+      })
+    }
+
+    // 4. Brain recommendations — advance/unblock deals
+    for (const r of (brainData.pipelineRecommendations ?? []).slice(0, 3)) {
+      if (seen.has(r.dealId) || items.length >= 5) break
+      seen.add(r.dealId)
+      items.push({
+        dealId: r.dealId, company: r.company, dealName: r.dealName,
+        headline: r.action ?? 'Review',
+        detail: `${r.company} · ${r.recommendation}`,
+        priority: r.priority,
+        actionType: r.actionType ?? 'custom',
+        prompt: `For the ${r.dealName} deal with ${r.company}: ${r.recommendation}. Review everything you know about this deal and help me take the best action right now.`,
+      })
+    }
+
+    return items.slice(0, 5)
+  })()
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0, width: '100%' }}>
 
@@ -813,53 +888,76 @@ export default function PipelinePage() {
         </div>
       )}
 
-      {/* AI Pipeline Recommendations */}
-      {(() => {
-        const recs = (brainRes?.data?.pipelineRecommendations ?? []).slice(0, 4)
-        if (recs.length === 0) return null
-        return (
-          <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--card-border)', borderRadius: '14px', padding: '16px 18px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <div style={{ width: '26px', height: '26px', background: 'var(--accent-subtle)', border: '1px solid var(--border-strong)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Zap size={12} style={{ color: 'var(--accent)' }} />
-              </div>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>AI Recommendations</span>
-              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Actions to advance your pipeline</span>
+      {/* Action Queue — proactive: stale + urgent + declining + recommendations, all one-click */}
+      {actionQueue.length > 0 && (
+        <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--card-border)', borderRadius: '14px', padding: '16px 18px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <div style={{ width: '26px', height: '26px', background: 'color-mix(in srgb, var(--warning) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--warning) 25%, transparent)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Zap size={12} style={{ color: 'var(--warning)' }} />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {recs.map((rec: any, i: number) => (
-                <Link key={i} href={`/deals/${rec.dealId}`} style={{
-                  display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px',
-                  background: rec.priority === 'high' ? 'color-mix(in srgb, var(--danger) 4%, transparent)' : 'var(--accent-subtle)',
-                  border: `1px solid ${rec.priority === 'high' ? 'color-mix(in srgb, var(--danger) 12%, transparent)' : 'var(--border)'}`,
-                  borderRadius: '9px', textDecoration: 'none',
-                  transition: 'border-color 0.1s',
-                }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = rec.priority === 'high' ? 'color-mix(in srgb, var(--danger) 30%, transparent)' : 'var(--border-strong)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = rec.priority === 'high' ? 'color-mix(in srgb, var(--danger) 12%, transparent)' : 'var(--border)'}
-                >
-                  <div style={{
-                    width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
-                    background: rec.priority === 'high' ? 'var(--danger)' : rec.priority === 'medium' ? 'var(--warning)' : 'var(--text-tertiary)',
-                  }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: '500' }}>{rec.company}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px' }}>{rec.recommendation}</div>
-                  </div>
-                  {rec.action && (
-                    <span style={{
-                      fontSize: '10px', padding: '3px 10px', borderRadius: '6px', flexShrink: 0,
-                      background: 'var(--accent-subtle)', border: '1px solid var(--border-strong)', color: 'var(--accent)', fontWeight: 600,
-                    }}>
-                      {rec.action}
-                    </span>
-                  )}
-                </Link>
-              ))}
-            </div>
+            <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Action Queue</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Needs your attention — click Act to ask AI</span>
           </div>
-        )
-      })()}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+            {actionQueue.map((item, i) => {
+              const isHigh = item.priority === 'high'
+              const isStale = item.actionType === 'stale'
+              const isRisk = item.actionType === 'risk'
+              const dotColor = isHigh ? 'var(--danger)' : item.priority === 'medium' ? 'var(--warning)' : 'var(--text-tertiary)'
+              const bgColor = isHigh ? 'color-mix(in srgb, var(--danger) 4%, transparent)' : 'var(--accent-subtle)'
+              const borderColor = isHigh ? 'color-mix(in srgb, var(--danger) 12%, transparent)' : 'var(--border)'
+              return (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
+                  background: bgColor, border: `1px solid ${borderColor}`,
+                  borderRadius: '9px',
+                }}>
+                  {/* Priority dot */}
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0, background: dotColor }} />
+
+                  {/* Content — clicking navigates to deal */}
+                  <Link href={`/deals/${item.dealId}`} style={{ flex: 1, minWidth: 0, textDecoration: 'none' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{item.company}</span>
+                      <span style={{
+                        fontSize: '10px', fontWeight: '600', padding: '1px 6px', borderRadius: '4px', flexShrink: 0,
+                        background: isHigh ? 'color-mix(in srgb, var(--danger) 10%, transparent)' : isStale ? 'color-mix(in srgb, var(--warning) 10%, transparent)' : 'var(--accent-subtle)',
+                        color: isHigh ? 'var(--danger)' : isStale ? 'var(--warning)' : 'var(--accent)',
+                        border: `1px solid ${isHigh ? 'color-mix(in srgb, var(--danger) 20%, transparent)' : isStale ? 'color-mix(in srgb, var(--warning) 20%, transparent)' : 'var(--border-strong)'}`,
+                      }}>
+                        {isRisk ? '⚠ ' : isStale ? '⏱ ' : ''}{item.headline}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.detail}
+                    </div>
+                  </Link>
+
+                  {/* Act button — opens Ask AI with pre-loaded prompt */}
+                  <button
+                    onClick={e => {
+                      e.stopPropagation()
+                      window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query: item.prompt } }))
+                    }}
+                    style={{
+                      flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
+                      padding: '5px 10px', borderRadius: '6px', border: '1px solid var(--border-strong)',
+                      background: 'var(--surface)', color: 'var(--accent)',
+                      fontSize: '11px', fontWeight: '600', cursor: 'pointer',
+                      transition: 'background 0.1s, border-color 0.1s',
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--accent-subtle)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)' }}
+                  >
+                    <Sparkles size={10} />
+                    Act
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Kanban board */}
       <div style={{ overflowX: 'auto', paddingBottom: '8px', maxWidth: `calc(100vw - ${sidebarWidth}px - 48px)` }}>

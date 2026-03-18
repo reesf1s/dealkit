@@ -225,9 +225,24 @@ export default function CommandPalette() {
     return () => window.removeEventListener('keydown', handler)
   }, [openPalette, closePalette])
 
-  // Custom event listener
+  // Custom event listener — supports optional pre-loaded query
+  // Usage: window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query: '...' } }))
   useEffect(() => {
-    const handler = () => openPalette()
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { query?: string } | undefined
+      if (detail?.query) {
+        // Open with pre-filled query so user can review & press Enter (or edit first)
+        setOpen(true)
+        setQuery(detail.query)
+        setActiveIndex(0)
+        setMode('nav')
+        setAiAnswer('')
+        setAiDone(false)
+        setAiLoading(false)
+      } else {
+        openPalette()
+      }
+    }
     window.addEventListener('openCommandPalette', handler)
     return () => window.removeEventListener('openCommandPalette', handler)
   }, [openPalette])
