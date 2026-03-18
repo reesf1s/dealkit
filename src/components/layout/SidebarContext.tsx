@@ -20,6 +20,14 @@ interface SidebarCtx {
   copilotOpen: boolean
   toggleCopilot: () => void
   setCopilotOpen: (open: boolean) => void
+  // Prefill copilot input and open panel
+  prefillCopilot: (text: string) => void
+  copilotPrefill: string | null
+  clearCopilotPrefill: () => void
+  // Auto-send a message through the copilot (bypasses prefill, submits immediately)
+  sendToCopilot: (text: string) => void
+  copilotAutoSend: string | null
+  clearCopilotAutoSend: () => void
   // Active deal context — set by deal detail page so AI chat knows what you're looking at
   activeDeal: ActiveDeal | null
   setActiveDeal: (deal: ActiveDeal | null) => void
@@ -35,6 +43,12 @@ const Ctx = createContext<SidebarCtx>({
   copilotOpen: false,
   toggleCopilot: () => {},
   setCopilotOpen: () => {},
+  prefillCopilot: () => {},
+  copilotPrefill: null,
+  clearCopilotPrefill: () => {},
+  sendToCopilot: () => {},
+  copilotAutoSend: null,
+  clearCopilotAutoSend: () => {},
   activeDeal: null,
   setActiveDeal: () => {},
 })
@@ -44,6 +58,8 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [copilotOpen, setCopilotOpen] = useState(false)
+  const [copilotPrefill, setCopilotPrefill] = useState<string | null>(null)
+  const [copilotAutoSend, setCopilotAutoSend] = useState<string | null>(null)
   const [activeDeal, setActiveDeal] = useState<ActiveDeal | null>(null)
 
   useEffect(() => {
@@ -68,6 +84,24 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     setCopilotOpen(p => !p)
   }, [])
 
+  const prefillCopilot = useCallback((text: string) => {
+    setCopilotPrefill(text)
+    setCopilotOpen(true)
+  }, [])
+
+  const clearCopilotPrefill = useCallback(() => {
+    setCopilotPrefill(null)
+  }, [])
+
+  const sendToCopilot = useCallback((text: string) => {
+    setCopilotAutoSend(text)
+    setCopilotOpen(true)
+  }, [])
+
+  const clearCopilotAutoSend = useCallback(() => {
+    setCopilotAutoSend(null)
+  }, [])
+
   const sidebarWidth = isMobile ? 0 : collapsed ? 64 : 220
 
   return (
@@ -81,6 +115,12 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
       copilotOpen,
       toggleCopilot,
       setCopilotOpen,
+      prefillCopilot,
+      copilotPrefill,
+      clearCopilotPrefill,
+      sendToCopilot,
+      copilotAutoSend,
+      clearCopilotAutoSend,
       activeDeal,
       setActiveDeal,
     }}>

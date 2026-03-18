@@ -17,7 +17,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 // Nav: Brain-centric — command center + intelligence layers
 const CORE_ITEMS = [
-  { href: '/dashboard',  icon: Activity,        label: 'Brain',        matchPaths: ['/dashboard'] },
+  { href: '/dashboard',  icon: Activity,        label: 'Overview',     matchPaths: ['/dashboard'] },
   { href: '/pipeline',   icon: Kanban,          label: 'Pipeline',     matchPaths: ['/pipeline', '/deals'] },
   { href: '/collateral', icon: Zap,             label: 'Collateral',   matchPaths: ['/collateral'] },
 ]
@@ -233,7 +233,7 @@ export default function Sidebar() {
             }}
           >
             <MessageSquare size={12} color="#818CF8" strokeWidth={2} />
-            <span style={{ flex: 1, fontSize: '12px', fontWeight: 600, textAlign: 'left' }}>Ask Brain</span>
+            <span style={{ flex: 1, fontSize: '12px', fontWeight: 600, textAlign: 'left' }}>Ask AI</span>
             <span style={{ fontSize: '10px', color: '#4B5563', background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: '3px', border: '1px solid rgba(255,255,255,0.08)' }}>⌘K</span>
           </button>
         </div>
@@ -241,7 +241,7 @@ export default function Sidebar() {
         <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: '6px' }}>
           <button
             onClick={toggleCopilot}
-            title="Ask Brain (⌘K)"
+            title="Ask AI (⌘K)"
             style={{ width: '30px', height: '30px', borderRadius: '7px', background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1))', border: '1px solid rgba(99,102,241,0.25)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <MessageSquare size={12} color="#818CF8" />
@@ -336,7 +336,7 @@ export default function Sidebar() {
             }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: '10px', color: brainAge ? '#9CA3AF' : '#374151', fontWeight: 600 }}>
-                {brainAge ? `Brain active · ${brainAge}` : 'Brain idle'}
+                {brainAge ? 'AI ready' : 'AI idle'}
               </div>
               {(urgentCount > 0 || staleCount > 0) && (
                 <div style={{ fontSize: '9px', color: '#EF4444', marginTop: '1px' }}>

@@ -13,7 +13,7 @@ import { useSidebar } from './SidebarContext'
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 const PAGE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
-  '/dashboard':    { label: 'Brain',             Icon: Brain },
+  '/dashboard':    { label: 'Overview',           Icon: Brain },
   '/pipeline':     { label: 'Pipeline',          Icon: Kanban },
   '/deals':        { label: 'Deal Intelligence', Icon: ClipboardList },
   '/collateral':   { label: 'Collateral',        Icon: FileText },
@@ -22,7 +22,7 @@ const PAGE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   '/competitors':  { label: 'Intelligence',      Icon: Swords },
   '/case-studies': { label: 'Case Studies',      Icon: BookOpen },
   '/settings':     { label: 'Settings',          Icon: Settings },
-  '/onboarding':   { label: 'Brain Setup',       Icon: Sparkles },
+  '/onboarding':   { label: 'Setup',             Icon: Sparkles },
   '/chat':         { label: 'Ask AI',            Icon: MessageSquare },
 }
 
@@ -147,7 +147,7 @@ export default function TopNav() {
       {/* Right: Brain status + Avatar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
 
-        {/* Brain status pill */}
+        {/* AI status pill */}
         {brainAge && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: '6px',
@@ -155,9 +155,13 @@ export default function TopNav() {
             background: urgentCount > 0 ? 'rgba(239,68,68,0.06)' : 'rgba(99,102,241,0.07)',
             border: `1px solid ${urgentCount > 0 ? 'rgba(239,68,68,0.18)' : 'rgba(99,102,241,0.18)'}`,
           }}>
-            <Brain size={11} color={urgentCount > 0 ? '#F87171' : '#818CF8'} />
+            <div style={{
+              width: '6px', height: '6px', borderRadius: '50%',
+              background: urgentCount > 0 ? '#EF4444' : '#22C55E',
+              boxShadow: urgentCount > 0 ? '0 0 6px rgba(239,68,68,0.6)' : '0 0 6px rgba(34,197,94,0.5)',
+            }} />
             <span style={{ fontSize: '11px', color: urgentCount > 0 ? '#F87171' : '#818CF8', fontWeight: '600', whiteSpace: 'nowrap' }}>
-              Brain · {brainAge}
+              AI
             </span>
             {urgentCount > 0 && (
               <span style={{ fontSize: '11px', color: '#EF4444', fontWeight: '700' }}>

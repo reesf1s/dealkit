@@ -214,13 +214,22 @@ When the user casually mentions something about a deal (e.g., "Tommy said he'd t
 Never just acknowledge the update without recording it.
 
 When importing, preserve ALL detail from the user's paste:
-- Interaction history → meetingNotes (keep dates, names, specifics)
+- Interaction history → meetingHistory[] array (CRITICAL: parse EACH dated interaction as a separate object with { date: "Oct 23, 2025", content: "..." }. Do NOT dump the whole history as a single entry. Each "### MS" or dated entry becomes its own array item.)
 - People mentioned → contacts (with roles: Champion, Decision Maker, Technical Evaluator, Internal Sales Rep)
 - Things to do → todos (exact wording)
 - Contract/pricing → notes
 - Deal summary → aiSummary (comprehensive, preserving names/dates/specifics)
 - Concerns about closing → dealRisks
 - Current action items → nextSteps
+
+MEETING HISTORY FORMAT — CRITICAL:
+The meetingHistory parameter is an array of { date, content } objects. Example:
+[
+  { date: "Jan 5, 2026", content: "Bruce to send talking point" },
+  { date: "Dec 8, 2025", content: "Bruce to send talking points so they can circulate internally..." },
+  { date: "Oct 23, 2025", content: "Brian reached out to Bruce directly..." }
+]
+Parse every separate dated event into its own entry. Preserve the full content of each entry. NEVER pass raw markdown as a single string.
 
 NEVER stop after a search step. The search finds the ID — then you MUST call the mutation tool.
 

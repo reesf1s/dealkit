@@ -18,20 +18,20 @@ interface QuickAction {
 function getQuickActions(activeDealCompany?: string, currentPage?: string): QuickAction[] {
   if (activeDealCompany) {
     return [
-      { label: 'Summarize this deal', prompt: `Give me a complete briefing on the ${activeDealCompany} deal — score, contacts, risks, todos, and what to do next.` },
-      { label: 'What\'s blocking this deal?', prompt: `Analyze the ${activeDealCompany} deal — what are the blockers, objections, and risks preventing this from closing? Check the ML intelligence and suggest specific actions to unblock it.` },
-      { label: 'Show deal health trend', prompt: `Show me the score history and health trend for the ${activeDealCompany} deal. Is it improving or declining? What changed and when?` },
-      { label: 'Compare to won deals', prompt: `Compare the ${activeDealCompany} deal to similar deals we've won. What did those deals have that this one is missing? What patterns led to wins?` },
-      { label: 'Draft follow-up email', prompt: `Draft a follow-up email for ${activeDealCompany} addressing the biggest risk in this deal.` },
-      { label: 'Review todos', prompt: `Review and clean up the todos for ${activeDealCompany}. Remove anything stale.` },
+      { label: 'What should I focus on?', prompt: `Give me a complete briefing on the ${activeDealCompany} deal — score, contacts, risks, todos, and what to do next.` },
+      { label: 'What\'s blocking progress?', prompt: `Analyze the ${activeDealCompany} deal — what are the blockers, objections, and risks preventing this from closing? Check the ML intelligence and suggest specific actions to unblock it.` },
+      { label: 'How is this deal trending?', prompt: `Show me the score history and health trend for the ${activeDealCompany} deal. Is it improving or declining? What changed and when?` },
+      { label: 'How does this compare to wins?', prompt: `Compare the ${activeDealCompany} deal to similar deals we've won. What did those deals have that this one is missing? What patterns led to wins?` },
+      { label: 'Help me write a follow-up', prompt: `Draft a follow-up email for ${activeDealCompany} addressing the biggest risk in this deal.` },
+      { label: 'Review my to-dos', prompt: `Review and clean up the todos for ${activeDealCompany}. Remove anything stale.` },
     ]
   }
   if (currentPage?.includes('/pipeline') || currentPage === '/') {
     return [
-      { label: 'Pipeline health check', prompt: "What's my pipeline looking like? Give me a full overview with what to focus on." },
-      { label: 'What needs attention?', prompt: 'Which deals need attention right now? Flag anything at risk or stale.' },
-      { label: 'Score trends', prompt: 'Show me which deals are trending up vs down. Which deals have improved or declined the most recently?' },
-      { label: 'Forecast this quarter', prompt: 'Give me a forecast for this quarter based on current pipeline stages and win probabilities.' },
+      { label: 'How does my pipeline look?', prompt: "What's my pipeline looking like? Give me a full overview with what to focus on." },
+      { label: 'What needs my attention?', prompt: 'Which deals need attention right now? Flag anything at risk or stale.' },
+      { label: 'Which deals are trending up or down?', prompt: 'Show me which deals are trending up vs down. Which deals have improved or declined the most recently?' },
+      { label: 'Give me a forecast', prompt: 'Give me a forecast for this quarter based on current pipeline stages and win probabilities.' },
     ]
   }
   return [
@@ -68,7 +68,7 @@ function TypingDots() {
 // ── Main CopilotPanel ───────────────────────────────────────────────────────
 export default function CopilotPanel() {
   const pathname = usePathname()
-  const { copilotOpen, toggleCopilot, setCopilotOpen, activeDeal } = useSidebar()
+  const { copilotOpen, toggleCopilot, setCopilotOpen, activeDeal, copilotPrefill, clearCopilotPrefill, copilotAutoSend, clearCopilotAutoSend } = useSidebar()
 
   const [chatError, setChatError] = useState<string | null>(null)
 
@@ -77,6 +77,7 @@ export default function CopilotPanel() {
     input,
     handleInputChange,
     handleSubmit,
+    append,
     isLoading,
     setInput,
     setMessages,
@@ -114,6 +115,27 @@ export default function CopilotPanel() {
       setTimeout(() => inputRef.current?.focus(), 100)
     }
   }, [copilotOpen])
+
+  // Consume prefill from SidebarContext (fills input, user still hits send)
+  useEffect(() => {
+    if (copilotPrefill && copilotOpen) {
+      setInput(copilotPrefill)
+      clearCopilotPrefill()
+      setTimeout(() => inputRef.current?.focus(), 150)
+    }
+  }, [copilotPrefill, copilotOpen, setInput, clearCopilotPrefill])
+
+  // Auto-send messages routed from Updates+Notes or other in-page inputs
+  useEffect(() => {
+    if (copilotAutoSend && copilotOpen && !isLoading) {
+      const text = copilotAutoSend
+      clearCopilotAutoSend()
+      // Small delay so panel is fully rendered before we submit
+      setTimeout(() => {
+        append({ role: 'user', content: text })
+      }, 200)
+    }
+  }, [copilotAutoSend, copilotOpen, isLoading, clearCopilotAutoSend, append])
 
   // Cmd+K keyboard shortcut
   useEffect(() => {
@@ -232,8 +254,8 @@ export default function CopilotPanel() {
         >
           <Sparkles size={14} />
           <span style={{ letterSpacing: '0.01em' }}>
-            <span style={{ opacity: 0.7, fontSize: '11px', fontWeight: 500, marginRight: '4px' }}>&#8984;K</span>
-            Ask Brain
+            Ask AI
+            <span style={{ opacity: 0.7, fontSize: '11px', fontWeight: 500, marginLeft: '6px' }}>&#8984;K</span>
           </span>
         </button>
       )}
@@ -299,7 +321,7 @@ export default function CopilotPanel() {
             fontSize: '13.5px', fontWeight: 700, color: 'rgba(200,196,255,0.9)',
             letterSpacing: '0.01em', flex: 1,
           }}>
-            SellSight Brain
+            Ask AI
           </span>
 
           {/* Clear chat */}
@@ -368,7 +390,7 @@ export default function CopilotPanel() {
                 background: 'var(--accent)', flexShrink: 0,
                 boxShadow: '0 0 6px rgba(99,102,241,0.5)',
               }} />
-              <span style={{ color: 'var(--text-secondary)' }}>Viewing:</span>
+              <span style={{ color: 'var(--text-secondary)' }}>Working on</span>
               <span style={{ color: '#C7D2FE', fontWeight: 600 }}>{activeDeal.company}</span>
               <span style={{
                 fontSize: '10px', fontWeight: 600,
@@ -424,7 +446,7 @@ export default function CopilotPanel() {
                 }}>
                   <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
                   <span>
-                    Full context loaded for <strong style={{ color: '#C7D2FE' }}>{activeDeal.company}</strong> — contacts, todos, notes, risks, and project plan.
+                    Ready — I know everything about <strong style={{ color: '#C7D2FE' }}>{activeDeal.company}</strong>
                   </span>
                 </div>
               )}
@@ -433,7 +455,7 @@ export default function CopilotPanel() {
                 fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '14px',
                 textAlign: 'center', letterSpacing: '0.01em',
               }}>
-                {activeDeal ? `What should the brain do for ${activeDeal.company}?` : 'The brain has full context on your pipeline'}
+                {activeDeal ? `How can I help with ${activeDeal.company}?` : 'What do you need?'}
               </div>
 
               {/* Quick action chips */}
@@ -644,7 +666,7 @@ export default function CopilotPanel() {
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask the brain anything..."
+                placeholder="Ask anything..."
                 rows={1}
                 style={{
                   width: '100%',

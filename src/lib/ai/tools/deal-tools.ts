@@ -323,7 +323,10 @@ export const import_deal = {
     })).optional().describe('All contacts involved in the deal'),
     competitors: z.array(z.string()).optional().describe('Competitor names being evaluated'),
     notes: z.string().optional().describe('Deal notes — preserve the user\'s exact wording and detail'),
-    meetingNotes: z.string().optional().describe('Chronological interaction history / meeting notes — preserve exact detail with dates'),
+    meetingHistory: z.array(z.object({
+      date: z.string().describe('Date of the interaction (e.g. "Oct 23, 2025", "3 Dec 2025")'),
+      content: z.string().describe('What happened — preserve exact detail'),
+    })).optional().describe('Chronological interaction history — each entry is a dated event. Parse ALL dates from the source text.'),
     aiSummary: z.string().optional().describe('Comprehensive deal summary preserving all key details: names, dates, decisions, requirements, history'),
     nextSteps: z.string().optional().describe('Current next steps'),
     dealRisks: z.array(z.string()).optional().describe('Deal-closing risks (NOT product gaps)'),
@@ -359,7 +362,7 @@ export const import_deal = {
       contacts?: { name: string; title?: string; email?: string; phone?: string; role?: string }[]
       competitors?: string[]
       notes?: string
-      meetingNotes?: string
+      meetingHistory?: { date: string; content: string }[]
       aiSummary?: string
       nextSteps?: string
       dealRisks?: string[]
@@ -439,7 +442,9 @@ export const import_deal = {
         competitors: params.competitors ?? [],
         contacts,
         notes: params.notes ?? null,
-        meetingNotes: params.meetingNotes ?? null,
+        meetingNotes: params.meetingHistory?.length
+          ? params.meetingHistory.map(e => `[${e.date}] ${e.content}`).join('\n---\n')
+          : null,
         aiSummary: params.aiSummary ?? null,
         nextSteps: params.nextSteps ?? null,
         dealRisks: params.dealRisks ?? [],
@@ -454,7 +459,8 @@ export const import_deal = {
 
     // Score the deal with ML signals
     try {
-      const allText = [params.notes, params.meetingNotes, params.aiSummary].filter(Boolean).join('\n')
+      const meetingText = params.meetingHistory?.map(e => e.content).join('\n') ?? ''
+      const allText = [params.notes, meetingText, params.aiSummary].filter(Boolean).join('\n')
       if (allText.length > 20) {
         const signals = extractTextSignals(allText, created.createdAt ?? new Date(), new Date())
         const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
@@ -505,7 +511,7 @@ export const import_deal = {
       const taskCount = projectPlan.phases.reduce((sum, p) => sum + p.tasks.length, 0)
       parts.push(`${projectPlan.phases.length} phase(s) / ${taskCount} task(s)`)
     }
-    if (params.meetingNotes) parts.push('interaction history')
+    if (params.meetingHistory?.length) parts.push(`${params.meetingHistory.length} interaction(s)`)
     if (params.aiSummary) parts.push('deal summary')
 
     const detailStr = parts.length > 0 ? ` with ${parts.join(', ')}` : ''
@@ -539,7 +545,10 @@ export const enrich_deal = {
       role: z.string().optional().describe('e.g. Champion, Decision Maker, Technical Evaluator, Internal Sales Rep'),
     })).optional().describe('Contacts to add (merged with existing, deduped by name)'),
     todos: z.array(z.string()).optional().describe('Action items to add (exact user wording, merged with existing)'),
-    meetingNotes: z.string().optional().describe('Meeting/interaction history to add (prepended with date header)'),
+    meetingHistory: z.array(z.object({
+      date: z.string().describe('Date of the interaction (e.g. "Oct 23, 2025")'),
+      content: z.string().describe('What happened — preserve exact detail'),
+    })).optional().describe('Interaction history entries to add — each with its own date'),
     notes: z.string().optional().describe('General notes to append'),
     aiSummary: z.string().optional().describe('Updated deal summary (replaces existing)'),
     nextSteps: z.string().optional().describe('Next steps (replaces existing)'),
@@ -572,7 +581,7 @@ export const enrich_deal = {
       dealId: string
       contacts?: { name: string; title?: string; email?: string; phone?: string; role?: string }[]
       todos?: string[]
-      meetingNotes?: string
+      meetingHistory?: { date: string; content: string }[]
       notes?: string
       aiSummary?: string
       nextSteps?: string
@@ -646,13 +655,12 @@ export const enrich_deal = {
       }
     }
 
-    // Prepend meeting notes
-    if (params.meetingNotes) {
-      const dateHeader = `[${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}]`
-      const newEntry = `${dateHeader} ${params.meetingNotes}`
+    // Merge meeting history entries (each with its own date)
+    if (params.meetingHistory?.length) {
+      const newEntries = params.meetingHistory.map(e => `[${e.date}] ${e.content}`).join('\n---\n')
       const existingNotes = existing.meetingNotes ?? ''
-      updateFields.meetingNotes = existingNotes ? `${newEntry}\n---\n${existingNotes}` : newEntry
-      changes.push('meeting history added')
+      updateFields.meetingNotes = existingNotes ? `${newEntries}\n---\n${existingNotes}` : newEntries
+      changes.push(`${params.meetingHistory.length} meeting(s) added`)
     }
 
     // Append notes
@@ -794,6 +802,48 @@ export const enrich_deal = {
     }
 
     await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, params.dealId))
+
+    // Score the deal if it doesn't already have a score
+    let scoreSet = false
+    if (existing.conversionScore == null || existing.conversionScore === 0) {
+      try {
+        const meetingText = params.meetingHistory?.map(e => e.content).join('\n') ?? ''
+        const allText = [params.notes, meetingText, params.aiSummary, existing.notes, existing.meetingNotes, existing.aiSummary].filter(Boolean).join('\n')
+        if (allText.length > 20) {
+          const signals = extractTextSignals(allText, existing.createdAt ?? new Date(), new Date())
+          const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
+          const mlPred = brain?.mlPredictions?.find((p: any) => p.dealId === params.dealId)
+          let finalScore: number
+          if (mlPred && brain?.mlModel) {
+            const { composite } = computeCompositeScore(
+              heuristicScore(signals, 0.5),
+              mlPred.winProbability,
+              brain.mlModel.trainingSize,
+            )
+            finalScore = composite
+          } else {
+            finalScore = heuristicScore(signals, 0.5)
+          }
+          const insights: string[] = []
+          if (signals.championStrength > 0.5) insights.push('Strong internal champion identified')
+          else if (signals.championStrength > 0) insights.push('Potential champion — needs confirmation')
+          if (signals.budgetConfirmed) insights.push('Budget confirmed')
+          if (signals.decisionMakerSignal) insights.push('Decision maker engaged')
+          if (signals.momentumScore > 0.7) insights.push('Strong forward momentum')
+          else if (signals.momentumScore < 0.3) insights.push('Momentum stalling — needs re-engagement')
+          if (signals.stakeholderDepth > 0.5) insights.push('Multiple stakeholders engaged')
+          if (signals.nextStepDefined) insights.push('Clear next steps defined')
+          if (signals.objectionCount > 0) insights.push(`${signals.objectionCount} objection${signals.objectionCount > 1 ? 's' : ''} identified`)
+          if (insights.length === 0) insights.push('Early stage — limited signals available')
+          await db.update(dealLogs).set({
+            conversionScore: Math.max(0, Math.min(100, Math.round(finalScore))),
+            conversionInsights: insights,
+          }).where(eq(dealLogs.id, params.dealId))
+          scoreSet = true
+          changes.push(`conversion score: ${Math.round(finalScore)}%`)
+        }
+      } catch { /* scoring is non-fatal */ }
+    }
 
     after(async () => {
       try { await rebuildWorkspaceBrain(ctx.workspaceId) } catch {}

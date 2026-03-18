@@ -269,9 +269,8 @@ const STAGE_COLORS: Record<string, string> = {
 }
 
 function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: string; deal: any; onUpdate: () => void; onSwitchToPrep?: () => void }) {
-  const [notes, setNotes] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const { sendToCopilot } = useSidebar()
+  const [updateText, setUpdateText] = useState('')
   const [historyExpanded, setHistoryExpanded] = useState(false)
   const [clearConfirm, setClearConfirm] = useState(false)
   const [clearing, setClearing] = useState(false)
@@ -329,14 +328,14 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
     }
   }
 
-  // Delete a single entry from the structured history (lines starting with [date])
+  // Delete a single entry from the structured history
   const deleteEntry = async (entryIndex: number) => {
     if (!deal?.meetingNotes) return
-    const lines = (deal.meetingNotes as string).split('\n').filter((l: string) => l.trim())
-    const entries = lines.filter((l: string) => /^\[\d/.test(l))
-    const legacy = lines.filter((l: string) => !/^\[\d/.test(l))
+    const blocks = (deal.meetingNotes as string).split(/\n---\n/).map((b: string) => b.trim()).filter(Boolean)
+    const entries = blocks.filter((b: string) => /^\[/.test(b))
+    const legacy = blocks.filter((b: string) => !/^\[/.test(b))
     const updatedEntries = entries.filter((_: string, i: number) => i !== entryIndex)
-    const updated = [...legacy, ...updatedEntries].join('\n') || null
+    const updated = [...legacy, ...updatedEntries].join('\n---\n') || null
     await fetch(`/api/deals/${dealId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ meetingNotes: updated }),
@@ -344,33 +343,16 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
     onUpdate()
   }
 
-  const analyze = async () => {
-    if (!notes.trim()) return
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/analyze-notes`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ meetingNotes: notes }),
-      })
-      const data = await res.json()
-      setResult(data.data)
-      setNotes('')
-      setHistoryExpanded(true) // auto-show updated history
-      onUpdate()
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
       {/* Previous meeting history */}
       {deal?.meetingNotes && (() => {
-        // Parse compact entries: lines starting with [date] are individual meetings
-        const lines = (deal.meetingNotes as string).split('\n').filter((l: string) => l.trim())
-        const entries = lines.filter((l: string) => /^\[\d/.test(l))
-        const legacy = lines.filter((l: string) => !/^\[\d/.test(l))
+        // Parse entries separated by --- with [date] headers
+        const raw = (deal.meetingNotes as string)
+        const blocks = raw.split(/\n---\n/).map((b: string) => b.trim()).filter(Boolean)
+        const entries = blocks.filter((b: string) => /^\[/.test(b))
+        const legacy = blocks.filter((b: string) => !/^\[/.test(b))
         return (
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px' }}>
             <button
@@ -442,84 +424,64 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
         )
       })()}
 
-      <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Clipboard size={14} color="var(--accent)" />
-            <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
-              {deal?.meetingNotes ? 'New Update' : 'Add Update'}
-            </span>
-          </div>
-          <button onClick={analyze} disabled={loading || !notes.trim()} style={{
-            display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 14px',
-            background: loading ? 'var(--accent-subtle)' : 'linear-gradient(135deg, #6366F1, #7C3AED)',
-            boxShadow: loading ? 'none' : 'var(--shadow)',
-            border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px', fontWeight: '600',
-            cursor: loading || !notes.trim() ? 'not-allowed' : 'pointer',
-          }}>
-            {loading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={12} />}
-            {loading ? 'Analyzing...' : 'Analyze with AI'}
-          </button>
+      {/* Add update — routes through AI copilot */}
+      <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+          <Sparkles size={13} color="var(--accent)" />
+          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
+            {deal?.meetingNotes ? 'Add Update' : 'Log First Update'}
+          </span>
+          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>· AI will ask if anything is unclear</span>
         </div>
         <textarea
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          placeholder={deal?.meetingNotes
-            ? 'Paste notes from your latest meeting or log a deal update — AI will analyze in context of all previous entries...'
-            : 'Paste meeting notes, call summaries, or deal updates — AI will extract action items, score conversion probability, and identify trends...'}
-          rows={10}
+          value={updateText}
+          onChange={e => setUpdateText(e.target.value)}
+          placeholder="Paste meeting notes, log a deal update, or ask anything about this deal..."
+          rows={6}
           style={{
             width: '100%', resize: 'vertical', background: 'var(--input-bg)',
             border: '1px solid var(--border)', borderRadius: '8px',
-            color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6', padding: '12px',
-            outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+            color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6',
+            padding: '12px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
           }}
-          onFocus={e => (e.target as HTMLElement).style.borderColor = 'var(--accent)'}
-          onBlur={e => (e.target as HTMLElement).style.borderColor = 'var(--border)'}
+          onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
+          onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+          onKeyDown={e => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+              if (updateText.trim()) {
+                sendToCopilot(`Update for ${deal?.prospectCompany ?? 'this deal'}:\n\n${updateText.trim()}`)
+                setUpdateText('')
+              }
+            }
+          }}
         />
-      </div>
-
-      {/* Quick-generate bar — shown after first analysis */}
-      {result && (
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {[
-            { label: 'Email sequence', icon: Mail, href: `/collateral?dealId=${dealId}&type=email_sequence` },
-            { label: 'Battlecard', icon: Sword, href: `/collateral?dealId=${dealId}&type=battlecard` },
-            { label: 'Meeting prep', icon: Zap, onClick: () => {} },
-          ].map(({ label, icon: Icon, href, onClick }) => (
-            href ? (
-              <Link key={label} href={href} style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px',
-                padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 500,
-                background: 'var(--surface)', border: '1px solid var(--border)',
-                color: 'var(--text-secondary)', textDecoration: 'none', transition: 'all 120ms',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)' }}
-              >
-                <Icon size={12} />
-                {label}
-              </Link>
-            ) : null
-          ))}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px', gap: '8px', alignItems: 'center' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>⌘↵ to send</span>
           <button
-            onClick={() => onSwitchToPrep?.()}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 12px',
-              borderRadius: '6px', fontSize: '12px', fontWeight: 500,
-              background: 'var(--surface)', border: '1px solid var(--border)',
-              color: 'var(--text-secondary)', cursor: 'pointer', transition: 'all 120ms',
+            onClick={() => {
+              if (!updateText.trim()) return
+              sendToCopilot(`Update for ${deal?.prospectCompany ?? 'this deal'}:\n\n${updateText.trim()}`)
+              setUpdateText('')
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--text-primary)' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)' }}
+            disabled={!updateText.trim()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '8px 16px', borderRadius: '8px',
+              background: updateText.trim() ? 'linear-gradient(135deg, #6366F1, #7C3AED)' : 'var(--surface)',
+              border: updateText.trim() ? 'none' : '1px solid var(--border)',
+              color: updateText.trim() ? '#fff' : 'var(--text-tertiary)',
+              fontSize: '13px', fontWeight: '600', cursor: updateText.trim() ? 'pointer' : 'not-allowed',
+              transition: 'all 0.15s',
+            }}
           >
-            <Zap size={12} />Meeting prep
+            <Sparkles size={12} />
+            Send to AI
           </button>
         </div>
-      )}
+      </div>
 
       {/* AI Results */}
-      {(result || deal?.aiSummary || (deal?.dealRisks as string[])?.length > 0) && (
+      {(deal?.aiSummary || (deal?.dealRisks as string[])?.length > 0) && (
         <div style={{ background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '12px', padding: '16px' }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
@@ -592,7 +554,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
 
           {/* Risks — per-item delete */}
           {(() => {
-            const risks: string[] = result?.deal?.dealRisks ?? deal?.dealRisks ?? []
+            const risks: string[] = deal?.dealRisks ?? []
             if (!risks.length) return null
             return (
               <div style={{ padding: '12px 14px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '8px' }}>
@@ -614,21 +576,6 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
               </div>
             )
           })()}
-
-          {/* Product gaps (read-only) */}
-          {result?.productGaps?.length > 0 && (
-            <div style={{ marginTop: '12px', padding: '10px 12px', background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '8px' }}>
-              <div style={{ fontSize: '11px', color: 'var(--danger)', fontWeight: '600', marginBottom: '4px' }}>
-                {result.productGaps.length} product gap{result.productGaps.length > 1 ? 's' : ''} detected
-              </div>
-              {result.productGaps.map((g: any) => (
-                <div key={g.id} style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px' }}>• {g.title}</div>
-              ))}
-              <Link href="/product-gaps" style={{ fontSize: '11px', color: 'var(--danger)', textDecoration: 'none', display: 'inline-block', marginTop: '6px' }}>
-                View in Product Gaps →
-              </Link>
-            </div>
-          )}
 
           {/* Reset all AI — nuclear option */}
           <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
@@ -2623,7 +2570,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
           {/* Header row with score */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
             <Sparkles size={14} color="var(--accent)" />
-            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--accent)' }}>AI Intelligence</span>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--accent)' }}>Deal Intelligence</span>
             {deal.conversionScore != null && (
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '11px', color: deal.conversionScore >= 70 ? 'var(--success)' : deal.conversionScore >= 40 ? 'var(--warning)' : 'var(--danger)' }}>
@@ -2665,13 +2612,13 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
                   style={{ opacity: 0, position: 'absolute', top: 0, right: 0, fontSize: '10px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', transition: 'opacity 0.15s', padding: '2px 4px' }}>✎ edit</button>
               </div>
             ) : (
-              <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: 0, fontStyle: 'italic' }}>No AI summary yet — add notes or updates and click Analyze to generate.</p>
+              <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: 0, fontStyle: 'italic' }}>No summary yet — add updates via the AI assistant to generate insights.</p>
             )}
 
             {/* Insights — filter out score-summary insights (e.g. "rates X at 82/100") to avoid conflicting with ML score */}
             {(deal.conversionInsights as string[])?.filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins))?.length > 0 && (
               <div>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Key Insights</div>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Insights</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   {(deal.conversionInsights as string[]).filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins)).map((insight: string, i: number) => (
                     <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: 'var(--text-secondary)' }}
@@ -2710,8 +2657,8 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
             {mlPrediction?.scoreDrivers?.length > 0 && (
               <div style={{ padding: '10px 14px', background: 'rgba(129,140,248,0.04)', border: '1px solid rgba(129,140,248,0.12)', borderRadius: '8px' }}>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
-                  ML Score Drivers
-                  <span style={{ fontSize: '9px', fontWeight: 400, color: 'var(--text-tertiary)', textTransform: 'none', marginLeft: '6px' }}>why this deal scores {deal.conversionScore ?? '?'}%</span>
+                  Score Drivers
+                  <span style={{ fontSize: '9px', fontWeight: 400, color: 'var(--text-tertiary)', textTransform: 'none', marginLeft: '6px' }}>factors behind the {deal.conversionScore ?? '?'}% score</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   {mlPrediction.scoreDrivers.map((d: any, i: number) => {
@@ -3182,7 +3129,7 @@ export default function DealDetailPage() {
                     border: `1px solid ${deal.conversionScore >= 70 ? 'rgba(34,197,94,0.25)' : 'rgba(245,158,11,0.25)'}`,
                     display: 'flex', alignItems: 'center', gap: '4px',
                   }}>
-                    <Target size={10} /> {deal.conversionScore}% conversion
+                    <Target size={10} /> {deal.conversionScore}% win probability
                   </span>
                 )}
               </div>
