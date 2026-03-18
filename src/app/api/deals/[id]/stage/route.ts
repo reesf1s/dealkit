@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const { workspaceId } = await getWorkspaceContext(userId)
     const { id } = await params
     const body = await req.json()
-    const { stage, kanbanOrder } = body
+    const { stage, kanbanOrder, winLossData } = body
     const validStages = ['prospecting','qualification','discovery','proposal','negotiation','closed_won','closed_lost']
     // Also accept custom stage IDs (format: custom_slug_timestamp)
     if (!validStages.includes(stage) && !stage?.startsWith('custom_')) return NextResponse.json({ error: 'Invalid stage' }, { status: 400 })
@@ -23,6 +23,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (kanbanOrder !== undefined) update.kanbanOrder = kanbanOrder
     if (stage === 'closed_won') update.wonDate = new Date()
     if (stage === 'closed_lost') update.lostDate = new Date()
+
+    // Append win/loss interview data to meetingNotes if provided
+    if (winLossData && (stage === 'closed_won' || stage === 'closed_lost')) {
+      const [existing] = await db.select({ meetingNotes: dealLogs.meetingNotes }).from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
+      const existingNotes = (existing?.meetingNotes as string) ?? ''
+      const interviewBlock = `\n\n---\n[Win/Loss Interview]\nOutcome: ${stage}\nPrimary reason: ${winLossData.primaryReason || 'Not specified'}\nCompetitor: ${winLossData.competitor || 'Not specified'}\nHardest objection: ${winLossData.hardestObjection || 'Not specified'}\nChampion present: ${winLossData.championPresent || 'unknown'}\nNotes: ${winLossData.notes || ''}`
+      update.meetingNotes = existingNotes + interviewBlock
+    }
+
     const [deal] = await db.update(dealLogs).set(update).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).returning()
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })

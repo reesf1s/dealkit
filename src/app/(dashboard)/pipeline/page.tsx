@@ -14,6 +14,7 @@ import {
   ChevronLeft, ChevronRight, Send, Home,
   BarChart3, Brain,
 } from 'lucide-react'
+import WinLossModal, { type WinLossData } from '@/components/shared/WinLossModal'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -1247,8 +1248,19 @@ export default function PipelinePage() {
 
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
+  const [winLossModal, setWinLossModal] = useState<{ dealId: string; deal: any; outcome: 'closed_won' | 'closed_lost' } | null>(null)
 
   const moveStage = async (dealId: string, stage: string) => {
+    // If moving to closed, show win/loss interview first
+    if (stage === 'closed_won' || stage === 'closed_lost') {
+      const deal = deals.find((d: any) => d.id === dealId)
+      setWinLossModal({ dealId, deal, outcome: stage as 'closed_won' | 'closed_lost' })
+      return
+    }
+    await doMoveStage(dealId, stage)
+  }
+
+  const doMoveStage = async (dealId: string, stage: string, winLossData?: WinLossData) => {
     // Optimistic update
     mutate('/api/deals', (current: any) => {
       if (!current?.data) return current
@@ -1263,7 +1275,7 @@ export default function PipelinePage() {
     await fetch(`/api/deals/${dealId}/stage`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stage }),
+      body: JSON.stringify({ stage, winLossData }),
     })
     mutate('/api/deals')
   }
@@ -2045,6 +2057,22 @@ export default function PipelinePage() {
         presets={presets}
         onUpdate={() => mutateConfig()}
       />
+
+      {winLossModal && (
+        <WinLossModal
+          deal={winLossModal.deal}
+          outcome={winLossModal.outcome}
+          onSubmit={async (data) => {
+            setWinLossModal(null)
+            await doMoveStage(winLossModal.dealId, winLossModal.outcome, data)
+          }}
+          onSkip={() => {
+            const { dealId, outcome } = winLossModal
+            setWinLossModal(null)
+            doMoveStage(dealId, outcome)
+          }}
+        />
+      )}
     </div>
   )
 }
