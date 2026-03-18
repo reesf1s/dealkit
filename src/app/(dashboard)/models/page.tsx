@@ -6,6 +6,17 @@ import useSWR from 'swr'
 import Link from 'next/link'
 import { Brain, TrendingUp, Target, Zap, Star, BarChart3, Award, AlertTriangle, CheckCircle, Clock, ArrowUpRight, ChevronRight } from 'lucide-react'
 
+// ── Forecast accuracy types ───────────────────────────────────────────────────
+interface BucketData { bucket: string; predicted: number; wonRate: number }
+interface CalibrationMonth { month: string; predicted: number; actual: number; count: number }
+interface ForecastAccuracy {
+  totalPredictions: number
+  correctPredictions: number
+  accuracy: number
+  byScoreBucket: BucketData[]
+  recentCalibration: CalibrationMonth[]
+}
+
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 // ── Mini bar chart component ──────────────────────────────────────────────────
@@ -31,6 +42,98 @@ function AccuracyRing({ pct }: { pct: number }) {
         strokeDasharray={`${dash} ${circ - dash}`} strokeLinecap="round"
         style={{ transition: 'stroke-dasharray 0.8s ease-out' }} />
     </svg>
+  )
+}
+
+// ── Calibration bucket chart (horizontal bars) ────────────────────────────────
+function CalibrationBucketChart({ buckets }: { buckets: BucketData[] }) {
+  const hasCounts = buckets.some(b => b.predicted > 0)
+  if (!hasCounts) return null
+  const maxCount = Math.max(...buckets.map(b => b.predicted), 1)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      {buckets.map((b) => {
+        const wonPct = Math.round(b.wonRate * 100)
+        const barPct = maxCount > 0 ? Math.min(100, (b.predicted / maxCount) * 100) : 0
+        return (
+          <div key={b.bucket} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '52px', fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', flexShrink: 0, fontFamily: 'var(--font-mono, monospace)' }}>
+              {b.bucket}
+            </div>
+            <div style={{ flex: 1, position: 'relative', height: '20px', borderRadius: '4px', background: 'var(--border)', overflow: 'hidden' }}>
+              {/* Count bar (light background) */}
+              <div style={{ position: 'absolute', inset: 0, width: `${barPct}%`, background: 'color-mix(in srgb, var(--accent) 20%, transparent)', transition: 'width 0.6s ease-out' }} />
+              {/* Actual win rate fill */}
+              <div style={{ position: 'absolute', inset: 0, width: `${wonPct}%`, background: b.predicted > 0 ? 'var(--accent)' : 'transparent', opacity: 0.9, transition: 'width 0.6s ease-out' }} />
+            </div>
+            <div style={{ width: '72px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', flexShrink: 0, fontFamily: 'var(--font-mono, monospace)' }}>
+              {b.predicted > 0 ? `${wonPct}% won` : '—'}
+            </div>
+            <div style={{ width: '44px', textAlign: 'right', fontSize: '11px', color: 'var(--text-tertiary)', flexShrink: 0 }}>
+              {b.predicted > 0 ? `n=${b.predicted}` : ''}
+            </div>
+          </div>
+        )
+      })}
+      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', paddingTop: '4px', borderTop: '1px solid var(--border)' }}>
+        Bar width = deal count. Fill = actual win rate. Ideal: win rate rises with score bucket.
+      </div>
+    </div>
+  )
+}
+
+// ── Monthly calibration line chart ────────────────────────────────────────────
+function ForecastCalibrationChart({ points }: { points: CalibrationMonth[] }) {
+  if (!points?.length) return null
+  const h = 90, w = 320, padX = 16, padY = 12
+  const innerW = w - padX * 2
+  const innerH = h - padY * 2
+
+  const normalize = (val: number) => Math.min(100, Math.max(0, val))
+
+  const xs = points.map((_, i) => padX + (i / Math.max(points.length - 1, 1)) * innerW)
+  const predictedYs = points.map(p => padY + innerH - (normalize(p.predicted) / 100) * innerH)
+  const actualYs = points.map(p => padY + innerH - (normalize(p.actual) / 100) * innerH)
+
+  const toPath = (ys: number[]) =>
+    ys.map((y, i) => `${i === 0 ? 'M' : 'L'} ${xs[i].toFixed(1)} ${y.toFixed(1)}`).join(' ')
+
+  return (
+    <div>
+      <svg width={w} height={h} style={{ overflow: 'visible', display: 'block' }}>
+        {/* Baseline */}
+        <line x1={padX} y1={h - padY} x2={w - padX} y2={h - padY} stroke="var(--border)" strokeWidth="1" />
+        {/* Predicted score line (dashed) */}
+        <path d={toPath(predictedYs)} fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Actual win rate line (solid accent) */}
+        <path d={toPath(actualYs)} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Dots */}
+        {points.map((p, i) => (
+          <g key={i}>
+            <circle cx={xs[i]} cy={predictedYs[i]} r="3" fill="var(--card-bg)" stroke="var(--text-tertiary)" strokeWidth="1.5" />
+            <circle cx={xs[i]} cy={actualYs[i]} r="3" fill="var(--accent)" />
+          </g>
+        ))}
+        {/* Month labels — show first, middle, last */}
+        {[0, Math.floor((points.length - 1) / 2), points.length - 1]
+          .filter((idx, pos, arr) => arr.indexOf(idx) === pos && idx < points.length)
+          .map(idx => (
+            <text key={idx} x={xs[idx]} y={h} textAnchor="middle" fontSize="9" fill="var(--text-tertiary)">
+              {points[idx].month}
+            </text>
+          ))}
+      </svg>
+      <div style={{ display: 'flex', gap: '16px', marginTop: '6px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+          <div style={{ width: '20px', height: '2px', background: 'var(--text-tertiary)', borderTop: '2px dashed var(--text-tertiary)' }} />
+          Avg predicted score
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+          <div style={{ width: '20px', height: '2px', background: 'var(--accent)' }} />
+          Actual win rate ×100
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -61,6 +164,8 @@ export default function ModelsPage() {
   const { data: brainRes, isLoading } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
   const brain = brainRes?.data
   const [selectedArchetype, setSelectedArchetype] = useState<number | null>(null)
+  const { data: forecastRes } = useSWR<{ data: ForecastAccuracy }>('/api/models/forecast-accuracy', fetcher, { revalidateOnFocus: false })
+  const forecastData = forecastRes?.data
 
   const cardStyle: React.CSSProperties = {
     background: 'var(--card-bg)',
@@ -356,6 +461,63 @@ export default function ModelsPage() {
           </div>
         </div>
       )}
+
+      {/* ── Prediction Accuracy ── */}
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <div>
+            <div style={labelStyle}>Prediction Accuracy</div>
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+              How SellSight&apos;s deal score predictions compare to actual close outcomes.
+            </div>
+          </div>
+          {forecastData && forecastData.totalPredictions >= 5 && (
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: '22px', fontWeight: '700', color: forecastData.accuracy >= 0.7 ? 'var(--success)' : forecastData.accuracy >= 0.5 ? 'var(--warning)' : 'var(--danger)' }} className="font-mono">
+                {Math.round(forecastData.accuracy * 100)}%
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>overall accuracy</div>
+            </div>
+          )}
+        </div>
+
+        {(!forecastData || forecastData.totalPredictions < 5) ? (
+          <div style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--text-tertiary)', fontSize: '13px', lineHeight: 1.6 }}>
+            <Target size={32} style={{ margin: '0 auto 10px', display: 'block', opacity: 0.3 }} />
+            Not enough closed deals yet to show calibration. Predictions will appear here as deals close.
+          </div>
+        ) : (
+          <>
+            {/* Summary stats */}
+            <div style={{ display: 'flex', gap: '16px' }}>
+              <div style={{ textAlign: 'center', flex: 1, padding: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }} className="font-mono">{forecastData.totalPredictions}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>Predictions logged</div>
+              </div>
+              <div style={{ textAlign: 'center', flex: 1, padding: '12px', background: 'color-mix(in srgb, var(--success) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)', borderRadius: '10px' }}>
+                <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--success)', lineHeight: 1 }} className="font-mono">{forecastData.correctPredictions}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>Correct predictions</div>
+              </div>
+            </div>
+
+            {/* Score bucket chart */}
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '10px' }}>Win Rate by Score Bucket</div>
+              <CalibrationBucketChart buckets={forecastData.byScoreBucket} />
+            </div>
+
+            {/* Monthly calibration line chart */}
+            {forecastData.recentCalibration.length >= 2 && (
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '10px' }}>Monthly Calibration</div>
+                <div style={{ overflowX: 'auto' }}>
+                  <ForecastCalibrationChart points={forecastData.recentCalibration} />
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* ── Stage Velocity ── */}
       {stageVel?.stageAlerts?.length > 0 && (
