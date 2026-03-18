@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useUser } from '@clerk/nextjs'
 import useSWR from 'swr'
 import { useState, useEffect } from 'react'
-import { CheckCircle, AlertTriangle, ExternalLink, Download, Trash2, Copy, LogOut, RefreshCw, Plug, Unplug, Mail } from 'lucide-react'
+import { CheckCircle, AlertTriangle, ExternalLink, Download, Trash2, Copy, LogOut, RefreshCw, Plug, Unplug, Mail, Key } from 'lucide-react'
 import { SkeletonCard } from '@/components/shared/SkeletonCard'
 import { ConfirmModal } from '@/components/shared/ConfirmModal'
 import { useToast } from '@/components/shared/Toast'
@@ -101,6 +101,7 @@ export default function SettingsPage() {
   const [eraseLoading, setEraseLoading] = useState(false)
   const [inboundEmailCopied, setInboundEmailCopied] = useState(false)
   const [regeneratingInbound, setRegeneratingInbound] = useState(false)
+  const [apiKeyCopied, setApiKeyCopied] = useState(false)
 
   const { data: userRes, isLoading: loadingUser } = useSWR<{ data: DbUser }>('/api/user', fetcher)
   const { data: membersRes, isLoading: loadingMembers, mutate: mutateMembers } = useSWR<{ data: Member[] }>('/api/workspaces/members', fetcher)
@@ -108,6 +109,7 @@ export default function SettingsPage() {
   const { data: configData, mutate: mutateConfig } = useSWR('/api/pipeline-config', fetcher, { revalidateOnFocus: false })
   const { data: consentRes } = useSWR<{ consented: boolean }>('/api/global/consent', fetcher, { revalidateOnFocus: false })
   const { data: inboundEmailRes, mutate: mutateInboundEmail } = useSWR<{ data: { email: string; token: string } }>('/api/workspace/inbound-email', fetcher, { revalidateOnFocus: false })
+  const { data: apiKeyRes } = useSWR<{ data: { apiKey: string } }>('/api/workspace/api-key', fetcher, { revalidateOnFocus: false })
   const hubspot = hubspotRes?.data
   const dbUser = userRes?.data
 
@@ -362,6 +364,15 @@ export default function SettingsPage() {
     setInboundEmailCopied(true)
     toast('Inbound email address copied!', 'success')
     setTimeout(() => setInboundEmailCopied(false), 2000)
+  }
+
+  function handleCopyApiKey() {
+    const key = apiKeyRes?.data?.apiKey
+    if (!key) return
+    navigator.clipboard.writeText(key)
+    setApiKeyCopied(true)
+    toast('API key copied!', 'success')
+    setTimeout(() => setApiKeyCopied(false), 2000)
   }
 
   async function handleRegenerateInboundEmail() {
@@ -891,6 +902,72 @@ export default function SettingsPage() {
               </div>
             )}
 
+          </div>
+        </SectionCard>
+
+        {/* API & Integrations */}
+        <SectionCard title="API &amp; Integrations" description="Push deals in from Zapier, Make, or any HTTP integration">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+            {/* Explainer */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 14px', borderRadius: '10px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.14)' }}>
+              <Key size={14} strokeWidth={2} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: '1px' }} />
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.7 }}>
+                Use this key with Zapier, Make, or any HTTP integration to push deals into SellSight. Send it as <code style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--surface)', padding: '1px 5px', borderRadius: '4px', border: '1px solid var(--border)' }}>apiKey</code> in the JSON body.
+              </p>
+            </div>
+
+            {/* Webhook URL */}
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>Webhook URL</p>
+              <input
+                readOnly
+                value="https://app.sellsight.ai/api/webhooks/zapier"
+                style={{
+                  width: '100%', height: '32px', padding: '0 10px', borderRadius: '7px', fontSize: '12px',
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  color: 'var(--text-primary)', fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            {/* API Key */}
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>Workspace API key</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input
+                  readOnly
+                  value={apiKeyRes?.data?.apiKey ?? 'Loading…'}
+                  style={{
+                    flex: 1, height: '32px', padding: '0 10px', borderRadius: '7px', fontSize: '12px',
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    color: 'var(--text-primary)', fontFamily: 'monospace', outline: 'none',
+                  }}
+                />
+                <button
+                  onClick={handleCopyApiKey}
+                  disabled={!apiKeyRes?.data?.apiKey}
+                  title="Copy API key"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    height: '32px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
+                    color: apiKeyCopied ? 'var(--success)' : 'var(--text-primary)',
+                    background: apiKeyCopied ? 'rgba(34,197,94,0.1)' : 'var(--surface-hover)',
+                    border: apiKeyCopied ? '1px solid rgba(34,197,94,0.3)' : '1px solid var(--border-strong)',
+                    cursor: !apiKeyRes?.data?.apiKey ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.15s', whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Copy size={11} />
+                  {apiKeyCopied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+            </div>
+
+            {/* Usage note */}
+            <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: 0, lineHeight: 1.5 }}>
+              Supported actions: <code style={{ fontFamily: 'monospace', fontSize: '11px' }}>create_deal</code>, <code style={{ fontFamily: 'monospace', fontSize: '11px' }}>update_deal</code>, <code style={{ fontFamily: 'monospace', fontSize: '11px' }}>log_note</code>.
+            </p>
           </div>
         </SectionCard>
 

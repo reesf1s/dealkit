@@ -20,6 +20,26 @@ import { ensureLinksColumn } from '@/lib/api-helpers'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
+// ── Scoring grounding rules — included in every system prompt referencing deal scores ──
+export const SCORING_GROUNDING = `SCORING RULES (never contradict these):
+- Scores 80-100 = Strong. Say "high confidence win" not "certain win"
+- Scores 60-79 = Moderate. Say "solid opportunity" not "likely win"
+- Scores 40-59 = Mixed. Say "needs attention" not "at risk"
+- Scores below 40 = Concerning. Say "high risk" not "dying"
+- Never say a deal is "guaranteed" or "definitely closing"
+- Never contradict the ML score with qualitative language`
+
+// ── Query complexity classification for model routing ─────────────────────────
+const COMPLEX_SIGNALS = ['why', 'strategy', 'forecast', 'analyze', 'analyse', 'compare', 'recommend', 'should i', 'how do i', 'what should', 'risk', 'pattern', 'trend']
+const SIMPLE_SIGNALS = ['what is', 'who is', 'when is', 'how much', 'what stage', 'show me', 'list']
+
+function classifyComplexity(message: string): 'simple' | 'complex' {
+  const lower = message.toLowerCase()
+  if (COMPLEX_SIGNALS.some(s => lower.includes(s))) return 'complex'
+  if (SIMPLE_SIGNALS.some(s => lower.includes(s))) return 'simple'
+  return 'complex'
+}
+
 // ── Action card types (returned alongside reply for rich UI rendering) ─────────
 export type ActionCard =
   | { type: 'deal_updated'; dealId: string; dealName: string; changes: string[] }
@@ -1666,6 +1686,9 @@ async function handlePipelineQuery(
       role: 'user',
       content: `You are a B2B sales AI assistant. Produce a concise, direct pipeline summary for the CEO/sales leader.
 
+${SCORING_GROUNDING}
+
+
 User asked: "${text}"
 
 Pipeline data:
@@ -1966,7 +1989,13 @@ When user says "this deal", "this company", "here", "this prospect" → they mea
     const isDeepQuery = lastText.length > 100 || /\b(full|complete|all|everything|detail|analysis|breakdown|overview|report)\b/i.test(lastText)
     const qaMaxTokens = wantsContent ? 3000 : isDeepQuery ? 2000 : 1200
 
+    // Route to cheaper model for simple lookups
+    const queryComplexity = classifyComplexity(lastText)
+    const qaModel = queryComplexity === 'simple' ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-6'
+
     const systemPrompt = `You are SellSight AI — the autonomous intelligence layer for this sales operation. You have COMPLETE, real-time knowledge of everything in this workspace and can act on any of it.${pageContext}
+
+${SCORING_GROUNDING}
 
 ## YOUR FULL CAPABILITIES
 KNOWLEDGE: You know every deal, contact, competitor, case study, product gap, collateral asset, win pattern, ML prediction, and meeting note in this workspace — it's all loaded below.
@@ -1999,7 +2028,7 @@ ${gapSection}
 ${collateralSection}${activeDealSection}${brainSection}${winPlaybookSection}`
 
     const stream = anthropic.messages.stream({
-      model: 'claude-sonnet-4-6', max_tokens: qaMaxTokens,
+      model: qaModel, max_tokens: qaMaxTokens,
       system: systemPrompt,
       messages: messages.slice(-8).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })),
     })
