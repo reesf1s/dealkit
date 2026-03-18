@@ -11,7 +11,8 @@ import {
   Star, AlertTriangle, Clock, Calendar,
   Settings, Edit, X, Trash2, Check,
   Kanban, List, ChevronUp, ChevronDown,
-  ChevronLeft, ChevronRight, Send, Home,
+  ChevronLeft, ChevronRight, Send, Home, BarChart2,
+  Activity, Award, Brain, TrendingDown,
 } from 'lucide-react'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
@@ -574,6 +575,313 @@ function PipelineSettings({
   )
 }
 
+// ── Insights View ────────────────────────────────────────────────────────────
+function InsightsView({ brainData, deals, currencySymbol, mlMap }: {
+  brainData: any; deals: any[]; currencySymbol: string
+  mlMap: Record<string, { churnRisk?: number; winProb?: number }>
+}) {
+  if (!brainData) {
+    return (
+      <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-tertiary)', fontSize: '13px' }}>
+        AI insights are loading — check back in a moment.
+      </div>
+    )
+  }
+
+  const dispatchAI = (query: string) => {
+    window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query } }))
+  }
+
+  const wl = brainData.winLossIntel
+  const phi = brainData.pipelineHealthIndex
+  const rf = brainData.revenueForecasts
+  const ml = brainData.mlModel
+  const ct = brainData.calibrationTimeline
+  const archetypes: any[] = brainData.dealArchetypes ?? []
+  const patterns: any[] = brainData.competitivePatterns ?? []
+  const scoreTrends: any[] = brainData.scoreTrendAlerts ?? []
+  const mlTrends = brainData.mlTrends
+
+  const cardStyle: React.CSSProperties = {
+    background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+    border: '1px solid var(--card-border)', borderRadius: '16px', padding: '18px 20px',
+    display: 'flex', flexDirection: 'column', gap: '12px',
+  }
+  const labelStyle: React.CSSProperties = {
+    fontSize: '10px', fontWeight: '700', color: 'var(--text-tertiary)',
+    letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '4px',
+  }
+  const bigNum = (n: number | undefined | null, suffix = '') =>
+    n != null ? `${n}${suffix}` : '—'
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+      {/* Header */}
+      <div>
+        <h1 style={{ fontSize: '22px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '4px' }}>
+          ML Insights
+        </h1>
+        <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+          Predictive intelligence, win/loss patterns, and pipeline forecasts
+        </p>
+      </div>
+
+      {/* Row 1: Pipeline Health + Win/Loss Record */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+
+        {/* Pipeline Health Index */}
+        {phi != null && (
+          <div style={cardStyle}>
+            <div style={labelStyle}>Pipeline Health</div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
+              <div style={{
+                fontSize: '42px', fontWeight: '800', lineHeight: 1,
+                color: phi >= 70 ? 'var(--success)' : phi >= 40 ? 'var(--warning)' : 'var(--danger)',
+              }}>{phi}</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', paddingBottom: '4px' }}>/100</div>
+            </div>
+            <div style={{ height: '4px', borderRadius: '2px', background: 'var(--border)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${phi}%`, borderRadius: '2px', background: phi >= 70 ? 'var(--success)' : phi >= 40 ? 'var(--warning)' : 'var(--danger)', transition: 'width 0.4s' }} />
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+              {phi >= 70 ? 'Pipeline is healthy and on track' : phi >= 40 ? 'Some areas need attention' : 'Pipeline needs significant work'}
+            </div>
+          </div>
+        )}
+
+        {/* Win/Loss Record */}
+        {wl && (
+          <div style={cardStyle}>
+            <div style={labelStyle}>Win / Loss Record</div>
+            <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
+              <div>
+                <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--success)', lineHeight: 1 }}>{wl.wins ?? 0}W</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{wl.wonValue != null ? `${currencySymbol}${(wl.wonValue).toLocaleString()}` : ''}</div>
+              </div>
+              <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--danger)', lineHeight: 1, paddingBottom: '2px' }}>{wl.losses ?? 0}L</div>
+            </div>
+            {wl.winRate != null && (
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                {wl.winRate}% win rate
+                {wl.winRateChange != null && (
+                  <span style={{ marginLeft: '8px', color: wl.winRateChange >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: '600' }}>
+                    {wl.winRateChange >= 0 ? '↑' : '↓'} {Math.abs(wl.winRateChange)}%
+                  </span>
+                )}
+              </div>
+            )}
+            {wl.topWinDrivers?.length > 0 && (
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                Top win factor: {wl.topWinDrivers[0]}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Revenue Forecast */}
+        {rf && (
+          <div style={cardStyle}>
+            <div style={labelStyle}>Revenue Forecast</div>
+            {rf.nextMonthForecast != null && (
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Next 30 days</div>
+                <div style={{ fontSize: '26px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>
+                  {currencySymbol}{rf.nextMonthForecast.toLocaleString()}
+                </div>
+              </div>
+            )}
+            {rf.quarterForecast != null && (
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>This quarter</div>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-secondary)', lineHeight: 1 }}>
+                  {currencySymbol}{rf.quarterForecast.toLocaleString()}
+                </div>
+              </div>
+            )}
+            {rf.confidence != null && (
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                {rf.confidence}% confidence
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ML Model accuracy */}
+        {ml && (
+          <div style={cardStyle}>
+            <div style={labelStyle}>ML Model</div>
+            {ml.accuracy != null && (
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
+                <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--accent)', lineHeight: 1 }}>{ml.accuracy}%</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', paddingBottom: '4px' }}>accuracy</div>
+              </div>
+            )}
+            {ml.trainingDeals != null && (
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                Trained on {ml.trainingDeals} deals
+              </div>
+            )}
+            {ct && (
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                {ct.message ?? `Next calibration: ${ct.nextCalibration ?? 'soon'}`}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Row 2: Score Trend Alerts */}
+      {scoreTrends.length > 0 && (
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <Activity size={14} style={{ color: 'var(--accent)' }} />
+            <div style={labelStyle}>Score Trends</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {scoreTrends.map((t: any, i: number) => {
+              const isDown = t.trend === 'declining' || t.direction === 'down' || (t.change ?? 0) < 0
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 12px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  {isDown ? <TrendingDown size={13} style={{ color: 'var(--danger)', flexShrink: 0 }} /> : <TrendingUp size={13} style={{ color: 'var(--success)', flexShrink: 0 }} />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{t.dealName ?? t.company}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.reason ?? t.detail ?? (isDown ? 'Win probability declining' : 'Score improving')}</div>
+                  </div>
+                  {t.change != null && (
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: isDown ? 'var(--danger)' : 'var(--success)', flexShrink: 0 }}>
+                      {isDown ? '' : '+'}{t.change}%
+                    </div>
+                  )}
+                  <button
+                    onClick={() => dispatchAI(`The ${t.dealName} deal score is ${isDown ? 'declining' : 'improving'}: ${t.reason ?? ''}. What should I do?`)}
+                    style={{ flexShrink: 0, padding: '4px 10px', borderRadius: '6px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)', fontSize: '10px', fontWeight: '600', cursor: 'pointer' }}
+                  >
+                    Ask AI
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Row 3: Deal Archetypes + Competitive Patterns */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+
+        {archetypes.length > 0 && (
+          <div style={cardStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Award size={14} style={{ color: 'var(--accent)' }} />
+              <div style={labelStyle}>Deal Archetypes</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {archetypes.slice(0, 4).map((a: any, i: number) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 10px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <div style={{ flexShrink: 0, width: '22px', height: '22px', borderRadius: '6px', background: 'var(--accent-subtle)', border: '1px solid var(--border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--accent)' }}>{i + 1}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{a.name ?? a.type}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{a.description ?? a.pattern ?? ''}</div>
+                    {a.winRate != null && <div style={{ fontSize: '11px', color: 'var(--success)', marginTop: '2px' }}>{a.winRate}% win rate</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {patterns.length > 0 && (
+          <div style={cardStyle}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Target size={14} style={{ color: 'var(--accent)' }} />
+              <div style={labelStyle}>Competitive Patterns</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {patterns.slice(0, 4).map((p: any, i: number) => (
+                <div key={i} style={{ padding: '8px 10px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{p.competitor}</div>
+                    {p.winRate != null && (
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: p.winRate >= 50 ? 'var(--success)' : 'var(--danger)' }}>
+                        {p.winRate}% win
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{p.pattern ?? p.insight ?? ''}</div>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => dispatchAI('Analyse our competitive win/loss patterns and give me specific recommendations for how to beat each competitor we face.')}
+              style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+            >
+              <Sparkles size={10} /> Competitive Strategy
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Row 4: ML Trends summary */}
+      {mlTrends && (
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <BarChart2 size={14} style={{ color: 'var(--accent)' }} />
+            <div style={labelStyle}>Pipeline Trends</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
+            {mlTrends.avgDealCycle != null && (
+              <div>
+                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Avg deal cycle</div>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' }}>{mlTrends.avgDealCycle}d</div>
+              </div>
+            )}
+            {mlTrends.avgDealValue != null && (
+              <div>
+                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Avg deal value</div>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' }}>{currencySymbol}{mlTrends.avgDealValue.toLocaleString()}</div>
+              </div>
+            )}
+            {mlTrends.conversionRate != null && (
+              <div>
+                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Conversion rate</div>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' }}>{mlTrends.conversionRate}%</div>
+              </div>
+            )}
+            {mlTrends.winRateChange != null && (
+              <div>
+                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Win rate change</div>
+                <div style={{ fontSize: '20px', fontWeight: '700', color: mlTrends.winRateChange >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                  {mlTrends.winRateChange >= 0 ? '+' : ''}{mlTrends.winRateChange}%
+                </div>
+              </div>
+            )}
+          </div>
+          {mlTrends.trendSummary && (
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              {mlTrends.trendSummary}
+            </div>
+          )}
+          <button
+            onClick={() => dispatchAI('Analyse my pipeline trends and tell me what\'s changed, what the data says about where my revenue will come from this quarter, and what I should do differently.')}
+            style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 14px', borderRadius: '8px', background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10))', border: '1px solid rgba(99,102,241,0.25)', color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+          >
+            <Sparkles size={10} /> Deep Analysis
+          </button>
+        </div>
+      )}
+
+      {/* Empty state when brain has no insights yet */}
+      {!wl && !phi && !rf && !ml && archetypes.length === 0 && scoreTrends.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🧠</div>
+          <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>Building your ML model</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Insights appear as you add deals and the AI analyses your pipeline patterns.</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Calendar View ────────────────────────────────────────────────────────────
 type CalEvent = {
   id: string
@@ -581,7 +889,7 @@ type CalEvent = {
   subtitle: string
   date: Date
   dealId: string
-  type: 'close' | 'contract_start' | 'contract_end' | 'follow_up' | 'urgent'
+  type: 'close' | 'contract_start' | 'contract_end' | 'follow_up' | 'urgent' | 'task' | 'phase'
 }
 
 function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
@@ -623,6 +931,45 @@ function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
       })
     }
   }
+  // Project plan tasks and phase targets
+  for (const deal of deals) {
+    const plan = deal.projectPlan as any
+    if (plan?.phases) {
+      for (const phase of (plan.phases ?? [])) {
+        // Phase target date
+        if (phase.targetDate) {
+          const d = new Date(phase.targetDate)
+          if (!isNaN(d.getTime())) {
+            events.push({
+              id: `${deal.id}-phase-${phase.id ?? phase.name}`,
+              title: deal.prospectCompany,
+              subtitle: `📋 ${phase.name}`,
+              date: d,
+              dealId: deal.id,
+              type: 'phase',
+            })
+          }
+        }
+        // Individual task due dates (non-complete only)
+        for (const task of (phase.tasks ?? [])) {
+          if (task.dueDate && task.status !== 'complete') {
+            const d = new Date(task.dueDate)
+            if (!isNaN(d.getTime())) {
+              events.push({
+                id: `${deal.id}-task-${task.id ?? task.text}`,
+                title: deal.prospectCompany,
+                subtitle: `✓ ${task.text}`,
+                date: d,
+                dealId: deal.id,
+                type: 'task',
+              })
+            }
+          }
+        }
+      }
+    }
+  }
+
   for (const s of (brainData?.staleDeals ?? [])) {
     const deal = deals.find((d: any) => d.id === s.dealId)
     if (!deal) continue
@@ -654,6 +1001,8 @@ function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
     if (type === 'urgent') return 'var(--danger)'
     if (type === 'contract_start') return 'var(--success)'
     if (type === 'contract_end') return 'var(--accent)'
+    if (type === 'task') return '#8B5CF6'
+    if (type === 'phase') return '#06B6D4'
     return 'var(--text-secondary)'
   }
 
@@ -830,7 +1179,7 @@ export default function PipelinePage() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
 
-  const [view, setView] = useState<'today' | 'board' | 'calendar'>('today')
+  const [view, setView] = useState<'today' | 'board' | 'calendar' | 'insights'>('today')
   const [aiInput, setAiInput] = useState('')
   const aiInputRef = useRef<HTMLInputElement>(null)
 
@@ -905,6 +1254,48 @@ export default function PipelinePage() {
   // ── Action Queue: merge stale/urgent/deteriorating/recs into one prioritised list ──────────
   // Each item has a specific Ask AI prompt so the user can act immediately.
   const brainData = brainRes?.data
+  // ── Trend alerts: pipeline-level signals (declining win rate, stuck stages, etc.) ──
+  const trendAlerts = (() => {
+    if (!brainData) return []
+    type TrendAlert = { headline: string; detail: string; severity: 'high' | 'medium' | 'low'; prompt: string }
+    const alerts: TrendAlert[] = []
+
+    // Score trend alerts — deals with improving/declining ML scores
+    for (const t of (brainData.scoreTrendAlerts ?? []).slice(0, 2)) {
+      const isDecline = t.trend === 'declining' || t.direction === 'down' || (t.change ?? 0) < 0
+      alerts.push({
+        headline: isDecline ? `${t.company ?? t.dealName} score declining` : `${t.company ?? t.dealName} improving`,
+        detail: t.reason ?? t.detail ?? (isDecline ? 'Win probability falling' : 'Engagement strengthening'),
+        severity: isDecline ? 'high' : 'low',
+        prompt: `The ${t.dealName} deal score is ${isDecline ? 'declining' : 'improving'}. ${t.reason ?? ''}. Review the deal and tell me what's driving this change and what I should do now.`,
+      })
+    }
+
+    // Stage velocity alerts — deals stuck in a stage too long
+    for (const s of (brainData.stageVelocityIntel?.stageAlerts ?? []).slice(0, 2)) {
+      alerts.push({
+        headline: `${s.count ?? ''} deal${(s.count ?? 0) !== 1 ? 's' : ''} stuck in ${s.stageName ?? s.stage}`,
+        detail: s.message ?? `Avg ${s.avgDays ?? '?'}d in stage (expected ${s.expectedDays ?? '?'}d)`,
+        severity: 'medium',
+        prompt: `${s.count ?? 'Several'} deals are stuck in the ${s.stageName ?? s.stage} stage longer than expected. Review them and tell me what's blocking progress and the best way to accelerate each one.`,
+      })
+    }
+
+    // ML pipeline trend (overall win rate change)
+    const trend = brainData.mlTrends
+    if (trend?.winRateChange != null && Math.abs(trend.winRateChange) >= 5) {
+      const down = trend.winRateChange < 0
+      alerts.push({
+        headline: `Win rate ${down ? 'down' : 'up'} ${Math.abs(trend.winRateChange)}%`,
+        detail: trend.trendSummary ?? (down ? 'Conversion declining vs prior period' : 'Pipeline momentum improving'),
+        severity: down ? 'high' : 'low',
+        prompt: `Our win rate has ${down ? 'dropped' : 'improved'} by ${Math.abs(trend.winRateChange)}% recently. ${trend.trendSummary ?? ''}. Analyse what's driving this and what we should change.`,
+      })
+    }
+
+    return alerts.slice(0, 3)
+  })()
+
   const actionQueue = (() => {
     if (!brainData) return []
     type ActionItem = {
@@ -960,8 +1351,9 @@ export default function PipelinePage() {
       })
     }
 
-    // 4. Brain recommendations — advance/unblock deals
-    for (const r of (brainData.pipelineRecommendations ?? []).slice(0, 3)) {
+    // 4. Brain recommendations — advance/unblock deals (never recommend stage moves)
+    for (const r of (brainData.pipelineRecommendations ?? []).slice(0, 5)) {
+      if (r.actionType === 'stage_change') continue  // stage moves are prospect-driven, not AI-driven
       if (seen.has(r.dealId) || items.length >= 5) break
       seen.add(r.dealId)
       items.push({
@@ -1021,6 +1413,10 @@ export default function PipelinePage() {
           <button style={tabBtn(view === 'calendar')} onClick={() => setView('calendar')}>
             <Calendar size={13} />
             Calendar
+          </button>
+          <button style={tabBtn(view === 'insights')} onClick={() => setView('insights')}>
+            <Brain size={13} />
+            Insights
           </button>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -1182,11 +1578,53 @@ export default function PipelinePage() {
             </div>
           </div>
 
-          {/* C. Action items */}
+          {/* C. Trend alerts */}
+          {trendAlerts.length > 0 && (
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
+                Pipeline signals
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {trendAlerts.map((alert, i) => {
+                  const color = alert.severity === 'high' ? 'var(--danger)' : alert.severity === 'medium' ? 'var(--warning)' : 'var(--success)'
+                  return (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px',
+                      background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+                      border: '1px solid var(--card-border)',
+                      borderLeft: `3px solid ${color}`,
+                      borderRadius: '10px',
+                    }}>
+                      <Activity size={14} style={{ color, flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{alert.headline}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{alert.detail}</div>
+                      </div>
+                      <button
+                        onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query: alert.prompt } }))}
+                        style={{
+                          flexShrink: 0, display: 'flex', alignItems: 'center', gap: '5px',
+                          padding: '5px 10px', borderRadius: '7px',
+                          background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10))',
+                          border: '1px solid rgba(99,102,241,0.25)',
+                          color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer',
+                        }}
+                      >
+                        <Sparkles size={10} />
+                        Ask AI
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* D. Action items */}
           {actionQueue.length > 0 && (
             <div>
               <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
-                Needs your attention
+                Deals needing action
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
                 {actionQueue.map((item, i) => {
@@ -1268,7 +1706,7 @@ export default function PipelinePage() {
             </div>
           )}
 
-          {/* D. Top picks */}
+          {/* E. Top picks */}
           {topDeals.length > 0 && (
             <div>
               <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
@@ -1314,7 +1752,7 @@ export default function PipelinePage() {
             </div>
           )}
 
-          {/* E. Empty state */}
+          {/* F. Empty state */}
           {!isLoading && activeDeals.length === 0 && (
             <div style={{ textAlign: 'center', padding: '60px 20px' }}>
               <div style={{ fontSize: '40px', marginBottom: '12px' }}>🚀</div>
@@ -1530,6 +1968,11 @@ export default function PipelinePage() {
       {/* ── CALENDAR VIEW ───────────────────────────────────────────────────── */}
       {view === 'calendar' && (
         <CalendarView deals={deals} brainData={brainData} />
+      )}
+
+      {/* ── INSIGHTS VIEW ───────────────────────────────────────────────────── */}
+      {view === 'insights' && (
+        <InsightsView brainData={brainData} deals={deals} currencySymbol={currencySymbol} mlMap={mlMap} />
       )}
 
       <PipelineSettings

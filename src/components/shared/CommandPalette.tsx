@@ -231,21 +231,21 @@ export default function CommandPalette() {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { query?: string } | undefined
       if (detail?.query) {
-        // Open with pre-filled query so user can review & press Enter (or edit first)
+        // Open and immediately fire the AI — no extra Enter needed
         setOpen(true)
         setQuery(detail.query)
         setActiveIndex(0)
-        setMode('nav')
         setAiAnswer('')
         setAiDone(false)
         setAiLoading(false)
+        askAI(detail.query)
       } else {
         openPalette()
       }
     }
     window.addEventListener('openCommandPalette', handler)
     return () => window.removeEventListener('openCommandPalette', handler)
-  }, [openPalette])
+  }, [openPalette, askAI])
 
   // Auto-focus input when opened
   useEffect(() => {
