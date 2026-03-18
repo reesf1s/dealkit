@@ -503,16 +503,25 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
         if (tasks.length === 0) return null
         return { total: tasks.length, complete: tasks.filter((t: any) => t.status === 'complete').length }
       })(),
-      signalSummary: sig ? {
-        momentum:          sig.momentumScore,
-        riskLevel:         sig.objectionCount >= 4 ? 'high' : sig.objectionCount >= 2 ? 'medium' : 'low',
-        isDeteriorating:   deteriorationMap.get(d.id) ?? false,
-        predictedCloseDays: null,   // filled in after ML runs
-        velocity:          sig.engagementVelocity,
-        stakeholderDepth:  sig.stakeholderDepth,
-        nextStepDefined:   sig.nextStepDefined,
-        championStrength:  sig.championStrength,
-      } : undefined,
+      signalSummary: sig ? (() => {
+        // Task 6: Prefer stored intentSignals for champion/budget if available (extraction-backed).
+        // Fall back to regex-based text signal detection if no stored extraction data.
+        const storedSignals = d.intentSignals as { championStatus?: string; budgetStatus?: string } | null
+        const storedChampionStrength = storedSignals?.championStatus === 'confirmed' ? 1.0
+          : storedSignals?.championStatus === 'suspected' ? 0.5
+          : null
+        return {
+          momentum:           sig.momentumScore,
+          riskLevel:          sig.objectionCount >= 4 ? 'high' : sig.objectionCount >= 2 ? 'medium' : 'low',
+          isDeteriorating:    deteriorationMap.get(d.id) ?? false,
+          predictedCloseDays: null,   // filled in after ML runs
+          velocity:           sig.engagementVelocity,
+          stakeholderDepth:   sig.stakeholderDepth,
+          nextStepDefined:    sig.nextStepDefined,
+          // Prefer stored extraction-backed champion strength; fall back to regex
+          championStrength:   storedChampionStrength ?? sig.championStrength,
+        }
+      })() : undefined,
       // ── Score history: carry forward from previous brain + append today's score ──
       scoreHistory: (() => {
         const prev = previousDeals.get(d.id)
