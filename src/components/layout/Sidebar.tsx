@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Building2, Swords,
   FileText, Settings, LogOut, Search,
   Kanban, ChevronLeft, ChevronRight,
-  X, Brain, Zap, Activity, MessageSquare, Sun, Moon, Home,
+  X, Brain, Zap, Activity, MessageSquare, Sun, Moon, Home, BookOpen,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 import { useTheme } from './ThemeContext'
@@ -18,6 +18,8 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 // Nav: AI-first — Today (command centre) + visual board + collateral + intel
 const CORE_ITEMS = [
   { href: '/pipeline',   icon: Home,            label: 'Today',        matchPaths: ['/pipeline', '/deals', '/dashboard'] },
+  { href: '/models',     icon: Brain,           label: 'Models',       matchPaths: ['/models'] },
+  { href: '/playbook',   icon: BookOpen,        label: 'Playbook',     matchPaths: ['/playbook'] },
   { href: '/collateral', icon: Zap,             label: 'Collateral',   matchPaths: ['/collateral'] },
 ]
 
