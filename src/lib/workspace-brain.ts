@@ -1714,35 +1714,26 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
   `)
 
   // ── Post-save background tasks ────────────────────────────────────────────────
-  // Run all three post-save tasks with Promise.allSettled so they are properly
-  // awaited before _doRebuildWorkspaceBrain returns. This prevents detached void
-  // IIFEs from being killed mid-query when Vercel terminates the lambda after
-  // after() resolves — which was causing DB connection leaks and pool exhaustion.
-  // A 30-second hard timeout ensures we never hold up the after() lifecycle
-  // indefinitely (e.g. if proactive collateral triggers a slow LLM call).
+  // Run sequentially (not concurrently) to avoid opening multiple DB connections
+  // simultaneously, which was exhausting the pgBouncer pool of 5 and causing
+  // /api/deals and /api/brain to hang on every rebuild.
+  // A 30-second hard timeout caps the total time spent on post-save work.
   await Promise.race([
-    Promise.allSettled([
-
+    (async () => {
       // 1. Semantic embeddings — skips unchanged entities via content hashing
-      (async () => {
-        try {
-          const { embedWorkspaceEntities } = await import('@/lib/semantic-search')
-          await embedWorkspaceEntities(workspaceId)
-        }
-        catch { /* non-fatal */ }
-      })(),
+      try {
+        const { embedWorkspaceEntities } = await import('@/lib/semantic-search')
+        await embedWorkspaceEntities(workspaceId)
+      } catch { /* non-fatal */ }
 
       // 2. Proactive collateral — 24-hour cooldown, returns in <50ms most runs
-      (async () => {
-        try { await generateProactiveCollateral(workspaceId, brain) }
-        catch { /* non-fatal */ }
-      })(),
+      try { await generateProactiveCollateral(workspaceId, brain) }
+      catch { /* non-fatal */ }
 
       // 3. Global pool contribution — no-ops if workspace has no consent
-      (async () => {
-        try {
-          const hasConsent = await getGlobalConsent(workspaceId)
-          if (!hasConsent) return
+      try {
+        const hasConsent = await getGlobalConsent(workspaceId)
+        if (hasConsent) {
 
           // Build closed deal contribution records using the pre-computed NLP signals
           const collateralByDeal = new Map<string, string[]>()
@@ -1794,12 +1785,11 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
 
           const contributions = extractContributions(closedForContribution)
           await contributeToGlobalPool(workspaceId, contributions)
-        } catch {
-          // Silently swallow — pool contribution must never block or error workspace operations
         }
-      })(),
-
-    ]),
+      } catch {
+        // Silently swallow — pool contribution must never block or error workspace operations
+      }
+    })(),
     // Hard cap: never hold the after() lifecycle open longer than 30 seconds
     new Promise<void>(resolve => setTimeout(resolve, 30_000)),
   ])

@@ -11,8 +11,8 @@ import {
   Star, AlertTriangle, Clock, Calendar,
   Settings, Edit, X, Trash2, Check,
   Kanban, List, ChevronUp, ChevronDown,
-  ChevronLeft, ChevronRight, Send, Home, BarChart2,
-  Activity, Award, Brain, TrendingDown,
+  ChevronLeft, ChevronRight, Send, Home,
+  BarChart3, Brain,
 } from 'lucide-react'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
@@ -735,7 +735,7 @@ function InsightsView({ brainData, deals, currencySymbol, mlMap }: {
       {scoreTrends.length > 0 && (
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <Activity size={14} style={{ color: 'var(--accent)' }} />
+            <TrendingUp size={14} style={{ color: 'var(--accent)' }} />
             <div style={labelStyle}>Score Trends</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -743,7 +743,7 @@ function InsightsView({ brainData, deals, currencySymbol, mlMap }: {
               const isDown = t.trend === 'declining' || t.direction === 'down' || (t.change ?? 0) < 0
               return (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 12px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                  {isDown ? <TrendingDown size={13} style={{ color: 'var(--danger)', flexShrink: 0 }} /> : <TrendingUp size={13} style={{ color: 'var(--success)', flexShrink: 0 }} />}
+                  {isDown ? <TrendingUp size={13} style={{ color: 'var(--danger)', flexShrink: 0, transform: 'scaleY(-1)' }} /> : <TrendingUp size={13} style={{ color: 'var(--success)', flexShrink: 0 }} />}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{t.dealName ?? t.company}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.reason ?? t.detail ?? (isDown ? 'Win probability declining' : 'Score improving')}</div>
@@ -772,7 +772,7 @@ function InsightsView({ brainData, deals, currencySymbol, mlMap }: {
         {archetypes.length > 0 && (
           <div style={cardStyle}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Award size={14} style={{ color: 'var(--accent)' }} />
+              <Star size={14} style={{ color: 'var(--accent)' }} />
               <div style={labelStyle}>Deal Archetypes</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -825,7 +825,7 @@ function InsightsView({ brainData, deals, currencySymbol, mlMap }: {
       {mlTrends && (
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BarChart2 size={14} style={{ color: 'var(--accent)' }} />
+            <BarChart3 size={14} style={{ color: 'var(--accent)' }} />
             <div style={labelStyle}>Pipeline Trends</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
@@ -1595,7 +1595,7 @@ export default function PipelinePage() {
                       borderLeft: `3px solid ${color}`,
                       borderRadius: '10px',
                     }}>
-                      <Activity size={14} style={{ color, flexShrink: 0 }} />
+                      <AlertTriangle size={14} style={{ color, flexShrink: 0 }} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{alert.headline}</div>
                         <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{alert.detail}</div>
