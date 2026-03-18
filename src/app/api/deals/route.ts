@@ -1,7 +1,7 @@
 import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { and, eq, count, gte, lte, sql } from 'drizzle-orm'
+import { and, eq, count, gte, lte, sql } from 'drizzle-orm' // sql kept for inline queries below
 import { db } from '@/lib/db'
 import { dealLogs, collateral, events } from '@/lib/db/schema'
 import { PLAN_LIMITS, isWithinLimit } from '@/lib/stripe/plans'
@@ -13,30 +13,9 @@ async function logEvent(workspaceId: string, userId: string, type: string, metad
   await db.insert(events).values({ workspaceId, userId, type, metadata, createdAt: new Date() })
 }
 
-let dealColsMigrated = false
-async function ensureDealColumns() {
-  if (dealColsMigrated) return
-  try {
-    await db.execute(sql`
-      ALTER TABLE deal_logs
-      ADD COLUMN IF NOT EXISTS contacts jsonb NOT NULL DEFAULT '[]'::jsonb,
-      ADD COLUMN IF NOT EXISTS description text,
-      ADD COLUMN IF NOT EXISTS project_plan jsonb,
-      ADD COLUMN IF NOT EXISTS links jsonb NOT NULL DEFAULT '[]'::jsonb,
-      ADD COLUMN IF NOT EXISTS parent_deal_id uuid,
-      ADD COLUMN IF NOT EXISTS expansion_type text,
-      ADD COLUMN IF NOT EXISTS contract_start_date timestamptz,
-      ADD COLUMN IF NOT EXISTS contract_end_date timestamptz
-    `)
-  } catch { /* columns may already exist */ }
-  try {
-    await db.execute(sql`
-      ALTER TABLE workspaces
-      ADD COLUMN IF NOT EXISTS pipeline_config jsonb
-    `)
-  } catch { /* column may already exist */ }
-  dealColsMigrated = true
-}
+/** No-op: DDL migrations now run only inside _doRebuildWorkspaceBrain (via after())
+ *  to avoid ALTER TABLE locks cascading into SELECT hangs on concurrent page loads. */
+async function ensureDealColumns() {}
 
 export async function GET(req: NextRequest) {
   try {
