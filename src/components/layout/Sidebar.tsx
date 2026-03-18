@@ -84,12 +84,12 @@ export default function Sidebar() {
         {active && !collapsed && (
           <div style={{
             position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
-            width: '2px', height: '14px', background: '#818CF8',
+            width: '2px', height: '14px', background: 'var(--accent)',
             borderRadius: '0 2px 2px 0',
           }} />
         )}
         <div style={{ position: 'relative', flexShrink: 0 }}>
-          <Icon size={14} color={active ? '#A78BFA' : 'currentColor'} style={{ display: 'block', marginLeft: active && !collapsed ? '2px' : 0 }} />
+          <Icon size={14} color={active ? 'var(--accent)' : 'currentColor'} style={{ display: 'block', marginLeft: active && !collapsed ? '2px' : 0 }} />
           {badge && badge.count > 0 && !collapsed && (
             <div style={{
               position: 'absolute', top: '-4px', right: '-6px',
@@ -170,9 +170,9 @@ export default function Sidebar() {
         )}
         <button
           onClick={() => { mobileOpen ? closeMobile() : toggleCollapsed() }}
-          style={{ background: 'none', border: 'none', color: '#374151', cursor: 'pointer', padding: '4px', borderRadius: '5px', display: 'flex' }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#9CA3AF'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#374151'}
+          style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', borderRadius: '5px', display: 'flex' }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'}
         >
           {mobileOpen ? <X size={13} /> : collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
         </button>
@@ -185,26 +185,26 @@ export default function Sidebar() {
             onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
             style={{
               width: '100%', height: '30px', borderRadius: '7px',
-              backgroundColor: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.07)',
+              backgroundColor: 'var(--surface-hover)',
+              border: '1px solid var(--border)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', padding: '0 8px',
               transition: 'background 0.1s',
             }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--border)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'}
           >
-            <Search size={11} color="#4B5563" strokeWidth={2} />
-            <span style={{ flex: 1, fontSize: '12px', color: '#4B5563', textAlign: 'left' }}>Search</span>
-            <span style={{ fontSize: '10px', color: '#374151', background: 'rgba(255,255,255,0.05)', padding: '1px 4px', borderRadius: '3px', border: '1px solid rgba(255,255,255,0.06)' }}>⌘P</span>
+            <Search size={11} color="var(--text-tertiary)" strokeWidth={2} />
+            <span style={{ flex: 1, fontSize: '12px', color: 'var(--text-tertiary)', textAlign: 'left' }}>Search</span>
+            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--surface-hover)', padding: '1px 4px', borderRadius: '3px', border: '1px solid var(--border)' }}>⌘P</span>
           </button>
         </div>
       ) : (
         <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: '8px' }}>
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
-            style={{ width: '30px', height: '30px', borderRadius: '7px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ width: '30px', height: '30px', borderRadius: '7px', background: 'var(--surface-hover)', border: '1px solid var(--border)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            <Search size={12} color="#4B5563" />
+            <Search size={12} color="var(--text-tertiary)" />
           </button>
         </div>
       )}
@@ -216,24 +216,24 @@ export default function Sidebar() {
             onClick={toggleCopilot}
             style={{
               width: '100%', height: '32px', borderRadius: '8px',
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1))',
-              border: '1px solid rgba(99,102,241,0.25)',
+              background: 'linear-gradient(135deg, rgba(79,70,229,0.10), rgba(139,92,246,0.07))',
+              border: '1px solid rgba(79,70,229,0.20)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', padding: '0 10px',
               transition: 'all 0.15s',
-              color: '#A5B4FC',
+              color: 'var(--accent-text)',
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(139,92,246,0.18))'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.4)'
+              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(79,70,229,0.18), rgba(139,92,246,0.12))'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(79,70,229,0.4)'
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1))'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.25)'
+              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(79,70,229,0.10), rgba(139,92,246,0.07))'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(79,70,229,0.20)'
             }}
           >
-            <MessageSquare size={12} color="#818CF8" strokeWidth={2} />
+            <MessageSquare size={12} color="var(--accent)" strokeWidth={2} />
             <span style={{ flex: 1, fontSize: '12px', fontWeight: 600, textAlign: 'left' }}>Ask AI</span>
-            <span style={{ fontSize: '10px', color: '#4B5563', background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: '3px', border: '1px solid rgba(255,255,255,0.08)' }}>⌘K</span>
+            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--surface-hover)', padding: '1px 5px', borderRadius: '3px', border: '1px solid var(--border)' }}>⌘K</span>
           </button>
         </div>
       ) : (
@@ -241,9 +241,9 @@ export default function Sidebar() {
           <button
             onClick={toggleCopilot}
             title="Ask AI (⌘K)"
-            style={{ width: '30px', height: '30px', borderRadius: '7px', background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1))', border: '1px solid rgba(99,102,241,0.25)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ width: '30px', height: '30px', borderRadius: '7px', background: 'linear-gradient(135deg, rgba(79,70,229,0.10), rgba(139,92,246,0.07))', border: '1px solid rgba(79,70,229,0.20)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            <MessageSquare size={12} color="#818CF8" />
+            <MessageSquare size={12} color="var(--accent)" />
           </button>
         </div>
       )}
@@ -327,14 +327,14 @@ export default function Sidebar() {
               width: '7px', height: '7px', borderRadius: '50%',
               background: brainAge
                 ? (urgentCount > 0 ? '#EF4444' : '#22C55E')
-                : '#374151',
+                : 'var(--text-tertiary)',
               boxShadow: brainAge
                 ? (urgentCount > 0 ? '0 0 6px rgba(239,68,68,0.6)' : '0 0 6px rgba(34,197,94,0.5)')
                 : 'none',
               flexShrink: 0,
             }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '10px', color: brainAge ? '#9CA3AF' : '#374151', fontWeight: 600 }}>
+              <div style={{ fontSize: '10px', color: brainAge ? 'var(--text-secondary)' : 'var(--text-tertiary)', fontWeight: 600 }}>
                 {brainAge ? 'AI ready' : 'AI idle'}
               </div>
               {(urgentCount > 0 || staleCount > 0) && (
@@ -352,12 +352,12 @@ export default function Sidebar() {
             title="Sign out"
             style={{
               width: '100%', height: '32px', borderRadius: '7px',
-              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+              background: 'var(--surface-hover)', border: '1px solid var(--border)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: '#4B5563',
+              cursor: 'pointer', color: 'var(--text-secondary)',
             }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#9CA3AF'}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#4B5563'}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'}
           >
             <LogOut size={12} />
           </button>
@@ -365,8 +365,8 @@ export default function Sidebar() {
           <div style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             padding: '7px 8px', borderRadius: '8px',
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.06)',
+            background: 'var(--surface-hover)',
+            border: '1px solid var(--border)',
           }}>
             <div style={{
               width: '24px', height: '24px', borderRadius: '50%',
@@ -377,18 +377,18 @@ export default function Sidebar() {
               {user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0]?.toUpperCase() ?? '?'}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '12px', fontWeight: '500', color: '#D1D5DB', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Account'}
               </div>
-              <div style={{ fontSize: '10px', color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
                 {user?.emailAddresses?.[0]?.emailAddress ?? ''}
               </div>
             </div>
             <button
               onClick={() => signOut({ redirectUrl: '/' })}
-              style={{ background: 'none', border: 'none', padding: '3px', color: '#374151', borderRadius: '4px', display: 'flex', alignItems: 'center', cursor: 'pointer' }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#9CA3AF'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#374151'}
+              style={{ background: 'none', border: 'none', padding: '3px', color: 'var(--text-tertiary)', borderRadius: '4px', display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
               title="Sign out"
             >
               <LogOut size={11} />
