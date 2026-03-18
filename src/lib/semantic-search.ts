@@ -117,14 +117,15 @@ export async function embedWorkspaceEntities(workspaceId: string): Promise<{
   const existingCompHashes = new Map(existingCache?.competitors.map(c => [c.id, c.hash]) ?? [])
   const existingCollHashes = new Map(existingCache?.collateral.map(c => [c.id, c.hash]) ?? [])
 
-  // Load all entities in parallel
-  const [deals, comps, colls] = await Promise.all([
-    db.select().from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)),
-    db.select().from(competitors).where(eq(competitors.workspaceId, workspaceId)),
-    db.select().from(collateral).where(
-      and(eq(collateral.workspaceId, workspaceId), eq(collateral.status, 'ready'))
-    ),
-  ])
+  // Load entities sequentially to avoid saturating the connection pool.
+  // Running these in parallel (Promise.all) would hold 3 connections simultaneously —
+  // combined with the concurrent brain-rebuild and proactive-collateral tasks this
+  // could exhaust the pool (max 5) and stall unrelated requests (e.g. /api/deals).
+  const deals = await db.select().from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId))
+  const comps = await db.select().from(competitors).where(eq(competitors.workspaceId, workspaceId))
+  const colls = await db.select().from(collateral).where(
+    and(eq(collateral.workspaceId, workspaceId), eq(collateral.status, 'ready'))
+  )
 
   // Compute max deal value for normalisation
   const maxDealValue = Math.max(...deals.map(d => d.dealValue ?? 0), 1)

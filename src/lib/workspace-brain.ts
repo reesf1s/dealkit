@@ -296,7 +296,8 @@ async function ensureBrainColumn() {
     await db.execute(sql`
       ALTER TABLE workspaces
       ADD COLUMN IF NOT EXISTS workspace_brain jsonb,
-      ADD COLUMN IF NOT EXISTS pipeline_config jsonb
+      ADD COLUMN IF NOT EXISTS pipeline_config jsonb,
+      ADD COLUMN IF NOT EXISTS embedding_cache jsonb
     `)
   } catch { /* already exists */ }
   try {
@@ -1712,92 +1713,96 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
     WHERE id = ${workspaceId}
   `)
 
-  // ── Semantic embeddings — fire-and-forget after brain is saved ────────────────
-  // Embeds all workspace entities for semantic search, deal similarity, and
-  // competitor deduplication. Uses content hashing to skip unchanged entities.
-  void (async () => {
-    try {
-      const { embedWorkspaceEntities } = await import('@/lib/semantic-search')
-      await embedWorkspaceEntities(workspaceId)
-    }
-    catch { /* non-fatal — embeddings disabled if no provider available */ }
-  })()
+  // ── Post-save background tasks ────────────────────────────────────────────────
+  // Run all three post-save tasks with Promise.allSettled so they are properly
+  // awaited before _doRebuildWorkspaceBrain returns. This prevents detached void
+  // IIFEs from being killed mid-query when Vercel terminates the lambda after
+  // after() resolves — which was causing DB connection leaks and pool exhaustion.
+  // A 30-second hard timeout ensures we never hold up the after() lifecycle
+  // indefinitely (e.g. if proactive collateral triggers a slow LLM call).
+  await Promise.race([
+    Promise.allSettled([
 
-  // ── Proactive collateral generation — fire-and-forget after brain is saved ───
-  // Non-blocking: auto-generates 1–2 highest-priority collateral pieces when the
-  // brain detects risks/patterns and has enough grounding knowledge.
-  void (async () => {
-    try { await generateProactiveCollateral(workspaceId, brain) }
-    catch { /* non-fatal */ }
-  })()
+      // 1. Semantic embeddings — skips unchanged entities via content hashing
+      (async () => {
+        try {
+          const { embedWorkspaceEntities } = await import('@/lib/semantic-search')
+          await embedWorkspaceEntities(workspaceId)
+        }
+        catch { /* non-fatal */ }
+      })(),
 
-  // ── Global pool contribution — fire-and-forget after brain is saved ───────────
-  // Non-blocking: never fails the rebuild. Only runs if workspace has consent.
-  void (async () => {
-    try {
-      const hasConsent = await getGlobalConsent(workspaceId)
-      if (!hasConsent) return
+      // 2. Proactive collateral — 24-hour cooldown, returns in <50ms most runs
+      (async () => {
+        try { await generateProactiveCollateral(workspaceId, brain) }
+        catch { /* non-fatal */ }
+      })(),
 
-      // Build closed deal contribution records using the pre-computed mlInputs feature vectors
-      // We need to re-run extractFeatures to get the per-deal feature vectors.
-      // Use the collateral types already fetched earlier in the rebuild.
-      const collateralByDeal = new Map<string, string[]>()
-      for (const c of collateralRows) {
-        if (!c.sourceDealLogId) continue
-        const arr = collateralByDeal.get(c.sourceDealLogId) ?? []
-        arr.push(c.type)
-        collateralByDeal.set(c.sourceDealLogId, arr)
-      }
+      // 3. Global pool contribution — no-ops if workspace has no consent
+      (async () => {
+        try {
+          const hasConsent = await getGlobalConsent(workspaceId)
+          if (!hasConsent) return
 
-      const closedForContribution = deals
-        .filter(d => d.stage === 'closed_won' || d.stage === 'closed_lost')
-        .map(d => {
-          const sig = signalMap.get(d.id)
-          // Re-derive feature vector — same logic as extractFeatures in deal-ml.ts
-          // but we use the pre-computed NLP features from signalMap
-          const stageOrdinal: Record<string, number> = {
-            prospecting: 0, qualification: 1, discovery: 2,
-            proposal: 3, negotiation: 4, closed_won: 4, closed_lost: 4,
+          // Build closed deal contribution records using the pre-computed NLP signals
+          const collateralByDeal = new Map<string, string[]>()
+          for (const c of collateralRows) {
+            if (!c.sourceDealLogId) continue
+            const arr = collateralByDeal.get(c.sourceDealLogId) ?? []
+            arr.push(c.type)
+            collateralByDeal.set(c.sourceDealLogId, arr)
           }
-          const fStage = (stageOrdinal[d.stage] ?? 0) / 4
-          const allVals = deals.map(x => x.dealValue ?? 0).filter(v => v > 0)
-          const maxVal  = allVals.length > 0 ? Math.max(...allVals) : 100_000
-          const val     = Math.max(d.dealValue ?? 0, 1)
-          const fValue  = maxVal > 1 ? Math.log(val + 1) / Math.log(maxVal + 1) : 0.5
-          const ageMs   = d.createdAt ? (now.getTime() - new Date(d.createdAt).getTime()) : 0
-          const fAge    = Math.min(ageMs / 86_400_000 / 180, 1)
-          const fRisk   = Math.min(((d.dealRisks as string[]) ?? []).length / 5, 1)
-          const fTodo   = (() => { const t = (d.todos as { done: boolean }[]) ?? []; return t.length > 0 ? t.filter(x => x.done).length / t.length : 0.5 })()
-          // Intentionally 10 features (excludes rep_win_rate at index 10).
-          // rep_win_rate is workspace-specific and must never cross workspace boundaries.
-          // Global pool trains on 10-feature vectors; Bayesian blend pads to 11 locally.
-          const features = [
-            fStage, fValue, fAge, fRisk,
-            0.5,   // competitor_win_rate: use neutral default (avoid cross-workspace leakage)
-            fTodo,
-            sig?.textEngagement    ?? 0.5,
-            sig?.momentumScore     ?? 0.5,
-            sig?.stakeholderDepth  ?? 0.5,
-            sig?.urgencyScore      ?? 0.5,
-          ]
-          return {
-            stage:           d.stage,
-            dealValue:       d.dealValue,
-            dealRisks:       (d.dealRisks as string[]) ?? [],
-            createdAt:       d.createdAt,
-            wonDate:         d.wonDate,
-            lostDate:        d.lostDate,
-            collateralTypes: collateralByDeal.get(d.id) ?? [],
-            features,
-          }
-        })
 
-      const contributions = extractContributions(closedForContribution)
-      await contributeToGlobalPool(workspaceId, contributions)
-    } catch {
-      // Silently swallow — pool contribution must never block or error workspace operations
-    }
-  })()
+          const closedForContribution = deals
+            .filter(d => d.stage === 'closed_won' || d.stage === 'closed_lost')
+            .map(d => {
+              const sig = signalMap.get(d.id)
+              const stageOrdinal: Record<string, number> = {
+                prospecting: 0, qualification: 1, discovery: 2,
+                proposal: 3, negotiation: 4, closed_won: 4, closed_lost: 4,
+              }
+              const fStage = (stageOrdinal[d.stage] ?? 0) / 4
+              const allVals = deals.map(x => x.dealValue ?? 0).filter(v => v > 0)
+              const maxVal  = allVals.length > 0 ? Math.max(...allVals) : 100_000
+              const val     = Math.max(d.dealValue ?? 0, 1)
+              const fValue  = maxVal > 1 ? Math.log(val + 1) / Math.log(maxVal + 1) : 0.5
+              const ageMs   = d.createdAt ? (now.getTime() - new Date(d.createdAt).getTime()) : 0
+              const fAge    = Math.min(ageMs / 86_400_000 / 180, 1)
+              const fRisk   = Math.min(((d.dealRisks as string[]) ?? []).length / 5, 1)
+              const fTodo   = (() => { const t = (d.todos as { done: boolean }[]) ?? []; return t.length > 0 ? t.filter(x => x.done).length / t.length : 0.5 })()
+              // Intentionally 10 features — rep_win_rate excluded to prevent cross-workspace leakage
+              const features = [
+                fStage, fValue, fAge, fRisk,
+                0.5, // competitor_win_rate: neutral default
+                fTodo,
+                sig?.textEngagement    ?? 0.5,
+                sig?.momentumScore     ?? 0.5,
+                sig?.stakeholderDepth  ?? 0.5,
+                sig?.urgencyScore      ?? 0.5,
+              ]
+              return {
+                stage:           d.stage,
+                dealValue:       d.dealValue,
+                dealRisks:       (d.dealRisks as string[]) ?? [],
+                createdAt:       d.createdAt,
+                wonDate:         d.wonDate,
+                lostDate:        d.lostDate,
+                collateralTypes: collateralByDeal.get(d.id) ?? [],
+                features,
+              }
+            })
+
+          const contributions = extractContributions(closedForContribution)
+          await contributeToGlobalPool(workspaceId, contributions)
+        } catch {
+          // Silently swallow — pool contribution must never block or error workspace operations
+        }
+      })(),
+
+    ]),
+    // Hard cap: never hold the after() lifecycle open longer than 30 seconds
+    new Promise<void>(resolve => setTimeout(resolve, 30_000)),
+  ])
 
   return brain
 }
