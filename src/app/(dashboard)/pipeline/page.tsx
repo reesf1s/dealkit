@@ -6,10 +6,10 @@ import Link from 'next/link'
 import { useState, useRef } from 'react'
 import { useSidebar } from '@/components/layout/SidebarContext'
 import {
-  Plus, TrendingUp, Sparkles, DollarSign,
-  Target, Zap, MoreHorizontal, ArrowUpRight,
+  Plus, TrendingUp, Sparkles,
+  Target, Zap,
   Star, AlertTriangle, Clock, Calendar,
-  Settings, Edit, X, Trash2, Check, CheckSquare,
+  Settings, Edit, X, Trash2, Check,
   Kanban, List, ChevronUp, ChevronDown,
   ChevronLeft, ChevronRight, Send, Home,
   BarChart3, Brain,
@@ -117,6 +117,7 @@ function DealCard({
   daysInStage,
   momentum,
   currencySymbol = '$',
+  mlPrediction,
   allStages,
 }: {
   deal: any
@@ -130,14 +131,22 @@ function DealCard({
   daysInStage?: number
   momentum?: 'hot' | 'cooling' | null
   currencySymbol?: string
+  mlPrediction?: { winProbability?: number; churnRisk?: number }
   allStages?: { id: string; label: string; color: string }[]
 }) {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const nextStages = (allStages ?? STAGES).filter(s => s.id !== deal.stage && s.id !== 'closed_won' && s.id !== 'closed_lost')
-  const stageConfig = (allStages ?? STAGES).find(s => s.id === deal.stage)
+  const score = deal.conversionScore ?? 0
+  const scoreColor = score >= 70 ? '#059669' : score >= 40 ? '#D97706' : '#DC2626'
+  const scoreBg = score >= 70 ? 'rgba(5,150,105,0.1)' : score >= 40 ? 'rgba(217,119,6,0.1)' : 'rgba(220,38,38,0.1)'
 
-  const todos: any[] = deal.todos ?? []
-  const doneTodos = todos.filter((t: any) => t.done).length
+  const value = deal.dealValue ?? 0
+  const valueLabel = value >= 1_000_000
+    ? `${currencySymbol}${(value / 1_000_000).toFixed(1)}m`
+    : value >= 1_000
+      ? `${currencySymbol}${(value / 1_000).toFixed(0)}k`
+      : value > 0 ? `${currencySymbol}${value}` : null
+
+  const isUrgent = !!urgentReason
+  const isStale = staleDays != null && staleDays > 0
 
   return (
     <div
@@ -145,235 +154,88 @@ function DealCard({
       onDragStart={e => {
         e.dataTransfer.effectAllowed = 'move'
         e.dataTransfer.setData('text/plain', deal.id)
-        // small delay so the ghost image captures before opacity change
-        requestAnimationFrame(() => {
-          onDragStart(deal.id)
-        })
+        requestAnimationFrame(() => { onDragStart(deal.id) })
       }}
-      onDragEnd={() => {
-        onDragEnd()
-      }}
+      onDragEnd={() => { onDragEnd() }}
+      onClick={() => { window.location.href = `/deals/${deal.id}` }}
       style={{
         background: 'var(--card-bg)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        border: '1px solid var(--card-border)',
-        borderRadius: '14px',
-        padding: '14px',
-        position: 'relative',
-        transition: 'border-color 0.2s, transform 0.15s, opacity 0.15s',
-        cursor: 'grab',
+        border: `1px solid ${isUrgent ? 'color-mix(in srgb, var(--danger) 30%, var(--card-border))' : 'var(--card-border)'}`,
+        borderRadius: '10px',
+        padding: '12px 13px',
+        cursor: 'pointer',
         opacity: isDragging ? 0.4 : 1,
+        transition: 'box-shadow 0.12s, border-color 0.12s',
+        boxShadow: 'var(--shadow-sm)',
         userSelect: 'none',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
       }}
       onMouseEnter={e => {
-        if (!isDragging) {
-          ;(e.currentTarget as HTMLElement).style.borderColor = `${stageConfig?.color ?? 'var(--accent)'}55`
-          ;(e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)'
-        }
+        ;(e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow)'
+        ;(e.currentTarget as HTMLElement).style.borderColor = isUrgent
+          ? 'color-mix(in srgb, var(--danger) 40%, transparent)'
+          : 'var(--border-strong)'
       }}
       onMouseLeave={e => {
-        ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--card-border)'
-        ;(e.currentTarget as HTMLElement).style.transform = 'translateY(0)'
+        ;(e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-sm)'
+        ;(e.currentTarget as HTMLElement).style.borderColor = isUrgent
+          ? 'color-mix(in srgb, var(--danger) 30%, var(--card-border))'
+          : 'var(--card-border)'
       }}
     >
-      {/* Top row */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '10px' }}>
+      {/* Top row: company name + score circle */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <Link href={`/deals/${deal.id}`} style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {deal.prospectCompany}
-          </Link>
-          {deal.prospectName && (
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px' }}>{deal.prospectName}</div>
+          </div>
+          {deal.dealName && deal.dealName !== deal.prospectCompany && (
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {deal.dealName}
+            </div>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '8px' }}>
-          <ScoreBadge score={deal.conversionScore} />
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={e => { e.stopPropagation(); setMenuOpen(!menuOpen) }}
-              style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: '2px', display: 'flex', borderRadius: '4px' }}
-            >
-              <MoreHorizontal size={14} />
-            </button>
-            {menuOpen && (
-              <div style={{
-                position: 'absolute', right: 0, top: '22px', zIndex: 50,
-                background: 'var(--elevated)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                border: '1px solid var(--border-strong)',
-                borderRadius: '10px', padding: '6px', minWidth: '160px',
-                boxShadow: 'var(--shadow-lg)',
-              }}
-              onMouseLeave={() => setMenuOpen(false)}
-              >
-                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', padding: '4px 8px 2px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Move to</div>
-                {nextStages.map(s => (
-                  <button key={s.id} onClick={() => { onMoveStage(deal.id, s.id); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '7px 8px', background: 'none', border: 'none', color: 'var(--text-primary)', fontSize: '12px', cursor: 'pointer', borderRadius: '6px', textAlign: 'left' }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}
-                  >
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-                    {s.label}
-                  </button>
-                ))}
-                <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
-                <button onClick={() => { onMoveStage(deal.id, 'closed_won'); setMenuOpen(false) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '7px 8px', background: 'none', border: 'none', color: 'var(--success)', fontSize: '12px', cursor: 'pointer', borderRadius: '6px', textAlign: 'left' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--success) 8%, transparent)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}
-                >
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--success)', flexShrink: 0 }} />
-                  Close Won
-                </button>
-                <button onClick={() => { onMoveStage(deal.id, 'closed_lost'); setMenuOpen(false) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', padding: '7px 8px', background: 'none', border: 'none', color: 'var(--danger)', fontSize: '12px', cursor: 'pointer', borderRadius: '6px', textAlign: 'left' }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--danger) 8%, transparent)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}
-                >
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--danger)', flexShrink: 0 }} />
-                  Close Lost
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Urgency / stale signals from brain */}
-      {urgentReason && (
-        <div style={{ display: 'flex', gap: '5px', alignItems: 'center', padding: '5px 8px', borderRadius: '6px', background: 'color-mix(in srgb, var(--danger) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 15%, transparent)', marginBottom: '8px' }}>
-          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--danger)', flexShrink: 0 }} />
-          <span style={{ fontSize: '10px', color: 'var(--danger)', lineHeight: 1.4 }}>{urgentReason}</span>
-        </div>
-      )}
-      {!urgentReason && staleDays !== undefined && staleDays >= 14 && (
-        <div style={{ display: 'flex', gap: '5px', alignItems: 'center', padding: '5px 8px', borderRadius: '6px', background: 'color-mix(in srgb, var(--warning) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--warning) 12%, transparent)', marginBottom: '8px' }}>
-          <Clock size={9} style={{ color: 'var(--warning)' }} />
-          <span style={{ fontSize: '10px', color: 'var(--warning)' }}>{staleDays}d since last update</span>
-        </div>
-      )}
-      {/* Churn risk — ML survival model signal */}
-      {!urgentReason && churnRisk !== undefined && churnRisk >= 65 && (
-        <div style={{
-          display: 'flex', gap: '5px', alignItems: 'center',
-          padding: '5px 8px', borderRadius: '6px',
-          background: churnRisk >= 85 ? 'color-mix(in srgb, var(--danger) 8%, transparent)' : 'color-mix(in srgb, var(--warning) 5%, transparent)',
-          border: churnRisk >= 85 ? '1px solid color-mix(in srgb, var(--danger) 20%, transparent)' : '1px solid color-mix(in srgb, var(--warning) 15%, transparent)',
-          marginBottom: '8px',
-        }}>
-          <span style={{ fontSize: '10px' }}>🔇</span>
-          <span style={{ fontSize: '10px', color: churnRisk >= 85 ? 'var(--danger)' : 'var(--warning)' }}>
-            {churnRisk}% going silent
-          </span>
-        </div>
-      )}
-      {/* Days in stage badge */}
-      {daysInStage !== undefined && daysInStage > 0 && (
-        <div style={{
-          display: 'flex', gap: '5px', alignItems: 'center',
-          padding: '4px 8px', borderRadius: '6px',
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          marginBottom: '8px',
-        }}>
-          <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>⏱ {daysInStage}d in stage</span>
-        </div>
-      )}
-      {/* Momentum: hot badge (cooling is already covered by churnRisk badge) */}
-      {momentum === 'hot' && (
-        <div style={{
-          display: 'flex', gap: '5px', alignItems: 'center',
-          padding: '4px 8px', borderRadius: '6px',
-          background: 'color-mix(in srgb, var(--success) 8%, transparent)',
-          border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)',
-          marginBottom: '8px',
-        }}>
-          <span style={{ fontSize: '10px', color: 'var(--success)' }}>🔥 Hot</span>
-        </div>
-      )}
-      {/* Contract end date badge */}
-      {deal.contractEndDate && (() => {
-        const endDate = new Date(deal.contractEndDate)
-        const now = new Date()
-        const daysUntilEnd = Math.ceil((endDate.getTime() - now.getTime()) / 86_400_000)
-        const isExpiringSoon = daysUntilEnd >= 0 && daysUntilEnd <= 30
-        const isExpired = daysUntilEnd < 0
-        const badgeColor = isExpired ? 'var(--danger)' : isExpiringSoon ? 'var(--warning)' : 'var(--text-secondary)'
-        const badgeBg = isExpired
-          ? 'color-mix(in srgb, var(--danger) 8%, transparent)'
-          : isExpiringSoon
-            ? 'color-mix(in srgb, var(--warning) 8%, transparent)'
-            : 'var(--surface)'
-        const badgeBorder = isExpired
-          ? 'color-mix(in srgb, var(--danger) 20%, transparent)'
-          : isExpiringSoon
-            ? 'color-mix(in srgb, var(--warning) 20%, transparent)'
-            : 'var(--border)'
-        const label = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        return (
-          <div style={{
-            display: 'flex', gap: '5px', alignItems: 'center',
-            padding: '4px 8px', borderRadius: '6px',
-            background: badgeBg,
-            border: `1px solid ${badgeBorder}`,
-            marginBottom: '8px',
-          }}>
-            <Calendar size={9} style={{ color: badgeColor, flexShrink: 0 }} />
-            <span style={{ fontSize: '10px', color: badgeColor }}>
-              {isExpired ? `Expired ${label}` : isExpiringSoon ? `Expires ${label}` : `Ends ${label}`}
-            </span>
-          </div>
-        )
-      })()}
-
-      {/* AI Insights — filter out score-summary insights to avoid conflicting with ML % badge */}
-      {(() => {
-        const firstInsight = (deal.conversionInsights ?? []).find((ins: string) => !/\d+\s*\/\s*100/i.test(ins))
-        return firstInsight ? (
-          <div style={{
-            background: 'var(--accent-subtle)',
-            border: '1px solid var(--border-strong)',
-            borderRadius: '9px', padding: '8px 10px', marginBottom: '10px',
-            display: 'flex', gap: '6px', alignItems: 'flex-start',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-          }}>
-            <Sparkles size={11} style={{ color: 'var(--accent)', marginTop: '1px', flexShrink: 0 }} />
-            <span style={{ fontSize: '11px', color: 'var(--accent)', lineHeight: '1.5', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any, overflow: 'hidden' }}>{firstInsight}</span>
-          </div>
-        ) : null
-      })()}
-
-      {/* Deal value + todos */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        {deal.dealValue ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: '700', color: 'var(--success)' }}>
-            <DollarSign size={11} />
-            {dealValueLabel(deal.dealValue, deal.dealType, deal.recurringInterval, currencySymbol)}
-          </div>
-        ) : <div />}
-        {todos.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--text-tertiary)' }}>
-            <CheckSquare size={11} style={{ color: doneTodos === todos.length ? 'var(--success)' : 'var(--text-tertiary)' }} />
-            {doneTodos}/{todos.length}
+        {score > 0 && (
+          <div style={{ flexShrink: 0, width: '30px', height: '30px', borderRadius: '50%', background: scoreBg, border: `1.5px solid ${scoreColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: '10px', fontWeight: '800', color: scoreColor, lineHeight: 1 }}>{score}</span>
           </div>
         )}
       </div>
 
-      {/* Bottom: view link */}
-      <Link href={`/deals/${deal.id}`} style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '10px', fontSize: '11px', color: 'var(--text-tertiary)', textDecoration: 'none', borderTop: '1px solid var(--border)', paddingTop: '8px', transition: 'color 0.1s' }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--accent)'}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
-      >
-        Open deal <ArrowUpRight size={10} style={{ marginLeft: 'auto' }} />
-      </Link>
+      {/* Bottom row: value + days in stage + momentum dot + alert badge */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        {valueLabel && (
+          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>{valueLabel}</span>
+        )}
+        {daysInStage != null && daysInStage > 0 && (
+          <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginLeft: valueLabel ? '2px' : 0 }}>{daysInStage}d</span>
+        )}
+        <div style={{ flex: 1 }} />
+        {momentum === 'hot' && (
+          <div title="Hot deal" style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#059669', boxShadow: '0 0 5px rgba(5,150,105,0.5)', flexShrink: 0 }} />
+        )}
+        {momentum === 'cooling' && (
+          <div title="Cooling" style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#D97706', flexShrink: 0 }} />
+        )}
+        {(isUrgent || isStale) && (
+          <div
+            title={urgentReason ?? `${staleDays}d without update`}
+            style={{
+              fontSize: '9px', fontWeight: '700', padding: '1px 5px', borderRadius: '4px',
+              background: isUrgent ? 'color-mix(in srgb, var(--danger) 12%, transparent)' : 'color-mix(in srgb, var(--warning) 12%, transparent)',
+              color: isUrgent ? 'var(--danger)' : 'var(--warning)',
+              border: `1px solid ${isUrgent ? 'color-mix(in srgb, var(--danger) 25%, transparent)' : 'color-mix(in srgb, var(--warning) 25%, transparent)'}`,
+            }}
+          >
+            {isUrgent ? '!' : `${staleDays}d`}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
-
 function PipelineSettings({
   open, onClose, config, presets, onUpdate
 }: {
@@ -1897,25 +1759,23 @@ export default function PipelinePage() {
                   >
                     {/* Column header */}
                     <div style={{
-                      display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px',
-                      background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.12)` : 'var(--card-bg)',
-                      backdropFilter: 'blur(16px)',
-                      WebkitBackdropFilter: 'blur(16px)',
-                      border: isDropTarget ? `1px solid ${stage.color}55` : '1px solid var(--card-border)',
-                      borderRadius: '12px',
-                      borderTop: `3px solid ${stage.color}`,
+                      padding: '10px 12px',
+                      background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.08)` : 'var(--card-bg)',
+                      border: isDropTarget ? `1px solid ${stage.color}44` : '1px solid var(--card-border)',
+                      borderRadius: '10px',
+                      borderTop: `2px solid ${stage.color}`,
                       transition: 'background 0.15s, border-color 0.15s',
                     }}>
-                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: stage.color, boxShadow: `0 0 8px ${stage.color}` }} />
-                      <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', flex: 1 }}>{stage.label}</span>
-                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', background: 'var(--accent-subtle)', border: '1px solid var(--border)', padding: '1px 7px', borderRadius: '100px' }}>{stageDeals.length}</span>
-                    </div>
-                    {stageValue > 0 && (
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '0 4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <TrendingUp size={10} />
-                        {currencySymbol}{stageValue.toLocaleString()} annualised
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>{stage.label}</span>
+                        <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)', background: 'var(--surface)', border: '1px solid var(--border)', padding: '1px 6px', borderRadius: '100px' }}>{stageDeals.length}</span>
                       </div>
-                    )}
+                      {stageValue > 0 && (
+                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '3px' }}>
+                          {currencySymbol}{stageValue >= 1_000_000 ? `${(stageValue / 1_000_000).toFixed(1)}m` : stageValue >= 1_000 ? `${Math.round(stageValue / 1_000)}k` : stageValue.toLocaleString()} annualised
+                        </div>
+                      )}
+                    </div>
 
                     {/* Cards */}
                     {isLoading ? (
