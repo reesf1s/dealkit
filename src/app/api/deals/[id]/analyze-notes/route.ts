@@ -174,7 +174,7 @@ After the JSON above, include a signal extraction block wrapped in <extraction><
   "decision_timeline": "Q2 2026" or null,
   "next_step": "description of next action" or null,
   "competitors_mentioned": ["name1", "name2"],
-  "objections": [{"theme": "budget", "text": "exact quote or paraphrase"}],
+  "objections": [{"theme": "budget", "text": "exact quote or paraphrase", "severity": "high"}],
   "positive_signals": ["signal1", "signal2"],
   "negative_signals": ["signal1"],
   "stakeholders_mentioned": [{"name": "John", "role": "CEO", "functional_area": "executive"}],
@@ -185,7 +185,7 @@ After the JSON above, include a signal extraction block wrapped in <extraction><
 }
 </extraction>
 
-For objections, classify each into EXACTLY one theme:
+For objections, classify each into EXACTLY one theme and assign a severity:
 - "budget": price concerns, cost objections, ROI questions, affordability
 - "timing": not now, too early, waiting for something, seasonality
 - "authority": decision maker not involved, committee approval needed, no sign-off
@@ -193,7 +193,8 @@ For objections, classify each into EXACTLY one theme:
 - "value": unclear benefit, not convinced of need, feature gaps
 - "technical": IT concerns, security, compliance, data concerns
 - "integration": specific integration requirements (Salesforce, HubSpot, etc.)
-- "other": anything that doesn't fit the above` }],
+- "other": anything that doesn't fit the above
+Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/easily addressed.` }],
       model: 'claude-sonnet-4-6', max_tokens: 2500,
     })
     // Strip markdown fences and any leading/trailing text before the JSON object

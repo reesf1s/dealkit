@@ -462,6 +462,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
       lostReason: dealLogs.lostReason,
       meetingNotes: dealLogs.meetingNotes,
       intentSignals: dealLogs.intentSignals,
+      outcome: dealLogs.outcome,
     })
     .from(dealLogs)
     .where(eq(dealLogs.workspaceId, workspaceId))
@@ -495,7 +496,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
     }
   }
 
-  const activeDeals = deals.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+  const activeDeals = deals.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost' && d.outcome !== 'won' && d.outcome !== 'lost')
 
   // ── Extract text signals for ALL deals upfront (used for ML features and signal summaries) ──
   const signalMap = new Map<string, TextSignals>()
@@ -798,7 +799,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
   // ── Tier 2: Objection → Win Condition Mapping ─────────────────────────────
   // For risk themes that appear in CLOSED deals, compute how often the deal still won.
   // "We had [budget concern] on 6 deals and still closed 4 of them" = proven solvable.
-  const closedDeals = deals.filter(d => d.stage === 'closed_won' || d.stage === 'closed_lost')
+  const closedDeals = deals.filter(d => d.stage === 'closed_won' || d.stage === 'closed_lost' || d.outcome === 'won' || d.outcome === 'lost')
   const objectionWinMap: NonNullable<WorkspaceBrain['objectionWinMap']> = []
   if (closedDeals.length >= 4) {
     for (const theme of riskWords) {
@@ -1233,8 +1234,8 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
   }
 
   // ── Compounding intelligence: Win/Loss analysis from closed deal history ────
-  const wonDeals  = deals.filter(d => d.stage === 'closed_won')
-  const lostDeals = deals.filter(d => d.stage === 'closed_lost')
+  const wonDeals  = deals.filter(d => d.stage === 'closed_won'  || d.outcome === 'won')
+  const lostDeals = deals.filter(d => d.stage === 'closed_lost' || d.outcome === 'lost')
   const totalClosed = wonDeals.length + lostDeals.length
 
   let winLossIntel: WorkspaceBrain['winLossIntel'] | undefined

@@ -247,7 +247,11 @@ function ModelGrid({ trainingSize, brainData }: { trainingSize: number; brainDat
       return { status: 'active', output: 'Active — learning from your deals' }
     }
     if (trainingSize >= Math.floor(model.activatesAt * 0.6)) {
-      return { status: 'warming', output: `Warming up — need ${model.activatesAt - trainingSize} more deals` }
+      const needed = model.activatesAt - trainingSize
+      const wlData = (brainData as { winLossIntel?: { lossCount?: number } } | null)?.winLossIntel
+      const lossesNeeded = Math.max(0, Math.round(model.activatesAt * 0.3) - (wlData?.lossCount ?? 0))
+      const lossNote = lossesNeeded > 0 ? `, incl. ${lossesNeeded} loss${lossesNeeded !== 1 ? 'es' : ''}` : ''
+      return { status: 'warming', output: `Warming up — need ${needed} more deal${needed !== 1 ? 's' : ''}${lossNote}` }
     }
     return { status: 'locked', output: `Locked — need ${model.activatesAt}+ deals` }
   }
@@ -684,7 +688,14 @@ export default function ModelsPage() {
               <div style={{ textAlign: 'center', padding: '16px 8px 8px', color: 'var(--text-tertiary)', fontSize: '13px' }}>
                 <Lock size={28} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.3 }} />
                 <div style={{ fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' }}>Close 10+ deals to activate</div>
-                <div style={{ fontSize: '11px' }}>You have {trainingSize} deal{trainingSize !== 1 ? 's' : ''} — need {Math.max(0, 10 - trainingSize)} more</div>
+                <div style={{ fontSize: '11px' }}>
+                  {(() => {
+                    const needed = Math.max(0, 10 - trainingSize)
+                    const lossesNeeded = Math.max(0, 4 - (wl?.lossCount ?? 0))
+                    if (needed === 0) return 'Almost there — rebuild to activate'
+                    return `Need ${needed} more closed deal${needed !== 1 ? 's' : ''}${lossesNeeded > 0 ? `, including at least ${lossesNeeded} loss${lossesNeeded !== 1 ? 'es' : ''}` : ''}`
+                  })()}
+                </div>
               </div>
               <MilestoneRoadmap trainingSize={trainingSize} />
             </>

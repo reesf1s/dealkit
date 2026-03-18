@@ -83,6 +83,27 @@ export async function GET() {
       lastLog = (logResult as unknown as Record<string, unknown>[])[0] ?? null
     } catch { /* table may not exist yet */ }
 
+    // Signal extraction stats — count objections with theme field
+    let objectionsWithThemes = 0
+    let totalObjections = 0
+    try {
+      const signalsResult = await db.execute(sql`
+        SELECT note_signals_json
+        FROM deal_logs
+        WHERE workspace_id = ${workspaceId}
+          AND note_signals_json IS NOT NULL
+      `)
+      const rows = signalsResult as unknown as { note_signals_json: string }[]
+      for (const row of rows) {
+        try {
+          const parsed = JSON.parse(row.note_signals_json)
+          const objections = parsed.objections ?? []
+          totalObjections += objections.length
+          objectionsWithThemes += objections.filter((o: Record<string, unknown>) => o.theme && typeof o.theme === 'string').length
+        } catch { /* skip malformed */ }
+      }
+    } catch { /* non-fatal */ }
+
     const bugCount = stageWonOutcomeNull.length + stageLostOutcomeNull.length
 
     let diagnosis: string
@@ -95,6 +116,17 @@ export async function GET() {
     } else {
       diagnosis = `OK: ${won} won deal(s) and ${lost} lost deal(s). Brain is current.`
     }
+
+    // Model status per model (based on training size)
+    const trainingSize = (brainData?.training_size as number | null) ?? 0
+    const modelStatuses = [
+      { name: 'Win Probability', activatesAt: 10, status: trainingSize >= 10 ? 'active' : trainingSize >= 6 ? 'warming' : 'locked' },
+      { name: 'Deal Archetypes', activatesAt: 10, status: trainingSize >= 10 ? 'active' : trainingSize >= 6 ? 'warming' : 'locked' },
+      { name: 'Objection Playbook', activatesAt: 10, status: trainingSize >= 10 ? 'active' : trainingSize >= 6 ? 'warming' : 'locked' },
+      { name: 'Close Date Prediction', activatesAt: 15, status: trainingSize >= 15 ? 'active' : trainingSize >= 9 ? 'warming' : 'locked' },
+      { name: 'Rep Benchmarks', activatesAt: 20, status: trainingSize >= 20 ? 'active' : trainingSize >= 12 ? 'warming' : 'locked' },
+      { name: 'Competitive Intel', activatesAt: 20, status: trainingSize >= 20 ? 'active' : trainingSize >= 12 ? 'warming' : 'locked' },
+    ]
 
     return NextResponse.json({
       workspace_id: workspaceId,
@@ -111,6 +143,12 @@ export async function GET() {
       },
       brain: brainData,
       last_rebuild_log: lastLog,
+      signal_extraction: {
+        total_objections: totalObjections,
+        objections_with_themes: objectionsWithThemes,
+        theme_coverage_pct: totalObjections > 0 ? Math.round((objectionsWithThemes / totalObjections) * 100) : null,
+      },
+      model_status: modelStatuses,
       diagnosis,
       fix: bugCount > 0
         ? 'POST /api/brain to trigger a rebuild — the backfill in _doRebuildWorkspaceBrain will set outcome for all affected deals.'

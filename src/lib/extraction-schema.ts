@@ -8,7 +8,8 @@ export const NoteExtractionSchema = z.object({
   competitors_mentioned: z.array(z.string()).default([]),
   objections: z.array(z.object({
     theme: z.string(),
-    text: z.string()
+    text: z.string(),
+    severity: z.enum(['high', 'medium', 'low']).default('medium'),
   })).default([]),
   positive_signals: z.array(z.string()).default([]),
   negative_signals: z.array(z.string()).default([]),
@@ -43,7 +44,7 @@ Please return a corrected JSON object that exactly matches this schema:
   "decision_timeline": string | null,
   "next_step": string | null,
   "competitors_mentioned": string[],
-  "objections": [{"theme": string, "text": string}],
+  "objections": [{"theme": string, "text": string, "severity": "high"|"medium"|"low"}],
   "positive_signals": string[],
   "negative_signals": string[],
   "stakeholders_mentioned": [{"name": string, "role"?: string, "functional_area"?: string}],

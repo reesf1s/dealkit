@@ -167,7 +167,15 @@ function Skeleton() {
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────────
-function EmptyState({ totalDeals }: { totalDeals: number }) {
+function EmptyState({ totalDeals, winCount, lossCount }: { totalDeals: number; winCount: number; lossCount: number }) {
+  const needed = Math.max(0, 10 - totalDeals)
+  // For a balanced model we want at least 30% losses (min 3 out of 10)
+  const winsNeeded = Math.max(0, 6 - winCount)
+  const lossesNeeded = Math.max(0, 4 - lossCount)
+  const thresholdMsg = needed > 0
+    ? `Need ${needed} more closed deal${needed !== 1 ? 's' : ''}${lossesNeeded > 0 ? `, including at least ${lossesNeeded} loss${lossesNeeded !== 1 ? 'es' : ''}` : winsNeeded > 0 ? `, including at least ${winsNeeded} win${winsNeeded !== 1 ? 's' : ''}` : ''}.`
+    : 'Almost there — rebuild the brain to activate.'
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', maxWidth: '800px' }}>
       {/* Header */}
@@ -194,7 +202,7 @@ function EmptyState({ totalDeals }: { totalDeals: number }) {
           </div>
           <ProgressBar current={totalDeals} total={10} />
           <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
-            Currently: {totalDeals} of 10 deals needed.
+            {thresholdMsg} ({winCount} win{winCount !== 1 ? 's' : ''}, {lossCount} loss{lossCount !== 1 ? 'es' : ''} so far.)
           </p>
         </div>
       </div>
@@ -294,7 +302,7 @@ export default function PlaybookPage() {
   const hasEnoughData = totalDeals >= 10 || winFactors.length > 0
 
   if (!hasEnoughData) {
-    return <EmptyState totalDeals={totalDeals} />
+    return <EmptyState totalDeals={totalDeals} winCount={wl?.winCount ?? 0} lossCount={wl?.lossCount ?? 0} />
   }
 
   // Calibration data
