@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 
 import useSWR, { mutate } from 'swr'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useSidebar } from '@/components/layout/SidebarContext'
 import {
   Plus, TrendingUp, DollarSign, Sparkles,
@@ -11,8 +11,8 @@ import {
   Star, AlertTriangle, Clock, Calendar,
   Settings, Edit, X, Trash2, Check,
   Kanban, List, ChevronUp, ChevronDown,
+  ChevronLeft, ChevronRight, Send, Home,
 } from 'lucide-react'
-import { PageTabs } from '@/components/shared/PageTabs'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -574,6 +574,251 @@ function PipelineSettings({
   )
 }
 
+// ── Calendar View ────────────────────────────────────────────────────────────
+type CalEvent = {
+  id: string
+  title: string
+  subtitle: string
+  date: Date
+  dealId: string
+  type: 'close' | 'contract_start' | 'contract_end' | 'follow_up' | 'urgent'
+}
+
+function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
+  const today = new Date()
+  const [month, setMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
+  const [selectedDay, setSelectedDay] = useState<number | null>(null)
+
+  // Build calendar events from deals
+  const events: CalEvent[] = []
+  for (const deal of deals) {
+    if (deal.closeDate) {
+      events.push({
+        id: `${deal.id}-close`,
+        title: deal.prospectCompany,
+        subtitle: 'Close target',
+        date: new Date(deal.closeDate),
+        dealId: deal.id,
+        type: 'close',
+      })
+    }
+    if (deal.contractStartDate) {
+      events.push({
+        id: `${deal.id}-cstart`,
+        title: deal.prospectCompany,
+        subtitle: 'Contract starts',
+        date: new Date(deal.contractStartDate),
+        dealId: deal.id,
+        type: 'contract_start',
+      })
+    }
+    if (deal.contractEndDate) {
+      events.push({
+        id: `${deal.id}-cend`,
+        title: deal.prospectCompany,
+        subtitle: 'Contract renews',
+        date: new Date(deal.contractEndDate),
+        dealId: deal.id,
+        type: 'contract_end',
+      })
+    }
+  }
+  for (const s of (brainData?.staleDeals ?? [])) {
+    const deal = deals.find((d: any) => d.id === s.dealId)
+    if (!deal) continue
+    const baseDate = new Date(deal.updatedAt ?? deal.createdAt)
+    const followUpDate = new Date(baseDate.getTime() + 14 * 86_400_000)
+    events.push({
+      id: `${deal.id}-stale`,
+      title: deal.prospectCompany,
+      subtitle: `Follow up (${s.daysSinceUpdate}d without update)`,
+      date: followUpDate,
+      dealId: deal.id,
+      type: 'follow_up',
+    })
+  }
+  for (const u of (brainData?.urgentDeals ?? [])) {
+    events.push({
+      id: `${u.dealId}-urgent`,
+      title: u.company,
+      subtitle: u.reason,
+      date: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
+      dealId: u.dealId,
+      type: 'urgent',
+    })
+  }
+
+  const eventColor = (type: CalEvent['type']) => {
+    if (type === 'close') return 'var(--danger)'
+    if (type === 'follow_up') return 'var(--warning)'
+    if (type === 'urgent') return 'var(--danger)'
+    if (type === 'contract_start') return 'var(--success)'
+    if (type === 'contract_end') return 'var(--accent)'
+    return 'var(--text-secondary)'
+  }
+
+  const year = month.getFullYear()
+  const mon = month.getMonth()
+  const firstDay = new Date(year, mon, 1).getDay()
+  const daysInMonth = new Date(year, mon + 1, 0).getDate()
+
+  // 6 rows × 7 cols = 42 cells
+  const cells: (number | null)[] = []
+  for (let i = 0; i < firstDay; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d)
+  while (cells.length < 42) cells.push(null)
+
+  const eventsThisMonth = events
+    .filter(e => e.date.getFullYear() === year && e.date.getMonth() === mon)
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+
+  const eventsOnDay = (day: number) =>
+    events.filter(e => e.date.getFullYear() === year && e.date.getMonth() === mon && e.date.getDate() === day)
+
+  const isToday = (day: number) =>
+    day === today.getDate() && mon === today.getMonth() && year === today.getFullYear()
+
+  const monthLabel = month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Calendar card */}
+      <div style={{
+        background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+        border: '1px solid var(--card-border)', borderRadius: '16px', padding: '20px',
+      }}>
+        {/* Month nav */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <button
+            onClick={() => setMonth(new Date(year, mon - 1, 1))}
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 8px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <span style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>{monthLabel}</span>
+          <button
+            onClick={() => setMonth(new Date(year, mon + 1, 1))}
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '6px 8px', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+
+        {/* Day-of-week headers */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px', marginBottom: '4px' }}>
+          {DOW.map(d => (
+            <div key={d} style={{ textAlign: 'center', fontSize: '10px', fontWeight: '600', color: 'var(--text-tertiary)', padding: '4px 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{d}</div>
+          ))}
+        </div>
+
+        {/* Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
+          {cells.map((day, i) => {
+            if (day === null) {
+              return <div key={`empty-${i}`} style={{ height: '52px' }} />
+            }
+            const dayEvents = eventsOnDay(day)
+            const todayCell = isToday(day)
+            const selected = selectedDay === day
+            return (
+              <div
+                key={day}
+                onClick={() => setSelectedDay(selected ? null : day)}
+                style={{
+                  height: '52px', borderRadius: '8px', padding: '6px',
+                  background: todayCell
+                    ? 'var(--accent-subtle)'
+                    : selected
+                      ? 'var(--surface)'
+                      : 'transparent',
+                  border: todayCell
+                    ? '1px solid var(--accent)'
+                    : selected
+                      ? '1px solid var(--border-strong)'
+                      : '1px solid transparent',
+                  cursor: dayEvents.length > 0 ? 'pointer' : 'default',
+                  transition: 'background 0.1s, border-color 0.1s',
+                  display: 'flex', flexDirection: 'column', gap: '3px',
+                }}
+                onMouseEnter={e => { if (!todayCell) (e.currentTarget as HTMLElement).style.background = 'var(--surface)' }}
+                onMouseLeave={e => { if (!todayCell && !selected) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+              >
+                <span style={{
+                  fontSize: '12px', fontWeight: todayCell ? '700' : '500',
+                  color: todayCell ? 'var(--accent)' : 'var(--text-primary)',
+                  lineHeight: 1,
+                }}>{day}</span>
+                {dayEvents.length > 0 && (
+                  <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
+                    {dayEvents.slice(0, 3).map(ev => (
+                      <div key={ev.id} style={{ width: '6px', height: '6px', borderRadius: '50%', background: eventColor(ev.type), flexShrink: 0 }} />
+                    ))}
+                    {dayEvents.length > 3 && (
+                      <span style={{ fontSize: '9px', color: 'var(--text-tertiary)' }}>+{dayEvents.length - 3}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Events this month */}
+      {eventsThisMonth.length > 0 && (
+        <div>
+          <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
+            Events this month
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {eventsThisMonth.map(ev => {
+              const isPast = ev.date < today && !(ev.date.getDate() === today.getDate() && ev.date.getMonth() === today.getMonth() && ev.date.getFullYear() === today.getFullYear())
+              const dateStr = ev.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+              return (
+                <div key={ev.id} style={{
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  padding: '10px 14px',
+                  background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+                  border: '1px solid var(--card-border)', borderRadius: '10px',
+                  opacity: isPast ? 0.5 : 1,
+                  transition: 'opacity 0.1s',
+                }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: eventColor(ev.type), flexShrink: 0 }} />
+                  <Link href={`/deals/${ev.dealId}`} style={{ flex: 1, minWidth: 0, textDecoration: 'none' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.title}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px' }}>{ev.subtitle}</div>
+                  </Link>
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', flexShrink: 0 }}>{dateStr}</div>
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query: `Prep me for ${ev.title} — ${ev.subtitle} on ${dateStr}. Review the deal and tell me what I need to know and do before this date.` } }))}
+                    style={{
+                      flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
+                      padding: '5px 10px', borderRadius: '6px',
+                      background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10))',
+                      border: '1px solid rgba(99,102,241,0.25)',
+                      color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer',
+                    }}
+                  >
+                    <Sparkles size={10} />
+                    Prep
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {eventsThisMonth.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-tertiary)', fontSize: '13px' }}>
+          No events this month. Add close dates, contract dates, or follow-ups to deals to see them here.
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function PipelinePage() {
   const { sidebarWidth } = useSidebar()
   const { data: dealsData, isLoading } = useSWR('/api/deals', fetcher)
@@ -584,6 +829,10 @@ export default function PipelinePage() {
   const presets = configData?.presets ?? []
   const [settingsOpen, setSettingsOpen] = useState(false)
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
+
+  const [view, setView] = useState<'today' | 'board' | 'calendar'>('today')
+  const [aiInput, setAiInput] = useState('')
+  const aiInputRef = useRef<HTMLInputElement>(null)
 
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
@@ -728,56 +977,51 @@ export default function PipelinePage() {
     return items.slice(0, 5)
   })()
 
+  const activeDeals = deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+
+  const dispatchAI = (query: string) => {
+    if (!query.trim()) return
+    window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query } }))
+    setAiInput('')
+  }
+
+  // ── Tab bar ──────────────────────────────────────────────────────────────
+  const tabBarStyle: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    gap: '8px',
+  }
+  const tabGroupStyle: React.CSSProperties = {
+    display: 'flex', gap: '4px',
+  }
+  const tabBtn = (active: boolean): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: '6px',
+    padding: '7px 14px', borderRadius: '8px',
+    fontSize: '12px', fontWeight: '500',
+    cursor: 'pointer', border: 'none', outline: 'none',
+    background: active ? 'var(--accent)' : 'var(--surface)',
+    color: active ? '#fff' : 'var(--text-secondary)',
+    ...(active ? {} : { border: '1px solid var(--border)' }),
+    transition: 'background 0.15s, color 0.15s',
+  })
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0, width: '100%' }}>
 
-      {/* View toggle */}
-      <PageTabs tabs={[
-        { label: 'Board View', href: '/pipeline', icon: Kanban },
-        { label: 'List View',  href: '/deals',    icon: List   },
-      ]} />
-
-      {/* Brain focus bar */}
-      {(urgentCount > 0 || staleCount > 0 || churnCount > 0) && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px',
-          background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: '8px',
-          flexWrap: 'wrap',
-        }}>
-          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginRight: '4px' }}>Focus</span>
-          {urgentCount > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 15%, transparent)', borderRadius: '4px', padding: '2px 8px' }}>
-              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--danger)' }} />
-              {urgentCount} urgent
-            </span>
-          )}
-          {staleCount > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--warning)', background: 'color-mix(in srgb, var(--warning) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--warning) 12%, transparent)', borderRadius: '4px', padding: '2px 8px' }}>
-              <Clock size={9} style={{ color: 'var(--warning)' }} />
-              {staleCount} stale
-            </span>
-          )}
-          {churnCount > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--danger)', background: 'color-mix(in srgb, var(--danger) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 12%, transparent)', borderRadius: '4px', padding: '2px 8px' }}>
-              🔇 {churnCount} going silent
-            </span>
-          )}
-          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginLeft: 'auto' }}>Flagged by Sales Brain · hover for detail</span>
-        </div>
-      )}
-
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <div>
-          <h1 style={{ fontSize: '22px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '4px' }}>
-            Sales Pipeline
-          </h1>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-            {deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost').length} active deals
-            {totalPipeline > 0 && ` · ${dealValueLabel(totalPipeline, undefined, undefined, currencySymbol)} pipeline`}
-            {' · '}
-            <span style={{ color: 'var(--text-tertiary)' }}>Drag cards to move stages</span>
-          </p>
+      {/* Tab bar */}
+      <div style={tabBarStyle}>
+        <div style={tabGroupStyle}>
+          <button style={tabBtn(view === 'today')} onClick={() => setView('today')}>
+            <Home size={13} />
+            Today
+          </button>
+          <button style={tabBtn(view === 'board')} onClick={() => setView('board')}>
+            <Kanban size={13} />
+            Board
+          </button>
+          <button style={tabBtn(view === 'calendar')} onClick={() => setView('calendar')}>
+            <Calendar size={13} />
+            Calendar
+          </button>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
@@ -804,335 +1048,490 @@ export default function PipelinePage() {
         </div>
       </div>
 
-      {/* AI Top Picks */}
-      {topDeals.length > 0 && (
-        <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--card-border)', borderRadius: '14px', padding: '16px 18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-            <div style={{ width: '26px', height: '26px', background: 'var(--accent-subtle)', border: '1px solid var(--border-strong)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Star size={12} style={{ color: 'var(--accent)' }} />
+      {/* ── TODAY VIEW ──────────────────────────────────────────────────────── */}
+      {view === 'today' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+          {/* A. Stats strip */}
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '5px',
+              padding: '5px 12px', borderRadius: '100px',
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)',
+            }}>
+              <Kanban size={11} style={{ color: 'var(--accent)' }} />
+              {activeDeals.length} active
             </div>
-            <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Brain&apos;s Top Picks</span>
-            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Highest ML win probability</span>
+            {totalPipeline > 0 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                padding: '5px 12px', borderRadius: '100px',
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                fontSize: '12px', fontWeight: '500', color: 'var(--text-secondary)',
+              }}>
+                <TrendingUp size={11} style={{ color: 'var(--success)' }} />
+                {dealValueLabel(totalPipeline, undefined, undefined, currencySymbol)} pipeline
+              </div>
+            )}
+            {urgentCount > 0 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                padding: '5px 12px', borderRadius: '100px',
+                background: 'color-mix(in srgb, var(--danger) 8%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)',
+                fontSize: '12px', fontWeight: '600', color: 'var(--danger)',
+              }}>
+                <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--danger)' }} />
+                {urgentCount} urgent
+              </div>
+            )}
+            {staleCount > 0 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                padding: '5px 12px', borderRadius: '100px',
+                background: 'color-mix(in srgb, var(--warning) 6%, transparent)',
+                border: '1px solid color-mix(in srgb, var(--warning) 15%, transparent)',
+                fontSize: '12px', fontWeight: '600', color: 'var(--warning)',
+              }}>
+                <Clock size={11} />
+                {staleCount} stale
+              </div>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            {topDeals.map((deal: any) => {
-              const pendingTodos: any[] = (deal.todos ?? []).filter((t: any) => !t.done)
-              const urgentTodo = pendingTodos[0]
-              // Detect risk signals from insights (look for negative/warning language)
-              // Filter out score-summary insights (e.g. "rates X at 82/100") to avoid showing conflicting scores
-              const riskInsight = (deal.conversionInsights ?? []).find((ins: string) =>
-                /risk|danger|concern|warn|block|stall|compet|objection|overdue|miss|lost|slow|churn|cancel|threat/i.test(ins)
-                && !/rates .+ at \d+\/100/i.test(ins)
-                && !/\d+\/100/i.test(ins)
-              )
-              const topScore = mlMap[deal.id]?.winProb ?? deal.conversionScore ?? 0
-              const scoreColor = topScore >= 70 ? 'var(--success)' : topScore >= 40 ? 'var(--warning)' : 'var(--danger)'
 
-              return (
-                <Link key={deal.id} href={`/deals/${deal.id}`} style={{
-                  flex: '1 1 220px', display: 'flex', flexDirection: 'column', gap: '8px',
-                  padding: '12px 14px',
-                  background: 'var(--accent-subtle)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '10px', textDecoration: 'none',
-                  transition: 'border-color 0.1s',
-                  minWidth: '200px',
-                }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'}
-                >
-                  {/* Top: name + score */}
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.prospectCompany}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                        {configStages.find((s: any) => s.id === deal.stage)?.label ?? deal.stage}
-                        {deal.dealValue && ` · ${dealValueLabel(deal.dealValue, deal.dealType, deal.recurringInterval, currencySymbol)}`}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '17px', fontWeight: '800', color: scoreColor, flexShrink: 0 }}>
-                      {mlMap[deal.id]?.winProb ?? deal.conversionScore}%
-                    </div>
-                  </div>
-
-                  {/* Risk signal */}
-                  {riskInsight && (
-                    <div style={{
-                      display: 'flex', gap: '5px', alignItems: 'flex-start',
-                      padding: '6px 8px', borderRadius: '7px',
-                      background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 18%, transparent)',
-                    }}>
-                      <AlertTriangle size={10} style={{ color: 'var(--danger)', marginTop: '1px', flexShrink: 0 }} />
-                      <span style={{ fontSize: '10px', color: 'var(--danger)', lineHeight: '1.4' }}>{riskInsight}</span>
-                    </div>
-                  )}
-
-                  {/* Urgent to-do */}
-                  {urgentTodo && (
-                    <div style={{
-                      display: 'flex', gap: '5px', alignItems: 'flex-start',
-                      padding: '6px 8px', borderRadius: '7px',
-                      background: 'color-mix(in srgb, var(--warning) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--warning) 18%, transparent)',
-                    }}>
-                      <Clock size={10} style={{ color: 'var(--warning)', marginTop: '1px', flexShrink: 0 }} />
-                      <span style={{ fontSize: '10px', color: 'var(--warning)', lineHeight: '1.4' }}>
-                        {urgentTodo.text}
-                        {pendingTodos.length > 1 && <span style={{ color: 'var(--text-tertiary)', marginLeft: '4px' }}>+{pendingTodos.length - 1} more</span>}
-                      </span>
-                    </div>
-                  )}
-                </Link>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Action Queue — proactive: stale + urgent + declining + recommendations, all one-click */}
-      {actionQueue.length > 0 && (
-        <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--card-border)', borderRadius: '14px', padding: '16px 18px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-            <div style={{ width: '26px', height: '26px', background: 'color-mix(in srgb, var(--warning) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--warning) 25%, transparent)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Zap size={12} style={{ color: 'var(--warning)' }} />
+          {/* B. AI Input Hero */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.06) 100%)',
+            border: '1px solid rgba(99,102,241,0.2)',
+            borderRadius: '16px', padding: '20px 22px',
+          }}>
+            {/* Header row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '6px 12px', borderRadius: '100px',
+                background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.12))',
+                border: '1px solid rgba(99,102,241,0.25)',
+              }}>
+                <Sparkles size={13} style={{ color: 'var(--accent)' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1.2 }}>Sales AI</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '1px' }}>Ask anything about your pipeline</div>
+              </div>
             </div>
-            <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Action Queue</span>
-            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Needs your attention — click Act to ask AI</span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-            {actionQueue.map((item, i) => {
-              const isHigh = item.priority === 'high'
-              const isStale = item.actionType === 'stale'
-              const isRisk = item.actionType === 'risk'
-              const dotColor = isHigh ? 'var(--danger)' : item.priority === 'medium' ? 'var(--warning)' : 'var(--text-tertiary)'
-              const bgColor = isHigh ? 'color-mix(in srgb, var(--danger) 4%, transparent)' : 'var(--accent-subtle)'
-              const borderColor = isHigh ? 'color-mix(in srgb, var(--danger) 12%, transparent)' : 'var(--border)'
-              return (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
-                  background: bgColor, border: `1px solid ${borderColor}`,
-                  borderRadius: '9px',
-                }}>
-                  {/* Priority dot */}
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0, background: dotColor }} />
 
-                  {/* Content — clicking navigates to deal */}
-                  <Link href={`/deals/${item.dealId}`} style={{ flex: 1, minWidth: 0, textDecoration: 'none' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{item.company}</span>
-                      <span style={{
-                        fontSize: '10px', fontWeight: '600', padding: '1px 6px', borderRadius: '4px', flexShrink: 0,
-                        background: isHigh ? 'color-mix(in srgb, var(--danger) 10%, transparent)' : isStale ? 'color-mix(in srgb, var(--warning) 10%, transparent)' : 'var(--accent-subtle)',
-                        color: isHigh ? 'var(--danger)' : isStale ? 'var(--warning)' : 'var(--accent)',
-                        border: `1px solid ${isHigh ? 'color-mix(in srgb, var(--danger) 20%, transparent)' : isStale ? 'color-mix(in srgb, var(--warning) 20%, transparent)' : 'var(--border-strong)'}`,
-                      }}>
-                        {isRisk ? '⚠ ' : isStale ? '⏱ ' : ''}{item.headline}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {item.detail}
-                    </div>
-                  </Link>
-
-                  {/* Act button — opens Ask AI with pre-loaded prompt */}
-                  <button
-                    onClick={e => {
-                      e.stopPropagation()
-                      window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query: item.prompt } }))
-                    }}
-                    style={{
-                      flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
-                      padding: '5px 10px', borderRadius: '6px', border: '1px solid var(--border-strong)',
-                      background: 'var(--surface)', color: 'var(--accent)',
-                      fontSize: '11px', fontWeight: '600', cursor: 'pointer',
-                      transition: 'background 0.1s, border-color 0.1s',
-                    }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--accent-subtle)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)' }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)' }}
-                  >
-                    <Sparkles size={10} />
-                    Act
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Kanban board */}
-      <div style={{ overflowX: 'auto', paddingBottom: '8px', maxWidth: `calc(100vw - ${sidebarWidth}px - 48px)` }}>
-        <div style={{ display: 'flex', gap: '12px', minWidth: 'max-content' }}>
-          {activeStages.map((stage: any) => {
-            const stageDeals = deals.filter((d: any) => d.stage === stage.id)
-            const stageValue = stageDeals.reduce((s: number, d: any) => s + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
-            const isDropTarget = dragOverStage === stage.id && draggedId !== null
-
-            return (
-              <div
-                key={stage.id}
-                style={{ width: '260px', display: 'flex', flexDirection: 'column', gap: '10px' }}
-                onDragOver={e => {
-                  e.preventDefault()
-                  e.dataTransfer.dropEffect = 'move'
-                  setDragOverStage(stage.id)
+            {/* Input row */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                ref={aiInputRef}
+                value={aiInput}
+                onChange={e => setAiInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') dispatchAI(aiInput) }}
+                placeholder="What should I focus on today? Draft a follow-up for Acme..."
+                style={{
+                  flex: 1, padding: '10px 14px',
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(99,102,241,0.25)',
+                  borderRadius: '10px',
+                  color: 'var(--text-primary)', fontSize: '13px', outline: 'none',
+                  backdropFilter: 'blur(8px)',
                 }}
-                onDragLeave={e => {
-                  // Only clear if leaving the column itself (not a child)
-                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                  if (
-                    e.clientX < rect.left || e.clientX > rect.right ||
-                    e.clientY < rect.top || e.clientY > rect.bottom
-                  ) {
-                    setDragOverStage(null)
-                  }
-                }}
-                onDrop={e => {
-                  e.preventDefault()
-                  handleDrop(stage.id)
+              />
+              <button
+                onClick={() => dispatchAI(aiInput)}
+                style={{
+                  flexShrink: 0, display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '10px 16px', borderRadius: '10px',
+                  background: 'linear-gradient(135deg, var(--accent), var(--accent-hover))',
+                  border: 'none', color: '#fff', fontSize: '13px', fontWeight: '600',
+                  cursor: 'pointer', boxShadow: 'var(--shadow-lg)',
                 }}
               >
-                {/* Column header */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px',
-                  background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.12)` : 'var(--card-bg)',
-                  backdropFilter: 'blur(16px)',
-                  WebkitBackdropFilter: 'blur(16px)',
-                  border: isDropTarget ? `1px solid ${stage.color}55` : '1px solid var(--card-border)',
-                  borderRadius: '12px',
-                  borderTop: `3px solid ${stage.color}`,
-                  transition: 'background 0.15s, border-color 0.15s',
-                }}>
-                  <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: stage.color, boxShadow: `0 0 8px ${stage.color}` }} />
-                  <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', flex: 1 }}>{stage.label}</span>
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', background: 'var(--accent-subtle)', border: '1px solid var(--border)', padding: '1px 7px', borderRadius: '100px' }}>{stageDeals.length}</span>
-                </div>
-                {stageValue > 0 && (
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '0 4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <TrendingUp size={10} />
-                    {currencySymbol}{stageValue.toLocaleString()} annualised
-                  </div>
-                )}
+                <Send size={13} />
+                Send
+              </button>
+            </div>
 
-                {/* Cards */}
-                {isLoading ? (
-                  <div style={{ height: '80px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Loading...</div>
-                  </div>
-                ) : stageDeals.length === 0 ? (
-                  <div style={{
-                    height: '80px',
-                    background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.06)` : 'var(--surface)',
-                    border: isDropTarget ? `1px dashed ${stage.color}88` : '1px dashed var(--border)',
-                    borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'background 0.15s, border-color 0.15s',
-                  }}>
-                    <span style={{ fontSize: '11px', color: isDropTarget ? stage.color : 'var(--text-tertiary)' }}>
-                      {isDropTarget ? 'Drop here' : 'No deals'}
-                    </span>
-                  </div>
-                ) : (
-                  stageDeals.map((deal: any) => (
-                    <DealCard
-                      key={deal.id}
-                      deal={deal}
-                      onMoveStage={moveStage}
-                      onDragStart={setDraggedId}
-                      onDragEnd={() => { setDraggedId(null); setDragOverStage(null) }}
-                      isDragging={draggedId === deal.id}
-                      urgentReason={urgentMap[deal.id]}
-                      staleDays={staleMap[deal.id]}
-                      churnRisk={mlMap[deal.id]?.churnRisk}
-                      daysInStage={daysInStageMap[deal.id]}
-                      momentum={momentumMap[deal.id]}
-                      currencySymbol={currencySymbol}
-                      allStages={configStages}
-                    />
-                  ))
-                )}
-
-                {/* Add to stage */}
-                <Link href="/deals" style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                  padding: '9px', background: 'var(--surface)',
-                  border: '1px dashed var(--border)',
-                  borderRadius: '9px', color: 'var(--text-tertiary)', fontSize: '12px', textDecoration: 'none',
-                  transition: 'color 0.1s, border-color 0.1s, background 0.1s',
-                }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLElement).style.color = 'var(--accent)'
-                  ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'
-                  ;(e.currentTarget as HTMLElement).style.background = 'var(--accent-subtle)'
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'
-                  ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
-                  ;(e.currentTarget as HTMLElement).style.background = 'var(--surface)'
-                }}
-                >
-                  <Plus size={12} /> Add deal
-                </Link>
-              </div>
-            )
-          })}
-
-          {/* Won/Lost summary columns */}
-          <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {closedStages.map((s: any) => {
-              const stageId = s.id
-              const stageDeals = deals.filter((d: any) => d.stage === stageId)
-              const val = stageDeals.reduce((sum: number, d: any) => sum + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
-              const isDropTarget = dragOverStage === stageId && draggedId !== null
-
-              return (
-                <div
-                  key={stageId}
+            {/* Quick-action chips */}
+            <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
+              {[
+                'What should I prioritise today?',
+                'Which deals are at risk?',
+                'Summarise my pipeline',
+                actionQueue[0] ? `Help with ${actionQueue[0].company}` : 'Who should I chase this week?',
+              ].map(chip => (
+                <button
+                  key={chip}
+                  onClick={() => dispatchAI(chip)}
                   style={{
-                    padding: '14px',
-                    background: isDropTarget ? `rgba(${hexToRgb(s.color)},0.1)` : 'var(--card-bg)',
-                    backdropFilter: 'blur(16px)',
-                    WebkitBackdropFilter: 'blur(16px)',
-                    border: isDropTarget ? `1px solid ${s.color}55` : `1px solid var(--card-border)`,
-                    borderRadius: '14px',
-                    borderTop: `3px solid ${s.color}`,
-                    transition: 'background 0.15s, border-color 0.15s',
-                    flex: 1,
+                    padding: '5px 12px', borderRadius: '100px',
+                    background: 'rgba(99,102,241,0.08)',
+                    border: '1px solid rgba(99,102,241,0.2)',
+                    color: 'var(--accent)', fontSize: '11px', fontWeight: '500',
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                    transition: 'background 0.1s',
                   }}
-                  onDragOver={e => {
-                    e.preventDefault()
-                    e.dataTransfer.dropEffect = 'move'
-                    setDragOverStage(stageId)
-                  }}
-                  onDragLeave={e => {
-                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-                    if (
-                      e.clientX < rect.left || e.clientX > rect.right ||
-                      e.clientY < rect.top || e.clientY > rect.bottom
-                    ) {
-                      setDragOverStage(null)
-                    }
-                  }}
-                  onDrop={e => {
-                    e.preventDefault()
-                    handleDrop(stageId)
-                  }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.15)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.08)'}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                    <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: s.color, boxShadow: `0 0 8px ${s.color}` }} />
-                    <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{s.label}</span>
-                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', background: 'var(--accent-subtle)', border: '1px solid var(--border)', padding: '1px 7px', borderRadius: '100px', marginLeft: 'auto' }}>{stageDeals.length}</span>
-                  </div>
-                  {val > 0 && <div style={{ fontSize: '18px', fontWeight: '700', color: s.color }}>{currencySymbol}{val.toLocaleString()}</div>}
-                  {stageDeals.length === 0 && (
-                    <div style={{ fontSize: '11px', color: isDropTarget ? s.color : 'var(--text-tertiary)' }}>
-                      {isDropTarget ? 'Drop to close' : 'No deals yet'}
+                  {chip}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* C. Action items */}
+          {actionQueue.length > 0 && (
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
+                Needs your attention
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                {actionQueue.map((item, i) => {
+                  const isHigh = item.priority === 'high'
+                  const isMedium = item.priority === 'medium'
+                  const isStale = item.actionType === 'stale'
+                  const isRisk = item.actionType === 'risk'
+                  const leftBorderColor = isHigh ? 'var(--danger)' : isMedium ? 'var(--warning)' : 'var(--text-tertiary)'
+                  const badgeBg = isHigh
+                    ? 'color-mix(in srgb, var(--danger) 10%, transparent)'
+                    : isStale
+                      ? 'color-mix(in srgb, var(--warning) 10%, transparent)'
+                      : 'var(--accent-subtle)'
+                  const badgeColor = isHigh ? 'var(--danger)' : isStale ? 'var(--warning)' : 'var(--accent)'
+                  const badgeBorder = isHigh
+                    ? 'color-mix(in srgb, var(--danger) 20%, transparent)'
+                    : isStale
+                      ? 'color-mix(in srgb, var(--warning) 20%, transparent)'
+                      : 'var(--border-strong)'
+                  return (
+                    <div key={i} style={{
+                      display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 14px',
+                      background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+                      border: '1px solid var(--card-border)',
+                      borderLeft: `3px solid ${leftBorderColor}`,
+                      borderRadius: '10px',
+                    }}>
+                      {/* Number circle */}
+                      <div style={{
+                        width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0,
+                        background: leftBorderColor,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: '11px', fontWeight: '700', color: '#fff',
+                      }}>
+                        {i + 1}
+                      </div>
+
+                      {/* Content */}
+                      <Link href={`/deals/${item.dealId}`} style={{ flex: 1, minWidth: 0, textDecoration: 'none' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '7px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>{item.company}</span>
+                          <span style={{
+                            fontSize: '10px', fontWeight: '600', padding: '1px 7px', borderRadius: '4px', flexShrink: 0,
+                            background: badgeBg, color: badgeColor,
+                            border: `1px solid ${badgeBorder}`,
+                          }}>
+                            {isRisk ? '⚠ ' : isStale ? '⏱ ' : ''}{item.headline}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.detail}
+                        </div>
+                      </Link>
+
+                      {/* Ask AI button */}
+                      <button
+                        onClick={e => {
+                          e.stopPropagation()
+                          window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query: item.prompt } }))
+                        }}
+                        style={{
+                          flexShrink: 0, display: 'flex', alignItems: 'center', gap: '5px',
+                          padding: '6px 12px', borderRadius: '7px',
+                          background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10))',
+                          border: '1px solid rgba(99,102,241,0.25)',
+                          color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer',
+                          transition: 'background 0.1s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.16))'}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10))'}
+                      >
+                        <Sparkles size={10} />
+                        Ask AI
+                      </button>
                     </div>
-                  )}
-                </div>
-              )
-            })}
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* D. Top picks */}
+          {topDeals.length > 0 && (
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
+                Highest win probability
+              </div>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                {topDeals.map((deal: any) => {
+                  const topScore = mlMap[deal.id]?.winProb ?? deal.conversionScore ?? 0
+                  const scoreColor = topScore >= 70 ? 'var(--success)' : topScore >= 40 ? 'var(--warning)' : 'var(--danger)'
+                  return (
+                    <Link
+                      key={deal.id}
+                      href={`/deals/${deal.id}`}
+                      style={{
+                        flex: '1 1 200px', minWidth: '180px',
+                        display: 'flex', flexDirection: 'column', gap: '6px',
+                        padding: '14px 16px',
+                        background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+                        border: '1px solid var(--card-border)', borderRadius: '12px',
+                        textDecoration: 'none', transition: 'border-color 0.1s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--card-border)'}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {deal.prospectCompany}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                            {configStages.find((s: any) => s.id === deal.stage)?.label ?? deal.stage}
+                            {deal.dealValue && ` · ${dealValueLabel(deal.dealValue, deal.dealType, deal.recurringInterval, currencySymbol)}`}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: '20px', fontWeight: '800', color: scoreColor, flexShrink: 0, lineHeight: 1 }}>
+                          {topScore}%
+                        </div>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* E. Empty state */}
+          {!isLoading && activeDeals.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+              <div style={{ fontSize: '40px', marginBottom: '12px' }}>🚀</div>
+              <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>Start building your pipeline</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>Add your first deal to get AI-powered insights and recommendations.</div>
+              <Link href="/deals" style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                padding: '10px 20px',
+                background: 'linear-gradient(135deg, var(--accent), var(--accent-hover))',
+                borderRadius: '10px', color: '#fff', fontSize: '13px', fontWeight: '600',
+                textDecoration: 'none', boxShadow: 'var(--shadow-lg)',
+              }}>
+                <Plus size={14} /> Add your first deal
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── BOARD VIEW ──────────────────────────────────────────────────────── */}
+      {view === 'board' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Header */}
+          <div>
+            <h1 style={{ fontSize: '22px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '4px' }}>
+              Sales Pipeline
+            </h1>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              {activeDeals.length} active deals
+              {totalPipeline > 0 && ` · ${dealValueLabel(totalPipeline, undefined, undefined, currencySymbol)} pipeline`}
+              {' · '}
+              <span style={{ color: 'var(--text-tertiary)' }}>Drag cards to move stages</span>
+            </p>
+          </div>
+
+          {/* Kanban board */}
+          <div style={{ overflowX: 'auto', paddingBottom: '8px', maxWidth: `calc(100vw - ${sidebarWidth}px - 48px)` }}>
+            <div style={{ display: 'flex', gap: '12px', minWidth: 'max-content' }}>
+              {activeStages.map((stage: any) => {
+                const stageDeals = deals.filter((d: any) => d.stage === stage.id)
+                const stageValue = stageDeals.reduce((s: number, d: any) => s + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
+                const isDropTarget = dragOverStage === stage.id && draggedId !== null
+
+                return (
+                  <div
+                    key={stage.id}
+                    style={{ width: '260px', display: 'flex', flexDirection: 'column', gap: '10px' }}
+                    onDragOver={e => {
+                      e.preventDefault()
+                      e.dataTransfer.dropEffect = 'move'
+                      setDragOverStage(stage.id)
+                    }}
+                    onDragLeave={e => {
+                      // Only clear if leaving the column itself (not a child)
+                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                      if (
+                        e.clientX < rect.left || e.clientX > rect.right ||
+                        e.clientY < rect.top || e.clientY > rect.bottom
+                      ) {
+                        setDragOverStage(null)
+                      }
+                    }}
+                    onDrop={e => {
+                      e.preventDefault()
+                      handleDrop(stage.id)
+                    }}
+                  >
+                    {/* Column header */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px',
+                      background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.12)` : 'var(--card-bg)',
+                      backdropFilter: 'blur(16px)',
+                      WebkitBackdropFilter: 'blur(16px)',
+                      border: isDropTarget ? `1px solid ${stage.color}55` : '1px solid var(--card-border)',
+                      borderRadius: '12px',
+                      borderTop: `3px solid ${stage.color}`,
+                      transition: 'background 0.15s, border-color 0.15s',
+                    }}>
+                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: stage.color, boxShadow: `0 0 8px ${stage.color}` }} />
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', flex: 1 }}>{stage.label}</span>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', background: 'var(--accent-subtle)', border: '1px solid var(--border)', padding: '1px 7px', borderRadius: '100px' }}>{stageDeals.length}</span>
+                    </div>
+                    {stageValue > 0 && (
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', padding: '0 4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <TrendingUp size={10} />
+                        {currencySymbol}{stageValue.toLocaleString()} annualised
+                      </div>
+                    )}
+
+                    {/* Cards */}
+                    {isLoading ? (
+                      <div style={{ height: '80px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Loading...</div>
+                      </div>
+                    ) : stageDeals.length === 0 ? (
+                      <div style={{
+                        height: '80px',
+                        background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.06)` : 'var(--surface)',
+                        border: isDropTarget ? `1px dashed ${stage.color}88` : '1px dashed var(--border)',
+                        borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'background 0.15s, border-color 0.15s',
+                      }}>
+                        <span style={{ fontSize: '11px', color: isDropTarget ? stage.color : 'var(--text-tertiary)' }}>
+                          {isDropTarget ? 'Drop here' : 'No deals'}
+                        </span>
+                      </div>
+                    ) : (
+                      stageDeals.map((deal: any) => (
+                        <DealCard
+                          key={deal.id}
+                          deal={deal}
+                          onMoveStage={moveStage}
+                          onDragStart={setDraggedId}
+                          onDragEnd={() => { setDraggedId(null); setDragOverStage(null) }}
+                          isDragging={draggedId === deal.id}
+                          urgentReason={urgentMap[deal.id]}
+                          staleDays={staleMap[deal.id]}
+                          churnRisk={mlMap[deal.id]?.churnRisk}
+                          daysInStage={daysInStageMap[deal.id]}
+                          momentum={momentumMap[deal.id]}
+                          currencySymbol={currencySymbol}
+                          allStages={configStages}
+                        />
+                      ))
+                    )}
+
+                    {/* Add to stage */}
+                    <Link href="/deals" style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                      padding: '9px', background: 'var(--surface)',
+                      border: '1px dashed var(--border)',
+                      borderRadius: '9px', color: 'var(--text-tertiary)', fontSize: '12px', textDecoration: 'none',
+                      transition: 'color 0.1s, border-color 0.1s, background 0.1s',
+                    }}
+                    onMouseEnter={e => {
+                      (e.currentTarget as HTMLElement).style.color = 'var(--accent)'
+                      ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'
+                      ;(e.currentTarget as HTMLElement).style.background = 'var(--accent-subtle)'
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'
+                      ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
+                      ;(e.currentTarget as HTMLElement).style.background = 'var(--surface)'
+                    }}
+                    >
+                      <Plus size={12} /> Add deal
+                    </Link>
+                  </div>
+                )
+              })}
+
+              {/* Won/Lost summary columns */}
+              <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {closedStages.map((s: any) => {
+                  const stageId = s.id
+                  const stageDeals = deals.filter((d: any) => d.stage === stageId)
+                  const val = stageDeals.reduce((sum: number, d: any) => sum + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
+                  const isDropTarget = dragOverStage === stageId && draggedId !== null
+
+                  return (
+                    <div
+                      key={stageId}
+                      style={{
+                        padding: '14px',
+                        background: isDropTarget ? `rgba(${hexToRgb(s.color)},0.1)` : 'var(--card-bg)',
+                        backdropFilter: 'blur(16px)',
+                        WebkitBackdropFilter: 'blur(16px)',
+                        border: isDropTarget ? `1px solid ${s.color}55` : `1px solid var(--card-border)`,
+                        borderRadius: '14px',
+                        borderTop: `3px solid ${s.color}`,
+                        transition: 'background 0.15s, border-color 0.15s',
+                        flex: 1,
+                      }}
+                      onDragOver={e => {
+                        e.preventDefault()
+                        e.dataTransfer.dropEffect = 'move'
+                        setDragOverStage(stageId)
+                      }}
+                      onDragLeave={e => {
+                        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+                        if (
+                          e.clientX < rect.left || e.clientX > rect.right ||
+                          e.clientY < rect.top || e.clientY > rect.bottom
+                        ) {
+                          setDragOverStage(null)
+                        }
+                      }}
+                      onDrop={e => {
+                        e.preventDefault()
+                        handleDrop(stageId)
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: s.color, boxShadow: `0 0 8px ${s.color}` }} />
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{s.label}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)', background: 'var(--accent-subtle)', border: '1px solid var(--border)', padding: '1px 7px', borderRadius: '100px', marginLeft: 'auto' }}>{stageDeals.length}</span>
+                      </div>
+                      {val > 0 && <div style={{ fontSize: '18px', fontWeight: '700', color: s.color }}>{currencySymbol}{val.toLocaleString()}</div>}
+                      {stageDeals.length === 0 && (
+                        <div style={{ fontSize: '11px', color: isDropTarget ? s.color : 'var(--text-tertiary)' }}>
+                          {isDropTarget ? 'Drop to close' : 'No deals yet'}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ── CALENDAR VIEW ───────────────────────────────────────────────────── */}
+      {view === 'calendar' && (
+        <CalendarView deals={deals} brainData={brainData} />
+      )}
+
       <PipelineSettings
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}

@@ -8,17 +8,16 @@ import {
   LayoutDashboard, Building2, Swords,
   FileText, Settings, LogOut, Search,
   Kanban, ChevronLeft, ChevronRight,
-  X, Brain, Zap, Activity, MessageSquare, Sun, Moon,
+  X, Brain, Zap, Activity, MessageSquare, Sun, Moon, Home,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 import { useTheme } from './ThemeContext'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
-// Nav: Brain-centric — command center + intelligence layers
+// Nav: AI-first — Today (command centre) + visual board + collateral + intel
 const CORE_ITEMS = [
-  { href: '/dashboard',  icon: Activity,        label: 'Overview',     matchPaths: ['/dashboard'] },
-  { href: '/pipeline',   icon: Kanban,          label: 'Pipeline',     matchPaths: ['/pipeline', '/deals'] },
+  { href: '/pipeline',   icon: Home,            label: 'Today',        matchPaths: ['/pipeline', '/deals', '/dashboard'] },
   { href: '/collateral', icon: Zap,             label: 'Collateral',   matchPaths: ['/collateral'] },
 ]
 

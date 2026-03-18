@@ -18,7 +18,7 @@ interface CommandItem {
 }
 
 const ALL_ITEMS: CommandItem[] = [
-  { id: 'dashboard',      label: 'Dashboard',           section: 'navigate', icon: LayoutDashboard, href: '/dashboard',    shortcut: '↩' },
+  { id: 'pipeline',       label: 'Today / Pipeline',     section: 'navigate', icon: LayoutDashboard, href: '/pipeline',     shortcut: '↩' },
   { id: 'competitors',    label: 'Competitors',          section: 'navigate', icon: Swords,          href: '/competitors' },
   { id: 'case-studies',   label: 'Case Studies',         section: 'navigate', icon: BookOpen,         href: '/case-studies' },
   { id: 'deals',          label: 'Deal Log',             section: 'navigate', icon: TrendingUp,       href: '/deals' },
