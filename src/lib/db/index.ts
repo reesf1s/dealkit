@@ -12,10 +12,10 @@ const isSupabase = connectionString.includes('supabase.co') || connectionString.
 const isPooler = connectionString.includes('pooler.supabase.com') || connectionString.includes(':6543/')
 
 const client = postgres(connectionString, {
-  // Serverless: keep pool small — each function instance has its own pool.
-  // Supabase free tier allows ~15 total; paid tiers allow more but pgBouncer
-  // handles multiplexing. Large pools cause "too many connections" under load.
-  max: isPooler ? 1 : 3,
+  // Serverless: pool size balanced for concurrency vs connection limits.
+  // pgBouncer (pooler) multiplexes to Postgres — 5 app connections is fine.
+  // Direct connections count against Supabase's limit — 10 is safe on pro.
+  max: isPooler ? 5 : 10,
   idle_timeout: 20,
   connect_timeout: 10,
   // Kill runaway queries after 55 seconds — prevents connection starvation
