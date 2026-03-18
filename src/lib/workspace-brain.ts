@@ -215,6 +215,8 @@ export interface WorkspaceBrain {
       sampleSize: number
     }[]
   }
+  // ── One-time backfill flag — set after extraction backfill runs ────────────
+  extractionBackfillDone?: boolean
 }
 
 export interface PipelineHealthIndex {
@@ -428,6 +430,112 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
   return promise
 }
 
+// ── One-time extraction backfill ──────────────────────────────────────────────
+// Runs on the first brain rebuild for any workspace that has deals with meeting
+// notes but no structured note_signals_json. Uses the same extraction prompt as
+// analyze-notes/route.ts but processes deals in a batch without blocking the UI.
+async function _runExtractionBackfill(workspaceId: string): Promise<{ processed: number; skipped: number; errors: number }> {
+  const stats = { processed: 0, skipped: 0, errors: 0 }
+  try {
+    // Ensure column exists before querying
+    try { await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS note_signals_json text`) } catch { /* exists */ }
+
+    // Find deals that have meeting notes but no extraction yet
+    const rows = await db.execute<{ id: string; meeting_notes: string | null; note_signals_json: string | null }>(sql`
+      SELECT id, meeting_notes, note_signals_json
+      FROM deal_logs
+      WHERE workspace_id = ${workspaceId}
+        AND meeting_notes IS NOT NULL
+        AND meeting_notes != ''
+        AND (note_signals_json IS NULL OR note_signals_json = '')
+      LIMIT 50
+    `)
+
+    const dealsToProcess = Array.isArray(rows) ? rows : (rows as any).rows ?? []
+    if (dealsToProcess.length === 0) return stats
+
+    const Anthropic = (await import('@anthropic-ai/sdk')).default
+    const { NoteExtractionSchema } = await import('@/lib/extraction-schema')
+    const anthropic = new Anthropic()
+
+    for (const deal of dealsToProcess) {
+      try {
+        const notes = deal.meeting_notes ?? ''
+        if (!notes.trim()) { stats.skipped++; continue }
+
+        // Run the extraction block only (no full analyze-notes prompt — lighter call)
+        const msg = await anthropic.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1024,
+          messages: [{
+            role: 'user',
+            content: `Extract structured signals from these B2B sales meeting notes. Return ONLY a JSON object matching the schema exactly — no markdown, no explanation.
+
+MEETING NOTES:
+${notes.slice(0, 4000)}
+
+Return this JSON:
+{
+  "champion_signal": boolean,
+  "budget_signal": "confirmed" | "discussed" | "concern" | "not_mentioned",
+  "decision_timeline": string | null,
+  "next_step": string | null,
+  "competitors_mentioned": string[],
+  "objections": [{"theme": "budget"|"timing"|"authority"|"competitor"|"value"|"technical"|"integration"|"other", "text": string, "severity": "high"|"medium"|"low"}],
+  "positive_signals": string[],
+  "negative_signals": string[],
+  "stakeholders_mentioned": [{"name": string, "role": string, "functional_area": string}],
+  "product_gaps": [{"gap": string, "severity": "high"|"medium"|"low", "quote": string}],
+  "sentiment_score": number (0.0-1.0),
+  "urgency_signals": string[],
+  "user_verified": false
+}`
+          }],
+        })
+
+        const rawText = (msg.content[0] as any)?.text?.trim() ?? ''
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/)
+        if (!jsonMatch) { stats.errors++; continue }
+
+        const parsed = NoteExtractionSchema.safeParse(JSON.parse(jsonMatch[0]))
+        if (!parsed.success) { stats.errors++; continue }
+
+        // Store extraction and update deal fields
+        const extraction = { ...parsed.data, user_verified: false }
+        const updateFields: Record<string, unknown> = {
+          note_signals_json: JSON.stringify(extraction),
+        }
+
+        // Update intent signals if not already set
+        const intentSignals = {
+          championStatus: extraction.champion_signal ? 'confirmed' : 'none',
+          budgetStatus: extraction.budget_signal === 'confirmed' ? 'approved'
+            : extraction.budget_signal === 'discussed' ? 'awaiting'
+            : extraction.budget_signal === 'concern' ? 'blocked'
+            : 'not_discussed',
+          decisionTimeline: extraction.decision_timeline ?? null,
+          nextMeetingBooked: false,
+        }
+        updateFields.intentSignals = intentSignals
+
+        await db.execute(sql`
+          UPDATE deal_logs
+          SET note_signals_json = ${updateFields.note_signals_json as string},
+              intent_signals = ${JSON.stringify(intentSignals)}::jsonb
+          WHERE id = ${deal.id}
+            AND workspace_id = ${workspaceId}
+            AND (note_signals_json IS NULL OR note_signals_json = '')
+        `)
+
+        stats.processed++
+      } catch { stats.errors++ }
+    }
+  } catch (e) {
+    console.warn('[brain-backfill] extraction backfill error:', (e as Error)?.message)
+  }
+  return stats
+}
+
 async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceBrain> {
   const rebuildStartMs = Date.now()
   await ensureBrainColumn()
@@ -458,6 +566,18 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
   const previousDeals = new Map<string, DealSnapshot>()
   if (previousBrain?.deals) {
     for (const d of previousBrain.deals) previousDeals.set(d.id, d)
+  }
+
+  // ── One-time extraction backfill — runs on first rebuild that hasn't done it ─
+  // After running, the flag is stored in the brain JSON so it won't run again.
+  // Safe: gated by note_signals_json IS NULL so it only processes unextracted deals.
+  let extractionBackfillDone = previousBrain?.extractionBackfillDone ?? false
+  if (!extractionBackfillDone) {
+    const backfillStats = await _runExtractionBackfill(workspaceId)
+    extractionBackfillDone = true
+    if (backfillStats.processed > 0 || backfillStats.errors === 0) {
+      console.log(`[brain] extraction backfill: ${backfillStats.processed} processed, ${backfillStats.skipped} skipped, ${backfillStats.errors} errors`)
+    }
   }
 
   const deals = await db
@@ -1956,6 +2076,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
     collateralEffectiveness: collateralEffectiveness.length > 0 ? collateralEffectiveness : undefined,
     globalPrior:            globalPriorMeta,
     winPlaybook,
+    extractionBackfillDone,
   }
 
   await db.execute(sql`
