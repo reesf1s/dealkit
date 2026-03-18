@@ -67,7 +67,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     await ensureDealColumns()
     const body = await req.json()
     const updateData: Record<string, unknown> = { updatedAt: new Date() }
-    const fields = ['dealName','prospectCompany','prospectName','prospectTitle','contacts','description','dealValue','stage','competitors','notes','meetingNotes','aiSummary','conversionScore','conversionInsights','dealRisks','todos','nextSteps','closeDate','wonDate','lostDate','lostReason','dealType','recurringInterval','kanbanOrder','projectPlan','links','parentDealId','expansionType','contractStartDate','contractEndDate','successCriteria','successCriteriaTodos','conversionScorePinned']
+    const fields = ['dealName','prospectCompany','prospectName','prospectTitle','contacts','description','dealValue','stage','competitors','notes','meetingNotes','aiSummary','conversionScore','conversionInsights','dealRisks','todos','nextSteps','closeDate','wonDate','lostDate','lostReason','dealType','recurringInterval','kanbanOrder','projectPlan','links','parentDealId','expansionType','contractStartDate','contractEndDate','successCriteria','successCriteriaTodos','conversionScorePinned','note_signals_json']
     // Date fields need explicit conversion — Drizzle expects Date objects for timestamptz
     const dateFields = new Set(['closeDate', 'wonDate', 'lostDate', 'contractStartDate', 'contractEndDate'])
     for (const f of fields) {

@@ -355,6 +355,10 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
   const [summaryDraft, setSummaryDraft] = useState('')
   const [resetAIConfirm, setResetAIConfirm] = useState(false)
   const [savingAI, setSavingAI] = useState(false)
+  // Extraction confirmation state
+  const [analysing, setAnalysing] = useState(false)
+  const [lastExtraction, setLastExtraction] = useState<{ extraction: any; analysedAt: string } | null>(null)
+  const [verifyingExtraction, setVerifyingExtraction] = useState(false)
 
   const patchDeal = async (payload: Record<string, unknown>) => {
     setSavingAI(true)
@@ -402,6 +406,51 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
       onUpdate()
     } finally {
       setClearing(false)
+    }
+  }
+
+  // Direct note analysis — calls analyze-notes API and shows extraction confirmation card
+  const analyseNotes = async () => {
+    if (!updateText.trim()) return
+    setAnalysing(true)
+    try {
+      const res = await fetch(`/api/deals/${dealId}/analyze-notes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meetingNotes: updateText.trim() }),
+      })
+      const json = await res.json()
+      if (json.data) {
+        const extraction = json.data.parsed
+        // Try to read the note_signals_json from updated deal
+        const signals = json.data.deal?.note_signals_json
+          ? (typeof json.data.deal.note_signals_json === 'string' ? JSON.parse(json.data.deal.note_signals_json) : json.data.deal.note_signals_json)
+          : null
+        setLastExtraction({ extraction: { ...extraction, signals }, analysedAt: new Date().toISOString() })
+        setUpdateText('')
+        onUpdate()
+      }
+    } finally {
+      setAnalysing(false)
+    }
+  }
+
+  // Mark extraction as verified
+  const confirmExtraction = async () => {
+    if (!lastExtraction) return
+    setVerifyingExtraction(true)
+    try {
+      // Store user_verified: true in note_signals_json
+      const existing = deal?.note_signals_json
+        ? (typeof deal.note_signals_json === 'string' ? JSON.parse(deal.note_signals_json) : deal.note_signals_json)
+        : {}
+      await fetch(`/api/deals/${dealId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note_signals_json: JSON.stringify({ ...existing, user_verified: true }) }),
+      })
+      setLastExtraction(null)
+      onUpdate()
+    } finally {
+      setVerifyingExtraction(false)
     }
   }
 
@@ -505,19 +554,19 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
         )
       })()}
 
-      {/* Add update — routes through AI copilot */}
+      {/* Add update */}
       <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '14px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
           <Sparkles size={13} color="var(--accent)" />
           <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
             {deal?.meetingNotes ? 'Add Update' : 'Log First Update'}
           </span>
-          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>· AI will ask if anything is unclear</span>
+          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>· AI extracts signals automatically</span>
         </div>
         <textarea
           value={updateText}
           onChange={e => setUpdateText(e.target.value)}
-          placeholder="Describe what happened — Tommy confirmed the call, they pushed the timeline, etc."
+          placeholder="Paste meeting notes or describe what happened — AI will extract signals, risks, and next steps."
           rows={6}
           style={{
             width: '100%', resize: 'vertical', background: 'var(--input-bg)',
@@ -529,15 +578,11 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
           onBlur={e => (e.target.style.borderColor = 'var(--border)')}
           onKeyDown={e => {
             if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-              if (updateText.trim()) {
-                sendToCopilot(`Update for ${deal?.prospectCompany ?? 'this deal'}:\n\n${updateText.trim()}`)
-                setUpdateText('')
-              }
+              analyseNotes()
             }
           }}
         />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>⌘↵ to send</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', gap: '8px', alignItems: 'center' }}>
           <button
             onClick={() => {
               if (!updateText.trim()) return
@@ -547,19 +592,132 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
             disabled={!updateText.trim()}
             style={{
               display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '8px 16px', borderRadius: '8px',
-              background: updateText.trim() ? 'linear-gradient(135deg, #6366F1, #7C3AED)' : 'var(--surface)',
-              border: updateText.trim() ? 'none' : '1px solid var(--border)',
-              color: updateText.trim() ? '#fff' : 'var(--text-tertiary)',
-              fontSize: '13px', fontWeight: '600', cursor: updateText.trim() ? 'pointer' : 'not-allowed',
-              transition: 'all 0.15s',
+              padding: '7px 12px', borderRadius: '7px',
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500',
+              cursor: updateText.trim() ? 'pointer' : 'not-allowed', opacity: updateText.trim() ? 1 : 0.5,
             }}
           >
-            <Sparkles size={12} />
-            Send to AI →
+            <Sparkles size={11} />
+            Ask AI copilot
           </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>⌘↵ to analyse</span>
+            <button
+              onClick={analyseNotes}
+              disabled={!updateText.trim() || analysing}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '8px 16px', borderRadius: '8px',
+                background: updateText.trim() && !analysing ? 'linear-gradient(135deg, #6366F1, #7C3AED)' : 'var(--surface)',
+                border: updateText.trim() && !analysing ? 'none' : '1px solid var(--border)',
+                color: updateText.trim() && !analysing ? '#fff' : 'var(--text-tertiary)',
+                fontSize: '13px', fontWeight: '600', cursor: updateText.trim() && !analysing ? 'pointer' : 'not-allowed',
+                transition: 'all 0.15s',
+              }}
+            >
+              {analysing ? <><RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> Analysing…</> : <><Zap size={12} /> Analyse Notes</>}
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Extraction confirmation card — shown after analyse-notes returns */}
+      {lastExtraction && (() => {
+        const ex = lastExtraction.extraction
+        const signals = ex.signals
+        const champStatus = ex.intentSignals?.championStatus ?? (signals?.champion_signal ? 'confirmed' : 'none')
+        const budgetStatus = ex.intentSignals?.budgetStatus ?? signals?.budget_signal ?? 'not_mentioned'
+        const timeline = ex.intentSignals?.decisionTimeline ?? signals?.decision_timeline ?? null
+        const nextStep = signals?.next_step ?? null
+        const competitors = (ex.competitors ?? []).length > 0 ? ex.competitors : (signals?.competitors_mentioned ?? [])
+        const objections = signals?.objections ?? []
+        const gaps = ex.productGaps ?? []
+        const sentiment = signals?.sentiment_score ?? null
+        const champLabel = champStatus === 'confirmed' ? '✓ Confirmed' : champStatus === 'suspected' ? '~ Likely' : '— Not detected'
+        const champColor = champStatus === 'confirmed' ? 'var(--success)' : champStatus === 'suspected' ? 'var(--warning)' : 'var(--text-tertiary)'
+        const budgetLabel = budgetStatus === 'approved' ? '✓ Confirmed' : budgetStatus === 'awaiting' ? '~ Awaiting approval' : budgetStatus === 'blocked' ? '⚠ Blocked' : '— Not discussed'
+        const budgetColor = budgetStatus === 'approved' ? 'var(--success)' : budgetStatus === 'blocked' ? 'var(--danger)' : budgetStatus === 'awaiting' ? 'var(--warning)' : 'var(--text-tertiary)'
+        return (
+          <div style={{ background: 'color-mix(in srgb, var(--accent) 5%, var(--card-bg))', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', borderRadius: '12px', padding: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                <CheckCircle size={14} color="var(--accent)" />
+                <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Note analysed</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>— {new Date(lastExtraction.analysedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              <button onClick={() => setLastExtraction(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', fontSize: '12px', padding: '2px 6px' }}>✕</button>
+            </div>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '8px' }}>Extracted signals</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Champion</span>
+                <span style={{ color: champColor, fontWeight: '600' }}>{champLabel}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Budget</span>
+                <span style={{ color: budgetColor, fontWeight: '600' }}>{budgetLabel}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Timeline</span>
+                <span style={{ color: timeline ? 'var(--text-primary)' : 'var(--text-tertiary)', fontWeight: '600' }}>{timeline ?? '— Not mentioned'}</span>
+              </div>
+              {nextStep && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Next step</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: '600', maxWidth: '200px', textAlign: 'right' }}>&ldquo;{nextStep}&rdquo;</span>
+                </div>
+              )}
+              {competitors.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Competitors</span>
+                  <span style={{ color: '#3B82F6', fontWeight: '600' }}>{competitors.join(', ')}</span>
+                </div>
+              )}
+              {objections.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Objections</span>
+                  <span style={{ color: 'var(--warning)', fontWeight: '600' }}>{objections.map((o: any) => o.theme).join(', ')} ({objections.length})</span>
+                </div>
+              )}
+              {gaps.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Product gaps</span>
+                  <span style={{ color: 'var(--danger)', fontWeight: '600' }}>{gaps.map((g: any) => g.title).join(', ')}</span>
+                </div>
+              )}
+              {sentiment !== null && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Sentiment</span>
+                  <span style={{ color: sentiment >= 0.6 ? 'var(--success)' : sentiment <= 0.4 ? 'var(--danger)' : 'var(--warning)', fontWeight: '600' }}>
+                    {sentiment >= 0.6 ? 'Positive' : sentiment <= 0.4 ? 'Negative' : 'Neutral'} ({sentiment.toFixed(2)})
+                  </span>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={confirmExtraction}
+                disabled={verifyingExtraction}
+                style={{
+                  flex: 2, padding: '8px 14px', borderRadius: '8px',
+                  background: 'var(--accent)', border: 'none', color: '#fff',
+                  fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                }}
+              >
+                {verifyingExtraction ? <><RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</> : <><Check size={12} /> Confirm & mark verified</>}
+              </button>
+              <button
+                onClick={() => setLastExtraction(null)}
+                style={{ flex: 1, padding: '8px 14px', borderRadius: '8px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* AI Results */}
       {(deal?.aiSummary || (deal?.dealRisks as string[])?.length > 0) && (

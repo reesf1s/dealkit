@@ -1,13 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { CheckCircle, XCircle, X, ChevronDown } from 'lucide-react'
+import { CheckCircle, XCircle, ChevronDown } from 'lucide-react'
 
 interface WinLossModalProps {
   deal: { id: string; prospectCompany: string; dealName?: string; stage?: string }
   outcome: 'closed_won' | 'closed_lost'
   onSubmit: (data: WinLossData) => void
-  onSkip: () => void
+  onSkip?: () => void
 }
 
 export interface WinLossData {
@@ -47,6 +47,9 @@ export default function WinLossModal({ deal, outcome, onSubmit, onSkip }: WinLos
     championPresent: 'unknown',
     notes: '',
   })
+  const [submitted, setSubmitted] = useState(false)
+  const primaryReasonMissing = submitted && !data.primaryReason
+  const competitorMissing = submitted && !isWon && data.primaryReason === 'Lost to competitor' && !data.competitor
 
   const accentColor = isWon ? 'var(--success)' : 'var(--danger)'
   const accentBg = isWon ? 'color-mix(in srgb, var(--success) 8%, transparent)' : 'color-mix(in srgb, var(--danger) 8%, transparent)'
@@ -77,22 +80,20 @@ export default function WinLossModal({ deal, outcome, onSubmit, onSkip }: WinLos
               </p>
             </div>
           </div>
-          <button onClick={onSkip} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '4px' }}>
-            <X size={16} />
-          </button>
         </div>
 
         <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, padding: '10px 14px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)', margin: 0 }}>
           Quick answers train your private ML model. The more deals you capture, the more accurate your win predictions become.
         </p>
 
-        {/* Primary reason */}
+        {/* Primary reason — required */}
         <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-            Primary reason for {isWon ? 'winning' : 'losing'}
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: primaryReasonMissing ? 'var(--danger)' : 'var(--text-secondary)', marginBottom: '6px' }}>
+            Primary reason for {isWon ? 'winning' : 'losing'} <span style={{ color: 'var(--danger)' }}>*</span>
+            {primaryReasonMissing && <span style={{ marginLeft: '6px', fontSize: '11px', fontWeight: '500' }}>Required</span>}
           </label>
           <div style={{ position: 'relative' }}>
-            <select value={data.primaryReason} onChange={e => setData(d => ({ ...d, primaryReason: e.target.value }))} style={selectStyle}>
+            <select value={data.primaryReason} onChange={e => setData(d => ({ ...d, primaryReason: e.target.value }))} style={{ ...selectStyle, borderColor: primaryReasonMissing ? 'var(--danger)' : undefined }}>
               <option value="">Select a reason…</option>
               {(isWon ? WIN_REASONS : LOSS_REASONS).map(r => <option key={r} value={r}>{r}</option>)}
             </select>
@@ -100,13 +101,15 @@ export default function WinLossModal({ deal, outcome, onSubmit, onSkip }: WinLos
           </div>
         </div>
 
-        {/* Competitor */}
+        {/* Competitor — required when loss reason is "Lost to competitor" */}
         <div>
-          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: competitorMissing ? 'var(--danger)' : 'var(--text-secondary)', marginBottom: '6px' }}>
             Which competitor was in the running?
+            {data.primaryReason === 'Lost to competitor' && !isWon && <span style={{ color: 'var(--danger)' }}> *</span>}
+            {competitorMissing && <span style={{ marginLeft: '6px', fontSize: '11px', fontWeight: '500' }}>Required when lost to competitor</span>}
           </label>
           <div style={{ position: 'relative' }}>
-            <select value={data.competitor} onChange={e => setData(d => ({ ...d, competitor: e.target.value }))} style={selectStyle}>
+            <select value={data.competitor} onChange={e => setData(d => ({ ...d, competitor: e.target.value }))} style={{ ...selectStyle, borderColor: competitorMissing ? 'var(--danger)' : undefined }}>
               <option value="">Select…</option>
               {COMMON_COMPETITORS.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -166,12 +169,14 @@ export default function WinLossModal({ deal, outcome, onSubmit, onSkip }: WinLos
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={onSkip} style={{ flex: 1, padding: '10px', borderRadius: '9px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', cursor: 'pointer' }}>
-            Skip
-          </button>
           <button
-            onClick={() => onSubmit(data)}
-            style={{ flex: 2, padding: '10px', borderRadius: '9px', background: accentColor, border: 'none', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+            onClick={() => {
+              setSubmitted(true)
+              if (!data.primaryReason) return
+              if (!isWon && data.primaryReason === 'Lost to competitor' && !data.competitor) return
+              onSubmit(data)
+            }}
+            style={{ flex: 1, padding: '10px', borderRadius: '9px', background: accentColor, border: 'none', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
           >
             Save & close deal
           </button>

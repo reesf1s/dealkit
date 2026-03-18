@@ -253,7 +253,16 @@ function ModelGrid({ trainingSize, brainData }: { trainingSize: number; brainDat
       const lossNote = lossesNeeded > 0 ? `, incl. ${lossesNeeded} loss${lossesNeeded !== 1 ? 'es' : ''}` : ''
       return { status: 'warming', output: `Warming up — need ${needed} more deal${needed !== 1 ? 's' : ''}${lossNote}` }
     }
-    return { status: 'locked', output: `Locked — need ${model.activatesAt}+ deals` }
+    {
+      const wlData = (brainData as { winLossIntel?: { winCount?: number; lossCount?: number } } | null)?.winLossIntel
+      const winsNeededForLocked = Math.max(0, Math.round(model.activatesAt * 0.4) - (wlData?.winCount ?? 0))
+      const lossesNeededForLocked = Math.max(0, Math.round(model.activatesAt * 0.3) - (wlData?.lossCount ?? 0))
+      const parts: string[] = []
+      if (winsNeededForLocked > 0) parts.push(`${winsNeededForLocked} win${winsNeededForLocked !== 1 ? 's' : ''}`)
+      if (lossesNeededForLocked > 0) parts.push(`${lossesNeededForLocked} loss${lossesNeededForLocked !== 1 ? 'es' : ''}`)
+      const needNote = parts.length > 0 ? ` (need ${parts.join(' AND ')})` : ''
+      return { status: 'locked', output: `Locked — need ${model.activatesAt}+ closed deals${needNote}` }
+    }
   }
 
   return (

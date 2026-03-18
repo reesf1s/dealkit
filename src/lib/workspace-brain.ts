@@ -332,10 +332,17 @@ async function ensureBrainColumn() {
         avg_score real,
         errors text,
         duration_ms integer,
+        models_trained text,
+        models_skipped text,
+        tokens_used integer,
         created_at timestamp DEFAULT now()
       )
     `)
   } catch { /* already exists */ }
+  // Add new columns to existing brain_rebuild_log tables (idempotent)
+  try { await db.execute(sql`ALTER TABLE brain_rebuild_log ADD COLUMN IF NOT EXISTS models_trained text`) } catch { /* exists */ }
+  try { await db.execute(sql`ALTER TABLE brain_rebuild_log ADD COLUMN IF NOT EXISTS models_skipped text`) } catch { /* exists */ }
+  try { await db.execute(sql`ALTER TABLE brain_rebuild_log ADD COLUMN IF NOT EXISTS tokens_used integer`) } catch { /* exists */ }
   // Stage transitions — history of all stage changes for velocity tracking
   try {
     await db.execute(sql`
@@ -467,8 +474,8 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
     .from(dealLogs)
     .where(eq(dealLogs.workspaceId, workspaceId))
 
-  // ── Tier 2: parallel fetch of product gaps + collateral ───────────────────
-  const [gaps, collateralRows] = await Promise.all([
+  // ── Tier 2: parallel fetch of product gaps + collateral + stage transitions ──
+  const [gaps, collateralRows, stageTransitionRows] = await Promise.all([
     db.select({
       id: productGapsTable.id,
       title: productGapsTable.title,
@@ -481,6 +488,13 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
       status: collateralTable.status,
       sourceDealLogId: collateralTable.sourceDealLogId,
     }).from(collateralTable).where(eq(collateralTable.workspaceId, workspaceId)),
+    // Latest stage transition per deal — for accurate days-in-current-stage
+    db.execute<{ deal_id: string; to_stage: string; transitioned_at: string }>(sql`
+      SELECT DISTINCT ON (deal_id) deal_id, to_stage, transitioned_at
+      FROM stage_transitions
+      WHERE workspace_id = ${workspaceId}
+      ORDER BY deal_id, transitioned_at DESC
+    `).catch(() => [] as { deal_id: string; to_stage: string; transitioned_at: string }[]),
   ])
 
   const now = new Date()
@@ -1546,6 +1560,49 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
           riskThemeWinRates: globalPrior.riskThemeWinRates.map(r => Math.round(r * 100)),
         }
       }
+
+      // ── Augment stageVelocityIntel with stage_transitions data ────────────────
+      // Replace deal.createdAt-based age with actual days-in-current-stage from transitions.
+      // This gives accurate stall detection per-stage, not just overall deal age.
+      if (stageVelocityIntel && (stageTransitionRows as any[]).length > 0) {
+        const transitionMap = new Map<string, Date>()
+        for (const row of stageTransitionRows as any[]) {
+          if (row.deal_id && row.transitioned_at) {
+            transitionMap.set(row.deal_id, new Date(row.transitioned_at))
+          }
+        }
+        // Re-compute stageAlerts using actual days-in-current-stage
+        const p75 = stageVelocityIntel.p75DaysToClose
+        const updatedAlerts = stageVelocityIntel.stageAlerts.map(alert => {
+          const transitionedAt = transitionMap.get(alert.dealId)
+          if (!transitionedAt) return alert
+          const actualDaysInStage = (now.getTime() - transitionedAt.getTime()) / 86_400_000
+          return {
+            ...alert,
+            currentAgeDays: Math.round(actualDaysInStage),
+            severity: (actualDaysInStage > p75 * 1.5 ? 'critical' : 'warning') as 'critical' | 'warning',
+          }
+        })
+        // Add any open deals with transitions that weren't in alerts (stalling in early stages)
+        const alertedIds = new Set(updatedAlerts.map(a => a.dealId))
+        for (const [dealId, transitionedAt] of transitionMap.entries()) {
+          if (alertedIds.has(dealId)) continue
+          const deal = activeDeals.find(d => d.id === dealId)
+          if (!deal) continue
+          const actualDaysInStage = (now.getTime() - transitionedAt.getTime()) / 86_400_000
+          if (actualDaysInStage > p75) {
+            updatedAlerts.push({
+              dealId,
+              company: deal.prospectCompany,
+              currentAgeDays: Math.round(actualDaysInStage),
+              expectedMaxDays: p75,
+              stage: deal.stage,
+              severity: (actualDaysInStage > p75 * 1.5 ? 'critical' : 'warning') as 'critical' | 'warning',
+            })
+          }
+        }
+        stageVelocityIntel = { ...stageVelocityIntel, stageAlerts: updatedAlerts }
+      }
     }
   }
 
@@ -1900,14 +1957,29 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
     const avgScoreVal    = openScores.length > 0
       ? Math.round(openScores.reduce((a, b) => a + b, 0) / openScores.length * 10) / 10
       : null
+    // Build models_trained / models_skipped for auditability
+    const modelsTrained: string[] = []
+    const modelsSkipped: { model: string; reason: string }[] = []
+    if (mlModel)              modelsTrained.push('logistic_regression')
+    else                      modelsSkipped.push({ model: 'logistic_regression', reason: `need ${ML_MIN_TRAINING_DEALS} closed deals, have ${closedTotal}` })
+    if (dealArchetypes)       modelsTrained.push('kmeans_archetypes')
+    else                      modelsSkipped.push({ model: 'kmeans_archetypes', reason: 'insufficient training data' })
+    if (stageVelocityIntel)   modelsTrained.push('stage_velocity')
+    else                      modelsSkipped.push({ model: 'stage_velocity', reason: 'need 3+ won deals' })
+    if (competitivePatterns)  modelsTrained.push('competitive_patterns')
+    else                      modelsSkipped.push({ model: 'competitive_patterns', reason: 'insufficient competitor data' })
+    if (closeDateModel)       modelsTrained.push('ols_close_date')
+    else                      modelsSkipped.push({ model: 'ols_close_date', reason: 'need 10+ won deals' })
     await db.execute(sql`
       INSERT INTO brain_rebuild_log
         (workspace_id, triggered_by, closed_deals_total, wins, losses,
-         ml_active, model_accuracy_loo, open_deals_scored, avg_score, duration_ms)
+         ml_active, model_accuracy_loo, open_deals_scored, avg_score, duration_ms,
+         models_trained, models_skipped, tokens_used)
       VALUES
         (${workspaceId}, 'auto', ${closedTotal}, ${wonDeals.length}, ${lostDeals.length},
          ${mlModel != null}, ${mlModel?.looAccuracy ?? null}, ${openScored},
-         ${avgScoreVal}, ${durationMs})
+         ${avgScoreVal}, ${durationMs},
+         ${JSON.stringify(modelsTrained)}, ${JSON.stringify(modelsSkipped)}, ${null})
     `)
   } catch { /* non-fatal — log failure must never block the brain rebuild */ }
 

@@ -34,8 +34,19 @@ async function ensurePredictionLogTable() {
   } catch { /* already exists */ }
 }
 
+// ── Ensure structured win/loss columns (idempotent, cached per cold-start) ────
+let _winLossColsEnsured = false
+async function ensureWinLossColumns() {
+  if (_winLossColsEnsured) return
+  _winLossColsEnsured = true
+  try { await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS win_reason text`) } catch { /* exists */ }
+  try { await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS loss_reason text`) } catch { /* exists */ }
+  try { await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS competitor_lost_to text`) } catch { /* exists */ }
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    await ensureWinLossColumns()
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { workspaceId } = await getWorkspaceContext(userId)
@@ -63,11 +74,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const [existing] = await db.select({ meetingNotes: dealLogs.meetingNotes, stage: dealLogs.stage }).from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
     const fromStage = existing?.stage ?? null
 
-    // Append win/loss interview data to meetingNotes if provided
+    // Store win/loss interview data as structured fields AND append compact summary to meetingNotes
     if (winLossData && (stage === 'closed_won' || stage === 'closed_lost')) {
       const existingNotes = (existing?.meetingNotes as string) ?? ''
       const interviewBlock = `\n\n---\n[Win/Loss Interview]\nOutcome: ${stage}\nPrimary reason: ${winLossData.primaryReason || 'Not specified'}\nCompetitor: ${winLossData.competitor || 'Not specified'}\nHardest objection: ${winLossData.hardestObjection || 'Not specified'}\nChampion present: ${winLossData.championPresent || 'unknown'}\nNotes: ${winLossData.notes || ''}`
       update.meetingNotes = existingNotes + interviewBlock
+      // Structured columns — primary ML training signal
+      if (stage === 'closed_won') {
+        update.win_reason = winLossData.primaryReason || null
+      } else {
+        update.loss_reason = winLossData.primaryReason || null
+        // competitor_lost_to: only set when loss reason is competitor-related
+        if (winLossData.competitor && winLossData.competitor !== 'None' && winLossData.competitor !== '') {
+          update.competitor_lost_to = winLossData.competitor
+        }
+      }
     } else if (!winLossData) {
       // No win/loss data — no meetingNotes update needed
     }
