@@ -5,7 +5,7 @@ import { and, eq, count, gte, lte, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { dealLogs, collateral, events } from '@/lib/db/schema'
 import { PLAN_LIMITS, isWithinLimit } from '@/lib/stripe/plans'
-import { dbErrResponse } from '@/lib/api-helpers'
+import { dbErrResponse, ensureIndexes } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
 
@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     await ensureDealColumns()
+    ensureIndexes().catch(() => {}) // fire-and-forget on first cold start
     const { workspaceId } = await getWorkspaceContext(userId)
     const { searchParams } = new URL(req.url)
     const outcome = searchParams.get('outcome')

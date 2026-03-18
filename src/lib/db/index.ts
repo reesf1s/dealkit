@@ -12,9 +12,11 @@ const isSupabase = connectionString.includes('supabase.co') || connectionString.
 const isPooler = connectionString.includes('pooler.supabase.com') || connectionString.includes(':6543/')
 
 const client = postgres(connectionString, {
-  max: 5,
+  max: 20,
   idle_timeout: 20,
   connect_timeout: 10,
+  // Kill long-running queries after 30 seconds to prevent connection starvation
+  options: { statement_timeout: '30000' },
   ssl: isSupabase ? 'require' : false,
   // pgBouncer in transaction mode doesn't support prepared statements
   prepare: !isPooler,

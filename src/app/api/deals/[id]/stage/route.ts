@@ -27,7 +27,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     return NextResponse.json({ data: deal })
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+  } catch (e: unknown) {
+    console.error('[deals/stage] failed:', e instanceof Error ? e.message : e)
+    return NextResponse.json({ error: 'Stage update failed' }, { status: 500 })
   }
 }

@@ -39,7 +39,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       return NextResponse.json({ isShared: false })
     }
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+  } catch (e: unknown) {
+    console.error('[success-criteria/share] failed:', e instanceof Error ? e.message : e)
+    return NextResponse.json({ error: 'Share operation failed' }, { status: 500 })
   }
 }

@@ -55,7 +55,8 @@ Only include fields you can infer from the text. Return empty arrays for fields 
     } catch { /* use defaults */ }
 
     return NextResponse.json(parsed)
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+  } catch (e: unknown) {
+    console.error('[onboarding/parse] failed:', e instanceof Error ? e.message : e)
+    return NextResponse.json({ error: 'Parse failed' }, { status: 500 })
   }
 }

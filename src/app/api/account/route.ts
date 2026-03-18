@@ -19,8 +19,8 @@ export async function DELETE() {
     await clerk.users.deleteUser(userId)
 
     return NextResponse.json({ deleted: true })
-  } catch (e: any) {
-    console.error('Account deletion error:', e)
-    return NextResponse.json({ error: e.message ?? 'Deletion failed' }, { status: 500 })
+  } catch (e: unknown) {
+    console.error('[account] deletion failed:', e instanceof Error ? e.message : e)
+    return NextResponse.json({ error: 'Deletion failed' }, { status: 500 })
   }
 }

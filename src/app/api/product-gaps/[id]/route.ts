@@ -17,7 +17,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const [gap] = await db.update(productGaps).set({ ...rest, updatedAt: new Date() }).where(and(eq(productGaps.id, id), eq(productGaps.workspaceId, workspaceId))).returning()
     if (!gap) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json({ data: gap })
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+  } catch (e: unknown) { console.error('[product-gaps] failed:', e instanceof Error ? e.message : e); return NextResponse.json({ error: 'Operation failed' }, { status: 500 }) }
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -68,5 +68,5 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     }
 
     return NextResponse.json({ success: true })
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+  } catch (e: unknown) { console.error('[product-gaps] failed:', e instanceof Error ? e.message : e); return NextResponse.json({ error: 'Operation failed' }, { status: 500 }) }
 }

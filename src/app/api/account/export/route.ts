@@ -61,7 +61,8 @@ export async function GET() {
         'Content-Length': String(Buffer.byteLength(json, 'utf8')),
       },
     })
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message ?? 'Export failed' }, { status: 500 })
+  } catch (e: unknown) {
+    console.error('[account/export] failed:', e instanceof Error ? e.message : e)
+    return NextResponse.json({ error: 'Export failed' }, { status: 500 })
   }
 }

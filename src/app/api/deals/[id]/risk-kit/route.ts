@@ -112,7 +112,8 @@ URGENCY_REASON: [One honest, deal-specific reason to act now — without manufac
     }
 
     return NextResponse.json({ data: kit })
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 })
+  } catch (e: unknown) {
+    console.error('[risk-kit] failed:', e instanceof Error ? e.message : e)
+    return NextResponse.json({ error: 'Risk kit generation failed' }, { status: 500 })
   }
 }

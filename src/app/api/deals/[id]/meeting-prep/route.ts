@@ -104,5 +104,5 @@ One concrete, time-bound action to advance or close this deal.`
     const msg = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 1500, messages: [{ role: 'user', content: prompt }] })
     const prep = (msg.content[0] as any).text
     return NextResponse.json({ data: { prep } })
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+  } catch (e: unknown) { console.error('[meeting-prep] failed:', e instanceof Error ? e.message : e); return NextResponse.json({ error: 'Meeting prep failed' }, { status: 500 }) }
 }

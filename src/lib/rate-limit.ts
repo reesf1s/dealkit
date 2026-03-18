@@ -58,10 +58,12 @@ export async function checkRateLimit(
 
     const count = (rows as unknown as { count: number }[])[0]?.count ?? 1
     return { allowed: count <= limit, remaining: Math.max(0, limit - count), resetAt }
-  } catch {
-    // If rate limiting fails for any reason, allow the request through
-    // rather than breaking the feature. Errors here are non-fatal.
-    return { allowed: true, remaining: limit, resetAt }
+  } catch (err) {
+    // Log the failure but still enforce rate limiting conservatively.
+    // Allowing through on failure would disable rate limiting entirely
+    // whenever the DB is under load — which is exactly when you need it most.
+    console.error('[rate-limit] DB error, denying request conservatively:', err instanceof Error ? err.message : err)
+    return { allowed: false, remaining: 0, resetAt }
   }
 }
 

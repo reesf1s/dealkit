@@ -99,7 +99,7 @@ Return a JSON array of criteria objects. Each object: {"text": "the specific req
 
     after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     return NextResponse.json({ data: { successCriteriaTodos: updated.successCriteriaTodos } })
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+  } catch (e: unknown) { console.error('[success-criteria] failed:', e instanceof Error ? e.message : e); return NextResponse.json({ error: 'Operation failed' }, { status: 500 }) }
 }
 
 // PATCH — update a single criterion (achieved toggle + note)
@@ -123,7 +123,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     await db.update(dealLogs).set({ successCriteriaTodos: updated, updatedAt: new Date() }).where(eq(dealLogs.id, id))
     return NextResponse.json({ data: { successCriteriaTodos: updated } })
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+  } catch (e: unknown) { console.error('[success-criteria] failed:', e instanceof Error ? e.message : e); return NextResponse.json({ error: 'Operation failed' }, { status: 500 }) }
 }
 
 // DELETE — remove a single criterion by ID
@@ -142,5 +142,5 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const updated = ((deal.successCriteriaTodos as any[]) ?? []).filter((c: any) => c.id !== criterionId)
     await db.update(dealLogs).set({ successCriteriaTodos: updated, updatedAt: new Date() }).where(eq(dealLogs.id, id))
     return NextResponse.json({ data: { successCriteriaTodos: updated } })
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+  } catch (e: unknown) { console.error('[success-criteria] failed:', e instanceof Error ? e.message : e); return NextResponse.json({ error: 'Operation failed' }, { status: 500 }) }
 }

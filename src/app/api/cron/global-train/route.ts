@@ -14,13 +14,15 @@ import { trainGlobalModel } from '@/lib/global-model'
 import { ensureGlobalTables } from '@/lib/global-pool'
 
 export async function GET(req: NextRequest) {
-  // Verify cron secret
+  // Verify cron secret — always required to prevent public access
   const secret = process.env.CRON_SECRET
-  if (secret) {
-    const auth = req.headers.get('authorization')
-    if (auth !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  if (!secret) {
+    console.error('[cron/global-train] CRON_SECRET not set — endpoint disabled')
+    return NextResponse.json({ error: 'Not configured' }, { status: 503 })
+  }
+  const authHeader = req.headers.get('authorization')
+  if (authHeader !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   await ensureGlobalTables()

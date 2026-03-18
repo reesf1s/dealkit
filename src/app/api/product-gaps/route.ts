@@ -34,7 +34,10 @@ export async function GET() {
     }))
 
     return NextResponse.json({ data: gapsWithRevenue })
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+  } catch (e: unknown) {
+    console.error('[product-gaps] GET failed:', e instanceof Error ? e.message : e)
+    return NextResponse.json({ error: 'Failed to load product gaps' }, { status: 500 })
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -46,5 +49,8 @@ export async function POST(req: NextRequest) {
     const { userId: _uid, workspaceId: _wid, ...rest } = body
     const [gap] = await db.insert(productGaps).values({ ...rest, workspaceId, userId, createdAt: new Date(), updatedAt: new Date() }).returning()
     return NextResponse.json({ data: gap })
-  } catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }) }
+  } catch (e: unknown) {
+    console.error('[product-gaps] POST failed:', e instanceof Error ? e.message : e)
+    return NextResponse.json({ error: 'Failed to save product gap' }, { status: 500 })
+  }
 }
