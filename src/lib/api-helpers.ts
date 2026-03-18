@@ -30,22 +30,10 @@ export function dbNotConfigured(): NextResponse {
   )
 }
 
-/** Ensure new columns exist on deal_logs (idempotent, cached per cold-start) */
-let _linksMigrated = false
+/** No-op: DDL migrations now run only inside _doRebuildWorkspaceBrain (via after())
+ *  to avoid ALTER TABLE locks cascading into SELECT hangs on concurrent page loads. */
 export async function ensureLinksColumn() {
-  if (_linksMigrated) return
-  try {
-    await db.execute(sql`
-      ALTER TABLE deal_logs
-      ADD COLUMN IF NOT EXISTS links jsonb NOT NULL DEFAULT '[]'::jsonb,
-      ADD COLUMN IF NOT EXISTS parent_deal_id uuid,
-      ADD COLUMN IF NOT EXISTS expansion_type text,
-      ADD COLUMN IF NOT EXISTS contract_start_date timestamptz,
-      ADD COLUMN IF NOT EXISTS contract_end_date timestamptz,
-      ADD COLUMN IF NOT EXISTS conversion_score_pinned boolean NOT NULL DEFAULT false
-    `)
-  } catch { /* columns already exist */ }
-  _linksMigrated = true
+  // Intentionally empty — columns are guaranteed to exist after any brain rebuild.
 }
 
 /** Create indexes on frequently-queried columns (idempotent, cached per cold-start).

@@ -316,13 +316,19 @@ async function ensureBrainColumn() {
   schemaMigrated = true
 }
 
-/** Read the brain. Returns null if not yet built. */
+/** Read the brain. Returns null if not yet built.
+ *  Never runs DDL here — DDL only runs inside _doRebuildWorkspaceBrain (via after()).
+ *  Catching column-not-found errors so a fresh DB returns null gracefully. */
 export async function getWorkspaceBrain(workspaceId: string): Promise<WorkspaceBrain | null> {
-  await ensureBrainColumn()
-  const rows = await db.execute<{ workspace_brain: WorkspaceBrain | null }>(
-    sql`SELECT workspace_brain FROM workspaces WHERE id = ${workspaceId} LIMIT 1`
-  )
-  return rows[0]?.workspace_brain ?? null
+  try {
+    const rows = await db.execute<{ workspace_brain: WorkspaceBrain | null }>(
+      sql`SELECT workspace_brain FROM workspaces WHERE id = ${workspaceId} LIMIT 1`
+    )
+    return rows[0]?.workspace_brain ?? null
+  } catch {
+    // Column doesn't exist yet on a fresh DB — brain will be created on next rebuild
+    return null
+  }
 }
 
 // ── Rebuild deduplication + cooldown ─────────────────────────────────────────
@@ -1008,58 +1014,96 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
   // ── Proactive: pipeline recommendations ──────────────────────────────────
   const pipelineRecommendations: WorkspaceBrain['pipelineRecommendations'] = []
 
+  // Map risk keywords to specific mitigation actions
+  const riskMitigations: { keywords: string[]; action: string; prompt: string }[] = [
+    { keywords: ['budget', 'cost', 'price', 'expensive', 'roi', 'finance'], action: 'Address budget concern', prompt: 'Request a ROI/business-case meeting to quantify the cost of inaction' },
+    { keywords: ['procurement', 'legal', 'compliance', 'security', 'gdpr', 'contract'], action: 'Unblock procurement', prompt: 'Proactively send a vendor security pack and DPA to cut legal review time' },
+    { keywords: ['unresponsive', 'ghosted', 'no reply', 'gone quiet', 'disengaged'], action: 'Re-engage stakeholder', prompt: 'Try a different contact or a pattern-interrupt message to get a response' },
+    { keywords: ['competitor', 'evaluating', 'shortlist', 'other vendors', 'rfp'], action: 'Strengthen competitive position', prompt: 'Request the evaluation criteria and build a direct comparison that highlights your differentiators' },
+    { keywords: ['decision', 'approver', 'stakeholder', 'champion', 'sponsor', 'sign-off'], action: 'Expand stakeholder map', prompt: 'Identify the economic buyer and book a separate meeting to secure executive sponsorship' },
+    { keywords: ['timeline', 'delayed', 'postponed', 'on hold', 'not urgent', 'priority'], action: 'Create urgency', prompt: 'Tie the deal timeline to a specific business date or cost-of-delay calculation to rebuild urgency' },
+  ]
+
   for (const snap of snapshots) {
     if (snap.stage === 'closed_won' || snap.stage === 'closed_lost') continue
     if (pipelineRecommendations.length >= 6) break
+    const sig = snap.signalSummary
 
-    // Deal in prospecting for 7+ days with no score → suggest qualification
+    // 1. Deteriorating engagement — highest priority, very specific
+    if (sig?.isDeteriorating && ['proposal', 'negotiation', 'discovery'].includes(snap.stage)) {
+      const topRisk = snap.risks[0]
+      pipelineRecommendations.push({
+        dealId: snap.id, dealName: snap.name, company: snap.company,
+        recommendation: topRisk
+          ? `Engagement declining at ${snap.company}. Top risk: "${topRisk}". Act before this goes cold.`
+          : `Engagement declining at ${snap.company}. Meeting notes suggest cooling sentiment — re-engage now.`,
+        priority: 'high', action: 'Address declining engagement', actionType: 'follow_up',
+      })
+      continue
+    }
+
+    // 2. No champion / weak stakeholder depth at late stage
+    if (sig && sig.championStrength < 0.25 && sig.stakeholderDepth < 0.3 && ['proposal', 'negotiation'].includes(snap.stage)) {
+      pipelineRecommendations.push({
+        dealId: snap.id, dealName: snap.name, company: snap.company,
+        recommendation: `No clear internal champion at ${snap.company} in ${snap.stage} stage. Single point of contact is a deal risk — expand your stakeholder map.`,
+        priority: 'high', action: 'Develop a champion', actionType: 'meeting',
+      })
+      continue
+    }
+
+    // 3. Specific risk mitigation — map risks to concrete next actions
+    if (snap.risks.length >= 1) {
+      const riskText = snap.risks.join(' ').toLowerCase()
+      const matched = riskMitigations.find(m => m.keywords.some(kw => riskText.includes(kw)))
+      if (matched) {
+        pipelineRecommendations.push({
+          dealId: snap.id, dealName: snap.name, company: snap.company,
+          recommendation: `${snap.company} (${snap.stage}): ${matched.prompt}`,
+          priority: ['proposal', 'negotiation'].includes(snap.stage) ? 'high' : 'medium',
+          action: matched.action, actionType: 'custom',
+        })
+        continue
+      }
+    }
+
+    // 4. No next step defined at an active stage
+    if (sig && !sig.nextStepDefined && ['qualification', 'discovery', 'proposal'].includes(snap.stage)) {
+      pipelineRecommendations.push({
+        dealId: snap.id, dealName: snap.name, company: snap.company,
+        recommendation: `No next step defined for ${snap.company}. Deals without a booked follow-up go cold 3× faster — confirm the next meeting now.`,
+        priority: 'medium', action: 'Book next step', actionType: 'meeting',
+      })
+      continue
+    }
+
+    // 5. Decelerating momentum at a late stage
+    if (sig?.velocity === 'decelerating' && ['proposal', 'negotiation'].includes(snap.stage)) {
+      pipelineRecommendations.push({
+        dealId: snap.id, dealName: snap.name, company: snap.company,
+        recommendation: `${snap.company} deal velocity is slowing in ${snap.stage} stage. Consider escalating to a decision-maker or introducing new value to reset momentum.`,
+        priority: 'medium', action: 'Reset deal momentum', actionType: 'follow_up',
+      })
+      continue
+    }
+
+    // 6. Fresh deal with no analysis yet
     if (snap.stage === 'prospecting' && snap.daysSinceUpdate >= 7 && snap.conversionScore == null) {
       pipelineRecommendations.push({
         dealId: snap.id, dealName: snap.name, company: snap.company,
-        recommendation: 'No analysis yet — paste meeting notes to qualify this deal',
-        priority: 'medium', action: 'Analyze meeting notes', actionType: 'meeting',
+        recommendation: `${snap.company} has had no notes or analysis in ${snap.daysSinceUpdate} days. Add meeting notes to get a qualification score and AI-powered next steps.`,
+        priority: 'medium', action: 'Add meeting notes', actionType: 'meeting',
       })
       continue
     }
 
-    // High-scoring deal still in early stage → suggest advancing
-    if (snap.conversionScore != null && snap.conversionScore >= 70 && ['prospecting', 'qualification', 'discovery'].includes(snap.stage)) {
-      const nextStage = snap.stage === 'prospecting' ? 'qualification' : snap.stage === 'qualification' ? 'discovery' : 'proposal'
+    // 7. Pending to-dos blocking progress
+    if (snap.pendingTodos.length >= 3) {
+      const topTodo = snap.pendingTodos[0]
       pipelineRecommendations.push({
         dealId: snap.id, dealName: snap.name, company: snap.company,
-        recommendation: `High conversion score (${snap.conversionScore}%) — consider advancing to ${nextStage.replace('_', ' ')}`,
-        priority: 'high', action: `Move to ${nextStage.replace('_', ' ')}`, actionType: 'stage_change',
-      })
-      continue
-    }
-
-    // Deal in proposal/negotiation with risks but no objection handler → suggest collateral
-    if (['proposal', 'negotiation'].includes(snap.stage) && snap.risks.length >= 2) {
-      pipelineRecommendations.push({
-        dealId: snap.id, dealName: snap.name, company: snap.company,
-        recommendation: `${snap.risks.length} risks identified — generate an objection handler to prepare`,
-        priority: 'high', action: 'Generate objection handler', actionType: 'collateral',
-      })
-      continue
-    }
-
-    // Deal with incomplete project plan tasks overdue
-    if (snap.projectPlanProgress && snap.projectPlanProgress.complete < snap.projectPlanProgress.total) {
-      const remaining = snap.projectPlanProgress.total - snap.projectPlanProgress.complete
-      pipelineRecommendations.push({
-        dealId: snap.id, dealName: snap.name, company: snap.company,
-        recommendation: `${remaining} project plan task${remaining > 1 ? 's' : ''} still pending`,
-        priority: remaining > 3 ? 'high' : 'medium', action: 'Review project plan', actionType: 'custom',
-      })
-      continue
-    }
-
-    // Deal with many pending todos → suggest follow-up
-    if (snap.pendingTodos.length >= 4) {
-      pipelineRecommendations.push({
-        dealId: snap.id, dealName: snap.name, company: snap.company,
-        recommendation: `${snap.pendingTodos.length} pending to-dos — review and prioritise`,
-        priority: 'medium', action: 'Review to-dos', actionType: 'follow_up',
+        recommendation: `${snap.pendingTodos.length} open actions for ${snap.company}, including: "${topTodo}". Complete these to keep the deal moving.`,
+        priority: snap.pendingTodos.length >= 5 ? 'high' : 'medium', action: 'Complete open actions', actionType: 'follow_up',
       })
     }
   }

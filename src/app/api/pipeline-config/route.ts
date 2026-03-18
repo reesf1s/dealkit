@@ -1,21 +1,14 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { workspaces } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 
-let colMigrated = false
-async function ensurePipelineConfigCol() {
-  if (colMigrated) return
-  try {
-    await db.execute(sql`
-      ALTER TABLE workspaces
-      ADD COLUMN IF NOT EXISTS pipeline_config jsonb
-    `)
-  } catch { /* already exists */ }
-  colMigrated = true
-}
+// No-op: pipeline_config column is guaranteed to exist after any brain rebuild.
+// DDL only runs inside _doRebuildWorkspaceBrain (via after()) to prevent
+// ALTER TABLE locks from cascading into SELECT hangs on concurrent page loads.
+async function ensurePipelineConfigCol() {}
 
 const DEFAULT_STAGES = [
   { id: 'prospecting',   label: 'Prospecting',   color: '#6B7280', order: 1, isDefault: true },
