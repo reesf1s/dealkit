@@ -436,7 +436,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
         <textarea
           value={updateText}
           onChange={e => setUpdateText(e.target.value)}
-          placeholder="Paste meeting notes, log a deal update, or ask anything about this deal..."
+          placeholder="Describe what happened — Tommy confirmed the call, they pushed the timeline, etc."
           rows={6}
           style={{
             width: '100%', resize: 'vertical', background: 'var(--input-bg)',
@@ -475,7 +475,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
             }}
           >
             <Sparkles size={12} />
-            Send to AI
+            Send to AI →
           </button>
         </div>
       </div>

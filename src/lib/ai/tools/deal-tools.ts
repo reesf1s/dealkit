@@ -963,6 +963,44 @@ export const update_deal = {
 
     await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, params.dealId))
 
+    // Auto-refresh score + summary when meeting notes are added
+    if (params.meetingNotes) {
+      try {
+        const allText = [existing.notes, existing.meetingNotes, params.meetingNotes, existing.aiSummary].filter(Boolean).join('\n')
+        if (allText.length > 20) {
+          const signals = extractTextSignals(allText, existing.createdAt ?? new Date(), new Date())
+          const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
+          const mlPred = brain?.mlPredictions?.find((p: any) => p.dealId === params.dealId)
+          let finalScore: number
+          if (mlPred && brain?.mlModel) {
+            const { composite } = computeCompositeScore(
+              heuristicScore(signals, 0.5),
+              mlPred.winProbability,
+              brain.mlModel.trainingSize,
+            )
+            finalScore = composite
+          } else {
+            finalScore = heuristicScore(signals, 0.5)
+          }
+          const insights: string[] = []
+          if (signals.championStrength > 0.5) insights.push('Strong internal champion identified')
+          else if (signals.championStrength > 0) insights.push('Potential champion — needs confirmation')
+          if (signals.budgetConfirmed) insights.push('Budget confirmed')
+          if (signals.decisionMakerSignal) insights.push('Decision maker engaged')
+          if (signals.momentumScore > 0.7) insights.push('Strong forward momentum')
+          else if (signals.momentumScore < 0.3) insights.push('Momentum stalling — needs re-engagement')
+          if (signals.stakeholderDepth > 0.5) insights.push('Multiple stakeholders engaged')
+          if (signals.nextStepDefined) insights.push('Clear next steps defined')
+          if (signals.objectionCount > 0) insights.push(`${signals.objectionCount} objection${signals.objectionCount > 1 ? 's' : ''} identified`)
+          if (insights.length === 0) insights.push('Early stage — limited signals available')
+          await db.update(dealLogs).set({
+            conversionScore: Math.max(0, Math.min(100, Math.round(finalScore))),
+            conversionInsights: insights,
+          }).where(eq(dealLogs.id, params.dealId))
+        }
+      } catch { /* scoring is non-fatal */ }
+    }
+
     after(async () => {
       try { await rebuildWorkspaceBrain(ctx.workspaceId) } catch { /* non-fatal */ }
     })

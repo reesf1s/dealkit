@@ -323,8 +323,26 @@ export async function getWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
   return rows[0]?.workspace_brain ?? null
 }
 
+// ── Rebuild deduplication ─────────────────────────────────────────────────────
+// Prevents multiple simultaneous brain rebuilds for the same workspace (which
+// would each open DB connections, thrash the pool, and produce the same result).
+// In-process map — resets on cold start, but that's fine for serverless.
+const _rebuildInFlight = new Map<string, Promise<WorkspaceBrain>>()
+
 /** Rebuild and persist the brain from current deal state. Call in background after any deal mutation. */
 export async function rebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceBrain> {
+  // Deduplicate: if a rebuild is already running for this workspace, wait for it
+  const existing = _rebuildInFlight.get(workspaceId)
+  if (existing) return existing
+
+  const promise = _doRebuildWorkspaceBrain(workspaceId).finally(() => {
+    _rebuildInFlight.delete(workspaceId)
+  })
+  _rebuildInFlight.set(workspaceId, promise)
+  return promise
+}
+
+async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceBrain> {
   await ensureBrainColumn()
 
   // Load previous brain to carry forward score history

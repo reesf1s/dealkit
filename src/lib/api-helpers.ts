@@ -47,21 +47,24 @@ export async function ensureLinksColumn() {
   _linksMigrated = true
 }
 
-/** Create indexes on frequently-queried columns (idempotent, cached per cold-start) */
+/** Create indexes on frequently-queried columns (idempotent, cached per cold-start).
+ *  Uses CONCURRENTLY so index builds never block reads/writes on the table. */
 let _indexesMigrated = false
 export async function ensureIndexes() {
   if (_indexesMigrated) return
-  try {
-    await db.execute(sql`
-      CREATE INDEX IF NOT EXISTS idx_deal_logs_workspace_stage ON deal_logs (workspace_id, stage);
-      CREATE INDEX IF NOT EXISTS idx_deal_logs_workspace_updated ON deal_logs (workspace_id, updated_at DESC);
-      CREATE INDEX IF NOT EXISTS idx_collateral_workspace_status ON collateral (workspace_id, status);
-      CREATE INDEX IF NOT EXISTS idx_events_workspace_created ON events (workspace_id, created_at DESC);
-      CREATE INDEX IF NOT EXISTS idx_competitors_workspace ON competitors (workspace_id);
-      CREATE INDEX IF NOT EXISTS idx_product_gaps_workspace ON product_gaps (workspace_id);
-    `)
-  } catch { /* indexes may already exist */ }
-  _indexesMigrated = true
+  _indexesMigrated = true // mark before async work — prevents concurrent runs
+  // Each CONCURRENTLY index must be a separate statement (can't be in a transaction)
+  const indexes = [
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_deal_logs_workspace_stage ON deal_logs (workspace_id, stage)`,
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_deal_logs_workspace_updated ON deal_logs (workspace_id, updated_at DESC)`,
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_collateral_workspace_status ON collateral (workspace_id, status)`,
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_events_workspace_created ON events (workspace_id, created_at DESC)`,
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_competitors_workspace ON competitors (workspace_id)`,
+    `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_product_gaps_workspace ON product_gaps (workspace_id)`,
+  ]
+  for (const stmt of indexes) {
+    try { await db.execute(sql.raw(stmt)) } catch { /* already exists */ }
+  }
 }
 
 /** Wraps a route handler with standard DB error handling.

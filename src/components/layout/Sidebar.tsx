@@ -264,7 +264,7 @@ export default function Sidebar() {
           />
         ))}
 
-        <SectionLabel>Intelligence</SectionLabel>
+        <SectionLabel>Insights</SectionLabel>
         {INTEL_ITEMS.map(item => <NavItem key={item.href} {...item} />)}
 
         <div style={{ margin: '8px 4px', height: '1px', background: 'var(--border)' }} />

@@ -455,7 +455,7 @@ export default function CopilotPanel() {
                 fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '14px',
                 textAlign: 'center', letterSpacing: '0.01em',
               }}>
-                {activeDeal ? `How can I help with ${activeDeal.company}?` : 'What do you need?'}
+                {activeDeal ? `How can I help with ${activeDeal.company}?` : 'What would you like to do?'}
               </div>
 
               {/* Quick action chips */}
