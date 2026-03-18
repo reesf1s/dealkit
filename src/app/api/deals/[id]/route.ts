@@ -67,7 +67,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     await ensureDealColumns()
     const body = await req.json()
     const updateData: Record<string, unknown> = { updatedAt: new Date() }
-    const fields = ['dealName','prospectCompany','prospectName','prospectTitle','contacts','description','dealValue','stage','competitors','notes','meetingNotes','aiSummary','conversionScore','conversionInsights','dealRisks','todos','nextSteps','closeDate','wonDate','lostDate','lostReason','dealType','recurringInterval','kanbanOrder','projectPlan','links','parentDealId','expansionType','contractStartDate','contractEndDate','successCriteria','successCriteriaTodos']
+    const fields = ['dealName','prospectCompany','prospectName','prospectTitle','contacts','description','dealValue','stage','competitors','notes','meetingNotes','aiSummary','conversionScore','conversionInsights','dealRisks','todos','nextSteps','closeDate','wonDate','lostDate','lostReason','dealType','recurringInterval','kanbanOrder','projectPlan','links','parentDealId','expansionType','contractStartDate','contractEndDate','successCriteria','successCriteriaTodos','conversionScorePinned']
     // Date fields need explicit conversion — Drizzle expects Date objects for timestamptz
     const dateFields = new Set(['closeDate', 'wonDate', 'lostDate', 'contractStartDate', 'contractEndDate'])
     for (const f of fields) {
@@ -77,6 +77,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       } else {
         updateData[f] = body[f]
       }
+    }
+    // Score integrity: clamp to 0-100 if provided as a number
+    if (typeof updateData.conversionScore === 'number') {
+      updateData.conversionScore = Math.max(0, Math.min(100, Math.round(updateData.conversionScore as number)))
+    }
+    // When score is explicitly cleared to null (e.g. "Reset AI"), also unpin so AI can re-score
+    if (body.conversionScore === null && !('conversionScorePinned' in body)) {
+      updateData.conversionScorePinned = false
     }
     const [updated] = await db.update(dealLogs).set(updateData).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).returning()
     await logEvent(workspaceId, userId, 'deal_log.updated', { dealLogId: id, dealName: updated.dealName })

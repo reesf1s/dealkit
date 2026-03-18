@@ -309,7 +309,8 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
   }
 
   const resetAllAI = async () => {
-    await patchDeal({ aiSummary: null, conversionScore: null, conversionInsights: [], dealRisks: [] })
+    // conversionScorePinned: false — ensure pin is cleared so AI can re-score after reset
+    await patchDeal({ aiSummary: null, conversionScore: null, conversionScorePinned: false, conversionInsights: [], dealRisks: [] })
     setResetAIConfirm(false)
   }
 
@@ -2425,7 +2426,8 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
   }
 
   const resetAllAI = async () => {
-    await patchDeal({ aiSummary: null, conversionScore: null, conversionInsights: [], dealRisks: [] })
+    // conversionScorePinned: false — ensure pin is cleared so AI can re-score after reset
+    await patchDeal({ aiSummary: null, conversionScore: null, conversionScorePinned: false, conversionInsights: [], dealRisks: [] })
     setResetAIConfirm(false)
   }
 

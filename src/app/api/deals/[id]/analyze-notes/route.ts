@@ -22,6 +22,7 @@ const anthropic = new Anthropic()
 const AnalyzeNotesSchema = z.object({
   summary: z.string().nullable().optional(),
   risks: z.array(z.string()).default([]),
+  resolvedRisks: z.array(z.string()).default([]),
   todos: z.array(z.object({ text: z.string() })).default([]),
   obsoleteTodoIds: z.array(z.string()).default([]),
   productGaps: z.array(z.object({
@@ -84,6 +85,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       meetingNotes: dealLogs.meetingNotes,
       competitors: dealLogs.competitors,
       createdAt: dealLogs.createdAt,
+      conversionScorePinned: dealLogs.conversionScorePinned,
     }).from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -98,17 +100,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       ? `\n\nCONFIRMED PRODUCT CAPABILITIES (do NOT flag these as product gaps under any circumstances):\n${knownCapabilities.map(c => `- ${c}`).join('\n')}`
       : ''
 
-    // Compress meeting history to last 5 structured [date] entries only — skip raw email blobs
+    // Compress meeting history to last 10 structured entries — split on \n---\n separator
     // This prevents unbounded context growth while preserving recent trajectory
     function compressMeetingHistory(raw: string | null): string {
       if (!raw) return ''
-      const entries = raw.split('\n').reduce<string[]>((acc, line) => {
-        if (/^\[\d/.test(line)) acc.push(line)        // start of a new [date] entry
-        else if (acc.length > 0) acc[acc.length - 1] += ' ' + line.trim() // continuation
-        return acc
-      }, [])
-      const recent = entries.slice(-5) // keep only last 5 structured entries
-      return recent.join('\n')
+      const entries = raw.split('\n---\n').map(e => e.trim()).filter(Boolean)
+      const recent = entries.slice(-10) // keep last 10 entries
+      return recent.join('\n---\n')
     }
 
     const compressedHistory = compressMeetingHistory(deal.meetingNotes as string | null)
@@ -139,7 +137,8 @@ Deal: ${deal.dealName} with ${deal.prospectCompany}${capabilitiesContext}${exist
 Return this exact JSON — extract facts, do not score or judge:
 {
   "summary": "2-3 sentence factual summary of deal status and trajectory",
-  "risks": ["direct observation from THESE notes only — what was said or happened (max 10 words, e.g. 'No reply for 2 weeks' or 'Budget under review' or 'Evaluating Salesforce' — no inferences, no assumptions about unseen stakeholders or processes)"],
+  "risks": ["NEW risks from THESE notes only — what was said or happened (max 10 words, e.g. 'No reply for 2 weeks' or 'Budget under review' or 'Evaluating Salesforce' — no inferences, no assumptions about unseen stakeholders or processes). Do NOT repeat existing risks from context — only include brand new ones."],
+  "resolvedRisks": ["exact substring or close match of an EXISTING risk that is now resolved or no longer valid based on these notes — e.g. if 'No reply for 2 weeks' is in known risks and the prospect just replied, include it here"],
   "todos": [{"text": "specific action item"}],
   "obsoleteTodoIds": ["id-of-existing-todo-now-done-or-irrelevant"],
   "productGaps": [{"title": "gap title", "description": "what prospect said is missing", "priority": "high"}],
@@ -152,7 +151,8 @@ Return this exact JSON — extract facts, do not score or judge:
   }
 }
 
-Rules — risks: deal-level signals only (not product feature requests). Max 4. Return [] if none.
+Rules — risks: NEW deal-level signals only from THESE notes (not product feature requests, not repeating known risks). Max 4 new risks. Return [] if none.
+Rules — resolvedRisks: substrings of KNOWN RISKS that are now resolved. Return [] if none resolved.
 Rules — todos: new items only. No duplicates of existing open items. Return [] if none.
 Rules — obsoleteTodoIds: IDs of open items now done, superseded, or irrelevant. Return [].
 Rules — productGaps: only if prospect EXPLICITLY said your product lacks a feature/integration. Return [] otherwise.
@@ -221,7 +221,7 @@ priority: critical | high | medium | low` }],
       ? `[${dateStamp}] ${parsed.summary}${risksLine}${actionLine}`
       : `[${dateStamp}] Meeting notes processed (analysis unavailable)${actionLine}`
     const appendedNotes = deal.meetingNotes
-      ? `${deal.meetingNotes}\n${compactEntry}`
+      ? `${deal.meetingNotes}\n---\n${compactEntry}`
       : compactEntry
     // Remove obsolete todos entirely; deduplicate by normalising text; append new non-duplicate todos
     const existingKept = ((deal.todos as any[]) ?? []).filter((t: any) => !obsoleteIds.has(t.id))
@@ -238,10 +238,25 @@ priority: critical | high | medium | low` }],
     const newComps = extractedComps.filter(c => !existingCompKeys.has(c.toLowerCase()))
     const mergedCompetitors = newComps.length > 0 ? [...existingComps, ...newComps] : undefined
 
+    // Smart risk merge: keep existing risks minus resolved ones, add newly detected risks
+    const resolvedRisksRaw: string[] = parsed.resolvedRisks ?? []
+    const existingRisks: string[] = (deal.dealRisks as string[]) ?? []
+    const newRisks: string[] = parsed.risks ?? []
+    const survivingRisks = resolvedRisksRaw.length > 0
+      ? existingRisks.filter(r => !resolvedRisksRaw.some(resolved =>
+          r.toLowerCase().includes(resolved.toLowerCase()) ||
+          resolved.toLowerCase().includes(r.toLowerCase())
+        ))
+      : existingRisks
+    // Dedup new risks against surviving
+    const existingRiskKeys = new Set(survivingRisks.map(r => r.toLowerCase().slice(0, 40)))
+    const dedupedNewRisks = newRisks.filter(r => !existingRiskKeys.has(r.toLowerCase().slice(0, 40)))
+    const mergedRisks = [...survivingRisks, ...dedupedNewRisks]
+
     // Only overwrite aiSummary/conversionScore/insights if parse succeeded — never corrupt with raw text or nulls
     const updateFields: Record<string, unknown> = {
       meetingNotes: appendedNotes,
-      dealRisks: parsed.risks ?? [],
+      dealRisks: mergedRisks,
       todos: mergedTodos,
       updatedAt: new Date(),
     }
@@ -327,8 +342,11 @@ priority: critical | high | medium | low` }],
         }
       }
 
-      updateFields.conversionScore = finalScore
-      if (narratedInsights.length > 0) updateFields.conversionInsights = narratedInsights
+      // Only update score if not pinned by user — user-set scores are authoritative
+      if (!deal.conversionScorePinned) {
+        updateFields.conversionScore = Math.max(0, Math.min(100, Math.round(finalScore)))
+        if (narratedInsights.length > 0) updateFields.conversionInsights = narratedInsights
+      }
     } catch { /* non-fatal — deal saves without score if brain fails */ }
 
     // Persist intent signals — separate from scoring so a scoring failure doesn't lose them
