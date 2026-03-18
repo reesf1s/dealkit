@@ -18,9 +18,10 @@ const client = postgres(connectionString, {
   max: isPooler ? 1 : 3,
   idle_timeout: 20,
   connect_timeout: 10,
-  // Kill runaway queries after 25 seconds — prevents connection starvation
+  // Kill runaway queries after 55 seconds — prevents connection starvation
+  // (55s to stay within Vercel's 60s serverless function limit)
   connection: {
-    statement_timeout: 25000,
+    statement_timeout: 55000,
   },
   ssl: isSupabase ? 'require' : false,
   // pgBouncer in transaction mode doesn't support prepared statements

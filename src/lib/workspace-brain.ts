@@ -323,20 +323,31 @@ export async function getWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
   return rows[0]?.workspace_brain ?? null
 }
 
-// ── Rebuild deduplication ─────────────────────────────────────────────────────
+// ── Rebuild deduplication + cooldown ─────────────────────────────────────────
 // Prevents multiple simultaneous brain rebuilds for the same workspace (which
 // would each open DB connections, thrash the pool, and produce the same result).
-// In-process map — resets on cold start, but that's fine for serverless.
+// Cooldown: skip rebuild if one completed within the last 10 seconds — rapid
+// mutations (e.g. import_deal) would otherwise chain N rebuilds.
 const _rebuildInFlight = new Map<string, Promise<WorkspaceBrain>>()
+const _lastRebuildAt = new Map<string, number>()
+const REBUILD_COOLDOWN_MS = 10_000 // 10 seconds
 
 /** Rebuild and persist the brain from current deal state. Call in background after any deal mutation. */
 export async function rebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceBrain> {
+  // Cooldown: skip if rebuilt very recently and no rebuild is in flight
+  const lastAt = _lastRebuildAt.get(workspaceId) ?? 0
+  if (!_rebuildInFlight.has(workspaceId) && Date.now() - lastAt < REBUILD_COOLDOWN_MS) {
+    // Return current brain from DB without rebuilding
+    return getWorkspaceBrain(workspaceId).then(b => b ?? _doRebuildWorkspaceBrain(workspaceId))
+  }
+
   // Deduplicate: if a rebuild is already running for this workspace, wait for it
   const existing = _rebuildInFlight.get(workspaceId)
   if (existing) return existing
 
   const promise = _doRebuildWorkspaceBrain(workspaceId).finally(() => {
     _rebuildInFlight.delete(workspaceId)
+    _lastRebuildAt.set(workspaceId, Date.now())
   })
   _rebuildInFlight.set(workspaceId, promise)
   return promise
