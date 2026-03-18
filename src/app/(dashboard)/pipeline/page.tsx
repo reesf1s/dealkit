@@ -629,14 +629,24 @@ export default function PipelinePage() {
   const totalPipeline = deals
     .filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
     .reduce((sum: number, d: any) => sum + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
-  // Brain's Top Picks: prefer ML win probability, fall back to conversion score
+  // Brain's Top Picks: stage-weighted ranking so later-stage deals rank higher than
+  // early-stage deals with similar raw scores (Demo Phase shouldn't beat Verbal Commit).
+  // Stage norm: 0 = earliest active stage → 1 = latest active stage before closed.
+  const activeStageIds = activeStages.map((s: any) => s.id)
+  function dealStageNorm(stage: string): number {
+    const idx = activeStageIds.indexOf(stage)
+    if (idx === -1) return 0.5
+    return activeStageIds.length > 1 ? idx / (activeStageIds.length - 1) : 0.5
+  }
+  // compositeRank = rawScore × (0.5 + 0.5 × stageNorm)
+  // A negotiation deal (norm=1) gets full score weight; prospecting (norm=0) is halved.
+  function compositeRank(deal: any): number {
+    const raw = mlMap[deal.id]?.winProb ?? deal.conversionScore ?? 0
+    return raw * (0.5 + 0.5 * dealStageNorm(deal.stage))
+  }
   const topDeals = deals
     .filter((d: any) => (mlMap[d.id]?.winProb || d.conversionScore) && d.stage !== 'closed_won' && d.stage !== 'closed_lost')
-    .sort((a: any, b: any) => {
-      const aScore = mlMap[a.id]?.winProb ?? a.conversionScore ?? 0
-      const bScore = mlMap[b.id]?.winProb ?? b.conversionScore ?? 0
-      return bScore - aScore
-    })
+    .sort((a: any, b: any) => compositeRank(b) - compositeRank(a))
     .slice(0, 3)
 
   const urgentCount = Object.keys(urgentMap).length

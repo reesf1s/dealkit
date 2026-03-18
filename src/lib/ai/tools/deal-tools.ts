@@ -26,6 +26,23 @@ const DEAL_STAGES = [
 
 const stageEnum = z.string().describe('Deal stage: prospecting, qualification, discovery, proposal, negotiation, closed_won, closed_lost, or any custom stage ID')
 
+/** Active (non-closed) stages in default pipeline order. */
+const ACTIVE_STAGES = ['prospecting', 'qualification', 'discovery', 'proposal', 'negotiation']
+
+/**
+ * Convert a deal's stage string to a 0–1 normalised position within the pipeline.
+ * 0 = earliest active stage, 1 = latest active stage before closed.
+ * Unknown/custom stages default to 0.5 (mid-pipeline).
+ * pipelineStages allows custom pipelines to pass their ordered active stage IDs.
+ */
+function stageToNorm(stage: string | null | undefined, pipelineStages?: string[]): number {
+  if (!stage) return 0.5
+  const stages = pipelineStages ?? ACTIVE_STAGES
+  const idx = stages.indexOf(stage)
+  if (idx === -1) return 0.5 // custom / unknown — treat as mid-pipeline
+  return stages.length > 1 ? idx / (stages.length - 1) : 0.5
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -467,16 +484,17 @@ export const import_deal = {
         const signals = extractTextSignals(allText, created.createdAt ?? new Date(), new Date())
         const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
         const mlPred = brain?.mlPredictions?.find(p => p.dealId === created.id)
+        const sNorm = stageToNorm(params.stage, brain?.pipelineStages)
         let finalScore: number
         if (mlPred && brain?.mlModel) {
           const { composite } = computeCompositeScore(
-            heuristicScore(signals, 0.5),
+            heuristicScore(signals, sNorm),
             mlPred.winProbability,
             brain.mlModel.trainingSize,
           )
           finalScore = composite
         } else {
-          finalScore = heuristicScore(signals, 0.5)
+          finalScore = heuristicScore(signals, sNorm)
         }
         // Generate human-readable insights, not raw floats
         const insights: string[] = []
@@ -816,16 +834,17 @@ export const enrich_deal = {
           const signals = extractTextSignals(allText, existing.createdAt ?? new Date(), new Date())
           const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
           const mlPred = brain?.mlPredictions?.find((p: any) => p.dealId === params.dealId)
+          const sNorm = stageToNorm(params.stage ?? existing.stage, brain?.pipelineStages)
           let finalScore: number
           if (mlPred && brain?.mlModel) {
             const { composite } = computeCompositeScore(
-              heuristicScore(signals, 0.5),
+              heuristicScore(signals, sNorm),
               mlPred.winProbability,
               brain.mlModel.trainingSize,
             )
             finalScore = composite
           } else {
-            finalScore = heuristicScore(signals, 0.5)
+            finalScore = heuristicScore(signals, sNorm)
           }
           const insights: string[] = []
           if (signals.championStrength > 0.5) insights.push('Strong internal champion identified')
@@ -975,16 +994,17 @@ export const update_deal = {
           const signals = extractTextSignals(allText, existing.createdAt ?? new Date(), new Date())
           const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
           const mlPred = brain?.mlPredictions?.find((p: any) => p.dealId === params.dealId)
+          const sNorm = stageToNorm(params.stage ?? existing.stage, brain?.pipelineStages)
           let finalScore: number
           if (mlPred && brain?.mlModel) {
             const { composite } = computeCompositeScore(
-              heuristicScore(signals, 0.5),
+              heuristicScore(signals, sNorm),
               mlPred.winProbability,
               brain.mlModel.trainingSize,
             )
             finalScore = composite
           } else {
-            finalScore = heuristicScore(signals, 0.5)
+            finalScore = heuristicScore(signals, sNorm)
           }
           const insights: string[] = []
           if (signals.championStrength > 0.5) insights.push('Strong internal champion identified')
@@ -1555,17 +1575,19 @@ Rules:
         const signals = extractTextSignals(appendedNotes, deal.createdAt ?? new Date(), new Date())
         const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
         const mlPred = brain?.mlPredictions?.find(p => p.dealId === dealId)
+        const effectiveStage = (updateFields.stage as string | undefined) ?? deal.stage
+        const sNorm = stageToNorm(effectiveStage, brain?.pipelineStages)
 
         let finalScore: number
         if (mlPred && brain?.mlModel) {
           const { composite } = computeCompositeScore(
-            heuristicScore(signals, 0.5),
+            heuristicScore(signals, sNorm),
             mlPred.winProbability,
             brain.mlModel.trainingSize,
           )
           finalScore = composite
         } else {
-          finalScore = heuristicScore(signals, 0.5)
+          finalScore = heuristicScore(signals, sNorm)
         }
 
         // Intent signal adjustments

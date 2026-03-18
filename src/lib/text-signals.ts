@@ -437,5 +437,12 @@ export function heuristicScore(signals: TextSignals, stageNormalized?: number): 
   score -= (signals.objectionCategories.competitor ? 2  : 0)
   score -= (signals.engagementVelocity === 'decelerating' ? 5 : 0)
 
-  return Math.max(0, Math.min(100, Math.round(score)))
+  // Stage cap: early-stage deals cannot reach near-100% regardless of signals.
+  // A prospecting deal caps at 45, mid-pipeline at ~71, late-stage (negotiation) at ~97.
+  // This prevents Demo-phase deals with strong notes from outranking Verbal Commit deals.
+  const stageCap = stageNormalized !== undefined
+    ? Math.round(45 + stageNormalized * 52)
+    : 80 // no stage info → moderate cap
+
+  return Math.max(0, Math.min(stageCap, Math.round(score)))
 }
