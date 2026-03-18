@@ -471,7 +471,7 @@ export const import_deal = {
           finalScore = heuristicScore(signals, 0.5)
         }
         await db.update(dealLogs).set({
-          conversionScore: Math.round(finalScore * 100),
+          conversionScore: Math.max(0, Math.min(100, Math.round(finalScore))),
           conversionInsights: [
             `Momentum: ${signals.momentumScore.toFixed(2)}`,
             `Engagement: ${signals.engagementScore.toFixed(2)}`,
@@ -1446,7 +1446,7 @@ Rules:
         if (is.nextMeetingBooked) finalScore = Math.min(100, finalScore + 3)
       }
 
-      updateFields.conversionScore = finalScore
+      updateFields.conversionScore = Math.max(0, Math.min(100, Math.round(finalScore)))
     } catch { /* non-fatal */ }
 
     await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, dealId))
@@ -1864,6 +1864,11 @@ export const correct_deal_data = {
       phone: z.string().optional(),
       role: z.string().optional(),
     }).optional().describe('Update a specific contact\'s details'),
+    resetConversionScore: z.boolean().optional().describe('Set to true to clear the conversion score and insights (reset to null). Use when the AI wrongly set a score.'),
+    replaceConversionScore: z.number().optional().describe('Override the conversion score (0-100). Only use when the user explicitly provides a score.'),
+    replaceConversionInsights: z.array(z.string()).optional().describe('Replace conversion insights entirely. Pass [] to clear.'),
+    replaceMeetingNotes: z.string().optional().describe('Replace the entire meeting history (Activity Log). Use when the user says the history is wrong/corrupted.'),
+    replaceStage: stageEnum.optional().describe('Override the deal stage'),
     correctionNote: z.string().optional().describe('Why this correction was made — appended to meeting notes for audit trail'),
   }),
   execute: async (
@@ -1875,6 +1880,11 @@ export const correct_deal_data = {
       replaceCompetitors?: string[]
       removeContactIds?: string[]
       updateContact?: { contactId: string; name?: string; title?: string; email?: string; phone?: string; role?: string }
+      resetConversionScore?: boolean
+      replaceConversionScore?: number
+      replaceConversionInsights?: string[]
+      replaceMeetingNotes?: string
+      replaceStage?: string
       correctionNote?: string
     },
     ctx: ToolContext,
@@ -1930,6 +1940,34 @@ export const correct_deal_data = {
       })
       updateFields.contacts = contacts
       corrections.push('Contact details updated')
+    }
+
+    // Reset or replace conversion score
+    if (params.resetConversionScore) {
+      updateFields.conversionScore = null
+      updateFields.conversionInsights = []
+      corrections.push('Conversion score and insights cleared')
+    } else if (params.replaceConversionScore !== undefined) {
+      updateFields.conversionScore = params.replaceConversionScore
+      corrections.push(`Conversion score set to ${params.replaceConversionScore}%`)
+    }
+    if (params.replaceConversionInsights !== undefined) {
+      updateFields.conversionInsights = params.replaceConversionInsights
+      corrections.push(`Conversion insights replaced (${params.replaceConversionInsights.length} total)`)
+    }
+
+    // Replace meeting history entirely
+    if (params.replaceMeetingNotes !== undefined) {
+      updateFields.meetingNotes = params.replaceMeetingNotes || null
+      corrections.push('Activity log / meeting history replaced')
+    }
+
+    // Override stage
+    if (params.replaceStage) {
+      updateFields.stage = params.replaceStage
+      if (params.replaceStage === 'closed_won') updateFields.wonDate = new Date()
+      if (params.replaceStage === 'closed_lost') updateFields.lostDate = new Date()
+      corrections.push(`Stage corrected to ${params.replaceStage}`)
     }
 
     // Append correction note to meeting notes for audit trail

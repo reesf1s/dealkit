@@ -52,8 +52,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     await ensureDealColumns()
     const body = await req.json()
     const updateData: Record<string, unknown> = { updatedAt: new Date() }
-    const fields = ['dealName','prospectCompany','prospectName','prospectTitle','contacts','description','dealValue','stage','competitors','notes','meetingNotes','aiSummary','conversionScore','conversionInsights','dealRisks','todos','nextSteps','closeDate','wonDate','lostDate','lostReason','dealType','recurringInterval','kanbanOrder','projectPlan','links','parentDealId','expansionType','contractStartDate','contractEndDate']
-    for (const f of fields) if (body[f] !== undefined) updateData[f] = body[f]
+    const fields = ['dealName','prospectCompany','prospectName','prospectTitle','contacts','description','dealValue','stage','competitors','notes','meetingNotes','aiSummary','conversionScore','conversionInsights','dealRisks','todos','nextSteps','closeDate','wonDate','lostDate','lostReason','dealType','recurringInterval','kanbanOrder','projectPlan','links','parentDealId','expansionType','contractStartDate','contractEndDate','successCriteria','successCriteriaTodos']
+    // Date fields need explicit conversion — Drizzle expects Date objects for timestamptz
+    const dateFields = new Set(['closeDate', 'wonDate', 'lostDate', 'contractStartDate', 'contractEndDate'])
+    for (const f of fields) {
+      if (body[f] === undefined) continue
+      if (dateFields.has(f)) {
+        updateData[f] = body[f] ? new Date(body[f]) : null
+      } else {
+        updateData[f] = body[f]
+      }
+    }
     const [updated] = await db.update(dealLogs).set(updateData).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).returning()
     await logEvent(workspaceId, userId, 'deal_log.updated', { dealLogId: id, dealName: updated.dealName })
     after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
