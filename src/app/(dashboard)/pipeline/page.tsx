@@ -6,10 +6,10 @@ import Link from 'next/link'
 import { useState, useRef } from 'react'
 import { useSidebar } from '@/components/layout/SidebarContext'
 import {
-  Plus, TrendingUp, DollarSign, Sparkles,
-  CheckSquare, MoreHorizontal, Target, Zap, ArrowUpRight,
+  Plus, TrendingUp, Sparkles, DollarSign,
+  Target, Zap, MoreHorizontal, ArrowUpRight,
   Star, AlertTriangle, Clock, Calendar,
-  Settings, Edit, X, Trash2, Check,
+  Settings, Edit, X, Trash2, Check, CheckSquare,
   Kanban, List, ChevronUp, ChevronDown,
   ChevronLeft, ChevronRight, Send, Home,
   BarChart3, Brain,

@@ -15,9 +15,10 @@ import { useTheme } from './ThemeContext'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
-// Nav: AI-first — Today (command centre) + visual board + collateral + intel
+// Nav: AI-first — Dashboard (morning briefing) + Today (command centre) + visual board + collateral + intel
 const CORE_ITEMS = [
-  { href: '/pipeline',   icon: Home,            label: 'Today',        matchPaths: ['/pipeline', '/deals', '/dashboard'] },
+  { href: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',    matchPaths: ['/dashboard'] },
+  { href: '/pipeline',   icon: Home,            label: 'Today',        matchPaths: ['/pipeline', '/deals'] },
   { href: '/models',     icon: Brain,           label: 'Models',       matchPaths: ['/models'] },
   { href: '/playbook',   icon: BookOpen,        label: 'Playbook',     matchPaths: ['/playbook'] },
   { href: '/collateral', icon: Zap,             label: 'Collateral',   matchPaths: ['/collateral'] },
