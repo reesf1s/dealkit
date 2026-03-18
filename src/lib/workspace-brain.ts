@@ -380,6 +380,18 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
   ])
 
   const now = new Date()
+
+  // ── Auto-fix corrupted scores (from the *100 bug) ──
+  for (const d of deals) {
+    if (d.conversionScore != null && (d.conversionScore > 100 || d.conversionScore < 0)) {
+      const fixed = Math.max(0, Math.min(100, Math.round(d.conversionScore / 100)))
+      try {
+        await db.update(dealLogs).set({ conversionScore: fixed, updatedAt: now }).where(eq(dealLogs.id, d.id))
+        d.conversionScore = fixed
+      } catch { /* non-fatal */ }
+    }
+  }
+
   const activeDeals = deals.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
 
   // ── Extract text signals for ALL deals upfront (used for ML features and signal summaries) ──
@@ -403,7 +415,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
       name: d.dealName,
       company: d.prospectCompany,
       stage: d.stage,
-      conversionScore: d.conversionScore,
+      conversionScore: d.conversionScore != null ? Math.max(0, Math.min(100, d.conversionScore)) : null,
       dealValue: d.dealValue,
       risks: (d.dealRisks as string[]) ?? [],
       pendingTodos: pending.slice(0, 8),
