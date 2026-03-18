@@ -7,6 +7,7 @@ import { anthropic } from '@/lib/ai/client'
 import { rebuildWorkspaceBrain, getWorkspaceBrain } from '@/lib/workspace-brain'
 import { extractTextSignals, heuristicScore } from '@/lib/text-signals'
 import { computeCompositeScore } from '@/lib/deal-ml'
+import { buildDealBriefing, scoreNarrationPrompt } from '@/lib/brain-narrator'
 import type { ToolContext, ToolResult } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1446,7 +1447,7 @@ Rules:
       ? `[${dateStamp}] ${parsed.summary}${risksLine}${actionLine}`
       : `[${dateStamp}] Meeting notes processed.${actionLine}`
 
-    const appendedNotes = deal.meetingNotes ? `${deal.meetingNotes}\n${compactEntry}` : compactEntry
+    const appendedNotes = deal.meetingNotes ? `${deal.meetingNotes}\n---\n${compactEntry}` : compactEntry
 
     // Merge todos: remove obsolete, dedup, append new
     const existingKept = existingTodos.filter((t: any) => !obsoleteIds.has(t.id))
@@ -1581,6 +1582,39 @@ Rules:
         updateFields.conversionScore = Math.max(0, Math.min(100, Math.round(finalScore)))
       } catch { /* non-fatal */ }
     }
+
+    // Phase 3: Regenerate conversionInsights — always, even when score is pinned.
+    // Insights must reflect current reality (post-merge risks, new summary), not stale state.
+    // This is what the UI shows as "INSIGHTS" — critical to keep accurate.
+    try {
+      const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
+      const currentScore = (updateFields.conversionScore as number | undefined) ?? (deal as any).conversionScore ?? 50
+      const signals = extractTextSignals(appendedNotes, deal.createdAt ?? new Date(), new Date())
+      const briefing = buildDealBriefing(brain ?? null, dealId, {
+        dealName: deal.dealName,
+        company: deal.prospectCompany ?? '',
+        stage: (updateFields.stage as string | undefined) ?? deal.stage,
+        dealRisks: mergedRisks,          // use POST-merge risks so resolved ones don't appear
+        dealCompetitors: mergedCompetitors ?? (deal.competitors as string[]) ?? [],
+        conversionScore: currentScore,
+        meetingNotes: appendedNotes,
+      }, signals)
+      const narrationMsg = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 400,
+        messages: [{ role: 'user', content: scoreNarrationPrompt(briefing) }],
+      })
+      const narration = (narrationMsg.content[0] as any)?.text?.trim() ?? ''
+      const freshInsights = narration
+        .split('\n')
+        .map((l: string) => l.replace(/^[-•*·]\s*/, '').trim())
+        .filter((l: string) => l.length > 8)
+        .filter((l: string) => !/\d+\/100/i.test(l))
+        .slice(0, 3)
+      if (freshInsights.length > 0) {
+        updateFields.conversionInsights = freshInsights
+      }
+    } catch { /* non-fatal — insights stay as-is if narration fails */ }
 
     await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, dealId))
 
