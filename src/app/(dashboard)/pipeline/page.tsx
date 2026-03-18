@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 
 import useSWR, { mutate } from 'swr'
 import Link from 'next/link'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useSidebar } from '@/components/layout/SidebarContext'
 import {
   Plus, TrendingUp, Sparkles,
@@ -13,6 +13,9 @@ import {
   Kanban, List, ChevronUp, ChevronDown,
   ChevronLeft, ChevronRight, Send, Home,
   BarChart3, Brain,
+  Info, TrendingDown, Users, DollarSign,
+  CheckCircle, XCircle, ArrowUp, ArrowDown, Minus,
+  Lock,
 } from 'lucide-react'
 import WinLossModal, { type WinLossData } from '@/components/shared/WinLossModal'
 
@@ -438,7 +441,81 @@ function PipelineSettings({
   )
 }
 
-// ── Insights View ────────────────────────────────────────────────────────────
+
+// ── Inline Tooltip helper ─────────────────────────────────────────────────────
+function InfoTooltip({ text }: { text: string }) {
+  const [show, setShow] = useState(false)
+  return (
+    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+      <button
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        style={{ background: 'none', border: 'none', padding: '1px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-tertiary)' }}
+      >
+        <Info size={11} />
+      </button>
+      {show && (
+        <div style={{
+          position: 'absolute', bottom: '120%', left: '50%', transform: 'translateX(-50%)',
+          background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px',
+          padding: '8px 10px', fontSize: '11px', color: '#d1d5db', lineHeight: 1.5,
+          width: '220px', zIndex: 100, pointerEvents: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+        }}>
+          {text}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Animated number counter ───────────────────────────────────────────────────
+function AnimatedNumber({ target, duration = 300 }: { target: number; duration?: number }) {
+  const [val, setVal] = useState(0)
+  useEffect(() => {
+    if (target === 0) return
+    const start = Date.now()
+    const tick = () => {
+      const elapsed = Date.now() - start
+      const progress = Math.min(elapsed / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setVal(Math.round(target * eased))
+      if (progress < 1) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  }, [target, duration])
+  return <>{val}</>
+}
+
+// ── Animated progress bar ─────────────────────────────────────────────────────
+function AnimatedBar({ pct, color }: { pct: number; color: string }) {
+  const [width, setWidth] = useState(0)
+  useEffect(() => {
+    const t = setTimeout(() => setWidth(pct), 50)
+    return () => clearTimeout(t)
+  }, [pct])
+  return (
+    <div style={{ height: '6px', borderRadius: '3px', background: 'var(--border)', overflow: 'hidden', flex: 1 }}>
+      <div style={{ height: '100%', width: `${width}%`, background: color, borderRadius: '3px', transition: 'width 500ms ease-out' }} />
+    </div>
+  )
+}
+
+// ── Mini SVG Sparkline ────────────────────────────────────────────────────────
+function Sparkline({ points, color = '#6366f1', w = 100, h = 28 }: { points: number[]; color?: string; w?: number; h?: number }) {
+  if (points.length < 2) return null
+  const min = Math.min(...points)
+  const max = Math.max(...points)
+  const range = max - min || 1
+  const step = w / (points.length - 1)
+  const coords = points.map((p, i) => `${(i * step).toFixed(1)},${(h - ((p - min) / range) * (h - 4) - 2).toFixed(1)}`).join(' ')
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }}>
+      <polyline points={coords} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// ── Insights View ─────────────────────────────────────────────────────────────
 function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
   brainData: any; deals: any[]; currencySymbol: string
   onAsk: (q: string) => void
@@ -452,31 +529,41 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
   }
 
   const wl = brainData.winLossIntel
-  // pipelineHealthIndex is an object {score, interpretation, keyInsight, ...}
   const phiObj = brainData.pipelineHealthIndex
   const phiScore: number | undefined = phiObj?.score
-  // revenueForecasts is RevenueForecast[] — aggregate for display
   const rfArr: any[] = brainData.revenueForecasts ?? []
-  const rfNextMonth = rfArr[0]?.expectedRevenue
-  const rfQuarter = rfArr.reduce((s: number, r: any) => s + (r.expectedRevenue ?? 0), 0) || undefined
-  const rfConfidence = rfArr.length > 0 ? Math.round(rfArr.reduce((s: number, r: any) => s + (r.avgConfidence ?? 0), 0) / rfArr.length) : undefined
   const ml = brainData.mlModel
   const archetypes: any[] = brainData.dealArchetypes ?? []
-  const patterns: any[] = brainData.competitivePatterns ?? []
   const scoreTrends: any[] = brainData.scoreTrendAlerts ?? []
   const mlTrends = brainData.mlTrends
+  const stageVelocityIntel = brainData.stageVelocityIntel
+  const objectionWinMap: any[] = brainData.objectionWinMap ?? []
+  const competitivePatterns: any[] = brainData.competitivePatterns ?? []
+
+  const openDeals = deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+
+  // Probability-weighted forecast from open deals
+  const weightedForecast = openDeals.reduce((sum: number, d: any) => sum + ((d.dealValue ?? 0) * ((d.conversionScore ?? 0) / 100)), 0)
+
+  // Score history for PHI sparkline
+  const phiHistory: number[] = (() => {
+    const cal = brainData.calibrationTimeline
+    if (cal && cal.length >= 2) return cal.slice(-12).map((p: any) => p.score ?? phiScore ?? 50)
+    return []
+  })()
 
   const cardStyle: React.CSSProperties = {
     background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
     border: '1px solid var(--card-border)', borderRadius: '16px', padding: '18px 20px',
     display: 'flex', flexDirection: 'column', gap: '12px',
+    transition: 'border-color 0.15s',
   }
   const labelStyle: React.CSSProperties = {
     fontSize: '10px', fontWeight: '700', color: 'var(--text-tertiary)',
-    letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '4px',
+    letterSpacing: '0.08em', textTransform: 'uppercase',
   }
-  const bigNum = (n: number | undefined | null, suffix = '') =>
-    n != null ? `${n}${suffix}` : '—'
+  const fmtCurrency = (n: number) => `${currencySymbol}${Math.round(n).toLocaleString()}`
+  const scoreColor = (s: number) => s >= 70 ? '#059669' : s >= 40 ? '#D97706' : '#DC2626'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -491,91 +578,101 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
         </p>
       </div>
 
-      {/* Row 1: Pipeline Health + Win/Loss Record */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+      {/* Row 1: Pipeline Health + Win/Loss Record + ML Model */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
 
         {/* Pipeline Health Index */}
         {phiScore != null && (
-          <div style={cardStyle}>
-            <div style={labelStyle}>Pipeline Health</div>
+          <div
+            style={cardStyle}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--card-border)'}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={labelStyle}>Pipeline Health</div>
+              <InfoTooltip text="A composite 0–100 score based on stage depth, deal velocity, ML win probability, and deal momentum." />
+            </div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
               <div style={{
                 fontSize: '42px', fontWeight: '800', lineHeight: 1,
                 color: phiScore >= 70 ? 'var(--success)' : phiScore >= 40 ? 'var(--warning)' : 'var(--danger)',
-              }}>{phiScore}</div>
+              }}>
+                <AnimatedNumber target={phiScore} />
+              </div>
               <div style={{ fontSize: '13px', color: 'var(--text-secondary)', paddingBottom: '4px' }}>/100</div>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: phiScore >= 70 ? 'var(--success)' : phiScore >= 40 ? 'var(--warning)' : 'var(--danger)', paddingBottom: '4px', marginLeft: '4px' }}>
+                {phiObj?.interpretation ?? ''}
+              </div>
             </div>
-            <div style={{ height: '4px', borderRadius: '2px', background: 'var(--border)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${phiScore}%`, borderRadius: '2px', background: phiScore >= 70 ? 'var(--success)' : phiScore >= 40 ? 'var(--warning)' : 'var(--danger)', transition: 'width 0.4s' }} />
-            </div>
+            <AnimatedBar pct={phiScore} color={phiScore >= 70 ? 'var(--success)' : phiScore >= 40 ? 'var(--warning)' : 'var(--danger)'} />
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
               {phiObj?.keyInsight ?? (phiScore >= 70 ? 'Pipeline is healthy and on track' : phiScore >= 40 ? 'Some areas need attention' : 'Pipeline needs significant work')}
             </div>
+            {phiHistory.length >= 2 ? (
+              <div style={{ marginTop: '4px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Last {phiHistory.length} data points</div>
+                <Sparkline points={phiHistory} color={phiScore >= 70 ? '#059669' : phiScore >= 40 ? '#D97706' : '#DC2626'} w={120} h={28} />
+              </div>
+            ) : (
+              <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+                Trend builds as you add deals
+              </div>
+            )}
           </div>
         )}
 
         {/* Win/Loss Record */}
-        {wl && (
-          <div style={cardStyle}>
+        {wl ? (
+          <div
+            style={cardStyle}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--card-border)'}
+          >
             <div style={labelStyle}>Win / Loss Record</div>
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-end' }}>
               <div>
                 <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--success)', lineHeight: 1 }}>{wl.winCount ?? 0}W</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{wl.avgWonValue ? `avg ${currencySymbol}${Math.round(wl.avgWonValue).toLocaleString()}` : ''}</div>
+                {wl.avgWonValue ? (
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>avg {fmtCurrency(wl.avgWonValue)}</div>
+                ) : null}
               </div>
-              <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--danger)', lineHeight: 1, paddingBottom: '2px' }}>{wl.lossCount ?? 0}L</div>
+              <div>
+                <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--danger)', lineHeight: 1 }}>{wl.lossCount ?? 0}L</div>
+              </div>
             </div>
             {wl.winRate != null && (
               <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                 {wl.winRate}% win rate
                 {wl.avgDaysToClose != null && (
-                  <span style={{ marginLeft: '8px', color: 'var(--text-tertiary)' }}>· avg {Math.round(wl.avgDaysToClose)}d to close</span>
+                  <span style={{ marginLeft: '8px', color: 'var(--text-tertiary)' }}>&middot; avg {Math.round(wl.avgDaysToClose)} days to close</span>
                 )}
               </div>
             )}
-            {wl.topLossReasons?.length > 0 && (
+            {(wl.lossCount ?? 0) === 0 ? (
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontStyle: 'italic', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
+                Log your first lost deal to unlock competitive loss analysis
+              </div>
+            ) : wl.topLossReasons?.length > 0 ? (
               <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
                 Top loss reason: {String(wl.topLossReasons[0])}
               </div>
-            )}
+            ) : null}
           </div>
-        )}
-
-        {/* Revenue Forecast */}
-        {rfArr.length > 0 && (
-          <div style={cardStyle}>
-            <div style={labelStyle}>Revenue Forecast</div>
-            {rfNextMonth != null && (
-              <div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Next 30 days</div>
-                <div style={{ fontSize: '26px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>
-                  {currencySymbol}{Math.round(rfNextMonth).toLocaleString()}
-                </div>
-              </div>
-            )}
-            {rfQuarter != null && rfArr.length > 1 && (
-              <div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>Next {rfArr.length} months</div>
-                <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-secondary)', lineHeight: 1 }}>
-                  {currencySymbol}{Math.round(rfQuarter).toLocaleString()}
-                </div>
-              </div>
-            )}
-            {rfConfidence != null && (
-              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                {rfConfidence}% avg confidence
-              </div>
-            )}
-          </div>
-        )}
+        ) : null}
 
         {/* ML Model accuracy */}
         {ml && (
-          <div style={cardStyle}>
+          <div
+            style={cardStyle}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--card-border)'}
+          >
             <div style={labelStyle}>ML Model</div>
             {ml.looAccuracy != null && (
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
-                <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--accent)', lineHeight: 1 }}>{Math.round(ml.looAccuracy * 100)}%</div>
+                <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--accent)', lineHeight: 1 }}>
+                  <AnimatedNumber target={Math.round(ml.looAccuracy * 100)} />%
+                </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', paddingBottom: '4px' }}>accuracy</div>
               </div>
             )}
@@ -593,9 +690,238 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
         )}
       </div>
 
-      {/* Row 2: Score Trend Alerts */}
+      {/* Row 2: Deal Score Distribution (full width) */}
+      <div
+        style={cardStyle}
+        onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
+        onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--card-border)'}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={labelStyle}>Deal Score Distribution</div>
+          <InfoTooltip text="Scores are calculated using text signals from your meeting notes and your private ML model (when activated)." />
+        </div>
+        {openDeals.length < 3 ? (
+          <div style={{ textAlign: 'center', padding: '20px', fontSize: '12px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+            Add more deals to see your score distribution
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {[...openDeals]
+              .sort((a: any, b: any) => (b.conversionScore ?? 0) - (a.conversionScore ?? 0))
+              .map((deal: any) => {
+                const s = deal.conversionScore ?? 0
+                const c = scoreColor(s)
+                const name = (deal.dealName || deal.prospectCompany || 'Deal').slice(0, 22)
+                const stageLabel = STAGES.find((st: any) => st.id === deal.stage)?.label ?? deal.stage ?? ''
+                return (
+                  <div key={deal.id}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{ width: '140px', fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        {name}
+                      </div>
+                      <AnimatedBar pct={s} color={c} />
+                      <div style={{ width: '36px', textAlign: 'right', fontSize: '12px', fontWeight: '700', color: c, flexShrink: 0 }}>{s}%</div>
+                    </div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginLeft: '150px', marginTop: '1px' }}>{stageLabel}</div>
+                  </div>
+                )
+              })}
+          </div>
+        )}
+      </div>
+
+      {/* Row 3: Stage Velocity + Top Objections */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+
+        {/* Stage Velocity */}
+        <div
+          style={cardStyle}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--card-border)'}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={labelStyle}>Stage Velocity</div>
+            <InfoTooltip text="Stage velocity shows how long deals typically take at each stage based on your won deals. Deals exceeding the average may be stalling." />
+          </div>
+          {(() => {
+            const stageStats: any[] = stageVelocityIntel?.stageStats ?? []
+            const hasHistory = stageStats.length > 0
+            const openStages = STAGES.filter((s: any) => s.id !== 'closed_won' && s.id !== 'closed_lost')
+            const rows = openStages.map((s: any) => {
+              const count = openDeals.filter((d: any) => d.stage === s.id).length
+              const stat = stageStats.find((st: any) => st.stage === s.id)
+              return { id: s.id, label: s.label, color: s.color, count, avgDays: stat?.p50Days ?? null }
+            }).filter((r: any) => r.count > 0 || r.avgDays != null)
+            if (rows.length === 0) return (
+              <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+                Add deals to see stage velocity data
+              </div>
+            )
+            return (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {rows.map((r: any) => (
+                    <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: r.color, flexShrink: 0 }} />
+                      <div style={{ flex: 1, fontSize: '12px', fontWeight: '500', color: 'var(--text-primary)' }}>{r.label}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{r.count} deal{r.count !== 1 ? 's' : ''}</div>
+                      {r.avgDays != null ? (
+                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>avg {r.avgDays}d</div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+                {!hasHistory && (
+                  <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontStyle: 'italic', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
+                    Close 5+ deals to see velocity benchmarks
+                  </div>
+                )}
+              </>
+            )
+          })()}
+        </div>
+
+        {/* Top Objections */}
+        <div
+          style={cardStyle}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--card-border)'}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={labelStyle}>Top Objections</div>
+            <InfoTooltip text="SellSight detects objection themes from your meeting notes and tracks whether deals with each objection type tend to close." />
+          </div>
+          {objectionWinMap.length === 0 ? (
+            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+              Objections are auto-extracted from your meeting notes. Paste notes from your next call to start tracking.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {objectionWinMap.slice(0, 5).map((o: any, i: number) => {
+                const wr = o.winRateWithTheme ?? 0
+                const wrColor = wr >= 60 ? '#059669' : wr >= 40 ? '#D97706' : '#DC2626'
+                return (
+                  <div key={i} style={{ padding: '8px 10px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', flex: 1 }}>{o.theme}</div>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: wrColor, flexShrink: 0 }}>{wr}% win rate</div>
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                      {o.dealsWithTheme ?? 0} deal{(o.dealsWithTheme ?? 0) !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Row 4: Competitor Win Rates + Revenue Forecast */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+
+        {/* Competitor Win Rates */}
+        <div
+          style={cardStyle}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--card-border)'}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={labelStyle}>Competitor Win Rates</div>
+            <InfoTooltip text="Updated automatically when deals close. Shows your historical record against each competitor." />
+          </div>
+          {competitivePatterns.length === 0 ? (
+            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+              Add competitors to your deals or mention them in meeting notes to track win rates automatically.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {competitivePatterns.slice(0, 6).map((p: any, i: number) => {
+                const wr = p.winRate ?? 0
+                const wrColor = wr >= 60 ? '#059669' : wr >= 40 ? '#D97706' : '#DC2626'
+                const wins = p.wins ?? 0
+                const losses = p.losses ?? 0
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 10px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <div style={{ flex: 1, fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{p.competitor}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{wins}W {losses}L</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ width: '50px', height: '5px', borderRadius: '3px', background: 'var(--border)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${wr}%`, background: wrColor, borderRadius: '3px', transition: 'width 500ms ease-out' }} />
+                      </div>
+                      <div style={{ fontSize: '11px', fontWeight: '700', color: wrColor, width: '32px', textAlign: 'right' }}>{wr}%</div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+          {competitivePatterns.length > 0 && (
+            <button
+              onClick={() => onAsk('Analyse our competitive win/loss patterns and give me specific recommendations for how to beat each competitor we face.')}
+              style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+            >
+              <Sparkles size={10} /> Competitive Strategy
+            </button>
+          )}
+        </div>
+
+        {/* Revenue Forecast */}
+        <div
+          style={cardStyle}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--card-border)'}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={labelStyle}>Revenue Forecast</div>
+            <InfoTooltip text="Each deal's value is multiplied by its ML win probability to give an honest forecast — not a gut-feel number." />
+          </div>
+          {weightedForecast > 0 ? (
+            <>
+              <div>
+                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Weighted forecast</div>
+                <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>
+                  {currencySymbol}<AnimatedNumber target={Math.round(weightedForecast)} />
+                </div>
+              </div>
+              {rfArr.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                  {rfArr.slice(0, 4).map((r: any, i: number) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>{r.month}</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{fmtCurrency(r.expectedRevenue)}</span>
+                      <span style={{ color: 'var(--text-tertiary)' }}>{r.dealCount} deal{r.dealCount !== 1 ? 's' : ''}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {(() => {
+                const cutoff = Date.now() - 90 * 86_400_000
+                const recentWon = deals.filter((d: any) => d.stage === 'closed_won' && new Date(d.wonDate ?? d.updatedAt).getTime() > cutoff)
+                const closedRev = recentWon.reduce((s: number, d: any) => s + (d.dealValue ?? 0), 0)
+                if (closedRev <= 0) return null
+                return (
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: '8px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    Closed (last 90 days): <strong style={{ color: 'var(--success)' }}>{fmtCurrency(closedRev)}</strong>
+                  </div>
+                )
+              })()}
+            </>
+          ) : (
+            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+              Set close dates on your deals to see a probability-weighted revenue forecast
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Score Trend Alerts */}
       {scoreTrends.length > 0 && (
-        <div style={cardStyle}>
+        <div
+          style={cardStyle}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--card-border)'}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
             <TrendingUp size={14} style={{ color: 'var(--accent)' }} />
             <div style={labelStyle}>Score Trends</div>
@@ -605,10 +931,10 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
               const isDown = t.trend === 'declining' || (t.delta ?? 0) < 0
               return (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 12px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                  {isDown ? <TrendingUp size={13} style={{ color: 'var(--danger)', flexShrink: 0, transform: 'scaleY(-1)' }} /> : <TrendingUp size={13} style={{ color: 'var(--success)', flexShrink: 0 }} />}
+                  {isDown ? <TrendingDown size={13} style={{ color: 'var(--danger)', flexShrink: 0 }} /> : <TrendingUp size={13} style={{ color: 'var(--success)', flexShrink: 0 }} />}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{t.company ?? t.dealName}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(t.message ?? (isDown ? 'Win probability declining' : 'Score improving'))}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(t.message ?? (isDown ? 'Win probability declining' : 'Engagement strengthening'))}</div>
                   </div>
                   {t.delta != null && (
                     <div style={{ fontSize: '12px', fontWeight: '700', color: isDown ? 'var(--danger)' : 'var(--success)', flexShrink: 0 }}>
@@ -628,64 +954,44 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
         </div>
       )}
 
-      {/* Row 3: Deal Archetypes + Competitive Patterns */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
-
-        {archetypes.length > 0 && (
-          <div style={cardStyle}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Star size={14} style={{ color: 'var(--accent)' }} />
-              <div style={labelStyle}>Deal Archetypes</div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {archetypes.slice(0, 4).map((a: any, i: number) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 10px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+      {/* Deal Archetypes — only if ML trained on 10+ deals */}
+      {archetypes.length > 0 && (ml?.trainingSize ?? 0) >= 10 && (
+        <div
+          style={cardStyle}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--card-border)'}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Star size={14} style={{ color: 'var(--accent)' }} />
+            <div style={labelStyle}>Deal Archetypes</div>
+            <InfoTooltip text="Archetypes are natural groupings discovered by the ML model from your closed deal patterns." />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
+            {archetypes.slice(0, 6).map((a: any, i: number) => (
+              <div key={i} style={{ padding: '12px 14px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <div style={{ flexShrink: 0, width: '22px', height: '22px', borderRadius: '6px', background: 'var(--accent-subtle)', border: '1px solid var(--border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--accent)' }}>{i + 1}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{a.label ?? a.name ?? `Archetype ${a.id ?? i + 1}`}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{String(a.winningCharacteristic ?? a.description ?? '')}</div>
-                    {a.winRate != null && <div style={{ fontSize: '11px', color: 'var(--success)', marginTop: '2px' }}>{a.winRate}% win rate · {a.dealCount ?? 0} deals</div>}
-                  </div>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>{a.label ?? a.name ?? `Archetype ${i + 1}`}</div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {patterns.length > 0 && (
-          <div style={cardStyle}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Target size={14} style={{ color: 'var(--accent)' }} />
-              <div style={labelStyle}>Competitive Patterns</div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {patterns.slice(0, 4).map((p: any, i: number) => (
-                <div key={i} style={{ padding: '8px 10px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{p.competitor}</div>
-                    {p.winRate != null && (
-                      <div style={{ fontSize: '11px', fontWeight: '700', color: p.winRate >= 50 ? 'var(--success)' : 'var(--danger)' }}>
-                        {p.winRate}% win
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{String(p.topLossRisk ?? p.topWinCondition ?? '')}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  {a.winRate != null && <div style={{ fontSize: '11px', color: 'var(--success)' }}>{a.winRate}% win rate</div>}
+                  {a.dealCount != null && <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{a.dealCount} deals</div>}
+                  {a.avgDealValue != null && <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>avg {fmtCurrency(a.avgDealValue)}</div>}
+                  {a.avgDaysToClose != null && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>avg {Math.round(a.avgDaysToClose)} days</div>}
                 </div>
-              ))}
-            </div>
-            <button
-              onClick={() => onAsk('Analyse our competitive win/loss patterns and give me specific recommendations for how to beat each competitor we face.')}
-              style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
-            >
-              <Sparkles size={10} /> Competitive Strategy
-            </button>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Row 4: ML Trends summary */}
+      {/* ML Pipeline Trends */}
       {mlTrends && (
-        <div style={cardStyle}>
+        <div
+          style={cardStyle}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--card-border)'}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <BarChart3 size={14} style={{ color: 'var(--accent)' }} />
             <div style={labelStyle}>Pipeline Trends</div>
@@ -697,7 +1003,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
                 <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' }}>{Math.round(mlTrends.dealVelocity.recentAvgDays)}d</div>
                 {mlTrends.dealVelocity.direction !== 'stable' && (
                   <div style={{ fontSize: '10px', color: mlTrends.dealVelocity.direction === 'faster' ? 'var(--success)' : 'var(--warning)' }}>
-                    {mlTrends.dealVelocity.direction === 'faster' ? '↑ Faster' : '↓ Slower'} vs prior
+                    {mlTrends.dealVelocity.direction === 'faster' ? '\u2191 Faster' : '\u2193 Slower'} vs prior
                   </div>
                 )}
               </div>
@@ -708,7 +1014,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
                 <div style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)' }}>{Math.round(mlTrends.winRate.recentPct)}%</div>
                 {mlTrends.winRate.direction !== 'stable' && (
                   <div style={{ fontSize: '10px', color: mlTrends.winRate.direction === 'improving' ? 'var(--success)' : 'var(--danger)' }}>
-                    {mlTrends.winRate.direction === 'improving' ? '↑ Improving' : '↓ Declining'}
+                    {mlTrends.winRate.direction === 'improving' ? '\u2191 Improving' : '\u2193 Declining'}
                   </div>
                 )}
               </div>
@@ -723,7 +1029,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
             )}
           </div>
           <button
-            onClick={() => onAsk('Analyse my pipeline trends and tell me what\'s changed, what the data says about where my revenue will come from this quarter, and what I should do differently.')}
+            onClick={() => onAsk("Analyse my pipeline trends and tell me what's changed, what the data says about where my revenue will come from this quarter, and what I should do differently.")}
             style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 14px', borderRadius: '8px', background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10))', border: '1px solid rgba(99,102,241,0.25)', color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
           >
             <Sparkles size={10} /> Deep Analysis
@@ -731,10 +1037,10 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
         </div>
       )}
 
-      {/* Empty state when brain has no insights yet */}
+      {/* Empty state */}
       {!wl && !phiScore && !rfArr.length && !ml && archetypes.length === 0 && scoreTrends.length === 0 && (
         <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-          <div style={{ fontSize: '40px', marginBottom: '12px' }}>🧠</div>
+          <div style={{ fontSize: '40px', marginBottom: '12px' }}>&#x1F9E0;</div>
           <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>Building your ML model</div>
           <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Insights appear as you add deals and the AI analyses your pipeline patterns.</div>
         </div>
@@ -742,6 +1048,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
     </div>
   )
 }
+
 
 // ── Calendar View ────────────────────────────────────────────────────────────
 type CalEvent = {
@@ -1091,6 +1398,82 @@ function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
       )}
     </div>
   )
+}
+
+// ── getDealAction: returns specific action for each deal ─────────────────────
+function getDealAction(deal: any, brain: any, daysInStage: number): {
+  type: string; label: string; description: string; colour: string
+} {
+  const score = deal.conversionScore ?? 0
+  const stage = deal.stage ?? ''
+  const now = Date.now()
+
+  // 1. Close window approaching
+  if (deal.closingDate || deal.closeDate) {
+    const closeMs = new Date(deal.closingDate ?? deal.closeDate).getTime()
+    const daysToClose = Math.round((closeMs - now) / 86_400_000)
+    if (daysToClose >= 0 && daysToClose <= 7 && score > 60) {
+      return {
+        type: 'close',
+        label: 'Close window approaching',
+        description: `Close date is in ${daysToClose} day${daysToClose !== 1 ? 's' : ''} and win probability is strong. Now is the time to push for commitment.`,
+        colour: '#059669',
+      }
+    }
+  }
+
+  // 2. No meeting notes in 14+ days (stale)
+  const daysSince = Math.floor((now - new Date(deal.updatedAt ?? deal.createdAt).getTime()) / 86_400_000)
+  if (daysSince >= 14) {
+    return {
+      type: 'followup',
+      label: 'Follow up needed',
+      description: `No meeting notes in ${daysSince} days. Risk of going cold — reach out to re-establish momentum.`,
+      colour: '#D97706',
+    }
+  }
+
+  // 3. High score but early stage — ready to advance
+  if (score > 80 && (stage === 'discovery' || stage === 'qualification')) {
+    return {
+      type: 'advance',
+      label: 'Ready to advance stage',
+      description: `Win probability is ${score}% but deal is still at ${stage}. Strong signals — consider moving to the next stage.`,
+      colour: '#4F46E5',
+    }
+  }
+
+  // 4. Has competitors and low score
+  const hasCompetitors = Array.isArray(deal.competitors) && deal.competitors.length > 0
+  if (hasCompetitors && score < 50) {
+    const comp = deal.competitors[0]?.name ?? 'a competitor'
+    return {
+      type: 'competitive',
+      label: 'Competitive risk',
+      description: `Score is ${score}% and ${comp} is in play. Differentiate your value proposition before this deal drifts away.`,
+      colour: '#DC2626',
+    }
+  }
+
+  // 5. Deal stalling — days in stage exceeds benchmark (21d fallback)
+  const stageVel = brain?.stageVelocityIntel?.stageStats?.find((s: any) => s.stage === stage)
+  const benchmark = stageVel?.p75Days ?? 21
+  if (daysInStage > benchmark) {
+    return {
+      type: 'stalling',
+      label: 'Deal may be stalling',
+      description: `${daysInStage} days in ${stage} stage (typical is ~${benchmark} days). Review blockers and identify what needs to happen next.`,
+      colour: '#D97706',
+    }
+  }
+
+  // 6. Default
+  return {
+    type: 'action',
+    label: 'Review deal',
+    description: 'Check in on deal progress and ensure next steps are clear.',
+    colour: '#71717A',
+  }
 }
 
 export default function PipelinePage() {
@@ -1489,12 +1872,25 @@ export default function PipelinePage() {
 
             {/* Quick-action chips */}
             <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
-              {[
-                'What should I prioritise today?',
-                'Which deals are at risk?',
-                'Summarise my pipeline',
-                actionQueue[0] ? `Help with ${actionQueue[0].company}` : 'Who should I chase this week?',
-              ].map(chip => (
+              {(() => {
+                const today = new Date()
+                const todayMs = today.getTime()
+                // Find the nearest upcoming deal by closingDate
+                const nearestDeal = activeDeals
+                  .filter((d: any) => d.closingDate || d.closeDate)
+                  .map((d: any) => ({ deal: d, ms: new Date(d.closingDate ?? d.closeDate).getTime() }))
+                  .filter(({ ms }) => ms >= todayMs && ms <= todayMs + 2 * 86_400_000)
+                  .sort((a, b) => a.ms - b.ms)[0]?.deal
+                const chips = [
+                  'What should I prioritise today?',
+                  'Which deals are at risk?',
+                  'Summarise my pipeline',
+                  nearestDeal
+                    ? `Prep me for ${nearestDeal.prospectCompany}`
+                    : actionQueue[0] ? `Help with ${actionQueue[0].company}` : 'Who should I chase this week?',
+                ]
+                return chips
+              })().map(chip => (
                 <button
                   key={chip}
                   onClick={() => dispatchAI(chip)}
@@ -1557,85 +1953,90 @@ export default function PipelinePage() {
             </div>
           )}
 
-          {/* D. Action items */}
-          {actionQueue.length > 0 && (
+          {/* D. Deals needing action — specific per-deal actions */}
+          {activeDeals.length > 0 && (
             <div>
               <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
                 Deals needing action
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                {actionQueue.map((item, i) => {
-                  const isHigh = item.priority === 'high'
-                  const isMedium = item.priority === 'medium'
-                  const isStale = item.actionType === 'stale'
-                  const isRisk = item.actionType === 'risk'
-                  const leftBorderColor = isHigh ? 'var(--danger)' : isMedium ? 'var(--warning)' : 'var(--text-tertiary)'
-                  const badgeBg = isHigh
-                    ? 'color-mix(in srgb, var(--danger) 10%, transparent)'
-                    : isStale
-                      ? 'color-mix(in srgb, var(--warning) 10%, transparent)'
-                      : 'var(--accent-subtle)'
-                  const badgeColor = isHigh ? 'var(--danger)' : isStale ? 'var(--warning)' : 'var(--accent)'
-                  const badgeBorder = isHigh
-                    ? 'color-mix(in srgb, var(--danger) 20%, transparent)'
-                    : isStale
-                      ? 'color-mix(in srgb, var(--warning) 20%, transparent)'
-                      : 'var(--border-strong)'
+                {activeDeals.slice(0, 5).map((deal: any, i: number) => {
+                  const dias = daysInStageMap[deal.id] ?? 0
+                  const action = getDealAction(deal, brainData, dias)
+                  const score = mlMap[deal.id]?.winProb ?? deal.conversionScore ?? 0
+                  const stageLabel = configStages.find((s: any) => s.id === deal.stage)?.label ?? deal.stage ?? ''
+                  const prompt = `For the ${deal.dealName || deal.prospectCompany} deal: ${action.description} Review everything about this deal and tell me the single most important next step.`
                   return (
-                    <div key={i} style={{
-                      display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 14px',
+                    <div key={deal.id} style={{
+                      display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px 14px',
                       background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
                       border: '1px solid var(--card-border)',
-                      borderLeft: `3px solid ${leftBorderColor}`,
+                      borderLeft: `3px solid ${action.colour}`,
                       borderRadius: '10px',
-                    }}>
-                      {/* Number circle */}
-                      <div style={{
-                        width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0,
-                        background: leftBorderColor,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '11px', fontWeight: '700', color: '#fff',
-                      }}>
-                        {i + 1}
+                      transition: 'border-color 0.1s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--card-border)'}
+                    >
+                      {/* Top row: name + badge + Ask AI */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {deal.dealName || deal.prospectCompany}
+                            </span>
+                            {deal.dealName && deal.prospectCompany && deal.dealName !== deal.prospectCompany && (
+                              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>{deal.prospectCompany}</span>
+                            )}
+                          </div>
+                          {/* Action description */}
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px' }}>
+                            {action.description}
+                          </div>
+                        </div>
+                        <button
+                          onClick={e => {
+                            e.stopPropagation()
+                            sendToCopilot(prompt)
+                          }}
+                          style={{
+                            flexShrink: 0, display: 'flex', alignItems: 'center', gap: '5px',
+                            padding: '6px 12px', borderRadius: '7px',
+                            background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10))',
+                            border: '1px solid rgba(99,102,241,0.25)',
+                            color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer',
+                            transition: 'background 0.1s',
+                          }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.16))'}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10))'}
+                        >
+                          <Sparkles size={10} />
+                          Ask AI
+                        </button>
                       </div>
-
-                      {/* Content */}
-                      <Link href={`/deals/${item.dealId}`} style={{ flex: 1, minWidth: 0, textDecoration: 'none' }}>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '7px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>{item.company}</span>
+                      {/* Bottom row: action badge + score + stage + days */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{
+                          fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '100px',
+                          background: `${action.colour}18`,
+                          color: action.colour,
+                          border: `1px solid ${action.colour}33`,
+                        }}>
+                          {action.label}
+                        </span>
+                        {score > 0 && (
                           <span style={{
-                            fontSize: '10px', fontWeight: '600', padding: '1px 7px', borderRadius: '4px', flexShrink: 0,
-                            background: badgeBg, color: badgeColor,
-                            border: `1px solid ${badgeBorder}`,
+                            fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '100px',
+                            background: score >= 70 ? 'rgba(5,150,105,0.1)' : score >= 40 ? 'rgba(217,119,6,0.1)' : 'rgba(220,38,38,0.1)',
+                            color: score >= 70 ? '#059669' : score >= 40 ? '#D97706' : '#DC2626',
+                            border: `1px solid ${score >= 70 ? 'rgba(5,150,105,0.25)' : score >= 40 ? 'rgba(217,119,6,0.25)' : 'rgba(220,38,38,0.25)'}`,
                           }}>
-                            {isRisk ? '⚠ ' : isStale ? '⏱ ' : ''}{item.headline}
+                            {score}%
                           </span>
-                        </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {item.detail}
-                        </div>
-                      </Link>
-
-                      {/* Ask AI button */}
-                      <button
-                        onClick={e => {
-                          e.stopPropagation()
-                          window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query: item.prompt } }))
-                        }}
-                        style={{
-                          flexShrink: 0, display: 'flex', alignItems: 'center', gap: '5px',
-                          padding: '6px 12px', borderRadius: '7px',
-                          background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10))',
-                          border: '1px solid rgba(99,102,241,0.25)',
-                          color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer',
-                          transition: 'background 0.1s',
-                        }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.16))'}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10))'}
-                      >
-                        <Sparkles size={10} />
-                        Ask AI
-                      </button>
+                        )}
+                        <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{stageLabel}</span>
+                        {dias > 0 && <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>&middot; {dias}d in stage</span>}
+                      </div>
                     </div>
                   )
                 })}
@@ -1643,7 +2044,7 @@ export default function PipelinePage() {
             </div>
           )}
 
-          {/* E. Top picks */}
+          {/* E. Top picks — Highest Win Probability with days in stage */}
           {topDeals.length > 0 && (
             <div>
               <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
@@ -1652,7 +2053,9 @@ export default function PipelinePage() {
               <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 {topDeals.map((deal: any) => {
                   const topScore = mlMap[deal.id]?.winProb ?? deal.conversionScore ?? 0
-                  const scoreColor = topScore >= 70 ? 'var(--success)' : topScore >= 40 ? 'var(--warning)' : 'var(--danger)'
+                  const scoreColorVal = topScore >= 70 ? 'var(--success)' : topScore >= 40 ? 'var(--warning)' : 'var(--danger)'
+                  const dias = daysInStageMap[deal.id] ?? 0
+                  // TODO: Add direction indicator (↑/↓/→) once historical score tracking is available
                   return (
                     <Link
                       key={deal.id}
@@ -1677,9 +2080,18 @@ export default function PipelinePage() {
                             {configStages.find((s: any) => s.id === deal.stage)?.label ?? deal.stage}
                             {deal.dealValue && ` · ${dealValueLabel(deal.dealValue, deal.dealType, deal.recurringInterval, currencySymbol)}`}
                           </div>
+                          {dias > 0 && (
+                            <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                              {dias}d in stage
+                            </div>
+                          )}
                         </div>
-                        <div style={{ fontSize: '20px', fontWeight: '800', color: scoreColor, flexShrink: 0, lineHeight: 1 }}>
-                          {topScore}%
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                          <div style={{ fontSize: '20px', fontWeight: '800', color: scoreColorVal, flexShrink: 0, lineHeight: 1 }}>
+                            {topScore}%
+                          </div>
+                          {/* Direction: → stable (TODO: update when score history available) */}
+                          <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>&rarr; stable</div>
                         </div>
                       </div>
                     </Link>
@@ -1689,10 +2101,114 @@ export default function PipelinePage() {
             </div>
           )}
 
+          {/* G. Recently Closed */}
+          {(() => {
+            const cutoff = Date.now() - 30 * 86_400_000
+            const recentClosed = deals.filter((d: any) =>
+              (d.stage === 'closed_won' || d.stage === 'closed_lost') &&
+              new Date(d.wonDate ?? d.lostDate ?? d.updatedAt).getTime() > cutoff
+            ).sort((a: any, b: any) => new Date(b.wonDate ?? b.lostDate ?? b.updatedAt).getTime() - new Date(a.wonDate ?? a.lostDate ?? a.updatedAt).getTime())
+            if (recentClosed.length === 0) return null
+            return (
+              <div>
+                <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-tertiary)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
+                  Recently Closed
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+                  {recentClosed.slice(0, 5).map((deal: any) => {
+                    const isWon = deal.stage === 'closed_won'
+                    const closeDate = new Date(deal.wonDate ?? deal.lostDate ?? deal.updatedAt)
+                    const dateStr = closeDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                    return (
+                      <Link
+                        key={deal.id}
+                        href={`/deals/${deal.id}`}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px',
+                          background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+                          border: `1px solid ${isWon ? 'rgba(5,150,105,0.2)' : 'var(--card-border)'}`,
+                          borderRadius: '10px', textDecoration: 'none',
+                          transition: 'border-color 0.1s',
+                        }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = isWon ? 'rgba(5,150,105,0.2)' : 'var(--card-border)'}
+                      >
+                        {isWon
+                          ? <CheckCircle size={14} style={{ color: 'var(--success)', flexShrink: 0 }} />
+                          : <XCircle size={14} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+                        }
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {deal.prospectCompany}
+                          </div>
+                          <div style={{ fontSize: '10px', color: isWon ? '#06B6D4' : '#06B6D4', marginTop: '1px' }}>
+                            {isWon ? 'Contributing to ML training data' : "Loss patterns improving your model's risk detection"}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ fontSize: '11px', fontWeight: '600', color: isWon ? 'var(--success)' : 'var(--danger)' }}>
+                            {isWon ? 'Won' : 'Lost'}
+                            {deal.dealValue ? ` · ${currencySymbol}${Math.round(deal.dealValue).toLocaleString()}` : ''}
+                          </div>
+                          <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{dateStr}</div>
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* H. Model Status */}
+          {(() => {
+            const ml = brainData?.mlModel
+            const trainingSize = ml?.trainingSize ?? 0
+            const accuracy = ml?.looAccuracy != null ? Math.round(ml.looAccuracy * 100) : null
+            let statusLabel = 'ML Model: Building'
+            let statusColor = 'var(--text-tertiary)'
+            let nextMilestone = ''
+            if (trainingSize >= 10) {
+              statusLabel = 'ML Model: Active'
+              statusColor = 'var(--success)'
+              nextMilestone = accuracy != null ? `${accuracy}% prediction accuracy` : 'Predictions active'
+            } else if (trainingSize >= 5) {
+              statusLabel = 'ML Model: Warming Up'
+              statusColor = 'var(--warning)'
+              nextMilestone = `${10 - trainingSize} more closed deal${(10 - trainingSize) !== 1 ? 's' : ''} to activate ML predictions`
+            } else {
+              statusLabel = 'ML Model: Building'
+              statusColor = 'var(--text-tertiary)'
+              nextMilestone = `${5 - trainingSize} more closed deal${(5 - trainingSize) !== 1 ? 's' : ''} to start warming up`
+            }
+            return (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '14px', padding: '12px 16px',
+                background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+                border: '1px solid var(--card-border)', borderRadius: '12px',
+              }}>
+                <Brain size={16} style={{ color: statusColor, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: statusColor }}>{statusLabel}</div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px' }}>
+                    {trainingSize} closed deal{trainingSize !== 1 ? 's' : ''} &middot; {nextMilestone}
+                  </div>
+                </div>
+                <Link href="/models" style={{
+                  flexShrink: 0, fontSize: '11px', fontWeight: '600', color: 'var(--accent)',
+                  textDecoration: 'none', padding: '4px 10px', borderRadius: '6px',
+                  background: 'var(--accent-subtle)', border: '1px solid var(--border-strong)',
+                }}>
+                  View model
+                </Link>
+              </div>
+            )
+          })()}
+
           {/* F. Empty state */}
           {!isLoading && activeDeals.length === 0 && (
             <div style={{ textAlign: 'center', padding: '60px 20px' }}>
-              <div style={{ fontSize: '40px', marginBottom: '12px' }}>🚀</div>
+              <div style={{ fontSize: '40px', marginBottom: '12px' }}>&#x1F680;</div>
               <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>Start building your pipeline</div>
               <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>Add your first deal to get AI-powered insights and recommendations.</div>
               <Link href="/deals" style={{
