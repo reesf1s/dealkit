@@ -484,7 +484,7 @@ export const import_deal = {
         const signals = extractTextSignals(allText, created.createdAt ?? new Date(), new Date())
         const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
         const mlPred = brain?.mlPredictions?.find(p => p.dealId === created.id)
-        const sNorm = stageToNorm(params.stage, brain?.pipelineStages)
+        const sNorm = stageToNorm(params.stage)
         let finalScore: number
         if (mlPred && brain?.mlModel) {
           const { composite } = computeCompositeScore(
@@ -834,7 +834,7 @@ export const enrich_deal = {
           const signals = extractTextSignals(allText, existing.createdAt ?? new Date(), new Date())
           const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
           const mlPred = brain?.mlPredictions?.find((p: any) => p.dealId === params.dealId)
-          const sNorm = stageToNorm(params.stage ?? existing.stage, brain?.pipelineStages)
+          const sNorm = stageToNorm(params.stage ?? existing.stage)
           let finalScore: number
           if (mlPred && brain?.mlModel) {
             const { composite } = computeCompositeScore(
@@ -994,7 +994,7 @@ export const update_deal = {
           const signals = extractTextSignals(allText, existing.createdAt ?? new Date(), new Date())
           const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
           const mlPred = brain?.mlPredictions?.find((p: any) => p.dealId === params.dealId)
-          const sNorm = stageToNorm(params.stage ?? existing.stage, brain?.pipelineStages)
+          const sNorm = stageToNorm(params.stage ?? existing.stage)
           let finalScore: number
           if (mlPred && brain?.mlModel) {
             const { composite } = computeCompositeScore(
@@ -1576,7 +1576,7 @@ Rules:
         const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
         const mlPred = brain?.mlPredictions?.find(p => p.dealId === dealId)
         const effectiveStage = (updateFields.stage as string | undefined) ?? deal.stage
-        const sNorm = stageToNorm(effectiveStage, brain?.pipelineStages)
+        const sNorm = stageToNorm(effectiveStage)
 
         let finalScore: number
         if (mlPred && brain?.mlModel) {
