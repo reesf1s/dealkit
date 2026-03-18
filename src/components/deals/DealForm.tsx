@@ -77,6 +77,7 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
   })
   const [contacts, setContacts] = useState<DealContact[]>([{ ...EMPTY_CONTACT }])
   const [expanded, setExpanded] = useState(false)
+  const [errors, setErrors] = useState<{ dealValue?: string; dealName?: string }>({})
 
   const u = (patch: Partial<FormState>) => setForm((p) => ({ ...p, ...patch }))
 
@@ -91,9 +92,22 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
   const isLost = form.stage === 'closed_lost'
   const isClosed = isWon || isLost
 
+  const validateForm = () => {
+    const newErrors: { dealValue?: string; dealName?: string } = {}
+    if (!form.dealValue || Number(form.dealValue) <= 0) {
+      newErrors.dealValue = 'Deal value is required for ML scoring. Enter £0 if unknown.'
+    }
+    if (!form.dealName || form.dealName.trim().length < 2) {
+      newErrors.dealName = 'Deal name is required (min 2 characters)'
+    }
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.dealName.trim() || !form.prospectCompany.trim()) return
+    if (!validateForm()) return
+    if (!form.prospectCompany.trim()) return
 
     // Filter out empty contacts
     const cleanContacts = contacts
@@ -131,7 +145,12 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
       {/* Deal name */}
       <div>
         <Label>Deal name *</Label>
-        <Input value={form.dealName} onChange={(v) => u({ dealName: v })} placeholder="e.g. Acme Corp Q2 Expansion" />
+        <Input value={form.dealName} onChange={(v) => { u({ dealName: v }); if (errors.dealName) setErrors(prev => ({ ...prev, dealName: undefined })) }} placeholder="e.g. Acme Corp Q2 Expansion" />
+        {errors.dealName && (
+          <p style={{ color: '#EF4444', fontSize: '12px', marginTop: '4px' }}>
+            {errors.dealName}
+          </p>
+        )}
       </div>
 
       {/* Prospect company */}
@@ -230,7 +249,26 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
       {/* Deal value */}
       <div>
         <Label>{form.dealType === 'recurring' ? `Deal value (${form.recurringInterval === 'monthly' ? 'MRR' : form.recurringInterval === 'quarterly' ? 'QRR' : 'ARR'} £)` : 'Deal value (£)'}</Label>
-        <Input value={form.dealValue} onChange={(v) => u({ dealValue: v })} placeholder="50000" type="number" />
+        <input
+          type="number"
+          value={form.dealValue}
+          onChange={(e) => { u({ dealValue: e.target.value }); if (errors.dealValue) setErrors(prev => ({ ...prev, dealValue: undefined })) }}
+          placeholder="50000"
+          style={{
+            width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px',
+            background: 'rgba(0,0,0,0.3)',
+            border: `1px solid ${errors.dealValue ? '#EF4444' : 'rgba(255,255,255,0.1)'}`,
+            color: '#EBEBEB', fontSize: '13px', outline: 'none',
+            boxSizing: 'border-box', transition: 'border-color 150ms ease'
+          }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = errors.dealValue ? '#EF4444' : 'rgba(99,102,241,0.6)' }}
+          onBlur={(e) => { e.currentTarget.style.borderColor = errors.dealValue ? '#EF4444' : 'rgba(255,255,255,0.1)' }}
+        />
+        {errors.dealValue && (
+          <p style={{ color: '#EF4444', fontSize: '12px', marginTop: '4px' }}>
+            {errors.dealValue}
+          </p>
+        )}
       </div>
 
       {/* Expand toggle */}
@@ -343,10 +381,10 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
       <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '4px' }}>
         <button
           type="submit"
-          disabled={loading || !form.dealName.trim() || !form.prospectCompany.trim()}
-          style={{ height: '34px', padding: '0 18px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: loading || !form.dealName.trim() || !form.prospectCompany.trim() ? '#333' : '#6366F1', border: 'none', cursor: loading || !form.dealName.trim() || !form.prospectCompany.trim() ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
-          onMouseEnter={(e) => { if (!loading && form.dealName.trim() && form.prospectCompany.trim()) e.currentTarget.style.backgroundColor = '#4F46E5' }}
-          onMouseLeave={(e) => { if (!loading && form.dealName.trim() && form.prospectCompany.trim()) e.currentTarget.style.backgroundColor = '#6366F1' }}
+          disabled={loading}
+          style={{ height: '34px', padding: '0 18px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: loading ? '#333' : '#6366F1', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
+          onMouseEnter={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#4F46E5' }}
+          onMouseLeave={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#6366F1' }}
         >
           {loading ? 'Logging…' : 'Log deal'}
         </button>

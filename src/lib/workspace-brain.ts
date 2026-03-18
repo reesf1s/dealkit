@@ -15,7 +15,7 @@
 import { db } from '@/lib/db'
 import { dealLogs, competitors as competitorRecords, productGaps as productGapsTable, collateral as collateralTable } from '@/lib/db/schema'
 import { eq, and, sql } from 'drizzle-orm'
-import { runMLEngine, computeCompositeScore, type TrainedMLModel, type DealMLPrediction, type MLTrends, type DealArchetype, type StageVelocityIntel, type CompetitivePattern, type ScoreCalibrationPoint, type CloseDateModel, ML_MIN_TRAINING_DEALS } from '@/lib/deal-ml'
+import { runMLEngine, computeCompositeScore, type TrainedMLModel, type DealMLPrediction, type MLTrends, type DealArchetype, type StageVelocityIntel, type CompetitivePattern, type ScoreCalibrationPoint, type CloseDateModel, type ScoreBreakdown, ML_MIN_TRAINING_DEALS } from '@/lib/deal-ml'
 import { extractTextSignals, analyzeDeterioration, parseMeetingEntries, type TextSignals } from '@/lib/text-signals'
 import { BRAIN_VERSION } from '@/lib/brain-constants'
 export { BRAIN_VERSION } from '@/lib/brain-constants'
@@ -310,7 +310,29 @@ async function ensureBrainColumn() {
       ADD COLUMN IF NOT EXISTS expansion_type text,
       ADD COLUMN IF NOT EXISTS contract_start_date timestamptz,
       ADD COLUMN IF NOT EXISTS contract_end_date timestamptz,
-      ADD COLUMN IF NOT EXISTS conversion_score_pinned boolean NOT NULL DEFAULT false
+      ADD COLUMN IF NOT EXISTS conversion_score_pinned boolean NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS note_signals_json text,
+      ADD COLUMN IF NOT EXISTS score_breakdown text
+    `)
+  } catch { /* already exists */ }
+  // Brain rebuild log — records every rebuild for debugging and ML auditability
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS brain_rebuild_log (
+        id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        workspace_id text NOT NULL,
+        triggered_by text,
+        closed_deals_total integer,
+        wins integer,
+        losses integer,
+        ml_active boolean,
+        model_accuracy_loo real,
+        open_deals_scored integer,
+        avg_score real,
+        errors text,
+        duration_ms integer,
+        created_at timestamp DEFAULT now()
+      )
     `)
   } catch { /* already exists */ }
   schemaMigrated = true
@@ -362,6 +384,7 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
 }
 
 async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceBrain> {
+  const rebuildStartMs = Date.now()
   await ensureBrainColumn()
 
   // Load previous brain to carry forward score history
@@ -1381,11 +1404,18 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
       calibrationTimeline  = mlResult.calibrationTimeline.length > 0 ? mlResult.calibrationTimeline : undefined
       closeDateModel       = mlResult.closeDateModel ?? undefined
 
-      // Embed composite scores into predictions — blends LLM+ML so stored conversionScore reflects both
+      // Embed composite scores into predictions — deterministic ML+text-signal blend
+      // The momentumScore from text signals is passed as the 4th argument.
       mlPredictions = mlResult.predictions.map(pred => {
         const snap = snapshots.find(s => s.id === pred.dealId)
         if (snap?.conversionScore != null) {
-          const { composite } = computeCompositeScore(snap.conversionScore, pred.winProbability, mlResult.model!.trainingSize)
+          const dealSignals = signalMap.get(pred.dealId)
+          const { composite } = computeCompositeScore(
+            snap.conversionScore,
+            pred.winProbability,
+            mlResult.model!.trainingSize,
+            dealSignals?.momentumScore,
+          )
           return { ...pred, compositeScore: composite }
         }
         return pred
@@ -1756,6 +1786,26 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
     SET workspace_brain = ${JSON.stringify(brain)}::jsonb
     WHERE id = ${workspaceId}
   `)
+
+  // ── Rebuild log — record every rebuild for ML auditability ───────────────────
+  try {
+    const durationMs     = Date.now() - rebuildStartMs
+    const closedTotal    = wonDeals.length + lostDeals.length
+    const openScored     = activeDeals.filter(d => d.conversionScore != null).length
+    const openScores     = activeDeals.map(d => d.conversionScore).filter((s): s is number => s != null)
+    const avgScoreVal    = openScores.length > 0
+      ? Math.round(openScores.reduce((a, b) => a + b, 0) / openScores.length * 10) / 10
+      : null
+    await db.execute(sql`
+      INSERT INTO brain_rebuild_log
+        (workspace_id, triggered_by, closed_deals_total, wins, losses,
+         ml_active, model_accuracy_loo, open_deals_scored, avg_score, duration_ms)
+      VALUES
+        (${workspaceId}, 'auto', ${closedTotal}, ${wonDeals.length}, ${lostDeals.length},
+         ${mlModel != null}, ${mlModel?.looAccuracy ?? null}, ${openScored},
+         ${avgScoreVal}, ${durationMs})
+    `)
+  } catch { /* non-fatal — log failure must never block the brain rebuild */ }
 
   // ── Post-save background tasks ────────────────────────────────────────────────
   // Run sequentially (not concurrently) to avoid opening multiple DB connections

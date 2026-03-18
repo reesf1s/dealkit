@@ -11,10 +11,11 @@ import { dealLogs, productGaps, companyProfiles, workspaces } from '@/lib/db/sch
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { rebuildWorkspaceBrain, getWorkspaceBrain } from '@/lib/workspace-brain'
-import { computeCompositeScore } from '@/lib/deal-ml'
+import { computeCompositeScore, type ScoreBreakdown } from '@/lib/deal-ml'
 import { ensureLinksColumn } from '@/lib/api-helpers'
 import { extractTextSignals, heuristicScore } from '@/lib/text-signals'
 import { buildDealBriefing, scoreNarrationPrompt } from '@/lib/brain-narrator'
+import { NoteExtractionSchema, buildCorrectionPrompt, type NoteExtraction } from '@/lib/extraction-schema'
 
 const anthropic = new Anthropic()
 
@@ -40,12 +41,18 @@ const AnalyzeNotesSchema = z.object({
 })
 type AnalyzeNotesOutput = z.infer<typeof AnalyzeNotesSchema>
 
-// Ensure intent_signals column exists — runs once per process lifetime
+// Ensure intent_signals, note_signals_json, and score_breakdown columns exist — runs once per process lifetime
 let intentSignalsMigrated = false
 async function ensureIntentSignalsCol() {
   if (intentSignalsMigrated) return
   try {
     await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS intent_signals jsonb`)
+  } catch { /* already exists */ }
+  try {
+    await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS note_signals_json text`)
+  } catch { /* already exists */ }
+  try {
+    await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS score_breakdown text`)
   } catch { /* already exists */ }
   intentSignalsMigrated = true
 }
@@ -126,7 +133,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Phase 1: LLM extracts structured data ONLY — no scoring.
     // Scoring is computed deterministically by the brain from text signals + ML.
     const msg = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6', max_tokens: 2000,
       messages: [{ role: 'user', content: `You are extracting structured data from B2B sales meeting notes. Return ONLY valid JSON, no markdown, no analysis.
 
 ${previousContext ? `${previousContext}\n\n---\n\n` : ''}NEW MEETING NOTES:
@@ -158,7 +164,27 @@ Rules — obsoleteTodoIds: IDs of open items now done, superseded, or irrelevant
 Rules — productGaps: only if prospect EXPLICITLY said your product lacks a feature/integration. Return [] otherwise.
 Rules — competitors: max 4, ONLY if named as an explicit alternative being evaluated. Return [] if none.
 Rules — intentSignals: extract ONLY what is explicitly stated. championStatus=confirmed only if someone is actively advocating internally. budgetStatus=approved only if spend is explicitly confirmed. decisionTimeline=null if not mentioned. nextMeetingBooked=true only if a specific next meeting was arranged in these notes.
-priority: critical | high | medium | low` }],
+priority: critical | high | medium | low
+
+After the JSON above, include a signal extraction block wrapped in <extraction></extraction> tags:
+<extraction>
+{
+  "champion_signal": true/false,
+  "budget_signal": "confirmed"/"discussed"/"concern"/"not_mentioned",
+  "decision_timeline": "Q2 2026" or null,
+  "next_step": "description of next action" or null,
+  "competitors_mentioned": ["name1", "name2"],
+  "objections": [{"theme": "budget", "text": "exact quote or paraphrase"}],
+  "positive_signals": ["signal1", "signal2"],
+  "negative_signals": ["signal1"],
+  "stakeholders_mentioned": [{"name": "John", "role": "CEO", "functional_area": "executive"}],
+  "product_gaps": [{"gap": "Salesforce integration", "severity": "high", "quote": "we need this to work with SF"}],
+  "sentiment_score": 0.72,
+  "urgency_signals": ["end of quarter deadline"],
+  "user_verified": false
+}
+</extraction>` }],
+      model: 'claude-sonnet-4-6', max_tokens: 2500,
     })
     // Strip markdown fences and any leading/trailing text before the JSON object
     function stripToJson(raw: string): string {
@@ -211,6 +237,45 @@ priority: critical | high | medium | low` }],
 
     const rawText = (msg.content[0] as any).text.trim()
     const { parsed, parseOk } = await parseAndValidate(rawText)
+
+    // ── Parse and validate the <extraction> signal block ──────────────────────
+    // The LLM appends a structured <extraction>JSON</extraction> block with rich signal data.
+    // We validate it with NoteExtractionSchema + retry logic for reliability.
+    async function parseExtractionBlock(fullResponse: string): Promise<NoteExtraction | null> {
+      try {
+        const match = fullResponse.match(/<extraction>([\s\S]*?)<\/extraction>/i)
+        if (!match) return null
+        const jsonStr = match[1].trim()
+        const raw = JSON.parse(jsonStr)
+        const result = NoteExtractionSchema.safeParse(raw)
+        if (result.success) return result.data
+
+        // Validation failed — retry with correction prompt
+        const correctionPrompt = buildCorrectionPrompt(jsonStr, JSON.stringify(result.error.issues))
+        const retryMsg = await anthropic.messages.create({
+          model: 'claude-haiku-4-5-20251001', max_tokens: 1024,
+          messages: [{ role: 'user', content: correctionPrompt }],
+        })
+        const retryText = (retryMsg.content[0] as any).type === 'text' ? (retryMsg.content[0] as any).text : ''
+        const jsonMatch = retryText.match(/\{[\s\S]*\}/)
+        if (!jsonMatch) return null
+        const retryParsed = JSON.parse(jsonMatch[0])
+        const retryResult = NoteExtractionSchema.safeParse(retryParsed)
+        if (retryResult.success) return retryResult.data
+
+        // Second failure — try partial parse with defaults
+        const partial = NoteExtractionSchema.partial().safeParse(retryParsed)
+        if (partial.success) {
+          return NoteExtractionSchema.parse({ ...partial.data })
+        }
+        return null
+      } catch {
+        return null
+      }
+    }
+
+    const noteExtraction = await parseExtractionBlock(rawText)
+
     const newTodos = (parsed.todos ?? []).map((t: any) => ({ id: crypto.randomUUID(), text: t.text, done: false, createdAt: new Date().toISOString() }))
     const obsoleteIds = new Set<string>(parsed.obsoleteTodoIds ?? [])
     const dateStamp = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -263,42 +328,62 @@ priority: critical | high | medium | low` }],
     if (mergedCompetitors) updateFields.competitors = mergedCompetitors
     if (parseOk && parsed.summary) updateFields.aiSummary = parsed.summary
 
-    // ── Phase 2: Brain-determined scoring ──────────────────────────────────────
-    // The brain (ML + text signals) determines the score. The LLM did NOT produce one.
+    // ── Phase 2: Brain-determined scoring — deterministic math, no LLM ──────────
     // Pipeline: text signals → heuristic score (always) → ML composite (if trained).
+    // The LLM NEVER generates the score; it only narrates the already-computed result.
     try {
       const combinedNotes = appendedNotes  // includes today's notes
       const signals = extractTextSignals(combinedNotes, deal.createdAt ?? new Date(), new Date())
       const brain = await getWorkspaceBrain(workspaceId)
       const mlPred = brain?.mlPredictions?.find(p => p.dealId === id)
 
+      const stageIdx = activeStages.findIndex(s => s.id === deal.stage)
+      const stageNorm = activeStages.length > 0 && stageIdx >= 0
+        ? stageIdx / Math.max(activeStages.length - 1, 1)
+        : 0.5
+
       let finalScore: number
-      let scoreBasis: 'ml_composite' | 'text_heuristic' = 'text_heuristic'
+      let scoreBreakdown: ScoreBreakdown | null = null
 
       if (mlPred && brain?.mlModel) {
-        // ML model trained on closed deals: use composite (ML dominates as training grows)
-        // Compute stage position (0–1) relative to this workspace's actual pipeline
-        const stageIdx = activeStages.findIndex(s => s.id === deal.stage)
-        const stageNorm = activeStages.length > 0 && stageIdx >= 0
-          ? stageIdx / Math.max(activeStages.length - 1, 1)
-          : 0.5
-        const { composite } = computeCompositeScore(
-          heuristicScore(signals, stageNorm),
+        // ML model trained on closed deals: deterministic composite score
+        const textScore = heuristicScore(signals, stageNorm)
+        const result = computeCompositeScore(
+          textScore,
           mlPred.winProbability,
           brain.mlModel.trainingSize,
+          signals.momentumScore,
         )
-        finalScore = composite
-        scoreBasis = 'ml_composite'
+        finalScore = result.composite
+        scoreBreakdown = {
+          composite_score: result.composite,
+          text_signal_score: textScore,
+          text_weight: result.textWeight,
+          ml_score: result.mlScore,
+          ml_weight: result.mlWeight,
+          momentum_component: result.momentumComponent,
+          ml_active: true,
+          training_deals: brain.mlModel.trainingSize,
+          model_version: new Date().toISOString(),
+        }
       } else {
-        // No ML model yet: stage-position-adjusted text signal heuristic
-        const stageIdx = activeStages.findIndex(s => s.id === deal.stage)
-        const stageNorm = activeStages.length > 0 && stageIdx >= 0
-          ? stageIdx / Math.max(activeStages.length - 1, 1)
-          : 0.5
+        // No ML model yet: stage-position-adjusted text signal heuristic only
         finalScore = heuristicScore(signals, stageNorm)
+        scoreBreakdown = {
+          composite_score: finalScore,
+          text_signal_score: finalScore,
+          text_weight: 0.70,
+          ml_score: 50,
+          ml_weight: 0,
+          momentum_component: 50 + Math.max(-10, Math.min(10, (signals.momentumScore - 0.5) * 20)),
+          ml_active: false,
+          training_deals: 0,
+          model_version: new Date().toISOString(),
+        }
       }
 
       // Phase 3: LLM narrates the brain's determination (tiny call — 3 bullets only)
+      // The LLM receives the already-computed score and explains it; it does not alter it.
       const dealForBriefing = {
         dealName: deal.dealName,
         company: deal.prospectCompany,
@@ -324,7 +409,7 @@ priority: critical | high | medium | low` }],
 
       // ── Intent signal score adjustment ─────────────────────────────────────────
       // LLM-extracted intent catches paraphrases that vocabulary matching misses.
-      // Only adjusts when the LLM sees something the text signals didn't detect.
+      // This is a deterministic adjustment based on extracted facts — not a score guess.
       if (parsed.intentSignals) {
         const is = parsed.intentSignals
         if (is.championStatus === 'confirmed' && !signals.decisionMakerSignal) finalScore = Math.min(100, finalScore + 6)
@@ -340,17 +425,53 @@ priority: critical | high | medium | low` }],
             if (daysTo >= 0 && daysTo <= 90) finalScore = Math.min(100, finalScore + 3)
           }
         }
+        // Update breakdown final score after intent adjustments
+        if (scoreBreakdown) scoreBreakdown.composite_score = Math.max(0, Math.min(100, Math.round(finalScore)))
       }
 
       // Only update score if not pinned by user — user-set scores are authoritative
       if (!deal.conversionScorePinned) {
         updateFields.conversionScore = Math.max(0, Math.min(100, Math.round(finalScore)))
         if (narratedInsights.length > 0) updateFields.conversionInsights = narratedInsights
+        if (scoreBreakdown) updateFields.score_breakdown = JSON.stringify(scoreBreakdown)
       }
     } catch { /* non-fatal — deal saves without score if brain fails */ }
 
     // Persist intent signals — separate from scoring so a scoring failure doesn't lose them
     if (parseOk && parsed.intentSignals) updateFields.intentSignals = parsed.intentSignals
+
+    // ── Store structured extraction signals ────────────────────────────────────
+    // note_signals_json stores the per-note extraction result as a JSON string.
+    // We also use extraction data to augment intentSignals for aggregate tracking.
+    if (noteExtraction) {
+      // Store the extraction for this note (always user_verified: false on AI extraction)
+      updateFields.note_signals_json = JSON.stringify({ ...noteExtraction, user_verified: false })
+
+      // Supplement intentSignals with richer extraction data if LLM intentSignals not already captured
+      if (!updateFields.intentSignals) {
+        updateFields.intentSignals = {
+          championStatus: noteExtraction.champion_signal ? 'confirmed' : 'none',
+          budgetStatus: noteExtraction.budget_signal === 'confirmed' ? 'approved'
+            : noteExtraction.budget_signal === 'discussed' ? 'awaiting'
+            : noteExtraction.budget_signal === 'concern' ? 'blocked'
+            : 'not_discussed',
+          decisionTimeline: noteExtraction.decision_timeline ?? null,
+          nextMeetingBooked: false,
+        }
+      } else {
+        // Merge: extraction champion/budget can upgrade existing intentSignals if stronger signal found
+        const existing = updateFields.intentSignals as Record<string, unknown>
+        if (noteExtraction.champion_signal && existing.championStatus === 'none') {
+          existing.championStatus = 'confirmed'
+        }
+        if (noteExtraction.budget_signal === 'confirmed' && existing.budgetStatus !== 'approved') {
+          existing.budgetStatus = 'approved'
+        }
+        if (!existing.decisionTimeline && noteExtraction.decision_timeline) {
+          existing.decisionTimeline = noteExtraction.decision_timeline
+        }
+      }
+    }
 
     const [updatedDeal] = await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, id)).returning()
     const createdGaps = []

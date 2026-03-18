@@ -97,7 +97,7 @@ export interface ScoreDriver {
 export interface DealMLPrediction {
   dealId: string
   winProbability: number                         // raw LR output [0–1]
-  compositeScore: number | null                  // ML+LLM blend (set in analyze-notes)
+  compositeScore: number | null                  // ML+text-signal composite (set during brain rebuild or analyze-notes)
   confidence: 'high' | 'medium' | 'low'
   nearestWin:  { dealId: string; company: string } | null
   nearestLoss: { dealId: string; company: string } | null
@@ -1037,38 +1037,86 @@ export function runMLEngine(
   return { model, predictions: predictionsWithDates, trends, archetypes, stageVelocity, competitivePatterns, calibrationTimeline, closeDateModel }
 }
 
-// ─── Composite score computation (called from analyze-notes after LLM scores) ─
+// ─── Composite score computation — deterministic math only, no LLM ───────────
 
 /**
- * Blends the LLM's qualitative score with the ML model's data-driven prediction.
- * Alpha (ML weight) scales from 0 → 0.7 as training data grows, ensuring the
- * model only overrides the LLM once it has enough evidence to be trusted.
+ * Blends the text-signal heuristic score with the ML model's logistic regression
+ * prediction. The LLM never touches this function — it only narrates the result.
  *
- * Returns: { composite, llmScore, mlScore, divergence, insight }
+ * Weighting schedule:
+ *   - mlWeight  = min(0.70, 0.14 × ln(max(trainingSize,1)))
+ *     grows from 0% (0 deals) → ~32% (10 deals) → ~70% (148 deals)
+ *   - momentumWeight = 5%  (always)
+ *   - textWeight     = 1 - mlWeight - momentumWeight (remainder)
+ *
+ * When trainingSize < 10: falls back to pure text-signal + momentum blend.
+ *
+ * Returns: { composite, textScore, mlScore, mlWeight, textWeight, momentumComponent, divergence, insight }
  */
 export function computeCompositeScore(
-  llmScore: number,
+  textSignalScore: number,
   mlProbability: number,
   trainingSize: number,
+  momentumScore?: number,  // 0–1 from text signals; converted to -10..+10 component internally
 ): {
   composite: number
+  textScore: number
   mlScore: number
+  mlWeight: number
+  textWeight: number
+  momentumComponent: number
   divergence: number
   insight: string | null
 } {
-  const mlScore   = Math.round(mlProbability * 100)
-  // Scale ML weight more aggressively: 4 deals → 14%, 10 → 33%, 20 → 57%, 30+ → 70%
-  // Previous formula (/ 100) gave only 10% weight at 10 deals — too conservative.
-  const alpha     = Math.min(0.7, trainingSize / 30)
-  const composite = Math.round(alpha * mlScore + (1 - alpha) * llmScore)
-  const divergence = Math.abs(mlScore - llmScore)
+  const mlScore = Math.round(mlProbability * 100)
+
+  // Convert 0–1 momentum to a -10..+10 component, then map to 40–60 range
+  const rawMomentum = momentumScore !== undefined ? momentumScore : 0.5
+  const momentumNorm  = Math.max(-10, Math.min(10, (rawMomentum - 0.5) * 20))  // -10..+10
+  const momentumComponent = 50 + momentumNorm  // 40..60
+
+  let composite: number
+  let mlWeight: number
+  let textWeight: number
+
+  if (trainingSize >= 10) {
+    mlWeight       = Math.min(0.70, 0.14 * Math.log(Math.max(trainingSize, 1)))
+    const momentumWeight = 0.05
+    textWeight     = Math.max(0, 1.0 - mlWeight - momentumWeight)
+    const raw      = textSignalScore * textWeight + mlScore * mlWeight + momentumComponent * momentumWeight
+    composite      = Math.max(0, Math.min(100, Math.round(raw)))
+  } else {
+    // Cold start (< 10 closed deals): text signals drive the score
+    mlWeight   = 0
+    textWeight = 0.70
+    const raw  = textSignalScore * 0.70 + 50 * 0.25 + momentumComponent * 0.05
+    composite  = Math.max(0, Math.min(100, Math.round(raw)))
+  }
+
+  const divergence = Math.abs(mlScore - textSignalScore)
 
   let insight: string | null = null
   if (trainingSize >= 10 && divergence >= 20) {
-    insight = mlScore > llmScore
-      ? `ML model (trained on ${trainingSize} closed deals) predicts ${mlScore}% — higher than the AI score of ${llmScore}%. Similar deals in your history performed better than current signals suggest.`
-      : `ML model (trained on ${trainingSize} closed deals) predicts ${mlScore}% — lower than the AI score of ${llmScore}%. Historical patterns show similar deals at this stage are harder to close than they appear.`
+    insight = mlScore > textSignalScore
+      ? `ML model (trained on ${trainingSize} closed deals) predicts ${mlScore}% — higher than the signal score of ${textSignalScore}%. Similar deals in your history performed better than current signals suggest.`
+      : `ML model (trained on ${trainingSize} closed deals) predicts ${mlScore}% — lower than the signal score of ${textSignalScore}%. Historical patterns show similar deals at this stage are harder to close than they appear.`
   }
 
-  return { composite, mlScore, divergence, insight }
+  return { composite, textScore: textSignalScore, mlScore, mlWeight, textWeight, momentumComponent, divergence, insight }
+}
+
+/**
+ * Score breakdown record — saved alongside conversionScore for auditability.
+ * Shows exactly which components drove the score and what weights were used.
+ */
+export interface ScoreBreakdown {
+  composite_score: number
+  text_signal_score: number
+  text_weight: number
+  ml_score: number
+  ml_weight: number
+  momentum_component: number
+  ml_active: boolean
+  training_deals: number
+  model_version: string
 }

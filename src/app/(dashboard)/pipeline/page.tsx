@@ -831,8 +831,8 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
             <InfoTooltip text="Updated automatically when deals close. Shows your historical record against each competitor." />
           </div>
           {competitivePatterns.length === 0 ? (
-            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
-              Add competitors to your deals or mention them in meeting notes to track win rates automatically.
+            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
+              Add competitors to your deals or mention them in meeting notes to track win rates automatically. Need 5 closed deals per competitor to activate per-competitor predictions.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -950,6 +950,28 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Deal Archetypes — needs data message when < 20 deals */}
+      {archetypes.length === 0 && (ml?.trainingSize ?? 0) < 20 && (
+        <div
+          style={cardStyle}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--card-border)'}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+            <Star size={14} style={{ color: 'var(--accent)' }} />
+            <div style={labelStyle}>Deal Archetypes</div>
+            <InfoTooltip text="Archetypes are natural groupings discovered by the ML model from your closed deal patterns." />
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
+            {(() => {
+              const current = ml?.trainingSize ?? 0
+              const needed = Math.max(0, 20 - current)
+              return `Deal archetypes form after 20+ deals. Currently ${current} deal${current !== 1 ? 's' : ''}. ${needed} more needed to discover your natural deal types.`
+            })()}
           </div>
         </div>
       )}
