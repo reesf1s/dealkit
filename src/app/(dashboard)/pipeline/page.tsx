@@ -1050,6 +1050,15 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
 }
 
 
+// ── Calendar helpers ──────────────────────────────────────────────────────────
+function cleanSnippet(text: string): string {
+  return text
+    .replace(/^#+\s*/gm, '')  // strip markdown headers
+    .replace(/\n+/g, ' ')      // collapse newlines
+    .trim()
+    .slice(0, 80)
+}
+
 // ── Calendar View ────────────────────────────────────────────────────────────
 type CalEvent = {
   id: string
@@ -1297,7 +1306,7 @@ function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '2px' }}>
           {cells.map((day, i) => {
             if (day === null) {
-              return <div key={`empty-${i}`} style={{ height: '52px' }} />
+              return <div key={`empty-${i}`} style={{ minHeight: '80px' }} />
             }
             const dayEvents = eventsOnDay(day)
             const todayCell = isToday(day)
@@ -1307,7 +1316,7 @@ function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
                 key={day}
                 onClick={() => setSelectedDay(selected ? null : day)}
                 style={{
-                  height: '52px', borderRadius: '8px', padding: '6px',
+                  minHeight: '80px', borderRadius: '8px', padding: '6px',
                   background: todayCell
                     ? 'var(--accent-subtle)'
                     : selected
@@ -1328,15 +1337,30 @@ function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
                 <span style={{
                   fontSize: '12px', fontWeight: todayCell ? '700' : '500',
                   color: todayCell ? 'var(--accent)' : 'var(--text-primary)',
-                  lineHeight: 1,
+                  lineHeight: 1, flexShrink: 0,
                 }}>{day}</span>
                 {dayEvents.length > 0 && (
-                  <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
-                    {dayEvents.slice(0, 3).map(ev => (
-                      <div key={ev.id} style={{ width: '6px', height: '6px', borderRadius: '50%', background: eventColor(ev.type), flexShrink: 0 }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {dayEvents.slice(0, 2).map(ev => (
+                      <div key={ev.id} style={{
+                        display: 'flex', alignItems: 'center', gap: '3px',
+                        background: eventColor(ev.type),
+                        borderRadius: '3px', padding: '1px 4px',
+                        height: '16px', overflow: 'hidden',
+                        opacity: 0.9,
+                      }}>
+                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'rgba(255,255,255,0.8)', flexShrink: 0 }} />
+                        <span style={{
+                          fontSize: '10px', color: '#fff', fontWeight: 500,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          lineHeight: 1,
+                        }}>
+                          {ev.title.slice(0, 12)}{ev.title.length > 12 ? '…' : ''}
+                        </span>
+                      </div>
                     ))}
-                    {dayEvents.length > 3 && (
-                      <span style={{ fontSize: '9px', color: 'var(--text-tertiary)' }}>+{dayEvents.length - 3}</span>
+                    {dayEvents.length > 2 && (
+                      <span style={{ fontSize: '9px', color: 'var(--text-tertiary)', paddingLeft: '2px' }}>+{dayEvents.length - 2} more</span>
                     )}
                   </div>
                 )}
@@ -1367,8 +1391,8 @@ function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
                 }}>
                   <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: eventColor(ev.type), flexShrink: 0 }} />
                   <Link href={`/deals/${ev.dealId}`} style={{ flex: 1, minWidth: 0, textDecoration: 'none' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.title}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px' }}>{ev.subtitle}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.title}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cleanSnippet(ev.subtitle)}</div>
                   </Link>
                   <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', flexShrink: 0 }}>{dateStr}</div>
                   <button
