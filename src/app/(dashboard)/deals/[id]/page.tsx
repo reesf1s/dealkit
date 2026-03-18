@@ -2387,7 +2387,126 @@ function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; o
   )
 }
 
-function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', mlPrediction = null, globalPrior = null }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void; currencySymbol?: string; mlPrediction?: any; globalPrior?: any }) {
+// ─── Score Breakdown Visual ──────────────────────────────────────────────────
+
+function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPrediction: any; brainData: any }) {
+  const score = deal.conversionScore ?? 0
+  const mlProb = mlPrediction ? Math.round(mlPrediction.winProbability * 100) : null
+  const churnRisk = mlPrediction?.churnRisk ?? 50
+  const momentumPct = Math.max(0, 100 - churnRisk)  // high churn = low momentum
+
+  // Three layers: ML, text signals, momentum (all scale to the composite score)
+  const mlContrib = mlProb != null ? Math.round(mlProb * 0.6) : null
+  const textContrib = mlProb != null ? Math.max(0, score - mlContrib!) : score
+  const momentumContrib = Math.round(momentumPct * 0.1)
+
+  const scoreColor = score >= 70 ? 'var(--success)' : score >= 40 ? 'var(--warning)' : 'var(--danger)'
+  const scoreBg = score >= 70 ? 'color-mix(in srgb, var(--success) 8%, transparent)' : score >= 40 ? 'color-mix(in srgb, var(--warning) 8%, transparent)' : 'color-mix(in srgb, var(--danger) 8%, transparent)'
+  const scoreBorder = score >= 70 ? 'color-mix(in srgb, var(--success) 20%, transparent)' : score >= 40 ? 'color-mix(in srgb, var(--warning) 20%, transparent)' : 'color-mix(in srgb, var(--danger) 20%, transparent)'
+
+  const drivers: any[] = mlPrediction?.scoreDrivers ?? []
+  const archetype = mlPrediction?.archetypeId != null
+    ? (brainData?.dealArchetypes ?? []).find((a: any) => a.id === mlPrediction.archetypeId)
+    : null
+
+  const similarWins = mlPrediction?.similarWins ?? []
+  const similarLosses = mlPrediction?.similarLosses ?? []
+
+  return (
+    <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Deal Score</div>
+        {mlPrediction?.confidence && (
+          <div style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '100px', background: 'var(--accent-subtle)', color: 'var(--accent)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            {mlPrediction.confidence} confidence
+          </div>
+        )}
+      </div>
+
+      {/* Main score + bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ flexShrink: 0, width: '64px', height: '64px', borderRadius: '14px', background: scoreBg, border: `1px solid ${scoreBorder}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ fontSize: '24px', fontWeight: '800', color: scoreColor, lineHeight: 1 }}>{score}</div>
+          <div style={{ fontSize: '9px', color: scoreColor, marginTop: '1px' }}>/100</div>
+        </div>
+        <div style={{ flex: 1 }}>
+          {/* Stacked contribution bar */}
+          <div style={{ marginBottom: '8px' }}>
+            <div style={{ height: '8px', borderRadius: '4px', display: 'flex', overflow: 'hidden', gap: '1px', background: 'var(--border)' }}>
+              {mlContrib != null && (
+                <div style={{ width: `${mlContrib}%`, background: 'var(--accent)', borderRadius: '4px 0 0 4px', transition: 'width 0.5s' }} title={`ML model: ${mlContrib}pts`} />
+              )}
+              <div style={{ width: `${textContrib}%`, background: 'var(--data-accent)', transition: 'width 0.5s' }} title={`Text signals: ${textContrib}pts`} />
+              {momentumContrib > 0 && (
+                <div style={{ width: `${momentumContrib}%`, background: 'var(--success)', borderRadius: '0 4px 4px 0', transition: 'width 0.5s' }} title={`Momentum: ${momentumContrib}pts`} />
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+              {mlContrib != null && <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-tertiary)' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'var(--accent)', flexShrink: 0 }} />ML {mlContrib}pt</div>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-tertiary)' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'var(--data-accent)', flexShrink: 0 }} />Signals {textContrib}pt</div>
+              {momentumContrib > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-tertiary)' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'var(--success)', flexShrink: 0 }} />Momentum {momentumContrib}pt</div>}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Score Drivers */}
+      {drivers.length > 0 && (
+        <div>
+          <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Top Score Drivers</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            {drivers.slice(0, 5).map((d: any, i: number) => {
+              const isPos = d.direction === 'positive'
+              const barWidth = Math.min(100, Math.abs(d.contribution) * 200)
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '130px', fontSize: '11px', color: 'var(--text-secondary)', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
+                  <div style={{ flex: 1, height: '4px', borderRadius: '2px', background: 'var(--border)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${barWidth}%`, background: isPos ? 'var(--success)' : 'var(--danger)', borderRadius: '2px', transition: 'width 0.4s' }} />
+                  </div>
+                  <div style={{ fontSize: '10px', color: isPos ? 'var(--success)' : 'var(--danger)', fontWeight: '600', width: '20px', textAlign: 'right', flexShrink: 0 }}>
+                    {isPos ? '↑' : '↓'}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Archetype */}
+      {archetype && (
+        <div style={{ padding: '10px 12px', background: 'var(--accent-subtle)', border: '1px solid rgba(79,70,229,0.15)', borderRadius: '8px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>Deal Archetype</div>
+          <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{archetype.label}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{archetype.winRate}% win rate for this type · {String(archetype.winningCharacteristic)}</div>
+        </div>
+      )}
+
+      {/* Similar deals */}
+      {(similarWins.length > 0 || similarLosses.length > 0) && (
+        <div>
+          <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Similar Deals</div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {similarWins.slice(0, 2).map((w: any, i: number) => (
+              <div key={i} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'color-mix(in srgb, var(--success) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)', color: 'var(--success)' }}>
+                ✓ {w.company}
+              </div>
+            ))}
+            {similarLosses.slice(0, 2).map((l: any, i: number) => (
+              <div key={i} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)', color: 'var(--danger)' }}>
+                ✗ {l.company}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', mlPrediction = null, globalPrior = null, brainData = null }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void; currencySymbol?: string; mlPrediction?: any; globalPrior?: any; brainData?: any }) {
   const router = useRouter()
   const [expandingType, setExpandingType] = useState<string | null>(null)
   const { data: allDealsRes } = useSWR('/api/deals', fetcher)
@@ -2564,6 +2683,11 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
             )}
           </div>
         </div>
+      )}
+
+      {/* Score Breakdown Visual — shown when a conversion score exists */}
+      {deal.conversionScore != null && (
+        <ScoreBreakdown deal={deal} mlPrediction={mlPrediction} brainData={brainData} />
       )}
 
       {/* AI Analysis card — shown first if any AI data exists */}
@@ -3199,7 +3323,7 @@ export default function DealDetailPage() {
       ) : (
         <div>
           {activeTab === 'overview' && (
-            <OverviewTab dealId={id} deal={deal} dealGaps={dealGaps} onUpdate={() => mutate()} currencySymbol={currencySymbol} mlPrediction={mlPrediction} globalPrior={globalPrior} />
+            <OverviewTab dealId={id} deal={deal} dealGaps={dealGaps} onUpdate={() => mutate()} currencySymbol={currencySymbol} mlPrediction={mlPrediction} globalPrior={globalPrior} brainData={brainRes?.data} />
           )}
           {activeTab === 'meeting-notes' && (
             <MeetingNotesTab dealId={id} deal={deal} onUpdate={() => mutate()} onSwitchToPrep={() => setActiveTab('prep')} />
