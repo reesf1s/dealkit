@@ -440,7 +440,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
   for (const d of deals) {
     if (d.stage === 'closed_won' || d.stage === 'closed_lost') continue
     try {
-      const det = analyzeDeterioration(d.meetingNotes as string | null, d.createdAt, d.updatedAt)
+      const det = analyzeDeterioration(d.meetingNotes as string | null)
       if (det.isDeteriorating) deteriorationMap.set(d.id, true)
     } catch { /* non-fatal */ }
   }
