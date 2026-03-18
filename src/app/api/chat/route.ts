@@ -378,7 +378,7 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
       const updatePayload: Record<string, unknown> = { todos: mergedTodos, meetingNotes: text, notes: accumulatedNotes, updatedAt: new Date() }
       if (parsed.risks?.length) { updatePayload.dealRisks = parsed.risks; dealChanges.push(`${parsed.risks.length} risk${parsed.risks.length > 1 ? 's' : ''} identified`) }
       if (parsed.dealUpdate?.stage) { updatePayload.stage = parsed.dealUpdate.stage; dealChanges.push(`stage → **${parsed.dealUpdate.stage}**`) }
-      if (parsed.dealUpdate?.dealValue) { updatePayload.dealValue = parsed.dealUpdate.dealValue; dealChanges.push(`value → **$${parsed.dealUpdate.dealValue.toLocaleString()}**`) }
+      if (parsed.dealUpdate?.dealValue) { updatePayload.dealValue = parsed.dealUpdate.dealValue; dealChanges.push(`value → **£${parsed.dealUpdate.dealValue.toLocaleString('en-GB')}**`) }
 
       await db.update(dealLogs).set(updatePayload).where(eq(dealLogs.id, parsed.matchedDealId))
 
@@ -1049,7 +1049,7 @@ Text: ${text.slice(0, 3000)}`,
   after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
 
   return {
-    reply: `Created deal **${deal.dealName}** at **${deal.prospectCompany}**${deal.dealValue ? ` ($${deal.dealValue.toLocaleString()})` : ''}. Stage: **${deal.stage}**.\n\nView and edit it in [Deal Log](/deals/${deal.id}).`,
+    reply: `Created deal **${deal.dealName}** at **${deal.prospectCompany}**${deal.dealValue ? ` (£${deal.dealValue.toLocaleString('en-GB')})` : ''}. Stage: **${deal.stage}**.\n\nView and edit it in [Deal Log](/deals/${deal.id}).`,
     actions: [{ type: 'deal_created', dealId: deal.id, dealName: deal.dealName, company: deal.prospectCompany }],
   }
 }
@@ -1198,8 +1198,8 @@ Return ONLY JSON:
     await db.update(dealLogs).set({ dealValue: identified.valueInDollars, updatedAt: new Date() }).where(eq(dealLogs.id, targetDeal.id))
     after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
     return {
-      reply: `Updated **${targetDeal.dealName}** deal value to **$${identified.valueInDollars.toLocaleString()}**.`,
-      actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: [`value → $${identified.valueInDollars.toLocaleString()}`] }],
+      reply: `Updated **${targetDeal.dealName}** deal value to **£${identified.valueInDollars.toLocaleString('en-GB')}**.`,
+      actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: [`value → £${identified.valueInDollars.toLocaleString('en-GB')}`] }],
     }
   }
 
@@ -1742,8 +1742,29 @@ export async function POST(req: NextRequest) {
     const lastUserMsg = [...messages].reverse().find((m: { role: string }) => m.role === 'user')
     const lastText: string = lastUserMsg?.content ?? ''
 
+    // Empty / whitespace-only message guard
+    if (!lastText?.trim()) {
+      return NextResponse.json({ reply: 'What would you like to know about your pipeline?', actions: [] })
+    }
+
+    // Meeting notes paste detection
+    const looksLikeMeetingNotesPaste = lastText.length > 300 &&
+      /discussed|mentioned|next steps|action items|agreed|meeting|call|demo/i.test(lastText)
+
+    // Context window guard: trim to last 20 non-system messages if history is long
+    const trimmedMessages = messages.length > 40
+      ? [
+          ...messages.filter((m: { role: string }) => m.role === 'system'),
+          ...messages.filter((m: { role: string }) => m.role !== 'system').slice(-20),
+        ]
+      : messages
+
     // LLM-based intent classification (with regex fallback)
-    const intent = await classifyIntent(lastText)
+    // Override to meeting_notes if paste detection triggers but classification missed it
+    let intent = await classifyIntent(lastText)
+    if (looksLikeMeetingNotesPaste && intent === 'qa') {
+      intent = 'meeting_notes'
+    }
 
     if (intent === 'competitor_battlecard') {
       const result = await handleCompetitorBattlecard(workspaceId, userId, lastText, plan)
@@ -1956,10 +1977,13 @@ When user says "this deal", "this company", "here", "this prospect" → they mea
     }
 
     // ── Brain pipeline intelligence ──
+    // FIX 3: Only use brain context if it actually has deal data
     let brainSection = ''
-    if (brain) {
+    if (brain && brain.deals?.length) {
       try { brainSection = `\n\n## PIPELINE INTELLIGENCE\n${formatBrainContext(brain, Object.keys(chatStageLabels).length > 0 ? chatStageLabels : undefined)}` }
       catch { /* non-fatal */ }
+    } else if (!brain?.deals?.length && !dealFallbackRows.length) {
+      brainSection = '\n\n## PIPELINE INTELLIGENCE\nNo deals have been added yet. Encourage the user to add their first deal.'
     } else if (dealFallbackRows.length > 0) {
       const open = dealFallbackRows.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
       const csl = (id: string) => chatStageLabels[id] ?? id
@@ -2027,26 +2051,48 @@ ${caseStudySection}
 ${gapSection}
 ${collateralSection}${activeDealSection}${brainSection}${winPlaybookSection}`
 
+    const messagesForQA = trimmedMessages.slice(-8).map((m: { role: string; content: string }) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+
     const stream = anthropic.messages.stream({
       model: qaModel, max_tokens: qaMaxTokens,
       system: systemPrompt,
-      messages: messages.slice(-8).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content })),
+      messages: messagesForQA,
     })
 
     const encoder = new TextEncoder()
     const readable = new ReadableStream({
       async start(controller) {
         try {
+          // Timeout: if no chunk arrives within 30s, stream a fallback message
+          let settled = false
+          const timeoutId = setTimeout(() => {
+            if (!settled) {
+              settled = true
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ t: "I'm taking longer than usual. Please try again." })}\n\n`))
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`))
+              controller.close()
+            }
+          }, 30000)
+
           for await (const event of stream) {
+            if (settled) break
             if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({ t: event.delta.text })}\n\n`))
             }
           }
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`))
-          controller.close()
-        } catch {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`))
-          controller.close()
+
+          if (!settled) {
+            settled = true
+            clearTimeout(timeoutId)
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`))
+            controller.close()
+          }
+        } catch (streamErr) {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ t: 'Something went wrong. Please try again.' })}\n\n`))
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`))
+            controller.close()
+          } catch { /* controller already closed */ }
         }
       },
     })

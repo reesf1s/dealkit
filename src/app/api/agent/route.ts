@@ -68,7 +68,7 @@ function buildActiveDealContext(
   lines.push(`- **Deal**: ${brainDeal.name}`)
   lines.push(`- **Company**: ${brainDeal.company}`)
   lines.push(`- **Stage**: ${brainDeal.stage}`)
-  if (brainDeal.dealValue != null) lines.push(`- **Value**: ${brainDeal.dealValue.toLocaleString()}`)
+  if (brainDeal.dealValue != null) lines.push(`- **Value**: £${brainDeal.dealValue.toLocaleString('en-GB')}`)
   if (brainDeal.conversionScore != null) lines.push(`- **Conversion Score**: ${brainDeal.conversionScore}%`)
   if (brainDeal.closeDate) lines.push(`- **Close Date**: ${brainDeal.closeDate}`)
 
@@ -421,6 +421,10 @@ KEEP MEETING HISTORIES ISOLATED. When the user sends notes about deal A:
 - If no active deal is selected and you can't match the notes, ASK which deal they belong to.
 - NEVER append notes to the wrong deal.
 
+═══ CURRENCY FORMAT ═══
+
+Always use £ (British pounds) when displaying monetary values. Format as £X,XXX (e.g., £50,000 not $50,000).
+
 ═══ ACCURACY ABOVE ALL ELSE ═══
 
 The golden rule: **Only store what the user explicitly tells you. Never store what you infer.**
@@ -484,6 +488,41 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'messages required' }, { status: 400 })
     }
 
+    // ── Empty / whitespace-only message guard ────────────────────────────────
+    const lastUserMessage = [...messages].reverse().find((m: any) => m.role === 'user')
+    const lastUserText = typeof lastUserMessage?.content === 'string'
+      ? lastUserMessage.content
+      : Array.isArray(lastUserMessage?.content)
+        ? lastUserMessage.content.map((p: any) => p.text ?? '').join('')
+        : ''
+
+    if (!lastUserText?.trim()) {
+      const emptyStream = new ReadableStream({
+        start(controller) {
+          const msg = 'What would you like to know about your pipeline?'
+          controller.enqueue(new TextEncoder().encode(`0:${JSON.stringify(msg)}\n`))
+          controller.enqueue(new TextEncoder().encode(`d:{"finishReason":"stop","usage":{"promptTokens":0,"completionTokens":0}}\n`))
+          controller.close()
+        },
+      })
+      return new Response(emptyStream, {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      })
+    }
+
+    // ── Meeting notes paste detection ─────────────────────────────────────────
+    const looksLikeMeetingNotes = lastUserText.length > 300 &&
+      /discussed|mentioned|next steps|action items|agreed|meeting|call|demo/i.test(lastUserText)
+
+    // ── Context window guard: trim to last 20 non-system messages ─────────────
+    let trimmedMessages = messages
+    if (messages.length > 40) {
+      const systemMessages = messages.filter((m: any) => m.role === 'system')
+      const nonSystemMessages = messages.filter((m: any) => m.role !== 'system')
+      trimmedMessages = [...systemMessages, ...nonSystemMessages.slice(-20)]
+    }
+
     // ── Load workspace brain + active deal context ───────────────────────────
     const brain = await getWorkspaceBrain(wsCtx.workspaceId)
 
@@ -525,9 +564,12 @@ export async function POST(req: NextRequest) {
     } catch { /* non-fatal */ }
 
     // Re-format brain context with stage labels so the AI sees custom names
-    const brainContextWithLabels = brain
+    // FIX 3: Check if brain has deal data before building context
+    const brainContextWithLabels = brain && brain.deals?.length
       ? formatBrainContext(brain, Object.keys(stageLabels).length > 0 ? stageLabels : undefined)
-      : 'No workspace data loaded yet.'
+      : brain
+        ? 'Pipeline data is loading — no deals recorded yet. Encourage the user to add their first deal.'
+        : 'No workspace data loaded yet.'
     const systemPrompt = buildSystemPrompt(brainContextWithLabels, activeDealContext, pipelineStageContext)
 
     // ── Build tool context for tool execute() calls ──────────────────────────
@@ -597,24 +639,59 @@ export async function POST(req: NextRequest) {
       ]),
     )
 
+    // ── Meeting notes detection hint — prepend to system if detected ────────
+    const meetingNotesHint = looksLikeMeetingNotes
+      ? `\n\nIMPORTANT: The user's latest message appears to be meeting notes (it is long and contains meeting-related keywords). If no active deal is selected or the notes don't clearly match a deal, ask: "This looks like meeting notes. Which deal should I add this to?" before processing.`
+      : ''
+
+    const finalSystemPrompt = systemPrompt + meetingNotesHint
+
     // ── Stream response ──────────────────────────────────────────────────────
-    const result = streamText({
-      model: anthropic('claude-sonnet-4-6'),
-      system: systemPrompt,
-      messages,
-      tools: sdkTools,
-      maxSteps: 20,
-      maxTokens: 8192,
-      onFinish: async () => {
-        after(async () => {
-          try {
-            await rebuildWorkspaceBrain(wsCtx.workspaceId)
-          } catch {
-            // Non-fatal — brain will rebuild on next access
-          }
-        })
-      },
-    })
+    // Wrap with a 30-second timeout so the UI never hangs indefinitely
+    let result: ReturnType<typeof streamText>
+    try {
+      const streamPromise = streamText({
+        model: anthropic('claude-sonnet-4-6'),
+        system: finalSystemPrompt,
+        messages: trimmedMessages,
+        tools: sdkTools,
+        maxSteps: 20,
+        maxTokens: 8192,
+        onFinish: async () => {
+          after(async () => {
+            try {
+              await rebuildWorkspaceBrain(wsCtx.workspaceId)
+            } catch {
+              // Non-fatal — brain will rebuild on next access
+            }
+          })
+        },
+      })
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Response timed out')), 30000)
+      )
+
+      result = await Promise.race([
+        Promise.resolve(streamPromise),
+        timeoutPromise,
+      ]) as ReturnType<typeof streamText>
+    } catch (timeoutErr) {
+      const timeoutMsg = timeoutErr instanceof Error && timeoutErr.message === 'Response timed out'
+        ? "I'm taking longer than usual. Please try again."
+        : (timeoutErr instanceof Error ? timeoutErr.message : String(timeoutErr))
+      const timeoutStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(`0:${JSON.stringify(timeoutMsg)}\n`))
+          controller.enqueue(new TextEncoder().encode(`d:{"finishReason":"stop","usage":{"promptTokens":0,"completionTokens":0}}\n`))
+          controller.close()
+        },
+      })
+      return new Response(timeoutStream, {
+        status: 200,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      })
+    }
 
     return result.toDataStreamResponse()
   } catch (err) {
