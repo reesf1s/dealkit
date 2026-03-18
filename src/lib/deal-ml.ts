@@ -22,22 +22,14 @@
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-export const ML_FEATURE_NAMES = [
-  'stage_progress',       // 0 = prospecting → 1 = negotiation
-  'deal_value',           // log-normalised by workspace max
-  'pipeline_age',         // days / 180, capped at 1
-  'risk_intensity',       // continuous: dealRisks.length / 5, capped at 1 (replaces binary has_risks)
-  'competitor_win_rate',  // min win rate across this deal's competitors (penalises strong rivals more)
-  'todo_engagement',      // todos-completed / total
-  'text_engagement',      // NLP composite from meeting notes (sentiment × recency × signals)
-                          // Replaces ai_confidence — no circular LLM dependency.
-  'momentum_score',       // recent vs early sentiment delta (0–1, 0.5=stable)
-  'stakeholder_depth',    // breadth of stakeholder engagement (0–1, 6 categories)
-  'urgency_score',        // urgency language density from NLP (0–1)
-  'rep_win_rate',         // owning rep's historical win rate across closed deals (0–1, 0.5=unknown)
-  'champion_signal',      // internal champion/sponsor/advocate strength from NLP (0–1)
-                          // Strongest single predictor of close in B2B sales — separate from text_engagement
-] as const
+import { FEATURE_NAMES as ML_FEATURE_NAMES_IMPORT } from './ml/features'
+import { trainLogisticRegression, predictProbability, sigmoid } from './ml/logistic-regression'
+import { kMeans as kMeansLib, type ClusterResult } from './ml/kmeans'
+import { fitOLS } from './ml/ols'
+import { extractTextSignals } from '@/lib/text-signals'
+import type { GlobalPriorInput } from '@/lib/global-pool'
+
+export const ML_FEATURE_NAMES = ML_FEATURE_NAMES_IMPORT
 
 export const ML_MIN_TRAINING_DEALS = 4
 
@@ -194,11 +186,7 @@ export interface MLEngineResult {
   closeDateModel: CloseDateModel | null
 }
 
-// ─── Math helpers ─────────────────────────────────────────────────────────────
-
-function sigmoid(z: number): number {
-  return 1 / (1 + Math.exp(-Math.max(-30, Math.min(30, z))))
-}
+// ─── Math helpers (local utilities not exported from ml/ library) ─────────────
 
 function dot(a: number[], b: number[]): number {
   return a.reduce((s, v, i) => s + v * (b[i] ?? 0), 0)
@@ -209,13 +197,8 @@ function euclidean(a: number[], b: number[]): number {
 }
 
 function olsSlope(pts: [number, number][]): number {
-  const n = pts.length
-  if (n < 2) return 0
-  const mx = pts.reduce((s, [x]) => s + x, 0) / n
-  const my = pts.reduce((s, [, y]) => s + y, 0) / n
-  const num = pts.reduce((s, [x, y]) => s + (x - mx) * (y - my), 0)
-  const den = pts.reduce((s, [x]) => s + (x - mx) ** 2, 0)
-  return den === 0 ? 0 : num / den
+  const result = fitOLS(pts.map(([x]) => x), pts.map(([, y]) => y))
+  return result.slope
 }
 
 function quantile(sorted: number[], q: number): number {
@@ -226,7 +209,7 @@ function quantile(sorted: number[], q: number): number {
   return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo)
 }
 
-// ─── K-means clustering (deterministic maximin init) ─────────────────────────
+// ─── K-means: adapt library return type to deal-ml's internal shape ───────────
 
 function kMeans(
   points: number[][],
@@ -236,47 +219,22 @@ function kMeans(
   if (points.length === 0 || k <= 0 || k > points.length) {
     return { centroids: [], assignments: new Array(points.length).fill(0) }
   }
-  const n = points[0]?.length ?? 0
+  // Build id-tagged points for the library
+  const tagged = points.map((features, i) => ({ id: String(i), features }))
+  const clusters: ClusterResult[] = kMeansLib(tagged, k, maxIter)
 
-  // Maximin init: spread centroids as far apart as possible (deterministic)
-  const centroids: number[][] = [points[0].slice()]
-  while (centroids.length < k) {
-    let farthest = 0, farthestDist = -1
-    for (let i = 0; i < points.length; i++) {
-      const minDist = Math.min(...centroids.map(c => euclidean(points[i], c)))
-      if (minDist > farthestDist) { farthestDist = minDist; farthest = i }
-    }
-    centroids.push(points[farthest].slice())
-  }
-
+  // Reconstruct flat assignments array from cluster memberIds
   const assignments = new Array<number>(points.length).fill(0)
-
-  for (let iter = 0; iter < maxIter; iter++) {
-    let changed = false
-    for (let i = 0; i < points.length; i++) {
-      let nearest = 0, nearestDist = Infinity
-      for (let j = 0; j < k; j++) {
-        const d = euclidean(points[i], centroids[j])
-        if (d < nearestDist) { nearestDist = d; nearest = j }
-      }
-      if (assignments[i] !== nearest) { assignments[i] = nearest; changed = true }
-    }
-    if (!changed) break
-    for (let j = 0; j < k; j++) {
-      const cluster = points.filter((_, i) => assignments[i] === j)
-      if (cluster.length === 0) continue
-      for (let d = 0; d < n; d++) {
-        centroids[j][d] = cluster.reduce((s, p) => s + (p[d] ?? 0), 0) / cluster.length
-      }
+  for (let c = 0; c < clusters.length; c++) {
+    for (const id of clusters[c].memberIds) {
+      assignments[Number(id)] = c
     }
   }
-
+  const centroids = clusters.map(cl => cl.centroid)
   return { centroids, assignments }
 }
 
 // ─── Feature extraction ───────────────────────────────────────────────────────
-
-import { extractTextSignals } from '@/lib/text-signals'
 
 function extractFeatures(
   deal: DealMLInput,
@@ -331,7 +289,7 @@ function extractFeatures(
   return [f_stage, f_value, f_age, f_risk, f_comp, f_todo, f_text, f_momentum, f_stakeholder, f_urgency, f_rep, f_champion]
 }
 
-// ─── Logistic regression ──────────────────────────────────────────────────────
+// ─── Logistic regression — thin wrappers around ml/logistic-regression ────────
 
 interface TrainOpts { lr: number; epochs: number; lambda: number }
 
@@ -340,36 +298,33 @@ function trainLR(
   opts: TrainOpts = { lr: 0.1, epochs: 800, lambda: 0.01 },
 ): { weights: number[]; bias: number } {
   if (examples.length === 0) return { weights: new Array(ML_FEATURE_NAMES.length).fill(0), bias: 0 }
-  const n = examples[0].features.length
-  const w = new Array<number>(n).fill(0)
-  let b = 0
-
-  for (let epoch = 0; epoch < opts.epochs; epoch++) {
-    const dw = new Array<number>(n).fill(0)
-    let db = 0
-    for (const { features, label } of examples) {
-      const err = sigmoid(dot(w, features) + b) - label
-      for (let i = 0; i < n; i++) dw[i] += err * (features[i] ?? 0)
-      db += err
-    }
-    const m = examples.length
-    for (let i = 0; i < n; i++) w[i] -= opts.lr * (dw[i] / m + 2 * opts.lambda * w[i])
-    b -= opts.lr * (db / m)
-  }
-  return { weights: w, bias: b }
+  const X = examples.map(e => e.features)
+  const y = examples.map(e => e.label)
+  const model = trainLogisticRegression(X, y, {
+    learningRate: opts.lr,
+    iterations: opts.epochs,
+    l2Lambda: opts.lambda,
+  })
+  return { weights: model.weights, bias: model.bias }
 }
 
 function computeLOO(examples: { features: number[]; label: number }[]): number {
   if (examples.length < 4) return 0
-  const opts: TrainOpts = { lr: 0.1, epochs: 300, lambda: 0.01 }
+  const X = examples.map(e => e.features)
+  const y = examples.map(e => e.label)
+  // Use reduced epochs for LOO (300 vs 800) — same as original
+  const looOpts = { learningRate: 0.1, iterations: 300, l2Lambda: 0.01 }
+  if (X.length < 4) return 0
   let correct = 0
-  for (let i = 0; i < examples.length; i++) {
-    const trainSet = examples.filter((_, j) => j !== i)
-    const { weights, bias } = trainLR(trainSet, opts)
-    if ((sigmoid(dot(weights, examples[i].features) + bias) >= 0.5 ? 1 : 0) === examples[i].label)
-      correct++
+  for (let i = 0; i < X.length; i++) {
+    const trainX = [...X.slice(0, i), ...X.slice(i + 1)]
+    const trainY = [...y.slice(0, i), ...y.slice(i + 1)]
+    if (!trainY.includes(0) || !trainY.includes(1)) continue
+    const model = trainLogisticRegression(trainX, trainY, looOpts)
+    const prob = predictProbability(model, X[i])
+    if ((prob >= 0.5 ? 1 : 0) === y[i]) correct++
   }
-  return correct / examples.length
+  return correct / X.length
 }
 
 // ─── Archetype helpers ────────────────────────────────────────────────────────
@@ -685,8 +640,6 @@ export function predictDaysToClose(model: CloseDateModel, features: number[]): n
 }
 
 // ─── Main engine ──────────────────────────────────────────────────────────────
-
-import type { GlobalPriorInput } from '@/lib/global-pool'
 
 export function runMLEngine(
   allDeals: DealMLInput[],
