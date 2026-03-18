@@ -443,6 +443,7 @@ export async function POST(req: NextRequest) {
       messages,
       tools: sdkTools,
       maxSteps: 20,
+      maxTokens: 8192,
       onFinish: async () => {
         after(async () => {
           try {

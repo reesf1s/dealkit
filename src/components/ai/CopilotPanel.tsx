@@ -548,8 +548,8 @@ export default function CopilotPanel() {
             </div>
           ))}
 
-          {/* Loading / streaming indicator */}
-          {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
+          {/* Loading / streaming indicator — show during tool execution too (assistant msg exists but has no visible text yet) */}
+          {isLoading && !(messages[messages.length - 1]?.role === 'assistant' && (messages[messages.length - 1]?.content ?? '').trim().length > 0) && (
             <div className="copilot-msg-row" style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
               <div style={{
                 width: '24px', height: '24px', flexShrink: 0, marginTop: '2px',
