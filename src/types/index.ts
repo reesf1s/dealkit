@@ -134,6 +134,8 @@ export interface DealLog {
   dealType: 'one_off' | 'recurring'
   recurringInterval: 'monthly' | 'quarterly' | 'annual' | null
   links: DealLink[]
+  contractStartDate?: Date | string | null
+  contractEndDate?: Date | string | null
   parentDealId?: string | null
   expansionType?: ExpansionType | null
   projectPlan?: ProjectPlan | null

@@ -2984,6 +2984,49 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
         ))}
       </div>
 
+      {/* Contract dates */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 auto', minWidth: '200px' }}>
+          <label style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, whiteSpace: 'nowrap' }}>Contract Start</label>
+          <input
+            type="date"
+            value={deal.contractStartDate ? new Date(deal.contractStartDate).toISOString().split('T')[0] : ''}
+            onChange={async (e) => {
+              const val = e.target.value
+              await patchDeal({ contractStartDate: val || null })
+            }}
+            style={{
+              flex: 1, height: '30px', padding: '0 8px', borderRadius: '6px',
+              background: 'var(--input-bg)', border: '1px solid var(--border)',
+              color: 'var(--text-primary)', fontSize: '12px', outline: 'none',
+              boxSizing: 'border-box' as const, fontFamily: 'inherit',
+            }}
+            onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
+            onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+          />
+        </div>
+        <span style={{ color: 'var(--text-tertiary)', fontSize: '12px', flexShrink: 0 }}>&mdash;</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 auto', minWidth: '200px' }}>
+          <label style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, whiteSpace: 'nowrap' }}>Contract End</label>
+          <input
+            type="date"
+            value={deal.contractEndDate ? new Date(deal.contractEndDate).toISOString().split('T')[0] : ''}
+            onChange={async (e) => {
+              const val = e.target.value
+              await patchDeal({ contractEndDate: val || null })
+            }}
+            style={{
+              flex: 1, height: '30px', padding: '0 8px', borderRadius: '6px',
+              background: 'var(--input-bg)', border: '1px solid var(--border)',
+              color: 'var(--text-primary)', fontSize: '12px', outline: 'none',
+              boxSizing: 'border-box' as const, fontFamily: 'inherit',
+            }}
+            onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
+            onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+          />
+        </div>
+      </div>
+
       {/* Contacts */}
       {Array.isArray(deal.contacts) && deal.contacts.length > 0 && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' }}>

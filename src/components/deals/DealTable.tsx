@@ -126,13 +126,15 @@ export function DealTable({ deals, onAdd, onDelete }: DealTableProps) {
 
       <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflow: 'hidden' }}>
         {/* Header row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 120px 32px', padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 110px 110px 120px 32px', padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           {[
             { label: 'Deal / Prospect', field: 'dealName' as SortField },
             { label: 'Company', field: 'prospectCompany' as SortField },
             { label: 'Outcome', field: 'stage' as SortField },
             { label: 'Competitor', field: null },
             { label: 'Value', field: null },
+            { label: 'Contract Start', field: null },
+            { label: 'Contract End', field: null },
             { label: 'Date', field: 'createdAt' as SortField },
           ].map(({ label, field }) => (
             <button
@@ -152,7 +154,7 @@ export function DealTable({ deals, onAdd, onDelete }: DealTableProps) {
           <div
             key={deal.id}
             onClick={() => router.push(`/deals/${deal.id}`)}
-            style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 120px 32px', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center', transition: 'background-color 100ms ease', cursor: 'pointer' }}
+            style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 110px 110px 120px 32px', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center', transition: 'background-color 100ms ease', cursor: 'pointer' }}
             onMouseEnter={(e) => { setHoveredId(deal.id); e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)' }}
             onMouseLeave={(e) => { setHoveredId(null); setConfirmId(null); e.currentTarget.style.backgroundColor = 'transparent' }}
           >
@@ -178,6 +180,16 @@ export function DealTable({ deals, onAdd, onDelete }: DealTableProps) {
             {/* Value */}
             <span style={{ fontSize: '13px', color: '#888', fontVariantNumeric: 'tabular-nums' }}>
               {deal.dealValue != null ? `$${deal.dealValue.toLocaleString()}` : '—'}
+            </span>
+
+            {/* Contract Start */}
+            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
+              {formatDate((deal as any).contractStartDate)}
+            </span>
+
+            {/* Contract End */}
+            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
+              {formatDate((deal as any).contractEndDate)}
             </span>
 
             {/* Date */}

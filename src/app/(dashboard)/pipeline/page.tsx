@@ -8,7 +8,7 @@ import { useSidebar } from '@/components/layout/SidebarContext'
 import {
   Plus, TrendingUp, DollarSign, Sparkles,
   CheckSquare, MoreHorizontal, Target, Zap, ArrowUpRight,
-  Star, AlertTriangle, Clock,
+  Star, AlertTriangle, Clock, Calendar,
   Settings, Edit, X, Trash2, Check,
   Kanban, List, ChevronUp, ChevronDown,
 } from 'lucide-react'
@@ -292,6 +292,40 @@ function DealCard({
           <span style={{ fontSize: '10px', color: 'var(--success)' }}>🔥 Hot</span>
         </div>
       )}
+      {/* Contract end date badge */}
+      {deal.contractEndDate && (() => {
+        const endDate = new Date(deal.contractEndDate)
+        const now = new Date()
+        const daysUntilEnd = Math.ceil((endDate.getTime() - now.getTime()) / 86_400_000)
+        const isExpiringSoon = daysUntilEnd >= 0 && daysUntilEnd <= 30
+        const isExpired = daysUntilEnd < 0
+        const badgeColor = isExpired ? 'var(--danger)' : isExpiringSoon ? 'var(--warning)' : 'var(--text-secondary)'
+        const badgeBg = isExpired
+          ? 'color-mix(in srgb, var(--danger) 8%, transparent)'
+          : isExpiringSoon
+            ? 'color-mix(in srgb, var(--warning) 8%, transparent)'
+            : 'var(--surface)'
+        const badgeBorder = isExpired
+          ? 'color-mix(in srgb, var(--danger) 20%, transparent)'
+          : isExpiringSoon
+            ? 'color-mix(in srgb, var(--warning) 20%, transparent)'
+            : 'var(--border)'
+        const label = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        return (
+          <div style={{
+            display: 'flex', gap: '5px', alignItems: 'center',
+            padding: '4px 8px', borderRadius: '6px',
+            background: badgeBg,
+            border: `1px solid ${badgeBorder}`,
+            marginBottom: '8px',
+          }}>
+            <Calendar size={9} style={{ color: badgeColor, flexShrink: 0 }} />
+            <span style={{ fontSize: '10px', color: badgeColor }}>
+              {isExpired ? `Expired ${label}` : isExpiringSoon ? `Expires ${label}` : `Ends ${label}`}
+            </span>
+          </div>
+        )
+      })()}
 
       {/* AI Insights — filter out score-summary insights to avoid conflicting with ML % badge */}
       {(() => {

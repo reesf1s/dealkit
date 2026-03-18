@@ -24,7 +24,9 @@ async function ensureDealColumns() {
       ADD COLUMN IF NOT EXISTS project_plan jsonb,
       ADD COLUMN IF NOT EXISTS links jsonb NOT NULL DEFAULT '[]'::jsonb,
       ADD COLUMN IF NOT EXISTS parent_deal_id uuid,
-      ADD COLUMN IF NOT EXISTS expansion_type text
+      ADD COLUMN IF NOT EXISTS expansion_type text,
+      ADD COLUMN IF NOT EXISTS contract_start_date timestamptz,
+      ADD COLUMN IF NOT EXISTS contract_end_date timestamptz
     `)
   } catch { /* columns may already exist */ }
   try {
@@ -73,7 +75,7 @@ export async function POST(req: NextRequest) {
     }
     await ensureDealColumns()
     const body = await req.json()
-    const { dealName, prospectCompany, prospectName, prospectTitle, contacts, description, dealValue, stage, dealType, recurringInterval, competitors: dealCompetitors, notes, nextSteps, closeDate, wonDate, lostDate, lostReason } = body
+    const { dealName, prospectCompany, prospectName, prospectTitle, contacts, description, dealValue, stage, dealType, recurringInterval, competitors: dealCompetitors, notes, nextSteps, closeDate, wonDate, lostDate, lostReason, contractStartDate, contractEndDate } = body
     if (!dealName || !prospectCompany) return NextResponse.json({ error: 'dealName and prospectCompany are required' }, { status: 400 })
     const now = new Date()
     const [deal] = await db.insert(dealLogs).values({
@@ -85,7 +87,10 @@ export async function POST(req: NextRequest) {
       competitors: dealCompetitors ?? [], notes: notes ?? null,
       nextSteps: nextSteps ?? null, closeDate: closeDate ? new Date(closeDate) : null,
       wonDate: wonDate ? new Date(wonDate) : null, lostDate: lostDate ? new Date(lostDate) : null,
-      lostReason: lostReason ?? null, createdAt: now, updatedAt: now,
+      lostReason: lostReason ?? null,
+      contractStartDate: contractStartDate ? new Date(contractStartDate) : null,
+      contractEndDate: contractEndDate ? new Date(contractEndDate) : null,
+      createdAt: now, updatedAt: now,
     }).returning()
     let eventType = 'deal_log.created'
     if (deal.stage === 'closed_won') eventType = 'deal_log.closed_won'

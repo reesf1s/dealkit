@@ -224,6 +224,9 @@ export const dealLogs = pgTable('deal_logs', {
   intentSignals: jsonb('intent_signals'),                      // LLM-extracted intent: champion/budget/timeline/nextMeeting
   links: jsonb('links').notNull().default([]),                  // DealLink[] — external URLs (SharePoint, Google Docs, Salesforce, etc.)
   // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS links jsonb NOT NULL DEFAULT '[]'::jsonb;
+  contractStartDate: timestamp('contract_start_date', { withTimezone: true }),
+  contractEndDate: timestamp('contract_end_date', { withTimezone: true }),
+  // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS contract_start_date timestamptz, ADD COLUMN IF NOT EXISTS contract_end_date timestamptz;
   parentDealId: uuid('parent_deal_id'),                        // links expansion/upsell deals to their original won deal
   expansionType: text('expansion_type'),                       // 'upsell' | 'cross_sell' | 'renewal' | 'expansion' | null
   // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS parent_deal_id uuid, ADD COLUMN IF NOT EXISTS expansion_type text;
