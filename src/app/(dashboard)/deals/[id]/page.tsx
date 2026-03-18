@@ -18,6 +18,81 @@ import {
 import type { DealContact, DealLink as DealLinkType, DealLinkType as LinkTypeEnum } from '@/types'
 import { useSidebar } from '@/components/layout/SidebarContext'
 
+// ─── Signal highlighting helper ──────────────────────────────────────────────
+
+const POSITIVE_SIGNALS: string[] = [
+  'excited', 'committed', 'moving forward', 'approved', 'agreed', 'confirmed',
+  'ready to', 'champion', 'sponsor', 'budget approved', 'budget allocated',
+  'high priority', 'top priority', 'green light', 'sign off', 'signed off',
+  'go ahead', 'great fit', 'love it', 'impressed', 'strong fit',
+  'reference call', 'eager', 'enthusiastic', 'very interested',
+  'contract signed', 'contracts signed', 'signed contract', 'fully executed',
+  'purchase order', 'po issued', 'po received',
+]
+
+const NEGATIVE_SIGNALS: string[] = [
+  'budget freeze', 'budget cut', 'no budget', 'not sure', 'reconsidering',
+  'delay', 'postpone', 'no decision', 'on hold', 'not a priority',
+  'too expensive', 'cost concern', 'roi unclear', 'no response', 'ghosted',
+  'gone quiet', 'not responding', 'going with another', 'pushback',
+  'blocker', 'legal hold', 'lost', 'cancelled', 'walking away',
+  'no longer interested', 'competitor chosen',
+]
+
+const URGENCY_SIGNALS: string[] = [
+  'urgent', 'asap', 'immediately', 'end of quarter', 'end of year',
+  'eoy', 'eoq', 'deadline', 'must go live', 'launch date', 'go-live',
+  'this month', 'this quarter', 'time sensitive', 'hard deadline',
+]
+
+const PRODUCT_GAP_KEYWORDS: string[] = [
+  "gap", "missing", "doesn't have", "does not have", "wish", "would need",
+  "lacks", "no feature", "feature request", "can't do", "cannot do",
+]
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function highlightSignals(text: string, competitors: string[]): string {
+  let result = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+
+  const applyHighlight = (words: string[], cls: string) => {
+    for (const word of words) {
+      const pattern = new RegExp(`(${escapeRegex(word)})`, 'gi')
+      result = result.replace(pattern, `<mark style="background:var(--highlight-${cls}-bg,#dcfce7);color:var(--highlight-${cls}-text,#166534);border-radius:2px;padding:0 2px">$1</mark>`)
+    }
+  }
+
+  applyHighlight(POSITIVE_SIGNALS, 'positive')
+
+  for (const word of NEGATIVE_SIGNALS) {
+    const pattern = new RegExp(`(${escapeRegex(word)})`, 'gi')
+    result = result.replace(pattern, `<mark style="background:#fee2e2;color:#991b1b;border-radius:2px;padding:0 2px">$1</mark>`)
+  }
+
+  for (const word of URGENCY_SIGNALS) {
+    const pattern = new RegExp(`(${escapeRegex(word)})`, 'gi')
+    result = result.replace(pattern, `<mark style="background:#fef3c7;color:#92400e;border-radius:2px;padding:0 2px">$1</mark>`)
+  }
+
+  for (const competitor of competitors) {
+    if (!competitor.trim()) continue
+    const pattern = new RegExp(`(${escapeRegex(competitor.trim())})`, 'gi')
+    result = result.replace(pattern, `<mark style="background:#dbeafe;color:#1e40af;border-radius:2px;padding:0 2px">$1</mark>`)
+  }
+
+  for (const word of PRODUCT_GAP_KEYWORDS) {
+    const pattern = new RegExp(`(${escapeRegex(word)})`, 'gi')
+    result = result.replace(pattern, `<mark style="background:#fef3c7;color:#92400e;border-radius:2px;padding:0 2px">$1</mark>`)
+  }
+
+  return result
+}
+
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 // ─── Workspace members hook ─────────────────────────────────────────────────
@@ -269,6 +344,7 @@ const STAGE_COLORS: Record<string, string> = {
 }
 
 function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: string; deal: any; onUpdate: () => void; onSwitchToPrep?: () => void }) {
+  const dealCompetitors: string[] = deal?.competitors ?? []
   const { sendToCopilot } = useSidebar()
   const [updateText, setUpdateText] = useState('')
   const [historyExpanded, setHistoryExpanded] = useState(false)
@@ -411,13 +487,17 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
                           title="Remove this entry"
                         >✕ remove</button>
                       </div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{body}</div>
+                      <div
+                        style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}
+                        dangerouslySetInnerHTML={{ __html: highlightSignals(body, dealCompetitors) }}
+                      />
                     </div>
                   )
                 }) : (
-                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: '1.7', margin: 0 }}>
-                    {legacy.join('\n')}
-                  </pre>
+                  <div
+                    style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: '1.7', margin: 0 }}
+                    dangerouslySetInnerHTML={{ __html: highlightSignals(legacy.join('\n'), dealCompetitors) }}
+                  />
                 )}
               </div>
             )}
@@ -2387,6 +2467,208 @@ function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; o
   )
 }
 
+// ─── Actions Tab (merged To-Dos + Project Plan + Success Criteria) ────────────
+
+function ActionsTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: any; onUpdate: () => void; members: WorkspaceMember[] }) {
+  const [subTab, setSubTab] = useState<'todos' | 'project-plan' | 'success'>('todos')
+
+  const openTodos = (deal?.todos ?? []).filter((t: any) => !t.done).length
+  const openTasks = (deal?.projectPlan as any)?.phases?.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete').length ?? 0
+  const openCriteria = (deal?.successCriteriaTodos as any[])?.filter((c: any) => !c.achieved).length ?? 0
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* Sub-tab pill navigation */}
+      <div style={{ display: 'flex', gap: '6px', padding: '3px', background: 'var(--surface)', borderRadius: '8px', width: 'fit-content' }}>
+        {([
+          { id: 'todos', label: `To-Dos${openTodos > 0 ? ` (${openTodos})` : ''}` },
+          { id: 'project-plan', label: `Project Plan${openTasks > 0 ? ` (${openTasks})` : ''}` },
+          { id: 'success', label: `Success Criteria${openCriteria > 0 ? ` (${openCriteria})` : ''}` },
+        ] as const).map(st => (
+          <button
+            key={st.id}
+            onClick={() => setSubTab(st.id)}
+            style={{
+              padding: '6px 14px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+              fontSize: '12px', fontWeight: '600', transition: 'all 0.15s',
+              background: subTab === st.id ? 'var(--card-bg)' : 'transparent',
+              color: subTab === st.id ? 'var(--text-primary)' : 'var(--text-tertiary)',
+              boxShadow: subTab === st.id ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
+            }}
+          >
+            {st.label}
+          </button>
+        ))}
+      </div>
+
+      {subTab === 'todos' && (
+        <TodosTab dealId={dealId} deal={deal} onUpdate={onUpdate} members={members} />
+      )}
+      {subTab === 'project-plan' && (
+        <ProjectPlanTab dealId={dealId} deal={deal} onUpdate={onUpdate} members={members} />
+      )}
+      {subTab === 'success' && (
+        <SuccessCriteriaTab dealId={dealId} deal={deal} onUpdate={onUpdate} members={members} />
+      )}
+    </div>
+  )
+}
+
+// ─── Collateral Tab ──────────────────────────────────────────────────────────
+
+function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
+  const { data: collateralRes } = useSWR('/api/collateral', fetcher)
+  const allCollateral: any[] = collateralRes?.data ?? []
+
+  // Filter client-side: match by dealId reference in content, title, or metadata
+  const dealName: string = deal?.dealName ?? ''
+  const company: string = deal?.prospectCompany ?? ''
+  const dealCollateral = allCollateral.filter((c: any) => {
+    if (c.dealId === dealId) return true
+    const content = [c.title ?? '', c.content ?? '', c.generationSource ?? ''].join(' ').toLowerCase()
+    const terms = [dealId, dealName, company].filter(Boolean).map(s => s.toLowerCase())
+    return terms.some(t => t.length > 3 && content.includes(t))
+  })
+
+  const typeLabels: Record<string, string> = {
+    proposal: 'Proposal',
+    case_study: 'Case Study',
+    one_pager: 'One-Pager',
+    email_sequence: 'Email Sequence',
+    battle_card: 'Battle Card',
+    roi_calculator: 'ROI Calculator',
+    custom: 'Custom',
+  }
+
+  const typeBadgeColors: Record<string, { bg: string; text: string }> = {
+    proposal: { bg: 'rgba(99,102,241,0.1)', text: 'var(--accent)' },
+    case_study: { bg: 'rgba(34,197,94,0.1)', text: 'var(--success)' },
+    one_pager: { bg: 'rgba(245,158,11,0.1)', text: 'var(--warning)' },
+    email_sequence: { bg: 'rgba(167,139,250,0.1)', text: '#7C3AED' },
+    battle_card: { bg: 'rgba(239,68,68,0.1)', text: 'var(--danger)' },
+    roi_calculator: { bg: 'rgba(16,185,129,0.1)', text: '#059669' },
+    custom: { bg: 'var(--surface-hover)', text: 'var(--text-secondary)' },
+  }
+
+  if (collateralRes === undefined) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {[1, 2].map(i => (
+          <div key={i} style={{ height: '80px', background: 'var(--surface)', borderRadius: '12px', animation: 'pulse 1.5s infinite' }} />
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
+          {dealCollateral.length > 0 ? `${dealCollateral.length} piece${dealCollateral.length !== 1 ? 's' : ''} of collateral` : 'No collateral yet for this deal'}
+        </span>
+        <Link
+          href={`/collateral?dealId=${dealId}`}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
+            background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
+            borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600',
+            textDecoration: 'none',
+          }}
+        >
+          <Sparkles size={13} /> Generate New
+        </Link>
+      </div>
+
+      {dealCollateral.length === 0 ? (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: '16px', padding: '60px 24px',
+          background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: '14px',
+        }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--accent-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <FileText size={22} color="var(--accent)" />
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>No collateral for this deal</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '320px' }}>
+              Generate proposals, one-pagers, email sequences, and battle cards tailored to this deal.
+            </div>
+          </div>
+          <Link
+            href={`/collateral?dealId=${dealId}`}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px',
+              background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
+              borderRadius: '9px', color: '#fff', fontSize: '13px', fontWeight: '600',
+              textDecoration: 'none', boxShadow: 'var(--shadow)',
+            }}
+          >
+            <Sparkles size={14} /> Generate Collateral
+          </Link>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+          {dealCollateral.map((c: any) => {
+            const badge = typeBadgeColors[c.type] ?? typeBadgeColors.custom
+            const createdDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+            return (
+              <div
+                key={c.id}
+                style={{
+                  background: 'var(--card-bg)', border: '1px solid var(--card-border)',
+                  borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px',
+                  transition: 'border-color 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--card-border)')}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {c.title || typeLabels[c.type] || 'Collateral'}
+                    </div>
+                    {createdDate && (
+                      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{createdDate}</div>
+                    )}
+                  </div>
+                  <span style={{
+                    fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '100px',
+                    background: badge.bg, color: badge.text, whiteSpace: 'nowrap', flexShrink: 0,
+                  }}>
+                    {typeLabels[c.type] ?? c.type}
+                  </span>
+                </div>
+
+                {c.status === 'generating' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--accent)' }}>
+                    <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
+                    Generating…
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
+                  <Link
+                    href={`/collateral/${c.id}`}
+                    style={{
+                      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                      padding: '7px 12px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.2)',
+                      borderRadius: '7px', color: 'var(--accent)', fontSize: '12px', fontWeight: 600,
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <ExternalLink size={11} /> View
+                  </Link>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Score Breakdown Visual ──────────────────────────────────────────────────
 
 function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPrediction: any; brainData: any }) {
@@ -3161,7 +3443,7 @@ export default function DealDetailPage() {
     expansion: 'var(--warning)',
   }
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'meeting-notes' | 'prep' | 'todos' | 'project-plan' | 'success'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'intelligence' | 'actions' | 'collateral'>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [winStoryOpen, setWinStoryOpen] = useState(false)
   const [wonDeal, setWonDeal] = useState<any>(null)
@@ -3174,10 +3456,10 @@ export default function DealDetailPage() {
     return () => setActiveDeal(null)
   }, [deal?.id, deal?.dealName, deal?.prospectCompany, deal?.stage])
 
-  // Auto-switch to Meeting Notes tab only if deal has no AI data at all AND no notes
+  // Auto-switch to Notes tab only if deal has no AI data at all AND no notes
   useEffect(() => {
     if (deal && !deal.meetingNotes && !deal.aiSummary && !deal.conversionScore) {
-      setActiveTab('meeting-notes')
+      setActiveTab('notes')
     }
   }, [deal?.id])
 
@@ -3291,11 +3573,16 @@ export default function DealDetailPage() {
       <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border)', paddingBottom: '0' }}>
         {[
           { id: 'overview', label: 'Overview' },
-          { id: 'meeting-notes', label: 'Updates + Notes' },
-          { id: 'prep', label: 'Meeting Prep' },
-          { id: 'todos', label: `To-Dos ${deal?.todos?.length > 0 ? `(${deal.todos.filter((t: any) => !t.done).length})` : ''}` },
-          { id: 'project-plan', label: `Project Plan${(deal?.projectPlan as any)?.phases?.length > 0 ? ` (${(deal.projectPlan as any).phases.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete').length} open)` : ''}` },
-          { id: 'success', label: `Success Criteria${(deal?.successCriteriaTodos as any[])?.length > 0 ? ` (${(deal.successCriteriaTodos as any[]).filter((c: any) => !c.achieved).length} open)` : ''}` },
+          { id: 'notes', label: 'Notes' },
+          { id: 'intelligence', label: 'Intelligence' },
+          { id: 'actions', label: (() => {
+            const openTodos = deal?.todos?.filter((t: any) => !t.done).length ?? 0
+            const openTasks = (deal?.projectPlan as any)?.phases?.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete').length ?? 0
+            const openCriteria = (deal?.successCriteriaTodos as any[])?.filter((c: any) => !c.achieved).length ?? 0
+            const total = openTodos + openTasks + openCriteria
+            return total > 0 ? `Actions (${total})` : 'Actions'
+          })() },
+          { id: 'collateral', label: 'Collateral' },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{
             padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '500',
@@ -3325,18 +3612,15 @@ export default function DealDetailPage() {
           {activeTab === 'overview' && (
             <OverviewTab dealId={id} deal={deal} dealGaps={dealGaps} onUpdate={() => mutate()} currencySymbol={currencySymbol} mlPrediction={mlPrediction} globalPrior={globalPrior} brainData={brainRes?.data} />
           )}
-          {activeTab === 'meeting-notes' && (
-            <MeetingNotesTab dealId={id} deal={deal} onUpdate={() => mutate()} onSwitchToPrep={() => setActiveTab('prep')} />
+          {activeTab === 'notes' && (
+            <MeetingNotesTab dealId={id} deal={deal} onUpdate={() => mutate()} onSwitchToPrep={() => setActiveTab('intelligence')} />
           )}
-          {activeTab === 'prep' && <MeetingPrepTab dealId={id} deal={deal} objectionWinMap={objectionWinMap} objectionConditionalWins={objectionConditionalWins} />}
-          {activeTab === 'todos' && (
-            <TodosTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
+          {activeTab === 'intelligence' && <MeetingPrepTab dealId={id} deal={deal} objectionWinMap={objectionWinMap} objectionConditionalWins={objectionConditionalWins} />}
+          {activeTab === 'actions' && (
+            <ActionsTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
           )}
-          {activeTab === 'project-plan' && (
-            <ProjectPlanTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
-          )}
-          {activeTab === 'success' && (
-            <SuccessCriteriaTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
+          {activeTab === 'collateral' && (
+            <CollateralTab dealId={id} deal={deal} />
           )}
         </div>
       )}
