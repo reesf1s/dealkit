@@ -470,13 +470,22 @@ export const import_deal = {
         } else {
           finalScore = heuristicScore(signals, 0.5)
         }
+        // Generate human-readable insights, not raw floats
+        const insights: string[] = []
+        if (signals.championStrength > 0.5) insights.push('Strong internal champion identified')
+        else if (signals.championStrength > 0) insights.push('Potential champion — needs confirmation')
+        if (signals.budgetConfirmed) insights.push('Budget confirmed')
+        if (signals.decisionMakerSignal) insights.push('Decision maker engaged')
+        if (signals.momentumScore > 0.7) insights.push('Strong forward momentum')
+        else if (signals.momentumScore < 0.3) insights.push('Momentum stalling — needs re-engagement')
+        if (signals.stakeholderDepth > 0.5) insights.push('Multiple stakeholders engaged')
+        if (signals.nextStepDefined) insights.push('Clear next steps defined')
+        if (signals.objectionCount > 0) insights.push(`${signals.objectionCount} objection${signals.objectionCount > 1 ? 's' : ''} identified`)
+        if (insights.length === 0) insights.push('Early stage — limited signals available')
+
         await db.update(dealLogs).set({
           conversionScore: Math.max(0, Math.min(100, Math.round(finalScore))),
-          conversionInsights: [
-            `Momentum: ${signals.momentumScore.toFixed(2)}`,
-            `Engagement: ${signals.engagementScore.toFixed(2)}`,
-            `Stakeholder depth: ${signals.stakeholderDepth.toFixed(2)}`,
-          ],
+          conversionInsights: insights,
         }).where(eq(dealLogs.id, created.id))
       }
     } catch { /* scoring is non-fatal */ }
@@ -1417,37 +1426,41 @@ Rules:
       if (parsed.suggestedStage === 'closed_lost') updateFields.lostDate = new Date()
     }
 
-    // Phase 2: Score computation (brain-driven, not LLM)
-    try {
-      const signals = extractTextSignals(appendedNotes, deal.createdAt ?? new Date(), new Date())
-      const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
-      const mlPred = brain?.mlPredictions?.find(p => p.dealId === dealId)
+    // Phase 2: Score computation — ONLY if deal doesn't already have a score
+    // Don't re-score on every note processing — let the brain rebuild handle scoring
+    // This prevents corrections from being overwritten by heuristic re-derivation
+    if (deal.conversionScore == null) {
+      try {
+        const signals = extractTextSignals(appendedNotes, deal.createdAt ?? new Date(), new Date())
+        const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
+        const mlPred = brain?.mlPredictions?.find(p => p.dealId === dealId)
 
-      let finalScore: number
-      if (mlPred && brain?.mlModel) {
-        const { composite } = computeCompositeScore(
-          heuristicScore(signals, 0.5),
-          mlPred.winProbability,
-          brain.mlModel.trainingSize,
-        )
-        finalScore = composite
-      } else {
-        finalScore = heuristicScore(signals, 0.5)
-      }
+        let finalScore: number
+        if (mlPred && brain?.mlModel) {
+          const { composite } = computeCompositeScore(
+            heuristicScore(signals, 0.5),
+            mlPred.winProbability,
+            brain.mlModel.trainingSize,
+          )
+          finalScore = composite
+        } else {
+          finalScore = heuristicScore(signals, 0.5)
+        }
 
-      // Intent signal adjustments
-      if (parsed.intentSignals) {
-        const is = parsed.intentSignals
-        if (is.championStatus === 'confirmed') finalScore = Math.min(100, finalScore + 6)
-        if (is.championStatus === 'suspected') finalScore = Math.min(100, finalScore + 3)
-        if (is.budgetStatus === 'approved') finalScore = Math.min(100, finalScore + 8)
-        if (is.budgetStatus === 'awaiting') finalScore = Math.min(100, finalScore + 2)
-        if (is.budgetStatus === 'blocked') finalScore = Math.max(0, finalScore - 8)
-        if (is.nextMeetingBooked) finalScore = Math.min(100, finalScore + 3)
-      }
+        // Intent signal adjustments
+        if (parsed.intentSignals) {
+          const is = parsed.intentSignals
+          if (is.championStatus === 'confirmed') finalScore = Math.min(100, finalScore + 6)
+          if (is.championStatus === 'suspected') finalScore = Math.min(100, finalScore + 3)
+          if (is.budgetStatus === 'approved') finalScore = Math.min(100, finalScore + 8)
+          if (is.budgetStatus === 'awaiting') finalScore = Math.min(100, finalScore + 2)
+          if (is.budgetStatus === 'blocked') finalScore = Math.max(0, finalScore - 8)
+          if (is.nextMeetingBooked) finalScore = Math.min(100, finalScore + 3)
+        }
 
-      updateFields.conversionScore = Math.max(0, Math.min(100, Math.round(finalScore)))
-    } catch { /* non-fatal */ }
+        updateFields.conversionScore = Math.max(0, Math.min(100, Math.round(finalScore)))
+      } catch { /* non-fatal */ }
+    }
 
     await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, dealId))
 
@@ -1970,12 +1983,10 @@ export const correct_deal_data = {
       corrections.push(`Stage corrected to ${params.replaceStage}`)
     }
 
-    // Append correction note to meeting notes for audit trail
+    // Correction note is logged server-side only, not appended to meeting history
+    // Meeting history should only contain real interactions, not system corrections
     if (params.correctionNote) {
-      const dateStamp = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-      const correctionEntry = `[${dateStamp}] CORRECTION: ${params.correctionNote}`
-      const existingNotes = (deal.meetingNotes as string) ?? ''
-      updateFields.meetingNotes = existingNotes ? `${existingNotes}\n${correctionEntry}` : correctionEntry
+      console.log(`[correct_deal_data] ${deal.dealName}: ${params.correctionNote}`)
     }
 
     if (corrections.length === 0) {
