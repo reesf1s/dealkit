@@ -10,7 +10,7 @@ import { db } from '@/lib/db'
 import { dealLogs, productGaps, companyProfiles, workspaces } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
-import { rebuildWorkspaceBrain, getWorkspaceBrain } from '@/lib/workspace-brain'
+import { scheduleBrainRebuild, getWorkspaceBrain } from '@/lib/workspace-brain'
 import { computeCompositeScore, type ScoreBreakdown } from '@/lib/deal-ml'
 import { ensureLinksColumn } from '@/lib/api-helpers'
 import { extractTextSignals, heuristicScore } from '@/lib/text-signals'
@@ -132,6 +132,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Phase 1: LLM extracts structured data ONLY — no scoring.
     // Scoring is computed deterministically by the brain from text signals + ML.
+    const noteDate = new Date().toISOString().slice(0, 10)
+    const currentYear = new Date().getFullYear()
+
     const msg = await anthropic.messages.create({
       messages: [{ role: 'user', content: `You are extracting structured data from B2B sales meeting notes. Return ONLY valid JSON, no markdown, no analysis.
 
@@ -181,9 +184,24 @@ After the JSON above, include a signal extraction block wrapped in <extraction><
   "product_gaps": [{"gap": "Salesforce integration", "severity": "high", "quote": "we need this to work with SF"}],
   "sentiment_score": 0.72,
   "urgency_signals": ["end of quarter deadline"],
-  "user_verified": false
+  "user_verified": false,
+  "scheduled_events": [{"type": "meeting", "description": "Discovery call with Jack", "date": "YYYY-MM-DD", "time": "14:00", "source_text": "exact phrase from note"}]
 }
 </extraction>
+
+Note creation date: ${noteDate} (today is ${noteDate}, current year is ${currentYear}).
+
+For "scheduled_events": Extract any scheduled future events mentioned. For each:
+- "type": classify as meeting/follow_up/demo/deadline/decision/other
+- "description": brief description like "Discovery call with Jack" or "Send proposal"
+- "date": resolve to ISO date YYYY-MM-DD. Resolve relative dates using the note date (${noteDate}):
+  - "next Tuesday" = the Tuesday after ${noteDate}
+  - "end of March" = ${currentYear}-03-31
+  - "in two weeks" = ${noteDate} + 14 days
+  - Only include future dates (after ${noteDate}). If date cannot be resolved, set null.
+- "time": if time is mentioned (e.g. "at 2pm" → "14:00"), else null
+- "source_text": the exact phrase from the note that mentioned this event
+Return [] if no scheduled events are mentioned.
 
 For objections, classify each into EXACTLY one theme and assign a severity:
 - "budget": price concerns, cost objections, ROI questions, affordability
@@ -498,9 +516,7 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
       }
     }
     // Rebuild workspace brain in background so chat/overview always have fresh context
-    after(async () => {
-      try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ }
-    })
+    after(() => { scheduleBrainRebuild(workspaceId, 'analyze_notes') })
 
     return NextResponse.json({ data: { deal: updatedDeal, productGaps: createdGaps, parsed } })
   } catch (e: any) {

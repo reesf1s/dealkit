@@ -25,7 +25,14 @@ export const NoteExtractionSchema = z.object({
   })).default([]),
   sentiment_score: z.number().min(0).max(1).default(0.5),
   urgency_signals: z.array(z.string()).default([]),
-  user_verified: z.boolean().default(false)
+  user_verified: z.boolean().default(false),
+  scheduled_events: z.array(z.object({
+    type: z.enum(['meeting', 'follow_up', 'demo', 'deadline', 'decision', 'other']).default('meeting'),
+    description: z.string(),
+    date: z.string().nullable().default(null),
+    time: z.string().nullable().default(null),
+    source_text: z.string().optional()
+  })).default([])
 })
 
 export type NoteExtraction = z.infer<typeof NoteExtractionSchema>
@@ -51,7 +58,8 @@ Please return a corrected JSON object that exactly matches this schema:
   "product_gaps": [{"gap": string, "severity": "high"|"medium"|"low", "quote"?: string}],
   "sentiment_score": number (0-1),
   "urgency_signals": string[],
-  "user_verified": false
+  "user_verified": false,
+  "scheduled_events": [{"type": "meeting"|"follow_up"|"demo"|"deadline"|"decision"|"other", "description": string, "date": "YYYY-MM-DD"|null, "time": "HH:MM"|null, "source_text"?: string}]
 }
 
 Return ONLY the JSON object, no other text.`

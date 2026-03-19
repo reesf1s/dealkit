@@ -15,7 +15,7 @@ import {
   BarChart3, Brain,
   Info, TrendingDown, Users, DollarSign,
   CheckCircle, XCircle, ArrowUp, ArrowDown, Minus,
-  Lock,
+  Lock, MessageSquare,
 } from 'lucide-react'
 import WinLossModal, { type WinLossData } from '@/components/shared/WinLossModal'
 
@@ -191,11 +191,11 @@ function DealCard({
       {/* Top row: company name + score circle */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div title={deal.prospectCompany} style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {deal.prospectCompany}
           </div>
           {deal.dealName && deal.dealName !== deal.prospectCompany && (
-            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div title={deal.dealName} style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {deal.dealName}
             </div>
           )}
@@ -802,8 +802,10 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
             <InfoTooltip text="SellSight detects objection themes from your meeting notes and tracks whether deals with each objection type tend to close." />
           </div>
           {objectionWinMap.length === 0 ? (
-            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
-              Objections are auto-extracted from your meeting notes. Paste notes from your next call to start tracking.
+            <div style={{ textAlign: 'center', padding: '16px 8px', color: 'var(--text-tertiary)' }}>
+              <MessageSquare size={18} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.4 }} />
+              <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', margin: '0 0 4px' }}>No objections tracked yet</p>
+              <p style={{ fontSize: '11px', margin: 0 }}>Paste meeting notes to start tracking objections automatically.</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -1099,7 +1101,12 @@ type CalEvent = {
   subtitle: string
   date: Date
   dealId: string
-  type: 'close' | 'contract_start' | 'contract_end' | 'follow_up' | 'urgent' | 'task' | 'phase' | 'mention'
+  type: 'close' | 'contract_start' | 'contract_end' | 'follow_up' | 'urgent' | 'task' | 'phase' | 'mention' | 'meeting' | 'demo' | 'deadline' | 'decision' | 'predicted_close'
+  description?: string
+  snippet?: string
+  source?: string
+  time?: string | null
+  isPast?: boolean
 }
 
 // Extract dates mentioned in free-form text (meeting notes, descriptions, todos, etc.)
@@ -1144,6 +1151,7 @@ function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
   const today = new Date()
   const [month, setMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
+  const [popoverEvent, setPopoverEvent] = useState<CalEvent | null>(null)
 
   // Build calendar events from deals
   const events: CalEvent[] = []
@@ -1268,16 +1276,76 @@ function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
     }
   }
 
-  const eventColor = (type: CalEvent['type']) => {
-    if (type === 'close') return 'var(--danger)'
-    if (type === 'follow_up') return 'var(--warning)'
-    if (type === 'urgent') return 'var(--danger)'
-    if (type === 'contract_start') return 'var(--success)'
-    if (type === 'contract_end') return 'var(--accent)'
-    if (type === 'task') return '#8B5CF6'
-    if (type === 'phase') return '#06B6D4'
-    if (type === 'mention') return '#F59E0B'
-    return 'var(--text-secondary)'
+  // Parse scheduled_events from note_signals_json
+  const now = new Date()
+  for (const deal of deals) {
+    try {
+      const signals = deal.note_signals_json ? JSON.parse(deal.note_signals_json) : null
+      const scheduledEvts = signals?.scheduled_events ?? []
+      for (const ev of scheduledEvts) {
+        if (!ev.date) continue
+        const evDate = new Date(ev.date)
+        if (isNaN(evDate.getTime())) continue
+        // Only show events within -7 to +90 days
+        const diffDays = (evDate.getTime() - now.getTime()) / 86400000
+        if (diffDays < -7 || diffDays > 90) continue
+        const evType = (ev.type as CalEvent['type']) ?? 'meeting'
+        const dealName = deal.prospectCompany || deal.dealName || 'Deal'
+        const eventId = `${deal.id}-sched-${ev.type}-${ev.date}`
+        // Avoid duplicate with same id
+        if (events.find(e => e.id === eventId)) continue
+        events.push({
+          id: eventId,
+          title: dealName,
+          subtitle: ev.description ?? '',
+          date: evDate,
+          dealId: deal.id,
+          type: evType,
+          description: ev.description,
+          source: ev.source_text,
+          time: ev.time ?? null,
+          isPast: evDate < now,
+        })
+      }
+    } catch { /* malformed JSON — skip */ }
+  }
+
+  const eventColor = (type: CalEvent['type']): string => {
+    switch (type) {
+      case 'close': return '#EF4444'
+      case 'urgent': return '#EF4444'
+      case 'deadline': return '#EF4444'
+      case 'follow_up': return '#EAB308'
+      case 'mention': return '#F59E0B'
+      case 'meeting': return '#3B82F6'
+      case 'demo': return '#22C55E'
+      case 'decision': return '#A855F7'
+      case 'predicted_close': return '#6366F1'
+      case 'contract_start': return '#22C55E'
+      case 'contract_end': return '#22D3EE'
+      case 'task': return '#8B5CF6'
+      case 'phase': return '#06B6D4'
+      default: return '#22D3EE'
+    }
+  }
+
+  const eventTypeLabel = (type: CalEvent['type']): string => {
+    switch (type) {
+      case 'close': return 'Close Date'
+      case 'urgent': return 'Urgent'
+      case 'deadline': return 'Deadline'
+      case 'follow_up': return 'Follow-up'
+      case 'mention': return 'Date Mention'
+      case 'meeting': return 'Meeting'
+      case 'demo': return 'Demo'
+      case 'decision': return 'Decision'
+      case 'predicted_close': return 'Predicted Close'
+      case 'contract_start': return 'Contract Start'
+      case 'contract_end': return 'Contract End'
+      case 'task': return 'Task'
+      case 'phase': return 'Phase'
+      default: return 'Event'
+    }
   }
 
   const year = month.getFullYear()
@@ -1411,25 +1479,38 @@ function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {eventsThisMonth.map(ev => {
-              const isPast = ev.date < today && !(ev.date.getDate() === today.getDate() && ev.date.getMonth() === today.getMonth() && ev.date.getFullYear() === today.getFullYear())
-              const dateStr = ev.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+              const evIsPast = ev.date < today && !(ev.date.getDate() === today.getDate() && ev.date.getMonth() === today.getMonth() && ev.date.getFullYear() === today.getFullYear())
+              const dateStr = ev.date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+              const displayText = ev.description || cleanSnippet(ev.subtitle)
               return (
                 <div key={ev.id} style={{
                   display: 'flex', alignItems: 'center', gap: '12px',
                   padding: '10px 14px',
                   background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
                   border: '1px solid var(--card-border)', borderRadius: '10px',
-                  opacity: isPast ? 0.5 : 1,
+                  opacity: evIsPast ? 0.5 : 1,
                   transition: 'opacity 0.1s',
                 }}>
                   <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: eventColor(ev.type), flexShrink: 0 }} />
-                  <Link href={`/deals/${ev.dealId}`} style={{ flex: 1, minWidth: 0, textDecoration: 'none' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.title}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cleanSnippet(ev.subtitle)}</div>
-                  </Link>
+                  <div
+                    style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
+                    onClick={() => setPopoverEvent(popoverEvent?.id === ev.id ? null : ev)}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.title}</span>
+                      <span style={{
+                        fontSize: '9px', fontWeight: '600', padding: '1px 5px', borderRadius: '10px',
+                        background: eventColor(ev.type) + '22', color: eventColor(ev.type),
+                        border: `1px solid ${eventColor(ev.type)}44`, flexShrink: 0,
+                        textTransform: 'uppercase', letterSpacing: '0.04em',
+                      }}>{eventTypeLabel(ev.type)}</span>
+                      {evIsPast && <span style={{ fontSize: '9px', color: 'var(--text-tertiary)', flexShrink: 0 }}>(past)</span>}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayText}</div>
+                  </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', flexShrink: 0 }}>{dateStr}</div>
                   <button
-                    onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query: `Prep me for ${ev.title} — ${ev.subtitle} on ${dateStr}. Review the deal and tell me what I need to know and do before this date.` } }))}
+                    onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query: `Prep me for ${ev.title} — ${displayText} on ${dateStr}. Review the deal and tell me what I need to know and do before this date.` } }))}
                     style={{
                       flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
                       padding: '5px 10px', borderRadius: '6px',
@@ -1449,8 +1530,99 @@ function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
       )}
 
       {eventsThisMonth.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-tertiary)', fontSize: '13px' }}>
-          No events this month. Add close dates, contract dates, or follow-ups to deals to see them here.
+        <div style={{ textAlign: 'center', padding: '40px 20px', color: '#71717A' }}>
+          <Calendar size={32} style={{ margin: '0 auto 12px', opacity: 0.4, display: 'block' }} />
+          <p style={{ fontSize: '14px', fontWeight: 500, marginBottom: '6px', margin: '0 0 6px' }}>No scheduled events this month</p>
+          <p style={{ fontSize: '12px', margin: 0 }}>Paste meeting notes with dates to populate your calendar automatically.</p>
+        </div>
+      )}
+
+      {/* Event popover */}
+      {popoverEvent && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
+          }}
+          onClick={() => setPopoverEvent(null)}
+        >
+          <div
+            style={{
+              background: 'var(--card-bg)', border: '1px solid var(--card-border)',
+              borderRadius: '14px', padding: '20px', maxWidth: '380px', width: '90%',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <div>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>{popoverEvent.title}</div>
+                <span style={{
+                  fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '10px',
+                  background: eventColor(popoverEvent.type) + '22', color: eventColor(popoverEvent.type),
+                  border: `1px solid ${eventColor(popoverEvent.type)}44`,
+                  textTransform: 'uppercase', letterSpacing: '0.05em',
+                }}>{eventTypeLabel(popoverEvent.type)}</span>
+              </div>
+              <button
+                onClick={() => setPopoverEvent(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '2px' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {(popoverEvent.description || popoverEvent.subtitle) && (
+              <div style={{ fontSize: '13px', color: 'var(--text-primary)', marginBottom: '10px' }}>
+                {popoverEvent.description || cleanSnippet(popoverEvent.subtitle)}
+              </div>
+            )}
+
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+              {popoverEvent.date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              {popoverEvent.time && <span style={{ marginLeft: '6px', color: 'var(--text-tertiary)' }}>at {popoverEvent.time}</span>}
+            </div>
+
+            {popoverEvent.source && (
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontStyle: 'italic', marginBottom: '14px', padding: '8px 10px', background: 'var(--surface)', borderRadius: '6px', borderLeft: `3px solid ${eventColor(popoverEvent.type)}` }}>
+                &ldquo;{popoverEvent.source}&rdquo;
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Link
+                href={`/deals/${popoverEvent.dealId}`}
+                style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: '8px 12px', borderRadius: '8px', textDecoration: 'none',
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  color: 'var(--text-primary)', fontSize: '12px', fontWeight: '600',
+                }}
+                onClick={() => setPopoverEvent(null)}
+              >
+                View Deal
+              </Link>
+              <button
+                onClick={() => {
+                  const dateStr = popoverEvent.date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+                  const desc = popoverEvent.description || cleanSnippet(popoverEvent.subtitle)
+                  window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query: `Prep me for ${popoverEvent.title} — ${desc} on ${dateStr}. Review the deal and tell me what I need to know and do before this date.` } }))
+                  setPopoverEvent(null)
+                }}
+                style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+                  padding: '8px 12px', borderRadius: '8px',
+                  background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.12))',
+                  border: '1px solid rgba(99,102,241,0.3)',
+                  color: 'var(--accent)', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                }}
+              >
+                <Sparkles size={11} />
+                Prep for this
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
