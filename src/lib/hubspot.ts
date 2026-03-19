@@ -42,15 +42,7 @@ export async function ensureHubspotSchema() {
         updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
       )
     `)
-    await db.execute(sql`
-      ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS hubspot_deal_id TEXT UNIQUE
-    `)
-    await db.execute(sql`
-      ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS hubspot_stage_label TEXT
-    `)
-    await db.execute(sql`
-      ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS hubspot_notes TEXT
-    `)
+    // deal_logs HubSpot columns are managed by lib/db/migrations.ts
   } catch { /* already exists */ }
   schemaMigrated = true
 }

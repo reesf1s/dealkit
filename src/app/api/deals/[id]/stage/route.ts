@@ -34,19 +34,8 @@ async function ensurePredictionLogTable() {
   } catch { /* already exists */ }
 }
 
-// ── Ensure structured win/loss columns (idempotent, cached per cold-start) ────
-let _winLossColsEnsured = false
-async function ensureWinLossColumns() {
-  if (_winLossColsEnsured) return
-  _winLossColsEnsured = true
-  try { await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS win_reason text`) } catch { /* exists */ }
-  try { await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS loss_reason text`) } catch { /* exists */ }
-  try { await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS competitor_lost_to text`) } catch { /* exists */ }
-}
-
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await ensureWinLossColumns()
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { workspaceId } = await getWorkspaceContext(userId)

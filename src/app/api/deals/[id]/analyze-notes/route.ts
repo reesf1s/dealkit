@@ -41,25 +41,8 @@ const AnalyzeNotesSchema = z.object({
 })
 type AnalyzeNotesOutput = z.infer<typeof AnalyzeNotesSchema>
 
-// Ensure intent_signals, note_signals_json, and score_breakdown columns exist — runs once per process lifetime
-let intentSignalsMigrated = false
-async function ensureIntentSignalsCol() {
-  if (intentSignalsMigrated) return
-  try {
-    await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS intent_signals jsonb`)
-  } catch { /* already exists */ }
-  try {
-    await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS note_signals_json text`)
-  } catch { /* already exists */ }
-  try {
-    await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS score_breakdown text`)
-  } catch { /* already exists */ }
-  intentSignalsMigrated = true
-}
-
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await ensureIntentSignalsCol()
     await ensureLinksColumn()
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

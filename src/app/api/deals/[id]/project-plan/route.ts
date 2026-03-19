@@ -14,17 +14,8 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 interface Params { params: Promise<{ id: string }> }
 
-let colMigrated = false
-async function ensureProjectPlanCol() {
-  if (colMigrated) return
-  try {
-    await db.execute(sql`
-      ALTER TABLE deal_logs
-      ADD COLUMN IF NOT EXISTS project_plan jsonb
-    `)
-  } catch { /* already exists */ }
-  colMigrated = true
-}
+/** No-op: project_plan column is guaranteed by runMigrations() in lib/db/migrations.ts */
+async function ensureProjectPlanCol() {}
 
 /** Robustly extract the first valid JSON object from a string */
 function extractJsonFromText(text: string): any {

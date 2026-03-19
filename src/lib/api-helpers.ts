@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
+import { runMigrations } from '@/lib/db/migrations'
 
 /** Returns true if the error is due to a missing / bad DATABASE_URL */
 export function isDbConnectionError(err: unknown): boolean {
@@ -30,18 +31,20 @@ export function dbNotConfigured(): NextResponse {
   )
 }
 
-/** No-op: DDL migrations now run only inside _doRebuildWorkspaceBrain (via after())
- *  to avoid ALTER TABLE locks cascading into SELECT hangs on concurrent page loads. */
-export async function ensureLinksColumn() {
-  // Intentionally empty — columns are guaranteed to exist after any brain rebuild.
-}
+/** No-op kept for backward compatibility — use runMigrations() for new columns. */
+export async function ensureLinksColumn() {}
 
 /** Create indexes on frequently-queried columns (idempotent, cached per cold-start).
+ *  Runs schema migrations first, then index creation.
  *  Uses CONCURRENTLY so index builds never block reads/writes on the table. */
 let _indexesMigrated = false
 export async function ensureIndexes() {
   if (_indexesMigrated) return
   _indexesMigrated = true // mark before async work — prevents concurrent runs
+
+  // Run all schema migrations before any index creation
+  await runMigrations()
+
   // Each CONCURRENTLY index must be a separate statement (can't be in a transaction)
   const indexes = [
     `CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_deal_logs_workspace_stage ON deal_logs (workspace_id, stage)`,

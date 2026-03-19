@@ -29,10 +29,6 @@ export async function POST(req: NextRequest) {
 
     const { workspaceId } = await getWorkspaceContext(userId)
 
-    // Ensure columns exist
-    try { await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS note_signals_json text`) } catch { /* exists */ }
-    try { await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS intent_signals jsonb`) } catch { /* exists */ }
-
     // Find deals with notes but no extraction
     const rows = await db.execute<{ id: string; deal_name: string; meeting_notes: string | null; note_signals_json: string | null }>(sql`
       SELECT id, deal_name, meeting_notes, note_signals_json

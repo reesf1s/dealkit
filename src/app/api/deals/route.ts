@@ -13,22 +13,11 @@ async function logEvent(workspaceId: string, userId: string, type: string, metad
   await db.insert(events).values({ workspaceId, userId, type, metadata, createdAt: new Date() })
 }
 
-let _colsMigrated = false
-/** Ensures new columns added post-deploy exist before any SELECT * runs. */
-async function ensureDealColumns() {
-  if (_colsMigrated) return
-  _colsMigrated = true
-  try {
-    await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS hubspot_notes text`)
-  } catch { /* already exists */ }
-}
-
 export async function GET(req: NextRequest) {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    await ensureDealColumns()
-    ensureIndexes().catch(() => {}) // fire-and-forget on first cold start
+    ensureIndexes().catch(() => {}) // runs runMigrations() then indexes on first cold start
     const { workspaceId } = await getWorkspaceContext(userId)
     const { searchParams } = new URL(req.url)
     const outcome = searchParams.get('outcome')
