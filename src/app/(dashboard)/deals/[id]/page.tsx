@@ -14,7 +14,8 @@ import {
   Globe, FileText, Database, BookOpen, Github, Cloud,
   ExternalLink, ChevronDown, ChevronRight, PenTool,
   TrendingUp, ArrowUpRight, RefreshCw,
-  FileCheck, BarChart2, File
+  FileCheck, BarChart2, File,
+  ArrowUp, ArrowDown
 } from 'lucide-react'
 import type { DealContact, DealLink as DealLinkType, DealLinkType as LinkTypeEnum } from '@/types'
 import { useSidebar } from '@/components/layout/SidebarContext'
@@ -1341,8 +1342,35 @@ function TodosTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: a
   const addTodo = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newTodo.trim()) return
-    await saveTodos([...todos, { id: crypto.randomUUID(), text: newTodo.trim(), done: false, createdAt: new Date().toISOString() }])
+    // New items go to top of pending list — insert before first pending item
+    const firstPendingIdx = todos.findIndex((t: any) => !t.done)
+    const newItem = { id: crypto.randomUUID(), text: newTodo.trim(), done: false, createdAt: new Date().toISOString() }
+    const updated = firstPendingIdx === -1
+      ? [newItem, ...todos]
+      : [...todos.slice(0, firstPendingIdx), newItem, ...todos.slice(firstPendingIdx)]
+    await saveTodos(updated)
     setNewTodo('')
+  }
+
+  const moveTodoUp = (id: string) => {
+    const idx = todos.findIndex((t: any) => t.id === id)
+    if (idx <= 0) return
+    // Swap with previous pending item
+    const prevPendingIdx = todos.slice(0, idx).map((t: any, i: number) => ({ t, i })).filter(({ t }) => !t.done).pop()?.i
+    if (prevPendingIdx == null) return
+    const updated = [...todos]
+    ;[updated[prevPendingIdx], updated[idx]] = [updated[idx], updated[prevPendingIdx]]
+    saveTodos(updated)
+  }
+
+  const moveTodoDown = (id: string) => {
+    const idx = todos.findIndex((t: any) => t.id === id)
+    if (idx === -1) return
+    const nextPendingIdx = todos.slice(idx + 1).map((t: any, i: number) => ({ t, i: idx + 1 + i })).find(({ t }) => !t.done)?.i
+    if (nextPendingIdx == null) return
+    const updated = [...todos]
+    ;[updated[idx], updated[nextPendingIdx]] = [updated[nextPendingIdx], updated[idx]]
+    saveTodos(updated)
   }
 
   const deleteTodo = (id: string) => saveTodos(todos.filter((t: any) => t.id !== id))
@@ -1432,6 +1460,22 @@ function TodosTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: a
                         members={members}
                         onAssign={(a) => assignTodo(todo.id, a)}
                       />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', flexShrink: 0 }}>
+                        <button
+                          onClick={() => moveTodoUp(todo.id)}
+                          title="Move up"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '1px 2px', display: 'flex', borderRadius: '3px', lineHeight: 1 }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
+                        ><ArrowUp size={10} /></button>
+                        <button
+                          onClick={() => moveTodoDown(todo.id)}
+                          title="Move down"
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '1px 2px', display: 'flex', borderRadius: '3px', lineHeight: 1 }}
+                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'}
+                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
+                        ><ArrowDown size={10} /></button>
+                      </div>
                       <button onClick={() => startEdit(todo)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '2px', display: 'flex', borderRadius: '4px', flexShrink: 0 }}
                         onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--accent)'}
                         onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
@@ -2544,9 +2588,27 @@ const LINK_TYPE_ICON: Record<LinkTypeEnum, { icon: typeof Globe; color: string }
   other:      { icon: Globe,     color: 'var(--text-tertiary)' },
 }
 
+function relativeTime(iso: string | undefined): string {
+  if (!iso) return ''
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins  = Math.floor(diff / 60_000)
+  const hours = Math.floor(diff / 3_600_000)
+  const days  = Math.floor(diff / 86_400_000)
+  const weeks = Math.floor(days / 7)
+  const months = Math.floor(days / 30)
+  if (mins < 1)  return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  if (hours < 24) return `${hours}h ago`
+  if (days < 7)  return `${days}d ago`
+  if (weeks < 5) return `${weeks}w ago`
+  return `${months}mo ago`
+}
+
 function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
-  const links: DealLinkType[] = Array.isArray(deal.links) ? deal.links : []
-  const [expanded, setExpanded] = useState(links.length > 0)
+  const rawLinks: DealLinkType[] = Array.isArray(deal.links) ? deal.links : []
+  // Show newest first
+  const links = [...rawLinks].sort((a, b) => new Date(b.addedAt ?? 0).getTime() - new Date(a.addedAt ?? 0).getTime())
+  const [expanded, setExpanded] = useState(rawLinks.length > 0)
   const [adding, setAdding] = useState(false)
   const [urlInput, setUrlInput] = useState('')
   const [labelInput, setLabelInput] = useState('')
@@ -2583,18 +2645,18 @@ function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; o
       type,
       addedAt: new Date().toISOString(),
     }
-    await patchLinks([...links, newLink])
+    await patchLinks([...rawLinks, newLink])
     setUrlInput('')
     setLabelInput('')
     setAdding(false)
   }
 
   const deleteLink = (linkId: string) => {
-    patchLinks(links.filter(l => l.id !== linkId))
+    patchLinks(rawLinks.filter(l => l.id !== linkId))
   }
 
   const saveEditLabel = (linkId: string) => {
-    const updated = links.map(l => l.id === linkId ? { ...l, label: editLabel.trim() || l.label } : l)
+    const updated = rawLinks.map(l => l.id === linkId ? { ...l, label: editLabel.trim() || l.label } : l)
     patchLinks(updated)
     setEditingId(null)
   }
@@ -2612,7 +2674,7 @@ function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; o
         {expanded ? <ChevronDown size={12} color="var(--text-tertiary)" /> : <ChevronRight size={12} color="var(--text-tertiary)" />}
         <Link2 size={13} color="var(--accent)" />
         <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-          External Links{links.length > 0 ? ` (${links.length})` : ''}
+          External Links{rawLinks.length > 0 ? ` (${rawLinks.length})` : ''}
         </span>
         {!adding && (
           <span
@@ -2691,8 +2753,15 @@ function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; o
                       <ExternalLink size={10} color="var(--text-tertiary)" style={{ flexShrink: 0 }} />
                     </div>
                   )}
-                  <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
-                    {link.url}
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '1px' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                      {link.url}
+                    </span>
+                    {link.addedAt && (
+                      <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        {relativeTime(link.addedAt)}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <button

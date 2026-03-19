@@ -80,6 +80,20 @@ function dealValueLabel(value: number, dealType?: string | null, recurringInterv
   return `${fmt(value)} ARR`
 }
 
+function sortBoardDeals(deals: any[], sort: string): any[] {
+  return [...deals].sort((a, b) => {
+    switch (sort) {
+      case 'score_desc': return (b.conversionScore ?? 0) - (a.conversionScore ?? 0)
+      case 'score_asc':  return (a.conversionScore ?? 0) - (b.conversionScore ?? 0)
+      case 'value_desc': return (b.dealValue ?? 0) - (a.dealValue ?? 0)
+      case 'value_asc':  return (a.dealValue ?? 0) - (b.dealValue ?? 0)
+      case 'newest':     return new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
+      case 'oldest':     return new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime()
+      default: return 0
+    }
+  })
+}
+
 const STAGES = [
   { id: 'prospecting',   label: 'Prospecting',   color: '#6B7280' },
   { id: 'qualification', label: 'Qualification',  color: '#3B82F6' },
@@ -1814,6 +1828,15 @@ export default function PipelinePage() {
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
   const [winLossModal, setWinLossModal] = useState<{ dealId: string; deal: any; outcome: 'closed_won' | 'closed_lost' } | null>(null)
   const [engagementFilter, setEngagementFilter] = useState<string>('')
+  const [boardSort, setBoardSort] = useState<string>('score_desc')
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? localStorage.getItem('pipeline_board_sort') : null
+    if (saved) setBoardSort(saved)
+  }, [])
+  const handleBoardSort = (sort: string) => {
+    setBoardSort(sort)
+    if (typeof window !== 'undefined') localStorage.setItem('pipeline_board_sort', sort)
+  }
 
   const moveStage = async (dealId: string, stage: string) => {
     // If moving to closed, show win/loss interview first
@@ -2574,12 +2597,31 @@ export default function PipelinePage() {
             <h1 style={{ fontSize: '22px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '4px' }}>
               Sales Pipeline
             </h1>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-              {activeDeals.length} active deals
-              {totalPipeline > 0 && ` · ${dealValueLabel(totalPipeline, undefined, undefined, currencySymbol)} annualised pipeline`}
-              {' · '}
-              <span style={{ color: 'var(--text-tertiary)' }}>Drag cards to move stages</span>
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
+                {activeDeals.length} active deals
+                {totalPipeline > 0 && ` · ${dealValueLabel(totalPipeline, undefined, undefined, currencySymbol)} annualised pipeline`}
+                {' · '}
+                <span style={{ color: 'var(--text-tertiary)' }}>Drag cards to move stages</span>
+              </p>
+              <select
+                value={boardSort}
+                onChange={e => handleBoardSort(e.target.value)}
+                style={{
+                  fontSize: '11px', padding: '4px 8px', background: 'var(--surface)',
+                  border: '1px solid var(--border)', borderRadius: '6px',
+                  color: 'var(--text-secondary)', cursor: 'pointer', outline: 'none',
+                  fontFamily: 'inherit', flexShrink: 0,
+                }}
+              >
+                <option value="score_desc">Score ↓</option>
+                <option value="score_asc">Score ↑</option>
+                <option value="value_desc">Value ↓</option>
+                <option value="value_asc">Value ↑</option>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
+            </div>
           </div>
 
           {/* Engagement type filter */}
@@ -2614,7 +2656,10 @@ export default function PipelinePage() {
           <div style={{ overflowX: 'auto', paddingBottom: '8px', maxWidth: `calc(100vw - ${sidebarWidth}px - 48px)` }}>
             <div style={{ display: 'flex', gap: '12px', minWidth: 'max-content' }}>
               {activeStages.map((stage: any) => {
-                const stageDeals = deals.filter((d: any) => d.stage === stage.id)
+                const stageDeals = sortBoardDeals(
+                  deals.filter((d: any) => d.stage === stage.id && (!engagementFilter || d.engagementType === engagementFilter)),
+                  boardSort,
+                )
                 const stageValue = stageDeals.reduce((s: number, d: any) => s + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
                 const isDropTarget = dragOverStage === stage.id && draggedId !== null
 
