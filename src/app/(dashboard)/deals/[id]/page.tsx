@@ -2531,13 +2531,17 @@ function deriveLabelFromUrl(url: string): string {
 }
 
 const LINK_TYPE_ICON: Record<LinkTypeEnum, { icon: typeof Globe; color: string }> = {
-  sharepoint: { icon: Cloud, color: '#0078D4' },
-  google: { icon: FileText, color: '#4285F4' },
-  salesforce: { icon: Database, color: '#00A1E0' },
-  notion: { icon: BookOpen, color: 'var(--text-primary)' },
-  figma: { icon: PenTool, color: '#A259FF' },
-  github: { icon: Github, color: 'var(--text-primary)' },
-  other: { icon: Globe, color: 'var(--text-tertiary)' },
+  proposal:   { icon: FileText,  color: 'var(--accent)' },
+  contract:   { icon: FileCheck, color: 'var(--success)' },
+  deck:       { icon: BarChart2, color: 'var(--warning)' },
+  document:   { icon: File,      color: 'var(--text-secondary)' },
+  sharepoint: { icon: Cloud,     color: '#0078D4' },
+  google:     { icon: FileText,  color: '#4285F4' },
+  salesforce: { icon: Database,  color: '#00A1E0' },
+  notion:     { icon: BookOpen,  color: 'var(--text-primary)' },
+  figma:      { icon: PenTool,   color: '#A259FF' },
+  github:     { icon: Github,    color: 'var(--text-primary)' },
+  other:      { icon: Globe,     color: 'var(--text-tertiary)' },
 }
 
 function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
