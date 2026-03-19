@@ -5,7 +5,7 @@ import { useState } from 'react'
 import useSWR from 'swr'
 import {
   AlertTriangle, CheckCircle, Clock, Package, ChevronDown, ChevronUp,
-  Info, Download, Lock, BarChart3,
+  Info, Download, Lock, BarChart3, Trash2, List, Columns,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
 
@@ -160,6 +160,23 @@ export default function ProductGapsPage() {
   const [sortBy, setSortBy]       = useState<SortKey>('revenue')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [showMoreMap, setShowMoreMap] = useState<Record<string, boolean>>({})
+  const [view, setView]           = useState<'list' | 'roadmap'>('list')
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const handleDeleteGap = async (id: string) => {
+    if (!confirm('Delete this product gap? This cannot be undone.')) return
+    setDeletingId(id)
+    try {
+      const res = await fetch(`/api/product-gaps/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        mutateGaps()
+      }
+    } catch (err) {
+      console.error('Failed to delete gap:', err)
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   const isLoading = brainLoading || gapsLoading
 
@@ -257,7 +274,37 @@ export default function ProductGapsPage() {
           )}
         </div>
 
-        {/* Export button */}
+        {/* View toggle + Export */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: '2px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '3px' }}>
+            <button
+              onClick={() => setView('list')}
+              title="List view"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                padding: '5px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '600',
+                cursor: 'pointer', border: 'none', transition: 'all 0.12s',
+                background: view === 'list' ? 'var(--accent)' : 'transparent',
+                color: view === 'list' ? '#fff' : 'var(--text-secondary)',
+              }}
+            >
+              <List size={12} /> List
+            </button>
+            <button
+              onClick={() => setView('roadmap')}
+              title="Roadmap view"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                padding: '5px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '600',
+                cursor: 'pointer', border: 'none', transition: 'all 0.12s',
+                background: view === 'roadmap' ? 'var(--accent)' : 'transparent',
+                color: view === 'roadmap' ? '#fff' : 'var(--text-secondary)',
+              }}
+            >
+              <Columns size={12} /> Roadmap
+            </button>
+          </div>
+
         <button
           onClick={() => exportReport(enrichedGaps, totalGaps, uniqueDeals, totalRevRisk)}
           style={{
@@ -273,6 +320,7 @@ export default function ProductGapsPage() {
           <Download size={13} />
           Export Impact Report
         </button>
+        </div>
       </div>
 
       {/* ── Summary strip ── */}
@@ -302,8 +350,8 @@ export default function ProductGapsPage() {
         </div>
       )}
 
-      {/* ── Sort controls ── */}
-      {!isLoading && sorted.length > 0 && (
+      {/* ── Sort controls (list view only) ── */}
+      {!isLoading && sorted.length > 0 && view === 'list' && (
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginRight: '4px' }}>Sort by:</div>
           {(
@@ -359,7 +407,7 @@ export default function ProductGapsPage() {
         </div>
       )}
 
-      {!isLoading && sorted.length > 0 && (
+      {!isLoading && sorted.length > 0 && view === 'list' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {sorted.map((gap: EnrichedGap, idx: number) => {
             const statusKey     = (gap.status ?? 'open') as GapStatus
@@ -383,7 +431,9 @@ export default function ProductGapsPage() {
                   border: '1px solid var(--card-border)',
                   borderRadius: '12px',
                   overflow: 'hidden',
-                  transition: 'box-shadow 0.15s, border-color 0.15s',
+                  transition: 'box-shadow 0.15s, border-color 0.15s, opacity 0.15s',
+                  opacity: deletingId === gap.id ? 0.5 : 1,
+                  pointerEvents: deletingId === gap.id ? 'none' : undefined,
                 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px color-mix(in srgb, var(--accent) 8%, transparent)'; (e.currentTarget as HTMLDivElement).style.borderColor = 'color-mix(in srgb, var(--accent) 30%, var(--card-border))' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = ''; (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--card-border)' }}
@@ -455,6 +505,24 @@ export default function ProductGapsPage() {
                   <div style={{ flexShrink: 0, color: 'var(--text-tertiary)' }}>
                     {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </div>
+
+                  {/* Delete button */}
+                  {!String(gap.id).startsWith('brain-') && (
+                    <button
+                      onClick={e => { e.stopPropagation(); handleDeleteGap(gap.id) }}
+                      title="Delete this gap"
+                      disabled={deletingId === gap.id}
+                      style={{
+                        flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer',
+                        color: '#52525B', padding: '4px', borderRadius: '4px',
+                        display: 'flex', alignItems: 'center', opacity: deletingId === gap.id ? 0.4 : 1,
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
+                      onMouseLeave={e => (e.currentTarget.style.color = '#52525B')}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
 
                 {/* ── Expanded detail ── */}
@@ -564,6 +632,125 @@ export default function ProductGapsPage() {
                     )}
                   </div>
                 )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── Roadmap view ── */}
+      {!isLoading && view === 'roadmap' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', alignItems: 'start' }}>
+          {(['open', 'in_review', 'on_roadmap', 'shipped'] as GapStatus[]).map(col => {
+            const colGaps = enrichedGaps.filter(g => (g.status ?? 'open') === col)
+            const cfg = statusConfig[col]
+            return (
+              <div key={col} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {/* Column header */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  padding: '8px 10px', borderRadius: '8px',
+                  background: cfg.bg, border: `1px solid color-mix(in srgb, ${cfg.color} 25%, transparent)`,
+                }}>
+                  {cfg.icon}
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: cfg.color }}>{cfg.label}</span>
+                  <span style={{
+                    marginLeft: 'auto', fontSize: '11px', fontWeight: '700',
+                    background: `color-mix(in srgb, ${cfg.color} 18%, transparent)`,
+                    color: cfg.color, borderRadius: '100px', padding: '1px 7px',
+                  }}>{colGaps.length}</span>
+                </div>
+                {/* Gap cards */}
+                {colGaps.length === 0 && (
+                  <div style={{ padding: '20px 12px', textAlign: 'center', fontSize: '11px', color: 'var(--text-tertiary)', border: '1px dashed var(--border)', borderRadius: '8px' }}>
+                    No gaps
+                  </div>
+                )}
+                {colGaps.map(gap => {
+                  const priority = getPriorityBadge(gap)
+                  return (
+                    <div
+                      key={gap.id}
+                      style={{
+                        background: 'var(--card-bg)', border: '1px solid var(--card-border)',
+                        borderRadius: '10px', padding: '10px 12px',
+                        display: 'flex', flexDirection: 'column', gap: '6px',
+                        opacity: deletingId === gap.id ? 0.5 : 1,
+                        transition: 'opacity 0.15s',
+                      }}
+                    >
+                      {/* Card header: title + delete */}
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                        <div style={{ flex: 1, fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1.3 }}>
+                          {gap.title}
+                        </div>
+                        {!String(gap.id).startsWith('brain-') && (
+                          <button
+                            onClick={() => handleDeleteGap(gap.id)}
+                            title="Delete this gap"
+                            disabled={deletingId === gap.id}
+                            style={{
+                              flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer',
+                              color: '#71717A', padding: '2px', borderRadius: '4px',
+                              display: 'flex', alignItems: 'center',
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.color = '#EF4444')}
+                            onMouseLeave={e => (e.currentTarget.style.color = '#71717A')}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
+                      {/* Priority + revenue */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '10px', fontWeight: '700', padding: '1px 6px', borderRadius: '100px', color: priority.color, background: priority.bg }}>
+                          {priority.label}
+                        </span>
+                        {gap.revenueAtRisk > 0 && (
+                          <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--danger)' }}>
+                            {formatCurrency(gap.revenueAtRisk, true)}
+                          </span>
+                        )}
+                      </div>
+                      {/* Affected deals */}
+                      {gap.frequency > 0 && (
+                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>
+                          {gap.frequency} deal{gap.frequency !== 1 ? 's' : ''} affected
+                        </div>
+                      )}
+                      {/* Move status buttons */}
+                      {!String(gap.id).startsWith('brain-') && (
+                        <div style={{ display: 'flex', gap: '4px', marginTop: '2px', flexWrap: 'wrap' }}>
+                          {(['open', 'in_review', 'on_roadmap', 'shipped'] as GapStatus[])
+                            .filter(s => s !== col)
+                            .map(s => (
+                              <button
+                                key={s}
+                                onClick={async () => {
+                                  await fetch(`/api/product-gaps/${gap.id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ status: s }),
+                                  })
+                                  mutateGaps()
+                                }}
+                                style={{
+                                  fontSize: '9px', fontWeight: '600', padding: '2px 6px',
+                                  borderRadius: '4px', cursor: 'pointer', border: '1px solid var(--border)',
+                                  background: 'var(--surface)', color: 'var(--text-tertiary)',
+                                  transition: 'all 0.1s',
+                                }}
+                                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = statusConfig[s].bg; (e.currentTarget as HTMLButtonElement).style.color = statusConfig[s].color; (e.currentTarget as HTMLButtonElement).style.borderColor = statusConfig[s].color }}
+                                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--surface)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-tertiary)'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border)' }}
+                              >
+                                {statusConfig[s].label}
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )
           })}
