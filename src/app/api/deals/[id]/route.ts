@@ -22,7 +22,8 @@ async function ensureDealColumns() {
       ADD COLUMN IF NOT EXISTS description text,
       ADD COLUMN IF NOT EXISTS project_plan jsonb,
       ADD COLUMN IF NOT EXISTS links jsonb NOT NULL DEFAULT '[]'::jsonb,
-      ADD COLUMN IF NOT EXISTS engagement_type text
+      ADD COLUMN IF NOT EXISTS engagement_type text,
+      ADD COLUMN IF NOT EXISTS hubspot_notes text
     `)
   } catch { /* columns may already exist */ }
   dealColsMigrated = true

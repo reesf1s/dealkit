@@ -13,9 +13,15 @@ async function logEvent(workspaceId: string, userId: string, type: string, metad
   await db.insert(events).values({ workspaceId, userId, type, metadata, createdAt: new Date() })
 }
 
-/** No-op: DDL migrations now run only inside _doRebuildWorkspaceBrain (via after())
- *  to avoid ALTER TABLE locks cascading into SELECT hangs on concurrent page loads. */
-async function ensureDealColumns() {}
+let _colsMigrated = false
+/** Ensures new columns added post-deploy exist before any SELECT * runs. */
+async function ensureDealColumns() {
+  if (_colsMigrated) return
+  _colsMigrated = true
+  try {
+    await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS hubspot_notes text`)
+  } catch { /* already exists */ }
+}
 
 export async function GET(req: NextRequest) {
   try {
