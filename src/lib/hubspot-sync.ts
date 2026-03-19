@@ -3,7 +3,8 @@
  *
  * What this does on every sync:
  *  1. Fetches all deals + contacts + companies + pipeline stage labels from HubSpot
- *  2. Fetches emails and notes associated with each deal
+ *  2. Fetches engagements (emails, notes, calls) for each deal via Engagements v1 API
+ *     — requires only crm.objects.contacts.read, no extra scopes needed
  *  3. Upserts into deal_logs (keyed on hubspot_deal_id)
  *     – meeting_notes is populated on INSERT only; manual notes are never overwritten
  *  4. Rebuilds workspace pipelineConfig from HubSpot's real stage names & order
@@ -18,9 +19,7 @@ import {
   fetchContacts,
   fetchCompanies,
   fetchPipelineStages,
-  fetchDealAssociations,
-  fetchEmails,
-  fetchNotes,
+  fetchDealEngagements,
   buildMeetingNotes,
   buildHubspotPipelineConfig,
   mapHubspotDeal,
@@ -54,34 +53,39 @@ export async function syncHubspotDeals(workspaceId: string, userId: string): Pro
   const allCompanyIds = [...new Set(
     rawDeals.flatMap(d => d.associations?.companies?.results.map(r => r.id) ?? [])
   )]
-  const allDealIds = rawDeals.map(d => d.id)
 
-  // ── 2. Parallel fetch: contacts, companies, pipeline stages, email/note IDs ─
-  const [contacts, companies, { stageLabels, orderedStages }, emailAssocs, noteAssocs] = await Promise.all([
+  // ── 2. Parallel fetch: contacts, companies, pipeline stages ─────────────────
+  const [contacts, companies, { stageLabels, orderedStages }] = await Promise.all([
     fetchContacts(token, allContactIds),
     fetchCompanies(token, allCompanyIds),
     fetchPipelineStages(token),
-    fetchDealAssociations(token, allDealIds, 'emails'),
-    fetchDealAssociations(token, allDealIds, 'notes'),
   ])
 
   const contactMap = new Map(contacts.map(c => [c.id, c]))
   const companyMap = new Map(companies.map(c => [c.id, c]))
 
-  // ── 3. Fetch email and note content ─────────────────────────────────────────
-  const allEmailIds = [...new Set([...emailAssocs.values()].flat())]
-  const allNoteIds  = [...new Set([...noteAssocs.values()].flat())]
+  // ── 3. Fetch engagements for all deals in parallel (Engagements v1 API) ─────
+  //  Uses crm.objects.contacts.read — no additional scopes required.
+  //  Concurrency-limited to 10 at a time to stay well inside HubSpot's rate limit.
+  const CONCURRENCY = 10
+  const engagementResults: Map<string, Awaited<ReturnType<typeof fetchDealEngagements>>> = new Map()
 
-  const [emailObjects, noteObjects] = await Promise.all([
-    fetchEmails(token, allEmailIds),
-    fetchNotes(token, allNoteIds),
-  ])
-
-  const emailById = new Map(emailObjects.map(e => [e.id, e]))
-  const noteById  = new Map(noteObjects.map(n => [n.id, n]))
+  for (let i = 0; i < rawDeals.length; i += CONCURRENCY) {
+    const batch = rawDeals.slice(i, i + CONCURRENCY)
+    const settled = await Promise.allSettled(
+      batch.map(d => fetchDealEngagements(token, d.id).then(r => ({ dealId: d.id, ...r })))
+    )
+    for (const result of settled) {
+      if (result.status === 'fulfilled') {
+        engagementResults.set(result.value.dealId, { emails: result.value.emails, notes: result.value.notes })
+      }
+    }
+  }
 
   // ── 4. Upsert each deal ──────────────────────────────────────────────────────
   let upserted = 0
+  let totalEmails = 0
+  let totalNotes = 0
   const now = new Date()
 
   for (const raw of rawDeals) {
@@ -93,9 +97,10 @@ export async function syncHubspotDeals(workspaceId: string, userId: string): Pro
 
     const mapped = mapHubspotDeal(raw, dealContacts, companyName, stageLabels)
 
-    // Build meeting notes from emails + notes for this deal
-    const dealEmails = (emailAssocs.get(raw.id) ?? []).map(id => emailById.get(id)).filter(Boolean) as typeof emailObjects
-    const dealNotes  = (noteAssocs.get(raw.id)  ?? []).map(id => noteById.get(id)).filter(Boolean)  as typeof noteObjects
+    // Build meeting notes from engagements for this deal
+    const { emails: dealEmails, notes: dealNotes } = engagementResults.get(raw.id) ?? { emails: [], notes: [] }
+    totalEmails += dealEmails.length
+    totalNotes  += dealNotes.length
     const meetingNotes = buildMeetingNotes(dealEmails, dealNotes)
 
     await db.execute(sql`
@@ -169,8 +174,8 @@ export async function syncHubspotDeals(workspaceId: string, userId: string): Pro
   return {
     workspaceId,
     dealsImported: upserted,
-    emailsFetched: allEmailIds.length,
-    notesFetched: allNoteIds.length,
+    emailsFetched: totalEmails,
+    notesFetched:  totalNotes,
     syncedAt: now,
   }
 }

@@ -6,8 +6,9 @@
  *
  * How to get a token:
  *   HubSpot CRM → Settings (gear icon) → Integrations → Private Apps → Create private app
- *   Required scopes: crm.objects.deals.read, crm.objects.contacts.read, crm.objects.companies.read,
- *                    crm.objects.emails.read, crm.objects.notes.read
+ *   Required scopes: crm.objects.deals.read, crm.objects.contacts.read, crm.objects.companies.read
+ *   (No extra scopes needed for emails/notes — we use the Engagements v1 API which is
+ *    covered by crm.objects.contacts.read)
  *   Copy the access token and paste it into SellSight Settings → Integrations.
  *
  * Stage strategy:
@@ -281,8 +282,60 @@ export async function fetchPipelineStages(token: string): Promise<{
 }
 
 /**
+ * Fetch all engagements (notes, emails, calls) for a single deal via the Engagements v1 API.
+ * This API requires only crm.objects.contacts.read — no extra scopes needed.
+ * Handles pagination automatically.
+ */
+export async function fetchDealEngagements(
+  token: string,
+  dealId: string,
+): Promise<{
+  emails: { subject: string | null; body: string | null; direction: string | null; fromEmail: string | null; timestamp: string | null }[]
+  notes:  { body: string | null; timestamp: string | null }[]
+}> {
+  const emails: { subject: string | null; body: string | null; direction: string | null; fromEmail: string | null; timestamp: string | null }[] = []
+  const notes:  { body: string | null; timestamp: string | null }[] = []
+
+  let offset: number | undefined
+  do {
+    const params = new URLSearchParams({ limit: '100' })
+    if (offset != null) params.set('offset', String(offset))
+    let data: any
+    try {
+      data = await hsGet(`/engagements/v1/engagements/associated/deal/${dealId}/paged?${params}`, token)
+    } catch { break }
+
+    for (const item of data.results ?? []) {
+      const type  = item.engagement?.type as string | undefined
+      const tsMs  = item.engagement?.timestamp as number | null | undefined
+      const ts    = tsMs ? new Date(tsMs).toISOString() : null
+
+      if (type === 'EMAIL') {
+        const meta = item.metadata ?? {}
+        emails.push({
+          subject:   meta.subject ?? null,
+          body:      meta.text ?? meta.html ?? null,
+          direction: meta.from?.email ? 'OUTGOING_EMAIL' : null,
+          fromEmail: meta.from?.email ?? null,
+          timestamp: ts,
+        })
+      } else if (type === 'NOTE') {
+        const meta = item.metadata ?? {}
+        notes.push({ body: meta.body ?? null, timestamp: ts })
+      }
+    }
+
+    offset = data.hasMore ? (data.offset as number) : undefined
+  } while (offset != null)
+
+  return { emails, notes }
+}
+
+/**
  * Batch-fetch associations between deals and a related object type (emails or notes).
  * Returns a Map of dealId → list of related object IDs.
+ * @deprecated Use fetchDealEngagements instead — requires crm.objects.emails/notes.read scopes
+ *             which are not available on all HubSpot tiers.
  */
 export async function fetchDealAssociations(
   token: string,
