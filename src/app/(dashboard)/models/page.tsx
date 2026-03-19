@@ -548,7 +548,10 @@ function GlobalBenchmarksCard({ winRate, avgClose, mlAccuracy }: { winRate: numb
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function ModelsPage() {
-  const { data: brainRes, isLoading } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
+  const { data: brainRes, isLoading, mutate: refreshBrain } = useSWR('/api/brain', fetcher, {
+    revalidateOnFocus: true,  // picks up brain rebuilt after closing a deal on the board
+    refreshInterval: 0,
+  })
   const brain = brainRes?.data
   const [selectedArchetype, setSelectedArchetype] = useState<number | null>(null)
   const { data: forecastRes } = useSWR<{ data: ForecastAccuracy }>('/api/models/forecast-accuracy', fetcher, { revalidateOnFocus: false })
@@ -713,9 +716,18 @@ export default function ModelsPage() {
 
         {/* Training Data Health */}
         <div style={cardStyle}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={labelStyle}>Training Data Health</div>
-            <InfoButton text="The quality of your ML model depends on both win and loss data. A balanced mix produces more accurate predictions." />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={labelStyle}>Training Data Health</div>
+              <InfoButton text="The quality of your ML model depends on both win and loss data. A balanced mix produces more accurate predictions." />
+            </div>
+            <button
+              onClick={() => refreshBrain()}
+              style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: '4px' }}
+              title="Refresh model data"
+            >
+              ↻ Refresh
+            </button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', gap: '16px' }}>
