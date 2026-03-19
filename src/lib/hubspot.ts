@@ -458,8 +458,8 @@ export function buildHubspotPipelineConfig(orderedStages: HubspotPipelineStage[]
     fromHubspot: true,
   }))
 
-  stages.push({ id: 'closed_won',  label: 'Closed Won',  color: '#22C55E', order: stages.length + 1, isDefault: true })
-  stages.push({ id: 'closed_lost', label: 'Closed Lost', color: '#6B7280', order: stages.length + 2, isDefault: true })
+  stages.push({ id: 'closed_won',  label: 'Closed Won',  color: '#22C55E', order: stages.length + 1, isDefault: true, fromHubspot: false })
+  stages.push({ id: 'closed_lost', label: 'Closed Lost', color: '#6B7280', order: stages.length + 2, isDefault: true, fromHubspot: false })
 
   return stages
 }
