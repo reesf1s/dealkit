@@ -11,6 +11,7 @@ interface DealTableProps {
   deals: DealLog[]
   onAdd?: () => void
   onDelete?: (id: string) => void
+  currencySymbol?: string
 }
 
 type SortField = 'dealName' | 'stage' | 'prospectCompany' | 'createdAt'
@@ -36,7 +37,7 @@ function SortIcon({ field, active, direction }: { field: string; active: boolean
   return direction === 'asc' ? <ChevronUp size={12} style={{ color: '#6366F1' }} /> : <ChevronDown size={12} style={{ color: '#6366F1' }} />
 }
 
-export function DealTable({ deals, onAdd, onDelete }: DealTableProps) {
+export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: DealTableProps) {
   const router = useRouter()
   const [sortField, setSortField] = useState<SortField>('createdAt')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
@@ -179,7 +180,7 @@ export function DealTable({ deals, onAdd, onDelete }: DealTableProps) {
 
             {/* Value */}
             <span style={{ fontSize: '13px', color: '#888', fontVariantNumeric: 'tabular-nums' }}>
-              {deal.dealValue != null ? `$${deal.dealValue.toLocaleString()}` : '—'}
+              {deal.dealValue != null ? `${currencySymbol}${deal.dealValue.toLocaleString()}` : '—'}
             </span>
 
             {/* Contract Start */}

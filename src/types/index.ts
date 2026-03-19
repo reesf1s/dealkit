@@ -102,7 +102,10 @@ export interface DealContact {
   email?: string
 }
 
-export type DealLinkType = 'sharepoint' | 'google' | 'salesforce' | 'notion' | 'figma' | 'github' | 'other'
+export type DealLinkType =
+  | 'proposal' | 'contract' | 'deck' | 'document'
+  | 'sharepoint' | 'google' | 'salesforce' | 'notion' | 'figma' | 'github'
+  | 'other'
 
 export interface DealLink {
   id: string
@@ -112,6 +115,8 @@ export interface DealLink {
   addedAt: string   // ISO date
   addedBy?: string  // user email or name
 }
+
+export type EngagementType = 'POC' | 'Pilot' | 'Live' | 'Expansion' | 'Renewal' | 'Upsell' | string
 
 export interface DealLog {
   id: string
@@ -133,6 +138,7 @@ export interface DealLog {
   lostReason: string | null
   dealType: 'one_off' | 'recurring'
   recurringInterval: 'monthly' | 'quarterly' | 'annual' | null
+  engagementType?: string | null   // 'POC' | 'Pilot' | 'Live' | 'Expansion' | 'Renewal' | 'Upsell' | custom
   links: DealLink[]
   contractStartDate?: Date | string | null
   contractEndDate?: Date | string | null

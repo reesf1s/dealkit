@@ -199,6 +199,16 @@ function DealCard({
               {deal.dealName}
             </div>
           )}
+          {deal.engagementType && (
+            <span style={{
+              display: 'inline-block', marginTop: '3px',
+              fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '100px',
+              background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)',
+              border: '1px solid rgba(255,255,255,0.10)',
+            }}>
+              {deal.engagementType}
+            </span>
+          )}
         </div>
         {score > 0 && (
           <div style={{ flexShrink: 0, width: '30px', height: '30px', borderRadius: '50%', background: scoreBg, border: `1.5px solid ${scoreColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -248,6 +258,7 @@ function PipelineSettings({
   const [editLabel, setEditLabel] = useState('')
   const [newLabel, setNewLabel] = useState('')
   const [newColor, setNewColor] = useState('#8B5CF6')
+  const [editingColorId, setEditingColorId] = useState<string | null>(null)
 
   if (!open) return null
 
@@ -294,6 +305,15 @@ function PipelineSettings({
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(isHidden ? { showStage: id } : { hideStage: id }),
     })
+    onUpdate()
+  }
+
+  const updateColor = async (id: string, color: string) => {
+    await fetch('/api/pipeline-config', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updateStageColor: { id, color } }),
+    })
+    setEditingColorId(null)
     onUpdate()
   }
 
@@ -360,12 +380,23 @@ function PipelineSettings({
           <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '8px' }}>Stages</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {stages.map((s: any) => (
-              <div key={s.id} style={{
+              <div key={s.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{
                 display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px',
                 background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px',
                 opacity: s.isHidden ? 0.4 : 1,
               }}>
-                <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: s.color, flexShrink: 0 }} />
+                <button
+                  onClick={() => setEditingColorId(editingColorId === s.id ? null : s.id)}
+                  title="Click to change colour"
+                  style={{
+                    width: '14px', height: '14px', borderRadius: '4px', background: s.color, flexShrink: 0,
+                    border: editingColorId === s.id ? '2px solid #fff' : '2px solid transparent',
+                    cursor: 'pointer', padding: 0, transition: 'transform 0.1s',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.2)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)' }}
+                />
                 {editingId === s.id ? (
                   <form onSubmit={e => { e.preventDefault(); rename(s.id) }} style={{ flex: 1, display: 'flex', gap: '6px' }}>
                     <input autoFocus value={editLabel} onChange={e => setEditLabel(e.target.value)}
@@ -408,6 +439,22 @@ function PipelineSettings({
                     )}
                   </>
                 )}
+              </div>
+              {/* Inline colour picker */}
+              {editingColorId === s.id && (
+                <div style={{ display: 'flex', gap: '5px', padding: '6px 12px', background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: '8px', flexWrap: 'wrap' }}>
+                  {PRESET_COLORS.map(c => (
+                    <button key={c} onClick={() => updateColor(s.id, c)} style={{
+                      width: '22px', height: '22px', borderRadius: '5px', background: c, padding: 0,
+                      border: s.color === c ? '2px solid #fff' : '2px solid transparent', cursor: 'pointer',
+                      transform: 'scale(1)', transition: 'transform 0.1s',
+                    }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.15)' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)' }}
+                    />
+                  ))}
+                </div>
+              )}
               </div>
             ))}
           </div>
@@ -1766,6 +1813,7 @@ export default function PipelinePage() {
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
   const [winLossModal, setWinLossModal] = useState<{ dealId: string; deal: any; outcome: 'closed_won' | 'closed_lost' } | null>(null)
+  const [engagementFilter, setEngagementFilter] = useState<string>('')
 
   const moveStage = async (dealId: string, stage: string) => {
     // If moving to closed, show win/loss interview first
@@ -1961,7 +2009,12 @@ export default function PipelinePage() {
     return items.slice(0, 5)
   })()
 
-  const activeDeals = deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+  const activeDeals = deals.filter((d: any) =>
+    d.stage !== 'closed_won' && d.stage !== 'closed_lost' &&
+    (!engagementFilter || d.engagementType === engagementFilter)
+  )
+  // Unique engagement types for filter dropdown
+  const engagementTypes: string[] = [...new Set(deals.map((d: any) => d.engagementType).filter(Boolean))] as string[]
 
   const dispatchAI = (query: string) => {
     if (!query.trim()) return
@@ -2528,6 +2581,34 @@ export default function PipelinePage() {
               <span style={{ color: 'var(--text-tertiary)' }}>Drag cards to move stages</span>
             </p>
           </div>
+
+          {/* Engagement type filter */}
+          {engagementTypes.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 600 }}>Filter:</span>
+              <button
+                onClick={() => setEngagementFilter('')}
+                style={{
+                  fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '100px', cursor: 'pointer',
+                  background: engagementFilter === '' ? 'var(--accent-subtle)' : 'transparent',
+                  color: engagementFilter === '' ? 'var(--accent)' : 'var(--text-tertiary)',
+                  border: `1px solid ${engagementFilter === '' ? 'var(--accent)' : 'var(--border)'}`,
+                }}
+              >All</button>
+              {engagementTypes.map(t => (
+                <button
+                  key={t}
+                  onClick={() => setEngagementFilter(engagementFilter === t ? '' : t)}
+                  style={{
+                    fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '100px', cursor: 'pointer',
+                    background: engagementFilter === t ? 'rgba(255,255,255,0.10)' : 'transparent',
+                    color: engagementFilter === t ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                    border: `1px solid ${engagementFilter === t ? 'rgba(255,255,255,0.20)' : 'var(--border)'}`,
+                  }}
+                >{t}</button>
+              ))}
+            </div>
+          )}
 
           {/* Kanban board */}
           <div style={{ overflowX: 'auto', paddingBottom: '8px', maxWidth: `calc(100vw - ${sidebarWidth}px - 48px)` }}>

@@ -8,12 +8,13 @@ import Link from 'next/link'
 import * as Dialog from '@radix-ui/react-dialog'
 import {
   ArrowLeft, Sparkles, Square, Plus, Target, Loader2,
-  Clipboard, DollarSign, Calendar,
+  Clipboard, Banknote, Calendar,
   User, UserPlus, Edit, Trash2, CheckCircle, X, Link2, Check,
   Mail, Sword, Zap, Layers,
   Globe, FileText, Database, BookOpen, Github, Cloud,
   ExternalLink, ChevronDown, ChevronRight, PenTool,
-  TrendingUp, ArrowUpRight, RefreshCw
+  TrendingUp, ArrowUpRight, RefreshCw,
+  FileCheck, BarChart2, File
 } from 'lucide-react'
 import type { DealContact, DealLink as DealLinkType, DealLinkType as LinkTypeEnum } from '@/types'
 import { useSidebar } from '@/components/layout/SidebarContext'
@@ -1515,6 +1516,7 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
         stage: deal.stage ?? 'proposal',
         dealType: deal.dealType ?? 'one_off',
         recurringInterval: deal.recurringInterval ?? 'annual',
+        engagementType: deal.engagementType ?? '',
         competitors: Array.isArray(deal.competitors) ? deal.competitors.join(', ') : '',
         notes: deal.notes ?? '',
         nextSteps: deal.nextSteps ?? '',
@@ -1565,6 +1567,7 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
           stage: form.stage,
           dealType: form.dealType ?? 'one_off',
           recurringInterval: form.dealType === 'recurring' ? (form.recurringInterval ?? 'annual') : null,
+          engagementType: form.engagementType || null,
           competitors: form.competitors.split(',').map((s: string) => s.trim()).filter(Boolean),
           notes: form.notes || null,
           nextSteps: form.nextSteps || null,
@@ -1709,8 +1712,8 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
               <div>
                 <label style={labelStyle}>
                   {form.dealType === 'recurring'
-                    ? `Value (${form.recurringInterval === 'monthly' ? 'MRR' : form.recurringInterval === 'quarterly' ? 'QRR' : 'ARR'} $)`
-                    : 'Deal value ($)'}
+                    ? `Value (${form.recurringInterval === 'monthly' ? 'MRR' : form.recurringInterval === 'quarterly' ? 'QRR' : 'ARR'})`
+                    : 'Deal value'}
                 </label>
                 <input style={inputStyle} type="number" value={form.dealValue ?? ''} onChange={e => u('dealValue', e.target.value)} placeholder="50000"
                   onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
@@ -1722,10 +1725,28 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
                 </select>
               </div>
             </div>
-            <div>
-              <label style={labelStyle}>Competitors (comma-separated)</label>
-              <input style={inputStyle} value={form.competitors ?? ''} onChange={e => u('competitors', e.target.value)} placeholder="Competitor A, Competitor B"
-                onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={labelStyle}>Competitors (comma-separated)</label>
+                <input style={inputStyle} value={form.competitors ?? ''} onChange={e => u('competitors', e.target.value)} placeholder="Competitor A, Competitor B"
+                  onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
+              </div>
+              <div>
+                <label style={labelStyle}>Engagement type</label>
+                <select
+                  style={{ ...inputStyle, cursor: 'pointer' }}
+                  value={form.engagementType ?? ''}
+                  onChange={e => u('engagementType', e.target.value)}
+                >
+                  <option value="">— None —</option>
+                  {['POC', 'Pilot', 'Live', 'Expansion', 'Renewal', 'Upsell'].map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                  {form.engagementType && !['POC','Pilot','Live','Expansion','Renewal','Upsell',''].includes(form.engagementType) && (
+                    <option value={form.engagementType}>{form.engagementType}</option>
+                  )}
+                </select>
+              </div>
             </div>
             {form.stage === 'closed_lost' && (
               <div>
@@ -1766,8 +1787,8 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
   )
 }
 
-function WinStoryPromptModal({ wonDeal, open, onOpenChange }: {
-  wonDeal: any; open: boolean; onOpenChange: (v: boolean) => void
+function WinStoryPromptModal({ wonDeal, open, onOpenChange, currencySymbol = '£' }: {
+  wonDeal: any; open: boolean; onOpenChange: (v: boolean) => void; currencySymbol?: string
 }) {
   const [form, setForm] = useState({ customerName: '', customerIndustry: '', customerSize: '', challenge: '', solution: '', results: '' })
   const [saving, setSaving] = useState(false)
@@ -1781,7 +1802,7 @@ function WinStoryPromptModal({ wonDeal, open, onOpenChange }: {
         customerSize: '',
         challenge: wonDeal.notes ? `${wonDeal.notes.slice(0, 300)}` : '',
         solution: '',
-        results: wonDeal.dealValue ? `Closed at $${Number(wonDeal.dealValue).toLocaleString()}` : '',
+        results: wonDeal.dealValue ? `Closed at ${currencySymbol}${Number(wonDeal.dealValue).toLocaleString()}` : '',
       })
       setSaved(false)
     }
@@ -3082,6 +3103,175 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
   )
 }
 
+const LINK_TYPE_OPTIONS = [
+  { value: 'proposal',  label: 'Proposal' },
+  { value: 'contract',  label: 'Contract' },
+  { value: 'deck',      label: 'Deck' },
+  { value: 'document',  label: 'Document' },
+  { value: 'other',     label: 'Other' },
+] as const
+
+function linkIcon(type: string) {
+  switch (type) {
+    case 'proposal':  return <FileText  size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+    case 'contract':  return <FileCheck size={13} style={{ color: 'var(--success)', flexShrink: 0 }} />
+    case 'deck':      return <BarChart2 size={13} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+    case 'document':  return <File      size={13} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+    default:          return <Link2     size={13} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+  }
+}
+
+function DealLinksSection({ deal, patchDeal }: { deal: any; patchDeal: (payload: Record<string, unknown>) => Promise<void> }) {
+  const [adding, setAdding] = useState(false)
+  const [newLabel, setNewLabel] = useState('')
+  const [newUrl, setNewUrl] = useState('')
+  const [newType, setNewType] = useState<string>('document')
+  const [saving, setSaving] = useState(false)
+
+  const links: DealLinkType[] = Array.isArray(deal.links) ? deal.links : []
+
+  const inputSt: React.CSSProperties = {
+    height: '30px', padding: '0 8px', borderRadius: '6px',
+    background: 'var(--input-bg)', border: '1px solid var(--border)',
+    color: 'var(--text-primary)', fontSize: '12px', outline: 'none', boxSizing: 'border-box',
+  }
+
+  const addLink = async () => {
+    if (!newLabel.trim() || !newUrl.trim()) return
+    setSaving(true)
+    try {
+      let url = newUrl.trim()
+      if (!/^https?:\/\//i.test(url)) url = 'https://' + url
+      const newLink: DealLinkType = {
+        id: crypto.randomUUID(),
+        url,
+        label: newLabel.trim(),
+        type: newType as LinkTypeEnum,
+        addedAt: new Date().toISOString(),
+      }
+      await patchDeal({ links: [...links, newLink] })
+      setNewLabel('')
+      setNewUrl('')
+      setNewType('document')
+      setAdding(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const removeLink = async (id: string) => {
+    await patchDeal({ links: links.filter(l => l.id !== id) })
+  }
+
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: links.length > 0 || adding ? '10px' : '0' }}>
+        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>Links</div>
+        {!adding && (
+          <button
+            onClick={() => setAdding(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '0.75')} onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+          >
+            <Plus size={11} /> Add link
+          </button>
+        )}
+      </div>
+
+      {links.length === 0 && !adding && (
+        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>No links yet</div>
+      )}
+
+      {links.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: adding ? '10px' : '0' }}>
+          {links.map(link => (
+            <div key={link.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {linkIcon(link.type)}
+              <a
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ flex: 1, fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+                onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
+              >
+                {link.label}
+              </a>
+              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px', flexShrink: 0 }}>
+                {(() => { try { return new URL(link.url).hostname } catch { return link.url } })()}
+              </span>
+              {link.addedAt && (
+                <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', flexShrink: 0 }}>
+                  {new Date(link.addedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                </span>
+              )}
+              <button
+                onClick={() => removeLink(link.id)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', display: 'flex', padding: '2px', borderRadius: '4px', flexShrink: 0 }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--danger)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
+              >
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {adding && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: links.length > 0 ? '8px' : '0', borderTop: links.length > 0 ? '1px solid var(--border)' : 'none' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+            <input
+              style={{ ...inputSt, width: '100%' }}
+              placeholder="Title (e.g. Proposal v2)"
+              value={newLabel}
+              onChange={e => setNewLabel(e.target.value)}
+              onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
+              onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+            />
+            <select
+              style={{ ...inputSt, width: '100%', cursor: 'pointer' }}
+              value={newType}
+              onChange={e => setNewType(e.target.value)}
+            >
+              {LINK_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <input
+            style={{ ...inputSt, width: '100%' }}
+            placeholder="URL (https://...)"
+            value={newUrl}
+            onChange={e => setNewUrl(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') addLink() }}
+            onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
+            onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+          />
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              onClick={addLink}
+              disabled={saving || !newLabel.trim() || !newUrl.trim()}
+              style={{
+                height: '28px', padding: '0 14px', borderRadius: '6px', fontSize: '12px', fontWeight: 600,
+                background: saving || !newLabel.trim() || !newUrl.trim() ? 'var(--surface)' : 'var(--accent)',
+                color: saving || !newLabel.trim() || !newUrl.trim() ? 'var(--text-tertiary)' : '#fff',
+                border: 'none', cursor: saving || !newLabel.trim() || !newUrl.trim() ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {saving ? 'Adding…' : 'Add'}
+            </button>
+            <button
+              onClick={() => { setAdding(false); setNewLabel(''); setNewUrl(''); setNewType('document') }}
+              style={{ height: '28px', padding: '0 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, background: 'transparent', color: 'var(--text-tertiary)', border: '1px solid var(--border)', cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', mlPrediction = null, globalPrior = null, brainData = null }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void; currencySymbol?: string; mlPrediction?: any; globalPrior?: any; brainData?: any }) {
   const router = useRouter()
   const [expandingType, setExpandingType] = useState<string | null>(null)
@@ -3617,18 +3807,19 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
       {/* Deal info grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
         {[
-          { label: 'Stage', value: deal.stage?.replace(/_/g, ' ') },
-          { label: 'Deal Value', value: deal.dealValue ? `${currencySymbol}${Number(deal.dealValue).toLocaleString()}` : null },
-          { label: 'Close Date', value: deal.closeDate ? new Date(deal.closeDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null },
-          { label: 'Deal Type', value: deal.dealType === 'recurring' ? `Recurring (${deal.recurringInterval ?? ''})`.trim() : deal.dealType === 'one_off' ? 'One-off' : null },
-          { label: 'Competitors', value: (deal.competitors as string[])?.join(', ') || null },
-          { label: 'Description', value: deal.description },
-          { label: 'Notes', value: deal.notes },
-          { label: 'Next Steps', value: deal.nextSteps },
-        ].filter(f => f.value).map(({ label, value }) => (
+          { label: 'Stage', value: deal.stage?.replace(/_/g, ' '), preWrap: false },
+          { label: 'Deal Value', value: deal.dealValue ? `${currencySymbol}${Number(deal.dealValue).toLocaleString()}` : null, preWrap: false },
+          { label: 'Close Date', value: deal.closeDate ? new Date(deal.closeDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null, preWrap: false },
+          { label: 'Deal Type', value: deal.dealType === 'recurring' ? `Recurring (${deal.recurringInterval ?? ''})`.trim() : deal.dealType === 'one_off' ? 'One-off' : null, preWrap: false },
+          { label: 'Engagement', value: deal.engagementType ?? null, preWrap: false },
+          { label: 'Competitors', value: (deal.competitors as string[])?.join(', ') || null, preWrap: false },
+          { label: 'Description', value: deal.description, preWrap: true },
+          { label: 'Notes', value: deal.notes, preWrap: true },
+          { label: 'Next Steps', value: deal.nextSteps, preWrap: true },
+        ].filter(f => f.value).map(({ label, value, preWrap }) => (
           <div key={label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' }}>
             <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>{label}</div>
-            <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '500', lineHeight: 1.5 }}>{value}</div>
+            <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '500', lineHeight: 1.5, whiteSpace: preWrap ? 'pre-wrap' : undefined }}>{value}</div>
           </div>
         ))}
       </div>
@@ -3693,6 +3884,9 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', m
         </div>
       )}
 
+      {/* Document Links */}
+      <DealLinksSection deal={deal} patchDeal={patchDeal} />
+
       {/* Activity log */}
       <ActivityLog dealId={dealId} deal={deal} onUpdate={onUpdate} />
     </div>
@@ -3706,7 +3900,7 @@ export default function DealDetailPage() {
   const { data: gapsData } = useSWR('/api/product-gaps', fetcher)
   const dealGaps: any[] = (gapsData?.data ?? []).filter((g: any) => (g.sourceDeals as string[] ?? []).includes(id))
   const { data: configData } = useSWR('/api/pipeline-config', fetcher, { revalidateOnFocus: false })
-  const currencySymbol: string = configData?.data?.currency ?? '$'
+  const currencySymbol: string = configData?.data?.currency ?? '£'
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
   const mlPrediction = (brainRes?.data?.mlPredictions ?? []).find((p: any) => p.dealId === id) ?? null
   const objectionWinMap: any[] = brainRes?.data?.objectionWinMap ?? []
@@ -3834,10 +4028,19 @@ export default function DealDetailPage() {
                     <Target size={10} /> {deal.conversionScore}% win probability
                   </span>
                 )}
+                {deal.engagementType && (
+                  <span style={{
+                    fontSize: '11px', padding: '3px 10px', borderRadius: '100px', fontWeight: '600',
+                    background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                  }}>
+                    {deal.engagementType}
+                  </span>
+                )}
               </div>
               <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'var(--text-tertiary)' }}>
                 {deal.prospectName && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><User size={11} />{deal.prospectName}</span>}
-                {deal.dealValue && <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--success)', fontWeight: '600' }}><DollarSign size={11} />{currencySymbol}{Number(deal.dealValue).toLocaleString()}</span>}
+                {deal.dealValue && <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--success)', fontWeight: '600' }}><Banknote size={11} />{currencySymbol}{Number(deal.dealValue).toLocaleString()}</span>}
                 {deal.closeDate && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} />Close {new Date(deal.closeDate).toLocaleDateString()}</span>}
               </div>
             </div>
@@ -3896,7 +4099,7 @@ export default function DealDetailPage() {
         onWon={(data) => { setWonDeal(data); setWinStoryOpen(true) }}
       />
       {/* Win story capture */}
-      <WinStoryPromptModal wonDeal={wonDeal} open={winStoryOpen} onOpenChange={setWinStoryOpen} />
+      <WinStoryPromptModal wonDeal={wonDeal} open={winStoryOpen} onOpenChange={setWinStoryOpen} currencySymbol={currencySymbol} />
 
       {/* Tab content */}
       {!deal ? (

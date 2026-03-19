@@ -23,6 +23,8 @@ export default function DealsPage() {
   const { data, isLoading, error, mutate } = useSWR<{ data: DealLog[] }>('/api/deals', fetcher)
   const deals = data?.data ?? []
   const dbError = isDbNotConfigured(error)
+  const { data: configData } = useSWR('/api/pipeline-config', fetcher, { revalidateOnFocus: false })
+  const currencySymbol: string = configData?.data?.currency ?? '£'
 
   async function handleDelete(id: string) {
     try {
@@ -123,7 +125,7 @@ export default function DealsPage() {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '24px', alignItems: 'start' }}>
-          <DealTable deals={deals} onAdd={() => setAddOpen(true)} onDelete={handleDelete} />
+          <DealTable deals={deals} onAdd={() => setAddOpen(true)} onDelete={handleDelete} currencySymbol={currencySymbol} />
           <DealInsights deals={deals} />
         </div>
       )}
