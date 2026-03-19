@@ -7,6 +7,7 @@ import {
   AlertTriangle, CheckCircle, Clock, Package, ChevronDown, ChevronUp,
   Info, Download, Lock, BarChart3,
 } from 'lucide-react'
+import { formatCurrency } from '@/lib/format'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -114,7 +115,7 @@ function ScoreBadge({ score }: { score?: number | null }) {
 
 function exportReport(gaps: EnrichedGap[], totalGaps: number, uniqueDeals: number, totalRev: number) {
   const today = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })
-  const fmtRev = (v: number) => v >= 1000 ? `£${(v / 1000).toFixed(0)}k` : `£${v}`
+  const fmtRev = (v: number) => formatCurrency(v, true)
   const sortedByPriority = [...gaps].sort((a, b) => {
     const order = ['Critical', 'High', 'Medium', 'Low']
     return order.indexOf(getPriorityBadge(a).label) - order.indexOf(getPriorityBadge(b).label)
@@ -244,7 +245,7 @@ export default function ProductGapsPage() {
               <span style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>{uniqueDeals > 0 ? uniqueDeals : enrichedGaps.reduce((s, g) => s + (g.frequency ?? 0), 0)} deals</span>
               {totalRevRisk > 0 && (
                 <> — <span style={{ color: 'var(--danger)', fontWeight: '700' }}>
-                  £{totalRevRisk >= 1000 ? `${(totalRevRisk / 1000).toFixed(0)}k` : totalRevRisk} revenue at risk
+                  {formatCurrency(totalRevRisk, true)} revenue at risk
                 </span></>
               )}
             </div>
@@ -279,7 +280,7 @@ export default function ProductGapsPage() {
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <div style={{ padding: '12px 16px', background: 'color-mix(in srgb, var(--danger) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 15%, transparent)', borderRadius: '10px' }}>
             <div style={{ fontSize: '22px', fontWeight: '800', color: 'var(--danger)', lineHeight: 1 }}>
-              £{totalRevRisk >= 1000 ? `${Math.round(totalRevRisk / 1000)}k` : totalRevRisk}
+              {formatCurrency(totalRevRisk, true)}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px' }}>Total revenue at risk</div>
           </div>
@@ -438,7 +439,7 @@ export default function ProductGapsPage() {
                     {revRisk > 0 ? (
                       <>
                         <div style={{ fontSize: '16px', fontWeight: '800', color: revRisk >= 10000 ? 'var(--danger)' : revRisk >= 1000 ? 'var(--warning)' : 'var(--text-secondary)', lineHeight: 1 }}>
-                          £{revRisk >= 1000 ? `${(revRisk / 1000).toFixed(0)}k` : revRisk}
+                          {formatCurrency(revRisk, true)}
                         </div>
                         <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>at risk</div>
                       </>

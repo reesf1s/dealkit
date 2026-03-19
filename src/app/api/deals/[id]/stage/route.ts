@@ -6,7 +6,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
+import { scheduleBrainRebuild } from '@/lib/workspace-brain'
 
 // ── Ensure prediction log table (idempotent, cached per cold-start) ───────────
 let _predLogEnsured = false
@@ -124,7 +124,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       } catch { /* non-fatal — table may not exist yet on first run */ }
     })
 
-    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+    after(() => { scheduleBrainRebuild(workspaceId, 'stage_change') })
     return NextResponse.json({ data: deal })
   } catch (e: unknown) {
     console.error('[deals/stage] failed:', e instanceof Error ? e.message : e)

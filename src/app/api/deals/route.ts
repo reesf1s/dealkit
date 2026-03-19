@@ -7,7 +7,7 @@ import { dealLogs, collateral, events } from '@/lib/db/schema'
 import { PLAN_LIMITS, isWithinLimit } from '@/lib/stripe/plans'
 import { dbErrResponse, ensureIndexes } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
+import { scheduleBrainRebuild } from '@/lib/workspace-brain'
 
 async function logEvent(workspaceId: string, userId: string, type: string, metadata: Record<string, unknown>) {
   await db.insert(events).values({ workspaceId, userId, type, metadata, createdAt: new Date() })
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     await db.update(collateral).set({ status: 'stale', updatedAt: now }).where(and(eq(collateral.workspaceId, workspaceId), eq(collateral.type, 'objection_handler')))
     if (((deal.competitors as string[]) ?? []).length > 0)
       await db.update(collateral).set({ status: 'stale', updatedAt: now }).where(and(eq(collateral.workspaceId, workspaceId), eq(collateral.type, 'battlecard')))
-    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+    after(() => { scheduleBrainRebuild(workspaceId, 'deal_created') })
     return NextResponse.json({ data: deal }, { status: 201 })
   } catch (err) { return dbErrResponse(err) }
 }

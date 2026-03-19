@@ -9,6 +9,7 @@ import {
   ArrowUpRight, Users, Clock, Award, Lock, Info,
   CheckCircle, BarChart3, Zap, Shield, ChevronRight
 } from 'lucide-react'
+import { formatCurrency } from '@/lib/format'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -336,7 +337,7 @@ export default function PlaybookPage() {
         {[
           { label: 'Win rate', value: `${wl?.winRate ?? 0}%`, color: 'var(--success)' },
           { label: 'Avg close time', value: wl?.avgDaysToClose ? `${Math.round(wl.avgDaysToClose)} days` : '—', color: 'var(--data-accent)' },
-          { label: 'Avg won value', value: wl?.avgWonValue ? `£${Math.round(wl.avgWonValue).toLocaleString()}` : '—', color: 'var(--accent)' },
+          { label: 'Avg won value', value: wl?.avgWonValue ? formatCurrency(Math.round(wl.avgWonValue)) : '—', color: 'var(--accent)' },
           { label: 'Closed deals', value: String(totalDeals), color: 'var(--text-secondary)' },
         ].map(s => (
           <div key={s.label} style={{ padding: '12px 16px', background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '10px', minWidth: '110px' }}>

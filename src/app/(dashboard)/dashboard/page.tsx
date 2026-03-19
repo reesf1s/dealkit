@@ -6,6 +6,7 @@ import useSWR, { mutate } from 'swr'
 import Link from 'next/link'
 import { Sparkles, TrendingUp, AlertTriangle, ArrowUpRight, RefreshCw, Brain, Target, CheckCircle, Clock, DollarSign, Zap, ChevronRight } from 'lucide-react'
 import { useSidebar } from '@/components/layout/SidebarContext'
+import { formatCurrency } from '@/lib/format'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -25,12 +26,14 @@ export default function DashboardPage() {
   const deals: any[] = dealsRes?.data ?? []
   const activeDeals = deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
 
-  // Quick stats from brain/deals
-  const totalPipeline = activeDeals.reduce((s: number, d: any) => s + (d.dealValue ?? 0), 0)
+  // Quick stats — prefer brain's pre-computed pipeline values as the source of truth
+  const totalPipeline = brain?.pipeline?.totalValue ?? activeDeals.reduce((s: number, d: any) => s + (d.dealValue ?? 0), 0)
   const winRate = brain?.winLossIntel?.winRate
-  const avgScore = activeDeals.length > 0
-    ? Math.round(activeDeals.reduce((s: number, d: any) => s + (d.conversionScore ?? 0), 0) / activeDeals.length)
-    : null
+  const avgScore = brain?.pipeline?.avgConversionScore != null
+    ? Math.round(brain.pipeline.avgConversionScore)
+    : activeDeals.length > 0
+      ? Math.round(activeDeals.reduce((s: number, d: any) => s + (d.conversionScore ?? 0), 0) / activeDeals.length)
+      : null
 
   const healthColor = overview?.briefingHealth === 'green' ? 'var(--success)' : overview?.briefingHealth === 'red' ? 'var(--danger)' : 'var(--warning)'
 
@@ -182,7 +185,7 @@ export default function DashboardPage() {
               {totalPipeline > 0 && (
                 <div>
                   <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1, letterSpacing: '-0.02em' }}>
-                    &pound;{totalPipeline >= 1_000_000 ? `${(totalPipeline / 1_000_000).toFixed(1)}m` : totalPipeline >= 1_000 ? `${(totalPipeline / 1_000).toFixed(0)}k` : totalPipeline}
+                    {formatCurrency(totalPipeline, true)}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '3px' }}>total pipeline value</div>
                 </div>

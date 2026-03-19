@@ -430,6 +430,40 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
   return promise
 }
 
+// ── Debounced brain rebuild ───────────────────────────────────────────────────
+// For rapid successive mutations (e.g. 5 notes added in a row), use
+// scheduleBrainRebuild instead of calling rebuildWorkspaceBrain directly.
+// Any pending rebuild for the workspace is cancelled and rescheduled so only
+// one rebuild fires after the burst settles.
+const _pendingRebuildTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+/**
+ * Schedule a debounced brain rebuild. Cancels any existing pending rebuild for
+ * this workspace and schedules a new one after `delayMs` (default 10 s).
+ *
+ * Use this instead of `rebuildWorkspaceBrain` when calling from background
+ * `after()` handlers where bursts are likely (e.g. batch note saves).
+ * For manual/explicit triggers (refresh button, cron) call `rebuildWorkspaceBrain`
+ * directly so the rebuild runs immediately.
+ */
+export function scheduleBrainRebuild(workspaceId: string, trigger = 'scheduled', delayMs = REBUILD_COOLDOWN_MS): void {
+  // Cancel any pending rebuild for this workspace
+  const existing = _pendingRebuildTimers.get(workspaceId)
+  if (existing) clearTimeout(existing)
+
+  // Schedule a new rebuild after the debounce window
+  const timer = setTimeout(async () => {
+    _pendingRebuildTimers.delete(workspaceId)
+    try {
+      await _doRebuildWorkspaceBrain(workspaceId)
+      _lastRebuildAt.set(workspaceId, Date.now())
+    } catch (e) {
+      console.error(`[brain] scheduleBrainRebuild(${trigger}) failed for ${workspaceId}:`, e)
+    }
+  }, delayMs)
+  _pendingRebuildTimers.set(workspaceId, timer)
+}
+
 // ── One-time extraction backfill ──────────────────────────────────────────────
 // Runs on the first brain rebuild for any workspace that has deals with meeting
 // notes but no structured note_signals_json. Uses the same extraction prompt as
