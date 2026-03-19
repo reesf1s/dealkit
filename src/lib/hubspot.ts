@@ -48,6 +48,9 @@ export async function ensureHubspotSchema() {
     await db.execute(sql`
       ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS hubspot_stage_label TEXT
     `)
+    await db.execute(sql`
+      ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS hubspot_notes TEXT
+    `)
   } catch { /* already exists */ }
   schemaMigrated = true
 }

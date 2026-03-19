@@ -475,12 +475,11 @@ async function _runExtractionBackfill(workspaceId: string): Promise<{ processed:
     try { await db.execute(sql`ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS note_signals_json text`) } catch { /* exists */ }
 
     // Find deals that have meeting notes but no extraction yet
-    const rows = await db.execute<{ id: string; meeting_notes: string | null; note_signals_json: string | null }>(sql`
-      SELECT id, meeting_notes, note_signals_json
+    const rows = await db.execute<{ id: string; meeting_notes: string | null; hubspot_notes: string | null; note_signals_json: string | null }>(sql`
+      SELECT id, meeting_notes, hubspot_notes, note_signals_json
       FROM deal_logs
       WHERE workspace_id = ${workspaceId}
-        AND meeting_notes IS NOT NULL
-        AND meeting_notes != ''
+        AND (meeting_notes IS NOT NULL AND meeting_notes != '' OR hubspot_notes IS NOT NULL AND hubspot_notes != '')
         AND (note_signals_json IS NULL OR note_signals_json = '')
       LIMIT 50
     `)
@@ -494,7 +493,9 @@ async function _runExtractionBackfill(workspaceId: string): Promise<{ processed:
 
     for (const deal of dealsToProcess) {
       try {
-        const notes = deal.meeting_notes ?? ''
+        // Combine manual meeting notes + HubSpot notes for extraction
+        const noteParts = [deal.meeting_notes, deal.hubspot_notes].filter(Boolean)
+        const notes = noteParts.join('\n\n')
         if (!notes.trim()) { stats.skipped++; continue }
 
         // Run the extraction block only (no full analyze-notes prompt — lighter call)
@@ -638,6 +639,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
       lostDate: dealLogs.lostDate,
       lostReason: dealLogs.lostReason,
       meetingNotes: dealLogs.meetingNotes,
+      hubspotNotes: dealLogs.hubspotNotes,
       intentSignals: dealLogs.intentSignals,
       outcome: dealLogs.outcome,
     })
@@ -668,6 +670,20 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
   ])
 
   const now = new Date()
+
+  // ── Merge hubspotNotes into meetingNotes so all AI/NLP code sees the full picture ──
+  // hubspot_notes is always fresh from HubSpot; meeting_notes is manually editable.
+  // We combine them here so every downstream consumer gets both without knowing the distinction.
+  for (const d of deals) {
+    const manual  = (d.meetingNotes as string | null) ?? ''
+    const hsNotes = (d.hubspotNotes as string | null) ?? ''
+    if (hsNotes && manual) {
+      d.meetingNotes = `${manual}\n\n${hsNotes}`
+    } else if (hsNotes) {
+      d.meetingNotes = hsNotes
+    }
+    // If no hubspotNotes, meetingNotes stays as-is
+  }
 
   // ── Auto-fix corrupted scores (from the *100 bug) — only if not user-pinned ──
   for (const d of deals) {

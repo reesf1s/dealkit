@@ -108,7 +108,7 @@ export async function syncHubspotDeals(workspaceId: string, userId: string): Pro
         id, workspace_id, user_id,
         deal_name, prospect_company, prospect_name, prospect_title,
         contacts, deal_value, stage, hubspot_stage_label, description, close_date,
-        meeting_notes, hubspot_deal_id, updated_at, created_at
+        hubspot_notes, hubspot_deal_id, updated_at, created_at
       ) VALUES (
         gen_random_uuid(), ${workspaceId}, ${userId},
         ${mapped.dealName}, ${mapped.prospectCompany}, ${mapped.prospectName}, ${mapped.prospectTitle},
@@ -129,13 +129,9 @@ export async function syncHubspotDeals(workspaceId: string, userId: string): Pro
         description         = EXCLUDED.description,
         close_date          = EXCLUDED.close_date,
         updated_at          = EXCLUDED.updated_at,
-        -- Only update meeting_notes if HubSpot has content AND the deal has none yet
-        -- (preserves notes the rep has manually added in SellSight)
-        meeting_notes       = CASE
-          WHEN ${meetingNotes} IS NOT NULL AND (deal_logs.meeting_notes IS NULL OR deal_logs.meeting_notes = '')
-          THEN ${meetingNotes}
-          ELSE deal_logs.meeting_notes
-        END
+        -- hubspot_notes is ALWAYS overwritten so every sync brings the latest emails/notes
+        -- meeting_notes is intentionally NOT touched here — it's manually editable by reps
+        hubspot_notes       = EXCLUDED.hubspot_notes
     `)
     upserted++
   }

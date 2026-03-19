@@ -345,6 +345,55 @@ const STAGE_COLORS: Record<string, string> = {
   proposal: 'var(--warning)', negotiation: 'var(--danger)', closed_won: 'var(--success)', closed_lost: 'var(--text-tertiary)',
 }
 
+/** Read-only panel showing emails/notes pulled from HubSpot on the last sync. */
+function HubSpotActivityBlock({ deal, dealCompetitors }: { deal: any; dealCompetitors: string[] }) {
+  const [expanded, setExpanded] = useState(false)
+  const raw: string = deal?.hubspotNotes ?? ''
+  if (!raw.trim()) return null
+
+  // Split on double-newline before a [date] marker
+  const blocks = raw.split(/\n\n(?=\[)/).map((b: string) => b.trim()).filter(Boolean)
+
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px' }}>
+      <button
+        onClick={() => setExpanded(v => !v)}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <RefreshCw size={13} color="#FF7A59" />
+          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)' }}>HubSpot Activity</span>
+          <span style={{ fontSize: '11px', color: '#FF7A59', background: 'rgba(255,122,89,0.1)', borderRadius: '4px', padding: '1px 6px', fontWeight: 600 }}>
+            {blocks.length} entr{blocks.length === 1 ? 'y' : 'ies'}
+          </span>
+          <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>· updates on every sync</span>
+        </div>
+        <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{expanded ? 'Hide ↑' : 'Show ↓'}</span>
+      </button>
+      {expanded && (
+        <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '380px', overflowY: 'auto' }}>
+          {blocks.map((entry: string, i: number) => {
+            const dateMatch = entry.match(/^\[([^\]]+)\]/)
+            const date = dateMatch?.[1] ?? ''
+            const body = entry.slice(dateMatch?.[0].length ?? 0).trim()
+            return (
+              <div key={i} style={{ padding: '9px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                {date && (
+                  <div style={{ fontSize: '10px', fontWeight: 700, color: '#FF7A59', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '4px' }}>{date}</div>
+                )}
+                <div
+                  style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}
+                  dangerouslySetInnerHTML={{ __html: highlightSignals(body, dealCompetitors) }}
+                />
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: string; deal: any; onUpdate: () => void; onSwitchToPrep?: () => void }) {
   const dealCompetitors: string[] = deal?.competitors ?? []
   const { sendToCopilot } = useSidebar()
@@ -555,6 +604,8 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
           </div>
         )
       })()}
+
+      <HubSpotActivityBlock deal={deal} dealCompetitors={deal?.competitors ?? []} />
 
       {/* Add update */}
       <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '14px' }}>

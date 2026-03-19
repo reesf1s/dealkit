@@ -204,6 +204,7 @@ export const dealLogs = pgTable('deal_logs', {
   competitors: jsonb('competitors').notNull().default([]),
   notes: text('notes'),
   meetingNotes: text('meeting_notes'),
+  hubspotNotes: text('hubspot_notes'),    // always overwritten on HubSpot sync; meetingNotes is manual-only
   aiSummary: text('ai_summary'),
   conversionScore: integer('conversion_score'),
   conversionScorePinned: boolean('conversion_score_pinned').notNull().default(false), // true = user explicitly set, AI must not overwrite
