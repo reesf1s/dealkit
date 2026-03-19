@@ -39,7 +39,7 @@ const Ctx = createContext<SidebarCtx>({
   toggleCollapsed: () => {},
   openMobile: () => {},
   closeMobile: () => {},
-  sidebarWidth: 220,
+  sidebarWidth: 210,
   copilotOpen: false,
   toggleCopilot: () => {},
   setCopilotOpen: () => {},
@@ -102,7 +102,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     setCopilotAutoSend(null)
   }, [])
 
-  const sidebarWidth = isMobile ? 0 : collapsed ? 64 : 220
+  const sidebarWidth = isMobile ? 0 : collapsed ? 52 : 210
 
   return (
     <Ctx.Provider value={{

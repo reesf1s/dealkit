@@ -7,7 +7,7 @@ import useSWR from 'swr'
 import {
   LayoutDashboard, Building2, Swords,
   FileText, Settings, LogOut, Search,
-  Kanban, ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight,
   X, Brain, Zap, Activity, MessageSquare, Sun, Moon, Home, BookOpen,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
@@ -15,13 +15,12 @@ import { useTheme } from './ThemeContext'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
-// Nav: AI-first — Today (morning briefing) + Pipeline (command centre) + visual board + collateral + intel
 const CORE_ITEMS = [
-  { href: '/dashboard',  icon: LayoutDashboard, label: 'Today',        matchPaths: ['/dashboard'] },
-  { href: '/pipeline',   icon: Home,            label: 'Pipeline',     matchPaths: ['/pipeline', '/deals'] },
-  { href: '/models',     icon: Brain,           label: 'Models',       matchPaths: ['/models'] },
-  { href: '/playbook',   icon: BookOpen,        label: 'Playbook',     matchPaths: ['/playbook'] },
-  { href: '/collateral', icon: Zap,             label: 'Collateral',   matchPaths: ['/collateral'] },
+  { href: '/dashboard',  icon: LayoutDashboard, label: 'Today',      matchPaths: ['/dashboard'] },
+  { href: '/pipeline',   icon: Home,            label: 'Pipeline',   matchPaths: ['/pipeline', '/deals'] },
+  { href: '/models',     icon: Brain,           label: 'Models',     matchPaths: ['/models'] },
+  { href: '/playbook',   icon: BookOpen,        label: 'Playbook',   matchPaths: ['/playbook'] },
+  { href: '/collateral', icon: Zap,             label: 'Collateral', matchPaths: ['/collateral'] },
 ]
 
 const INTEL_ITEMS = [
@@ -38,25 +37,19 @@ export default function Sidebar() {
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false, dedupingInterval: 30000 })
   const brain = brainRes?.data
   const urgentCount = brain?.urgentDeals?.length ?? 0
-  const staleCount = brain?.staleDeals?.length ?? 0
 
   const isActive = (href: string, matchPaths?: string[]) => {
     const paths = matchPaths ? [href, ...matchPaths] : [href]
     return paths.some(p => pathname === p || pathname.startsWith(p + '/'))
   }
-  const w = collapsed ? '56px' : '216px'
+  const w = collapsed ? '52px' : '210px'
 
-  const brainAge = brain?.updatedAt
-    ? (() => {
-        const mins = Math.floor((Date.now() - new Date(brain.updatedAt).getTime()) / 60000)
-        if (mins < 1) return 'just now'
-        if (mins < 60) return `${mins}m ago`
-        const hrs = Math.floor(mins / 60)
-        return `${hrs}h ago`
-      })()
-    : null
-
-  function NavItem({ href, icon: Icon, label, badge, matchPaths }: { href: string; icon: React.ElementType; label: string; badge?: { count: number; color: string }; matchPaths?: string[] }) {
+  function NavItem({
+    href, icon: Icon, label, badge, matchPaths
+  }: {
+    href: string; icon: React.ElementType; label: string
+    badge?: { count: number; color: string }; matchPaths?: string[]
+  }) {
     const active = isActive(href, matchPaths)
     return (
       <Link
@@ -64,19 +57,23 @@ export default function Sidebar() {
         onClick={() => closeMobile()}
         title={collapsed ? label : undefined}
         style={{
-          display: 'flex', alignItems: 'center', gap: '9px',
-          padding: '0 10px',
+          display: 'flex', alignItems: 'center', gap: '8px',
+          padding: collapsed ? '0' : '0 8px',
           justifyContent: collapsed ? 'center' : 'flex-start',
-          height: '32px', borderRadius: '7px',
+          height: '30px', borderRadius: '7px',
           marginBottom: '1px', textDecoration: 'none',
-          fontSize: '13px', fontWeight: active ? '500' : '400',
+          fontSize: '13px',
+          fontWeight: active ? '500' : '400',
+          letterSpacing: '-0.01em',
           color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-          background: active ? 'var(--accent-subtle)' : 'transparent',
-          transition: 'all 0.1s',
-          position: 'relative',
+          background: active ? 'var(--surface-hover)' : 'transparent',
+          transition: 'background 0.1s, color 0.1s',
+          position: 'relative', flexShrink: 0,
+          width: collapsed ? '30px' : undefined,
+          margin: collapsed ? '0 auto 2px' : undefined,
         }}
         onMouseEnter={e => { if (!active) {
-          (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'
+          (e.currentTarget as HTMLElement).style.background = 'var(--surface)'
           ;(e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'
         }}}
         onMouseLeave={e => { if (!active) {
@@ -84,38 +81,29 @@ export default function Sidebar() {
           ;(e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'
         }}}
       >
-        {active && !collapsed && (
-          <div style={{
-            position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
-            width: '2px', height: '14px', background: 'var(--accent)',
-            borderRadius: '0 2px 2px 0',
-          }} />
-        )}
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <Icon size={14} color={active ? 'var(--accent)' : 'currentColor'} style={{ display: 'block', marginLeft: active && !collapsed ? '2px' : 0 }} />
-          {badge && badge.count > 0 && !collapsed && (
+        <div style={{ position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon
+            size={14}
+            style={{
+              color: active ? 'var(--text-primary)' : 'var(--text-tertiary)',
+              display: 'block',
+            }}
+          />
+          {badge && badge.count > 0 && (
             <div style={{
-              position: 'absolute', top: '-4px', right: '-6px',
-              width: '6px', height: '6px', borderRadius: '50%',
+              position: 'absolute', top: '-3px', right: '-4px',
+              width: '5px', height: '5px', borderRadius: '50%',
               background: badge.color,
-            }} />
-          )}
-          {badge && badge.count > 0 && collapsed && (
-            <div style={{
-              position: 'absolute', top: '-3px', right: '-3px',
-              width: '6px', height: '6px', borderRadius: '50%',
-              background: badge.color,
+              boxShadow: `0 0 5px ${badge.color}88`,
             }} />
           )}
         </div>
-        {!collapsed && (
-          <span style={{ flex: 1 }}>{label}</span>
-        )}
+        {!collapsed && <span style={{ flex: 1 }}>{label}</span>}
         {!collapsed && badge && badge.count > 0 && (
           <span style={{
-            fontSize: '10px', fontWeight: 700,
-            color: badge.color === '#EF4444' ? '#FCA5A5' : '#FDE68A',
-            background: badge.color === '#EF4444' ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.1)',
+            fontSize: '10px', fontWeight: 600,
+            color: '#FF453A',
+            background: 'rgba(255,69,58,0.12)',
             padding: '1px 5px', borderRadius: '100px',
           }}>{badge.count}</span>
         )}
@@ -123,153 +111,202 @@ export default function Sidebar() {
     )
   }
 
+  function Divider() {
+    return <div style={{ height: '1px', background: 'var(--border)', margin: '6px 0' }} />
+  }
+
   function SectionLabel({ children }: { children: string }) {
-    if (collapsed) return <div style={{ height: '16px' }} />
+    if (collapsed) return <div style={{ height: '10px' }} />
     return (
-      <div style={{ padding: '10px 10px 4px', fontSize: '10px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+      <div style={{
+        padding: '8px 8px 3px',
+        fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)',
+        textTransform: 'uppercase', letterSpacing: '0.07em',
+      }}>
         {children}
       </div>
     )
   }
 
+  const brainAge = brain?.updatedAt
+    ? (() => {
+        const mins = Math.floor((Date.now() - new Date(brain.updatedAt).getTime()) / 60000)
+        if (mins < 1) return 'live'
+        if (mins < 60) return `${mins}m`
+        const hrs = Math.floor(mins / 60)
+        return `${hrs}h`
+      })()
+    : null
+
   const SidebarContent = (
     <aside style={{
       position: 'fixed', left: 0, top: 0, bottom: 0, width: w,
       background: 'var(--sidebar-bg)',
-      backdropFilter: 'blur(var(--glass-blur))', WebkitBackdropFilter: 'blur(var(--glass-blur))',
+      backdropFilter: 'blur(var(--glass-blur))',
+      WebkitBackdropFilter: 'blur(var(--glass-blur))',
       borderRight: '1px solid var(--border)',
-      boxShadow: 'var(--shadow)',
       display: 'flex', flexDirection: 'column', zIndex: 40,
-      transition: 'width 0.2s cubic-bezier(0.4,0,0.2,1)',
+      transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)',
       overflow: 'hidden',
     }}>
 
-      {/* Logo */}
-      <div style={{ padding: collapsed ? '14px 0 10px' : '14px 12px 10px', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between' }}>
+      {/* ── Logo row ── */}
+      <div style={{
+        padding: collapsed ? '12px 0 8px' : '12px 10px 8px',
+        display: 'flex', alignItems: 'center',
+        justifyContent: collapsed ? 'center' : 'space-between',
+        flexShrink: 0,
+      }}>
         {!collapsed && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{
-              width: '26px', height: '26px',
-              background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
-              borderRadius: '7px',
+              width: '24px', height: '24px',
+              background: 'linear-gradient(135deg, #7C6AF5 0%, #9B6DFF 100%)',
+              borderRadius: '6px',
               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              boxShadow: '0 0 12px rgba(99,102,241,0.35)',
+              boxShadow: '0 0 14px rgba(124,106,245,0.40)',
             }}>
-              <Brain size={13} color="#fff" strokeWidth={2.5} />
+              <Brain size={12} color="#fff" strokeWidth={2.5} />
             </div>
-            <span style={{ fontWeight: '700', fontSize: '14px', letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>SellSight</span>
+            <span style={{
+              fontWeight: '600', fontSize: '14px',
+              letterSpacing: '-0.025em',
+              color: 'var(--text-primary)',
+            }}>SellSight</span>
           </div>
         )}
         {collapsed && (
           <div style={{
-            width: '26px', height: '26px',
-            background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
-            borderRadius: '7px',
+            width: '24px', height: '24px',
+            background: 'linear-gradient(135deg, #7C6AF5 0%, #9B6DFF 100%)',
+            borderRadius: '6px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 12px rgba(99,102,241,0.35)',
+            boxShadow: '0 0 14px rgba(124,106,245,0.40)',
           }}>
-            <Brain size={13} color="#fff" strokeWidth={2.5} />
+            <Brain size={12} color="#fff" strokeWidth={2.5} />
           </div>
         )}
         <button
           onClick={() => { mobileOpen ? closeMobile() : toggleCollapsed() }}
-          style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px', borderRadius: '5px', display: 'flex' }}
+          style={{
+            background: 'none', border: 'none',
+            color: 'var(--text-tertiary)', cursor: 'pointer',
+            padding: '3px', borderRadius: '5px', display: 'flex',
+            transition: 'color 0.1s',
+          }}
           onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
         >
           {mobileOpen ? <X size={13} /> : collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
         </button>
       </div>
 
-      {/* Search */}
-      {!collapsed ? (
-        <div style={{ padding: '0 8px 8px' }}>
+      {/* ── Search ── */}
+      <div style={{ padding: collapsed ? '0 0 6px' : '0 8px 6px', display: 'flex', justifyContent: 'center' }}>
+        {!collapsed ? (
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
             style={{
-              width: '100%', height: '30px', borderRadius: '7px',
-              backgroundColor: 'var(--surface-hover)',
+              width: '100%', height: '28px', borderRadius: '7px',
+              background: 'var(--surface)',
               border: '1px solid var(--border)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', padding: '0 8px',
-              transition: 'background 0.1s',
+              transition: 'border-color 0.1s, background 0.1s',
             }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--border)'}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.background = 'var(--surface)'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
+            }}
           >
-            <Search size={11} color="var(--text-tertiary)" strokeWidth={2} />
+            <Search size={11} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
             <span style={{ flex: 1, fontSize: '12px', color: 'var(--text-tertiary)', textAlign: 'left' }}>Search</span>
-            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--surface-hover)', padding: '1px 4px', borderRadius: '3px', border: '1px solid var(--border)' }}>⌘P</span>
+            <span style={{
+              fontSize: '10px', color: 'var(--text-tertiary)',
+              background: 'var(--surface)', padding: '1px 4px',
+              borderRadius: '4px', border: '1px solid var(--border)',
+              letterSpacing: '0.02em',
+            }}>⌘P</span>
           </button>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: '8px' }}>
+        ) : (
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
-            style={{ width: '30px', height: '30px', borderRadius: '7px', background: 'var(--surface-hover)', border: '1px solid var(--border)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{
+              width: '30px', height: '28px', borderRadius: '7px',
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
           >
-            <Search size={12} color="var(--text-tertiary)" />
+            <Search size={11} style={{ color: 'var(--text-tertiary)' }} />
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Ask Brain CTA */}
-      {!collapsed ? (
-        <div style={{ padding: '0 8px 6px' }}>
+      {/* ── Ask AI ── */}
+      <div style={{ padding: collapsed ? '0 0 8px' : '0 8px 8px', display: 'flex', justifyContent: 'center' }}>
+        {!collapsed ? (
           <button
             onClick={toggleCopilot}
             style={{
-              width: '100%', height: '32px', borderRadius: '8px',
-              background: 'linear-gradient(135deg, rgba(79,70,229,0.10), rgba(139,92,246,0.07))',
-              border: '1px solid rgba(79,70,229,0.20)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', padding: '0 10px',
-              transition: 'all 0.15s',
-              color: 'var(--accent-text)',
+              width: '100%', height: '30px', borderRadius: '8px',
+              background: 'linear-gradient(135deg, rgba(124,106,245,0.12), rgba(155,109,255,0.08))',
+              border: '1px solid rgba(124,106,245,0.22)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', padding: '0 9px',
+              transition: 'all 0.12s',
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(79,70,229,0.18), rgba(139,92,246,0.12))'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(79,70,229,0.4)'
+              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(124,106,245,0.20), rgba(155,109,255,0.14))'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,106,245,0.40)'
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(79,70,229,0.10), rgba(139,92,246,0.07))'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(79,70,229,0.20)'
+              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(124,106,245,0.12), rgba(155,109,255,0.08))'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,106,245,0.22)'
             }}
           >
-            <MessageSquare size={12} color="var(--accent)" strokeWidth={2} />
-            <span style={{ flex: 1, fontSize: '12px', fontWeight: 600, textAlign: 'left' }}>Ask AI</span>
-            <span style={{ fontSize: '10px', color: 'var(--text-secondary)', background: 'var(--surface-hover)', padding: '1px 5px', borderRadius: '3px', border: '1px solid var(--border)' }}>⌘K</span>
+            <MessageSquare size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: '12px', fontWeight: 500, color: 'var(--accent-text)', textAlign: 'left', letterSpacing: '-0.01em' }}>
+              Ask AI
+            </span>
+            <span style={{
+              fontSize: '10px', color: 'var(--text-tertiary)',
+              background: 'rgba(0,0,0,0.2)', padding: '1px 5px',
+              borderRadius: '4px', border: '1px solid var(--border)',
+            }}>⌘K</span>
           </button>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: '6px' }}>
+        ) : (
           <button
             onClick={toggleCopilot}
             title="Ask AI (⌘K)"
-            style={{ width: '30px', height: '30px', borderRadius: '7px', background: 'linear-gradient(135deg, rgba(79,70,229,0.10), rgba(139,92,246,0.07))', border: '1px solid rgba(79,70,229,0.20)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{
+              width: '30px', height: '28px', borderRadius: '7px',
+              background: 'linear-gradient(135deg, rgba(124,106,245,0.12), rgba(155,109,255,0.08))',
+              border: '1px solid rgba(124,106,245,0.22)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
           >
-            <MessageSquare size={12} color="var(--accent)" />
+            <MessageSquare size={11} style={{ color: 'var(--accent)' }} />
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Nav */}
-      <nav style={{ flex: 1, padding: '0 6px', overflowY: 'auto', overflowX: 'hidden' }}>
-
+      {/* ── Nav ── */}
+      <nav style={{ flex: 1, padding: collapsed ? '0 4px' : '0 6px', overflowY: 'auto', overflowX: 'hidden' }}>
         <SectionLabel>Navigate</SectionLabel>
         {CORE_ITEMS.map(item => (
           <NavItem
             key={item.href}
             {...item}
-            badge={
-              item.href === '/pipeline' && urgentCount > 0 ? { count: urgentCount, color: '#EF4444' } :
-              undefined
-            }
+            badge={item.href === '/pipeline' && urgentCount > 0 ? { count: urgentCount, color: '#FF453A' } : undefined}
           />
         ))}
 
         <SectionLabel>Insights</SectionLabel>
         {INTEL_ITEMS.map(item => <NavItem key={item.href} {...item} />)}
 
-        <div style={{ margin: '8px 4px', height: '1px', background: 'var(--border)' }} />
+        <Divider />
 
         <NavItem href="/settings" icon={Settings} label="Settings" />
 
@@ -278,16 +315,17 @@ export default function Sidebar() {
           <button
             onClick={toggleTheme}
             style={{
-              display: 'flex', alignItems: 'center', gap: '9px',
-              padding: '0 10px', height: '32px', borderRadius: '7px',
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '0 8px', height: '30px', borderRadius: '7px',
               marginBottom: '1px', border: 'none',
-              fontSize: '13px', fontWeight: '400',
+              fontSize: '13px', fontWeight: 400, letterSpacing: '-0.01em',
               color: 'var(--text-secondary)',
               background: 'transparent',
-              cursor: 'pointer', width: '100%',
+              cursor: 'pointer', width: '100%', textAlign: 'left',
+              transition: 'background 0.1s, color 0.1s',
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'
+              (e.currentTarget as HTMLElement).style.background = 'var(--surface)'
               ;(e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'
             }}
             onMouseLeave={e => {
@@ -295,7 +333,9 @@ export default function Sidebar() {
               ;(e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'
             }}
           >
-            {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
+            {theme === 'light'
+              ? <Moon size={13} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+              : <Sun  size={13} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />}
             <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
           </button>
         ) : (
@@ -304,92 +344,99 @@ export default function Sidebar() {
             title={theme === 'light' ? 'Dark mode' : 'Light mode'}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              height: '32px', width: '100%', borderRadius: '7px',
+              height: '30px', width: '30px', borderRadius: '7px',
               border: 'none', background: 'transparent',
-              color: 'var(--text-secondary)', cursor: 'pointer',
+              color: 'var(--text-tertiary)', cursor: 'pointer',
+              margin: '0 auto 2px',
             }}
           >
-            {theme === 'light' ? <Moon size={14} /> : <Sun size={14} />}
+            {theme === 'light' ? <Moon size={13} /> : <Sun size={13} />}
           </button>
         )}
       </nav>
 
-      {/* Brain status + user */}
-      <div style={{ borderTop: '1px solid var(--border)', padding: '8px 8px 10px' }}>
-        {/* Brain health indicator — pulsing when active */}
-        {!collapsed && (
+      {/* ── Brain status + user footer ── */}
+      <div style={{ borderTop: '1px solid var(--border)', padding: collapsed ? '8px 4px' : '8px', flexShrink: 0 }}>
+
+        {/* Brain indicator */}
+        {!collapsed && brainAge && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: '6px',
-            padding: '7px 10px', marginBottom: '6px', borderRadius: '8px',
-            background: urgentCount > 0
-              ? 'rgba(239,68,68,0.06)'
-              : 'rgba(99,102,241,0.06)',
-            border: `1px solid ${urgentCount > 0 ? 'rgba(239,68,68,0.15)' : 'rgba(99,102,241,0.15)'}`,
+            padding: '5px 8px', marginBottom: '6px', borderRadius: '7px',
+            background: urgentCount > 0 ? 'rgba(255,69,58,0.07)' : 'rgba(48,209,88,0.06)',
+            border: `1px solid ${urgentCount > 0 ? 'rgba(255,69,58,0.15)' : 'rgba(48,209,88,0.15)'}`,
           }}>
             <div style={{
-              width: '7px', height: '7px', borderRadius: '50%',
-              background: brainAge
-                ? (urgentCount > 0 ? '#EF4444' : '#22C55E')
-                : 'var(--text-tertiary)',
-              boxShadow: brainAge
-                ? (urgentCount > 0 ? '0 0 6px rgba(239,68,68,0.6)' : '0 0 6px rgba(34,197,94,0.5)')
-                : 'none',
-              flexShrink: 0,
+              width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
+              background: urgentCount > 0 ? '#FF453A' : '#30D158',
+              boxShadow: urgentCount > 0 ? '0 0 5px rgba(255,69,58,0.6)' : '0 0 5px rgba(48,209,88,0.5)',
             }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '10px', color: brainAge ? 'var(--text-secondary)' : 'var(--text-tertiary)', fontWeight: 600 }}>
-                {brainAge ? 'AI ready' : 'AI idle'}
+              <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                {urgentCount > 0 ? `${urgentCount} deals need attention` : 'AI ready'}
               </div>
-              {(urgentCount > 0 || staleCount > 0) && (
-                <div style={{ fontSize: '9px', color: '#EF4444', marginTop: '1px' }}>
-                  {urgentCount + staleCount} deal{urgentCount + staleCount !== 1 ? 's' : ''} need attention
-                </div>
-              )}
+              <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginTop: '1px' }}>
+                Updated {brainAge} ago
+              </div>
             </div>
           </div>
         )}
 
+        {/* User row */}
         {collapsed ? (
           <button
             onClick={() => signOut({ redirectUrl: '/' })}
             title="Sign out"
             style={{
-              width: '100%', height: '32px', borderRadius: '7px',
-              background: 'var(--surface-hover)', border: '1px solid var(--border)',
+              width: '30px', height: '30px', borderRadius: '7px',
+              background: 'var(--surface)', border: '1px solid var(--border)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: 'var(--text-secondary)',
+              cursor: 'pointer', color: 'var(--text-tertiary)', margin: '0 auto',
+              transition: 'color 0.1s',
             }}
             onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
           >
             <LogOut size={12} />
           </button>
         ) : (
           <div style={{
             display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '7px 8px', borderRadius: '8px',
-            background: 'var(--surface-hover)',
+            padding: '6px 8px', borderRadius: '8px',
+            background: 'var(--surface)',
             border: '1px solid var(--border)',
           }}>
             <div style={{
-              width: '24px', height: '24px', borderRadius: '50%',
-              background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+              width: '22px', height: '22px', borderRadius: '50%',
+              background: 'linear-gradient(135deg, #7C6AF5, #9B6DFF)',
               flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '10px', fontWeight: '700', color: '#fff',
+              fontSize: '9px', fontWeight: 700, color: '#fff',
             }}>
               {user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0]?.toUpperCase() ?? '?'}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div style={{
+                fontSize: '12px', fontWeight: 500, letterSpacing: '-0.01em',
+                color: 'var(--text-primary)',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
                 {user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Account'}
               </div>
-              <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px' }}>
+              <div style={{
+                fontSize: '10px', color: 'var(--text-tertiary)',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px',
+              }}>
                 {user?.emailAddresses?.[0]?.emailAddress ?? ''}
               </div>
             </div>
             <button
               onClick={() => signOut({ redirectUrl: '/' })}
-              style={{ background: 'none', border: 'none', padding: '3px', color: 'var(--text-tertiary)', borderRadius: '4px', display: 'flex', alignItems: 'center', cursor: 'pointer' }}
+              style={{
+                background: 'none', border: 'none', padding: '3px',
+                color: 'var(--text-tertiary)', borderRadius: '4px',
+                display: 'flex', alignItems: 'center', cursor: 'pointer',
+                transition: 'color 0.1s',
+              }}
               onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'}
               onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
               title="Sign out"
@@ -406,25 +453,28 @@ export default function Sidebar() {
     <>
       <div className="desktop-sidebar">{SidebarContent}</div>
       {mobileOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 39, background: 'rgba(0,0,0,0.7)' }} onClick={closeMobile} />
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 39, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+          onClick={closeMobile}
+        />
       )}
       <div
         className="mobile-sidebar"
         style={{
           position: 'fixed', left: 0, top: 0, bottom: 0, zIndex: 40,
           transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)',
-          transition: 'transform 0.2s cubic-bezier(0.4,0,0.2,1)',
-          width: '216px',
+          transition: 'transform 0.18s cubic-bezier(0.4,0,0.2,1)',
+          width: '210px',
         }}
       >
         {SidebarContent}
       </div>
       <style>{`
         .desktop-sidebar { display: block; }
-        .mobile-sidebar { display: none; }
+        .mobile-sidebar  { display: none; }
         @media (max-width: 768px) {
           .desktop-sidebar { display: none; }
-          .mobile-sidebar { display: block; }
+          .mobile-sidebar  { display: block; }
         }
       `}</style>
     </>

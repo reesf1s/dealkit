@@ -13,7 +13,7 @@ import { useSidebar } from './SidebarContext'
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 const PAGE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
-  '/dashboard':    { label: 'Overview',           Icon: Brain },
+  '/dashboard':    { label: 'Today',             Icon: LayoutDashboard },
   '/pipeline':     { label: 'Pipeline',          Icon: Kanban },
   '/deals':        { label: 'Deal Intelligence', Icon: ClipboardList },
   '/collateral':   { label: 'Collateral',        Icon: FileText },
@@ -23,13 +23,13 @@ const PAGE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   '/case-studies': { label: 'Case Studies',      Icon: BookOpen },
   '/settings':     { label: 'Settings',          Icon: Settings },
   '/onboarding':   { label: 'Setup',             Icon: Sparkles },
+  '/models':       { label: 'Models',            Icon: Brain },
+  '/playbook':     { label: 'Playbook',          Icon: BookOpen },
   '/chat':         { label: 'Ask AI',            Icon: MessageSquare },
 }
 
 function getPageInfo(pathname: string) {
-  // Exact match first
   if (PAGE_MAP[pathname]) return PAGE_MAP[pathname]
-  // Prefix match
   for (const [key, val] of Object.entries(PAGE_MAP)) {
     if (pathname.startsWith(key + '/')) return val
   }
@@ -39,7 +39,7 @@ function getPageInfo(pathname: string) {
 export default function TopNav() {
   const pathname = usePathname()
   const { user } = useUser()
-  const { sidebarWidth, openMobile } = useSidebar()
+  const { sidebarWidth, openMobile, toggleCopilot } = useSidebar()
 
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
   const brain = brainRes?.data
@@ -65,42 +65,49 @@ export default function TopNav() {
       top: 0,
       left: `${sidebarWidth}px`,
       right: 0,
-      height: '56px',
+      height: '52px',
       zIndex: 30,
       background: 'var(--topnav-bg)',
       backdropFilter: 'blur(var(--glass-blur))',
       WebkitBackdropFilter: 'blur(var(--glass-blur))',
       borderBottom: '1px solid var(--border)',
-      boxShadow: 'var(--shadow-sm)',
       display: 'flex',
       alignItems: 'center',
-      padding: '0 24px',
-      gap: '16px',
+      padding: '0 20px',
+      gap: '12px',
       justifyContent: 'space-between',
+      transition: 'left 0.18s cubic-bezier(0.4,0,0.2,1)',
     }}>
 
-      {/* Left: Mobile hamburger + Breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {/* Left: Mobile hamburger + page label */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
         <button
           onClick={openMobile}
           className="mobile-menu-btn"
           style={{
-            display: 'none', width: '34px', height: '34px', borderRadius: '8px',
-            background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
-            alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            display: 'none', width: '30px', height: '30px', borderRadius: '7px',
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
           }}
         >
-          <Menu size={15} color="#9CA3AF" />
+          <Menu size={14} style={{ color: 'var(--text-secondary)' }} />
         </button>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontWeight: '500' }}>SellSight</span>
-          <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>/</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Icon size={13} color="var(--accent)" strokeWidth={2} />
-            <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '600' }}>{label}</span>
+
+        {/* Breadcrumb */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontWeight: 400, letterSpacing: '-0.01em' }}>
+            SellSight
+          </span>
+          <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', opacity: 0.5 }}>/</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <Icon size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+            <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+              {label}
+            </span>
           </div>
         </div>
       </div>
+
       <style>{`
         @media (max-width: 768px) {
           .mobile-menu-btn { display: flex !important; }
@@ -111,17 +118,17 @@ export default function TopNav() {
       <button
         onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
         style={{
-          width: '280px',
-          height: '34px',
+          width: '260px',
+          height: '30px',
           background: 'var(--surface)',
           border: '1px solid var(--border)',
-          borderRadius: '100px',
+          borderRadius: '8px',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
-          padding: '0 14px',
+          gap: '7px',
+          padding: '0 10px',
           cursor: 'pointer',
-          transition: 'background 0.15s, border-color 0.15s',
+          transition: 'border-color 0.12s, background 0.12s',
           flexShrink: 0,
         }}
         onMouseEnter={e => {
@@ -133,51 +140,84 @@ export default function TopNav() {
           ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
         }}
       >
-        <Search size={13} color="var(--text-tertiary)" strokeWidth={2} />
-        <span style={{ fontSize: '13px', color: 'var(--text-tertiary)', flex: 1, textAlign: 'left' }}>Search...</span>
+        <Search size={12} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+        <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', flex: 1, textAlign: 'left', letterSpacing: '-0.01em' }}>
+          Search anything...
+        </span>
         <span style={{
           fontSize: '10px', color: 'var(--text-tertiary)',
           background: 'var(--surface)',
           border: '1px solid var(--border)',
-          padding: '2px 6px', borderRadius: '5px',
-          letterSpacing: '0.02em',
+          padding: '1px 5px', borderRadius: '4px',
+          letterSpacing: '0.02em', flexShrink: 0,
         }}>⌘P</span>
       </button>
 
-      {/* Right: Brain status + Avatar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {/* Right: AI status + Ask AI + Avatar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
 
-        {/* AI status pill */}
+        {/* AI status — only show when brain has run */}
         {brainAge && (
           <div style={{
-            display: 'flex', alignItems: 'center', gap: '6px',
-            padding: '5px 11px', borderRadius: '100px',
-            background: urgentCount > 0 ? 'rgba(239,68,68,0.06)' : 'rgba(99,102,241,0.07)',
-            border: `1px solid ${urgentCount > 0 ? 'rgba(239,68,68,0.18)' : 'rgba(99,102,241,0.18)'}`,
+            display: 'flex', alignItems: 'center', gap: '5px',
+            padding: '4px 10px', borderRadius: '7px',
+            background: urgentCount > 0 ? 'rgba(255,69,58,0.07)' : 'rgba(48,209,88,0.07)',
+            border: `1px solid ${urgentCount > 0 ? 'rgba(255,69,58,0.18)' : 'rgba(48,209,88,0.18)'}`,
           }}>
             <div style={{
-              width: '6px', height: '6px', borderRadius: '50%',
-              background: urgentCount > 0 ? '#EF4444' : '#22C55E',
-              boxShadow: urgentCount > 0 ? '0 0 6px rgba(239,68,68,0.6)' : '0 0 6px rgba(34,197,94,0.5)',
+              width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0,
+              background: urgentCount > 0 ? '#FF453A' : '#30D158',
+              boxShadow: urgentCount > 0 ? '0 0 5px rgba(255,69,58,0.6)' : '0 0 5px rgba(48,209,88,0.5)',
             }} />
-            <span style={{ fontSize: '11px', color: urgentCount > 0 ? '#F87171' : '#818CF8', fontWeight: '600', whiteSpace: 'nowrap' }}>
-              AI
+            <span style={{
+              fontSize: '11px', fontWeight: 500, letterSpacing: '-0.01em',
+              color: urgentCount > 0 ? '#FF6961' : '#30D158',
+              whiteSpace: 'nowrap',
+            }}>
+              {urgentCount > 0 ? `${urgentCount} flagged` : 'AI ready'}
             </span>
-            {urgentCount > 0 && (
-              <span style={{ fontSize: '11px', color: '#EF4444', fontWeight: '700' }}>
-                · {urgentCount} flagged
-              </span>
-            )}
           </div>
         )}
 
+        {/* Ask AI button */}
+        <button
+          onClick={toggleCopilot}
+          style={{
+            height: '30px', padding: '0 10px',
+            display: 'flex', alignItems: 'center', gap: '6px',
+            borderRadius: '7px', fontSize: '12px', fontWeight: 500,
+            letterSpacing: '-0.01em', cursor: 'pointer',
+            background: 'linear-gradient(135deg, rgba(124,106,245,0.14), rgba(155,109,255,0.09))',
+            border: '1px solid rgba(124,106,245,0.25)',
+            color: 'var(--accent-text)',
+            transition: 'all 0.12s', flexShrink: 0,
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(124,106,245,0.22), rgba(155,109,255,0.15))'
+            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,106,245,0.45)'
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(124,106,245,0.14), rgba(155,109,255,0.09))'
+            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,106,245,0.25)'
+          }}
+        >
+          <MessageSquare size={11} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+          Ask AI
+          <span style={{
+            fontSize: '10px', color: 'var(--text-tertiary)',
+            background: 'rgba(0,0,0,0.2)', padding: '1px 4px',
+            borderRadius: '3px', border: '1px solid var(--border)',
+          }}>⌘K</span>
+        </button>
+
+        {/* Avatar */}
         <div style={{
-          width: '34px', height: '34px', borderRadius: '50%',
-          background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+          width: '30px', height: '30px', borderRadius: '50%',
+          background: 'linear-gradient(135deg, #7C6AF5, #9B6DFF)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '13px', fontWeight: '700', color: '#fff',
-          boxShadow: '0 0 12px rgba(99,102,241,0.35)',
-          cursor: 'default', flexShrink: 0,
+          fontSize: '12px', fontWeight: 700, color: '#fff',
+          boxShadow: '0 0 10px rgba(124,106,245,0.35)',
+          cursor: 'default', flexShrink: 0, letterSpacing: '-0.01em',
         }}>
           {avatarLetter}
         </div>

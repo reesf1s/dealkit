@@ -33,10 +33,10 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
         flexDirection: 'column',
         position: 'relative',
         zIndex: 1,
-        paddingTop: '56px',
-        transition: 'margin-left 0.22s cubic-bezier(0.4,0,0.2,1)',
+        paddingTop: '52px',
+        transition: 'margin-left 0.18s cubic-bezier(0.4,0,0.2,1)',
       }}>
-        <div style={{ flex: 1, padding: '24px', width: '100%', boxSizing: 'border-box' }}>
+        <div style={{ flex: 1, padding: '22px 24px', width: '100%', boxSizing: 'border-box' }}>
           <ErrorBoundary>
             {children}
           </ErrorBoundary>

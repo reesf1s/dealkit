@@ -162,17 +162,33 @@ export default function ProductGapsPage() {
   const [showMoreMap, setShowMoreMap] = useState<Record<string, boolean>>({})
   const [view, setView]           = useState<'list' | 'roadmap'>('list')
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [localDeletedIds, setLocalDeletedIds] = useState<Set<string>>(new Set())
 
   const handleDeleteGap = async (id: string) => {
     if (!confirm('Delete this product gap? This cannot be undone.')) return
     setDeletingId(id)
+    // Optimistically remove from local state immediately — prevents ghost item from reappearing
+    // via the brain cache while the SWR re-fetch and brain rebuild are in flight
+    setLocalDeletedIds(prev => new Set([...prev, id]))
     try {
       const res = await fetch(`/api/product-gaps/${id}`, { method: 'DELETE' })
       if (res.ok) {
-        mutateGaps()
+        // Update SWR cache optimistically then revalidate
+        mutateGaps(
+          (current: any) => {
+            const items: any[] = Array.isArray(current) ? current : (Array.isArray(current?.data) ? current.data : [])
+            const filtered = items.filter((g: any) => g.id !== id)
+            return Array.isArray(current) ? filtered : { ...current, data: filtered }
+          },
+          { revalidate: true }
+        )
+      } else {
+        // Restore if the server rejected the delete
+        setLocalDeletedIds(prev => { const next = new Set(prev); next.delete(id); return next })
       }
     } catch (err) {
       console.error('Failed to delete gap:', err)
+      setLocalDeletedIds(prev => { const next = new Set(prev); next.delete(id); return next })
     } finally {
       setDeletingId(null)
     }
@@ -180,8 +196,9 @@ export default function ProductGapsPage() {
 
   const isLoading = brainLoading || gapsLoading
 
-  // Normalise stored gaps
-  const storedGaps: any[] = Array.isArray(gapsRes) ? gapsRes : (Array.isArray(gapsRes?.data) ? gapsRes.data : [])
+  // Normalise stored gaps — filter any locally-deleted IDs so they can't ghost after optimistic delete
+  const storedGaps: any[] = (Array.isArray(gapsRes) ? gapsRes : (Array.isArray(gapsRes?.data) ? gapsRes.data : []))
+    .filter((g: any) => !localDeletedIds.has(g.id))
   const brainGaps: any[] = brain?.productGapPriority ?? []
   const overallWinRate: number = brain?.winLossIntel?.winRate ?? 50
 
@@ -199,10 +216,11 @@ export default function ProductGapsPage() {
     }
   })
 
-  // Surface brain-only gaps
+  // Surface brain-only gaps — skip any that were locally deleted (brain cache may still reference them)
   for (const bg of brainGaps) {
     const alreadyPresent = enrichedGaps.some((g) => g.id === bg.gapId || g.title === bg.title)
-    if (!alreadyPresent && bg.title) {
+    const wasDeleted = bg.gapId ? localDeletedIds.has(bg.gapId) : false
+    if (!alreadyPresent && bg.title && !wasDeleted) {
       enrichedGaps.push({
         id:                bg.gapId ?? `brain-${bg.title}`,
         title:             bg.title,

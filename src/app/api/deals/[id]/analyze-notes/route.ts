@@ -164,7 +164,7 @@ Rules — risks: NEW deal-level signals only from THESE notes (not product featu
 Rules — resolvedRisks: substrings of KNOWN RISKS that are now resolved. Return [] if none resolved.
 Rules — todos: new items only. No duplicates of existing open items. Return [] if none.
 Rules — obsoleteTodoIds: IDs of open items now done, superseded, or irrelevant. Return [].
-Rules — productGaps: ONLY genuine PRODUCT FEATURE gaps — things the software itself is missing or can't do. INCLUDE: missing integrations ("we need Salesforce sync"), missing features ("no bulk edit", "can't export to CSV"), performance/scale limits ("too slow for our data volume"), UI/UX gaps ("reporting too basic", "no mobile app"). DO NOT INCLUDE: security/compliance requirements (IT approval, SOC2, data residency) — these are procurement requirements; pricing/commercial concerns — these are commercial objections; procurement/vendor process friction (vendor registration, legal review) — these are process issues; internal organisational friction (budget committee, sign-off) — these are authority objections; general implementation concerns (migration complexity, onboarding time) — these are timing concerns. Return [] if no genuine product feature gaps are present.
+Rules — productGaps: ONLY extract if the prospect EXPLICITLY states the missing feature BLOCKS or PREVENTS their decision — they say they "can't move forward without X", "need X to sign off", "won't work for us without X", or it is described as a hard requirement. DO NOT extract preferences, wishes, or nice-to-haves ("it would be nice if...", "we'd love...", "ideally..."). DO NOT extract: security/compliance/SOC2/data residency — procurement requirements; pricing/commercial concerns; procurement/vendor process friction; internal budget/sign-off friction; implementation/migration concerns; general desires for features the prospect hasn't said are blockers. A valid product gap must be: (1) a missing software capability (integration, feature, API, performance limit, UI function), AND (2) explicitly stated as a hard requirement or decision-blocker. Return [] if no hard-requirement feature gaps are present.
 Rules — competitors: max 4, ONLY if named as an explicit alternative being evaluated. Return [] if none.
 Rules — intentSignals: extract ONLY what is explicitly stated. championStatus=confirmed only if someone is actively advocating internally. budgetStatus=approved only if spend is explicitly confirmed. decisionTimeline=null if not mentioned. nextMeetingBooked=true only if a specific next meeting was arranged in these notes.
 priority: critical | high | medium | low
@@ -182,7 +182,7 @@ After the JSON above, include a signal extraction block wrapped in <extraction><
   "negative_signals": ["signal1"],
   "stakeholders_mentioned": [{"name": "John", "role": "CEO", "functional_area": "executive"}],
   "product_gaps": [{"gap": "Salesforce integration", "severity": "high", "quote": "we need this to work with SF"}],
-  // product_gaps: software feature/integration gaps ONLY. Exclude security/compliance/procurement/authority/timing objections.
+  // product_gaps: ONLY if prospect explicitly says it BLOCKS or PREVENTS their decision (hard requirement). NOT nice-to-haves or preferences.
   "sentiment_score": 0.72,
   "urgency_signals": ["end of quarter deadline"],
   "user_verified": false,
