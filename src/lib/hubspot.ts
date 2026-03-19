@@ -6,18 +6,14 @@
  *
  * How to get a token:
  *   HubSpot CRM → Settings (gear icon) → Integrations → Private Apps → Create private app
- *   Required scopes: crm.objects.deals.read, crm.objects.contacts.read, crm.objects.companies.read
+ *   Required scopes: crm.objects.deals.read, crm.objects.contacts.read, crm.objects.companies.read,
+ *                    crm.objects.emails.read, crm.objects.notes.read
  *   Copy the access token and paste it into SellSight Settings → Integrations.
  *
- * Stage mapping (HubSpot default pipeline → SellSight):
- *   appointmentscheduled  → discovery
- *   qualifiedtobuy        → qualification
- *   presentationscheduled → proposal
- *   decisionmakerboughtin → negotiation
- *   contractsent          → negotiation
- *   closedwon             → closed_won
- *   closedlost            → closed_lost
- *   (anything else)       → prospecting
+ * Stage strategy:
+ *   Closed stages are normalised to closed_won / closed_lost so the ML model can use them.
+ *   All other stages keep their native HubSpot stage ID — the pipeline config is rebuilt from
+ *   the real HubSpot pipeline on every sync so column labels & order stay in sync.
  */
 
 import { db } from '@/lib/db'
@@ -59,15 +55,8 @@ export async function ensureHubspotSchema() {
 
 const HS_API = 'https://api.hubapi.com'
 
-const STAGE_MAP: Record<string, string> = {
-  appointmentscheduled:  'discovery',
-  qualifiedtobuy:        'qualification',
-  presentationscheduled: 'proposal',
-  decisionmakerboughtin: 'negotiation',
-  contractsent:          'negotiation',
-  closedwon:             'closed_won',
-  closedlost:            'closed_lost',
-}
+// Stage colours assigned left→right across the pipeline
+const PIPELINE_COLORS = ['#6B7280', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444', '#EC4899', '#14B8A6', '#F97316']
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -110,6 +99,12 @@ export interface MappedDeal {
   description: string | null
   closeDate: Date | null
   updatedAt: Date
+}
+
+export interface HubspotPipelineStage {
+  id: string
+  label: string
+  displayOrder: number
 }
 
 // ─── DB helpers ───────────────────────────────────────────────────────────────
@@ -173,11 +168,23 @@ export async function getValidToken(workspaceId: string): Promise<string> {
   return integration.accessToken
 }
 
-// ─── HubSpot API calls ────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const DEAL_PROPS = [
-  'dealname', 'amount', 'closedate', 'dealstage', 'description', 'hs_lastmodifieddate',
-].join(',')
+function chunks<T>(arr: T[], size: number): T[][] {
+  const result: T[][] = []
+  for (let i = 0; i < arr.length; i += size) result.push(arr.slice(i, i + size))
+  return result
+}
+
+async function hsPost(path: string, token: string, body: unknown): Promise<unknown> {
+  const res = await fetch(`${HS_API}${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`HubSpot POST ${path} failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
 
 async function hsGet(path: string, token: string): Promise<unknown> {
   const res = await fetch(`${HS_API}${path}`, {
@@ -186,6 +193,12 @@ async function hsGet(path: string, token: string): Promise<unknown> {
   if (!res.ok) throw new Error(`HubSpot GET ${path} failed: ${res.status} ${await res.text()}`)
   return res.json()
 }
+
+// ─── HubSpot API calls ────────────────────────────────────────────────────────
+
+const DEAL_PROPS = [
+  'dealname', 'amount', 'closedate', 'dealstage', 'description', 'hs_lastmodifieddate',
+].join(',')
 
 export async function fetchAllHubspotDeals(token: string): Promise<HubspotDealRaw[]> {
   const deals: HubspotDealRaw[] = []
@@ -236,29 +249,234 @@ export async function fetchCompanies(token: string, companyIds: string[]): Promi
   return (data.results ?? []).map(c => ({ id: c.id, name: c.properties.name ?? 'Unknown Company' }))
 }
 
-/** Fetch all deal pipeline stages and return a map of stageId → display label. */
-export async function fetchPipelineStages(token: string): Promise<Map<string, string>> {
+/**
+ * Fetch all deal pipeline stages from HubSpot's primary sales pipeline.
+ * Returns both a label lookup map and an ordered stage list for building pipelineConfig.
+ */
+export async function fetchPipelineStages(token: string): Promise<{
+  stageLabels: Map<string, string>
+  orderedStages: HubspotPipelineStage[]
+}> {
   try {
     const data = await hsGet('/crm/v3/pipelines/deals', token) as {
-      results: { stages: { id: string; label: string }[] }[]
+      results: { id: string; label: string; stages: { id: string; label: string; displayOrder: number }[] }[]
     }
-    const map = new Map<string, string>()
-    for (const pipeline of data.results ?? []) {
-      for (const stage of pipeline.stages ?? []) {
-        map.set(stage.id, stage.label)
+    const stageLabels = new Map<string, string>()
+    const orderedStages: HubspotPipelineStage[] = []
+
+    // Use the first (primary) pipeline
+    const primary = data.results?.[0]
+    if (primary) {
+      for (const s of primary.stages ?? []) {
+        stageLabels.set(s.id, s.label)
+        orderedStages.push({ id: s.id, label: s.label, displayOrder: s.displayOrder })
       }
+      orderedStages.sort((a, b) => a.displayOrder - b.displayOrder)
     }
-    return map
+
+    return { stageLabels, orderedStages }
   } catch {
-    return new Map() // non-fatal — fall back to mapped stage names
+    return { stageLabels: new Map(), orderedStages: [] }
   }
+}
+
+/**
+ * Batch-fetch associations between deals and a related object type (emails or notes).
+ * Returns a Map of dealId → list of related object IDs.
+ */
+export async function fetchDealAssociations(
+  token: string,
+  dealIds: string[],
+  toObjectType: 'emails' | 'notes',
+): Promise<Map<string, string[]>> {
+  const result = new Map<string, string[]>()
+  if (dealIds.length === 0) return result
+
+  for (const chunk of chunks(dealIds, 100)) {
+    try {
+      const data = await hsPost(
+        `/crm/v4/associations/deals/${toObjectType}/batch/read`,
+        token,
+        { inputs: chunk.map(id => ({ id })) },
+      ) as { results: { from: { id: string }; to: { id: string }[] }[] }
+
+      for (const item of data.results ?? []) {
+        result.set(item.from.id, (item.to ?? []).map(t => t.id))
+      }
+    } catch { /* non-fatal — emails scope may not be enabled */ }
+  }
+  return result
+}
+
+/** Batch-read HubSpot email engagement objects. */
+export async function fetchEmails(token: string, emailIds: string[]): Promise<{
+  id: string
+  subject: string | null
+  body: string | null
+  direction: string | null
+  fromEmail: string | null
+  timestamp: string | null
+}[]> {
+  if (emailIds.length === 0) return []
+  const results: any[] = []
+
+  for (const chunk of chunks(emailIds, 100)) {
+    try {
+      const data = await hsPost('/crm/v3/objects/emails/batch/read', token, {
+        inputs: chunk.map(id => ({ id })),
+        properties: ['hs_email_subject', 'hs_email_text', 'hs_email_direction', 'hs_email_from_email', 'hs_timestamp'],
+      }) as { results: any[] }
+      results.push(...(data.results ?? []))
+    } catch { /* non-fatal */ }
+  }
+
+  return results.map(e => ({
+    id: e.id,
+    subject:   e.properties?.hs_email_subject   ?? null,
+    body:      e.properties?.hs_email_text       ?? null,
+    direction: e.properties?.hs_email_direction  ?? null,
+    fromEmail: e.properties?.hs_email_from_email ?? null,
+    timestamp: e.properties?.hs_timestamp        ?? null,
+  }))
+}
+
+/** Batch-read HubSpot note engagement objects. */
+export async function fetchNotes(token: string, noteIds: string[]): Promise<{
+  id: string
+  body: string | null
+  timestamp: string | null
+}[]> {
+  if (noteIds.length === 0) return []
+  const results: any[] = []
+
+  for (const chunk of chunks(noteIds, 100)) {
+    try {
+      const data = await hsPost('/crm/v3/objects/notes/batch/read', token, {
+        inputs: chunk.map(id => ({ id })),
+        properties: ['hs_note_body', 'hs_timestamp'],
+      }) as { results: any[] }
+      results.push(...(data.results ?? []))
+    } catch { /* non-fatal */ }
+  }
+
+  return results.map(n => ({
+    id:        n.id,
+    body:      n.properties?.hs_note_body  ?? null,
+    timestamp: n.properties?.hs_timestamp  ?? null,
+  }))
+}
+
+// ─── Meeting notes builder ────────────────────────────────────────────────────
+
+function isoDate(ts: string | null): string {
+  if (!ts) return new Date().toISOString().slice(0, 10)
+  try { return new Date(ts).toISOString().slice(0, 10) } catch { return new Date().toISOString().slice(0, 10) }
+}
+
+/** Strip HTML tags from a string. */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+/**
+ * Build a structured meeting-notes string from HubSpot emails and notes.
+ * Entries are formatted with [YYYY-MM-DD] date headers so parseMeetingEntries()
+ * in text-signals.ts can parse them for NLP scoring.
+ *
+ * Body text is truncated to 1 500 chars per entry to keep DB rows sane.
+ */
+export function buildMeetingNotes(
+  emails: { subject: string | null; body: string | null; direction: string | null; fromEmail: string | null; timestamp: string | null }[],
+  notes:  { body: string | null; timestamp: string | null }[],
+): string | null {
+  const entries: { sortDate: number; text: string }[] = []
+
+  for (const email of emails) {
+    const raw = email.body?.trim()
+    if (!raw || raw.length < 10) continue
+    const body = stripHtml(raw).slice(0, 1500)
+    const direction = email.direction?.toUpperCase() === 'INCOMING_EMAIL' ? 'Inbound email' : 'Email'
+    const subject = email.subject ? `: ${email.subject}` : ''
+    const from = email.fromEmail ? ` from ${email.fromEmail}` : ''
+    const date = email.timestamp ? new Date(email.timestamp) : new Date()
+    entries.push({
+      sortDate: date.getTime(),
+      text: `[${isoDate(email.timestamp)}] ${direction}${from}${subject}\n${body}`,
+    })
+  }
+
+  for (const note of notes) {
+    const raw = note.body?.trim()
+    if (!raw || raw.length < 5) continue
+    const body = stripHtml(raw).slice(0, 1500)
+    const date = note.timestamp ? new Date(note.timestamp) : new Date()
+    entries.push({
+      sortDate: date.getTime(),
+      text: `[${isoDate(note.timestamp)}] Note:\n${body}`,
+    })
+  }
+
+  if (entries.length === 0) return null
+
+  // Oldest first — matches how reps write notes chronologically
+  entries.sort((a, b) => a.sortDate - b.sortDate)
+  return entries.map(e => e.text).join('\n\n')
+}
+
+// ─── Pipeline config builder ──────────────────────────────────────────────────
+
+/**
+ * Build a SellSight pipelineConfig.stages array from HubSpot's ordered stage list.
+ * Closed stages are always normalised to closed_won / closed_lost.
+ * All other stages keep their native HubSpot ID so deal.stage values match column IDs.
+ */
+export function buildHubspotPipelineConfig(orderedStages: HubspotPipelineStage[]): {
+  id: string; label: string; color: string; order: number; isDefault: boolean; fromHubspot?: boolean
+}[] {
+  const openStages = orderedStages.filter(s => {
+    const k = s.id.toLowerCase().replace(/[_\s]/g, '')
+    return k !== 'closedwon' && k !== 'closedlost'
+  })
+
+  const totalOpen = openStages.length
+  const stages = openStages.map((s, i) => ({
+    id: s.id,
+    label: s.label,
+    color: PIPELINE_COLORS[Math.round(i / Math.max(totalOpen - 1, 1) * (PIPELINE_COLORS.length - 1))] ?? '#8B5CF6',
+    order: i + 1,
+    isDefault: false,
+    fromHubspot: true,
+  }))
+
+  stages.push({ id: 'closed_won',  label: 'Closed Won',  color: '#22C55E', order: stages.length + 1, isDefault: true })
+  stages.push({ id: 'closed_lost', label: 'Closed Lost', color: '#6B7280', order: stages.length + 2, isDefault: true })
+
+  return stages
 }
 
 // ─── Field mapping ────────────────────────────────────────────────────────────
 
+/**
+ * Map a HubSpot stage ID to a SellSight stage ID.
+ * Only closed stages are normalised — every other stage keeps its native HubSpot ID
+ * so the pipeline board can show HubSpot's real column names.
+ */
 export function mapHubspotStage(hubspotStage: string | undefined): string {
   if (!hubspotStage) return 'prospecting'
-  return STAGE_MAP[hubspotStage.toLowerCase().replace(/\s+/g, '')] ?? 'prospecting'
+  const key = hubspotStage.toLowerCase().replace(/[_\s]/g, '')
+  if (key === 'closedwon')  return 'closed_won'
+  if (key === 'closedlost') return 'closed_lost'
+  return hubspotStage  // preserve native HubSpot stage ID
 }
 
 export function mapHubspotDeal(

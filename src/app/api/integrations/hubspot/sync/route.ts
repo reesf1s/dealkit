@@ -4,7 +4,7 @@
  * Core sync logic lives in src/lib/hubspot-sync.ts (shared with the cron job).
  */
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 120
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
@@ -25,7 +25,14 @@ export async function POST(_req: NextRequest) {
     const { workspaceId } = await getWorkspaceContext(userId)
     const result = await syncHubspotDeals(workspaceId, userId)
 
-    return NextResponse.json({ data: { dealsImported: result.dealsImported, syncedAt: result.syncedAt } })
+    return NextResponse.json({
+      data: {
+        dealsImported: result.dealsImported,
+        emailsFetched: result.emailsFetched,
+        notesFetched:  result.notesFetched,
+        syncedAt: result.syncedAt,
+      },
+    })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error'
     console.error('[hubspot/sync]', msg)

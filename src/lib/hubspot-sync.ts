@@ -1,10 +1,16 @@
 /**
  * Core HubSpot sync logic — usable by both the user-facing route and the cron job.
- * Fetches all deals + contacts + companies + pipeline stage labels from HubSpot,
- * upserts into deal_logs (keyed on hubspot_deal_id), and triggers brain rebuild.
+ *
+ * What this does on every sync:
+ *  1. Fetches all deals + contacts + companies + pipeline stage labels from HubSpot
+ *  2. Fetches emails and notes associated with each deal
+ *  3. Upserts into deal_logs (keyed on hubspot_deal_id)
+ *     – meeting_notes is populated on INSERT only; manual notes are never overwritten
+ *  4. Rebuilds workspace pipelineConfig from HubSpot's real stage names & order
+ *  5. Triggers brain rebuild
  */
 import { db } from '@/lib/db'
-import { hubspotIntegrations } from '@/lib/db/schema'
+import { hubspotIntegrations, workspaces } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
 import {
   getValidToken,
@@ -12,6 +18,11 @@ import {
   fetchContacts,
   fetchCompanies,
   fetchPipelineStages,
+  fetchDealAssociations,
+  fetchEmails,
+  fetchNotes,
+  buildMeetingNotes,
+  buildHubspotPipelineConfig,
   mapHubspotDeal,
   ensureHubspotSchema,
   getHubspotIntegration,
@@ -21,6 +32,8 @@ import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
 export interface SyncResult {
   workspaceId: string
   dealsImported: number
+  emailsFetched: number
+  notesFetched: number
   syncedAt: Date
 }
 
@@ -32,7 +45,7 @@ export async function syncHubspotDeals(workspaceId: string, userId: string): Pro
 
   const token = await getValidToken(workspaceId)
 
-  // Fetch deals, contacts, companies, and pipeline stage labels in parallel
+  // ── 1. Fetch all deals (paginated) ──────────────────────────────────────────
   const rawDeals = await fetchAllHubspotDeals(token)
 
   const allContactIds = [...new Set(
@@ -41,15 +54,33 @@ export async function syncHubspotDeals(workspaceId: string, userId: string): Pro
   const allCompanyIds = [...new Set(
     rawDeals.flatMap(d => d.associations?.companies?.results.map(r => r.id) ?? [])
   )]
+  const allDealIds = rawDeals.map(d => d.id)
 
-  const [contacts, companies, stageLabels] = await Promise.all([
+  // ── 2. Parallel fetch: contacts, companies, pipeline stages, email/note IDs ─
+  const [contacts, companies, { stageLabels, orderedStages }, emailAssocs, noteAssocs] = await Promise.all([
     fetchContacts(token, allContactIds),
     fetchCompanies(token, allCompanyIds),
     fetchPipelineStages(token),
+    fetchDealAssociations(token, allDealIds, 'emails'),
+    fetchDealAssociations(token, allDealIds, 'notes'),
   ])
+
   const contactMap = new Map(contacts.map(c => [c.id, c]))
   const companyMap = new Map(companies.map(c => [c.id, c]))
 
+  // ── 3. Fetch email and note content ─────────────────────────────────────────
+  const allEmailIds = [...new Set([...emailAssocs.values()].flat())]
+  const allNoteIds  = [...new Set([...noteAssocs.values()].flat())]
+
+  const [emailObjects, noteObjects] = await Promise.all([
+    fetchEmails(token, allEmailIds),
+    fetchNotes(token, allNoteIds),
+  ])
+
+  const emailById = new Map(emailObjects.map(e => [e.id, e]))
+  const noteById  = new Map(noteObjects.map(n => [n.id, n]))
+
+  // ── 4. Upsert each deal ──────────────────────────────────────────────────────
   let upserted = 0
   const now = new Date()
 
@@ -62,19 +93,24 @@ export async function syncHubspotDeals(workspaceId: string, userId: string): Pro
 
     const mapped = mapHubspotDeal(raw, dealContacts, companyName, stageLabels)
 
+    // Build meeting notes from emails + notes for this deal
+    const dealEmails = (emailAssocs.get(raw.id) ?? []).map(id => emailById.get(id)).filter(Boolean) as typeof emailObjects
+    const dealNotes  = (noteAssocs.get(raw.id)  ?? []).map(id => noteById.get(id)).filter(Boolean)  as typeof noteObjects
+    const meetingNotes = buildMeetingNotes(dealEmails, dealNotes)
+
     await db.execute(sql`
       INSERT INTO deal_logs (
         id, workspace_id, user_id,
         deal_name, prospect_company, prospect_name, prospect_title,
         contacts, deal_value, stage, hubspot_stage_label, description, close_date,
-        hubspot_deal_id, updated_at, created_at
+        meeting_notes, hubspot_deal_id, updated_at, created_at
       ) VALUES (
         gen_random_uuid(), ${workspaceId}, ${userId},
         ${mapped.dealName}, ${mapped.prospectCompany}, ${mapped.prospectName}, ${mapped.prospectTitle},
         ${JSON.stringify(mapped.contacts)}::jsonb,
         ${mapped.dealValue}, ${mapped.stage}, ${mapped.hubspotStageLabel},
         ${mapped.description}, ${mapped.closeDate?.toISOString() ?? null},
-        ${mapped.hubspotDealId}, ${now.toISOString()}, ${now.toISOString()}
+        ${meetingNotes}, ${mapped.hubspotDealId}, ${now.toISOString()}, ${now.toISOString()}
       )
       ON CONFLICT (hubspot_deal_id) DO UPDATE SET
         deal_name           = EXCLUDED.deal_name,
@@ -87,18 +123,54 @@ export async function syncHubspotDeals(workspaceId: string, userId: string): Pro
         hubspot_stage_label = EXCLUDED.hubspot_stage_label,
         description         = EXCLUDED.description,
         close_date          = EXCLUDED.close_date,
-        updated_at          = EXCLUDED.updated_at
+        updated_at          = EXCLUDED.updated_at,
+        -- Only update meeting_notes if HubSpot has content AND the deal has none yet
+        -- (preserves notes the rep has manually added in SellSight)
+        meeting_notes       = CASE
+          WHEN ${meetingNotes} IS NOT NULL AND (deal_logs.meeting_notes IS NULL OR deal_logs.meeting_notes = '')
+          THEN ${meetingNotes}
+          ELSE deal_logs.meeting_notes
+        END
     `)
     upserted++
   }
 
-  // Update sync stats
+  // ── 5. Update workspace pipelineConfig from HubSpot's real stage names ───────
+  if (orderedStages.length > 0) {
+    try {
+      const newStages = buildHubspotPipelineConfig(orderedStages)
+      const [ws] = await db.select({ pipelineConfig: workspaces.pipelineConfig })
+        .from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1)
+      const existing = ws?.pipelineConfig as any ?? {}
+
+      const updatedConfig = {
+        ...existing,
+        stages: newStages,
+        hubspotSynced: true,
+        updatedAt: now.toISOString(),
+      }
+
+      await db.update(workspaces)
+        .set({ pipelineConfig: updatedConfig, updatedAt: now })
+        .where(eq(workspaces.id, workspaceId))
+    } catch (e) {
+      console.warn('[hubspot-sync] pipeline config update failed:', (e as Error)?.message)
+    }
+  }
+
+  // ── 6. Update sync stats ─────────────────────────────────────────────────────
   await db.update(hubspotIntegrations)
     .set({ lastSyncAt: now, dealsImported: upserted, syncError: null, updatedAt: now })
     .where(eq(hubspotIntegrations.workspaceId, workspaceId))
 
-  // Rebuild brain in the background
+  // ── 7. Rebuild brain in the background ───────────────────────────────────────
   rebuildWorkspaceBrain(workspaceId).catch(() => {})
 
-  return { workspaceId, dealsImported: upserted, syncedAt: now }
+  return {
+    workspaceId,
+    dealsImported: upserted,
+    emailsFetched: allEmailIds.length,
+    notesFetched: allNoteIds.length,
+    syncedAt: now,
+  }
 }
