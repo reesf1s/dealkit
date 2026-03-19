@@ -138,8 +138,8 @@ function DealCard({
   allStages?: { id: string; label: string; color: string }[]
 }) {
   const score = deal.conversionScore ?? 0
-  const scoreColor = score >= 70 ? '#059669' : score >= 40 ? '#D97706' : '#DC2626'
-  const scoreBg = score >= 70 ? 'rgba(5,150,105,0.1)' : score >= 40 ? 'rgba(217,119,6,0.1)' : 'rgba(220,38,38,0.1)'
+  const scoreColor = score >= 70 ? '#30D158' : score >= 40 ? '#FFD60A' : score > 0 ? '#FF453A' : 'rgba(255,255,255,0.15)'
+  const scoreBg = score >= 70 ? 'rgba(48,209,88,0.12)' : score >= 40 ? 'rgba(255,214,10,0.10)' : score > 0 ? 'rgba(255,69,58,0.12)' : 'rgba(255,255,255,0.05)'
 
   const value = deal.dealValue ?? 0
   const valueLabel = value >= 1_000_000
@@ -573,7 +573,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
     letterSpacing: '0.08em', textTransform: 'uppercase',
   }
   const fmtCurrency = (n: number) => `${currencySymbol}${Math.round(n).toLocaleString()}`
-  const scoreColor = (s: number) => s >= 70 ? '#059669' : s >= 40 ? '#D97706' : '#DC2626'
+  const scoreColor = (s: number) => s >= 70 ? '#30D158' : s >= 40 ? '#FFD60A' : s > 0 ? '#FF453A' : 'rgba(255,255,255,0.15)'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -729,8 +729,10 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
                       <div style={{ width: '140px', fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
                         {name}
                       </div>
-                      <AnimatedBar pct={s} color={c} />
-                      <div style={{ width: '36px', textAlign: 'right', fontSize: '12px', fontWeight: '700', color: c, flexShrink: 0 }}>{s}%</div>
+                      <AnimatedBar pct={s === 0 ? 2 : s} color={c} />
+                      <div style={{ width: '42px', textAlign: 'right', fontSize: '12px', fontWeight: '700', color: c, flexShrink: 0 }}>
+                        {s === 0 ? <span style={{ fontSize: '10px', fontStyle: 'italic', color: 'var(--text-tertiary)' }}>No data</span> : `${s}%`}
+                      </div>
                     </div>
                     <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginLeft: '150px', marginTop: '1px' }}>{stageLabel}</div>
                   </div>
@@ -1630,14 +1632,29 @@ function CalendarView({ deals, brainData }: { deals: any[]; brainData: any }) {
 }
 
 // ── getDealAction: returns specific action for each deal ─────────────────────
-function getDealAction(deal: any, brain: any, daysInStage: number): {
-  type: string; label: string; description: string; colour: string
-} {
+function getDealAction(
+  deal: any, brain: any, daysInStage: number, activeStages?: any[]
+): { type: string; label: string; description: string; colour: string } {
   const score = deal.conversionScore ?? 0
   const stage = deal.stage ?? ''
   const now = Date.now()
+  const stageLabel = (activeStages?.find((s: any) => s.id === stage)?.label ?? stage.replace(/_/g, ' ') ?? 'this stage')
+  const stageIdx = activeStages ? activeStages.findIndex((s: any) => s.id === stage) : -1
+  const totalStages = activeStages?.length ?? 5
+  const isEarlyStage = stageIdx >= 0 && stageIdx <= Math.floor(totalStages * 0.4)
+  const isLateStage  = stageIdx >= 0 && stageIdx >= Math.ceil(totalStages * 0.7)
 
-  // 1. Close window approaching
+  // 0. No meeting notes — no score yet
+  if (score === 0 || deal.conversionScore == null) {
+    return {
+      type: 'data',
+      label: 'Needs notes',
+      description: `No meeting notes yet for ${deal.dealName || deal.prospectCompany}. Paste notes from your last call to start scoring this deal.`,
+      colour: '#6B7280',
+    }
+  }
+
+  // 1. Close window approaching (within 7 days)
   if (deal.closingDate || deal.closeDate) {
     const closeMs = new Date(deal.closingDate ?? deal.closeDate).getTime()
     const daysToClose = Math.round((closeMs - now) / 86_400_000)
@@ -1645,63 +1662,89 @@ function getDealAction(deal: any, brain: any, daysInStage: number): {
       return {
         type: 'close',
         label: 'Close window approaching',
-        description: `Close date is in ${daysToClose} day${daysToClose !== 1 ? 's' : ''} and win probability is strong. Now is the time to push for commitment.`,
-        colour: '#059669',
+        description: `${deal.dealName || deal.prospectCompany} — close date in ${daysToClose} day${daysToClose !== 1 ? 's' : ''}, score is ${score}%. Push for a final commitment now.`,
+        colour: '#30D158',
       }
     }
   }
 
-  // 2. No meeting notes in 14+ days (stale)
+  // 2. Stale — no update in 14+ days
   const daysSince = Math.floor((now - new Date(deal.updatedAt ?? deal.createdAt).getTime()) / 86_400_000)
   if (daysSince >= 14) {
     return {
       type: 'followup',
-      label: 'Follow up needed',
-      description: `No meeting notes in ${daysSince} days. Risk of going cold — reach out to re-establish momentum.`,
-      colour: '#D97706',
+      label: `Stale — ${daysSince}d`,
+      description: `${deal.dealName || deal.prospectCompany} hasn't been updated in ${daysSince} days. Risk of going cold — reach out to re-establish contact.`,
+      colour: '#FFD60A',
     }
   }
 
-  // 3. High score but early stage — ready to advance
-  if (score > 80 && (stage === 'discovery' || stage === 'qualification')) {
+  // 3. High score in late stage — push for close
+  if (score >= 75 && isLateStage) {
+    return {
+      type: 'close',
+      label: 'Push for close',
+      description: `${deal.dealName || deal.prospectCompany} is at ${score}% in ${stageLabel} — strong signals. This deal is ready to close. Define the final step.`,
+      colour: '#30D158',
+    }
+  }
+
+  // 4. High score but early stage — advance
+  if (score >= 78 && isEarlyStage) {
     return {
       type: 'advance',
-      label: 'Ready to advance stage',
-      description: `Win probability is ${score}% but deal is still at ${stage}. Strong signals — consider moving to the next stage.`,
-      colour: '#4F46E5',
+      label: 'Ready to advance',
+      description: `${deal.dealName || deal.prospectCompany} scores ${score}% at ${stageLabel}. Strong signals early — move this to the next stage.`,
+      colour: '#7C6AF5',
     }
   }
 
-  // 4. Has competitors and low score
+  // 5. Has competitors and weak score
   const hasCompetitors = Array.isArray(deal.competitors) && deal.competitors.length > 0
-  if (hasCompetitors && score < 50) {
-    const comp = deal.competitors[0]?.name ?? 'a competitor'
+  if (hasCompetitors && score < 55) {
+    const comp = deal.competitors[0]?.name ?? deal.competitors[0] ?? 'a competitor'
     return {
       type: 'competitive',
       label: 'Competitive risk',
-      description: `Score is ${score}% and ${comp} is in play. Differentiate your value proposition before this deal drifts away.`,
-      colour: '#DC2626',
+      description: `${deal.dealName || deal.prospectCompany} — score ${score}% with ${comp} in play. Sharpen your differentiation before this slips away.`,
+      colour: '#FF453A',
     }
   }
 
-  // 5. Deal stalling — days in stage exceeds benchmark (21d fallback)
+  // 6. Deal stalling — days in stage exceeds benchmark
   const stageVel = brain?.stageVelocityIntel?.stageStats?.find((s: any) => s.stage === stage)
   const benchmark = stageVel?.p75Days ?? 21
   if (daysInStage > benchmark) {
     return {
       type: 'stalling',
-      label: 'Deal may be stalling',
-      description: `${daysInStage} days in ${stage} stage (typical is ~${benchmark} days). Review blockers and identify what needs to happen next.`,
-      colour: '#D97706',
+      label: 'Stalling',
+      description: `${deal.dealName || deal.prospectCompany} has been in ${stageLabel} for ${daysInStage} days (typical is ~${benchmark}d). Find the blocker.`,
+      colour: '#FFD60A',
     }
   }
 
-  // 6. Default
+  // 7. Score-aware default — no more generic messages
+  if (score >= 70) {
+    return {
+      type: 'maintain',
+      label: 'Momentum strong',
+      description: `${deal.dealName || deal.prospectCompany} at ${score}% — solid trajectory. Confirm the next concrete step to keep momentum.`,
+      colour: '#30D158',
+    }
+  }
+  if (score >= 45) {
+    return {
+      type: 'nurture',
+      label: 'Needs nurturing',
+      description: `${deal.dealName || deal.prospectCompany} at ${score}% — moderate signals. Identify what's unclear or unresolved and address it directly.`,
+      colour: '#FFD60A',
+    }
+  }
   return {
-    type: 'action',
-    label: 'Review deal',
-    description: 'Check in on deal progress and ensure next steps are clear.',
-    colour: '#71717A',
+    type: 'risk',
+    label: 'Weak signals',
+    description: `${deal.dealName || deal.prospectCompany} at ${score}% — low confidence. Review what's missing and consider whether this deal is progressing.`,
+    colour: '#FF453A',
   }
 }
 
@@ -2191,7 +2234,7 @@ export default function PipelinePage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
                 {activeDeals.slice(0, 5).map((deal: any, i: number) => {
                   const dias = daysInStageMap[deal.id] ?? 0
-                  const action = getDealAction(deal, brainData, dias)
+                  const action = getDealAction(deal, brainData, dias, activeStages)
                   const score = mlMap[deal.id]?.winProb ?? deal.conversionScore ?? 0
                   const stageLabel = configStages.find((s: any) => s.id === deal.stage)?.label ?? deal.stage ?? ''
                   const prompt = `For the ${deal.dealName || deal.prospectCompany} deal: ${action.description} Review everything about this deal and tell me the single most important next step.`
@@ -2480,7 +2523,7 @@ export default function PipelinePage() {
             </h1>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
               {activeDeals.length} active deals
-              {totalPipeline > 0 && ` · ${dealValueLabel(totalPipeline, undefined, undefined, currencySymbol)} pipeline`}
+              {totalPipeline > 0 && ` · ${dealValueLabel(totalPipeline, undefined, undefined, currencySymbol)} annualised pipeline`}
               {' · '}
               <span style={{ color: 'var(--text-tertiary)' }}>Drag cards to move stages</span>
             </p>
@@ -2521,10 +2564,9 @@ export default function PipelinePage() {
                     {/* Column header */}
                     <div style={{
                       padding: '10px 12px',
-                      background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.08)` : 'var(--card-bg)',
-                      border: isDropTarget ? `1px solid ${stage.color}44` : '1px solid var(--card-border)',
+                      background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.06)` : 'var(--card-bg)',
+                      border: isDropTarget ? `1px solid ${stage.color}33` : '1px solid var(--card-border)',
                       borderRadius: '10px',
-                      borderTop: `2px solid ${stage.color}`,
                       transition: 'background 0.15s, border-color 0.15s',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

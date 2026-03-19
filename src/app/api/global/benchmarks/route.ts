@@ -10,14 +10,22 @@ import { auth } from '@clerk/nextjs/server'
 import { getGlobalBenchmarks } from '@/lib/global-model'
 
 export async function GET() {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const { userId } = await auth()
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const benchmarks = await getGlobalBenchmarks()
+    const benchmarks = await getGlobalBenchmarks()
 
-  if (!benchmarks) {
-    return NextResponse.json({ available: false })
+    if (!benchmarks) {
+      return NextResponse.json({ available: false })
+    }
+
+    return NextResponse.json({ available: true, benchmarks })
+  } catch (err) {
+    console.error('[GET /api/global/benchmarks]', err)
+    return NextResponse.json(
+      { error: 'Internal server error', details: process.env.NODE_ENV === 'development' ? (err as Error).message : undefined },
+      { status: 500 }
+    )
   }
-
-  return NextResponse.json({ available: true, benchmarks })
 }

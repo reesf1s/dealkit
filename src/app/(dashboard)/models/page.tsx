@@ -830,9 +830,13 @@ export default function ModelsPage() {
             <div style={labelStyle}>Feature Importance</div>
             <InfoButton text="Which factors matter most for winning deals in YOUR pipeline. Updates automatically as more deals close." />
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-            {formattedFeatures.length > 0 ? 'Unique to your workspace' : 'Example preview'}
-          </div>
+          {formattedFeatures.length > 0 ? (
+            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Unique to your workspace</div>
+          ) : (
+            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#D97706', background: 'rgba(217,119,6,0.10)', border: '1px solid rgba(217,119,6,0.25)', padding: '2px 8px', borderRadius: '100px' }}>
+              EXAMPLE DATA
+            </span>
+          )}
         </div>
         <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
           Which factors matter most for winning deals in YOUR pipeline
@@ -869,7 +873,12 @@ export default function ModelsPage() {
             </div>
           </>
         ) : (
-          <FeatureImportanceChart features={PLACEHOLDER_FEATURES} isPlaceholder={true} />
+          <>
+            <FeatureImportanceChart features={PLACEHOLDER_FEATURES} isPlaceholder={true} />
+            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', textAlign: 'center', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+              Close 10+ deals to unlock your personalised feature importance rankings.
+            </div>
+          </>
         )}
       </div>
 

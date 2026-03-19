@@ -255,3 +255,53 @@ body, * {
 .score-high { color: #30D158; background: rgba(48,209,88,0.12);  border: 1px solid rgba(48,209,88,0.22);  }
 .score-mid  { color: #FFD60A; background: rgba(255,214,10,0.10); border: 1px solid rgba(255,214,10,0.22); }
 .score-low  { color: #FF453A; background: rgba(255,69,58,0.12);  border: 1px solid rgba(255,69,58,0.22);  }
+
+/* ============================================================
+   SELLSIGHT DESIGN OVERRIDES — Raycast/Dark Pro
+   Applied after base styles — surgical overrides only
+   ============================================================ */
+
+/* PAGE BACKGROUND — slightly deeper than #181818 */
+.dark body, .dark [class*="layout"], .dark main {
+  background: #0E0E0E;
+}
+.dark {
+  --bg: #0E0E0E;
+  --bg-secondary: #141414;
+  --card-bg: rgba(255, 255, 255, 0.04);
+  --card-border: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --sidebar-bg: rgba(16, 16, 16, 0.97);
+  --topnav-bg: rgba(14, 14, 14, 0.92);
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-hover: rgba(255, 255, 255, 0.07);
+}
+
+/* INPUTS — no border, just surface bg */
+.dark input, .dark textarea, .dark select {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: transparent;
+}
+.dark input:focus, .dark textarea:focus, .dark select:focus {
+  border-color: var(--accent);
+}
+
+/* SCROLLBARS — ultra subtle */
+.dark * {
+  scrollbar-color: rgba(255,255,255,0.06) transparent;
+}
+.dark *::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.06);
+}
+
+/* TABLE — remove all visible borders */
+.dark th { border: none; }
+.dark td { border: none; }
+.dark tbody tr { border-top: 1px solid rgba(255,255,255,0.04); }
+.dark tbody tr:hover { background: rgba(255,255,255,0.04); }
+
+/* TRANSITIONS — snappy */
+.dark *, .dark *::before, .dark *::after {
+  transition-duration: 0.08s;
+}

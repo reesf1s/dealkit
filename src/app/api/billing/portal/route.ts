@@ -8,6 +8,7 @@ import { getStripe } from '@/lib/stripe/client'
 
 // POST /api/billing/portal — creates a Stripe Customer Portal session
 export async function POST() {
+  try {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -71,4 +72,11 @@ export async function POST() {
   })
 
   return NextResponse.json({ url: session.url })
+  } catch (err) {
+    console.error('[POST /api/billing/portal]', err)
+    return NextResponse.json(
+      { error: 'Internal server error', details: process.env.NODE_ENV === 'development' ? (err as Error).message : undefined },
+      { status: 500 }
+    )
+  }
 }

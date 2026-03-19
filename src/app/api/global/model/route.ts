@@ -12,16 +12,24 @@ import { getActiveGlobalModel } from '@/lib/global-pool'
 export const revalidate = 3600  // 1-hour CDN cache
 
 export async function GET() {
-  const { userId } = await auth()
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const { userId } = await auth()
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const model = await getActiveGlobalModel()
+    const model = await getActiveGlobalModel()
 
-  if (!model) {
-    return NextResponse.json({ available: false })
+    if (!model) {
+      return NextResponse.json({ available: false })
+    }
+
+    return NextResponse.json({ available: true, model }, {
+      headers: { 'Cache-Control': 'public, max-age=3600, s-maxage=3600' },
+    })
+  } catch (err) {
+    console.error('[GET /api/global/model]', err)
+    return NextResponse.json(
+      { error: 'Internal server error', details: process.env.NODE_ENV === 'development' ? (err as Error).message : undefined },
+      { status: 500 }
+    )
   }
-
-  return NextResponse.json({ available: true, model }, {
-    headers: { 'Cache-Control': 'public, max-age=3600, s-maxage=3600' },
-  })
 }

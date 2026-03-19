@@ -13,10 +13,10 @@
  * - keyPatterns: recurring risk/objection themes across the pipeline
  */
 import { db } from '@/lib/db'
-import { dealLogs, competitors as competitorRecords, productGaps as productGapsTable, collateral as collateralTable } from '@/lib/db/schema'
+import { dealLogs, competitors as competitorRecords, productGaps as productGapsTable, collateral as collateralTable, workspaces as workspacesTable } from '@/lib/db/schema'
 import { eq, and, sql } from 'drizzle-orm'
 import { runMLEngine, computeCompositeScore, type TrainedMLModel, type DealMLPrediction, type MLTrends, type DealArchetype, type StageVelocityIntel, type CompetitivePattern, type ScoreCalibrationPoint, type CloseDateModel, type ScoreBreakdown, ML_MIN_TRAINING_DEALS } from '@/lib/deal-ml'
-import { extractTextSignals, analyzeDeterioration, parseMeetingEntries, type TextSignals } from '@/lib/text-signals'
+import { extractTextSignals, analyzeDeterioration, parseMeetingEntries, heuristicScore, type TextSignals } from '@/lib/text-signals'
 import { BRAIN_VERSION } from '@/lib/brain-constants'
 export { BRAIN_VERSION } from '@/lib/brain-constants'
 import { getActiveGlobalModel, getGlobalConsent, extractContributions, contributeToGlobalPool } from '@/lib/global-pool'
@@ -691,6 +691,41 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
       d.updatedAt,
     ))
   }
+
+  // ── Baseline score backfill — for deals that have never been analyzed ────────
+  // Any active deal with conversionScore === null gets a stage-normalized heuristic
+  // baseline so the pipeline board shows a real estimate instead of null/0%.
+  // Does NOT overwrite scores that were explicitly set (even 0).
+  try {
+    const [wsRow] = await db.select({ pipelineConfig: workspacesTable.pipelineConfig })
+      .from(workspacesTable).where(eq(workspacesTable.id, workspaceId)).limit(1)
+    const pipelineStages = ((wsRow?.pipelineConfig as any)?.stages ?? []) as { id: string; order: number }[]
+    const activePipelineStages = pipelineStages
+      .filter(s => s.id !== 'closed_won' && s.id !== 'closed_lost')
+      .sort((a, b) => a.order - b.order)
+
+    const dealsNeedingBaseline = deals.filter(d =>
+      d.conversionScore === null &&
+      d.stage !== 'closed_won' && d.stage !== 'closed_lost' &&
+      d.outcome !== 'won' && d.outcome !== 'lost'
+    )
+
+    for (const d of dealsNeedingBaseline) {
+      const signals = signalMap.get(d.id)
+      if (!signals) continue
+      const stageIdx = activePipelineStages.findIndex(s => s.id === d.stage)
+      const stageNorm = activePipelineStages.length > 0 && stageIdx >= 0
+        ? stageIdx / Math.max(activePipelineStages.length - 1, 1)
+        : 0.5
+      const baseline = heuristicScore(signals, stageNorm)
+      if (baseline > 0) {
+        try {
+          await db.update(dealLogs).set({ conversionScore: baseline }).where(eq(dealLogs.id, d.id))
+          d.conversionScore = baseline
+        } catch { /* non-fatal */ }
+      }
+    }
+  } catch { /* non-fatal — baseline scoring failure should not block brain rebuild */ }
 
   // ── Deterioration pass — compute per-deal before snapshot creation ──────────
   // analyzeDeterioration splits notes into early/recent halves and detects declining sentiment

@@ -33,9 +33,21 @@ export const ML_FEATURE_NAMES = ML_FEATURE_NAMES_IMPORT
 
 export const ML_MIN_TRAINING_DEALS = 4
 
+// Stage ordinal — maps stage IDs/names to a 0–4 scale.
+// Custom stages that don't match any key default to 2 (mid-pipeline),
+// which is neutral rather than the previous 0 (misclassified as earliest stage).
 const STAGE_ORDINAL: Record<string, number> = {
-  prospecting: 0, qualification: 1, discovery: 2,
-  proposal: 3,   negotiation: 4,   closed_won: 4, closed_lost: 4,
+  // Standard names
+  prospecting: 0, lead: 0,
+  qualification: 1, qualified: 1,
+  discovery: 2, 'disco phase': 2, disco_phase: 2,
+  static: 1.5,
+  'demo phase': 2.5, demo_phase: 2.5, demo: 2.5, demonstration: 2.5,
+  proposal: 3, 'proposal sent': 3,
+  negotiation: 3.5, 'verbal commit': 3.5, verbal_commit: 3.5, verbally_committed: 3.5,
+  client: 4, onboarding: 4,
+  closed_won: 4, 'closed won': 4,
+  closed_lost: 4, 'closed lost': 4,
 }
 
 // ─── Input types ──────────────────────────────────────────────────────────────
@@ -244,7 +256,9 @@ function extractFeatures(
   maxDealValue: number,
   now: Date,
 ): number[] {
-  const f_stage = (STAGE_ORDINAL[deal.stage] ?? 0) / 4
+  // Normalize stage name: try exact match first, then lowercase, then default to mid-pipeline
+  const stageKey = deal.stage ?? ''
+  const f_stage = (STAGE_ORDINAL[stageKey] ?? STAGE_ORDINAL[stageKey.toLowerCase()] ?? 2) / 4
 
   const val = Math.max(deal.dealValue ?? avgDealValue, 1)
   const f_value = maxDealValue > 1

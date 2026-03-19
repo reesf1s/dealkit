@@ -12,6 +12,7 @@ import type { Plan } from '@/types'
 // POST /api/billing/sync — pull current subscription state from Stripe and update workspace plan
 // Useful when webhooks may have been missed or delayed
 export async function POST() {
+  try {
   const { userId } = await auth()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -64,4 +65,11 @@ export async function POST() {
   }
 
   return NextResponse.json({ plan, fromPlan, synced: fromPlan !== plan })
+  } catch (err) {
+    console.error('[POST /api/billing/sync]', err)
+    return NextResponse.json(
+      { error: 'Internal server error', details: process.env.NODE_ENV === 'development' ? (err as Error).message : undefined },
+      { status: 500 }
+    )
+  }
 }
