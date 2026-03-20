@@ -2285,23 +2285,25 @@ export default function PipelinePage() {
             {/* Quick-action chips */}
             <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
               {(() => {
+                // Use contextual prompts from brain if available, else static fallback
+                const brainPrompts = brainData?.suggestedPrompts as string[] | undefined
+                if (brainPrompts && brainPrompts.length > 0) return brainPrompts.slice(0, 4)
+                // Static fallback when brain hasn't been built yet
                 const today = new Date()
                 const todayMs = today.getTime()
-                // Find the nearest upcoming deal by closingDate
                 const nearestDeal = activeDeals
                   .filter((d: any) => d.closingDate || d.closeDate)
                   .map((d: any) => ({ deal: d, ms: new Date(d.closingDate ?? d.closeDate).getTime() }))
                   .filter(({ ms }) => ms >= todayMs && ms <= todayMs + 2 * 86_400_000)
                   .sort((a, b) => a.ms - b.ms)[0]?.deal
-                const chips = [
+                return [
                   'What should I prioritise today?',
                   'Which deals are at risk?',
                   'Summarise my pipeline',
                   nearestDeal
                     ? `Prep me for ${nearestDeal.prospectCompany}`
-                    : actionQueue[0] ? `Help with ${actionQueue[0].company}` : 'Who should I chase this week?',
+                    : actionQueue[0] ? `Help with ${actionQueue[0].company}` : 'Summarise my pipeline this week',
                 ]
-                return chips
               })().map(chip => (
                 <button
                   key={chip}

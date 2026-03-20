@@ -234,6 +234,8 @@ export interface WorkspaceBrain {
       sampleSize: number
     }[]
   }
+  // ── Contextual suggested prompts for Ask AI ────────────────────────────────
+  suggestedPrompts?: string[]              // top 4 contextual prompts computed during brain rebuild
   // ── One-time backfill flag — set after extraction backfill runs ────────────
   extractionBackfillDone?: boolean
 }
@@ -506,6 +508,133 @@ Return this JSON:
   return stats
 }
 
+// ── Generate contextual suggested prompts for Ask AI ─────────────────────────
+// Picks top 4 most relevant prompts based on current brain/deal state.
+// Pure data analysis — no AI calls.
+function _generateSuggestedPrompts(opts: {
+  activeDeals: { id: string; dealName: string; prospectCompany: string; stage: string; conversionScore: number | null; scheduledEvents: unknown; dealCompetitors: unknown; updatedAt: Date | null }[]
+  staleDeals: WorkspaceBrain['staleDeals']
+  scoreAlerts: WorkspaceBrain['scoreAlerts']
+  wonCount: number
+  lostCount: number
+  previousBrain: WorkspaceBrain | null
+  stageTransitionRows: any[]
+  now: Date
+}): string[] {
+  const { activeDeals, staleDeals, scoreAlerts, wonCount, lostCount, previousBrain, stageTransitionRows, now } = opts
+  const candidates: { priority: number; prompt: string }[] = []
+
+  // 1. Deal with meeting today or tomorrow (from scheduled_events)
+  const todayStr = now.toISOString().slice(0, 10)
+  const tomorrow = new Date(now)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const tomorrowStr = tomorrow.toISOString().slice(0, 10)
+
+  for (const d of activeDeals) {
+    const events = (d.scheduledEvents ?? []) as { type?: string; date?: string | null; description?: string }[]
+    for (const evt of events) {
+      if (!evt.date) continue
+      const evtDate = evt.date.slice(0, 10)
+      if (evtDate === todayStr) {
+        candidates.push({ priority: 1, prompt: `Prep me for the ${d.dealName} meeting today` })
+      } else if (evtDate === tomorrowStr) {
+        candidates.push({ priority: 2, prompt: `Prep me for the ${d.dealName} meeting tomorrow` })
+      }
+    }
+  }
+
+  // 2. Score dropped >10pts since last rebuild (from scoreAlerts)
+  for (const alert of (scoreAlerts ?? []).slice(0, 2)) {
+    candidates.push({
+      priority: 3,
+      prompt: `Why did ${alert.dealName} drop from ${alert.previousScore}% to ${alert.currentScore}%?`,
+    })
+  }
+
+  // 3. Deal stuck in current stage longer than average
+  if (stageTransitionRows.length > 0) {
+    const transitionMap = new Map<string, Date>()
+    for (const row of stageTransitionRows) {
+      if (row.deal_id && row.transitioned_at) {
+        transitionMap.set(row.deal_id, new Date(row.transitioned_at))
+      }
+    }
+    // Compute average days in stage across all active deals that have transitions
+    const daysInStageList: { dealId: string; dealName: string; stage: string; days: number }[] = []
+    for (const d of activeDeals) {
+      const t = transitionMap.get(d.id)
+      if (t) {
+        const days = (now.getTime() - t.getTime()) / 86_400_000
+        daysInStageList.push({ dealId: d.id, dealName: d.dealName, stage: d.stage, days })
+      }
+    }
+    if (daysInStageList.length >= 2) {
+      const avg = daysInStageList.reduce((s, x) => s + x.days, 0) / daysInStageList.length
+      const stuck = daysInStageList
+        .filter(x => x.days > avg * 1.5 && x.days > 7)
+        .sort((a, b) => b.days - a.days)
+      for (const s of stuck.slice(0, 2)) {
+        candidates.push({
+          priority: 4,
+          prompt: `How do I unstick ${s.dealName} from ${s.stage}?`,
+        })
+      }
+    }
+  }
+
+  // 4. Deal with no notes in 14+ days (from staleDeals)
+  for (const s of (staleDeals ?? []).slice(0, 2)) {
+    candidates.push({
+      priority: 5,
+      prompt: `Help me re-engage ${s.dealName}`,
+    })
+  }
+
+  // 5. Zero closed deals or near ML activation milestone
+  const closedTotal = wonCount + lostCount
+  if (closedTotal < 10) {
+    candidates.push({
+      priority: 6,
+      prompt: 'What do I need to do to activate ML predictions?',
+    })
+  }
+
+  // 6. New competitor detected — check if any active deal has a competitor not seen in previous brain
+  const previousCompetitors = new Set<string>()
+  if (previousBrain?.deals) {
+    // Competitors are in keyPatterns competitorNames and in deal risks
+    for (const p of previousBrain.keyPatterns ?? []) {
+      for (const c of p.competitorNames ?? []) previousCompetitors.add(c.toLowerCase())
+    }
+  }
+  for (const d of activeDeals) {
+    for (const c of ((d.dealCompetitors as string[]) ?? [])) {
+      if (c && !previousCompetitors.has(c.toLowerCase())) {
+        candidates.push({
+          priority: 7,
+          prompt: `Build a battlecard against ${c}`,
+        })
+      }
+    }
+  }
+
+  // Sort by priority (lower = more urgent), deduplicate, pick top 4
+  candidates.sort((a, b) => a.priority - b.priority)
+  const seen = new Set<string>()
+  const prompts: string[] = []
+  for (const c of candidates) {
+    if (seen.has(c.prompt)) continue
+    seen.add(c.prompt)
+    prompts.push(c.prompt)
+    if (prompts.length >= 3) break // leave room for the fallback
+  }
+
+  // Always include one generic fallback
+  prompts.push('Summarise my pipeline this week')
+
+  return prompts
+}
+
 async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown'): Promise<WorkspaceBrain> {
   const rebuildStartMs = Date.now()
   console.log(`[brain] Rebuild started for workspace ${workspaceId} — triggered by: ${reason}`)
@@ -578,6 +707,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown')
       hubspotNotes: dealLogs.hubspotNotes,
       intentSignals: dealLogs.intentSignals,
       outcome: dealLogs.outcome,
+      scheduledEvents: dealLogs.scheduledEvents,
     })
     .from(dealLogs)
     .where(eq(dealLogs.workspaceId, workspaceId))
@@ -2134,6 +2264,18 @@ async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown')
       }))
   })()
 
+  // ── Contextual suggested prompts for Ask AI ─────────────────────────────────
+  const suggestedPrompts = _generateSuggestedPrompts({
+    activeDeals,
+    staleDeals,
+    scoreAlerts,
+    wonCount: wonDeals.length,
+    lostCount: lostDeals.length,
+    previousBrain,
+    stageTransitionRows: stageTransitionRows as any[],
+    now,
+  })
+
   const brain: WorkspaceBrain = {
     brainVersion: BRAIN_VERSION,
     updatedAt: now.toISOString(),
@@ -2169,6 +2311,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown')
     collateralEffectiveness: collateralEffectiveness.length > 0 ? collateralEffectiveness : undefined,
     globalPrior:            globalPriorMeta,
     winPlaybook,
+    suggestedPrompts,
     extractionBackfillDone,
   }
 
