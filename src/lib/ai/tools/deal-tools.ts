@@ -1297,6 +1297,13 @@ const MeetingNotesSchema = z.object({
     newDate: z.string().nullable(),
     reason: z.string(),
   }).nullable().optional(),
+  scheduledEvents: z.array(z.object({
+    type: z.enum(['meeting', 'follow_up', 'deadline', 'demo', 'decision']).default('meeting'),
+    description: z.string(),
+    date: z.string().describe('ISO date YYYY-MM-DD'),
+    time: z.string().nullable().optional().describe('HH:MM 24-hour or null'),
+    participants: z.array(z.string()).default([]),
+  })).optional().default([]),
 })
 
 export const process_meeting_notes = {
@@ -1385,6 +1392,8 @@ export const process_meeting_notes = {
         role: 'user',
         content: `Extract structured data from these sales meeting notes. Return ONLY valid JSON.
 
+Today's date is ${new Date().toISOString().split('T')[0]}.
+
 DEFINITIONS — read these carefully:
 - DEAL RISKS: Concerns about whether this deal will CLOSE. Examples: budget freeze, champion leaving, competitor preferred, timeline slipping, decision-maker disengaged. NOT about product features.
 - PRODUCT GAPS: Features/capabilities that OUR PRODUCT is MISSING that the prospect explicitly said they need. Only if they said "your product can't do X" or "we need X and you don't have it". NOT general concerns or nice-to-haves.
@@ -1417,7 +1426,16 @@ Return this exact JSON:
   "closeDateUpdate": {
     "newDate": "2026-05-15 or null if no timeline change mentioned",
     "reason": "Trial extended 30 days"
-  }
+  },
+  "scheduledEvents": [
+    {
+      "type": "meeting",
+      "description": "Product demo with Morgan and IT team",
+      "date": "2026-03-24",
+      "time": "14:00",
+      "participants": ["Morgan", "IT team"]
+    }
+  ]
 }
 
 Rules:
@@ -1432,6 +1450,7 @@ Rules:
 - projectPlanUpdates: CRITICAL — if the notes describe completing or progressing a task, match it to the task ID and set status to "complete" or "in_progress". Be smart: "agreed on plan and dates" = complete any planning tasks; "session confirmed for 19 Mar" = complete any attendance-confirmation tasks. Return [] if no task progress.
 - suggestedStage: ONLY if notes clearly imply a stage transition (e.g., "sent proposal" = proposal, "received signed contract" = closed_won). Return null if current stage still appropriate.
 - closeDateUpdate: If the notes mention a timeline change (extended, pushed back, delayed, moved to, new deadline, trial extended), calculate the new close date. If "pushed back 30 days" and current close date is known, add 30 days to it. If an absolute date is given ("moving to June"), use that date. Return null for newDate if no timeline change is mentioned.
+- scheduledEvents: Extract any events mentioned with dates. Resolve relative dates ("next Tuesday", "this Friday", "in two weeks") relative to today's date shown above. Include event type (meeting|follow_up|deadline|demo|decision), description, ISO date (YYYY-MM-DD), time if mentioned (HH:MM 24-hour), and participants. Return [] if no concrete events with dates are mentioned.
 - DO NOT infer things that weren't said. If the notes don't mention budget, leave budgetStatus as "not_discussed".`,
       }],
     })
@@ -1516,6 +1535,19 @@ Rules:
     if (mergedCompetitors) updateFields.competitors = mergedCompetitors
     if (parsed.summary) updateFields.aiSummary = parsed.summary
     if (parsed.intentSignals) updateFields.intentSignals = parsed.intentSignals
+
+    // Merge scheduled events: append new ones (deduplicate by date+description)
+    if ((parsed.scheduledEvents ?? []).length > 0) {
+      const existingEvents = ((deal as any).scheduledEvents as any[]) ?? []
+      const existingKeys = new Set(existingEvents.map((e: any) => `${e.date}|${e.description?.slice(0, 40).toLowerCase()}`))
+      const newEvents = (parsed.scheduledEvents ?? [])
+        .filter(e => e.date && e.description)
+        .map(e => ({ ...e, id: crypto.randomUUID(), extractedAt: new Date().toISOString() }))
+        .filter(e => !existingKeys.has(`${e.date}|${e.description.slice(0, 40).toLowerCase()}`))
+      if (newEvents.length > 0) {
+        updateFields.scheduledEvents = [...existingEvents, ...newEvents]
+      }
+    }
 
     // Apply success criteria updates
     if (parsed.criteriaUpdates?.length) {
@@ -1737,6 +1769,12 @@ Rules:
     }
     if (parsed.closeDateUpdate?.newDate) {
       resultLines.push(`\n**Close date updated:** ${new Date(parsed.closeDateUpdate.newDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} (${parsed.closeDateUpdate.reason})`)
+    }
+    const newExtractedEvents = (parsed.scheduledEvents ?? []).filter(e => e.date && e.description)
+    if (newExtractedEvents.length > 0) {
+      resultLines.push(`\n**Calendar events extracted:** ${newExtractedEvents.length} event(s) added`)
+      newExtractedEvents.forEach(e => resultLines.push(`- ${e.type}: ${e.description} (${e.date}${e.time ? ' ' + e.time : ''})`))
+
     }
     if (updateFields.conversionScore != null) {
       resultLines.push(`\n**Updated conversion score:** ${updateFields.conversionScore}%`)

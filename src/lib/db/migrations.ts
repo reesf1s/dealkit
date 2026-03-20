@@ -244,6 +244,14 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
       )
     `,
   },
+  {
+    version: 18,
+    name: 'deal_scheduled_events_column',
+    sql: `
+      ALTER TABLE deal_logs
+        ADD COLUMN IF NOT EXISTS scheduled_events jsonb NOT NULL DEFAULT '[]'::jsonb
+    `,
+  },
 ]
 
 // ── In-process cache — prevents redundant round-trips on the same cold-start ──
