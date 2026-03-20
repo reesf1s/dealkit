@@ -274,6 +274,37 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
       WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
     `,
   },
+  {
+    version: 20,
+    name: 'create_deal_events',
+    sql: `
+      CREATE TABLE IF NOT EXISTS deal_events (
+        id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        deal_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT,
+        event_date DATE NOT NULL,
+        event_time TEXT,
+        source TEXT NOT NULL,
+        source_note_id TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `,
+  },
+  {
+    version: 21,
+    name: 'deal_events_indexes',
+    sql: `
+      CREATE INDEX IF NOT EXISTS idx_deal_events_workspace_date
+        ON deal_events (workspace_id, event_date);
+      CREATE INDEX IF NOT EXISTS idx_deal_events_deal
+        ON deal_events (deal_id, event_date);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_deal_events_dedup
+        ON deal_events (deal_id, event_date, title)
+    `,
+  },
 ]
 
 // ── In-process cache — prevents redundant round-trips on the same cold-start ──

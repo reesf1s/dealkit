@@ -76,6 +76,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       competitors: dealLogs.competitors,
       createdAt: dealLogs.createdAt,
       conversionScorePinned: dealLogs.conversionScorePinned,
+      scheduledEvents: dealLogs.scheduledEvents,
     }).from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -485,6 +486,46 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
         }
       }
     }
+
+    // ── Merge scheduled events from extraction into deal.scheduledEvents ────
+    // The <extraction> block may contain scheduled_events that need to be persisted
+    // to the scheduledEvents column so the calendar API can read them.
+    if (noteExtraction && (noteExtraction.scheduled_events ?? []).length > 0) {
+      const existingEvents = (deal.scheduledEvents as any[]) ?? []
+      const existingKeys = new Set(existingEvents.map((e: any) =>
+        `${e.date}|${(e.description ?? '').slice(0, 40).toLowerCase()}`
+      ))
+      const newEvents = noteExtraction.scheduled_events
+        .filter(e => e.date && e.description)
+        .map(e => ({
+          id: crypto.randomUUID(),
+          type: e.type === 'other' ? 'meeting' : e.type,
+          description: e.description,
+          date: e.date,
+          time: e.time ?? null,
+          participants: [],
+          extractedAt: new Date().toISOString(),
+        }))
+        .filter(e => !existingKeys.has(`${e.date}|${e.description.slice(0, 40).toLowerCase()}`))
+      if (newEvents.length > 0) {
+        updateFields.scheduledEvents = [...existingEvents, ...newEvents]
+      }
+    }
+
+    // ── Write events to deal_events table for calendar ─────────────────────
+    try {
+      if (noteExtraction && (noteExtraction.scheduled_events ?? []).length > 0) {
+        for (const ev of noteExtraction.scheduled_events) {
+          if (!ev.date || !ev.description) continue
+          const eventType = ev.type === 'other' ? 'meeting' : ev.type
+          await db.execute(sql`
+            INSERT INTO deal_events (deal_id, workspace_id, event_type, title, description, event_date, event_time, source)
+            VALUES (${id}, ${workspaceId}, ${eventType}, ${ev.description}, ${ev.description}, ${ev.date}::date, ${ev.time ?? null}, 'note_extraction')
+            ON CONFLICT (deal_id, event_date, title) DO NOTHING
+          `)
+        }
+      }
+    } catch { /* deal_events table may not exist yet — non-fatal */ }
 
     const [updatedDeal] = await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, id)).returning()
     const createdGaps = []

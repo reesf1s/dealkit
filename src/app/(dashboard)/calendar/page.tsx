@@ -13,7 +13,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 // ── Event type config ──────────────────────────────────────────────────────
 
-type EventType = 'meeting' | 'follow_up' | 'deadline' | 'demo' | 'decision' | 'predicted_close' | 'todo'
+type EventType = 'meeting' | 'follow_up' | 'deadline' | 'demo' | 'decision' | 'predicted_close' | 'todo' | 'action_due'
 
 const EVENT_CONFIG: Record<EventType, { label: string; color: string; borderStyle?: string; icon: React.ElementType }> = {
   meeting:         { label: 'Meeting',         color: '#6366F1', icon: Users },
@@ -23,6 +23,7 @@ const EVENT_CONFIG: Record<EventType, { label: string; color: string; borderStyl
   decision:        { label: 'Decision',        color: '#A855F7', icon: Target },
   predicted_close: { label: 'Predicted Close', color: '#A855F7', borderStyle: 'dashed', icon: Target },
   todo:            { label: 'Action Item',     color: '#94A3B8', icon: CheckSquare },
+  action_due:      { label: 'Action Due',      color: '#F59E0B', icon: AlertCircle },
 }
 
 function getConfig(type: string) {
@@ -325,7 +326,7 @@ export default function CalendarPage() {
 
       {/* Type filter chips */}
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
-        {(['all', 'meeting', 'demo', 'follow_up', 'deadline', 'decision', 'predicted_close', 'todo'] as const).map(type => {
+        {(['all', 'meeting', 'demo', 'follow_up', 'deadline', 'decision', 'predicted_close', 'todo', 'action_due'] as const).map(type => {
           const cfg = type === 'all' ? null : getConfig(type)
           const count = type === 'all' ? monthEvents.length : (typeCounts[type] ?? 0)
           if (type !== 'all' && count === 0) return null
