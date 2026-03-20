@@ -841,7 +841,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown')
       // Determine most likely cause
       const sig = signalMap.get(snap.id)
       let possibleCause: string
-      if (sig?.isDeteriorating) {
+      if (sig?.momentumScore != null && sig.momentumScore < 0.35) {
         possibleCause = 'sentiment declined'
       } else if (snap.daysSinceUpdate >= 14) {
         possibleCause = 'no recent activity'
