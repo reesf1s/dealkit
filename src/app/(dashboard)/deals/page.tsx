@@ -126,7 +126,7 @@ export default function DealsPage() {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '24px', alignItems: 'start' }}>
           <DealTable deals={deals} onAdd={() => setAddOpen(true)} onDelete={handleDelete} currencySymbol={currencySymbol} />
-          <DealInsights deals={deals} />
+          <DealInsights deals={deals} currencySymbol={currencySymbol} />
         </div>
       )}
 

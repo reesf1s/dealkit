@@ -3396,7 +3396,7 @@ function DealLinksSection({ deal, patchDeal }: { deal: any; patchDeal: (payload:
   )
 }
 
-function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '$', mlPrediction = null, globalPrior = null, brainData = null }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void; currencySymbol?: string; mlPrediction?: any; globalPrior?: any; brainData?: any }) {
+function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', mlPrediction = null, globalPrior = null, brainData = null }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void; currencySymbol?: string; mlPrediction?: any; globalPrior?: any; brainData?: any }) {
   const router = useRouter()
   const [expandingType, setExpandingType] = useState<string | null>(null)
   const { data: allDealsRes } = useSWR('/api/deals', fetcher)

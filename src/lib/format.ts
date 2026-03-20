@@ -58,6 +58,17 @@ export function formatDateWithDay(date: Date | string | null | undefined): strin
 }
 
 /**
+ * Score colour: green ≥70, amber ≥40, red <40, grey for null/no-data.
+ * Use CSS variables so light/dark themes work.
+ */
+export function scoreColor(score: number | null | undefined): string {
+  if (score == null) return 'var(--text-tertiary)'
+  if (score >= 70) return 'var(--success)'
+  if (score >= 40) return 'var(--warning)'
+  return 'var(--danger)'
+}
+
+/**
  * Relative: "2 days ago", "yesterday", "today", "tomorrow", "in 3 days"
  */
 export function formatRelativeDate(date: Date | string | null | undefined): string {

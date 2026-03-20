@@ -22,13 +22,13 @@ export function annualizedValue(value: number, dealType?: string | null, recurri
   return value // annual
 }
 
-function formatCurrency(value: number, sym = '$'): string {
+function formatCurrency(value: number, sym = '£'): string {
   if (value >= 1_000_000) return `${sym}${(value / 1_000_000).toFixed(1)}m`
   if (value >= 1_000) return `${sym}${(value / 1_000).toFixed(1)}k`
   return `${sym}${Math.round(value)}`
 }
 
-export default function ROIWidget({ deals, collateralCount, currencySymbol = '$' }: ROIWidgetProps) {
+export default function ROIWidget({ deals, collateralCount, currencySymbol = '£' }: ROIWidgetProps) {
   const wonDeals = deals.filter(d => d.outcome === 'won')
   const openDeals = deals.filter(d => d.outcome === 'open')
 

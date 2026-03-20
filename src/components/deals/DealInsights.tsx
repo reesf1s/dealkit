@@ -4,6 +4,7 @@ import type { DealLog } from '@/types'
 
 interface DealInsightsProps {
   deals: DealLog[]
+  currencySymbol?: string
 }
 
 function toMRR(deal: DealLog): number {
@@ -13,10 +14,12 @@ function toMRR(deal: DealLog): number {
   return deal.dealValue / 12 // annual (default)
 }
 
-function fmt(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}k`
-  return `$${Math.round(n).toLocaleString()}`
+function makeFmt(sym: string) {
+  return (n: number): string => {
+    if (n >= 1_000_000) return `${sym}${(n / 1_000_000).toFixed(1)}M`
+    if (n >= 1_000) return `${sym}${(n / 1_000).toFixed(1)}k`
+    return `${sym}${Math.round(n).toLocaleString()}`
+  }
 }
 
 function WinRateGauge({ rate }: { rate: number }) {
@@ -53,7 +56,8 @@ function WinRateGauge({ rate }: { rate: number }) {
   )
 }
 
-export function DealInsights({ deals }: DealInsightsProps) {
+export function DealInsights({ deals, currencySymbol = '£' }: DealInsightsProps) {
+  const fmt = makeFmt(currencySymbol)
   const closedDeals = deals.filter((d) => d.stage === 'closed_won' || d.stage === 'closed_lost')
   const wonDeals = deals.filter((d) => d.stage === 'closed_won')
   const lostDeals = deals.filter((d) => d.stage === 'closed_lost')

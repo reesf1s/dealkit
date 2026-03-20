@@ -72,7 +72,7 @@ function annualizedValue(value: number, dealType?: string | null, recurringInter
 }
 
 // Short label for a deal's value (e.g. "£5k/mo", "£60k ARR", "£30k")
-function dealValueLabel(value: number, dealType?: string | null, recurringInterval?: string | null, sym = '$'): string {
+function dealValueLabel(value: number, dealType?: string | null, recurringInterval?: string | null, sym = '£'): string {
   const fmt = (v: number) => v >= 1_000_000 ? `${sym}${(v/1_000_000).toFixed(1)}m` : v >= 1_000 ? `${sym}${(v/1_000).toFixed(0)}k` : `${sym}${Math.round(v)}`
   if (dealType !== 'recurring') return fmt(value)
   if (recurringInterval === 'monthly') return `${fmt(value)}/mo`
