@@ -86,6 +86,62 @@ function generateSimilarityReason(
   return `${first}, ${reasons.slice(1).join(', ')}`
 }
 
+// ── Overlapping risk finder ─────────────────────────────────────────────────
+// Finds risks that appear in both deals using keyword overlap.
+
+function findOverlappingRisks(srcRisks: string[], matchRisks: string[]): string[] {
+  if (srcRisks.length === 0 || matchRisks.length === 0) return []
+  const overlapping: string[] = []
+  for (const sr of srcRisks) {
+    const srWords = new Set(sr.toLowerCase().split(/\W+/).filter(w => w.length > 3))
+    for (const mr of matchRisks) {
+      const mrWords = mr.toLowerCase().split(/\W+/).filter(w => w.length > 3)
+      const shared = mrWords.filter(w => srWords.has(w))
+      if (shared.length >= 2) {
+        overlapping.push(sr)
+        break
+      }
+    }
+  }
+  return overlapping.slice(0, 3)
+}
+
+// ── Pre-computed advice generator ───────────────────────────────────────────
+// Generates "what to do differently" for closed deals based on their outcome,
+// loss reason, and overlapping risks. Pure heuristic — no LLM call.
+
+function generateAdvice(
+  similarDeal: { stage: string; lostReason: string | null; dealRisks: any; outcome: string | null; prospectCompany: string },
+  sourceDeal: { dealRisks: any; stage: string } | undefined,
+  overlappingRisks: string[],
+): string | null {
+  const outcome = similarDeal.outcome ?? (similarDeal.stage === 'closed_won' ? 'won' : similarDeal.stage === 'closed_lost' ? 'lost' : null)
+  if (!outcome) return null
+
+  if (outcome === 'lost') {
+    const lossReason = similarDeal.lostReason
+    if (lossReason && overlappingRisks.length > 0) {
+      return `Address overlapping risks early — ${similarDeal.prospectCompany} was lost due to "${lossReason}" with similar risk factors present in your deal.`
+    }
+    if (lossReason) {
+      return `${similarDeal.prospectCompany} was lost because: "${lossReason}". Proactively address this concern before it surfaces.`
+    }
+    if (overlappingRisks.length > 0) {
+      return `This deal shares ${overlappingRisks.length} risk${overlappingRisks.length > 1 ? 's' : ''} with ${similarDeal.prospectCompany}. Mitigate these early to avoid the same outcome.`
+    }
+    return `${similarDeal.prospectCompany} was lost at a similar stage. Review what went wrong and ensure you have stronger champion support.`
+  }
+
+  if (outcome === 'won') {
+    if (overlappingRisks.length > 0) {
+      return `${similarDeal.prospectCompany} won despite similar risks — study their approach to risk mitigation for tactics you can replicate.`
+    }
+    return `${similarDeal.prospectCompany} won with a similar profile — replicate the engagement pattern that led to their close.`
+  }
+
+  return null
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -138,6 +194,10 @@ export async function GET(
         description: dealLogs.description,
         dealRisks: dealLogs.dealRisks,
         notes: dealLogs.notes,
+        lostReason: dealLogs.lostReason,
+        lostDate: dealLogs.lostDate,
+        wonDate: dealLogs.wonDate,
+        outcome: dealLogs.outcome,
       })
       .from(dealLogs)
       .where(and(eq(dealLogs.workspaceId, workspaceId), inArray(dealLogs.id, ids)))
@@ -171,6 +231,14 @@ export async function GET(
             )
           : undefined
 
+        // Compute overlapping risks between source deal and this similar deal
+        const srcRisks = (sourceDeal?.dealRisks as string[] ?? [])
+        const matchRisks = (d.dealRisks as string[] ?? [])
+        const overlappingRisks = findOverlappingRisks(srcRisks, matchRisks)
+
+        // Generate "what to do differently" advice for closed deals
+        const advice = generateAdvice(d, sourceDeal, overlappingRisks)
+
         return {
           id: d.id,
           dealName: d.dealName,
@@ -180,6 +248,13 @@ export async function GET(
           conversionScore: d.conversionScore,
           similarity: Math.round(s.similarity * 100),
           reason,
+          lostReason: d.lostReason,
+          lostDate: d.lostDate?.toISOString() ?? null,
+          wonDate: d.wonDate?.toISOString() ?? null,
+          outcome: d.outcome ?? (d.stage === 'closed_won' ? 'won' : d.stage === 'closed_lost' ? 'lost' : null),
+          dealRisks: matchRisks,
+          overlappingRisks,
+          advice,
         }
       })
       .filter(Boolean)

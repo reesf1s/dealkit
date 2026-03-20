@@ -289,7 +289,7 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
 
     const noteExtraction = await parseExtractionBlock(rawText)
 
-    const newTodos = (parsed.todos ?? []).map((t: any) => ({ id: crypto.randomUUID(), text: t.text, done: false, createdAt: new Date().toISOString() }))
+    const newTodos = (parsed.todos ?? []).map((t: any) => ({ id: crypto.randomUUID(), text: t.text, done: false, createdAt: new Date().toISOString(), source: 'ai' as const }))
     const obsoleteIds = new Set<string>(parsed.obsoleteTodoIds ?? [])
     const dateStamp = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     // Store compact takeaways (not raw notes) to keep history token-efficient across many meetings

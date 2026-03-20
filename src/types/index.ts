@@ -407,6 +407,8 @@ export interface TodoItem {
   done: boolean
   assignee?: string                     // assigned member email or custom name
   createdAt: string
+  source?: 'manual' | 'ai'             // 'manual' = user-created, 'ai' = AI-extracted from notes
+  reordered?: boolean                   // true if user manually reordered this item
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1415,7 +1415,7 @@ function TodosTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: a
     if (!newTodo.trim()) return
     // New items go to top of pending list — insert before first pending item
     const firstPendingIdx = todos.findIndex((t: any) => !t.done)
-    const newItem = { id: crypto.randomUUID(), text: newTodo.trim(), done: false, createdAt: new Date().toISOString() }
+    const newItem = { id: crypto.randomUUID(), text: newTodo.trim(), done: false, createdAt: new Date().toISOString(), source: 'manual' as const }
     const updated = firstPendingIdx === -1
       ? [newItem, ...todos]
       : [...todos.slice(0, firstPendingIdx), newItem, ...todos.slice(firstPendingIdx)]
@@ -1429,7 +1429,7 @@ function TodosTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: a
     // Swap with previous pending item
     const prevPendingIdx = todos.slice(0, idx).map((t: any, i: number) => ({ t, i })).filter(({ t }) => !t.done).pop()?.i
     if (prevPendingIdx == null) return
-    const updated = [...todos]
+    const updated = [...todos].map((t: any) => t.id === id ? { ...t, reordered: true } : t)
     ;[updated[prevPendingIdx], updated[idx]] = [updated[idx], updated[prevPendingIdx]]
     saveTodos(updated)
   }
@@ -1439,7 +1439,7 @@ function TodosTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: a
     if (idx === -1) return
     const nextPendingIdx = todos.slice(idx + 1).map((t: any, i: number) => ({ t, i: idx + 1 + i })).find(({ t }) => !t.done)?.i
     if (nextPendingIdx == null) return
-    const updated = [...todos]
+    const updated = [...todos].map((t: any) => t.id === id ? { ...t, reordered: true } : t)
     ;[updated[idx], updated[nextPendingIdx]] = [updated[nextPendingIdx], updated[idx]]
     saveTodos(updated)
   }
@@ -3166,6 +3166,43 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
   const similarWins = mlPrediction?.similarWins ?? []
   const similarLosses = mlPrediction?.similarLosses ?? []
 
+  const [showBreakdown, setShowBreakdown] = useState(false)
+
+  // Compute detailed breakdown signals for the tooltip
+  const intentSignals = deal.intentSignals as any ?? {}
+  const notes: string = (deal.meetingNotes ?? '').toLowerCase()
+  const contacts = (deal.contacts ?? []) as any[]
+  const noteCount = deal.meetingNotes ? (deal.meetingNotes.match(/^## /gm) ?? []).length || (deal.meetingNotes.length > 50 ? 1 : 0) : 0
+  const championStatus = intentSignals?.championStatus ?? (/\bchampion\b|\bsponsor\b|\badvocate\b/.test(notes) ? 'confirmed' : 'none')
+  const budgetStatus = intentSignals?.budgetStatus ?? (/budget (confirmed|approved|allocated|secured)/.test(notes) ? 'confirmed' : 'not_mentioned')
+  const nextMeeting = intentSignals?.nextMeetingDate ?? (/next (meeting|call|session|step)/.test(notes) ? 'booked' : null)
+  const stakeholderCount = contacts.length
+  const sentimentScore = (deal.intentSignals as any)?.sentimentScore ?? null
+  const daysSinceLastNote = deal.updatedAt ? Math.floor((Date.now() - new Date(deal.updatedAt).getTime()) / 86400000) : null
+
+  // Reconstruct the text signal score components
+  const championPts = (championStatus === 'confirmed' || championStatus === 'suspected') ? 8 : 0
+  const budgetPts = budgetStatus === 'confirmed' ? 8 : 0
+  const nextMeetingPts = nextMeeting ? 5 : 0
+  const stakeholderPts = Math.min(stakeholderCount * 2, 6)
+  const sentimentPts = sentimentScore != null ? Math.round((sentimentScore - 0.5) * 10) : 0
+  const engagementPts = noteCount >= 3 ? 4 : noteCount >= 1 ? 2 : 0
+
+  // Compute weights based on ML state
+  const trainingSize = brainData?.mlModel?.trainingSize ?? 0
+  const mlActive = mlProb != null && trainingSize >= 10
+  const textWeight = mlActive ? Math.max(0, 1.0 - Math.min(0.70, 0.14 * Math.log(Math.max(trainingSize, 1))) - 0.05) : 0.70
+  const mlWeight = mlActive ? Math.min(0.70, 0.14 * Math.log(Math.max(trainingSize, 1))) : 0.25
+  const momWeight = 0.05
+
+  // Compute raw text signal score (baseline 50 + adjustments)
+  const rawTextScore = 50 + championPts + budgetPts + nextMeetingPts + stakeholderPts + sentimentPts + engagementPts
+  const clampedTextScore = Math.max(0, Math.min(100, rawTextScore))
+
+  const mlScoreVal = mlActive ? (mlProb ?? 0) : 50 // global prior = 50 in cold start
+  const momentumComponent = 50 + Math.max(-10, Math.min(10, momentumContrib))
+  const rawTotal = clampedTextScore * textWeight + mlScoreVal * mlWeight + momentumComponent * momWeight
+
   return (
     <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Header */}
@@ -3185,8 +3222,15 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
           <div style={{ fontSize: '9px', color: scoreColor, marginTop: '1px' }}>/100</div>
         </div>
         <div style={{ flex: 1 }}>
-          {/* Stacked contribution bar */}
-          <div style={{ marginBottom: '8px' }}>
+          {/* Stacked contribution bar — clickable to expand breakdown */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setShowBreakdown(b => !b)}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowBreakdown(b => !b) } }}
+            style={{ marginBottom: '8px', cursor: 'pointer' }}
+            title="Click to see full score breakdown"
+          >
             <div style={{ height: '8px', borderRadius: '4px', display: 'flex', overflow: 'hidden', gap: '1px', background: 'var(--border)' }}>
               {mlContrib != null && (
                 <div style={{ width: `${mlContrib}%`, background: 'var(--accent)', borderRadius: '4px 0 0 4px', transition: 'width 0.5s' }} title={`ML model: ${mlContrib}pts`} />
@@ -3196,14 +3240,77 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
                 <div style={{ width: `${momentumContrib}%`, background: 'var(--success)', borderRadius: '0 4px 4px 0', transition: 'width 0.5s' }} title={`Momentum: ${momentumContrib}pts`} />
               )}
             </div>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '6px', alignItems: 'center' }}>
               {mlContrib != null && <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-tertiary)' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'var(--accent)', flexShrink: 0 }} />ML {mlContrib}pt</div>}
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-tertiary)' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'var(--data-accent)', flexShrink: 0 }} />Signals {textContrib}pt</div>
               {momentumContrib > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-tertiary)' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'var(--success)', flexShrink: 0 }} />Momentum {momentumContrib}pt</div>}
+              <ChevronDown size={10} style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', transition: 'transform 150ms', transform: showBreakdown ? 'rotate(180deg)' : 'rotate(0deg)' }} />
             </div>
           </div>
         </div>
       </div>
+
+      {/* Score Breakdown Detail (expanded) */}
+      {showBreakdown && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', fontFamily: 'monospace', fontSize: '11px', lineHeight: '1.7', color: 'var(--text-secondary)' }}>
+          <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>{score} / 100 — Score breakdown</div>
+          <div style={{ borderBottom: '1px solid var(--border)', marginBottom: '6px' }} />
+
+          {/* Text signals section */}
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Text signals:</span>
+            <span>{clampedTextScore} x {textWeight.toFixed(2)} = {(clampedTextScore * textWeight).toFixed(1)}</span>
+          </div>
+          <div style={{ paddingLeft: '12px', color: 'var(--text-tertiary)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Champion: {championStatus === 'confirmed' ? '\u2713 confirmed' : championStatus === 'suspected' ? '~ suspected' : '\u2014 not detected'}</span>
+              <span style={{ color: championPts > 0 ? 'var(--success)' : 'var(--text-tertiary)' }}>+{championPts}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Budget: {budgetStatus === 'confirmed' ? '\u2713 confirmed' : budgetStatus === 'awaiting' ? '~ awaiting' : '\u2014 not discussed'}</span>
+              <span style={{ color: budgetPts > 0 ? 'var(--success)' : 'var(--text-tertiary)' }}>+{budgetPts}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Next meeting: {nextMeeting ? '\u2713 booked' : '\u2014 none'}</span>
+              <span style={{ color: nextMeetingPts > 0 ? 'var(--success)' : 'var(--text-tertiary)' }}>+{nextMeetingPts}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Stakeholders: {stakeholderCount} identified</span>
+              <span style={{ color: stakeholderPts > 0 ? 'var(--success)' : 'var(--text-tertiary)' }}>+{stakeholderPts}</span>
+            </div>
+            {sentimentScore != null && (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Sentiment: {sentimentScore >= 0.6 ? 'positive' : sentimentScore <= 0.4 ? 'negative' : 'neutral'} {sentimentScore.toFixed(2)}</span>
+                <span style={{ color: sentimentPts >= 0 ? 'var(--success)' : 'var(--danger)' }}>{sentimentPts >= 0 ? '+' : ''}{sentimentPts}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Engagement: {noteCount} note{noteCount !== 1 ? 's' : ''}{daysSinceLastNote != null ? ` / ${daysSinceLastNote}d ago` : ''}</span>
+              <span style={{ color: engagementPts > 0 ? 'var(--success)' : 'var(--text-tertiary)' }}>+{engagementPts}</span>
+            </div>
+          </div>
+
+          <div style={{ marginTop: '4px' }} />
+
+          {/* ML or Global Prior */}
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>{mlActive ? 'ML model:' : 'Global prior:'}</span>
+            <span>{Math.round(mlScoreVal)} x {mlWeight.toFixed(2)} = {(mlScoreVal * mlWeight).toFixed(1)}</span>
+          </div>
+
+          {/* Momentum */}
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Momentum:</span>
+            <span>{momentumComponent.toFixed(1)} x {momWeight.toFixed(2)} = {(momentumComponent * momWeight).toFixed(1)}</span>
+          </div>
+
+          <div style={{ borderBottom: '1px solid var(--border)', margin: '6px 0' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: 'var(--text-primary)' }}>
+            <span>Total:</span>
+            <span>{rawTotal.toFixed(1)} → rounded to {score}</span>
+          </div>
+        </div>
+      )}
 
       {/* Score Drivers */}
       {drivers.length > 0 && (
@@ -3244,14 +3351,20 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
           <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Similar Deals</div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {similarWins.slice(0, 2).map((w: any, i: number) => (
-              <div key={i} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'color-mix(in srgb, var(--success) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)', color: 'var(--success)' }}>
+              <Link key={`w-${i}`} href={`/deals/${w.dealId}`} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'color-mix(in srgb, var(--success) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)', color: 'var(--success)', textDecoration: 'none', transition: 'opacity 150ms' }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = '0.8' }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+              >
                 ✓ {w.company}
-              </div>
+              </Link>
             ))}
             {similarLosses.slice(0, 2).map((l: any, i: number) => (
-              <div key={i} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)', color: 'var(--danger)' }}>
+              <Link key={`l-${i}`} href={`/deals/${l.dealId}`} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)', color: 'var(--danger)', textDecoration: 'none', transition: 'opacity 150ms' }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = '0.8' }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+              >
                 ✗ {l.company}
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -3877,43 +3990,132 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
               // eslint-disable-next-line react-hooks/rules-of-hooks
               const { data: similarData } = useSWR(deal?.id ? `/api/deals/${deal.id}/similar` : null, (url: string) => fetch(url).then(r => r.json()), { revalidateOnFocus: false })
               const similarDeals = similarData?.data ?? []
+              // eslint-disable-next-line react-hooks/rules-of-hooks
+              const [expandedSimilar, setExpandedSimilar] = useState<string | null>(null)
               if (similarDeals.length === 0) return null
+
+              const formatDate = (iso: string | null) => {
+                if (!iso) return null
+                const d = new Date(iso)
+                return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+              }
+
+              const outcomeLabel = (sd: any) => {
+                const o = sd.outcome ?? (sd.stage === 'closed_won' ? 'won' : sd.stage === 'closed_lost' ? 'lost' : null)
+                if (o === 'won') return { text: 'Won', color: 'var(--success)', date: formatDate(sd.wonDate) }
+                if (o === 'lost') return { text: 'Lost', color: 'var(--danger)', date: formatDate(sd.lostDate) }
+                return { text: sd.stage?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()), color: 'var(--text-tertiary)', date: null }
+              }
+
               return (
                 <div>
                   <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Similar Deals</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {similarDeals.slice(0, 3).map((sd: any) => (
-                      <Link
-                        key={sd.id}
-                        href={`/deals/${sd.id}`}
-                        style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-                          padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)',
-                          borderRadius: '6px', textDecoration: 'none', transition: 'border-color 150ms ease',
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)' }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
-                      >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sd.dealName}</div>
-                          <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{sd.prospectCompany}</div>
-                          {sd.reason && (
-                            <div style={{ fontSize: '10px', color: 'var(--accent)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {sd.reason}
+                    {similarDeals.slice(0, 5).map((sd: any) => {
+                      const isExpanded = expandedSimilar === sd.id
+                      const oc = outcomeLabel(sd)
+                      return (
+                        <div key={sd.id} style={{ background: 'var(--surface)', border: `1px solid ${isExpanded ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '8px', transition: 'border-color 150ms ease', overflow: 'hidden' }}>
+                          {/* Clickable header row */}
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setExpandedSimilar(isExpanded ? null : sd.id)}
+                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedSimilar(isExpanded ? null : sd.id) } }}
+                            style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+                              padding: '8px 10px', cursor: 'pointer', userSelect: 'none',
+                            }}
+                            onMouseEnter={e => { if (!isExpanded) e.currentTarget.parentElement!.style.borderColor = 'var(--accent)' }}
+                            onMouseLeave={e => { if (!isExpanded) e.currentTarget.parentElement!.style.borderColor = 'var(--border)' }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
+                              <ChevronRight size={12} style={{ color: 'var(--text-tertiary)', flexShrink: 0, transition: 'transform 150ms', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {sd.prospectCompany}
+                                  </span>
+                                  <span style={{ fontSize: '10px', color: oc.color, fontWeight: 600, flexShrink: 0 }}>
+                                    {oc.text}{oc.date ? ` ${oc.date}` : ''}
+                                  </span>
+                                </div>
+                                {!isExpanded && sd.reason && (
+                                  <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {sd.reason}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <span style={{
+                              fontSize: '10px', fontWeight: 600,
+                              color: sd.similarity >= 80 ? 'var(--success)' : sd.similarity >= 60 ? '#A78BFA' : 'var(--text-tertiary)',
+                              background: sd.similarity >= 80 ? 'rgba(34,197,94,0.1)' : sd.similarity >= 60 ? 'rgba(167,139,250,0.1)' : 'var(--surface)',
+                              border: `1px solid ${sd.similarity >= 80 ? 'rgba(34,197,94,0.2)' : sd.similarity >= 60 ? 'rgba(167,139,250,0.2)' : 'var(--border)'}`,
+                              borderRadius: '4px', padding: '1px 5px', flexShrink: 0,
+                            }}>
+                              {sd.similarity}% match
+                            </span>
+                          </div>
+
+                          {/* Expanded detail panel */}
+                          {isExpanded && (
+                            <div style={{ padding: '0 10px 10px 28px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--border)' }}>
+                              <div style={{ height: '8px' }} />
+                              {/* Why similar */}
+                              {sd.reason && (
+                                <div>
+                                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>Why similar</div>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{sd.reason}</div>
+                                </div>
+                              )}
+
+                              {/* Loss reason (only for lost deals) */}
+                              {(sd.outcome === 'lost' || sd.stage === 'closed_lost') && (
+                                <div>
+                                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>Why it was lost</div>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                    {sd.lostReason || 'No loss reason recorded'}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Overlapping risks */}
+                              {sd.overlappingRisks?.length > 0 && (
+                                <div>
+                                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--warning)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>Overlapping risks</div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                    {sd.overlappingRisks.map((r: string, i: number) => (
+                                      <div key={i} style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
+                                        <span style={{ color: 'var(--warning)', flexShrink: 0 }}>!</span> {r}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* What to do differently */}
+                              {sd.advice && (
+                                <div style={{ padding: '6px 10px', background: 'color-mix(in srgb, var(--accent) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 15%, transparent)', borderRadius: '6px' }}>
+                                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>What to do differently</div>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>{sd.advice}</div>
+                                </div>
+                              )}
+
+                              {/* Link to deal */}
+                              <Link
+                                href={`/deals/${sd.id}`}
+                                style={{ fontSize: '11px', color: 'var(--accent)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}
+                                onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
+                                onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
+                              >
+                                View deal <ArrowUpRight size={10} />
+                              </Link>
                             </div>
                           )}
                         </div>
-                        <span style={{
-                          fontSize: '10px', fontWeight: 600,
-                          color: sd.similarity >= 80 ? 'var(--success)' : sd.similarity >= 60 ? '#A78BFA' : 'var(--text-tertiary)',
-                          background: sd.similarity >= 80 ? 'rgba(34,197,94,0.1)' : sd.similarity >= 60 ? 'rgba(167,139,250,0.1)' : 'var(--surface)',
-                          border: `1px solid ${sd.similarity >= 80 ? 'rgba(34,197,94,0.2)' : sd.similarity >= 60 ? 'rgba(167,139,250,0.2)' : 'var(--border)'}`,
-                          borderRadius: '4px', padding: '1px 5px', flexShrink: 0,
-                        }}>
-                          {sd.similarity}% match
-                        </span>
-                      </Link>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )
@@ -4230,11 +4432,18 @@ export default function DealDetailPage() {
           { id: 'notes', label: 'Notes' },
           { id: 'intelligence', label: 'Intelligence' },
           { id: 'actions', label: (() => {
-            const openTodos = deal?.todos?.filter((t: any) => !t.done).length ?? 0
-            const openTasks = (deal?.projectPlan as any)?.phases?.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete').length ?? 0
-            const openCriteria = (deal?.successCriteriaTodos as any[])?.filter((c: any) => !c.achieved).length ?? 0
-            const total = openTodos + openTasks + openCriteria
-            return total > 0 ? `Actions (${total})` : 'Actions'
+            const openTodos = deal?.todos?.filter((t: any) => !t.done) ?? []
+            const openTasks = (deal?.projectPlan as any)?.phases?.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete') ?? []
+            const openCriteria = (deal?.successCriteriaTodos as any[])?.filter((c: any) => !c.achieved) ?? []
+            const total = openTodos.length + openTasks.length + openCriteria.length
+            // Priority = manually created, user-reordered, or project plan/success criteria items
+            const priorityTodos = openTodos.filter((t: any) => t.source === 'manual' || t.reordered).length
+            const priorityCount = priorityTodos + openTasks.length + openCriteria.length
+            const otherCount = total - priorityCount
+            if (total === 0) return 'Actions'
+            if (priorityCount > 0 && otherCount > 0) return `Actions (${priorityCount} priority · ${otherCount} other)`
+            if (priorityCount > 0) return `Actions (${priorityCount} priority)`
+            return `Actions (${total})`
           })() },
           { id: 'collateral', label: 'Collateral' },
         ].map(tab => (

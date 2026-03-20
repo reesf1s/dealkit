@@ -368,7 +368,7 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
       const updatedTodos = allTodos
         .filter(t => !todoRemoveIds.has(t.id))
         .map(t => todoCompleteIds.has(t.id) ? { ...t, done: true } : t)
-      const newTodos = todoAdd.map(text => ({ id: crypto.randomUUID(), text, done: false, createdAt: new Date().toISOString() }))
+      const newTodos = todoAdd.map(text => ({ id: crypto.randomUUID(), text, done: false, createdAt: new Date().toISOString(), source: 'ai' as const }))
       const mergedTodos = [...updatedTodos, ...newTodos]
 
       const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
