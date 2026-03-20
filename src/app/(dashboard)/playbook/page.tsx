@@ -168,14 +168,23 @@ function Skeleton() {
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────────
-function EmptyState({ totalDeals, winCount, lossCount }: { totalDeals: number; winCount: number; lossCount: number }) {
+interface RecentDeal { name: string; company: string; stage: string; lastUpdated: string }
+
+function EmptyState({ totalDeals, winCount, lossCount, recentDeals }: { totalDeals: number; winCount: number; lossCount: number; recentDeals: RecentDeal[] }) {
   const needed = Math.max(0, 10 - totalDeals)
-  // For a balanced model we want at least 30% losses (min 3 out of 10)
-  const winsNeeded = Math.max(0, 6 - winCount)
-  const lossesNeeded = Math.max(0, 4 - lossCount)
+  // For a balanced model we want at least 4 wins and 3 losses out of 10
+  const winsNeeded = Math.max(0, 4 - winCount)
+  const lossesNeeded = Math.max(0, 3 - lossCount)
+  const requireParts: string[] = []
+  if (winsNeeded > 0) requireParts.push(`at least ${winsNeeded} win${winsNeeded !== 1 ? 's' : ''}`)
+  if (lossesNeeded > 0) requireParts.push(`${lossesNeeded} loss${lossesNeeded !== 1 ? 'es' : ''}`)
   const thresholdMsg = needed > 0
-    ? `Need ${needed} more closed deal${needed !== 1 ? 's' : ''}${lossesNeeded > 0 ? `, including at least ${lossesNeeded} loss${lossesNeeded !== 1 ? 'es' : ''}` : winsNeeded > 0 ? `, including at least ${winsNeeded} win${winsNeeded !== 1 ? 's' : ''}` : ''}.`
+    ? `Need ${needed} more${requireParts.length > 0 ? `, including ${requireParts.join(' and ')}` : ''}.`
     : 'Almost there — rebuild the brain to activate.'
+
+  // Build the encouraging first-deal message
+  const firstDeal = recentDeals[0]
+  const hasFirstDeal = totalDeals >= 1 && firstDeal
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', maxWidth: '800px' }}>
@@ -198,13 +207,25 @@ function EmptyState({ totalDeals, winCount, lossCount }: { totalDeals: number; w
         {/* Progress bar */}
         <div style={{ padding: '20px', borderRadius: '12px', background: 'var(--card-bg)', border: '1px solid var(--card-border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Building your playbook…</span>
+            <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Building your playbook...</span>
             <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--accent)' }} className="font-mono">{totalDeals} / 10</span>
           </div>
           <ProgressBar current={totalDeals} total={10} />
-          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
-            {thresholdMsg} ({winCount} win{winCount !== 1 ? 's' : ''}, {lossCount} loss{lossCount !== 1 ? 'es' : ''} so far.)
-          </p>
+          {hasFirstDeal ? (
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px', lineHeight: 1.6 }}>
+              {totalDeals === 1 ? (
+                <span>Your first closed deal (<strong style={{ color: 'var(--text-primary)' }}>{firstDeal.name || firstDeal.company}</strong> — {firstDeal.stage === 'closed_won' ? 'won' : 'lost'}) is now training data. Every deal you close — won or lost — makes your playbook smarter.</span>
+              ) : (
+                <span>Most recent: <strong style={{ color: 'var(--text-primary)' }}>{firstDeal.name || firstDeal.company}</strong> — {firstDeal.stage === 'closed_won' ? 'won' : 'lost'}. Every deal you close — won or lost — makes your playbook smarter.</span>
+              )}
+              <br />
+              <span>{thresholdMsg}</span>
+            </div>
+          ) : (
+            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '8px' }}>
+              {thresholdMsg}
+            </p>
+          )}
         </div>
       </div>
 
@@ -302,8 +323,16 @@ export default function PlaybookPage() {
   const totalDeals = (wl?.winCount ?? 0) + (wl?.lossCount ?? 0)
   const hasEnoughData = totalDeals >= 10 || winFactors.length > 0
 
+  // Recent closed deals for empty state messaging
+  const recentClosedDeals: RecentDeal[] = brain?.deals
+    ? (brain.deals as { stage: string; name: string; company: string; lastUpdated: string }[])
+        .filter((d) => d.stage === 'closed_won' || d.stage === 'closed_lost')
+        .sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime())
+        .slice(0, 3)
+    : []
+
   if (!hasEnoughData) {
-    return <EmptyState totalDeals={totalDeals} winCount={wl?.winCount ?? 0} lossCount={wl?.lossCount ?? 0} />
+    return <EmptyState totalDeals={totalDeals} winCount={wl?.winCount ?? 0} lossCount={wl?.lossCount ?? 0} recentDeals={recentClosedDeals} />
   }
 
   // Calibration data

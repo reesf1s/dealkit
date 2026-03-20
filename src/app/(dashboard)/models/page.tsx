@@ -228,6 +228,10 @@ function ModelGrid({ trainingSize, brainData }: { trainingSize: number; brainDat
   ]
 
   function getModelStatus(model: ModelDef): { status: 'active' | 'warming' | 'locked'; output: string } {
+    const wlData = (brainData as { winLossIntel?: { winCount?: number; lossCount?: number } } | null)?.winLossIntel
+    const currentWins = wlData?.winCount ?? 0
+    const currentLosses = wlData?.lossCount ?? 0
+
     if (model.activatesAt === null) {
       return { status: 'active', output: 'Always active — no training required' }
     }
@@ -248,20 +252,22 @@ function ModelGrid({ trainingSize, brainData }: { trainingSize: number; brainDat
     }
     if (trainingSize >= Math.floor(model.activatesAt * 0.6)) {
       const needed = model.activatesAt - trainingSize
-      const wlData = (brainData as { winLossIntel?: { lossCount?: number } } | null)?.winLossIntel
-      const lossesNeeded = Math.max(0, Math.round(model.activatesAt * 0.3) - (wlData?.lossCount ?? 0))
+      const lossesNeeded = Math.max(0, Math.round(model.activatesAt * 0.3) - currentLosses)
       const lossNote = lossesNeeded > 0 ? `, incl. ${lossesNeeded} loss${lossesNeeded !== 1 ? 'es' : ''}` : ''
       return { status: 'warming', output: `Warming up — need ${needed} more deal${needed !== 1 ? 's' : ''}${lossNote}` }
     }
     {
-      const wlData = (brainData as { winLossIntel?: { winCount?: number; lossCount?: number } } | null)?.winLossIntel
-      const winsNeededForLocked = Math.max(0, Math.round(model.activatesAt * 0.4) - (wlData?.winCount ?? 0))
-      const lossesNeededForLocked = Math.max(0, Math.round(model.activatesAt * 0.3) - (wlData?.lossCount ?? 0))
-      const parts: string[] = []
-      if (winsNeededForLocked > 0) parts.push(`${winsNeededForLocked} win${winsNeededForLocked !== 1 ? 's' : ''}`)
-      if (lossesNeededForLocked > 0) parts.push(`${lossesNeededForLocked} loss${lossesNeededForLocked !== 1 ? 'es' : ''}`)
-      const needNote = parts.length > 0 ? ` (need ${parts.join(' AND ')})` : ''
-      return { status: 'locked', output: `Locked — need ${model.activatesAt}+ closed deals${needNote}` }
+      const needed = Math.max(0, model.activatesAt - trainingSize)
+      const winsRequired = Math.round(model.activatesAt * 0.4)
+      const lossesRequired = Math.round(model.activatesAt * 0.3)
+      const requireParts: string[] = []
+      if (winsRequired > 0) requireParts.push(`${winsRequired}+ wins`)
+      if (lossesRequired > 0) requireParts.push(`${lossesRequired}+ losses`)
+      const requireDesc = requireParts.length > 0 ? requireParts.join(', ') : `${model.activatesAt}+ closed deals`
+      return {
+        status: 'locked',
+        output: `Locked — ${needed} more closed deal${needed !== 1 ? 's' : ''} needed\nCurrently: ${currentWins} win${currentWins !== 1 ? 's' : ''}, ${currentLosses} loss${currentLosses !== 1 ? 'es' : ''}\nRequires: ${requireDesc}`,
+      }
     }
   }
 
@@ -300,7 +306,7 @@ function ModelGrid({ trainingSize, brainData }: { trainingSize: number; brainDat
             <div style={{ fontSize: '10px', color: statusColor, fontWeight: '600' }}>
               {statusText}
             </div>
-            <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '2px', lineHeight: 1.4 }}>
+            <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '2px', lineHeight: 1.4, whiteSpace: 'pre-line' }}>
               {output}
             </div>
           </div>
@@ -617,7 +623,6 @@ export default function ModelsPage() {
         .filter((d) => d.stage === 'closed_won' || d.stage === 'closed_lost')
         .sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime())
     : []
-  const mostRecentDeal = closedDeals[0]
   const totalClosed = (wl?.winCount ?? 0) + (wl?.lossCount ?? 0)
   const winPct = totalClosed > 0 ? Math.round(((wl?.winCount ?? 0) / totalClosed) * 100) : null
 
@@ -836,20 +841,25 @@ export default function ModelsPage() {
               )
             })()}
 
-            {/* Most recent deal */}
+            {/* Recent training data */}
             <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
-              {mostRecentDeal ? (
-                <span>
-                  Most recent:{' '}
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>{mostRecentDeal.name || mostRecentDeal.company}</span>
-                  {' — '}
-                  <span style={{ color: mostRecentDeal.stage === 'closed_won' ? 'var(--success)' : 'var(--danger)' }}>
-                    {mostRecentDeal.stage === 'closed_won' ? 'Won' : 'Lost'}
-                  </span>
-                  {mostRecentDeal.lastUpdated && (
-                    <span> — {new Date(mostRecentDeal.lastUpdated).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                  )}
-                </span>
+              {closedDeals.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                  <span style={{ fontWeight: '600', marginBottom: '2px' }}>Recent training data:</span>
+                  {closedDeals.slice(0, 3).map((d, i) => (
+                    <div key={i} style={{ paddingLeft: '8px' }}>
+                      <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>{d.name || d.company}</span>
+                      {d.company && d.name ? <span> ({d.company})</span> : null}
+                      {' — '}
+                      <span style={{ color: d.stage === 'closed_won' ? 'var(--success)' : 'var(--danger)' }}>
+                        {d.stage === 'closed_won' ? 'Won' : 'Lost'}
+                      </span>
+                      {d.lastUpdated && (
+                        <span> — {new Date(d.lastUpdated).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <span>No closed deals yet</span>
               )}
