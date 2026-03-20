@@ -242,9 +242,28 @@ function DealCard({
             onMouseLeave={() => setScoreHover(false)}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ width: isClosed ? 'auto' : '30px', minWidth: '30px', height: '30px', borderRadius: isClosed ? '8px' : '50%', padding: isClosed ? '0 8px' : 0, background: scColor, border: `1.5px solid ${scColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }}>
-              <span style={{ fontSize: '10px', fontWeight: '800', color: '#fff', lineHeight: 1 }}>{scoreDisplay.text}</span>
-            </div>
+            {isClosed ? (
+              <div style={{
+                height: '28px', padding: '0 10px', borderRadius: '8px',
+                background: `color-mix(in srgb, ${scColor} 15%, transparent)`,
+                border: `1.5px solid color-mix(in srgb, ${scColor} 35%, transparent)`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default',
+              }}>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: scColor, lineHeight: 1 }}>{scoreDisplay.text}</span>
+              </div>
+            ) : (
+              <svg width="34" height="34" viewBox="0 0 34 34" style={{ cursor: 'default', flexShrink: 0 }}>
+                {/* Background track */}
+                <circle cx="17" cy="17" r="14" fill={`color-mix(in srgb, ${scColor} 10%, transparent)`} stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
+                {/* Progress arc */}
+                <circle cx="17" cy="17" r="14" fill="none" stroke={scColor} strokeWidth="3" strokeLinecap="round"
+                  strokeDasharray={`${(score / 100) * 2 * Math.PI * 14} ${2 * Math.PI * 14}`}
+                  transform="rotate(-90 17 17)" style={{ transition: 'stroke-dasharray 0.3s ease' }} />
+                {/* Score text */}
+                <text x="17" y="17" textAnchor="middle" dominantBaseline="central"
+                  style={{ fontSize: '11px', fontWeight: 700, fill: scColor }}>{score}</text>
+              </svg>
+            )}
             {scoreHover && (
               <div style={{
                 position: 'absolute', top: '36px', right: 0, zIndex: 100,

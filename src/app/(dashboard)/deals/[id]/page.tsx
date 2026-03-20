@@ -3937,9 +3937,6 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
         )
       })()}
 
-      {/* ── All Actions (full todo list + project plan + success criteria) ── */}
-      <ActionsTab dealId={dealId} deal={deal} onUpdate={onUpdate} members={members} />
-
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
@@ -4824,7 +4821,7 @@ export default function DealDetailPage() {
     expansion: 'var(--warning)',
   }
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'collateral'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'plans' | 'collateral'>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [winStoryOpen, setWinStoryOpen] = useState(false)
   const [wonDeal, setWonDeal] = useState<any>(null)
@@ -4967,13 +4964,14 @@ export default function DealDetailPage() {
       <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border)', paddingBottom: '0' }}>
         {[
           { id: 'overview', label: 'Overview' },
-          { id: 'activity', label: (() => {
+          { id: 'activity', label: 'Activity' },
+          { id: 'plans', label: (() => {
             const openTodos = deal?.todos?.filter((t: any) => !t.done) ?? []
             const openTasks = (deal?.projectPlan as any)?.phases?.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete') ?? []
             const openCriteria = (deal?.successCriteriaTodos as any[])?.filter((c: any) => !c.achieved) ?? []
             const total = openTodos.length + openTasks.length + openCriteria.length
-            if (total === 0) return 'Activity'
-            return `Activity (${total})`
+            if (total === 0) return 'Plans'
+            return `Plans (${total})`
           })() },
           { id: 'collateral', label: 'Collateral' },
         ].map(tab => (
@@ -5007,6 +5005,9 @@ export default function DealDetailPage() {
           )}
           {activeTab === 'activity' && (
             <ActivityTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
+          )}
+          {activeTab === 'plans' && (
+            <ActionsTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
           )}
           {activeTab === 'collateral' && (
             <CollateralTab dealId={id} deal={deal} />
