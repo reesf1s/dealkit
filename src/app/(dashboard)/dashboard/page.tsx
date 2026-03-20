@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import Link from 'next/link'
-import { Sparkles, TrendingUp, AlertTriangle, ArrowUpRight, RefreshCw, Brain, Target, CheckCircle, Clock, DollarSign, Zap, ChevronRight } from 'lucide-react'
+import { Sparkles, TrendingUp, AlertTriangle, ArrowUpRight, RefreshCw, Brain, Target, CheckCircle, Clock, DollarSign, Zap, ChevronRight, ChevronDown } from 'lucide-react'
 import { useSidebar } from '@/components/layout/SidebarContext'
 import { formatCurrency } from '@/lib/format'
 
@@ -20,6 +20,7 @@ export default function DashboardPage() {
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
   const { data: dealsRes } = useSWR('/api/deals', fetcher, { revalidateOnFocus: false })
   const [regenerating, setRegenerating] = useState(false)
+  const [forecastExpanded, setForecastExpanded] = useState(false)
 
   const overview = overviewRes?.data
   const brain = brainRes?.data
@@ -28,6 +29,22 @@ export default function DashboardPage() {
 
   // Quick stats — prefer brain's pre-computed pipeline values as the source of truth
   const totalPipeline = brain?.pipeline?.totalValue ?? activeDeals.reduce((s: number, d: any) => s + (d.dealValue ?? 0), 0)
+
+  // Weighted forecast: dealValue * (score / 100), sorted descending
+  const forecastDeals = activeDeals
+    .filter((d: any) => (d.dealValue ?? 0) > 0)
+    .map((d: any) => ({
+      id: d.id,
+      dealName: d.dealName,
+      company: d.prospectCompany,
+      dealValue: d.dealValue ?? 0,
+      score: d.conversionScore ?? 50,
+      weightedValue: Math.round((d.dealValue ?? 0) * ((d.conversionScore ?? 50) / 100)),
+      closeDate: d.closeDate,
+    }))
+    .sort((a: any, b: any) => b.weightedValue - a.weightedValue)
+  const weightedForecast = forecastDeals.reduce((s: number, d: any) => s + d.weightedValue, 0)
+
   const winRate = brain?.winLossIntel?.winRate
   const avgScore = brain?.pipeline?.avgConversionScore != null
     ? Math.round(brain.pipeline.avgConversionScore)
@@ -188,6 +205,43 @@ export default function DashboardPage() {
                     {formatCurrency(totalPipeline, true)}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '3px' }}>total pipeline value</div>
+                  {weightedForecast > 0 && (
+                    <div style={{ marginTop: '10px' }}>
+                      <button
+                        onClick={() => setForecastExpanded(f => !f)}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                      >
+                        <DollarSign size={11} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Weighted forecast</div>
+                          <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--accent)', lineHeight: 1.1 }}>{formatCurrency(weightedForecast, true)}</div>
+                        </div>
+                        <ChevronDown size={12} style={{ color: 'var(--text-tertiary)', transform: forecastExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
+                      </button>
+                      {forecastExpanded && (
+                        <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '240px', overflowY: 'auto' }}>
+                          {forecastDeals.map((d: any) => (
+                            <Link
+                              key={d.id}
+                              href={`/deals/${d.id}`}
+                              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', borderRadius: '7px', background: 'var(--surface)', border: '1px solid var(--border)', textDecoration: 'none', transition: 'background 0.1s' }}
+                              onMouseEnter={e => (e.currentTarget.style.background = 'color-mix(in srgb, var(--accent) 5%, var(--surface))')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface)')}
+                            >
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.dealName}</div>
+                                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '1px' }}>
+                                  {formatCurrency(d.dealValue, true)} × {d.score}%
+                                  {d.closeDate ? ` · ${new Date(d.closeDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}
+                                </div>
+                              </div>
+                              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--accent)', flexShrink: 0 }}>{formatCurrency(d.weightedValue, true)}</div>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
               <div style={{ display: 'flex', gap: '8px' }}>
