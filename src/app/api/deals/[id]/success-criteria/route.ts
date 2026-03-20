@@ -8,7 +8,8 @@ import { db } from '@/lib/db'
 import { dealLogs, companyProfiles } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
-import { getWorkspaceBrain, formatBrainContext, rebuildWorkspaceBrain } from '@/lib/workspace-brain'
+import { getWorkspaceBrain, formatBrainContext } from '@/lib/workspace-brain'
+import { requestBrainRebuild } from '@/lib/brain-rebuild'
 import { ensureLinksColumn } from '@/lib/api-helpers'
 
 const anthropic = new Anthropic()
@@ -99,7 +100,7 @@ Return a JSON array of criteria objects. Each object: {"text": "the specific req
 
     after(async () => {
       console.log(`[brain] Rebuild triggered by: success_criteria at ${new Date().toISOString()}`)
-      try { await rebuildWorkspaceBrain(workspaceId, 'success_criteria') } catch { /* non-fatal */ }
+      await requestBrainRebuild(workspaceId, 'success_criteria')
     })
     return NextResponse.json({ data: { successCriteriaTodos: updated.successCriteriaTodos } })
   } catch (e: unknown) { console.error('[success-criteria] failed:', e instanceof Error ? e.message : e); return NextResponse.json({ error: 'Operation failed' }, { status: 500 }) }

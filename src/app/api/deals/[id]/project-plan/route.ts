@@ -5,7 +5,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
+import { requestBrainRebuild } from '@/lib/brain-rebuild'
 import Anthropic from '@anthropic-ai/sdk'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { ensureLinksColumn } from '@/lib/api-helpers'
@@ -144,10 +144,7 @@ ${text.slice(0, 8000)}`,
       .set({ projectPlan, updatedAt: new Date() } as any)
       .where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId)))
 
-    after(async () => {
-      console.log(`[brain] Rebuild triggered by: project_plan at ${new Date().toISOString()}`)
-      try { await rebuildWorkspaceBrain(workspaceId, 'project_plan') } catch { /* non-fatal */ }
-    })
+    after(async () => { await requestBrainRebuild(workspaceId, 'project_plan') })
 
     return NextResponse.json({ data: projectPlan })
   } catch (err) {
@@ -257,10 +254,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       .set({ projectPlan: updated, updatedAt: new Date() } as any)
       .where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId)))
 
-    after(async () => {
-      console.log(`[brain] Rebuild triggered by: project_plan at ${new Date().toISOString()}`)
-      try { await rebuildWorkspaceBrain(workspaceId, 'project_plan') } catch { /* non-fatal */ }
-    })
+    after(async () => { await requestBrainRebuild(workspaceId, 'project_plan') })
 
     return NextResponse.json({ data: updated })
   } catch (err) {
@@ -281,10 +275,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       .set({ projectPlan: null, updatedAt: new Date() } as any)
       .where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId)))
 
-    after(async () => {
-      console.log(`[brain] Rebuild triggered by: project_plan at ${new Date().toISOString()}`)
-      try { await rebuildWorkspaceBrain(workspaceId, 'project_plan') } catch { /* non-fatal */ }
-    })
+    after(async () => { await requestBrainRebuild(workspaceId, 'project_plan') })
 
     return NextResponse.json({ data: null })
   } catch (err) {

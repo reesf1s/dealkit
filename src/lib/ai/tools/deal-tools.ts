@@ -4,7 +4,8 @@ import { after } from 'next/server'
 import { db } from '@/lib/db'
 import { dealLogs, productGaps, companyProfiles } from '@/lib/db/schema'
 import { anthropic } from '@/lib/ai/client'
-import { rebuildWorkspaceBrain, getWorkspaceBrain } from '@/lib/workspace-brain'
+import { getWorkspaceBrain } from '@/lib/workspace-brain'
+import { requestBrainRebuild } from '@/lib/brain-rebuild'
 import { extractTextSignals, heuristicScore } from '@/lib/text-signals'
 import { computeCompositeScore } from '@/lib/deal-ml'
 import { buildDealBriefing, scoreNarrationPrompt } from '@/lib/brain-narrator'
@@ -302,7 +303,7 @@ export const create_deal = {
       .returning()
 
     after(async () => {
-      try { console.log(`[brain] Rebuild triggered by: deal_tool_call at ${new Date().toISOString()}`); await rebuildWorkspaceBrain(ctx.workspaceId, 'deal_tool_call') } catch { /* non-fatal */ }
+      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
     })
 
     return {
@@ -517,7 +518,7 @@ export const import_deal = {
     } catch { /* scoring is non-fatal */ }
 
     after(async () => {
-      try { console.log(`[brain] Rebuild triggered by: deal_tool_call at ${new Date().toISOString()}`); await rebuildWorkspaceBrain(ctx.workspaceId, 'deal_tool_call') } catch { /* non-fatal */ }
+      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
     })
 
     // Build summary
@@ -868,7 +869,7 @@ export const enrich_deal = {
     }
 
     after(async () => {
-      try { console.log(`[brain] Rebuild triggered by: deal_tool_call at ${new Date().toISOString()}`); await rebuildWorkspaceBrain(ctx.workspaceId, 'deal_tool_call') } catch {}
+      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
     })
 
     return {
@@ -1033,7 +1034,7 @@ export const update_deal = {
     }
 
     after(async () => {
-      try { console.log(`[brain] Rebuild triggered by: deal_tool_call at ${new Date().toISOString()}`); await rebuildWorkspaceBrain(ctx.workspaceId, 'deal_tool_call') } catch { /* non-fatal */ }
+      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
     })
 
     return {
@@ -1248,7 +1249,7 @@ export const delete_deal_confirmed = {
     await db.delete(dealLogs).where(eq(dealLogs.id, params.dealId))
 
     after(async () => {
-      try { console.log(`[brain] Rebuild triggered by: deal_tool_call at ${new Date().toISOString()}`); await rebuildWorkspaceBrain(ctx.workspaceId, 'deal_tool_call') } catch { /* non-fatal */ }
+      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
     })
 
     return {
@@ -1744,7 +1745,7 @@ Rules:
     }
 
     after(async () => {
-      try { console.log(`[brain] Rebuild triggered by: deal_tool_call at ${new Date().toISOString()}`); await rebuildWorkspaceBrain(ctx.workspaceId, 'deal_tool_call') } catch { /* non-fatal */ }
+      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
     })
 
     // Build response
@@ -1925,7 +1926,7 @@ export const update_project_plan = {
         .where(eq(dealLogs.id, params.dealId))
 
       after(async () => {
-        try { console.log(`[brain] Rebuild triggered by: deal_tool_call at ${new Date().toISOString()}`); await rebuildWorkspaceBrain(ctx.workspaceId, 'deal_tool_call') } catch { /* non-fatal */ }
+        await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
       })
 
       return {
@@ -2047,7 +2048,7 @@ export const update_project_plan = {
       .where(eq(dealLogs.id, params.dealId))
 
     after(async () => {
-      try { console.log(`[brain] Rebuild triggered by: deal_tool_call at ${new Date().toISOString()}`); await rebuildWorkspaceBrain(ctx.workspaceId, 'deal_tool_call') } catch { /* non-fatal */ }
+      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
     })
 
     return {
@@ -2150,7 +2151,7 @@ export const update_success_criteria = {
       .where(eq(dealLogs.id, params.dealId))
 
     after(async () => {
-      try { console.log(`[brain] Rebuild triggered by: deal_tool_call at ${new Date().toISOString()}`); await rebuildWorkspaceBrain(ctx.workspaceId, 'deal_tool_call') } catch { /* non-fatal */ }
+      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
     })
 
     const achieved = criteria.filter((c: any) => c.achieved).length
@@ -2353,7 +2354,7 @@ export const correct_deal_data = {
     await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, params.dealId))
 
     after(async () => {
-      try { console.log(`[brain] Rebuild triggered by: deal_tool_call at ${new Date().toISOString()}`); await rebuildWorkspaceBrain(ctx.workspaceId, 'deal_tool_call') } catch { /* non-fatal */ }
+      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
     })
 
     return {

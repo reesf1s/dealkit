@@ -12,7 +12,8 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { dealLogs, workspaces } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { getWorkspaceBrain, formatBrainContext, rebuildWorkspaceBrain } from '@/lib/workspace-brain'
+import { getWorkspaceBrain, formatBrainContext } from '@/lib/workspace-brain'
+import { requestBrainRebuild } from '@/lib/brain-rebuild'
 import type { DealSnapshot } from '@/lib/workspace-brain'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { PLAN_LIMITS } from '@/lib/stripe/plans'
@@ -717,14 +718,7 @@ export async function POST(req: NextRequest) {
         maxSteps: 20,
         maxTokens: 8192,
         onFinish: async () => {
-          after(async () => {
-            console.log(`[brain] Rebuild triggered by: agent_tool_call at ${new Date().toISOString()}`)
-            try {
-              await rebuildWorkspaceBrain(wsCtx.workspaceId, 'agent_tool_call')
-            } catch {
-              // Non-fatal — brain will rebuild on next access
-            }
-          })
+          after(async () => { await requestBrainRebuild(wsCtx.workspaceId, 'agent_tool_call') })
         },
       })
 
@@ -791,10 +785,7 @@ async function executeConfirmedAction(
         .delete(dealLogs)
         .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId)))
 
-      after(async () => {
-        console.log(`[brain] Rebuild triggered by: agent_tool_call at ${new Date().toISOString()}`)
-        try { await rebuildWorkspaceBrain(workspaceId, 'agent_tool_call') } catch { /* non-fatal */ }
-      })
+      after(async () => { await requestBrainRebuild(workspaceId, 'agent_tool_call') })
 
       return {
         reply: `**${dealName}** has been permanently deleted.`,
@@ -824,9 +815,7 @@ async function executeConfirmedAction(
       .set({ todos: updatedTodos, updatedAt: new Date() })
       .where(eq(dealLogs.id, dealId))
 
-    after(async () => {
-      try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ }
-    })
+    after(async () => { await requestBrainRebuild(workspaceId, 'agent_tool_call') })
 
     const removed = pendingAction.removedTexts ?? []
     const completed = pendingAction.completedTexts ?? []

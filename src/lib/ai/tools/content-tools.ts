@@ -5,7 +5,7 @@ import { db } from '@/lib/db'
 import { dealLogs, collateral, competitors } from '@/lib/db/schema'
 import { anthropic } from '@/lib/ai/client'
 import { generateCollateral, generateFreeformCollateral } from '@/lib/ai/generate'
-import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
+import { requestBrainRebuild } from '@/lib/brain-rebuild'
 import { upsertCollateral } from '@/lib/collateral-helpers'
 import type { ToolContext, ToolResult } from './types'
 

@@ -6,7 +6,7 @@ import { db } from '@/lib/db'
 import { dealLogs, events } from '@/lib/db/schema'
 import { dbErrResponse, ensureLinksColumn } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
+import { requestBrainRebuild } from '@/lib/brain-rebuild'
 
 /**
  * POST /api/deals/[id]/expand
@@ -115,7 +115,7 @@ export async function POST(
 
     after(async () => {
       console.log(`[brain] Rebuild triggered by: deal_expanded (deal: ${newDeal.dealName}) at ${new Date().toISOString()}`)
-      try { await rebuildWorkspaceBrain(workspaceId, 'deal_expanded') } catch { /* non-fatal */ }
+      await requestBrainRebuild(workspaceId, 'deal_expanded')
     })
 
     return NextResponse.json({ data: newDeal }, { status: 201 })

@@ -6,7 +6,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
+import { requestBrainRebuild } from '@/lib/brain-rebuild'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -86,13 +86,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       } catch { /* non-fatal — table may not exist yet on first run */ }
     })
 
-    // Always call rebuildWorkspaceBrain directly inside after() — Vercel keeps the
+    // Always call requestBrainRebuild inside after() — Vercel keeps the
     // execution alive for awaited promises but NOT for fire-and-forget timers.
     const rebuildReason = (stage === 'closed_won' || stage === 'closed_lost') ? 'deal_closed' : 'stage_change'
-    after(async () => {
-      console.log(`[brain] Rebuild triggered by: ${rebuildReason} (deal: ${deal.dealName}, stage: ${stage}) at ${new Date().toISOString()}`)
-      try { await rebuildWorkspaceBrain(workspaceId, rebuildReason) } catch { /* non-fatal */ }
-    })
+    after(async () => { await requestBrainRebuild(workspaceId, rebuildReason) })
     return NextResponse.json({ data: deal })
   } catch (e: unknown) {
     console.error('[deals/stage] failed:', e instanceof Error ? e.message : e)

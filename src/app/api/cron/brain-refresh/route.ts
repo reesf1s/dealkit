@@ -15,7 +15,8 @@ export const maxDuration = 300 // 5 min — may process many workspaces
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { sql } from 'drizzle-orm'
-import { rebuildWorkspaceBrain, getWorkspaceBrain, BRAIN_VERSION } from '@/lib/workspace-brain'
+import { getWorkspaceBrain, BRAIN_VERSION } from '@/lib/workspace-brain'
+import { requestBrainRebuild } from '@/lib/brain-rebuild'
 
 export async function GET(req: NextRequest) {
   // Verify cron secret — always required to prevent public access
@@ -82,7 +83,7 @@ export async function GET(req: NextRequest) {
         // - Proactive collateral generation (with 24h cooldown)
         // - Semantic embedding refresh
         // - Global pool contribution
-        await rebuildWorkspaceBrain(ws.workspace_id)
+        await requestBrainRebuild(ws.workspace_id, 'cron_refresh')
 
         results.push({
           workspaceId: ws.workspace_id,

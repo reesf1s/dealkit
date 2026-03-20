@@ -10,7 +10,8 @@ import { db } from '@/lib/db'
 import { dealLogs, productGaps, companyProfiles, workspaces } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
-import { rebuildWorkspaceBrain, getWorkspaceBrain } from '@/lib/workspace-brain'
+import { getWorkspaceBrain } from '@/lib/workspace-brain'
+import { requestBrainRebuild } from '@/lib/brain-rebuild'
 import { computeCompositeScore, type ScoreBreakdown } from '@/lib/deal-ml'
 import { ensureLinksColumn } from '@/lib/api-helpers'
 import { extractTextSignals, heuristicScore } from '@/lib/text-signals'
@@ -543,7 +544,7 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
     // Rebuild workspace brain in background so chat/overview always have fresh context
     after(async () => {
       console.log(`[brain] Rebuild triggered by: analyze_notes at ${new Date().toISOString()}`)
-      try { await rebuildWorkspaceBrain(workspaceId, 'analyze_notes') } catch { /* non-fatal */ }
+      await requestBrainRebuild(workspaceId, 'analyze_notes')
     })
 
     return NextResponse.json({ data: { deal: updatedDeal, productGaps: createdGaps, parsed } })

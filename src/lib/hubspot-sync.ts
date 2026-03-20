@@ -26,7 +26,7 @@ import {
   ensureHubspotSchema,
   getHubspotIntegration,
 } from '@/lib/hubspot'
-import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
+import { requestBrainRebuild } from '@/lib/brain-rebuild'
 
 export interface SyncResult {
   workspaceId: string
@@ -183,7 +183,7 @@ export async function syncHubspotDeals(workspaceId: string, userId: string): Pro
 
   // ── 7. Rebuild brain in the background ───────────────────────────────────────
   console.log(`[brain] Rebuild triggered by: hubspot_sync_complete at ${new Date().toISOString()}`)
-  rebuildWorkspaceBrain(workspaceId, 'hubspot_sync_complete').catch(() => {})
+  requestBrainRebuild(workspaceId, 'hubspot_sync_complete').catch(() => {})
 
   return {
     workspaceId,

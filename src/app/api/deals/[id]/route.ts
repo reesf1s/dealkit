@@ -6,7 +6,7 @@ import { db } from '@/lib/db'
 import { dealLogs, events } from '@/lib/db/schema'
 import { dbErrResponse, ensureIndexes } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
+import { requestBrainRebuild } from '@/lib/brain-rebuild'
 
 async function logEvent(workspaceId: string, userId: string, type: string, metadata: Record<string, unknown>) {
   await db.insert(events).values({ workspaceId, userId, type, metadata, createdAt: new Date() })
@@ -74,7 +74,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     await logEvent(workspaceId, userId, 'deal_log.updated', { dealLogId: id, dealName: updated.dealName })
     after(async () => {
       console.log(`[brain] Rebuild triggered by: deal_updated (deal: ${updated.dealName}) at ${new Date().toISOString()}`)
-      try { await rebuildWorkspaceBrain(workspaceId, 'deal_updated') } catch { /* non-fatal */ }
+      await requestBrainRebuild(workspaceId, 'deal_updated')
     })
     return NextResponse.json({ data: updated })
   } catch (err) { return dbErrResponse(err) }
@@ -92,7 +92,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     await logEvent(workspaceId, userId, 'deal_log.updated', { dealLogId: id, dealName: existing.dealName, action: 'deleted' })
     after(async () => {
       console.log(`[brain] Rebuild triggered by: deal_deleted (deal: ${existing.dealName}) at ${new Date().toISOString()}`)
-      try { await rebuildWorkspaceBrain(workspaceId, 'deal_deleted') } catch { /* non-fatal */ }
+      await requestBrainRebuild(workspaceId, 'deal_deleted')
     })
     return NextResponse.json({ data: { deleted: true } })
   } catch (err) { return dbErrResponse(err) }

@@ -3,7 +3,7 @@ import { eq, and } from 'drizzle-orm'
 import { after } from 'next/server'
 import { db } from '@/lib/db'
 import { competitors, companyProfiles, caseStudies, productGaps } from '@/lib/db/schema'
-import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
+import { requestBrainRebuild } from '@/lib/brain-rebuild'
 import type { ToolContext, ToolResult } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,7 +57,7 @@ export const create_competitor = {
       .returning()
 
     after(async () => {
-      try { console.log(`[brain] Rebuild triggered by: knowledge_tool_call at ${new Date().toISOString()}`); await rebuildWorkspaceBrain(ctx.workspaceId, 'knowledge_tool_call') } catch { /* non-fatal */ }
+      await requestBrainRebuild(ctx.workspaceId, 'knowledge_tool_call')
     })
 
     return {
@@ -140,7 +140,7 @@ export const update_competitor = {
     await db.update(competitors).set(updateFields).where(eq(competitors.id, params.competitorId))
 
     after(async () => {
-      try { console.log(`[brain] Rebuild triggered by: knowledge_tool_call at ${new Date().toISOString()}`); await rebuildWorkspaceBrain(ctx.workspaceId, 'knowledge_tool_call') } catch { /* non-fatal */ }
+      await requestBrainRebuild(ctx.workspaceId, 'knowledge_tool_call')
     })
 
     return {
@@ -267,7 +267,7 @@ export const create_case_study = {
       .returning()
 
     after(async () => {
-      try { console.log(`[brain] Rebuild triggered by: knowledge_tool_call at ${new Date().toISOString()}`); await rebuildWorkspaceBrain(ctx.workspaceId, 'knowledge_tool_call') } catch { /* non-fatal */ }
+      await requestBrainRebuild(ctx.workspaceId, 'knowledge_tool_call')
     })
 
     return {
