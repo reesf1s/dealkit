@@ -69,12 +69,22 @@ export async function upsertCollateral(opts: UpsertCollateralOpts): Promise<{ id
 
   // For typed collateral, look for an existing row with the same natural key
   // (any status — including 'ready' — to prevent true duplicates)
+  //
+  // Strategy: match on (workspace, type, competitorId, caseStudyId) when those
+  // foreign keys are set.  When BOTH are null, fall back to title matching so
+  // that battlecards generated without a linked competitor still dedup correctly.
   const competitorMatch = competitorId
     ? eq(collateral.sourceCompetitorId, competitorId)
     : isNull(collateral.sourceCompetitorId)
   const caseStudyMatch = caseStudyId
     ? eq(collateral.sourceCaseStudyId, caseStudyId)
     : isNull(collateral.sourceCaseStudyId)
+
+  // When neither foreign key is set, also match on title to catch duplicates
+  // that share the same name but were created without source IDs.
+  const titleFallback = (!competitorId && !caseStudyId && opts.title)
+    ? eq(collateral.title, opts.title)
+    : undefined
 
   const [existing] = await db
     .select({ id: collateral.id })
@@ -86,6 +96,7 @@ export async function upsertCollateral(opts: UpsertCollateralOpts): Promise<{ id
         competitorMatch,
         caseStudyMatch,
         ne(collateral.status, 'archived'),
+        ...(titleFallback ? [titleFallback] : []),
       ),
     )
     .orderBy(desc(collateral.updatedAt))
@@ -150,9 +161,8 @@ export async function archiveDuplicateCollateral(workspaceId?: string): Promise<
         id,
         ROW_NUMBER() OVER (
           PARTITION BY workspace_id, type,
-            COALESCE(source_competitor_id::text, ''),
-            COALESCE(source_case_study_id::text, '')
-          ORDER BY updated_at DESC
+            COALESCE(source_competitor_id::text, LOWER(TRIM(title)))
+          ORDER BY updated_at DESC NULLS LAST, created_at DESC
         ) AS rn
       FROM collateral c
       WHERE c.status != 'archived'

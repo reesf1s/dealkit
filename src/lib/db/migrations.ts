@@ -305,6 +305,27 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
         ON deal_events (deal_id, event_date, title)
     `,
   },
+  {
+    version: 22,
+    name: 'archive_duplicate_collateral_by_title',
+    sql: `
+      WITH ranked AS (
+        SELECT
+          id,
+          ROW_NUMBER() OVER (
+            PARTITION BY workspace_id, type,
+              COALESCE(source_competitor_id::text, LOWER(TRIM(title)))
+            ORDER BY updated_at DESC NULLS LAST, created_at DESC
+          ) AS rn
+        FROM collateral
+        WHERE status != 'archived'
+          AND type != 'custom'
+      )
+      UPDATE collateral
+      SET status = 'archived', updated_at = NOW()
+      WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
+    `,
+  },
 ]
 
 // ── In-process cache — prevents redundant round-trips on the same cold-start ──
