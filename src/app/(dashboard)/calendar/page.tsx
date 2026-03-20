@@ -9,6 +9,7 @@ import {
   Users, Clock, Target, Zap, AlertCircle, CheckSquare, X,
   Sparkles, FileText, RefreshCw, Flag,
 } from 'lucide-react'
+import { getCalendarEvents, type CalendarEvent } from '@/lib/calendar-events'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -16,7 +17,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 type CalEventType =
   | 'close' | 'contract_start' | 'contract_end'
-  | 'follow_up' | 'urgent' | 'task' | 'phase' | 'mention'
+  | 'follow_up' | 'urgent' | 'task' | 'phase'
   | 'meeting' | 'demo' | 'deadline' | 'decision' | 'predicted_close'
   | 'stale_followup'
 
@@ -51,7 +52,6 @@ const EVENT_CONFIG: Record<string, {
   task:            { label: 'Task Due',          color: '#F59E0B', icon: CheckSquare },
   phase:           { label: 'Phase Target',      color: '#06B6D4', icon: Flag },
   urgent:          { label: 'Urgent',            color: '#F87171', icon: AlertCircle },
-  mention:         { label: 'Date Mention',      color: '#F59E0B', icon: Calendar },
   stale_followup:  { label: 'Stale Follow-up',   color: '#9CA3AF', icon: Clock },
 }
 
@@ -83,65 +83,91 @@ function cleanSnippet(text: string): string {
     .slice(0, 80)
 }
 
-// ── Extract dates from free-form text ────────────────────────────────────────
-
-function extractDatesFromText(text: string, currentYear: number): { date: Date; snippet: string }[] {
-  if (!text) return []
-  const results: { date: Date; snippet: string }[] = []
-  const seen = new Set<string>()
-  const MONTHS: Record<string, number> = {
-    january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
-    july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
-    jan: 0, feb: 1, mar: 2, apr: 3, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
-  }
-  const push = (day: number, monthIdx: number, yr: number, idx: number) => {
-    if (day < 1 || day > 31 || monthIdx < 0 || monthIdx > 11) return
-    const d = new Date(yr, monthIdx, day)
-    if (isNaN(d.getTime())) return
-    const now = Date.now()
-    const diff = d.getTime() - now
-    if (diff < -60 * 86_400_000 || diff > 365 * 86_400_000) return
-    const key = d.toDateString()
-    if (seen.has(key)) return
-    seen.add(key)
-    const start = Math.max(0, idx - 40)
-    const end = Math.min(text.length, idx + 60)
-    const snippet = text.slice(start, end).replace(/\s+/g, ' ').trim()
-    results.push({ date: d, snippet: snippet.length > 80 ? snippet.slice(0, 77) + '...' : snippet })
-  }
-  const p1 = /(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)(?:\s+(\d{4}))?/gi
-  let m: RegExpExecArray | null
-  while ((m = p1.exec(text)) !== null)
-    push(+m[1], MONTHS[m[2].toLowerCase()], m[3] ? +m[3] : currentYear, m.index)
-  const p2 = /(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{4}))?/gi
-  while ((m = p2.exec(text)) !== null)
-    push(+m[2], MONTHS[m[1].toLowerCase()], m[3] ? +m[3] : currentYear, m.index)
-  return results
-}
-
 // ── Build all calendar events from deals + brain data ────────────────────────
+// Uses getCalendarEvents() from the foundation module for scheduled events and
+// close dates. Keeps inline logic for contract dates, project plans, stale
+// deals, and urgent deals until those move into the foundation module too.
 
 function buildCalendarEvents(deals: any[], brainData: any): CalEvent[] {
   const events: CalEvent[] = []
   const today = new Date()
   const now = new Date()
 
+  // ── Foundation module: scheduled events + close dates ──────────────────────
+  // Build lightweight DealContext array from deals data
+  const dealContexts = (deals || []).map((d: any) => {
+    const isClosed = d.stage === 'closed_won' || d.stage === 'closed_lost'
+    const scheduledEvents = (d.scheduledEvents as any[]) || []
+    const upcomingEvents = scheduledEvents.map((e: any) => ({
+      type: e.type || 'meeting',
+      title: e.description || e.title || 'Event',
+      date: e.date,
+      time: e.time || null,
+    }))
+
+    return {
+      id: d.id,
+      name: d.dealName || 'Untitled',
+      company: d.prospectCompany || '',
+      isClosed,
+      closeDate: d.closeDate ? new Date(d.closeDate).toISOString() : null,
+      upcomingEvents,
+      // Defaults for other DealContext fields
+      stage: d.stage || 'prospecting',
+      dealValue: d.dealValue ?? 0,
+      dealType: d.dealType || null,
+      currency: 'GBP',
+      outcome: null,
+      wonDate: null,
+      lostDate: null,
+      lossReason: null,
+      dealAgeDays: 0,
+      daysSinceLastNote: 999,
+      compositeScore: d.conversionScore ?? 0,
+      scoreColor: '#6B7280',
+      championIdentified: false,
+      budgetConfirmed: false,
+      nextStepDefined: false,
+      competitorsPresent: [],
+      sentimentRecent: 0.5,
+      momentum: 0.5,
+      noteCount: 0,
+      lastNoteDate: null,
+      lastNoteSummary: null,
+      openActionCount: 0,
+      completedActionCount: 0,
+      recentCompletedActions: [],
+      contacts: [],
+    }
+  })
+
+  // Compute calendar events from deal contexts (wide range to cover navigation)
+  const rangeStart = new Date(today.getFullYear() - 1, 0, 1)
+  const rangeEnd = new Date(today.getFullYear() + 2, 11, 31)
+  const foundationEvents: CalendarEvent[] = getCalendarEvents(dealContexts as any, rangeStart, rangeEnd)
+
+  // Convert foundation CalendarEvent[] → CalEvent[]
+  for (const fe of foundationEvents) {
+    const feDate = new Date(fe.date)
+    const calType: CalEventType = fe.type === 'predicted_close' ? 'close' : (fe.type as CalEventType) ?? 'meeting'
+    events.push({
+      id: `${fe.dealId}-foundation-${fe.type}-${fe.date}`,
+      title: fe.dealName,
+      subtitle: fe.title.includes(': ') ? fe.title.split(': ').slice(1).join(': ') : fe.title,
+      date: feDate,
+      dealId: fe.dealId,
+      type: calType,
+      time: fe.time ?? null,
+      isPast: feDate < now,
+    })
+  }
+
+  // ── Inline sources not yet in foundation module ────────────────────────────
+
   for (const deal of deals) {
     const dealName = deal.prospectCompany || deal.dealName || 'Deal'
 
-    // 1. Close dates
-    if (deal.closeDate) {
-      events.push({
-        id: `${deal.id}-close`,
-        title: dealName,
-        subtitle: 'Expected close',
-        date: new Date(deal.closeDate),
-        dealId: deal.id,
-        type: 'close',
-      })
-    }
-
-    // 2. Contract start/end dates
+    // Contract start/end dates
     if (deal.contractStartDate) {
       events.push({
         id: `${deal.id}-cstart`,
@@ -163,7 +189,7 @@ function buildCalendarEvents(deals: any[], brainData: any): CalEvent[] {
       })
     }
 
-    // 3. Project plan phases and tasks
+    // Project plan phases and tasks
     const plan = deal.projectPlan as any
     if (plan?.phases) {
       for (const phase of (plan.phases ?? [])) {
@@ -197,58 +223,9 @@ function buildCalendarEvents(deals: any[], brainData: any): CalEvent[] {
         }
       }
     }
-
-    // 4. Scheduled events from note_signals_json
-    try {
-      const signals = deal.note_signals_json ? JSON.parse(deal.note_signals_json) : null
-      const scheduledEvts = signals?.scheduled_events ?? []
-      for (const ev of scheduledEvts) {
-        if (!ev.date) continue
-        const evDate = new Date(ev.date)
-        if (isNaN(evDate.getTime())) continue
-        const diffDays = (evDate.getTime() - now.getTime()) / 86400000
-        if (diffDays < -7 || diffDays > 90) continue
-        const evType = (ev.type as CalEventType) ?? 'meeting'
-        const eventId = `${deal.id}-sched-${ev.type}-${ev.date}`
-        if (events.find(e => e.id === eventId)) continue
-        events.push({
-          id: eventId,
-          title: dealName,
-          subtitle: ev.description ?? '',
-          date: evDate,
-          dealId: deal.id,
-          type: evType,
-          description: ev.description,
-          source: ev.source_text,
-          time: ev.time ?? null,
-          isPast: evDate < now,
-        })
-      }
-    } catch { /* malformed JSON */ }
-
-    // 5. Extract dates from free-form text
-    const textSources: string[] = [
-      deal.meetingNotes ?? '',
-      deal.description ?? '',
-      deal.successCriteria ?? '',
-      Array.isArray(deal.todos) ? deal.todos.map((t: any) => t.text ?? t ?? '').join(' ') : '',
-      Array.isArray(deal.successCriteriaTodos) ? deal.successCriteriaTodos.map((t: any) => t.text ?? t ?? '').join(' ') : '',
-    ]
-    const combinedText = textSources.join('\n')
-    const extracted = extractDatesFromText(combinedText, today.getFullYear())
-    for (const { date, snippet } of extracted) {
-      events.push({
-        id: `${deal.id}-mention-${date.toDateString().replace(/\s/g, '')}`,
-        title: dealName,
-        subtitle: snippet,
-        date,
-        dealId: deal.id,
-        type: 'mention',
-      })
-    }
   }
 
-  // 6. Stale deal follow-up suggestions
+  // Stale deal follow-up suggestions
   for (const s of (brainData?.staleDeals ?? [])) {
     const deal = deals.find((d: any) => d.id === s.dealId)
     if (!deal) continue
@@ -265,7 +242,7 @@ function buildCalendarEvents(deals: any[], brainData: any): CalEvent[] {
     })
   }
 
-  // 7. Urgent deals (show today)
+  // Urgent deals (show today)
   for (const u of (brainData?.urgentDeals ?? [])) {
     events.push({
       id: `${u.dealId}-urgent`,
@@ -285,7 +262,7 @@ function buildCalendarEvents(deals: any[], brainData: any): CalEvent[] {
 const FILTER_TYPES: CalEventType[] = [
   'meeting', 'demo', 'follow_up', 'deadline', 'close',
   'contract_start', 'contract_end', 'phase', 'task',
-  'mention', 'stale_followup', 'urgent', 'decision', 'predicted_close',
+  'stale_followup', 'urgent', 'decision', 'predicted_close',
 ]
 
 // ── Event chip component ─────────────────────────────────────────────────────

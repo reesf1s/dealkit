@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import type { DealContact, DealLink as DealLinkType, DealLinkType as LinkTypeEnum } from '@/types'
 import { useSidebar } from '@/components/layout/SidebarContext'
+import { getScoreColor, getScoreDisplay } from '@/lib/deal-context'
 
 // ─── Signal highlighting helper ──────────────────────────────────────────────
 
@@ -802,7 +803,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
             {/* Conversion score — with clear button */}
             {deal?.conversionScore != null && (
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '20px', fontWeight: '800', color: deal.conversionScore >= 70 ? 'var(--success)' : deal.conversionScore >= 40 ? 'var(--warning)' : 'var(--danger)' }}>
+                <span style={{ fontSize: '20px', fontWeight: '800', color: getScoreColor(deal.conversionScore ?? 0, false) }}>
                   {deal.conversionScore}%
                 </span>
                 <button
@@ -1070,7 +1071,7 @@ function ScoreSimulator({ deal, mlPrediction, brainData }: { deal: any; mlPredic
       <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Simulated score</span>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-          <span style={{ fontSize: '22px', fontWeight: 800, fontFamily: 'monospace', color: simScore >= 70 ? 'var(--success)' : simScore >= 40 ? 'var(--warning)' : 'var(--danger)', lineHeight: 1 }}>
+          <span style={{ fontSize: '22px', fontWeight: 800, fontFamily: 'monospace', color: getScoreColor(simScore, false), lineHeight: 1 }}>
             {simScore}%
           </span>
           {delta !== 0 && (
@@ -3154,9 +3155,9 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
   const textContrib = mlProb != null ? Math.max(0, score - mlContrib!) : score
   const momentumContrib = Math.round(momentumPct * 0.1)
 
-  const scoreColor = score >= 70 ? 'var(--success)' : score >= 40 ? 'var(--warning)' : 'var(--danger)'
-  const scoreBg = score >= 70 ? 'color-mix(in srgb, var(--success) 8%, transparent)' : score >= 40 ? 'color-mix(in srgb, var(--warning) 8%, transparent)' : 'color-mix(in srgb, var(--danger) 8%, transparent)'
-  const scoreBorder = score >= 70 ? 'color-mix(in srgb, var(--success) 20%, transparent)' : score >= 40 ? 'color-mix(in srgb, var(--warning) 20%, transparent)' : 'color-mix(in srgb, var(--danger) 20%, transparent)'
+  const scoreColor = getScoreColor(score, false)
+  const scoreBg = `color-mix(in srgb, ${scoreColor} 8%, transparent)`
+  const scoreBorder = `color-mix(in srgb, ${scoreColor} 20%, transparent)`
 
   const drivers: any[] = mlPrediction?.scoreDrivers ?? []
   const archetype = mlPrediction?.archetypeId != null
@@ -3733,34 +3734,38 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
             <Sparkles size={14} color="var(--accent)" />
             <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--accent)' }}>Deal Intelligence</span>
-            {deal.conversionScore != null && deal.stage !== 'closed_lost' && deal.stage !== 'closed_won' && (
-              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '11px', color: deal.conversionScore >= 70 ? 'var(--success)' : deal.conversionScore >= 40 ? 'var(--warning)' : 'var(--danger)' }}>
-                  {deal.conversionScore >= 70 ? 'High likelihood' : deal.conversionScore >= 40 ? 'Needs attention' : 'At risk'}
-                </span>
-                <span style={{ fontSize: '22px', fontWeight: '800', letterSpacing: '-0.04em', color: deal.conversionScore >= 70 ? 'var(--success)' : deal.conversionScore >= 40 ? 'var(--warning)' : 'var(--danger)' }}>
-                  {deal.conversionScore}%
-                </span>
-                <button onClick={() => patchDeal({ conversionScore: null })} title="Clear score" style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}>✕</button>
-              </div>
-            )}
-            {(deal.stage === 'closed_lost' || deal.stage === 'closed_won') && (
-              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  background: deal.stage === 'closed_won'
-                    ? 'color-mix(in srgb, var(--success) 15%, transparent)'
-                    : 'color-mix(in srgb, var(--danger) 15%, transparent)',
-                  color: deal.stage === 'closed_won' ? 'var(--success)' : 'var(--danger)'
-                }}>
-                  {deal.stage === 'closed_won' ? 'Won' : 'Lost'}
-                  {deal.lostDate || deal.wonDate ? ` · ${new Date(deal.lostDate || deal.wonDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
-                </span>
-              </div>
-            )}
+            {(() => {
+              const isClosed = deal.stage === 'closed_won' || deal.stage === 'closed_lost'
+              const scoreDisplay = getScoreDisplay({
+                compositeScore: deal.conversionScore ?? 0,
+                isClosed,
+                outcome: deal.stage === 'closed_won' ? 'won' : deal.stage === 'closed_lost' ? 'lost' : null,
+              })
+              if (isClosed) return (
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    fontSize: '12px', fontWeight: '600', padding: '4px 10px', borderRadius: '6px',
+                    background: `color-mix(in srgb, ${scoreDisplay.color} 15%, transparent)`,
+                    color: scoreDisplay.color,
+                  }}>
+                    {scoreDisplay.text}
+                    {deal.lostDate || deal.wonDate ? ` · ${new Date(deal.lostDate || deal.wonDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+                  </span>
+                </div>
+              )
+              if (deal.conversionScore != null) return (
+                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '11px', color: scoreDisplay.color }}>
+                    {deal.conversionScore >= 70 ? 'High likelihood' : deal.conversionScore >= 40 ? 'Needs attention' : 'At risk'}
+                  </span>
+                  <span style={{ fontSize: '22px', fontWeight: '800', letterSpacing: '-0.04em', color: scoreDisplay.color }}>
+                    {scoreDisplay.text}
+                  </span>
+                  <button onClick={() => patchDeal({ conversionScore: null })} title="Clear score" style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}>✕</button>
+                </div>
+              )
+              return null
+            })()}
           </div>
 
           <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -4018,10 +4023,13 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
               }
 
               const outcomeLabel = (sd: any) => {
+                const isClosed = sd.stage === 'closed_won' || sd.stage === 'closed_lost'
                 const o = sd.outcome ?? (sd.stage === 'closed_won' ? 'won' : sd.stage === 'closed_lost' ? 'lost' : null)
-                if (o === 'won') return { text: 'Won', color: 'var(--success)', date: formatDate(sd.wonDate) }
-                if (o === 'lost') return { text: 'Lost', color: 'var(--danger)', date: formatDate(sd.lostDate) }
-                return { text: sd.stage?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()), color: 'var(--text-tertiary)', date: null }
+                if (o === 'won' || o === 'lost') {
+                  const display = getScoreDisplay({ compositeScore: sd.conversionScore ?? 0, isClosed: true, outcome: o })
+                  return { text: display.text, color: display.color, date: formatDate(o === 'won' ? sd.wonDate : sd.lostDate) }
+                }
+                return { text: sd.stage?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()), color: getScoreColor(sd.conversionScore ?? 0, isClosed), date: null }
               }
 
               return (
@@ -4393,17 +4401,21 @@ export default function DealDetailPage() {
                 }}>
                   {deal.stage?.replace('_', ' ')}
                 </span>
-                {deal.conversionScore != null && (
-                  <span style={{
-                    fontSize: '12px', padding: '3px 10px', borderRadius: '100px', fontWeight: '700',
-                    background: deal.conversionScore >= 70 ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)',
-                    color: deal.conversionScore >= 70 ? 'var(--success)' : 'var(--warning)',
-                    border: `1px solid ${deal.conversionScore >= 70 ? 'rgba(34,197,94,0.25)' : 'rgba(245,158,11,0.25)'}`,
-                    display: 'flex', alignItems: 'center', gap: '4px',
-                  }}>
-                    <Target size={10} /> {deal.conversionScore}% win probability
-                  </span>
-                )}
+                {deal.conversionScore != null && (() => {
+                  const isClosed = deal.stage === 'closed_won' || deal.stage === 'closed_lost'
+                  const c = getScoreColor(deal.conversionScore, isClosed)
+                  return (
+                    <span style={{
+                      fontSize: '12px', padding: '3px 10px', borderRadius: '100px', fontWeight: '700',
+                      background: `color-mix(in srgb, ${c} 10%, transparent)`,
+                      color: c,
+                      border: `1px solid color-mix(in srgb, ${c} 25%, transparent)`,
+                      display: 'flex', alignItems: 'center', gap: '4px',
+                    }}>
+                      <Target size={10} /> {deal.conversionScore}% win probability
+                    </span>
+                  )
+                })()}
                 {deal.engagementType && (
                   <span style={{
                     fontSize: '11px', padding: '3px 10px', borderRadius: '100px', fontWeight: '600',

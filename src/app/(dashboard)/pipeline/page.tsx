@@ -18,7 +18,7 @@ import {
   Lock, MessageSquare,
 } from 'lucide-react'
 import WinLossModal, { type WinLossData } from '@/components/shared/WinLossModal'
-import { scoreColor as getScoreColor } from '@/lib/format'
+import { getScoreColor, getScoreDisplay, type DealContext } from '@/lib/deal-context'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -105,11 +105,11 @@ const STAGES = [
   { id: 'closed_lost',   label: 'Closed Lost',    color: '#6B7280' },
 ]
 
-function ScoreBadge({ score }: { score?: number | null }) {
+function ScoreBadge({ score, isClosed = false }: { score?: number | null; isClosed?: boolean }) {
   if (!score && score !== 0) return null
-  const color = score >= 70 ? 'var(--success)' : score >= 40 ? 'var(--warning)' : 'var(--danger)'
-  const bg = score >= 70 ? 'color-mix(in srgb, var(--success) 10%, transparent)' : score >= 40 ? 'color-mix(in srgb, var(--warning) 10%, transparent)' : 'color-mix(in srgb, var(--danger) 10%, transparent)'
-  const border = score >= 70 ? 'color-mix(in srgb, var(--success) 25%, transparent)' : score >= 40 ? 'color-mix(in srgb, var(--warning) 25%, transparent)' : 'color-mix(in srgb, var(--danger) 25%, transparent)'
+  const color = getScoreColor(score, isClosed)
+  const bg = `color-mix(in srgb, ${color} 10%, transparent)`
+  const border = `color-mix(in srgb, ${color} 25%, transparent)`
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: '3px',
@@ -153,7 +153,10 @@ function DealCard({
   allStages?: { id: string; label: string; color: string }[]
 }) {
   const score = deal.conversionScore ?? 0
-  const scColor = getScoreColor(score > 0 ? score : null)
+  const isClosed = deal.stage === 'closed_won' || deal.stage === 'closed_lost'
+  const outcome: 'won' | 'lost' | null = deal.stage === 'closed_won' ? 'won' : deal.stage === 'closed_lost' ? 'lost' : null
+  const scoreDisplay = getScoreDisplay({ compositeScore: score, isClosed, outcome } as DealContext)
+  const scColor = scoreDisplay.color
   const scoreBg = score > 0 ? `color-mix(in srgb, ${scColor} 15%, transparent)` : 'rgba(255,255,255,0.05)'
   const [scoreHover, setScoreHover] = useState(false)
 
@@ -232,15 +235,15 @@ function DealCard({
             </span>
           )}
         </div>
-        {score > 0 && (
+        {(score > 0 || isClosed) && (
           <div
             style={{ position: 'relative', flexShrink: 0 }}
             onMouseEnter={e => { e.stopPropagation(); setScoreHover(true) }}
             onMouseLeave={() => setScoreHover(false)}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: scColor, border: `1.5px solid ${scColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }}>
-              <span style={{ fontSize: '10px', fontWeight: '800', color: '#fff', lineHeight: 1 }}>{score}</span>
+            <div style={{ width: isClosed ? 'auto' : '30px', minWidth: '30px', height: '30px', borderRadius: isClosed ? '8px' : '50%', padding: isClosed ? '0 8px' : 0, background: scColor, border: `1.5px solid ${scColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }}>
+              <span style={{ fontSize: '10px', fontWeight: '800', color: '#fff', lineHeight: 1 }}>{scoreDisplay.text}</span>
             </div>
             {scoreHover && (
               <div style={{
@@ -251,7 +254,7 @@ function DealCard({
                 pointerEvents: 'none',
               }}>
                 <div style={{ fontSize: '12px', fontWeight: '700', color: scColor, marginBottom: '8px' }}>
-                  {score}% win probability
+                  {isClosed ? scoreDisplay.text : `${score}% win probability`}
                 </div>
                 <div style={{ height: '1px', background: 'var(--border)', marginBottom: '8px' }} />
                 {breakdown ? (
@@ -699,7 +702,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
     letterSpacing: '0.08em', textTransform: 'uppercase',
   }
   const fmtCurrency = (n: number) => `${currencySymbol}${Math.round(n).toLocaleString()}`
-  const scoreColor = (s: number) => getScoreColor(s > 0 ? s : null)
+  const scoreColor = (s: number) => getScoreColor(s > 0 ? s : 0, false)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

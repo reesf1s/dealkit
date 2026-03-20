@@ -7,6 +7,8 @@ import Link from 'next/link'
 import { Sparkles, TrendingUp, AlertTriangle, ArrowUpRight, RefreshCw, Brain, Target, CheckCircle, Clock, DollarSign, Zap, ChevronRight, ChevronDown, Thermometer, TrendingDown, AlertCircle, Calendar } from 'lucide-react'
 import { useSidebar } from '@/components/layout/SidebarContext'
 import { formatCurrency } from '@/lib/format'
+import { generateAlerts } from '@/lib/alerts'
+import { getScoreColor } from '@/lib/deal-context'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -28,6 +30,48 @@ export default function DashboardPage() {
   const brain = brainRes?.data
   const deals: any[] = dealsRes?.data ?? []
   const activeDeals = deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+
+  // Build deal contexts for alerts
+  const alertDeals = (deals || []).map((d: any) => {
+    const isClosed = d.stage === 'closed_won' || d.stage === 'closed_lost'
+    const intentSignals = d.intentSignals as any || {}
+    const contacts = ((d.contacts as any[]) || []).map((c: any) => ({ name: c.name || 'Unknown', role: c.role || '' }))
+
+    return {
+      id: d.id,
+      name: d.dealName || 'Untitled',
+      company: d.prospectCompany || '',
+      stage: d.stage || 'prospecting',
+      dealValue: d.dealValue ?? 0,
+      dealType: null,
+      currency: 'GBP',
+      isClosed,
+      outcome: d.stage === 'closed_won' ? 'won' as const : d.stage === 'closed_lost' ? 'lost' as const : null,
+      closeDate: d.closeDate ? new Date(d.closeDate).toISOString() : null,
+      wonDate: null,
+      lostDate: null,
+      lossReason: null,
+      dealAgeDays: d.createdAt ? Math.floor((Date.now() - new Date(d.createdAt).getTime()) / 86400000) : 0,
+      daysSinceLastNote: d.updatedAt ? Math.floor((Date.now() - new Date(d.updatedAt).getTime()) / 86400000) : 999,
+      championIdentified: intentSignals.championStatus === 'confirmed',
+      budgetConfirmed: intentSignals.budgetStatus === 'confirmed' || intentSignals.budgetStatus === 'approved',
+      nextStepDefined: false,
+      competitorsPresent: [] as string[],
+      sentimentRecent: 0.5,
+      momentum: 0.5,
+      compositeScore: d.conversionScore ?? 0,
+      scoreColor: getScoreColor(d.conversionScore ?? 0, isClosed),
+      noteCount: 0,
+      lastNoteDate: null,
+      lastNoteSummary: null,
+      openActionCount: 0,
+      completedActionCount: 0,
+      recentCompletedActions: [] as string[],
+      upcomingEvents: [] as { type: string; title: string; date: string; time: string | null }[],
+      contacts,
+    }
+  })
+  const proactiveAlerts = generateAlerts(alertDeals as any)
 
   // Quick stats — prefer brain's pre-computed pipeline values as the source of truth
   const totalPipeline = brain?.pipeline?.totalValue ?? activeDeals.reduce((s: number, d: any) => s + (d.dealValue ?? 0), 0)
@@ -241,173 +285,35 @@ export default function DashboardPage() {
           )}
 
           {/* ── Proactive Alerts ── */}
-          {(() => {
-            const staleRaw: any[] = brain?.staleDeals ?? []
-            const scoreDropRaw: any[] = brain?.scoreAlerts ?? []
-            const missingRaw: any[] = brain?.missingSignals ?? []
-
-            // Close-date-approaching: active deals closing within 7 days
-            const now = new Date()
-            const closeApproachingRaw: { dealId: string; dealName: string; company: string; daysUntilClose: number; stage: string }[] = []
-            for (const d of activeDeals) {
-              if (!d.closeDate) continue
-              const closeDate = new Date(d.closeDate)
-              const daysUntil = Math.ceil((closeDate.getTime() - now.getTime()) / 86_400_000)
-              if (daysUntil >= 0 && daysUntil <= 7) {
-                closeApproachingRaw.push({
-                  dealId: d.id,
-                  dealName: d.dealName,
-                  company: d.prospectCompany ?? d.dealName,
-                  daysUntilClose: daysUntil,
-                  stage: d.stage,
-                })
-              }
-            }
-
-            // Build a contact lookup from deals for actionable text
-            const contactByDealId = new Map<string, { name: string; title: string }>(
-              deals.map((d: any) => [d.id, { name: d.prospectName ?? '', title: d.prospectTitle ?? '' }])
-            )
-
-            // ── Dedup: one alert per deal, highest severity wins ──
-            // Severity: score(0) > close(1) > stale(2) > missing(3)
-            type AlertEntry = {
-              dealId: string
-              dealName: string
-              company: string
-              severity: number
-              type: 'score' | 'close' | 'stale' | 'missing'
-              lines: string[]
-              // extra data per type
-              scoreData?: { delta: number; previousScore: number; currentScore: number; possibleCause: string }
-              closeData?: { daysUntilClose: number; stage: string }
-              staleData?: { daysSinceActivity: number }
-              missingData?: { missing: string[]; stage: string }
-            }
-
-            const alertMap = new Map<string, AlertEntry>()
-
-            const mergeAlert = (dealId: string, dealName: string, company: string, severity: number, type: AlertEntry['type'], line: string, extra: Partial<AlertEntry>) => {
-              const existing = alertMap.get(dealId)
-              if (existing) {
-                // Append line if not already present
-                if (!existing.lines.includes(line)) existing.lines.push(line)
-                // Keep highest severity (lowest number)
-                if (severity < existing.severity) {
-                  existing.severity = severity
-                  existing.type = type
-                  Object.assign(existing, extra)
-                }
-              } else {
-                alertMap.set(dealId, { dealId, dealName, company, severity, type, lines: [line], ...extra })
-              }
-            }
-
-            // Score drops (severity 0)
-            for (const d of scoreDropRaw) {
-              const cause = (d.possibleCause ?? 'unknown').replace(/_/g, ' ')
-              mergeAlert(d.dealId, d.dealName, d.company, 0, 'score',
-                `Dropped ${Math.abs(d.delta)}pts (${d.previousScore}% \u2192 ${d.currentScore}%) \u2014 ${cause}`,
-                { scoreData: { delta: d.delta, previousScore: d.previousScore, currentScore: d.currentScore, possibleCause: d.possibleCause } })
-            }
-
-            // Close approaching (severity 1)
-            for (const d of closeApproachingRaw) {
-              const stageLabel = d.stage ? d.stage.replace(/_/g, ' ') : 'unknown'
-              const timeStr = d.daysUntilClose === 0 ? 'today' : d.daysUntilClose === 1 ? 'tomorrow' : `in ${d.daysUntilClose} days`
-              mergeAlert(d.dealId, d.dealName, d.company, 1, 'close',
-                `Expected close ${timeStr} \u2014 still in ${stageLabel}`,
-                { closeData: { daysUntilClose: d.daysUntilClose, stage: d.stage } })
-            }
-
-            // Stale deals (severity 2)
-            for (const d of staleRaw) {
-              mergeAlert(d.dealId, d.dealName, d.company, 2, 'stale',
-                `No activity in ${d.daysSinceActivity ?? d.daysSinceUpdate} days \u2014 risk of going cold`,
-                { staleData: { daysSinceActivity: d.daysSinceActivity ?? d.daysSinceUpdate } })
-            }
-
-            // Missing signals (severity 3) — actionable text
-            for (const d of missingRaw) {
-              const contact = contactByDealId.get(d.dealId)
-              const contactName = contact?.name || null
-              const missingList: string[] = d.missing ?? []
-              const parts: string[] = []
-              for (const m of missingList) {
-                if (m === 'champion') {
-                  parts.push(contactName
-                    ? `no internal champion \u2014 ${contactName} is your contact, who\u2019s their sponsor?`
-                    : `no internal champion identified \u2014 find out who owns the decision`)
-                } else if (m === 'budget') {
-                  parts.push(contactName
-                    ? `budget not confirmed \u2014 ask ${contactName} about funding`
-                    : `budget status unknown \u2014 confirm funding before next step`)
-                } else if (m === 'next_steps') {
-                  parts.push('no next steps defined \u2014 set a clear follow-up action')
-                }
-              }
-              const line = parts.length > 0 ? parts[0] : `Missing: ${missingList.join(', ')}`
-              // Add remaining signals as extra lines
-              const extraLines = parts.slice(1)
-              mergeAlert(d.dealId, d.dealName, d.company, 3, 'missing', line,
-                { missingData: { missing: d.missing, stage: d.stage } })
-              // Merge additional lines
-              const entry = alertMap.get(d.dealId)
-              if (entry) {
-                for (const el of extraLines) {
-                  if (!entry.lines.includes(el)) entry.lines.push(el)
-                }
-              }
-            }
-
-            // Sort by severity, then alphabetically
-            const allAlerts = Array.from(alertMap.values())
-              .sort((a, b) => a.severity - b.severity || a.company.localeCompare(b.company))
-
-            if (allAlerts.length === 0) return null
-
-            const MAX_VISIBLE = 5
-            const visibleAlerts = allAlerts.slice(0, MAX_VISIBLE)
-            const overflowCount = allAlerts.length - MAX_VISIBLE
-
-            const alertStyles: Record<string, { bg: string; border: string; iconColor: string; icon: React.ReactNode }> = {
-              score:   { bg: 'color-mix(in srgb, var(--danger) 5%, transparent)', border: 'color-mix(in srgb, var(--danger) 20%, transparent)', iconColor: 'var(--danger)', icon: <TrendingDown size={13} style={{ color: 'var(--danger)', flexShrink: 0 }} /> },
-              close:   { bg: 'color-mix(in srgb, var(--warning) 5%, transparent)', border: 'color-mix(in srgb, var(--warning) 20%, transparent)', iconColor: 'var(--warning)', icon: <Calendar size={13} style={{ color: 'var(--warning)', flexShrink: 0 }} /> },
-              stale:   { bg: 'color-mix(in srgb, var(--text-tertiary) 4%, transparent)', border: 'color-mix(in srgb, var(--text-tertiary) 12%, transparent)', iconColor: 'var(--text-tertiary)', icon: <Clock size={13} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} /> },
-              missing: { bg: 'var(--surface)', border: 'var(--border)', iconColor: 'var(--text-tertiary)', icon: <AlertCircle size={13} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} /> },
-            }
-
-            return (
-              <div style={cardStyle}>
-                <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Proactive Alerts</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {visibleAlerts.map((alert) => {
-                    const st = alertStyles[alert.type]
-                    return (
-                      <div key={alert.dealId} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: st.bg, border: `1px solid ${st.border}`, borderRadius: '10px' }}>
-                        {st.icon}
-                        <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{alert.company}</span>
-                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}> &mdash; {alert.lines[0]}</span>
-                          {alert.lines.length > 1 && (
-                            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px', lineHeight: 1.4 }}>
-                              {alert.lines.slice(1).map((l, j) => <div key={j}>Also: {l}</div>)}
-                            </div>
-                          )}
-                        </div>
-                        <Link href={`/deals/${alert.dealId}`} style={{ flexShrink: 0, color: 'var(--text-tertiary)' }}><ArrowUpRight size={13} /></Link>
-                      </div>
-                    )
-                  })}
-                  {overflowCount > 0 && (
-                    <Link href="/pipeline" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '6px', fontSize: '12px', color: 'var(--text-secondary)', textDecoration: 'none', borderRadius: '8px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
-                      View {overflowCount} more alert{overflowCount > 1 ? 's' : ''} <ChevronRight size={12} />
+          {proactiveAlerts.length > 0 && (
+            <div style={cardStyle}>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Proactive Alerts</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {proactiveAlerts.slice(0, 5).map((alert) => (
+                  <div key={alert.dealId} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'var(--surface)', borderRadius: '10px', border: `1px solid ${alert.severity === 'critical' ? 'color-mix(in srgb, var(--danger) 20%, transparent)' : 'var(--border)'}` }}>
+                    {alert.severity === 'critical'
+                      ? <AlertCircle size={13} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+                      : <AlertCircle size={13} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+                    }
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: '13px', fontWeight: '600' }}>{alert.company}</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', marginLeft: '6px' }}>
+                        &mdash; {alert.message} {alert.action}
+                      </span>
+                    </div>
+                    <Link href={`/deals/${alert.dealId}`} style={{ flexShrink: 0, color: 'var(--text-tertiary)' }}>
+                      <ArrowUpRight size={13} />
                     </Link>
-                  )}
-                </div>
+                  </div>
+                ))}
+                {proactiveAlerts.length > 5 && (
+                  <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', textAlign: 'center', padding: '8px' }}>
+                    {proactiveAlerts.length - 5} more alert{proactiveAlerts.length - 5 > 1 ? 's' : ''}
+                  </div>
+                )}
               </div>
-            )
-          })()}
+            </div>
+          )}
         </div>
 
         {/* ── RIGHT column ── */}
@@ -476,7 +382,7 @@ export default function DashboardPage() {
                                   {d.dealName}
                                 </Link>
                                 <span style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{formatCurrency(d.dealValue, true)}</span>
-                                <span style={{ textAlign: 'right', color: d.score >= 70 ? 'var(--success)' : d.score >= 40 ? 'var(--warning)' : 'var(--danger)', fontWeight: '600' }}>{d.score}%</span>
+                                <span style={{ textAlign: 'right', color: getScoreColor(d.score, false), fontWeight: '600' }}>{d.score}%</span>
                                 <span style={{ textAlign: 'right', color: 'var(--accent)', fontWeight: '600' }}>{formatCurrency(d.weightedValue, true)}</span>
                                 <button
                                   onClick={() => dateInputRefs.current[d.id]?.showPicker()}
@@ -546,10 +452,10 @@ export default function DashboardPage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Avg deal score</div>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: avgScore >= 70 ? 'var(--success)' : avgScore >= 40 ? 'var(--warning)' : 'var(--danger)' }}>{avgScore}</div>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: getScoreColor(avgScore, false) }}>{avgScore}</div>
                   </div>
                   <div style={{ height: '4px', borderRadius: '2px', background: 'var(--border)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${avgScore}%`, background: avgScore >= 70 ? 'var(--success)' : avgScore >= 40 ? 'var(--warning)' : 'var(--danger)', borderRadius: '2px', transition: 'width 0.5s' }} />
+                    <div style={{ height: '100%', width: `${avgScore}%`, background: getScoreColor(avgScore, false), borderRadius: '2px', transition: 'width 0.5s' }} />
                   </div>
                 </div>
               )}

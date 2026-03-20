@@ -54,17 +54,17 @@ export interface DealContext {
 
 // Score color — THE one function everyone uses
 export function getScoreColor(score: number, isClosed: boolean): string {
-  if (isClosed) return '#6B7280' // grey
-  if (score >= 70) return '#34D399' // green
-  if (score >= 40) return '#FBBF24' // amber
-  return '#F87171' // red
+  if (isClosed) return 'var(--text-tertiary)' // grey for closed deals
+  if (score >= 70) return 'var(--success)'
+  if (score >= 40) return 'var(--warning)'
+  return 'var(--danger)'
 }
 
-export function getScoreDisplay(ctx: DealContext): { text: string; color: string } {
+export function getScoreDisplay(ctx: Pick<DealContext, 'isClosed' | 'outcome' | 'compositeScore'>): { text: string; color: string } {
   if (ctx.isClosed) {
     return {
       text: ctx.outcome === 'won' ? 'Won' : 'Lost',
-      color: ctx.outcome === 'won' ? '#34D399' : '#F87171',
+      color: ctx.outcome === 'won' ? 'var(--success)' : 'var(--danger)',
     }
   }
   return {
