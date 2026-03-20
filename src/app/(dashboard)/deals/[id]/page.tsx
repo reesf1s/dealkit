@@ -1377,6 +1377,13 @@ function TodosTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: a
   const pending = todos.filter((t: any) => !t.done)
   const done = todos.filter((t: any) => t.done)
 
+  // Strip redundant company name in parentheses from action text (Fix 4)
+  const companyName = deal?.prospectCompany?.toLowerCase() ?? ''
+  const stripCompanyParens = (text: string) => {
+    if (!companyName) return text
+    return text.replace(new RegExp(`\\s*\\(${companyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`, 'gi'), '')
+  }
+
   const copyPending = () => {
     const text = `Open to-dos for ${deal?.dealName ?? 'deal'}:\n${pending.map((t: any, i: number) => `${i + 1}. ${t.text}`).join('\n')}`
     navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
@@ -1539,7 +1546,7 @@ function TodosTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: a
                         onDoubleClick={() => startEdit(todo)}
                         style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)', cursor: 'text' }}
                         title="Double-click to edit"
-                      >{todo.text}</span>
+                      >{stripCompanyParens(todo.text)}</span>
                       <AssigneePicker
                         assignee={todo.assignee}
                         members={members}
@@ -1601,7 +1608,7 @@ function TodosTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: a
                       <button onClick={() => toggleTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}>
                         <CheckCircle size={13} color="var(--success)" />
                       </button>
-                      <span style={{ flex: 1, fontSize: '12px', color: 'var(--text-tertiary)', textDecoration: 'line-through' }}>{todo.text}</span>
+                      <span style={{ flex: 1, fontSize: '12px', color: 'var(--text-tertiary)', textDecoration: 'line-through' }}>{stripCompanyParens(todo.text)}</span>
                       {todo.assignee && (
                         <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--surface-hover)', borderRadius: '10px', padding: '1px 6px' }}>
                           {getDisplayName(todo.assignee)}
@@ -3543,7 +3550,402 @@ function DealLinksSection({ deal, patchDeal }: { deal: any; patchDeal: (payload:
   )
 }
 
-function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', mlPrediction = null, globalPrior = null, brainData = null }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void; currencySymbol?: string; mlPrediction?: any; globalPrior?: any; brainData?: any }) {
+// ─── Activity Tab (merged Notes + Actions) ──────────────────────────────────
+
+function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: any; onUpdate: () => void; members: WorkspaceMember[] }) {
+  const dealCompetitors: string[] = deal?.competitors ?? []
+  const { sendToCopilot } = useSidebar()
+  const [updateText, setUpdateText] = useState('')
+  const [clearConfirm, setClearConfirm] = useState(false)
+  const [clearing, setClearing] = useState(false)
+  const [analysing, setAnalysing] = useState(false)
+  const [lastExtraction, setLastExtraction] = useState<{ extraction: any; analysedAt: string } | null>(null)
+  const [verifyingExtraction, setVerifyingExtraction] = useState(false)
+
+  const clearNotes = async () => {
+    setClearing(true)
+    try {
+      await fetch(`/api/deals/${dealId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meetingNotes: null }),
+      })
+      setClearConfirm(false)
+      onUpdate()
+    } finally {
+      setClearing(false)
+    }
+  }
+
+  const analyseNotes = async () => {
+    if (!updateText.trim()) return
+    setAnalysing(true)
+    try {
+      const res = await fetch(`/api/deals/${dealId}/analyze-notes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ meetingNotes: updateText.trim() }),
+      })
+      const json = await res.json()
+      if (json.data) {
+        const extraction = json.data.parsed
+        const signals = json.data.deal?.note_signals_json
+          ? (typeof json.data.deal.note_signals_json === 'string' ? JSON.parse(json.data.deal.note_signals_json) : json.data.deal.note_signals_json)
+          : null
+        setLastExtraction({ extraction: { ...extraction, signals }, analysedAt: new Date().toISOString() })
+        setUpdateText('')
+        onUpdate()
+      }
+    } finally {
+      setAnalysing(false)
+    }
+  }
+
+  const confirmExtraction = async () => {
+    if (!lastExtraction) return
+    setVerifyingExtraction(true)
+    try {
+      const existing = deal?.note_signals_json
+        ? (typeof deal.note_signals_json === 'string' ? JSON.parse(deal.note_signals_json) : deal.note_signals_json)
+        : {}
+      await fetch(`/api/deals/${dealId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note_signals_json: JSON.stringify({ ...existing, user_verified: true }) }),
+      })
+      setLastExtraction(null)
+      onUpdate()
+    } finally {
+      setVerifyingExtraction(false)
+    }
+  }
+
+  const deleteEntry = async (entryIndex: number) => {
+    if (!deal?.meetingNotes) return
+    const blocks = (deal.meetingNotes as string).split(/\n---\n/).map((b: string) => b.trim()).filter(Boolean)
+    const entries = blocks.filter((b: string) => /^\[/.test(b))
+    const legacy = blocks.filter((b: string) => !/^\[/.test(b))
+    const updatedEntries = entries.filter((_: string, i: number) => i !== entryIndex)
+    const updated = [...legacy, ...updatedEntries].join('\n---\n') || null
+    await fetch(`/api/deals/${dealId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ meetingNotes: updated }),
+    })
+    onUpdate()
+  }
+
+  // State for controlling expanded meeting entries — first 3 expanded by default
+  const [collapsedEntries, setCollapsedEntries] = useState<Set<number>>(new Set())
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+      {/* ── Meeting History — most recent 3 expanded by default ── */}
+      {deal?.meetingNotes && (() => {
+        const raw = (deal.meetingNotes as string)
+        const blocks = raw.split(/\n---\n/).map((b: string) => b.trim()).filter(Boolean)
+        const entries = blocks.filter((b: string) => /^\[/.test(b))
+        const legacy = blocks.filter((b: string) => !/^\[/.test(b))
+        return (
+          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Clipboard size={13} color="var(--text-tertiary)" />
+                <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Meeting History</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'var(--surface-hover)', borderRadius: '4px', padding: '1px 6px' }}>
+                  {entries.length > 0 ? `${entries.length} meeting${entries.length > 1 ? 's' : ''}` : 'legacy notes'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {clearConfirm ? (
+                  <>
+                    <span style={{ fontSize: '11px', color: 'var(--danger)' }}>Clear all notes?</span>
+                    <button
+                      onClick={clearNotes}
+                      disabled={clearing}
+                      style={{ fontSize: '11px', color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '2px 8px', borderRadius: '5px', cursor: 'pointer' }}
+                    >{clearing ? 'Clearing\u2026' : 'Yes, clear'}</button>
+                    <button
+                      onClick={() => setClearConfirm(false)}
+                      style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}
+                    >Cancel</button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setClearConfirm(true)}
+                    style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: '4px' }}
+                    title="Clear all notes for this deal"
+                  >Clear all</button>
+                )}
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {entries.length > 0 ? entries.map((entry: string, i: number) => {
+                const dateMatch = entry.match(/^\[([^\]]+)\]/)
+                const date = dateMatch?.[1] ?? ''
+                const body = entry.slice(dateMatch?.[0].length ?? 0).trim()
+                // First 3 entries expanded by default, rest collapsed
+                const isExpanded = i < 3 ? !collapsedEntries.has(i) : !collapsedEntries.has(i) && i < 3
+                const isExpandedActual = i < 3 ? !collapsedEntries.has(i) : collapsedEntries.has(i)
+                // Simplified: first 3 default expanded, rest default collapsed
+                const defaultExpanded = i < 3
+                const isShown = defaultExpanded ? !collapsedEntries.has(i) : collapsedEntries.has(i)
+
+                // Extract signal badges from the note body
+                const signalBadges: { label: string; color: string; bg: string }[] = []
+                const bodyLower = body.toLowerCase()
+                if (POSITIVE_SIGNALS.some(s => bodyLower.includes(s))) signalBadges.push({ label: 'Positive', color: 'var(--success)', bg: 'rgba(34,197,94,0.1)' })
+                if (NEGATIVE_SIGNALS.some(s => bodyLower.includes(s))) signalBadges.push({ label: 'Risk', color: 'var(--danger)', bg: 'rgba(239,68,68,0.1)' })
+                if (URGENCY_SIGNALS.some(s => bodyLower.includes(s))) signalBadges.push({ label: 'Urgent', color: 'var(--warning)', bg: 'rgba(245,158,11,0.1)' })
+                if (dealCompetitors.some(c => c.trim() && bodyLower.includes(c.trim().toLowerCase()))) signalBadges.push({ label: 'Competitor', color: '#3B82F6', bg: 'rgba(59,130,246,0.1)' })
+
+                return (
+                  <div key={i} style={{ padding: '9px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', position: 'relative' }}
+                    onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.entry-del') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
+                    onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.entry-del') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
+                  >
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        setCollapsedEntries(prev => {
+                          const next = new Set(prev)
+                          if (defaultExpanded) {
+                            if (next.has(i)) next.delete(i); else next.add(i)
+                          } else {
+                            if (next.has(i)) next.delete(i); else next.add(i)
+                          }
+                          return next
+                        })
+                      }}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                        <ChevronRight size={12} style={{ color: 'var(--text-tertiary)', flexShrink: 0, transition: 'transform 150ms', transform: isShown ? 'rotate(90deg)' : 'rotate(0deg)' }} />
+                        <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{date}</div>
+                        {signalBadges.map((badge, bi) => (
+                          <span key={bi} style={{ fontSize: '9px', fontWeight: 600, padding: '1px 5px', borderRadius: '3px', background: badge.bg, color: badge.color }}>{badge.label}</span>
+                        ))}
+                      </div>
+                      <button
+                        className="entry-del"
+                        onClick={e => { e.stopPropagation(); deleteEntry(i) }}
+                        style={{ opacity: 0, fontSize: '10px', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', padding: '1px 4px', borderRadius: '3px', transition: 'opacity 0.15s' }}
+                        title="Remove this entry"
+                      >\u2715 remove</button>
+                    </div>
+                    {isShown && (
+                      <div
+                        style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6, marginTop: '6px', paddingLeft: '20px' }}
+                        dangerouslySetInnerHTML={{ __html: highlightSignals(body, dealCompetitors) }}
+                      />
+                    )}
+                  </div>
+                )
+              }) : legacy.length > 0 ? (
+                <div
+                  style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: '1.7', margin: 0 }}
+                  dangerouslySetInnerHTML={{ __html: highlightSignals(legacy.join('\n'), dealCompetitors) }}
+                />
+              ) : null}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Empty state — no notes yet */}
+      {!deal?.meetingNotes && (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: '12px', padding: '32px 24px',
+          background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: '14px',
+          textAlign: 'center',
+        }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--accent-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Clipboard size={18} color="var(--accent)" />
+          </div>
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>No meeting notes yet</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '340px' }}>
+              Paste your first meeting note or transcript below to get AI-powered insights, risk detection, and action items.
+            </div>
+          </div>
+        </div>
+      )}
+
+      <HubSpotActivityBlock deal={deal} dealCompetitors={deal?.competitors ?? []} />
+
+      {/* ── Add Update ── */}
+      <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+          <Sparkles size={13} color="var(--accent)" />
+          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
+            {deal?.meetingNotes ? 'Add Update' : 'Log First Update'}
+          </span>
+          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>\u00B7 AI extracts signals automatically</span>
+        </div>
+        <textarea
+          value={updateText}
+          onChange={e => setUpdateText(e.target.value)}
+          placeholder="Paste meeting notes or describe what happened \u2014 AI will extract signals, risks, and next steps."
+          rows={6}
+          style={{
+            width: '100%', resize: 'vertical', background: 'var(--input-bg)',
+            border: '1px solid var(--border)', borderRadius: '8px',
+            color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6',
+            padding: '12px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+          }}
+          onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
+          onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+          onKeyDown={e => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+              analyseNotes()
+            }
+          }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', gap: '8px', alignItems: 'center' }}>
+          <button
+            onClick={() => {
+              if (!updateText.trim()) return
+              sendToCopilot(`Update for ${deal?.prospectCompany ?? 'this deal'}:\n\n${updateText.trim()}`)
+              setUpdateText('')
+            }}
+            disabled={!updateText.trim()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '7px 12px', borderRadius: '7px',
+              background: 'var(--surface)', border: '1px solid var(--border)',
+              color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500',
+              cursor: updateText.trim() ? 'pointer' : 'not-allowed', opacity: updateText.trim() ? 1 : 0.5,
+            }}
+          >
+            <Sparkles size={11} />
+            Ask AI copilot
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>\u2318\u21B5 to analyse</span>
+            <button
+              onClick={analyseNotes}
+              disabled={!updateText.trim() || analysing}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '8px 16px', borderRadius: '8px',
+                background: updateText.trim() && !analysing ? 'linear-gradient(135deg, #6366F1, #7C3AED)' : 'var(--surface)',
+                border: updateText.trim() && !analysing ? 'none' : '1px solid var(--border)',
+                color: updateText.trim() && !analysing ? '#fff' : 'var(--text-tertiary)',
+                fontSize: '13px', fontWeight: '600', cursor: updateText.trim() && !analysing ? 'pointer' : 'not-allowed',
+                transition: 'all 0.15s',
+              }}
+            >
+              {analysing ? <><RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> Analysing\u2026</> : <><Zap size={12} /> Analyse Notes</>}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Extraction confirmation card */}
+      {lastExtraction && (() => {
+        const ex = lastExtraction.extraction
+        const signals = ex.signals
+        const champStatus = ex.intentSignals?.championStatus ?? (signals?.champion_signal ? 'confirmed' : 'none')
+        const budgetStatus = ex.intentSignals?.budgetStatus ?? signals?.budget_signal ?? 'not_mentioned'
+        const timeline = ex.intentSignals?.decisionTimeline ?? signals?.decision_timeline ?? null
+        const nextStep = signals?.next_step ?? null
+        const competitors = (ex.competitors ?? []).length > 0 ? ex.competitors : (signals?.competitors_mentioned ?? [])
+        const objections = signals?.objections ?? []
+        const gaps = ex.productGaps ?? []
+        const sentiment = signals?.sentiment_score ?? null
+        const champLabel = champStatus === 'confirmed' ? '\u2713 Confirmed' : champStatus === 'suspected' ? '~ Likely' : '\u2014 Not detected'
+        const champColor = champStatus === 'confirmed' ? 'var(--success)' : champStatus === 'suspected' ? 'var(--warning)' : 'var(--text-tertiary)'
+        const budgetLabel = budgetStatus === 'approved' ? '\u2713 Confirmed' : budgetStatus === 'awaiting' ? '~ Awaiting approval' : budgetStatus === 'blocked' ? '\u26A0 Blocked' : '\u2014 Not discussed'
+        const budgetColor = budgetStatus === 'approved' ? 'var(--success)' : budgetStatus === 'blocked' ? 'var(--danger)' : budgetStatus === 'awaiting' ? 'var(--warning)' : 'var(--text-tertiary)'
+        return (
+          <div style={{ background: 'color-mix(in srgb, var(--accent) 5%, var(--card-bg))', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', borderRadius: '12px', padding: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                <CheckCircle size={14} color="var(--accent)" />
+                <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Note analysed</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>\u2014 {new Date(lastExtraction.analysedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              <button onClick={() => setLastExtraction(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', fontSize: '12px', padding: '2px 6px' }}>\u2715</button>
+            </div>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '8px' }}>Extracted signals</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Champion</span>
+                <span style={{ color: champColor, fontWeight: '600' }}>{champLabel}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Budget</span>
+                <span style={{ color: budgetColor, fontWeight: '600' }}>{budgetLabel}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Timeline</span>
+                <span style={{ color: timeline ? 'var(--text-primary)' : 'var(--text-tertiary)', fontWeight: '600' }}>{timeline ?? '\u2014 Not mentioned'}</span>
+              </div>
+              {nextStep && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Next step</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: '600', maxWidth: '200px', textAlign: 'right' }}>&ldquo;{nextStep}&rdquo;</span>
+                </div>
+              )}
+              {competitors.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Competitors</span>
+                  <span style={{ color: '#3B82F6', fontWeight: '600' }}>{competitors.join(', ')}</span>
+                </div>
+              )}
+              {objections.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Objections</span>
+                  <span style={{ color: 'var(--warning)', fontWeight: '600' }}>{objections.map((o: any) => o.theme).join(', ')} ({objections.length})</span>
+                </div>
+              )}
+              {gaps.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Product gaps</span>
+                  <span style={{ color: 'var(--danger)', fontWeight: '600' }}>{gaps.map((g: any) => g.title).join(', ')}</span>
+                </div>
+              )}
+              {sentiment !== null && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0' }}>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Sentiment</span>
+                  <span style={{ color: sentiment >= 0.6 ? 'var(--success)' : sentiment <= 0.4 ? 'var(--danger)' : 'var(--warning)', fontWeight: '600' }}>
+                    {sentiment >= 0.6 ? 'Positive' : sentiment <= 0.4 ? 'Negative' : 'Neutral'} ({sentiment.toFixed(2)})
+                  </span>
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={confirmExtraction}
+                disabled={verifyingExtraction}
+                style={{
+                  flex: 2, padding: '8px 14px', borderRadius: '8px',
+                  background: 'var(--accent)', border: 'none', color: '#fff',
+                  fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                }}
+              >
+                {verifyingExtraction ? <><RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> Saving\u2026</> : <><Check size={12} /> Confirm & mark verified</>}
+              </button>
+              <button
+                onClick={() => setLastExtraction(null)}
+                style={{ flex: 1, padding: '8px 14px', borderRadius: '8px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── All Actions (full todo list + project plan + success criteria) ── */}
+      <ActionsTab dealId={dealId} deal={deal} onUpdate={onUpdate} members={members} />
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+    </div>
+  )
+}
+
+function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', mlPrediction = null, globalPrior = null, brainData = null, objectionWinMap = [], objectionConditionalWins = [] }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void; currencySymbol?: string; mlPrediction?: any; globalPrior?: any; brainData?: any; objectionWinMap?: any[]; objectionConditionalWins?: any[] }) {
   const router = useRouter()
   const [expandingType, setExpandingType] = useState<string | null>(null)
   const { data: allDealsRes } = useSWR('/api/deals', fetcher)
@@ -3929,6 +4331,35 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
               )
             })()}
 
+            {/* What To Do Next — first 5 open actions */}
+            {(() => {
+              const openTodos = (deal?.todos ?? []).filter((t: any) => !t.done)
+              const companyName = deal?.prospectCompany?.toLowerCase() ?? ''
+              const stripCompanyParens = (text: string) => {
+                if (!companyName) return text
+                return text.replace(new RegExp(`\\s*\\(${companyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`, 'gi'), '')
+              }
+              if (openTodos.length === 0) return null
+              return (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>What To Do Next</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {openTodos.slice(0, 5).map((todo: any, i: number) => (
+                      <div key={todo.id ?? i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', padding: '7px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '7px' }}>
+                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, marginTop: '5px' }} />
+                        <span style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.5, flex: 1 }}>{stripCompanyParens(todo.text)}</span>
+                      </div>
+                    ))}
+                    {openTodos.length > 5 && (
+                      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', paddingLeft: '13px', marginTop: '2px' }}>
+                        +{openTodos.length - 5} more in Activity tab
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Intent Signals — extracted by AI from deal updates */}
             {deal.intentSignals && (() => {
               const is = deal.intentSignals as { championStatus?: string; budgetStatus?: string; decisionTimeline?: string | null; nextMeetingBooked?: boolean }
@@ -3960,6 +4391,11 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                 </div>
               )
             })()}
+
+            {/* Score Simulator — moved from Intelligence tab */}
+            {deal.conversionScore != null && (
+              <ScoreSimulator deal={deal} mlPrediction={mlPrediction} brainData={brainData} />
+            )}
 
             {/* What to focus on — specific to this deal's data */}
             {deal.stage && deal.stage !== 'closed_won' && deal.stage !== 'closed_lost' && (
@@ -4146,6 +4582,79 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
               )
             })()}
 
+            {/* Likely Objections — moved from Intelligence tab */}
+            {(() => {
+              const dealRisks: string[] = deal?.dealRisks ?? []
+              const profileObjRes = typeof window !== 'undefined' ? null : null // profile from SWR in parent scope
+              // Use objectionWinMap + risk text to generate suggested responses
+              const getResponseApproach = (text: string): string => {
+                const lower = text.toLowerCase()
+                if (/declined|no response|ghosted|gone quiet|not responding/.test(lower)) return 'Suggested: Try a different channel or reframe the value proposition with a new stakeholder.'
+                if (/competitor|alternative|going with another|chosen/.test(lower)) return 'Suggested: Differentiate on unique strengths — focus on what competitors cannot offer.'
+                if (/no champion|no sponsor|no advocate|no internal/.test(lower)) return 'Suggested: Identify an internal advocate — find someone who benefits most from the solution.'
+                if (/budget|cost|expensive|price|roi/.test(lower)) return 'Suggested: Reframe around ROI and business impact — quantify the cost of inaction.'
+                if (/delay|postpone|on hold|not a priority/.test(lower)) return 'Suggested: Create urgency by tying the solution to an upcoming deadline or business event.'
+                return 'Suggested: Address directly in next meeting — prepare specific evidence to counter this concern.'
+              }
+              if (dealRisks.length === 0) return null
+              return (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Likely Objections</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    {dealRisks.map((risk, i) => (
+                      <div key={`obj-${i}`} style={{ padding: '8px 10px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: '7px' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '11px' }}>&#9888;</span>
+                          <span style={{ fontSize: '12px', color: 'var(--warning)', lineHeight: 1.5 }}>{risk}</span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px', paddingLeft: '19px', lineHeight: 1.5, fontStyle: 'italic' }}>
+                          {getResponseApproach(risk)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Win Stories — moved from Intelligence tab */}
+            {(() => {
+              // eslint-disable-next-line react-hooks/rules-of-hooks
+              const { data: csRes } = useSWR('/api/case-studies', fetcher)
+              const allCaseStudies: any[] = csRes?.data ?? []
+              // eslint-disable-next-line react-hooks/rules-of-hooks
+              const { data: similarDataWin } = useSWR(deal?.id ? `/api/deals/${deal.id}/similar` : null, (url: string) => fetch(url).then(r => r.json()), { revalidateOnFocus: false })
+              const similarDealsForMatch = similarDataWin?.data ?? []
+              if (allCaseStudies.length === 0) return null
+              return (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Win Stories</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {allCaseStudies.slice(0, 3).map((cs: any) => {
+                      // Try to find a match reason from similar deals
+                      const matchDeal = similarDealsForMatch.find((sd: any) =>
+                        sd.prospectCompany?.toLowerCase() === cs.customerName?.toLowerCase() ||
+                        (sd.outcome === 'won' || sd.stage === 'closed_won')
+                      )
+                      const matchReason = matchDeal?.reason ?? null
+                      return (
+                        <div key={cs.id} style={{ padding: '10px 12px', background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)', borderRadius: '8px' }}>
+                          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '3px' }}>{cs.customerName}</div>
+                          {cs.customerIndustry && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>{cs.customerIndustry}{cs.customerSize ? ` \u00B7 ${cs.customerSize}` : ''}</div>}
+                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{cs.results || cs.description || 'No details available'}</div>
+                          {matchReason && (
+                            <div style={{ fontSize: '11px', color: 'var(--accent)', marginTop: '6px', fontStyle: 'italic' }}>
+                              Why relevant: {matchReason}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Reset all AI */}
             <div style={{ paddingTop: '4px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
               {resetAIConfirm ? (
@@ -4315,7 +4824,7 @@ export default function DealDetailPage() {
     expansion: 'var(--warning)',
   }
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'intelligence' | 'actions' | 'collateral'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'collateral'>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [winStoryOpen, setWinStoryOpen] = useState(false)
   const [wonDeal, setWonDeal] = useState<any>(null)
@@ -4331,7 +4840,7 @@ export default function DealDetailPage() {
   // Auto-switch to Notes tab only if deal has no AI data at all AND no notes
   useEffect(() => {
     if (deal && !deal.meetingNotes && !deal.aiSummary && !deal.conversionScore) {
-      setActiveTab('notes')
+      setActiveTab('activity')
     }
   }, [deal?.id])
 
@@ -4458,21 +4967,13 @@ export default function DealDetailPage() {
       <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border)', paddingBottom: '0' }}>
         {[
           { id: 'overview', label: 'Overview' },
-          { id: 'notes', label: 'Notes' },
-          { id: 'intelligence', label: 'Intelligence' },
-          { id: 'actions', label: (() => {
+          { id: 'activity', label: (() => {
             const openTodos = deal?.todos?.filter((t: any) => !t.done) ?? []
             const openTasks = (deal?.projectPlan as any)?.phases?.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete') ?? []
             const openCriteria = (deal?.successCriteriaTodos as any[])?.filter((c: any) => !c.achieved) ?? []
             const total = openTodos.length + openTasks.length + openCriteria.length
-            // Priority = manually created, user-reordered, or project plan/success criteria items
-            const priorityTodos = openTodos.filter((t: any) => t.source === 'manual' || t.reordered).length
-            const priorityCount = priorityTodos + openTasks.length + openCriteria.length
-            const otherCount = total - priorityCount
-            if (total === 0) return 'Actions'
-            if (priorityCount > 0 && otherCount > 0) return `Actions (${priorityCount} priority · ${otherCount} other)`
-            if (priorityCount > 0) return `Actions (${priorityCount} priority)`
-            return `Actions (${total})`
+            if (total === 0) return 'Activity'
+            return `Activity (${total})`
           })() },
           { id: 'collateral', label: 'Collateral' },
         ].map(tab => (
@@ -4502,14 +5003,10 @@ export default function DealDetailPage() {
       ) : (
         <div>
           {activeTab === 'overview' && (
-            <OverviewTab dealId={id} deal={deal} dealGaps={dealGaps} onUpdate={() => mutate()} currencySymbol={currencySymbol} mlPrediction={mlPrediction} globalPrior={globalPrior} brainData={brainRes?.data} />
+            <OverviewTab dealId={id} deal={deal} dealGaps={dealGaps} onUpdate={() => mutate()} currencySymbol={currencySymbol} mlPrediction={mlPrediction} globalPrior={globalPrior} brainData={brainRes?.data} objectionWinMap={objectionWinMap} objectionConditionalWins={objectionConditionalWins} />
           )}
-          {activeTab === 'notes' && (
-            <MeetingNotesTab dealId={id} deal={deal} onUpdate={() => mutate()} onSwitchToPrep={() => setActiveTab('intelligence')} />
-          )}
-          {activeTab === 'intelligence' && <MeetingPrepTab dealId={id} deal={deal} objectionWinMap={objectionWinMap} objectionConditionalWins={objectionConditionalWins} mlPrediction={mlPrediction} brainData={brainRes?.data} />}
-          {activeTab === 'actions' && (
-            <ActionsTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
+          {activeTab === 'activity' && (
+            <ActivityTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
           )}
           {activeTab === 'collateral' && (
             <CollateralTab dealId={id} deal={deal} />
