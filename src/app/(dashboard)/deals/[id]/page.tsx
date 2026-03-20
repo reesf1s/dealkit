@@ -3721,8 +3721,8 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
         </div>
       )}
 
-      {/* Score Breakdown Visual — shown when a conversion score exists */}
-      {deal.conversionScore != null && (
+      {/* Score Breakdown Visual — shown when a conversion score exists (active deals only) */}
+      {deal.conversionScore != null && deal.stage !== 'closed_lost' && deal.stage !== 'closed_won' && (
         <ScoreBreakdown deal={deal} mlPrediction={mlPrediction} brainData={brainData} />
       )}
 
@@ -3733,7 +3733,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
             <Sparkles size={14} color="var(--accent)" />
             <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--accent)' }}>Deal Intelligence</span>
-            {deal.conversionScore != null && (
+            {deal.conversionScore != null && deal.stage !== 'closed_lost' && deal.stage !== 'closed_won' && (
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '11px', color: deal.conversionScore >= 70 ? 'var(--success)' : deal.conversionScore >= 40 ? 'var(--warning)' : 'var(--danger)' }}>
                   {deal.conversionScore >= 70 ? 'High likelihood' : deal.conversionScore >= 40 ? 'Needs attention' : 'At risk'}
@@ -3742,6 +3742,23 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                   {deal.conversionScore}%
                 </span>
                 <button onClick={() => patchDeal({ conversionScore: null })} title="Clear score" style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}>✕</button>
+              </div>
+            )}
+            {(deal.stage === 'closed_lost' || deal.stage === 'closed_won') && (
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  padding: '4px 10px',
+                  borderRadius: '6px',
+                  background: deal.stage === 'closed_won'
+                    ? 'color-mix(in srgb, var(--success) 15%, transparent)'
+                    : 'color-mix(in srgb, var(--danger) 15%, transparent)',
+                  color: deal.stage === 'closed_won' ? 'var(--success)' : 'var(--danger)'
+                }}>
+                  {deal.stage === 'closed_won' ? 'Won' : 'Lost'}
+                  {deal.lostDate || deal.wonDate ? ` · ${new Date(deal.lostDate || deal.wonDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+                </span>
               </div>
             )}
           </div>
