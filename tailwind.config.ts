@@ -15,16 +15,16 @@ const config: Config = {
     extend: {
       colors: {
         // ── Backgrounds ──────────────────────────────────────────────
-        background: '#0A0A0A',
-        surface: '#141414',
-        elevated: '#1A1A1A',
+        background: '#0E0E0E',
+        surface: '#181818',
+        elevated: '#1E1E1E',
         overlay: '#222222',
 
-        // ── Text ─────────────────────────────────────────────────────
-        'text-primary': '#EBEBEB',
-        'text-secondary': '#888888',
-        'text-tertiary': '#555555',
-        'text-disabled': '#3A3A3A',
+        // ── Text (rgba white at opacity) ─────────────────────────────
+        'text-primary': 'rgba(255,255,255,0.90)',
+        'text-secondary': 'rgba(255,255,255,0.50)',
+        'text-tertiary': 'rgba(255,255,255,0.30)',
+        'text-disabled': 'rgba(255,255,255,0.15)',
 
         // ── Accent ───────────────────────────────────────────────────
         accent: {

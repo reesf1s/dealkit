@@ -64,17 +64,17 @@ export default function Sidebar() {
           height: '30px', borderRadius: '7px',
           marginBottom: '1px', textDecoration: 'none',
           fontSize: '13px',
-          fontWeight: active ? '500' : '400',
+          fontWeight: 500,
           letterSpacing: '-0.01em',
           color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-          background: active ? 'var(--surface-hover)' : 'transparent',
-          transition: 'background 0.1s, color 0.1s',
+          background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
+          transition: 'background 0.08s ease, color 0.08s ease',
           position: 'relative', flexShrink: 0,
           width: collapsed ? '30px' : undefined,
           margin: collapsed ? '0 auto 2px' : undefined,
         }}
         onMouseEnter={e => { if (!active) {
-          (e.currentTarget as HTMLElement).style.background = 'var(--surface)'
+          (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
           ;(e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'
         }}}
         onMouseLeave={e => { if (!active) {
@@ -102,7 +102,7 @@ export default function Sidebar() {
         {!collapsed && <span style={{ flex: 1 }}>{label}</span>}
         {!collapsed && badge && badge.count > 0 && (
           <span style={{
-            fontSize: '10px', fontWeight: 600,
+            fontSize: '10px', fontWeight: 500,
             color: '#FF453A',
             background: 'rgba(255,69,58,0.12)',
             padding: '1px 5px', borderRadius: '100px',
@@ -121,7 +121,7 @@ export default function Sidebar() {
     return (
       <div style={{
         padding: '8px 8px 3px',
-        fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)',
+        fontSize: '10px', fontWeight: 500, color: 'var(--text-tertiary)',
         textTransform: 'uppercase', letterSpacing: '0.07em',
       }}>
         {children}
@@ -213,25 +213,23 @@ export default function Sidebar() {
             style={{
               width: '100%', height: '28px', borderRadius: '7px',
               background: 'var(--surface)',
-              border: '1px solid var(--border)',
+              border: 'none',
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', padding: '0 8px',
-              transition: 'border-color 0.1s, background 0.1s',
+              transition: 'background 0.08s ease',
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'
+              (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
             }}
             onMouseLeave={e => {
               (e.currentTarget as HTMLElement).style.background = 'var(--surface)'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'
             }}
           >
             <Search size={11} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
             <span style={{ flex: 1, fontSize: '12px', color: 'var(--text-tertiary)', textAlign: 'left' }}>Search</span>
             <span style={{
               fontSize: '10px', color: 'var(--text-tertiary)',
-              background: 'var(--surface)', padding: '1px 4px',
-              borderRadius: '4px', border: '1px solid var(--border)',
+              background: 'rgba(255,255,255,0.06)', padding: '1px 4px',
+              borderRadius: '4px', border: 'none',
               letterSpacing: '0.02em',
             }}>⌘P</span>
           </button>
@@ -240,7 +238,7 @@ export default function Sidebar() {
             onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
             style={{
               width: '30px', height: '28px', borderRadius: '7px',
-              background: 'var(--surface)', border: '1px solid var(--border)',
+              background: 'var(--surface)', border: 'none',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
@@ -277,7 +275,7 @@ export default function Sidebar() {
             <span style={{
               fontSize: '10px', color: 'var(--text-tertiary)',
               background: 'rgba(0,0,0,0.2)', padding: '1px 5px',
-              borderRadius: '4px', border: '1px solid var(--border)',
+              borderRadius: '4px', border: 'none',
             }}>⌘K</span>
           </button>
         ) : (
@@ -322,14 +320,14 @@ export default function Sidebar() {
               display: 'flex', alignItems: 'center', gap: '8px',
               padding: '0 8px', height: '30px', borderRadius: '7px',
               marginBottom: '1px', border: 'none',
-              fontSize: '13px', fontWeight: 400, letterSpacing: '-0.01em',
+              fontSize: '13px', fontWeight: 500, letterSpacing: '-0.01em',
               color: 'var(--text-secondary)',
               background: 'transparent',
               cursor: 'pointer', width: '100%', textAlign: 'left',
-              transition: 'background 0.1s, color 0.1s',
+              transition: 'background 0.08s ease, color 0.08s ease',
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = 'var(--surface)'
+              (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
               ;(e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'
             }}
             onMouseLeave={e => {
@@ -368,7 +366,7 @@ export default function Sidebar() {
             display: 'flex', alignItems: 'center', gap: '6px',
             padding: '5px 8px', marginBottom: '6px', borderRadius: '7px',
             background: brainAgeInfo.bg,
-            border: `1px solid ${brainAgeInfo.border}`,
+            border: 'none',
           }}>
             <div style={{
               width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
@@ -376,7 +374,7 @@ export default function Sidebar() {
               boxShadow: `0 0 5px ${brainAgeInfo.glow}`,
             }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: '10px', fontWeight: 500, color: 'var(--text-secondary)' }}>
                 {urgentCount > 0 ? `${urgentCount} deals need attention` : 'AI ready'}
               </div>
               <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginTop: '1px' }}>
@@ -393,7 +391,7 @@ export default function Sidebar() {
             title="Sign out"
             style={{
               width: '30px', height: '30px', borderRadius: '7px',
-              background: 'var(--surface)', border: '1px solid var(--border)',
+              background: 'var(--surface)', border: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', color: 'var(--text-tertiary)', margin: '0 auto',
               transition: 'color 0.1s',
@@ -408,7 +406,7 @@ export default function Sidebar() {
             display: 'flex', alignItems: 'center', gap: '8px',
             padding: '6px 8px', borderRadius: '8px',
             background: 'var(--surface)',
-            border: '1px solid var(--border)',
+            border: 'none',
           }}>
             <div style={{
               width: '22px', height: '22px', borderRadius: '50%',
