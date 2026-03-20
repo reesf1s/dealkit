@@ -46,6 +46,9 @@ export default function DashboardPage() {
   const weightedForecast = forecastDeals.reduce((s: number, d: any) => s + d.weightedValue, 0)
 
   const winRate = brain?.winLossIntel?.winRate
+  const winCount = brain?.winLossIntel?.winCount ?? 0
+  const lossCount = brain?.winLossIntel?.lossCount ?? 0
+  const totalClosed = winCount + lossCount
   const avgScore = brain?.pipeline?.avgConversionScore != null
     ? Math.round(brain.pipeline.avgConversionScore)
     : activeDeals.length > 0
@@ -315,8 +318,17 @@ export default function DashboardPage() {
                 </div>
                 {winRate != null && (
                   <div style={{ flex: 1, padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: '18px', fontWeight: '700', color: winRate >= 50 ? 'var(--success)' : 'var(--warning)', lineHeight: 1 }}>{winRate}%</div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '3px' }}>win rate</div>
+                    {totalClosed >= 5 ? (
+                      <>
+                        <div style={{ fontSize: '18px', fontWeight: '700', color: winRate >= 50 ? 'var(--success)' : 'var(--warning)', lineHeight: 1 }}>{winRate}%</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '3px' }}>win rate</div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1 }}>{winCount}W / {lossCount}L</div>
+                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '3px' }}>closed</div>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -331,12 +343,47 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
-              {overview?.momentum && (
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', padding: '8px 10px', background: 'color-mix(in srgb, var(--success) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 15%, transparent)', borderRadius: '8px' }}>
-                  <TrendingUp size={11} style={{ color: 'var(--success)', flexShrink: 0, marginTop: '1px' }} />
-                  <div style={{ fontSize: '11px', color: 'var(--success)', lineHeight: 1.4 }}>{overview.momentum}</div>
-                </div>
-              )}
+              {/* Pipeline signals — prefer rich score trend data from brain, fall back to AI momentum */}
+              {(() => {
+                const trendAlerts: any[] = brain?.scoreTrendAlerts ?? []
+                const improving = trendAlerts.filter((t: any) => t.trend === 'improving')
+                const declining = trendAlerts.filter((t: any) => t.trend === 'declining')
+                const hasRichSignals = improving.length > 0 || declining.length > 0
+                if (hasRichSignals) {
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {improving.slice(0, 2).map((t: any) => (
+                        <div key={t.dealId} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', padding: '8px 10px', background: 'color-mix(in srgb, var(--success) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 15%, transparent)', borderRadius: '8px' }}>
+                          <TrendingUp size={11} style={{ color: 'var(--success)', flexShrink: 0, marginTop: '1px' }} />
+                          <div style={{ fontSize: '11px', color: 'var(--success)', lineHeight: 1.4 }}>
+                            {t.dealName} +{Math.abs(t.delta)}pts ({t.priorScore}%&rarr;{t.currentScore}%)
+                            {t.message ? ` — ${t.message.replace(/^.*?(score|Score)\s*(rose|improved|increased)\s*/, '').replace(/^\d+\s*pts?\s*/, '').trim() || t.message}` : ''}
+                          </div>
+                        </div>
+                      ))}
+                      {declining.slice(0, 2).map((t: any) => (
+                        <div key={t.dealId} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', padding: '8px 10px', background: 'color-mix(in srgb, var(--danger) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 15%, transparent)', borderRadius: '8px' }}>
+                          <TrendingDown size={11} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: '1px' }} />
+                          <div style={{ fontSize: '11px', color: 'var(--danger)', lineHeight: 1.4 }}>
+                            {t.dealName} {t.delta}pts ({t.priorScore}%&rarr;{t.currentScore}%)
+                            {t.message ? ` — ${t.message.replace(/^.*?(score|Score)\s*(dropped|declined|fell)\s*/, '').replace(/^\d+\s*pts?\s*/, '').trim() || t.message}` : ''}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                }
+                // Fall back to AI-generated momentum when no rich trend data
+                if (overview?.momentum) {
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', padding: '8px 10px', background: 'color-mix(in srgb, var(--success) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 15%, transparent)', borderRadius: '8px' }}>
+                      <TrendingUp size={11} style={{ color: 'var(--success)', flexShrink: 0, marginTop: '1px' }} />
+                      <div style={{ fontSize: '11px', color: 'var(--success)', lineHeight: 1.4 }}>{overview.momentum}</div>
+                    </div>
+                  )
+                }
+                return null
+              })()}
               {overview?.topRisk && (
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', padding: '8px 10px', background: 'color-mix(in srgb, var(--danger) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 15%, transparent)', borderRadius: '8px' }}>
                   <AlertTriangle size={11} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: '1px' }} />

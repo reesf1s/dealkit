@@ -8,6 +8,7 @@ import { getWorkspaceContext } from '@/lib/workspace'
 import { anthropic } from '@/lib/ai/client'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getWorkspaceBrain, formatBrainContext } from '@/lib/workspace-brain'
+import { parseMeetingEntries } from '@/lib/text-signals'
 
 // Helper to load pipeline stage labels
 async function loadStageLabels(workspaceId: string): Promise<Record<string, string>> {
@@ -97,10 +98,37 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
       `- ${sl(stage)}: ${count} deal${count > 1 ? 's' : ''} (${fmt(value)})`
     ),
     '',
-    'OPEN DEALS (top 12):',
-    ...openDeals.slice(0, 12).map(d =>
-      `- "${d.dealName}" @ ${d.prospectCompany} | Stage: ${sl(d.stage)} | Value: ${fmt(d.dealValue ?? 0)} | Score: ${d.conversionScore ?? 'N/A'} | Close: ${d.closeDate ? new Date(d.closeDate).toLocaleDateString('en-GB') : 'TBD'} | Competitors: ${((d.competitors as string[]) ?? []).join(', ') || 'none'}`
-    ),
+    'OPEN DEALS (top 12) — each with UNIQUE context:',
+    ...openDeals.slice(0, 12).map(d => {
+      // Parse meeting notes to extract last note info
+      const allNotes = [d.meetingNotes, d.hubspotNotes].filter(Boolean).join('\n---\n')
+      const entries = parseMeetingEntries(allNotes)
+      const sortedEntries = entries.filter(e => e.date).sort((a, b) => (b.date!.getTime() - a.date!.getTime()))
+      const lastEntry = sortedEntries[0]
+      const lastNoteDate = lastEntry?.date ? lastEntry.date.toISOString().split('T')[0] : null
+      const daysSinceLastNote = lastEntry?.date ? Math.round((Date.now() - lastEntry.date.getTime()) / 86400000) : null
+      const lastNoteOneLiner = lastEntry?.text ? lastEntry.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().slice(0, 100) : null
+
+      // Open action count
+      const openActionCount = ((d.todos as any[]) ?? []).filter((t: any) => !t.done).length
+
+      // Deal risks for unique risk
+      const dealRisks = (d.dealRisks as string[]) ?? []
+      const uniqueRisk = dealRisks[0] ?? null
+
+      // AI summary as one-line context
+      const oneLineContext = d.aiSummary ? d.aiSummary.split('.')[0].trim().slice(0, 100) : null
+
+      const parts = [
+        `- "${d.dealName}" @ ${d.prospectCompany} | Stage: ${sl(d.stage)} | Value: ${fmt(d.dealValue ?? 0)} | Score: ${d.conversionScore ?? 'N/A'} | Close: ${d.closeDate ? new Date(d.closeDate).toLocaleDateString('en-GB') : 'TBD'} | Competitors: ${((d.competitors as string[]) ?? []).join(', ') || 'none'}`,
+        oneLineContext ? `  Context: ${oneLineContext}` : null,
+        uniqueRisk ? `  Top risk: ${uniqueRisk}` : null,
+        daysSinceLastNote != null ? `  Days since last note: ${daysSinceLastNote}` : null,
+        lastNoteDate ? `  Last note (${lastNoteDate}): "${lastNoteOneLiner}"` : null,
+        openActionCount > 0 ? `  Open actions: ${openActionCount}` : null,
+      ]
+      return parts.filter(Boolean).join('\n')
+    }),
     '',
     'PENDING TODOS (top 10):',
     ...(allTodos.length > 0
@@ -251,8 +279,16 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
     system: `You are a senior sales strategist reviewing a sales team's pipeline. Analyse the data and respond with ONLY a JSON object — no markdown, no explanation — with these exact keys:
 - "summary": string — 2–3 sentences summarising pipeline health and outlook, using specific numbers (deals, values, win rate). Be direct and honest.
 - "keyActions": string[] — exactly 3–5 specific, actionable items the rep should do TODAY. Each must start with a verb and be under 15 words. Prioritise by urgency/value. CRITICAL: Each action must reference at least ONE specific signal from the deal data — a named deal, a person, a specific objection, a day count, a competitor, or a missing qualifier. DO NOT use generic phrases like "check in on progress", "ensure next steps are clear", or "follow up with prospects". BAD: "Follow up on stalled deals". GOOD: "Push RELX for budget confirmation — 14d to close date, still in Proposal".
+
+CRITICAL: Every action MUST be unique. If two deals have similar scores, their actions must STILL differ because their context differs. Reference the specific last meeting, specific risk, specific person, or specific next step for each deal.
+
+DO NOT use these phrases for any deal:
+- "Define the final step"
+- "Confirm the next concrete step"
+- "Keep momentum"
+These are generic filler. Replace with what the ACTUAL next step is from the deal's notes and actions.
 - "pipelineHealth": string — a short phrase rating overall health (e.g. "Strong — 3 deals in late stage", "Caution — pipeline stagnating", "Healthy — £120k in negotiation").
-- "momentum": string | null — one short positive signal or win to note, or null if there is none.
+- "momentum": string | null — one short positive signal or win to note, or null if there is none. If a deal's score improved, include the delta and before/after: e.g. "BOE +18pts (74→92%) — POC trial started". Never use vague phrases like "Engagement strengthening"; cite the specific event.
 - "topRisk": string | null — the single biggest risk or blocker across the pipeline, or null if pipeline is empty or risk-free.
 - "singleMostImportantAction": string — one sentence describing the single most impactful action the rep should take today, chosen from the full context. Must be specific, start with a verb, reference a specific deal or person, and be under 20 words.`,
     messages: [{ role: 'user', content: `Pipeline data for ${today}:\n\n${contextStr}${brainContext}` }],
