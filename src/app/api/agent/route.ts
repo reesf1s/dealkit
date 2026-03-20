@@ -191,7 +191,10 @@ function buildActiveDealContext(
 type FastIntent = 'content_generation' | 'deal_modification' | 'information' | 'informational_statement' | null
 
 function fastIntentClassify(message: string): FastIntent {
-  const lower = message.toLowerCase()
+  const lower = message.toLowerCase().trim()
+  // Confirmation messages — user is confirming a previous action proposal.
+  // Return null so no routing hint overrides the LLM; it will use conversation history.
+  if (/^(yes|yep|yeah|sure|confirmed|do it|go ahead|proceed|sounds good|this is confirmed|absolutely|let'?s do it|approve|approved|ok|okay|please|please do|that'?s right|correct|exactly)\.?!?$/i.test(lower)) return null
   // Content generation: "send X the talking points", "draft an email", "write a proposal"
   if (lower.match(/send .+ (talking points|deck|ppt|doc|email|one-pager|battlecard|proposal|brief)/)) return 'content_generation'
   if (lower.match(/(draft|write|create|generate|build|make|prepare) .+ (email|doc|deck|points|battlecard|one-pager|proposal|brief|playbook|strategy|pitch|template|collateral|asset|talk.?track|objection)/)) return 'content_generation'
@@ -498,6 +501,21 @@ SELF-CORRECTION IS A FEATURE, NOT A BUG:
 - When you're correcting a previous mistake: fix the root data AND all derived fields (summary, insights, score, risks)
 - The user's word is ALWAYS the source of truth over any AI-generated content
 
+═══ CONFIRMATION HANDLING ═══
+
+When the user says "yes", "confirmed", "do it", "go ahead", "proceed", "sounds good", "this is confirmed", "yep", "yeah", "sure", "absolutely", "let's do it", "approve", "approved", or similar — they are confirming your PREVIOUS proposed action. Execute it immediately. Do NOT re-classify their intent. Do NOT ask for clarification. Look at the conversation history to find what you proposed, then execute that plan now.
+
+═══ ACTION EXECUTION STYLE ═══
+
+When executing multiple actions (e.g., log a note + mark a todo + update project plan):
+1. Execute ALL actions immediately — do not describe what you're going to do and wait
+2. Each action succeeds or fails independently — a failure in one does NOT stop the others
+3. After all actions complete, report results:
+   - "✓ Logged the QA call confirmation as a note on BOE"
+   - "✓ Marked 'Floor Plans QA call' action as complete"
+   - "✗ Couldn't update the project plan — the task wasn't found"
+4. Only ask for confirmation when there's genuine ambiguity (e.g., multiple matching deals, destructive operations like deletion)
+
 ═══ SPEED & PARALLEL EXECUTION ═══
 
 You can call MULTIPLE tools in a single response. When gathering info, call tools in parallel:
@@ -698,7 +716,7 @@ The user's message is a simple informational statement (e.g., scheduling update,
               const msg = toolErr instanceof Error ? toolErr.message : String(toolErr)
               console.error(`[agent] Tool "${name}" failed:`, msg, toolErr)
               // Never show raw errors to the user — return a graceful message for the LLM to work with
-              return `[Tool "${name}" encountered an issue. Inform the user you ran into a problem and ask them to rephrase or try a different approach. Do NOT show them technical error details.]`
+              return `[Tool "${name}" encountered an error: ${msg.slice(0, 200)}. Continue executing any remaining actions in the plan. After all actions are attempted, report what succeeded (✓) and what failed (✗) with brief reasons. Do NOT stop or ask the user to rephrase.]`
             }
           },
         }),

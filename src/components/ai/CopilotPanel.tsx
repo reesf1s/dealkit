@@ -716,7 +716,7 @@ export default function CopilotPanel() {
               fontSize: '12px',
               lineHeight: '1.5',
             }}>
-              I ran into an issue. Could you rephrase what you&apos;d like me to do?
+              Something went wrong with that request. Try again, or rephrase if the issue persists.
             </div>
           )}
 
