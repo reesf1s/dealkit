@@ -81,6 +81,25 @@ export interface WorkspaceBrain {
     dealName: string
     company: string
     daysSinceUpdate: number
+    daysSinceActivity: number   // alias for daysSinceUpdate (used by proactive alerts UI)
+    stage: string
+    score: number | null
+  }[]
+  scoreAlerts: {               // deals whose score dropped >10 pts since last brain
+    dealId: string
+    dealName: string
+    company: string
+    previousScore: number
+    currentScore: number
+    delta: number
+    possibleCause: string      // "sentiment declined" | "stalling in stage" | "competitor entered" | "no recent activity"
+  }[]
+  missingSignals: {            // late-stage deals missing critical qualification signals
+    dealId: string
+    dealName: string
+    company: string
+    stage: string
+    missing: ('champion' | 'budget' | 'next_steps')[]
   }[]
   suggestedCollateral: {        // proactive collateral suggestions based on deal data
     dealId: string
@@ -792,9 +811,79 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
         dealName: d.dealName,
         company: d.prospectCompany,
         daysSinceUpdate: snap.daysSinceUpdate,
+        daysSinceActivity: snap.daysSinceUpdate,
+        stage: d.stage,
+        score: snap.conversionScore,
       }
     })
     .sort((a, b) => b.daysSinceUpdate - a.daysSinceUpdate)
+
+  // ── Proactive: score drop alerts (vs previous brain) ──────────────────────
+  const scoreAlerts: WorkspaceBrain['scoreAlerts'] = []
+  for (const snap of snapshots) {
+    if (snap.stage === 'closed_won' || snap.stage === 'closed_lost') continue
+    if (snap.conversionScore == null) continue
+    const prev = previousDeals.get(snap.id)
+    if (!prev || prev.conversionScore == null) continue
+    const delta = snap.conversionScore - prev.conversionScore
+    if (delta < -10) {
+      // Determine most likely cause
+      const sig = signalMap.get(snap.id)
+      let possibleCause: string
+      if (sig?.isDeteriorating) {
+        possibleCause = 'sentiment declined'
+      } else if (snap.daysSinceUpdate >= 14) {
+        possibleCause = 'no recent activity'
+      } else {
+        const risks = snap.risks.map(r => r.toLowerCase())
+        if (risks.some(r => r.includes('competitor') || r.includes('rival'))) {
+          possibleCause = 'competitor entered'
+        } else {
+          possibleCause = 'stalling in stage'
+        }
+      }
+      scoreAlerts.push({
+        dealId: snap.id,
+        dealName: snap.name,
+        company: snap.company,
+        previousScore: prev.conversionScore,
+        currentScore: snap.conversionScore,
+        delta,
+        possibleCause,
+      })
+    }
+  }
+  scoreAlerts.sort((a, b) => a.delta - b.delta)  // most severe drops first
+
+  // ── Proactive: missing signals nudge (late-stage deals) ────────────────────
+  const LATE_STAGES_MISSING = new Set(['proposal', 'negotiation', 'closing', 'contract'])
+  const missingSignals: WorkspaceBrain['missingSignals'] = []
+  for (const d of activeDeals) {
+    if (!LATE_STAGES_MISSING.has(d.stage)) continue
+    const snap = snapshots.find(s => s.id === d.id)
+    if (!snap) continue
+    const intentSignals = d.intentSignals as { championStatus?: string; budgetStatus?: string } | null
+    const missing: ('champion' | 'budget' | 'next_steps')[] = []
+    if (!intentSignals?.championStatus || intentSignals.championStatus !== 'confirmed') {
+      missing.push('champion')
+    }
+    if (!intentSignals?.budgetStatus || intentSignals.budgetStatus === 'not_discussed') {
+      missing.push('budget')
+    }
+    if ((snap.pendingTodos ?? []).length === 0) {
+      missing.push('next_steps')
+    }
+    if (missing.length > 0) {
+      missingSignals.push({
+        dealId: d.id,
+        dealName: d.dealName,
+        company: d.prospectCompany,
+        stage: d.stage,
+        missing,
+      })
+    }
+  }
+  missingSignals.sort((a, b) => b.missing.length - a.missing.length)
 
   // ── Proactive: key patterns — recurring risk themes ────────────────────────
   // Count keyword frequency across all risk strings; surface themes seen in 2+ deals
@@ -2043,6 +2132,8 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
     keyPatterns,
     urgentDeals,
     staleDeals,
+    scoreAlerts,
+    missingSignals,
     suggestedCollateral,
     pipelineRecommendations,
     winLossIntel,

@@ -621,8 +621,43 @@ export default function ModelsPage() {
   const totalClosed = (wl?.winCount ?? 0) + (wl?.lossCount ?? 0)
   const winPct = totalClosed > 0 ? Math.round(((wl?.winCount ?? 0) / totalClosed) * 100) : null
 
+  // ── ML Milestone banner state ──────────────────────────────────────────────
+  const [mlBannerDismissed, setMlBannerDismissed] = useState(true) // default hidden to avoid flash
+  useEffect(() => {
+    // Read localStorage only on the client after mount
+    if (!window.localStorage.getItem('ml_milestone_dismissed')) {
+      setMlBannerDismissed(false)
+    }
+  }, [])
+  const showMlMilestoneBanner = !mlBannerDismissed
+    && brain?.mlModel != null
+    && totalClosed >= 10
+
+  const dismissMlBanner = () => {
+    setMlBannerDismissed(true)
+    window.localStorage.setItem('ml_milestone_dismissed', '1')
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', maxWidth: '960px' }}>
+
+      {/* ── ML Milestone celebration banner ── */}
+      {showMlMilestoneBanner && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 20px', borderRadius: '14px', background: 'linear-gradient(135deg, color-mix(in srgb, var(--success) 10%, transparent) 0%, color-mix(in srgb, var(--accent) 8%, transparent) 100%)', border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)' }}>
+          <div style={{ flexShrink: 0, width: '36px', height: '36px', borderRadius: '10px', background: 'color-mix(in srgb, var(--success) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 30%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Award size={18} style={{ color: 'var(--success)' }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '2px' }}>Your ML model is now active!</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>Win probability predictions are now powered by your private data — {totalClosed} closed deals trained your model.</div>
+          </div>
+          <button
+            onClick={dismissMlBanner}
+            style={{ flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', fontSize: '18px', lineHeight: 1, padding: '4px', borderRadius: '6px' }}
+            aria-label="Dismiss"
+          >&#x2715;</button>
+        </div>
+      )}
 
       {/* ── Header ── */}
       <div>
