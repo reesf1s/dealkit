@@ -1,83 +1,31 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// deal-context.ts — Client-safe types and utilities
-// NO server imports (db, drizzle, fs, net) — safe for browser bundles
+// deal-context.server.ts — Server-only DB functions
+// DO NOT import from client components — uses db/drizzle/fs
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface DealContext {
-  // Core
-  id: string
-  name: string
-  company: string
-  stage: string
-  dealValue: number
-  dealType: string | null
-  currency: string
+import { db } from '@/lib/db'
+import { dealLogs } from '@/lib/db/schema'
+import { eq, and } from 'drizzle-orm'
+import { parseMeetingEntries } from '@/lib/text-signals'
+import { getScoreColor, type DealContext } from './deal-context'
 
-  // Outcome
-  outcome: 'won' | 'lost' | null
-  isClosed: boolean
-  closeDate: string | null
-  wonDate: string | null
-  lostDate: string | null
-  lossReason: string | null
+export { type DealContext } from './deal-context'
 
-  // Computed
-  dealAgeDays: number
-  daysSinceLastNote: number
-
-  // Score
-  compositeScore: number
-  scoreColor: string
-
-  // Signals
-  championIdentified: boolean
-  budgetConfirmed: boolean
-  nextStepDefined: boolean
-  competitorsPresent: string[]
-  sentimentRecent: number
-  momentum: number
-
-  // Activity
-  noteCount: number
-  lastNoteDate: string | null
-  lastNoteSummary: string | null
-  openActionCount: number
-  completedActionCount: number
-  recentCompletedActions: string[]
-
-  // Calendar events
-  upcomingEvents: { type: string; title: string; date: string; time: string | null }[]
-
-  // Contacts
-  contacts: { name: string; role: string; email?: string }[]
+export async function buildDealContext(dealId: string, workspaceId: string): Promise<DealContext | null> {
+  const [deal] = await db.select().from(dealLogs)
+    .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId)))
+    .limit(1)
+  if (!deal) return null
+  return serverDealToContext(deal)
 }
 
-// Score color — THE one function everyone uses
-export function getScoreColor(score: number, isClosed: boolean): string {
-  if (isClosed) return 'var(--text-tertiary)' // grey for closed deals
-  if (score >= 70) return 'var(--success)'
-  if (score >= 40) return 'var(--warning)'
-  return 'var(--danger)'
+export async function buildAllDealContexts(workspaceId: string): Promise<DealContext[]> {
+  const deals = await db.select().from(dealLogs)
+    .where(eq(dealLogs.workspaceId, workspaceId))
+  return deals.map(serverDealToContext)
 }
 
-export function getScoreDisplay(ctx: Pick<DealContext, 'isClosed' | 'outcome' | 'compositeScore'>): { text: string; color: string } {
-  if (ctx.isClosed) {
-    return {
-      text: ctx.outcome === 'won' ? 'Won' : 'Lost',
-      color: ctx.outcome === 'won' ? 'var(--success)' : 'var(--danger)',
-    }
-  }
-  return {
-    text: `${ctx.compositeScore}%`,
-    color: getScoreColor(ctx.compositeScore, false),
-  }
-}
-
-/**
- * Convert raw deal data (from API/SWR) into a DealContext.
- * Client-safe — no DB access. Pass the deal object you already have.
- */
-export function rawDealToContext(deal: any): DealContext {
+function serverDealToContext(deal: any): DealContext {
   const now = Date.now()
   const isClosed = deal.stage === 'closed_won' || deal.stage === 'closed_lost'
   const outcome: 'won' | 'lost' | null = deal.outcome === 'won' ? 'won'
@@ -86,24 +34,40 @@ export function rawDealToContext(deal: any): DealContext {
     : deal.stage === 'closed_lost' ? 'lost'
     : null
 
-  // Parse intent signals
+  // Parse meeting notes to find last note date and note count
+  const meetingNotes = deal.meetingNotes || deal.hubspotNotes || ''
+  const meetingEntries = parseMeetingEntries(meetingNotes)
+  const noteCount = meetingEntries.length
+
+  let lastNoteDate: string | null = null
+  let daysSinceLastNote = 999
+
+  const datedEntries = meetingEntries
+    .filter(e => e.date && !isNaN(e.date.getTime()))
+    .sort((a, b) => b.date!.getTime() - a.date!.getTime())
+
+  if (datedEntries.length > 0) {
+    lastNoteDate = datedEntries[0].date!.toISOString()
+    daysSinceLastNote = Math.floor((now - datedEntries[0].date!.getTime()) / 86400000)
+  } else if (deal.updatedAt) {
+    lastNoteDate = new Date(deal.updatedAt).toISOString()
+    daysSinceLastNote = Math.floor((now - new Date(deal.updatedAt).getTime()) / 86400000)
+  }
+
   const intentSignals = (deal.intentSignals as any) || {}
   const championIdentified = intentSignals.championStatus === 'confirmed'
   const budgetConfirmed = intentSignals.budgetStatus === 'confirmed' || intentSignals.budgetStatus === 'approved'
 
-  // Parse todos for action counts
   const todos = (deal.todos as any[]) || []
   const openActions = todos.filter((t: any) => !t.done)
   const completedActions = todos.filter((t: any) => t.done)
 
-  // Parse contacts
   const contacts = ((deal.contacts as any[]) || []).map((c: any) => ({
     name: c.name || 'Unknown',
     role: c.role || c.title || '',
     email: c.email,
   }))
 
-  // Parse scheduled events
   const scheduledEvents = (deal.scheduledEvents as any[]) || []
   const upcomingEvents = scheduledEvents
     .filter((e: any) => e.date && new Date(e.date).getTime() >= now - 86400000)
@@ -114,18 +78,9 @@ export function rawDealToContext(deal: any): DealContext {
       time: e.time || null,
     }))
 
-  // Parse competitors
   const competitors = ((deal.competitors as any[]) || []).map((c: any) =>
     typeof c === 'string' ? c : c.name || String(c)
   )
-
-  // Days since last note — use updatedAt as proxy on client
-  let daysSinceLastNote = 999
-  let lastNoteDate: string | null = null
-  if (deal.updatedAt) {
-    lastNoteDate = new Date(deal.updatedAt).toISOString()
-    daysSinceLastNote = Math.floor((now - new Date(deal.updatedAt).getTime()) / 86400000)
-  }
 
   const momentum = intentSignals.momentum ?? 0.5
   const sentiment = intentSignals.sentiment ?? 0.5
@@ -155,7 +110,7 @@ export function rawDealToContext(deal: any): DealContext {
     competitorsPresent: competitors,
     sentimentRecent: sentiment,
     momentum,
-    noteCount: 0, // Not available client-side without parsing
+    noteCount,
     lastNoteDate,
     lastNoteSummary: deal.aiSummary ? String(deal.aiSummary).slice(0, 200) : null,
     openActionCount: openActions.length,
