@@ -6,32 +6,8 @@ import { db } from '@/lib/db'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { dbErrResponse } from '@/lib/api-helpers'
 
-// ── Ensure the deal_prediction_log table exists (idempotent) ──────────────────
-let tableEnsured = false
-async function ensurePredictionLogTable() {
-  if (tableEnsured) return
-  tableEnsured = true
-  try {
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS deal_prediction_log (
-        id SERIAL PRIMARY KEY,
-        workspace_id TEXT NOT NULL,
-        deal_id TEXT NOT NULL,
-        predicted_score INTEGER NOT NULL,
-        predicted_outcome TEXT,
-        actual_outcome TEXT,
-        predicted_at TIMESTAMPTZ DEFAULT NOW(),
-        resolved_at TIMESTAMPTZ,
-        deal_value NUMERIC
-      )
-    `)
-    // Index for workspace-scoped queries
-    await db.execute(sql`
-      CREATE INDEX IF NOT EXISTS idx_deal_prediction_log_workspace
-      ON deal_prediction_log (workspace_id, resolved_at DESC)
-    `)
-  } catch { /* already exists */ }
-}
+// deal_prediction_log table is created by lib/db/migrations.ts (versions 15 & 16).
+// No inline DDL needed here.
 
 interface BucketRow { bucket: string; predicted: number; wonRate: number }
 interface CalibrationRow { month: string; predicted: number; actual: number; count: number }
@@ -49,8 +25,6 @@ export async function GET() {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { workspaceId } = await getWorkspaceContext(userId)
-
-    await ensurePredictionLogTable()
 
     // ── Totals ────────────────────────────────────────────────────────────────
     const totals = await db.execute(sql`

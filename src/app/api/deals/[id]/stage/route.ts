@@ -8,32 +8,6 @@ import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { scheduleBrainRebuild, rebuildWorkspaceBrain } from '@/lib/workspace-brain'
 
-// ── Ensure prediction log table (idempotent, cached per cold-start) ───────────
-let _predLogEnsured = false
-async function ensurePredictionLogTable() {
-  if (_predLogEnsured) return
-  _predLogEnsured = true
-  try {
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS deal_prediction_log (
-        id SERIAL PRIMARY KEY,
-        workspace_id TEXT NOT NULL,
-        deal_id TEXT NOT NULL,
-        predicted_score INTEGER NOT NULL,
-        predicted_outcome TEXT,
-        actual_outcome TEXT,
-        predicted_at TIMESTAMPTZ DEFAULT NOW(),
-        resolved_at TIMESTAMPTZ,
-        deal_value NUMERIC
-      )
-    `)
-    await db.execute(sql`
-      CREATE INDEX IF NOT EXISTS idx_deal_prediction_log_workspace
-      ON deal_prediction_log (workspace_id, resolved_at DESC)
-    `)
-  } catch { /* already exists */ }
-}
-
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { userId } = await auth()
@@ -89,7 +63,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (stage === 'closed_won' || stage === 'closed_lost') {
       after(async () => {
         try {
-          await ensurePredictionLogTable()
           const score = deal.conversionScore ?? 50
           const predictedOutcome = score >= 60 ? 'won' : 'lost'
           const actualOutcome = stage === 'closed_won' ? 'won' : 'lost'

@@ -1,24 +1,11 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { workspaces } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { dbErrResponse } from '@/lib/api-helpers'
 import crypto from 'crypto'
-
-// Ensure the inbound_email_token column exists (safe ADD COLUMN IF NOT EXISTS)
-let _columnEnsured = false
-async function ensureInboundEmailTokenColumn() {
-  if (_columnEnsured) return
-  _columnEnsured = true
-  try {
-    await db.execute(sql`
-      ALTER TABLE workspaces
-      ADD COLUMN IF NOT EXISTS inbound_email_token text
-    `)
-  } catch { /* already exists */ }
-}
 
 export async function GET() {
   try {
@@ -26,8 +13,6 @@ export async function GET() {
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { workspaceId } = await getWorkspaceContext(userId)
-
-    await ensureInboundEmailTokenColumn()
 
     // Fetch current token
     const [ws] = await db

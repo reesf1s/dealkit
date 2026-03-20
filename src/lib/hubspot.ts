@@ -19,33 +19,12 @@
 
 import { db } from '@/lib/db'
 import { hubspotIntegrations } from '@/lib/db/schema'
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 
-// ─── Table migration (run once per process) ───────────────────────────────────
-
-let schemaMigrated = false
-export async function ensureHubspotSchema() {
-  if (schemaMigrated) return
-  try {
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS hubspot_integrations (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE UNIQUE,
-        access_token TEXT NOT NULL,
-        refresh_token TEXT NOT NULL DEFAULT '',
-        expires_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW() + INTERVAL '100 years',
-        portal_id TEXT NOT NULL DEFAULT '',
-        last_sync_at TIMESTAMP WITH TIME ZONE,
-        deals_imported INTEGER NOT NULL DEFAULT 0,
-        sync_error TEXT,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-      )
-    `)
-    // deal_logs HubSpot columns are managed by lib/db/migrations.ts
-  } catch { /* already exists */ }
-  schemaMigrated = true
-}
+// ─── Table migration ──────────────────────────────────────────────────────────
+// hubspot_integrations table is created by lib/db/migrations.ts (version 14).
+// This no-op is kept for backward compatibility with callers.
+export async function ensureHubspotSchema() {}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

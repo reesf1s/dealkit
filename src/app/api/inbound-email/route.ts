@@ -1,21 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { workspaces, dealLogs } from '@/lib/db/schema'
 import crypto from 'crypto'
-
-// Ensure the inbound_email_token column exists (safe ADD COLUMN IF NOT EXISTS)
-let _columnEnsured = false
-async function ensureInboundEmailTokenColumn() {
-  if (_columnEnsured) return
-  _columnEnsured = true
-  try {
-    await db.execute(sql`
-      ALTER TABLE workspaces
-      ADD COLUMN IF NOT EXISTS inbound_email_token text
-    `)
-  } catch { /* already exists */ }
-}
 
 function extractTextBody(body: Record<string, unknown>): string {
   // Resend inbound: body.text / body.html
@@ -110,8 +97,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await ensureInboundEmailTokenColumn()
-
     const toAddresses = extractTo(body)
     const token = extractTokenFromTo(toAddresses)
 

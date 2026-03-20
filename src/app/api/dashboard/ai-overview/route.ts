@@ -39,22 +39,6 @@ export type AIOverview = {
   singleMostImportantAction: string
 }
 
-// Run once per cold start to add new columns if they don't exist yet
-let migrated = false
-async function ensureColumns() {
-  if (migrated) return
-  try {
-    await db.execute(
-      sql`ALTER TABLE workspaces
-          ADD COLUMN IF NOT EXISTS ai_overview jsonb,
-          ADD COLUMN IF NOT EXISTS ai_overview_generated_at timestamptz`
-    )
-    migrated = true
-  } catch {
-    migrated = true // don't retry on failure
-  }
-}
-
 async function generateOverview(workspaceId: string): Promise<AIOverview> {
   await ensureLinksColumn()
   const [deals, companyRows, comps, stageLabels] = await Promise.all([
@@ -260,8 +244,6 @@ export async function GET() {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    await ensureColumns()
-
     const { workspaceId } = await getWorkspaceContext(userId)
 
     // Return cached overview only — generation happens via POST (refresh button)
@@ -287,8 +269,6 @@ export async function POST() {
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const rl = await checkRateLimit(userId, 'ai-overview', 3)
     if (!rl.allowed) return rateLimitResponse(rl.resetAt)
-
-    await ensureColumns()
 
     const { workspaceId } = await getWorkspaceContext(userId)
 

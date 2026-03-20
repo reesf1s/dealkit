@@ -1,34 +1,17 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { and, eq, lt, sql } from 'drizzle-orm'
+import { and, eq, lt } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { collateral } from '@/lib/db/schema'
 import type { CollateralType, CollateralStatus } from '@/types'
 import { dbErrResponse } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 
-let collateralColsMigrated = false
-async function ensureCollateralColumns() {
-  if (collateralColsMigrated) return
-  try {
-    await db.execute(sql`
-      ALTER TABLE collateral
-      ADD COLUMN IF NOT EXISTS title text NOT NULL DEFAULT '',
-      ADD COLUMN IF NOT EXISTS custom_type_name text,
-      ADD COLUMN IF NOT EXISTS generation_source text,
-      ADD COLUMN IF NOT EXISTS share_token text,
-      ADD COLUMN IF NOT EXISTS is_shared boolean NOT NULL DEFAULT false
-    `)
-  } catch { /* columns may already exist */ }
-  collateralColsMigrated = true
-}
-
 export async function GET(req: NextRequest) {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { workspaceId } = await getWorkspaceContext(userId)
-    await ensureCollateralColumns()
     const { searchParams } = new URL(req.url)
     const typeFilter = searchParams.get('type') as CollateralType | null
     const statusFilter = searchParams.get('status') as CollateralStatus | null

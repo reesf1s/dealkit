@@ -1,22 +1,9 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { eq, and, sql } from 'drizzle-orm'
+import { eq, and } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { workspaces, dealLogs } from '@/lib/db/schema'
-
-// Ensure zapier_api_key column exists on workspaces
-let _columnEnsured = false
-async function ensureApiKeyColumn() {
-  if (_columnEnsured) return
-  _columnEnsured = true
-  try {
-    await db.execute(sql`
-      ALTER TABLE workspaces
-      ADD COLUMN IF NOT EXISTS zapier_api_key text
-    `)
-  } catch { /* already exists */ }
-}
 
 const VALID_STAGES = [
   'prospecting', 'qualification', 'discovery', 'proposal',
@@ -30,7 +17,6 @@ function isValidStage(s: string): s is DealStage {
 
 export async function POST(req: NextRequest) {
   try {
-    await ensureApiKeyColumn()
 
     // ── Auth: check x-api-key header against ZAPIER_WEBHOOK_SECRET env var ──
     const headerApiKey = req.headers.get('x-api-key')
