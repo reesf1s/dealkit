@@ -199,8 +199,13 @@ function fastIntentClassify(message: string): FastIntent {
   if (lower.match(/send .+ (talking points|deck|ppt|doc|email|one-pager|battlecard|proposal|brief)/)) return 'content_generation'
   if (lower.match(/(draft|write|create|generate|build|make|prepare) .+ (email|doc|deck|points|battlecard|one-pager|proposal|brief|playbook|strategy|pitch|template|collateral|asset|talk.?track|objection)/)) return 'content_generation'
   if (lower.match(/(talking points|one-pager|battlecard|pitch deck|email sequence|objection handler|talk track)\s+(for|about|on|regarding)/)) return 'content_generation'
-  // Deal modification
+  // Deal modification — "update relx:", "update the boe deal", "close schneider", etc.
   if (lower.match(/(close|move|update|change|set) .+ (deal|stage|value|status)/)) return 'deal_modification'
+  // "update [dealname]:" pattern — user is pasting notes/email for a specific deal
+  if (lower.match(/^update\s+\w+.*:/)) return 'deal_modification'
+  // "add this to [dealname]", "log this on [dealname]", "[dealname] update:"
+  if (lower.match(/^(add|log|record|save)\s+(this|these|it)\s+(to|on|for|under)\s+/)) return 'deal_modification'
+  if (lower.match(/^\w[\w\s]{1,30}(update|notes|email|call|meeting)\s*:/i)) return 'deal_modification'
   // Information query
   if (lower.match(/^(what|which|how|who|summarise|summarize|status|tell me|show me|give me|compare|analyze|analyse)/)) return 'information'
   // Informational statements — simple past/present tense statements about events (no action verb)
@@ -581,6 +586,8 @@ export async function POST(req: NextRequest) {
     // ── Meeting notes paste detection ─────────────────────────────────────────
     const looksLikeMeetingNotes = lastUserText.length > 300 &&
       /discussed|mentioned|next steps|action items|agreed|meeting|call|demo/i.test(lastUserText)
+    // Check if user already named the deal (e.g., "update relx:" or "add to boe:")
+    const userNamedDeal = /^(update|add to|log on|record for|save to)\s+\w/i.test(lastUserText.trim())
 
     // ── Context window guard: trim to last 20 non-system messages ─────────────
     let trimmedMessages = messages
@@ -645,6 +652,13 @@ export async function POST(req: NextRequest) {
 The user's message has been classified as a CONTENT GENERATION request. They want you to create/draft/generate a document, email, talking points, or similar output.
 - If you need deal context first, call get_deal_details or search_deals, then IMMEDIATELY call generate_content or draft_email — do NOT stop after the lookup.
 - Focus on GENERATING the content, not asking clarifying questions unless truly ambiguous.`
+    } else if (fastIntent === 'deal_modification') {
+      intentHint = `═══ INTENT HINT: DEAL UPDATE ═══
+The user wants to update a deal. If they wrote "update [deal name]:" followed by text, this is meeting notes or an email to log on that deal.
+- Search for the deal by the name they gave (the word after "update")
+- Use process_meeting_notes to log the content — this refreshes Deal Intelligence automatically
+- Do NOT ask which deal — they already told you
+- Do NOT just acknowledge — actually process the notes`
     } else if (fastIntent === 'informational_statement') {
       intentHint = `═══ INTENT HINT: INFORMATIONAL STATEMENT ═══
 The user's message is a simple informational statement (e.g., scheduling update, status report). This is NOT a question or command.
@@ -725,7 +739,11 @@ The user's message is a simple informational statement (e.g., scheduling update,
 
     // ── Meeting notes detection hint — prepend to system if detected ────────
     const meetingNotesHint = looksLikeMeetingNotes
-      ? `\n\nIMPORTANT: The user's latest message appears to be meeting notes (it is long and contains meeting-related keywords). If no active deal is selected or the notes don't clearly match a deal, ask: "This looks like meeting notes. Which deal should I add this to?" before processing.`
+      ? userNamedDeal
+        ? `\n\nIMPORTANT: The user's latest message contains meeting notes/email content AND they've named the deal. Search for the deal by name, then use process_meeting_notes to log the content immediately. Do NOT ask which deal — they already told you.`
+        : activeDealId
+          ? `\n\nIMPORTANT: The user's latest message appears to be meeting notes. Use process_meeting_notes on the active deal to log this content immediately.`
+          : `\n\nIMPORTANT: The user's latest message appears to be meeting notes (it is long and contains meeting-related keywords). If no active deal is selected or the notes don't clearly match a deal, ask: "This looks like meeting notes. Which deal should I add this to?" before processing.`
       : ''
 
     const finalSystemPrompt = systemPrompt + meetingNotesHint
@@ -754,7 +772,7 @@ The user's message is a simple informational statement (e.g., scheduling update,
       })
 
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Response timed out')), 30000)
+        setTimeout(() => reject(new Error('Response timed out')), 120000)
       )
 
       result = await Promise.race([
