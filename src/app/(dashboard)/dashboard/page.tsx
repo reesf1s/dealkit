@@ -245,10 +245,32 @@ export default function DashboardPage() {
             const stale: any[] = brain?.staleDeals ?? []
             const scoreDrop: any[] = brain?.scoreAlerts ?? []
             const missing: any[] = brain?.missingSignals ?? []
+
+            // Close-date-approaching: active deals closing within 7 days
+            const now = new Date()
+            const closeApproaching: { dealId: string; dealName: string; company: string; daysUntilClose: number; stage: string }[] = []
+            for (const d of activeDeals) {
+              if (!d.closeDate) continue
+              const closeDate = new Date(d.closeDate)
+              const daysUntil = Math.ceil((closeDate.getTime() - now.getTime()) / 86_400_000)
+              if (daysUntil >= 0 && daysUntil <= 7) {
+                closeApproaching.push({
+                  dealId: d.id,
+                  dealName: d.dealName,
+                  company: d.prospectCompany ?? d.dealName,
+                  daysUntilClose: daysUntil,
+                  stage: d.stage,
+                })
+              }
+            }
+            closeApproaching.sort((a, b) => a.daysUntilClose - b.daysUntilClose)
+
+            // Severity order: score drops (0) > close approaching (1) > stale (2) > missing signals (3)
             const allAlerts = [
-              ...stale.slice(0, 3).map((d: any) => ({ type: 'stale' as const, ...d })),
-              ...scoreDrop.slice(0, 3).map((d: any) => ({ type: 'score' as const, ...d })),
-              ...missing.slice(0, 3).map((d: any) => ({ type: 'missing' as const, ...d })),
+              ...scoreDrop.slice(0, 3).map((d: any) => ({ type: 'score' as const, severity: 0, ...d })),
+              ...closeApproaching.slice(0, 3).map((d: any) => ({ type: 'close' as const, severity: 1, ...d })),
+              ...stale.slice(0, 3).map((d: any) => ({ type: 'stale' as const, severity: 2, ...d })),
+              ...missing.slice(0, 3).map((d: any) => ({ type: 'missing' as const, severity: 3, ...d })),
             ]
             if (allAlerts.length === 0) return null
             return (
@@ -256,28 +278,48 @@ export default function DashboardPage() {
                 <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Proactive Alerts</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {allAlerts.map((alert, i) => {
-                    if (alert.type === 'stale') {
-                      return (
-                        <div key={`stale-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'color-mix(in srgb, var(--warning) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--warning) 20%, transparent)', borderRadius: '10px' }}>
-                          <Thermometer size={13} style={{ color: 'var(--warning)', flexShrink: 0 }} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{alert.company}</div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>No activity for {alert.daysSinceActivity} days</div>
-                          </div>
-                          <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '20px', background: 'color-mix(in srgb, var(--warning) 15%, transparent)', color: 'var(--warning)' }}>Going cold</span>
-                          <Link href={`/deals/${alert.dealId}`} style={{ flexShrink: 0, color: 'var(--text-tertiary)' }}><ArrowUpRight size={13} /></Link>
-                        </div>
-                      )
-                    }
                     if (alert.type === 'score') {
                       return (
                         <div key={`score-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'color-mix(in srgb, var(--danger) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)', borderRadius: '10px' }}>
                           <TrendingDown size={13} style={{ color: 'var(--danger)', flexShrink: 0 }} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{alert.company}</div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Score dropped {Math.abs(alert.delta)}pts &mdash; {alert.possibleCause}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                              {alert.company} dropped {Math.abs(alert.delta)}pts ({alert.previousScore}%&rarr;{alert.currentScore}%) &mdash; likely cause: {alert.possibleCause}
+                            </div>
                           </div>
-                          <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '20px', background: 'color-mix(in srgb, var(--danger) 15%, transparent)', color: 'var(--danger)' }}>Score dropped</span>
+                          <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '20px', background: 'color-mix(in srgb, var(--danger) 15%, transparent)', color: 'var(--danger)' }}>Score drop</span>
+                          <Link href={`/deals/${alert.dealId}`} style={{ flexShrink: 0, color: 'var(--text-tertiary)' }}><ArrowUpRight size={13} /></Link>
+                        </div>
+                      )
+                    }
+                    if (alert.type === 'close') {
+                      const stageLabel = alert.stage ? alert.stage.replace(/_/g, ' ') : 'unknown'
+                      return (
+                        <div key={`close-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'color-mix(in srgb, var(--warning) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--warning) 20%, transparent)', borderRadius: '10px' }}>
+                          <Calendar size={13} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{alert.company}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                              {alert.company} expected close in {alert.daysUntilClose === 0 ? 'today' : alert.daysUntilClose === 1 ? '1 day' : `${alert.daysUntilClose} days`} &mdash; current stage: {stageLabel}
+                            </div>
+                          </div>
+                          <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '20px', background: 'color-mix(in srgb, var(--warning) 15%, transparent)', color: 'var(--warning)' }}>Closing soon</span>
+                          <Link href={`/deals/${alert.dealId}`} style={{ flexShrink: 0, color: 'var(--text-tertiary)' }}><ArrowUpRight size={13} /></Link>
+                        </div>
+                      )
+                    }
+                    if (alert.type === 'stale') {
+                      return (
+                        <div key={`stale-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'color-mix(in srgb, var(--text-tertiary) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--text-tertiary) 12%, transparent)', borderRadius: '10px' }}>
+                          <Clock size={13} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{alert.company}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                              No activity on {alert.dealName} in {alert.daysSinceActivity} days &mdash; risk of going cold
+                            </div>
+                          </div>
+                          <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '20px', background: 'color-mix(in srgb, var(--text-tertiary) 12%, transparent)', color: 'var(--text-secondary)' }}>Stale</span>
                           <Link href={`/deals/${alert.dealId}`} style={{ flexShrink: 0, color: 'var(--text-tertiary)' }}><ArrowUpRight size={13} /></Link>
                         </div>
                       )
