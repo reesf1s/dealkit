@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { eq, and, or, ilike, sql } from 'drizzle-orm'
+import { eq, and, or, ilike } from 'drizzle-orm'
 import { after } from 'next/server'
 import { db } from '@/lib/db'
 import { dealLogs, productGaps, companyProfiles } from '@/lib/db/schema'
@@ -1698,19 +1698,6 @@ Rules:
     if (updateResult.length === 0) {
       return { result: `I wasn't able to update that deal — it wasn't found or there was a workspace mismatch.` }
     }
-
-    // Write extracted events to deal_events table for calendar
-    try {
-      const eventsToInsert = (parsed.scheduledEvents ?? []).filter(e => e.date && e.description)
-      for (const ev of eventsToInsert) {
-        const eventType = ev.type ?? 'meeting'
-        await db.execute(sql`
-          INSERT INTO deal_events (deal_id, workspace_id, event_type, title, description, event_date, event_time, source)
-          VALUES (${dealId}, ${ctx.workspaceId}, ${eventType}, ${ev.description}, ${ev.description}, ${ev.date}::date, ${ev.time ?? null}, 'note_extraction')
-          ON CONFLICT (deal_id, event_date, title) DO NOTHING
-        `)
-      }
-    } catch { /* deal_events table may not exist yet — non-fatal */ }
 
     // Create product gaps
     const createdGaps: string[] = []

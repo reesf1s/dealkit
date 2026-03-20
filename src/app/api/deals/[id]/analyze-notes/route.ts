@@ -3,7 +3,7 @@ export const maxDuration = 60
 import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -512,21 +512,6 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
         updateFields.scheduledEvents = [...existingEvents, ...newEvents]
       }
     }
-
-    // ── Write events to deal_events table for calendar ─────────────────────
-    try {
-      if (noteExtraction && (noteExtraction.scheduled_events ?? []).length > 0) {
-        for (const ev of noteExtraction.scheduled_events) {
-          if (!ev.date || !ev.description) continue
-          const eventType = ev.type === 'other' ? 'meeting' : ev.type
-          await db.execute(sql`
-            INSERT INTO deal_events (deal_id, workspace_id, event_type, title, description, event_date, event_time, source)
-            VALUES (${id}, ${workspaceId}, ${eventType}, ${ev.description}, ${ev.description}, ${ev.date}::date, ${ev.time ?? null}, 'note_extraction')
-            ON CONFLICT (deal_id, event_date, title) DO NOTHING
-          `)
-        }
-      }
-    } catch { /* deal_events table may not exist yet — non-fatal */ }
 
     const [updatedDeal] = await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, id)).returning()
     const createdGaps = []

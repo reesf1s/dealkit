@@ -60,6 +60,9 @@ export function formatDateWithDay(date: Date | string | null | undefined): strin
 /**
  * Score colour: green ≥70, amber ≥40, red <40, grey for null/no-data.
  * Use CSS variables so light/dark themes work.
+ *
+ * @deprecated Prefer `getScoreColor` from `@/lib/deal-context` for new code.
+ * This function is still used by pipeline/page.tsx.
  */
 export function scoreColor(score: number | null | undefined): string {
   if (score == null) return 'var(--text-tertiary)'
