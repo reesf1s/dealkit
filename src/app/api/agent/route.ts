@@ -186,42 +186,22 @@ function buildActiveDealContext(
   return lines.join('\n')
 }
 
-// ── Fast intent classification — runs BEFORE LLM to set routing hints ────────
-
-type FastIntent = 'content_generation' | 'deal_modification' | 'information' | 'informational_statement' | null
-
-function fastIntentClassify(message: string): FastIntent {
-  const lower = message.toLowerCase().trim()
-  // Confirmation messages — user is confirming a previous action proposal.
-  // Return null so no routing hint overrides the LLM; it will use conversation history.
-  if (/^(yes|yep|yeah|sure|confirmed|do it|go ahead|proceed|sounds good|this is confirmed|absolutely|let'?s do it|approve|approved|ok|okay|please|please do|that'?s right|correct|exactly)\.?!?$/i.test(lower)) return null
-  // Content generation: "send X the talking points", "draft an email", "write a proposal"
-  if (lower.match(/send .+ (talking points|deck|ppt|doc|email|one-pager|battlecard|proposal|brief)/)) return 'content_generation'
-  if (lower.match(/(draft|write|create|generate|build|make|prepare) .+ (email|doc|deck|points|battlecard|one-pager|proposal|brief|playbook|strategy|pitch|template|collateral|asset|talk.?track|objection)/)) return 'content_generation'
-  if (lower.match(/(talking points|one-pager|battlecard|pitch deck|email sequence|objection handler|talk track)\s+(for|about|on|regarding)/)) return 'content_generation'
-  // Deal modification — "update relx:", "update the boe deal", "close schneider", etc.
-  if (lower.match(/(close|move|update|change|set) .+ (deal|stage|value|status)/)) return 'deal_modification'
-  // "update [dealname]:" pattern — user is pasting notes/email for a specific deal
-  if (lower.match(/^update\s+\w+.*:/)) return 'deal_modification'
-  // "add this to [dealname]", "log this on [dealname]", "[dealname] update:"
-  if (lower.match(/^(add|log|record|save)\s+(this|these|it)\s+(to|on|for|under)\s+/)) return 'deal_modification'
-  if (lower.match(/^\w[\w\s]{1,30}(update|notes|email|call|meeting)\s*:/i)) return 'deal_modification'
-  // Information query
-  if (lower.match(/^(what|which|how|who|summarise|summarize|status|tell me|show me|give me|compare|analyze|analyse)/)) return 'information'
-  // Informational statements — simple past/present tense statements about events (no action verb)
-  if (lower.match(/\b(is |are |was |were |has been |have been |already |just |been )(scheduled|booked|confirmed|set|arranged|planned|done|completed|cancelled|moved|pushed|postponed|rescheduled)\b/)) return 'informational_statement'
-  if (lower.match(/\b(called|emailed|texted|met with|spoke with|talked to|heard from|reached out)\b/) && !lower.match(/^(draft|write|send|create|generate)/)) return 'informational_statement'
-  return null
-}
-
 // ── System prompt builder ────────────────────────────────────────────────────
 
-function buildSystemPrompt(brainContext: string, activeDealContext: string, pipelineStageContext: string = '', intentHint: string = ''): string {
+function buildSystemPrompt(brainContext: string, activeDealContext: string, pipelineStageContext: string = ''): string {
   return `You are SellSight AI — a sales copilot with complete CRM access. You are the interface between the user and their pipeline intelligence brain.
 
-${intentHint}
-
 ═══ CORE DIRECTIVE: BE INTELLIGENT ABOUT WHEN TO ACT vs CONFIRM ═══
+
+═══ DEAL UPDATES — CRITICAL ═══
+
+When the user says "update [deal name]:" followed by text (email, notes, update):
+1. If you have the deal ID from active context, call process_meeting_notes directly
+2. If not, call search_deals with the deal name FIRST, then call process_meeting_notes with the returned dealId
+3. The pasted text IS the meeting notes — pass it as the "notes" parameter
+4. Parameter names are EXACT camelCase: dealId (not deal_id), notes (not note)
+5. NEVER claim you updated a deal unless process_meeting_notes returned a success message
+6. If a tool fails, tell the user specifically what failed — never say "Done" when it didn't work
 
 IMMEDIATE ACTIONS (no confirmation needed):
 - User explicitly says "add", "create", "update", "delete", "move", "set" → DO IT immediately
@@ -583,12 +563,6 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // ── Meeting notes paste detection ─────────────────────────────────────────
-    const looksLikeMeetingNotes = lastUserText.length > 300 &&
-      /discussed|mentioned|next steps|action items|agreed|meeting|call|demo/i.test(lastUserText)
-    // Check if user already named the deal (e.g., "update relx:" or "add to boe:")
-    const userNamedDeal = /^(update|add to|log on|record for|save to)\s+\w/i.test(lastUserText.trim())
-
     // ── Context window guard: trim to last 20 non-system messages ─────────────
     let trimmedMessages = messages
     if (messages.length > 40) {
@@ -644,30 +618,7 @@ export async function POST(req: NextRequest) {
       : brain
         ? 'Pipeline data is loading — no deals recorded yet. Encourage the user to add their first deal.'
         : 'No workspace data loaded yet.'
-    // ── Fast intent classification for routing hints ─────────────────────────
-    const fastIntent = fastIntentClassify(lastUserText)
-    let intentHint = ''
-    if (fastIntent === 'content_generation') {
-      intentHint = `═══ INTENT HINT: CONTENT GENERATION ═══
-The user's message has been classified as a CONTENT GENERATION request. They want you to create/draft/generate a document, email, talking points, or similar output.
-- If you need deal context first, call get_deal_details or search_deals, then IMMEDIATELY call generate_content or draft_email — do NOT stop after the lookup.
-- Focus on GENERATING the content, not asking clarifying questions unless truly ambiguous.`
-    } else if (fastIntent === 'deal_modification') {
-      intentHint = `═══ INTENT HINT: DEAL UPDATE ═══
-The user wants to update a deal. If they wrote "update [deal name]:" followed by text, this is meeting notes or an email to log on that deal.
-- Search for the deal by the name they gave (the word after "update")
-- Use process_meeting_notes to log the content — this refreshes Deal Intelligence automatically
-- Do NOT ask which deal — they already told you
-- Do NOT just acknowledge — actually process the notes`
-    } else if (fastIntent === 'informational_statement') {
-      intentHint = `═══ INTENT HINT: INFORMATIONAL STATEMENT ═══
-The user's message is a simple informational statement (e.g., scheduling update, status report). This is NOT a question or command.
-- Acknowledge it naturally
-- Log it as a deal note via process_meeting_notes (search for the matching deal first if needed)
-- NEVER error on simple statements. If you can't match to a deal, ask which deal it's about.`
-    }
-
-    const systemPrompt = buildSystemPrompt(brainContextWithLabels, activeDealContext, pipelineStageContext, intentHint)
+    const systemPrompt = buildSystemPrompt(brainContextWithLabels, activeDealContext, pipelineStageContext)
 
     // ── Build tool context for tool execute() calls ──────────────────────────
     const toolContext = {
@@ -719,8 +670,26 @@ The user's message is a simple informational statement (e.g., scheduling update,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           execute: async (params: any) => {
             try {
+              // Coerce common LLM parameter name mistakes
+              const coerced = { ...params }
+              if ('deal_id' in coerced && !('dealId' in coerced)) {
+                coerced.dealId = coerced.deal_id
+                delete coerced.deal_id
+              }
+              if ('note' in coerced && !('notes' in coerced)) {
+                coerced.notes = coerced.note
+                delete coerced.note
+              }
+              if ('deal_name' in coerced && !('dealName' in coerced)) {
+                coerced.dealName = coerced.deal_name
+                delete coerced.deal_name
+              }
+              if ('query' in coerced && !('searchQuery' in coerced) && name === 'search_deals') {
+                coerced.searchQuery = coerced.query
+                delete coerced.query
+              }
               // Validate params through the original zod schema
-              const validated = t.parameters.parse(params) as any
+              const validated = t.parameters.parse(coerced) as any
               const result = await (t.execute as any)(validated, toolContext)
               if (result.actions?.length) {
                 accumulatedActions.push(...result.actions)
@@ -729,24 +698,12 @@ The user's message is a simple informational statement (e.g., scheduling update,
             } catch (toolErr) {
               const msg = toolErr instanceof Error ? toolErr.message : String(toolErr)
               console.error(`[agent] Tool "${name}" failed:`, msg, toolErr)
-              // Never show raw errors to the user — return a graceful message for the LLM to work with
-              return `[Tool "${name}" encountered an error: ${msg.slice(0, 200)}. Continue executing any remaining actions in the plan. After all actions are attempted, report what succeeded (✓) and what failed (✗) with brief reasons. Do NOT stop or ask the user to rephrase.]`
+              return `⚠ TOOL FAILED: "${name}" did not execute. Error: ${msg.slice(0, 300)}. DO NOT tell the user this action succeeded. Report this failure explicitly: "✗ Could not [action] — [reason]". If the error mentions parameter names, retry with the correct parameter names from the tool description.`
             }
           },
         }),
       ]),
     )
-
-    // ── Meeting notes detection hint — prepend to system if detected ────────
-    const meetingNotesHint = looksLikeMeetingNotes
-      ? userNamedDeal
-        ? `\n\nIMPORTANT: The user's latest message contains meeting notes/email content AND they've named the deal. Search for the deal by name, then use process_meeting_notes to log the content immediately. Do NOT ask which deal — they already told you.`
-        : activeDealId
-          ? `\n\nIMPORTANT: The user's latest message appears to be meeting notes. Use process_meeting_notes on the active deal to log this content immediately.`
-          : `\n\nIMPORTANT: The user's latest message appears to be meeting notes (it is long and contains meeting-related keywords). If no active deal is selected or the notes don't clearly match a deal, ask: "This looks like meeting notes. Which deal should I add this to?" before processing.`
-      : ''
-
-    const finalSystemPrompt = systemPrompt + meetingNotesHint
 
     // ── Stream response ──────────────────────────────────────────────────────
     // Wrap with a 30-second timeout so the UI never hangs indefinitely
@@ -754,7 +711,7 @@ The user's message is a simple informational statement (e.g., scheduling update,
     try {
       const streamPromise = streamText({
         model: anthropic('claude-sonnet-4-6'),
-        system: finalSystemPrompt,
+        system: systemPrompt,
         messages: trimmedMessages,
         tools: sdkTools,
         maxSteps: 20,
