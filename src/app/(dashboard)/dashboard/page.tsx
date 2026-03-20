@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useState } from 'react'
 import useSWR, { mutate } from 'swr'
 import Link from 'next/link'
-import { Sparkles, TrendingUp, AlertTriangle, ArrowUpRight, RefreshCw, Brain, Target, CheckCircle, Clock, DollarSign, Zap, ChevronRight, ChevronDown } from 'lucide-react'
+import { Sparkles, TrendingUp, AlertTriangle, ArrowUpRight, RefreshCw, Brain, Target, CheckCircle, Clock, DollarSign, Zap, ChevronRight, ChevronDown, Thermometer, TrendingDown, AlertCircle } from 'lucide-react'
 import { useSidebar } from '@/components/layout/SidebarContext'
 import { formatCurrency } from '@/lib/format'
 
@@ -190,6 +190,70 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
+
+          {/* ── Proactive Alerts ── */}
+          {(() => {
+            const stale: any[] = brain?.staleDeals ?? []
+            const scoreDrop: any[] = brain?.scoreAlerts ?? []
+            const missing: any[] = brain?.missingSignals ?? []
+            const allAlerts = [
+              ...stale.slice(0, 3).map((d: any) => ({ type: 'stale' as const, ...d })),
+              ...scoreDrop.slice(0, 3).map((d: any) => ({ type: 'score' as const, ...d })),
+              ...missing.slice(0, 3).map((d: any) => ({ type: 'missing' as const, ...d })),
+            ]
+            if (allAlerts.length === 0) return null
+            return (
+              <div style={cardStyle}>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Proactive Alerts</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {allAlerts.map((alert, i) => {
+                    if (alert.type === 'stale') {
+                      return (
+                        <div key={`stale-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'color-mix(in srgb, var(--warning) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--warning) 20%, transparent)', borderRadius: '10px' }}>
+                          <Thermometer size={13} style={{ color: 'var(--warning)', flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{alert.company}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>No activity for {alert.daysSinceActivity} days</div>
+                          </div>
+                          <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '20px', background: 'color-mix(in srgb, var(--warning) 15%, transparent)', color: 'var(--warning)' }}>Going cold</span>
+                          <Link href={`/deals/${alert.dealId}`} style={{ flexShrink: 0, color: 'var(--text-tertiary)' }}><ArrowUpRight size={13} /></Link>
+                        </div>
+                      )
+                    }
+                    if (alert.type === 'score') {
+                      return (
+                        <div key={`score-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'color-mix(in srgb, var(--danger) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)', borderRadius: '10px' }}>
+                          <TrendingDown size={13} style={{ color: 'var(--danger)', flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{alert.company}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Score dropped {Math.abs(alert.delta)}pts &mdash; {alert.possibleCause}</div>
+                          </div>
+                          <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '20px', background: 'color-mix(in srgb, var(--danger) 15%, transparent)', color: 'var(--danger)' }}>Score dropped</span>
+                          <Link href={`/deals/${alert.dealId}`} style={{ flexShrink: 0, color: 'var(--text-tertiary)' }}><ArrowUpRight size={13} /></Link>
+                        </div>
+                      )
+                    }
+                    // missing signals
+                    return (
+                      <div key={`missing-${i}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+                        <AlertCircle size={13} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{alert.company}</div>
+                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                            Missing: {(alert.missing as string[]).map((m: string) => m.replace('_', ' ')).join(', ')}
+                          </div>
+                        </div>
+                        <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '20px', background: 'color-mix(in srgb, var(--text-tertiary) 12%, transparent)', color: 'var(--text-secondary)' }}>
+                          Missing: {(alert.missing as string[])[0]?.replace('_', ' ')}
+                        </span>
+                        <Link href={`/deals/${alert.dealId}`} style={{ flexShrink: 0, color: 'var(--text-tertiary)' }}><ArrowUpRight size={13} /></Link>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
         </div>
 
         {/* ── RIGHT column ── */}
