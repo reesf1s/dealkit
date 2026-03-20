@@ -1,36 +1,65 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
 import {
   ChevronLeft, ChevronRight, Calendar,
   Users, Clock, Target, Zap, AlertCircle, CheckSquare, X,
+  Sparkles, FileText, RefreshCw, Flag,
 } from 'lucide-react'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
-// ── Event type config ──────────────────────────────────────────────────────
+// ── CalEvent type (matches pipeline CalendarView) ────────────────────────────
 
-type EventType = 'meeting' | 'follow_up' | 'deadline' | 'demo' | 'decision' | 'predicted_close' | 'todo' | 'action_due'
+type CalEventType =
+  | 'close' | 'contract_start' | 'contract_end'
+  | 'follow_up' | 'urgent' | 'task' | 'phase' | 'mention'
+  | 'meeting' | 'demo' | 'deadline' | 'decision' | 'predicted_close'
+  | 'stale_followup'
 
-const EVENT_CONFIG: Record<EventType, { label: string; color: string; borderStyle?: string; icon: React.ElementType }> = {
-  meeting:         { label: 'Meeting',         color: '#6366F1', icon: Users },
-  follow_up:       { label: 'Follow-up',       color: '#FBBF24', icon: Clock },
-  demo:            { label: 'Demo',            color: '#34D399', icon: Zap },
-  deadline:        { label: 'Deadline',        color: '#F87171', icon: AlertCircle },
-  decision:        { label: 'Decision',        color: '#A855F7', icon: Target },
-  predicted_close: { label: 'Predicted Close', color: '#A855F7', borderStyle: 'dashed', icon: Target },
-  todo:            { label: 'Action Item',     color: '#94A3B8', icon: CheckSquare },
-  action_due:      { label: 'Action Due',      color: '#F59E0B', icon: AlertCircle },
+type CalEvent = {
+  id: string
+  title: string      // deal / company name
+  subtitle: string   // event description
+  date: Date
+  dealId: string
+  type: CalEventType
+  description?: string
+  snippet?: string
+  source?: string
+  time?: string | null
+  isPast?: boolean
+}
+
+// ── Event type visual config ─────────────────────────────────────────────────
+
+const EVENT_CONFIG: Record<string, {
+  label: string; color: string; borderStyle?: string; icon: React.ElementType
+}> = {
+  meeting:         { label: 'Meeting',          color: '#6366F1', icon: Users },
+  follow_up:       { label: 'Follow-up',        color: '#FBBF24', icon: Clock },
+  demo:            { label: 'Demo',             color: '#34D399', icon: Zap },
+  deadline:        { label: 'Deadline',         color: '#F87171', icon: AlertCircle },
+  decision:        { label: 'Decision',         color: '#A855F7', icon: Target },
+  predicted_close: { label: 'Predicted Close',  color: '#A855F7', borderStyle: 'dashed', icon: Target },
+  close:           { label: 'Expected Close',   color: '#A855F7', borderStyle: 'dashed', icon: Target },
+  contract_start:  { label: 'Contract Start',   color: '#14B8A6', icon: FileText },
+  contract_end:    { label: 'Contract Renewal',  color: '#14B8A6', icon: RefreshCw },
+  task:            { label: 'Task Due',          color: '#F59E0B', icon: CheckSquare },
+  phase:           { label: 'Phase Target',      color: '#06B6D4', icon: Flag },
+  urgent:          { label: 'Urgent',            color: '#F87171', icon: AlertCircle },
+  mention:         { label: 'Date Mention',      color: '#F59E0B', icon: Calendar },
+  stale_followup:  { label: 'Stale Follow-up',   color: '#9CA3AF', icon: Clock },
 }
 
 function getConfig(type: string) {
-  return EVENT_CONFIG[type as EventType] ?? EVENT_CONFIG.meeting
+  return EVENT_CONFIG[type] ?? EVENT_CONFIG.meeting
 }
 
-// ── Calendar helpers ───────────────────────────────────────────────────────
+// ── Calendar helpers ─────────────────────────────────────────────────────────
 
 function daysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate()
@@ -44,157 +73,242 @@ const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December']
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-// ── Popover ────────────────────────────────────────────────────────────────
+// ── Text snippet cleaner ─────────────────────────────────────────────────────
 
-interface PopoverEvent {
-  id: string
-  dealId: string
-  dealName: string
-  prospectCompany: string
-  source: string
-  type: string
-  description: string
-  date: string
-  time?: string | null
-  participants?: string[]
+function cleanSnippet(text: string): string {
+  return text
+    .replace(/^#+\s*/gm, '')
+    .replace(/\n+/g, ' ')
+    .trim()
+    .slice(0, 80)
 }
 
-function EventPopover({
-  event,
-  anchorRef,
-  onClose,
-}: {
-  event: PopoverEvent
-  anchorRef: React.RefObject<HTMLElement | null>
-  onClose: () => void
-}) {
-  const popRef = useRef<HTMLDivElement>(null)
-  const cfg = getConfig(event.type)
+// ── Extract dates from free-form text ────────────────────────────────────────
 
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (popRef.current && !popRef.current.contains(e.target as Node) &&
-          anchorRef.current && !anchorRef.current.contains(e.target as Node)) {
-        onClose()
+function extractDatesFromText(text: string, currentYear: number): { date: Date; snippet: string }[] {
+  if (!text) return []
+  const results: { date: Date; snippet: string }[] = []
+  const seen = new Set<string>()
+  const MONTHS: Record<string, number> = {
+    january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+    july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
+    jan: 0, feb: 1, mar: 2, apr: 3, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+  }
+  const push = (day: number, monthIdx: number, yr: number, idx: number) => {
+    if (day < 1 || day > 31 || monthIdx < 0 || monthIdx > 11) return
+    const d = new Date(yr, monthIdx, day)
+    if (isNaN(d.getTime())) return
+    const now = Date.now()
+    const diff = d.getTime() - now
+    if (diff < -60 * 86_400_000 || diff > 365 * 86_400_000) return
+    const key = d.toDateString()
+    if (seen.has(key)) return
+    seen.add(key)
+    const start = Math.max(0, idx - 40)
+    const end = Math.min(text.length, idx + 60)
+    const snippet = text.slice(start, end).replace(/\s+/g, ' ').trim()
+    results.push({ date: d, snippet: snippet.length > 80 ? snippet.slice(0, 77) + '...' : snippet })
+  }
+  const p1 = /(\d{1,2})(?:st|nd|rd|th)?\s+(january|february|march|april|may|june|july|august|september|october|november|december)(?:\s+(\d{4}))?/gi
+  let m: RegExpExecArray | null
+  while ((m = p1.exec(text)) !== null)
+    push(+m[1], MONTHS[m[2].toLowerCase()], m[3] ? +m[3] : currentYear, m.index)
+  const p2 = /(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s+(\d{4}))?/gi
+  while ((m = p2.exec(text)) !== null)
+    push(+m[2], MONTHS[m[1].toLowerCase()], m[3] ? +m[3] : currentYear, m.index)
+  return results
+}
+
+// ── Build all calendar events from deals + brain data ────────────────────────
+
+function buildCalendarEvents(deals: any[], brainData: any): CalEvent[] {
+  const events: CalEvent[] = []
+  const today = new Date()
+  const now = new Date()
+
+  for (const deal of deals) {
+    const dealName = deal.prospectCompany || deal.dealName || 'Deal'
+
+    // 1. Close dates
+    if (deal.closeDate) {
+      events.push({
+        id: `${deal.id}-close`,
+        title: dealName,
+        subtitle: 'Expected close',
+        date: new Date(deal.closeDate),
+        dealId: deal.id,
+        type: 'close',
+      })
+    }
+
+    // 2. Contract start/end dates
+    if (deal.contractStartDate) {
+      events.push({
+        id: `${deal.id}-cstart`,
+        title: dealName,
+        subtitle: 'Contract starts',
+        date: new Date(deal.contractStartDate),
+        dealId: deal.id,
+        type: 'contract_start',
+      })
+    }
+    if (deal.contractEndDate) {
+      events.push({
+        id: `${deal.id}-cend`,
+        title: dealName,
+        subtitle: 'Contract renews',
+        date: new Date(deal.contractEndDate),
+        dealId: deal.id,
+        type: 'contract_end',
+      })
+    }
+
+    // 3. Project plan phases and tasks
+    const plan = deal.projectPlan as any
+    if (plan?.phases) {
+      for (const phase of (plan.phases ?? [])) {
+        if (phase.targetDate) {
+          const d = new Date(phase.targetDate)
+          if (!isNaN(d.getTime())) {
+            events.push({
+              id: `${deal.id}-phase-${phase.id ?? phase.name}`,
+              title: dealName,
+              subtitle: `Phase: ${phase.name}`,
+              date: d,
+              dealId: deal.id,
+              type: 'phase',
+            })
+          }
+        }
+        for (const task of (phase.tasks ?? [])) {
+          if (task.dueDate && task.status !== 'complete') {
+            const d = new Date(task.dueDate)
+            if (!isNaN(d.getTime())) {
+              events.push({
+                id: `${deal.id}-task-${task.id ?? task.text}`,
+                title: dealName,
+                subtitle: `Task: ${task.text}`,
+                date: d,
+                dealId: deal.id,
+                type: 'task',
+              })
+            }
+          }
+        }
       }
     }
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [anchorRef, onClose])
 
-  return (
-    <div
-      ref={popRef}
-      style={{
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        zIndex: 1000,
-        background: 'var(--card-bg)',
-        border: '1px solid var(--card-border)',
-        borderRadius: '14px',
-        padding: '20px',
-        minWidth: '300px',
-        maxWidth: '400px',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: '4px',
-            background: cfg.color + '22', color: cfg.color,
-            borderRadius: '6px', padding: '3px 8px', fontSize: '12px', fontWeight: 600,
-            border: `1px solid ${cfg.color}44`,
-          }}>
-            <cfg.icon size={11} />
-            {cfg.label}
-          </span>
-        </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', display: 'flex', alignItems: 'center' }}>
-          <X size={16} />
-        </button>
-      </div>
+    // 4. Scheduled events from note_signals_json
+    try {
+      const signals = deal.note_signals_json ? JSON.parse(deal.note_signals_json) : null
+      const scheduledEvts = signals?.scheduled_events ?? []
+      for (const ev of scheduledEvts) {
+        if (!ev.date) continue
+        const evDate = new Date(ev.date)
+        if (isNaN(evDate.getTime())) continue
+        const diffDays = (evDate.getTime() - now.getTime()) / 86400000
+        if (diffDays < -7 || diffDays > 90) continue
+        const evType = (ev.type as CalEventType) ?? 'meeting'
+        const eventId = `${deal.id}-sched-${ev.type}-${ev.date}`
+        if (events.find(e => e.id === eventId)) continue
+        events.push({
+          id: eventId,
+          title: dealName,
+          subtitle: ev.description ?? '',
+          date: evDate,
+          dealId: deal.id,
+          type: evType,
+          description: ev.description,
+          source: ev.source_text,
+          time: ev.time ?? null,
+          isPast: evDate < now,
+        })
+      }
+    } catch { /* malformed JSON */ }
 
-      <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', marginBottom: '8px', lineHeight: 1.4 }}>
-        {event.description}
-      </div>
+    // 5. Extract dates from free-form text
+    const textSources: string[] = [
+      deal.meetingNotes ?? '',
+      deal.description ?? '',
+      deal.successCriteria ?? '',
+      Array.isArray(deal.todos) ? deal.todos.map((t: any) => t.text ?? t ?? '').join(' ') : '',
+      Array.isArray(deal.successCriteriaTodos) ? deal.successCriteriaTodos.map((t: any) => t.text ?? t ?? '').join(' ') : '',
+    ]
+    const combinedText = textSources.join('\n')
+    const extracted = extractDatesFromText(combinedText, today.getFullYear())
+    for (const { date, snippet } of extracted) {
+      events.push({
+        id: `${deal.id}-mention-${date.toDateString().replace(/\s/g, '')}`,
+        title: dealName,
+        subtitle: snippet,
+        date,
+        dealId: deal.id,
+        type: 'mention',
+      })
+    }
+  }
 
-      <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Calendar size={13} />
-          <span>{event.date}{event.time ? ` at ${event.time}` : ''}</span>
-        </div>
-        {(event.participants?.length ?? 0) > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Users size={13} />
-            <span>{event.participants!.join(', ')}</span>
-          </div>
-        )}
-      </div>
+  // 6. Stale deal follow-up suggestions
+  for (const s of (brainData?.staleDeals ?? [])) {
+    const deal = deals.find((d: any) => d.id === s.dealId)
+    if (!deal) continue
+    const dealName = deal.prospectCompany || deal.dealName || 'Deal'
+    const baseDate = new Date(deal.updatedAt ?? deal.createdAt)
+    const followUpDate = new Date(baseDate.getTime() + 14 * 86_400_000)
+    events.push({
+      id: `${deal.id}-stale`,
+      title: dealName,
+      subtitle: `Follow up (${s.daysSinceUpdate}d without update)`,
+      date: followUpDate,
+      dealId: deal.id,
+      type: 'stale_followup',
+    })
+  }
 
-      <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-          <strong style={{ color: 'var(--text)', fontWeight: 600 }}>{event.dealName}</strong>
-          <div style={{ fontSize: '12px' }}>{event.prospectCompany}</div>
-        </div>
-        <Link
-          href={`/deals/${event.dealId}`}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: '4px',
-            background: 'var(--accent)', color: '#fff',
-            padding: '6px 12px', borderRadius: '8px',
-            fontSize: '12px', fontWeight: 600, textDecoration: 'none',
-          }}
-        >
-          View Deal
-        </Link>
-      </div>
-    </div>
-  )
+  // 7. Urgent deals (show today)
+  for (const u of (brainData?.urgentDeals ?? [])) {
+    events.push({
+      id: `${u.dealId}-urgent`,
+      title: u.company,
+      subtitle: u.reason,
+      date: new Date(today.getFullYear(), today.getMonth(), today.getDate()),
+      dealId: u.dealId,
+      type: 'urgent',
+    })
+  }
+
+  return events
 }
 
-// ── Backdrop ───────────────────────────────────────────────────────────────
+// ── Filter chip types (order matters for display) ────────────────────────────
 
-function Backdrop({ onClick }: { onClick: () => void }) {
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(0,0,0,0.4)',
-        zIndex: 999,
-      }}
-    />
-  )
-}
+const FILTER_TYPES: CalEventType[] = [
+  'meeting', 'demo', 'follow_up', 'deadline', 'close',
+  'contract_start', 'contract_end', 'phase', 'task',
+  'mention', 'stale_followup', 'urgent', 'decision', 'predicted_close',
+]
 
-// ── Event chip ─────────────────────────────────────────────────────────────
+// ── Event chip component ─────────────────────────────────────────────────────
 
 function EventChip({
   event,
   isPast,
-  isToday,
   onClick,
 }: {
-  event: PopoverEvent
+  event: CalEvent
   isPast: boolean
-  isToday: boolean
-  onClick: (ref: React.RefObject<HTMLButtonElement | null>, event: PopoverEvent) => void
+  onClick: (ev: CalEvent) => void
 }) {
   const cfg = getConfig(event.type)
-  const btnRef = useRef<HTMLButtonElement>(null)
 
   return (
     <button
-      ref={btnRef}
-      title={event.dealName + ' — ' + event.description}
-      onClick={() => onClick(btnRef as React.RefObject<HTMLButtonElement | null>, event)}
+      title={`[${event.title}] ${event.subtitle}`}
+      onClick={(e) => { e.stopPropagation(); onClick(event) }}
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '4px',
+        gap: '3px',
         width: '100%',
         background: cfg.color + (isPast ? '18' : '22'),
         color: cfg.color,
@@ -210,9 +324,13 @@ function EventChip({
         overflow: 'hidden',
       }}
     >
-      <cfg.icon size={10} style={{ flexShrink: 0 }} />
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-        {event.dealName}
+      <cfg.icon size={9} style={{ flexShrink: 0 }} />
+      <span style={{
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+        fontWeight: 600,
+      }}>
+        <span style={{ opacity: 0.7, fontWeight: 500 }}>[{event.title.length > 10 ? event.title.slice(0, 9) + '\u2026' : event.title}]</span>
+        {' '}{event.subtitle || getConfig(event.type).label}
       </span>
       {event.time && (
         <span style={{ flexShrink: 0, opacity: 0.8, fontSize: '10px' }}>{event.time}</span>
@@ -221,20 +339,156 @@ function EventChip({
   )
 }
 
-// ── Main calendar page ─────────────────────────────────────────────────────
+// ── Event popover (detail modal) ─────────────────────────────────────────────
+
+function EventPopover({
+  event,
+  onClose,
+}: {
+  event: CalEvent
+  onClose: () => void
+}) {
+  const cfg = getConfig(event.type)
+  const displayText = event.description || cleanSnippet(event.subtitle)
+  const dateStr = event.date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
+          zIndex: 999,
+        }}
+      />
+      {/* Modal */}
+      <div
+        style={{
+          position: 'fixed',
+          top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 1000,
+          background: 'var(--card-bg)',
+          border: '1px solid var(--card-border)',
+          borderRadius: '14px',
+          padding: '20px',
+          minWidth: '320px',
+          maxWidth: '420px',
+          width: '90vw',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '14px' }}>
+          <div>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', marginBottom: '6px' }}>
+              {event.title}
+            </div>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '4px',
+              background: cfg.color + '22', color: cfg.color,
+              borderRadius: '6px', padding: '3px 8px', fontSize: '11px', fontWeight: 600,
+              border: `1px ${cfg.borderStyle ?? 'solid'} ${cfg.color}44`,
+            }}>
+              <cfg.icon size={11} />
+              {cfg.label}
+            </span>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', display: 'flex', alignItems: 'center' }}>
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Description */}
+        {displayText && (
+          <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text)', marginBottom: '10px', lineHeight: 1.5 }}>
+            {displayText}
+          </div>
+        )}
+
+        {/* Date + time */}
+        <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Calendar size={13} />
+          <span>{dateStr}{event.time ? ` at ${event.time}` : ''}</span>
+        </div>
+
+        {/* Source quote */}
+        {event.source && (
+          <div style={{
+            fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: '14px',
+            padding: '8px 10px', background: 'var(--bg)', borderRadius: '6px',
+            borderLeft: `3px solid ${cfg.color}`,
+          }}>
+            &ldquo;{event.source}&rdquo;
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '12px', display: 'flex', gap: '8px' }}>
+          <Link
+            href={`/deals/${event.dealId}`}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '8px 12px', borderRadius: '8px', textDecoration: 'none',
+              background: 'var(--accent)', color: '#fff',
+              fontSize: '12px', fontWeight: 600,
+            }}
+            onClick={onClose}
+          >
+            View Deal
+          </Link>
+          <button
+            onClick={() => {
+              const d = event.date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+              window.dispatchEvent(new CustomEvent('openCommandPalette', {
+                detail: { query: `Prep me for ${event.title} — ${displayText} on ${d}. Review the deal and tell me what I need to know and do before this date.` }
+              }))
+              onClose()
+            }}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+              padding: '8px 12px', borderRadius: '8px',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.12))',
+              border: '1px solid rgba(99,102,241,0.3)',
+              color: 'var(--accent)', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            <Sparkles size={11} />
+            Prep for this
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── Main calendar page ───────────────────────────────────────────────────────
 
 export default function CalendarPage() {
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
-  const [selectedEvent, setSelectedEvent] = useState<PopoverEvent | null>(null)
-  const [anchorRef, setAnchorRef] = useState<React.RefObject<HTMLElement | null> | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<CalEvent | null>(null)
   const [typeFilter, setTypeFilter] = useState<string>('all')
 
-  const { data, isLoading } = useSWR('/api/calendar', fetcher, { revalidateOnFocus: false })
-  const allEvents: PopoverEvent[] = data?.data ?? []
+  // Fetch deals and brain data (same as pipeline page)
+  const { data: dealsData, isLoading: dealsLoading } = useSWR('/api/deals', fetcher, { revalidateOnFocus: false })
+  const deals: any[] = dealsData?.data ?? []
+  const { data: brainRes, isLoading: brainLoading } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
+  const brainData = brainRes?.data
 
-  const todayStr = today.toISOString().split('T')[0]
+  const isLoading = dealsLoading || brainLoading
+
+  // Build events from all sources
+  const allEvents = useMemo(
+    () => buildCalendarEvents(deals, brainData),
+    [deals, brainData],
+  )
+
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
   function prevMonth() {
     if (month === 0) { setYear(y => y - 1); setMonth(11) }
@@ -246,43 +500,50 @@ export default function CalendarPage() {
     else setMonth(m => m + 1)
   }
 
-  function handleChipClick(ref: React.RefObject<HTMLElement | null>, event: PopoverEvent) {
-    setAnchorRef(ref)
-    setSelectedEvent(event)
-  }
+  // Events for current month
+  const monthEvents = useMemo(() => {
+    return allEvents.filter(ev => ev.date.getFullYear() === year && ev.date.getMonth() === month)
+  }, [allEvents, year, month])
 
-  function closePopover() {
-    setSelectedEvent(null)
-    setAnchorRef(null)
-  }
+  // Filtered events
+  const filteredEvents = useMemo(() => {
+    if (typeFilter === 'all') return monthEvents
+    return monthEvents.filter(ev => ev.type === typeFilter)
+  }, [monthEvents, typeFilter])
 
-  // Filter events for the current month view
-  const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`
+  // Group by date string
+  const byDate = useMemo(() => {
+    const map: Record<string, CalEvent[]> = {}
+    for (const ev of filteredEvents) {
+      const dateStr = `${ev.date.getFullYear()}-${String(ev.date.getMonth() + 1).padStart(2, '0')}-${String(ev.date.getDate()).padStart(2, '0')}`
+      if (!map[dateStr]) map[dateStr] = []
+      map[dateStr].push(ev)
+    }
+    // Sort events within each day by time
+    for (const key in map) {
+      map[key].sort((a, b) => {
+        if (a.time && b.time) return a.time.localeCompare(b.time)
+        if (a.time) return -1
+        if (b.time) return 1
+        return 0
+      })
+    }
+    return map
+  }, [filteredEvents])
 
-  const filteredEvents = allEvents.filter(ev => {
-    if (!ev.date.startsWith(monthStr)) return false
-    if (typeFilter !== 'all' && ev.type !== typeFilter) return false
-    return true
-  })
+  // Type counts for filter chips
+  const typeCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const ev of monthEvents) {
+      counts[ev.type] = (counts[ev.type] ?? 0) + 1
+    }
+    return counts
+  }, [monthEvents])
 
-  // Group events by date
-  const byDate: Record<string, PopoverEvent[]> = {}
-  for (const ev of filteredEvents) {
-    if (!byDate[ev.date]) byDate[ev.date] = []
-    byDate[ev.date].push(ev)
-  }
-
-  // Build calendar grid
+  // Calendar grid
   const numDays = daysInMonth(year, month)
   const firstDay = firstDayOfMonth(year, month)
   const totalCells = Math.ceil((firstDay + numDays) / 7) * 7
-
-  // Count events by type for this month (from all, not filtered)
-  const monthEvents = allEvents.filter(ev => ev.date.startsWith(monthStr))
-  const typeCounts: Record<string, number> = {}
-  for (const ev of monthEvents) {
-    typeCounts[ev.type] = (typeCounts[ev.type] ?? 0) + 1
-  }
 
   const cardStyle: React.CSSProperties = {
     background: 'var(--card-bg)',
@@ -300,7 +561,7 @@ export default function CalendarPage() {
             Calendar
           </h1>
           <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: '4px 0 0' }}>
-            Meetings, demos, deadlines, and predicted closes across all deals
+            Meetings, demos, deadlines, close dates, contracts, and tasks across all deals
           </p>
         </div>
 
@@ -326,36 +587,56 @@ export default function CalendarPage() {
 
       {/* Type filter chips */}
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '20px' }}>
-        {(['all', 'meeting', 'demo', 'follow_up', 'deadline', 'decision', 'predicted_close', 'todo', 'action_due'] as const).map(type => {
-          const cfg = type === 'all' ? null : getConfig(type)
-          const count = type === 'all' ? monthEvents.length : (typeCounts[type] ?? 0)
-          if (type !== 'all' && count === 0) return null
+        <button
+          onClick={() => setTypeFilter('all')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '5px',
+            padding: '5px 12px', borderRadius: '20px',
+            border: `1.5px solid ${typeFilter === 'all' ? 'var(--accent)' : 'var(--card-border)'}`,
+            background: typeFilter === 'all' ? 'var(--accent)22' : 'transparent',
+            color: typeFilter === 'all' ? 'var(--accent)' : 'var(--text-muted)',
+            fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+            transition: 'all 0.15s',
+          }}
+        >
+          All
+          {monthEvents.length > 0 && (
+            <span style={{
+              background: typeFilter === 'all' ? 'var(--accent)' : 'var(--card-border)',
+              color: typeFilter === 'all' ? '#fff' : 'var(--text-muted)',
+              borderRadius: '10px', padding: '0 6px', fontSize: '11px', fontWeight: 600,
+            }}>
+              {monthEvents.length}
+            </span>
+          )}
+        </button>
+        {FILTER_TYPES.map(type => {
+          const cfg = getConfig(type)
+          const count = typeCounts[type] ?? 0
+          if (count === 0) return null
           return (
             <button
               key={type}
-              onClick={() => setTypeFilter(type)}
+              onClick={() => setTypeFilter(typeFilter === type ? 'all' : type)}
               style={{
                 display: 'flex', alignItems: 'center', gap: '5px',
-                padding: '5px 12px',
-                borderRadius: '20px',
-                border: `1.5px solid ${typeFilter === type ? (cfg?.color ?? 'var(--accent)') : 'var(--card-border)'}`,
-                background: typeFilter === type ? (cfg?.color ?? 'var(--accent)') + '22' : 'transparent',
-                color: typeFilter === type ? (cfg?.color ?? 'var(--accent)') : 'var(--text-muted)',
+                padding: '5px 12px', borderRadius: '20px',
+                border: `1.5px solid ${typeFilter === type ? cfg.color : 'var(--card-border)'}`,
+                background: typeFilter === type ? cfg.color + '22' : 'transparent',
+                color: typeFilter === type ? cfg.color : 'var(--text-muted)',
                 fontSize: '12px', fontWeight: 500, cursor: 'pointer',
                 transition: 'all 0.15s',
               }}
             >
-              {cfg && <cfg.icon size={12} />}
-              {type === 'all' ? 'All' : cfg!.label}
-              {count > 0 && (
-                <span style={{
-                  background: typeFilter === type ? (cfg?.color ?? 'var(--accent)') : 'var(--card-border)',
-                  color: typeFilter === type ? '#fff' : 'var(--text-muted)',
-                  borderRadius: '10px', padding: '0 6px', fontSize: '11px', fontWeight: 600,
-                }}>
-                  {count}
-                </span>
-              )}
+              <cfg.icon size={12} />
+              {cfg.label}
+              <span style={{
+                background: typeFilter === type ? cfg.color : 'var(--card-border)',
+                color: typeFilter === type ? '#fff' : 'var(--text-muted)',
+                borderRadius: '10px', padding: '0 6px', fontSize: '11px', fontWeight: 600,
+              }}>
+                {count}
+              </span>
             </button>
           )
         })}
@@ -428,8 +709,7 @@ export default function CalendarPage() {
                         key={ev.id}
                         event={ev}
                         isPast={isPastDay}
-                        isToday={isToday}
-                        onClick={handleChipClick}
+                        onClick={setSelectedEvent}
                       />
                     ))}
                     {dayEvents.length > 4 && (
@@ -445,28 +725,95 @@ export default function CalendarPage() {
         )}
       </div>
 
+      {/* Events list for this month (below grid) */}
+      {!isLoading && filteredEvents.length > 0 && (
+        <div style={{ marginTop: '24px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '12px' }}>
+            Events this month ({filteredEvents.length})
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {[...filteredEvents]
+              .sort((a, b) => a.date.getTime() - b.date.getTime())
+              .map(ev => {
+                const cfg = getConfig(ev.type)
+                const evIsPast = ev.date < today && !(ev.date.getDate() === today.getDate() && ev.date.getMonth() === today.getMonth() && ev.date.getFullYear() === today.getFullYear())
+                const dateStr = ev.date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+                const displayText = ev.description || cleanSnippet(ev.subtitle)
+                return (
+                  <div key={ev.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '12px',
+                    padding: '10px 14px',
+                    background: 'var(--card-bg)',
+                    border: '1px solid var(--card-border)', borderRadius: '10px',
+                    opacity: evIsPast ? 0.5 : 1,
+                    transition: 'opacity 0.1s',
+                    cursor: 'pointer',
+                  }}
+                    onClick={() => setSelectedEvent(ev)}
+                  >
+                    <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {ev.title}
+                        </span>
+                        <span style={{
+                          fontSize: '9px', fontWeight: 600, padding: '1px 5px', borderRadius: '10px',
+                          background: cfg.color + '22', color: cfg.color,
+                          border: `1px ${cfg.borderStyle ?? 'solid'} ${cfg.color}44`, flexShrink: 0,
+                          textTransform: 'uppercase', letterSpacing: '0.04em',
+                        }}>
+                          {cfg.label}
+                        </span>
+                        {evIsPast && <span style={{ fontSize: '9px', color: 'var(--text-muted)', flexShrink: 0 }}>(past)</span>}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {displayText}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>{dateStr}</div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const d = ev.date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+                        window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query: `Prep me for ${ev.title} — ${displayText} on ${d}. Review the deal and tell me what I need to know and do before this date.` } }))
+                      }}
+                      style={{
+                        flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
+                        padding: '5px 10px', borderRadius: '6px',
+                        background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10))',
+                        border: '1px solid rgba(99,102,241,0.25)',
+                        color: 'var(--accent)', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >
+                      <Sparkles size={10} />
+                      Prep
+                    </button>
+                  </div>
+                )
+              })}
+          </div>
+        </div>
+      )}
+
       {/* Empty state */}
       {!isLoading && monthEvents.length === 0 && (
         <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)' }}>
           <Calendar size={40} style={{ opacity: 0.3, marginBottom: '12px' }} />
           <div style={{ fontSize: '15px', fontWeight: 500, marginBottom: '6px' }}>No events this month</div>
           <div style={{ fontSize: '13px' }}>
-            Events are extracted from meeting notes and deal close dates.
-            Process meeting notes via the AI copilot to see events here.
+            Events are built from deal close dates, contracts, project plans, meeting notes, and AI signals.
+            Add deals with dates or process meeting notes to populate your calendar.
           </div>
         </div>
       )}
 
-      {/* Popover */}
-      {selectedEvent && anchorRef && (
-        <>
-          <Backdrop onClick={closePopover} />
-          <EventPopover
-            event={selectedEvent}
-            anchorRef={anchorRef}
-            onClose={closePopover}
-          />
-        </>
+      {/* Event popover */}
+      {selectedEvent && (
+        <EventPopover
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+        />
       )}
 
       <style>{`
