@@ -18,6 +18,7 @@ import {
   Lock, MessageSquare,
 } from 'lucide-react'
 import WinLossModal, { type WinLossData } from '@/components/shared/WinLossModal'
+import { scoreColor as getScoreColor } from '@/lib/format'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -152,8 +153,8 @@ function DealCard({
   allStages?: { id: string; label: string; color: string }[]
 }) {
   const score = deal.conversionScore ?? 0
-  const scoreColor = score >= 70 ? '#34D399' : score >= 40 ? '#FBBF24' : score > 0 ? '#F87171' : 'rgba(255,255,255,0.15)'
-  const scoreBg = score >= 70 ? 'rgba(52,211,153,0.12)' : score >= 40 ? 'rgba(251,191,36,0.10)' : score > 0 ? 'rgba(248,113,113,0.12)' : 'rgba(255,255,255,0.05)'
+  const scColor = getScoreColor(score > 0 ? score : null)
+  const scoreBg = score > 0 ? `color-mix(in srgb, ${scColor} 15%, transparent)` : 'rgba(255,255,255,0.05)'
   const [scoreHover, setScoreHover] = useState(false)
 
   // Parse score breakdown for tooltip
@@ -238,8 +239,8 @@ function DealCard({
             onMouseLeave={() => setScoreHover(false)}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: scoreBg, border: `1.5px solid ${scoreColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }}>
-              <span style={{ fontSize: '10px', fontWeight: '800', color: scoreColor, lineHeight: 1 }}>{score}</span>
+            <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: scColor, border: `1.5px solid ${scColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }}>
+              <span style={{ fontSize: '10px', fontWeight: '800', color: '#fff', lineHeight: 1 }}>{score}</span>
             </div>
             {scoreHover && (
               <div style={{
@@ -249,7 +250,7 @@ function DealCard({
                 boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
                 pointerEvents: 'none',
               }}>
-                <div style={{ fontSize: '12px', fontWeight: '700', color: scoreColor, marginBottom: '8px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: scColor, marginBottom: '8px' }}>
                   {score}% win probability
                 </div>
                 <div style={{ height: '1px', background: 'var(--border)', marginBottom: '8px' }} />
@@ -698,7 +699,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
     letterSpacing: '0.08em', textTransform: 'uppercase',
   }
   const fmtCurrency = (n: number) => `${currencySymbol}${Math.round(n).toLocaleString()}`
-  const scoreColor = (s: number) => s >= 70 ? '#30D158' : s >= 40 ? '#FFD60A' : s > 0 ? '#FF453A' : 'rgba(255,255,255,0.15)'
+  const scoreColor = (s: number) => getScoreColor(s > 0 ? s : null)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
