@@ -103,37 +103,54 @@ export async function syncHubspotDeals(workspaceId: string, userId: string): Pro
     totalNotes  += dealNotes.length
     const meetingNotes = buildMeetingNotes(dealEmails, dealNotes)
 
-    await db.execute(sql`
-      INSERT INTO deal_logs (
-        id, workspace_id, user_id,
-        deal_name, prospect_company, prospect_name, prospect_title,
-        contacts, deal_value, stage, hubspot_stage_label, description, close_date,
-        hubspot_notes, hubspot_deal_id, updated_at, created_at
-      ) VALUES (
-        gen_random_uuid(), ${workspaceId}, ${userId},
-        ${mapped.dealName}, ${mapped.prospectCompany}, ${mapped.prospectName}, ${mapped.prospectTitle},
-        ${JSON.stringify(mapped.contacts)}::jsonb,
-        ${mapped.dealValue}, ${mapped.stage}, ${mapped.hubspotStageLabel},
-        ${mapped.description}, ${mapped.closeDate?.toISOString() ?? null},
-        ${meetingNotes}, ${mapped.hubspotDealId}, ${now.toISOString()}, ${now.toISOString()}
-      )
-      ON CONFLICT (hubspot_deal_id) DO UPDATE SET
-        deal_name           = EXCLUDED.deal_name,
-        prospect_company    = EXCLUDED.prospect_company,
-        prospect_name       = EXCLUDED.prospect_name,
-        prospect_title      = EXCLUDED.prospect_title,
-        contacts            = EXCLUDED.contacts,
-        deal_value          = EXCLUDED.deal_value,
-        stage               = EXCLUDED.stage,
-        hubspot_stage_label = EXCLUDED.hubspot_stage_label,
-        description         = EXCLUDED.description,
-        close_date          = EXCLUDED.close_date,
-        updated_at          = EXCLUDED.updated_at,
-        -- hubspot_notes is ALWAYS overwritten so every sync brings the latest emails/notes
-        -- meeting_notes is intentionally NOT touched here — it's manually editable by reps
-        hubspot_notes       = EXCLUDED.hubspot_notes
-    `)
-    upserted++
+    // Derive outcome + date columns from HubSpot stage
+    const isWon  = mapped.stage === 'closed_won'
+    const isLost = mapped.stage === 'closed_lost'
+    const outcome = isWon ? 'won' : isLost ? 'lost' : null
+    const wonDate  = isWon  ? (mapped.closeDate ?? now).toISOString() : null
+    const lostDate = isLost ? (mapped.closeDate ?? now).toISOString() : null
+
+    try {
+      await db.execute(sql`
+        INSERT INTO deal_logs (
+          id, workspace_id, user_id,
+          deal_name, prospect_company, prospect_name, prospect_title,
+          contacts, deal_value, stage, hubspot_stage_label, description, close_date,
+          outcome, won_date, lost_date,
+          hubspot_notes, hubspot_deal_id, updated_at, created_at
+        ) VALUES (
+          gen_random_uuid(), ${workspaceId}, ${userId},
+          ${mapped.dealName}, ${mapped.prospectCompany}, ${mapped.prospectName}, ${mapped.prospectTitle},
+          ${JSON.stringify(mapped.contacts)}::jsonb,
+          ${mapped.dealValue}, ${mapped.stage}, ${mapped.hubspotStageLabel},
+          ${mapped.description}, ${mapped.closeDate?.toISOString() ?? null},
+          ${outcome}, ${wonDate}, ${lostDate},
+          ${meetingNotes}, ${mapped.hubspotDealId}, ${now.toISOString()}, ${now.toISOString()}
+        )
+        ON CONFLICT (hubspot_deal_id) DO UPDATE SET
+          deal_name           = EXCLUDED.deal_name,
+          prospect_company    = EXCLUDED.prospect_company,
+          prospect_name       = EXCLUDED.prospect_name,
+          prospect_title      = EXCLUDED.prospect_title,
+          contacts            = EXCLUDED.contacts,
+          deal_value          = EXCLUDED.deal_value,
+          stage               = EXCLUDED.stage,
+          hubspot_stage_label = EXCLUDED.hubspot_stage_label,
+          description         = EXCLUDED.description,
+          close_date          = EXCLUDED.close_date,
+          outcome             = EXCLUDED.outcome,
+          won_date            = COALESCE(EXCLUDED.won_date, deal_logs.won_date),
+          lost_date           = COALESCE(EXCLUDED.lost_date, deal_logs.lost_date),
+          updated_at          = EXCLUDED.updated_at,
+          -- hubspot_notes is ALWAYS overwritten so every sync brings the latest emails/notes
+          -- meeting_notes is intentionally NOT touched here — it's manually editable by reps
+          hubspot_notes       = EXCLUDED.hubspot_notes
+      `)
+      upserted++
+    } catch (e) {
+      console.error(`[hubspot-sync] Failed to upsert deal ${mapped.hubspotDealId}:`, (e as Error).message)
+      // Continue with remaining deals — don't crash the entire sync
+    }
   }
 
   // ── 5. Update workspace pipelineConfig from HubSpot's real stage names ───────
