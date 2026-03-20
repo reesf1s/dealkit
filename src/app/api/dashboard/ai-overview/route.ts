@@ -164,6 +164,10 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
         .filter(sentence => confirmationKeywords.test(sentence))
         .slice(0, 3)
 
+      // CHANGE 1 & 4: Include ALL deal data — notes field, all todos with status, project plan, scheduled events
+      const recentNotes = (d.notes || '').trim().slice(-800)
+      const allTodosForDeal = todos.map((t: any) => `    - [${t.done ? 'done' : 'not done'}] ${t.text}`).join('\n')
+
       const parts = [
         `- "${d.dealName}" @ ${d.prospectCompany} | Stage: ${sl(d.stage)} | Value: ${fmt(d.dealValue ?? 0)} | Score: ${d.conversionScore ?? 'N/A'} | Close: ${d.closeDate ? new Date(d.closeDate).toLocaleDateString('en-GB') : 'TBD'} | Competitors: ${((d.competitors as string[]) ?? []).join(', ') || 'none'}`,
         oneLineContext ? `  Context: ${oneLineContext}` : null,
@@ -176,7 +180,9 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
         inProgressActions.length > 0 ? `  IN-PROGRESS actions (already being worked on — DO NOT suggest these):\n${inProgressActions.map(a => `    - [in_progress] ${a.text}`).join('\n')}` : null,
         pendingActions.length > 0 ? `  PENDING actions (not started — these are candidates for today's actions):\n${pendingActions.slice(0, 5).map(a => `    - [pending] ${a.text}`).join('\n')}` : null,
         allRecentlyCompleted.length > 0 ? `  RECENTLY COMPLETED (already done — DO NOT suggest these):\n${allRecentlyCompleted.map(a => `    - [complete] ${a.text}`).join('\n')}` : null,
+        todos.length > 0 ? `  ALL TODOS (with status):\n${allTodosForDeal}` : null,
         last3Notes.length > 0 ? `  Recent notes:\n${last3Notes.map(n => `    - ${n}`).join('\n')}` : null,
+        recentNotes ? `  Deal notes (last 800 chars — check for confirmations/scheduled items):\n    ${recentNotes}` : null,
       ]
       return parts.filter(Boolean).join('\n')
     }),
@@ -333,26 +339,30 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
 
 CRITICAL: Every action MUST be unique. If two deals have similar scores, their actions must STILL differ because their context differs. Reference the specific last meeting, specific risk, specific person, or specific next step for each deal.
 
-CRITICAL — ACTION DEDUPLICATION:
-When generating today's actions for each deal:
-1. CHECK the deal's action items. Do NOT suggest actions that are already completed or in-progress. If an action is marked "in_progress", the user is already working on it — suggest the NEXT thing instead.
-2. CHECK the deal's recent notes. If the user mentioned that something is already done (e.g., "all calls have been scheduled"), do not suggest scheduling calls.
-3. Prioritise actions that are genuinely NEXT — things that haven't been started, aren't scheduled, and would move the deal forward.
+STALE ACTION DETECTION — CRITICAL:
+Before suggesting ANY action for a deal, CHECK ALL of the following:
 
-BAD: "Confirm BOE QA call for Monday" (already scheduled and in-progress)
-GOOD: "Prepare QA test scenarios for the BOE Monday call — ensure the floor plan data covers all 3 buildings Phil mentioned."
+1. NOTES: Read the deal's recent notes AND the "Deal notes (last 800 chars)" section. If a note mentions something is "confirmed", "scheduled", "booked", "done", "completed", "already arranged", or "set up" — that action is DONE. Do not suggest it.
 
-STALE ACTION DETECTION:
-- If a deal has a scheduled event (in SCHEDULED EVENTS), do NOT suggest "confirm" or "schedule" that event — it's already done.
-- If a recent note mentions "confirmed", "scheduled", "booked", "agreed" for a specific action, that action is DONE — do not suggest it.
-- If the user told Ask AI something was confirmed, that information is stored in meeting notes. CHECK the notes before suggesting actions.
-- Example: If BOE has a scheduled event "Floor Plans QA call — Monday 23 March 12:00-13:00", do NOT suggest "Confirm the BOE QA call" — it's already confirmed. Instead suggest preparation for the call.
+2. TODOS: Check the deal's todo list (ALL TODOS section). If a todo is marked [done], do not suggest it. If a todo is still [not done], it's a candidate — but only if it's genuinely the next step.
 
-DO NOT use these phrases for any deal:
-- "Define the final step"
+3. SCHEDULED EVENTS: If the deal has scheduled events, those meetings are CONFIRMED. Do not suggest "confirm" or "schedule" anything that's already in the events list.
+
+4. PROJECT PLAN: Check task statuses. "complete" or "in_progress" tasks are not suggestions.
+
+5. DATE CHECK: Today is ${today}. Do not suggest actions for past dates. "Confirm Monday 23 March call" on March 25 is stale.
+
+BANNED PATTERNS:
+- "Confirm [event that's already in notes/events]"
+- "Schedule [meeting that's already booked]"
+- "Follow up on [thing that was just discussed yesterday]"
+- "Define the final step" / "Keep momentum" / "Push for close" (generic filler)
 - "Confirm the next concrete step"
-- "Keep momentum"
-These are generic filler. Replace with what the ACTUAL next step is from the deal's notes and actions.
+
+Each action must be the GENUINE NEXT STEP that hasn't been started. Reference specific people, dates, and deliverables.
+
+BAD: "Confirm BOE QA call for Monday" (already in notes as confirmed)
+GOOD: "Prepare QA test scenarios for the BOE Monday call — ensure the floor plan data covers all 3 buildings Phil mentioned."
 - "pipelineHealth": string — a short phrase rating overall health (e.g. "Strong — 3 deals in late stage", "Caution — pipeline stagnating", "Healthy — £120k in negotiation").
 - "momentum": string | null — one short positive signal or win to note, or null if there is none. If a deal's score improved, include the delta and before/after: e.g. "BOE +18pts (74→92%) — POC trial started". Never use vague phrases like "Engagement strengthening"; cite the specific event.
 - "topRisk": string | null — the single biggest risk or blocker across the pipeline, or null if pipeline is empty or risk-free.
@@ -396,7 +406,7 @@ These are generic filler. Replace with what the ACTUAL next step is from the dea
         dealScheduledDescriptions.push({ dealName: d.dealName, description: ev.description })
       }
     }
-    // Collect confirmation notes
+    // Collect confirmation notes from meeting notes
     const allNotes = [d.meetingNotes, d.hubspotNotes].filter(Boolean).join('\n---\n')
     const noteEntries = parseMeetingEntries(allNotes)
     const sortedNotes = noteEntries.filter(e => e.date).sort((a, b) => (b.date!.getTime() - a.date!.getTime()))
@@ -404,6 +414,15 @@ These are generic filler. Replace with what the ACTUAL next step is from the dea
       const firstSentence = entry.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().split(/[.\n]/)[0].trim()
       if (confirmKw.test(firstSentence)) {
         confirmedNoteTexts.push(`${d.dealName}: ${firstSentence}`)
+      }
+    }
+    // Also check the raw notes field (populated by Ask AI interactions)
+    const rawNotes = (d.notes || '').trim()
+    if (rawNotes && confirmKw.test(rawNotes)) {
+      // Extract sentences containing confirmation keywords
+      const sentences = rawNotes.split(/[.\n]/).filter((s: string) => confirmKw.test(s))
+      for (const s of sentences.slice(0, 3)) {
+        confirmedNoteTexts.push(`${d.dealName}: ${s.trim().slice(0, 120)}`)
       }
     }
   }
@@ -451,7 +470,25 @@ These are generic filler. Replace with what the ACTUAL next step is from the dea
     return false
   }
 
+  // CHANGE 3: Date-based filtering — filter out actions referencing past dates
+  const todayDate = new Date()
+  todayDate.setHours(0, 0, 0, 0)
+
+  const referencesPastDate = (action: string): boolean => {
+    const dateMatch = action.match(/(\d{1,2})\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)/i)
+    if (dateMatch) {
+      const mentionedDate = new Date(`${dateMatch[2]} ${dateMatch[1]}, ${todayDate.getFullYear()}`)
+      if (!isNaN(mentionedDate.getTime()) && mentionedDate < todayDate) {
+        return true
+      }
+    }
+    return false
+  }
+
   const isDuplicate = (action: string): boolean => {
+    // Filter out actions referencing past dates
+    if (referencesPastDate(action)) return true
+
     // First check stale confirm/schedule actions against scheduled events & notes
     if (isStaleConfirmAction(action)) return true
 
