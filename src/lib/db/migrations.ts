@@ -87,6 +87,14 @@ export async function runMigrations(): Promise<void> {
     `)
   } catch { /* already exists */ }
 
+  // Batch 6 — scheduled events (calendar)
+  try {
+    await db.execute(sql`
+      ALTER TABLE deal_logs
+        ADD COLUMN IF NOT EXISTS scheduled_events          jsonb NOT NULL DEFAULT '[]'::jsonb
+    `)
+  } catch { /* already exists */ }
+
   // ── brain_rebuild_log ────────────────────────────────────────────────────────
   try {
     await db.execute(sql`

@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Building2, Swords,
   FileText, Settings, LogOut, Search,
   ChevronLeft, ChevronRight,
-  X, Brain, Zap, Activity, MessageSquare, Sun, Moon, Home, BookOpen,
+  X, Brain, Zap, Activity, MessageSquare, Sun, Moon, Home, BookOpen, CalendarDays,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 import { useTheme } from './ThemeContext'
@@ -18,6 +18,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 const CORE_ITEMS = [
   { href: '/dashboard',  icon: LayoutDashboard, label: 'Today',      matchPaths: ['/dashboard'] },
   { href: '/pipeline',   icon: Home,            label: 'Pipeline',   matchPaths: ['/pipeline', '/deals'] },
+  { href: '/calendar',   icon: CalendarDays,    label: 'Calendar',   matchPaths: ['/calendar'] },
   { href: '/models',     icon: Brain,           label: 'Models',     matchPaths: ['/models'] },
   { href: '/playbook',   icon: BookOpen,        label: 'Playbook',   matchPaths: ['/playbook'] },
   { href: '/collateral', icon: Zap,             label: 'Collateral', matchPaths: ['/collateral'] },

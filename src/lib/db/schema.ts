@@ -237,6 +237,8 @@ export const dealLogs = pgTable('deal_logs', {
   // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS outcome text;
   engagementType: text('engagement_type'),                     // 'POC' | 'Pilot' | 'Live' | 'Expansion' | 'Renewal' | 'Upsell' | custom
   // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS engagement_type text;
+  scheduledEvents: jsonb('scheduled_events').notNull().default([]), // ScheduledEvent[] — extracted from meeting notes
+  // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS scheduled_events jsonb NOT NULL DEFAULT '[]'::jsonb;
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
