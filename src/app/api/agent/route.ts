@@ -186,10 +186,32 @@ function buildActiveDealContext(
   return lines.join('\n')
 }
 
+// ── Fast intent classification — runs BEFORE LLM to set routing hints ────────
+
+type FastIntent = 'content_generation' | 'deal_modification' | 'information' | 'informational_statement' | null
+
+function fastIntentClassify(message: string): FastIntent {
+  const lower = message.toLowerCase()
+  // Content generation: "send X the talking points", "draft an email", "write a proposal"
+  if (lower.match(/send .+ (talking points|deck|ppt|doc|email|one-pager|battlecard|proposal|brief)/)) return 'content_generation'
+  if (lower.match(/(draft|write|create|generate|build|make|prepare) .+ (email|doc|deck|points|battlecard|one-pager|proposal|brief|playbook|strategy|pitch|template|collateral|asset|talk.?track|objection)/)) return 'content_generation'
+  if (lower.match(/(talking points|one-pager|battlecard|pitch deck|email sequence|objection handler|talk track)\s+(for|about|on|regarding)/)) return 'content_generation'
+  // Deal modification
+  if (lower.match(/(close|move|update|change|set) .+ (deal|stage|value|status)/)) return 'deal_modification'
+  // Information query
+  if (lower.match(/^(what|which|how|who|summarise|summarize|status|tell me|show me|give me|compare|analyze|analyse)/)) return 'information'
+  // Informational statements — simple past/present tense statements about events (no action verb)
+  if (lower.match(/\b(is |are |was |were |has been |have been |already |just |been )(scheduled|booked|confirmed|set|arranged|planned|done|completed|cancelled|moved|pushed|postponed|rescheduled)\b/)) return 'informational_statement'
+  if (lower.match(/\b(called|emailed|texted|met with|spoke with|talked to|heard from|reached out)\b/) && !lower.match(/^(draft|write|send|create|generate)/)) return 'informational_statement'
+  return null
+}
+
 // ── System prompt builder ────────────────────────────────────────────────────
 
-function buildSystemPrompt(brainContext: string, activeDealContext: string, pipelineStageContext: string = ''): string {
+function buildSystemPrompt(brainContext: string, activeDealContext: string, pipelineStageContext: string = '', intentHint: string = ''): string {
   return `You are SellSight AI — a sales copilot with complete CRM access. You are the interface between the user and their pipeline intelligence brain.
+
+${intentHint}
 
 ═══ CORE DIRECTIVE: BE INTELLIGENT ABOUT WHEN TO ACT vs CONFIRM ═══
 
@@ -230,6 +252,31 @@ The text field in your tool call should be a character-for-character copy of wha
 
 This applies to: manage_todos add[], update_success_criteria add[].text, update_project_plan tasks[].text, update_deal notes/nextSteps.
 
+═══ INFORMATIONAL STATEMENTS (CRITICAL — NEVER ERROR ON THESE) ═══
+
+When the user makes a simple statement about something that happened or is scheduled (NOT a request):
+- "BOE floorplan call is already scheduled for Monday 23rd"
+- "Called Sarah yesterday, she's interested"
+- "Meeting with Acme pushed to next week"
+- "Just heard from Brian, they're going with us"
+
+These are deal updates/notes. ALWAYS:
+1. Acknowledge the update naturally ("Got it" / "Noted" / "Good to know")
+2. Log it using process_meeting_notes (search for the deal first if needed) — this ensures the Deal Intelligence is refreshed
+3. If it matches an existing todo or action item, mention that
+4. NEVER error. NEVER say you can't process a simple statement. If you can't match it to a deal, ask which deal it's about.
+
+═══ TASK COMPLETION LOOP (CRITICAL — NEVER STALL AFTER TOOL CALLS) ═══
+
+After EVERY tool call, ask yourself: "Is the user's ORIGINAL request fulfilled?"
+
+If NO → immediately call the next tool. Common chains:
+- User asks for content + you called get_deal_details → NOW call generate_content or draft_email
+- User asks for analysis + you called search_deals → NOW call get_deal_intelligence
+- User asks to update + you called search_deals → NOW call update_deal / process_meeting_notes
+
+NEVER stop after a lookup/search tool and show buttons. The lookup was a means to an end — complete the user's actual request.
+
 ═══ ACTION CHAINS ═══
 
 "Add X to project plan" → search_deals (if no active deal) → update_project_plan
@@ -244,6 +291,8 @@ This applies to: manage_todos add[], update_success_criteria add[].text, update_
 "Reset/replace the project plan" → correct_deal_data with replaceProjectPlan (NOT enrich_deal — enrich MERGES, correct_deal_data REPLACES)
 "Clear the project plan" → correct_deal_data with clearProjectPlan: true
 "Create a timeline / document / output" → generate_content (can create ANY type of content — timelines, plans, proposals, risk assessments, anything)
+"Send [person] the [content type]" → search_deals (if needed to find the deal/person) → generate_content (talking points, one-pager, email, etc.)
+"Draft talking points for [deal/person]" → get_deal_details (if needed) → generate_content with relevant context
 
 IMPORTING LARGE DEALS:
 When the user pastes a large block of deal info (contacts, interaction history, contract details, action items, etc.), ALWAYS use import_deal — NOT create_deal. import_deal handles contacts, notes, meeting history, todos, risks, success criteria, and project plan in ONE operation. Do NOT chain create_deal → add_contact → update_deal — use import_deal once.
@@ -570,7 +619,23 @@ export async function POST(req: NextRequest) {
       : brain
         ? 'Pipeline data is loading — no deals recorded yet. Encourage the user to add their first deal.'
         : 'No workspace data loaded yet.'
-    const systemPrompt = buildSystemPrompt(brainContextWithLabels, activeDealContext, pipelineStageContext)
+    // ── Fast intent classification for routing hints ─────────────────────────
+    const fastIntent = fastIntentClassify(lastUserText)
+    let intentHint = ''
+    if (fastIntent === 'content_generation') {
+      intentHint = `═══ INTENT HINT: CONTENT GENERATION ═══
+The user's message has been classified as a CONTENT GENERATION request. They want you to create/draft/generate a document, email, talking points, or similar output.
+- If you need deal context first, call get_deal_details or search_deals, then IMMEDIATELY call generate_content or draft_email — do NOT stop after the lookup.
+- Focus on GENERATING the content, not asking clarifying questions unless truly ambiguous.`
+    } else if (fastIntent === 'informational_statement') {
+      intentHint = `═══ INTENT HINT: INFORMATIONAL STATEMENT ═══
+The user's message is a simple informational statement (e.g., scheduling update, status report). This is NOT a question or command.
+- Acknowledge it naturally
+- Log it as a deal note via process_meeting_notes (search for the matching deal first if needed)
+- NEVER error on simple statements. If you can't match to a deal, ask which deal it's about.`
+    }
+
+    const systemPrompt = buildSystemPrompt(brainContextWithLabels, activeDealContext, pipelineStageContext, intentHint)
 
     // ── Build tool context for tool execute() calls ──────────────────────────
     const toolContext = {
@@ -632,7 +697,8 @@ export async function POST(req: NextRequest) {
             } catch (toolErr) {
               const msg = toolErr instanceof Error ? toolErr.message : String(toolErr)
               console.error(`[agent] Tool "${name}" failed:`, msg, toolErr)
-              return `Error executing ${name}: ${msg}`
+              // Never show raw errors to the user — return a graceful message for the LLM to work with
+              return `[Tool "${name}" encountered an issue. Inform the user you ran into a problem and ask them to rephrase or try a different approach. Do NOT show them technical error details.]`
             }
           },
         }),
@@ -698,17 +764,19 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err)
     console.error('[agent] Error:', errMsg, err)
-    // Return as a proper data stream so useChat can parse and display the error
-    // useChat expects text/plain data stream format, not JSON
+    // Return a friendly message as a data stream — never expose raw error details to users
+    const friendlyMessage = "I ran into an issue processing your request. Could you try rephrasing what you'd like me to do?"
     const errorStream = new ReadableStream({
       start(controller) {
-        // AI SDK data stream protocol: '3:' prefix = error message
-        controller.enqueue(new TextEncoder().encode(`3:"${errMsg.replace(/"/g, '\\"')}"\n`))
+        // Send as a normal text message (0: prefix) instead of error (3: prefix)
+        // so the UI renders it as a regular assistant message, not a scary error banner
+        controller.enqueue(new TextEncoder().encode(`0:${JSON.stringify(friendlyMessage)}\n`))
+        controller.enqueue(new TextEncoder().encode(`d:{"finishReason":"stop","usage":{"promptTokens":0,"completionTokens":0}}\n`))
         controller.close()
       },
     })
     return new Response(errorStream, {
-      status: 200, // useChat ignores non-200 responses entirely; must be 200 with error in stream
+      status: 200,
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     })
   }

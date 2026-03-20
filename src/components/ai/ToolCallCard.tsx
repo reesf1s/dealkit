@@ -45,18 +45,24 @@ export default function ToolCallCard({ invocation }: ToolCallCardProps) {
   }
 
   const isDone = state === 'result'
-  const label = isDone ? labels.done : labels.pending
-
-  const resultText = result != null
+  // Detect if the result is a tool error (our graceful error wrapper)
+  const resultStr = result != null
     ? (typeof result === 'string' ? result : JSON.stringify(result, null, 2))
     : null
+  const isToolError = resultStr?.startsWith('[Tool "') ?? false
+  const label = isDone
+    ? (isToolError ? `${toolName.replace(/_/g, ' ')} — retrying...` : labels.done)
+    : labels.pending
+
+  // Don't expose internal error messages in the expandable result
+  const resultText = isToolError ? null : resultStr
 
   return (
     <div style={{
       margin: '4px 0',
       borderRadius: '8px',
       background: 'rgba(15, 12, 30, 0.6)',
-      border: `1px solid ${isDone ? 'rgba(16,185,129,0.2)' : 'rgba(99,102,241,0.2)'}`,
+      border: `1px solid ${isDone ? (isToolError ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)') : 'rgba(99,102,241,0.2)'}`,
       overflow: 'hidden',
       transition: 'border-color 0.2s',
     }}>
@@ -71,7 +77,7 @@ export default function ToolCallCard({ invocation }: ToolCallCardProps) {
           background: 'none',
           border: 'none',
           cursor: resultText ? 'pointer' : 'default',
-          color: isDone ? '#6EE7B7' : '#A5B4FC',
+          color: isDone ? (isToolError ? '#FCD34D' : '#6EE7B7') : '#A5B4FC',
           fontSize: '11.5px',
           fontWeight: 500,
           fontFamily: 'inherit',

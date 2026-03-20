@@ -41,6 +41,77 @@ function getQuickActions(activeDealCompany?: string, currentPage?: string): Quic
   ]
 }
 
+// ── Context-aware follow-up suggestions based on conversation content ────────
+
+const CONTENT_TOOLS = new Set(['generate_content', 'generate_battlecard', 'draft_email'])
+const DEAL_MUTATION_TOOLS = new Set(['update_deal', 'create_deal', 'import_deal', 'enrich_deal', 'process_meeting_notes', 'manage_todos', 'add_contact', 'correct_deal_data', 'update_project_plan', 'update_success_criteria'])
+const INFO_TOOLS = new Set(['search_deals', 'get_deal_details', 'query_pipeline', 'get_deal_intelligence', 'get_win_playbook', 'get_pipeline_forecast', 'get_deal_score_history', 'get_score_trends', 'get_rep_performance', 'search_workspace', 'find_similar_deals', 'get_workspace_overview', 'get_competitor_intel'])
+
+type ConversationIntent = 'content' | 'deal_update' | 'information' | 'generic'
+
+function detectConversationIntent(messages: Message[]): ConversationIntent {
+  // Look at ALL assistant messages for tool invocations
+  const toolNames = new Set<string>()
+  for (const msg of messages) {
+    if (msg.role !== 'assistant') continue
+    const invocations = (msg as any).toolInvocations ?? []
+    for (const inv of invocations) {
+      if (inv.toolName) toolNames.add(inv.toolName)
+    }
+  }
+
+  if (toolNames.size === 0) {
+    // No tools called — check user's last message for intent
+    const lastUser = [...messages].reverse().find(m => m.role === 'user')
+    if (lastUser) {
+      const lower = (typeof lastUser.content === 'string' ? lastUser.content : '').toLowerCase()
+      if (lower.match(/send .+ (talking points|deck|doc|email|one-pager|battlecard|proposal)/) ||
+          lower.match(/(draft|write|create|generate|build) .+ (email|doc|deck|points|battlecard|one-pager|proposal|brief)/)) {
+        return 'content'
+      }
+    }
+    return 'generic'
+  }
+
+  // Content tools take priority
+  for (const t of toolNames) {
+    if (CONTENT_TOOLS.has(t)) return 'content'
+  }
+  // Deal mutations
+  for (const t of toolNames) {
+    if (DEAL_MUTATION_TOOLS.has(t)) return 'deal_update'
+  }
+  // Pure info queries
+  for (const t of toolNames) {
+    if (INFO_TOOLS.has(t)) return 'information'
+  }
+
+  return 'generic'
+}
+
+function getFollowUpActions(intent: ConversationIntent, activeDealCompany?: string): QuickAction[] {
+  const dealRef = activeDealCompany ? ` for ${activeDealCompany}` : ''
+  switch (intent) {
+    case 'content':
+      return [
+        { label: 'Draft a follow-up email', prompt: `Draft a follow-up email${dealRef}` },
+        { label: 'Generate talking points', prompt: `Generate internal buy-in talking points${dealRef}` },
+        { label: 'Create a one-pager', prompt: `Create a one-pager${dealRef}` },
+      ]
+    case 'deal_update':
+      return [
+        { label: 'What should I do next?', prompt: `What are my next steps${dealRef}? What should I prioritise?` },
+        { label: 'Check deal health', prompt: `How is${dealRef ? ' the' + dealRef.slice(4) + ' deal' : ' my pipeline'} looking? Give me the ML analysis.` },
+        { label: 'Review to-dos', prompt: `Review my action items${dealRef} — anything stale or missing?` },
+      ]
+    case 'information':
+      // No follow-up buttons for pure information queries — the answer IS the response
+      return []
+    default:
+      return []
+  }
+}
+
 // ── Stage badge color map ───────────────────────────────────────────────────
 function stageBadgeColor(stage: string): { bg: string; text: string; border: string } {
   const s = stage.toLowerCase()
@@ -593,53 +664,59 @@ export default function CopilotPanel() {
             </div>
           )}
 
-          {/* Proactive suggestions after assistant response */}
-          {messages.length > 0 && !isLoading && messages[messages.length - 1]?.role === 'assistant' && (
-            <div style={{
-              display: 'flex', flexWrap: 'wrap', gap: '6px',
-              paddingTop: '4px',
-            }}>
-              {quickActions.slice(0, 3).map(action => (
-                <button
-                  key={action.label}
-                  onClick={() => handleQuickAction(action)}
-                  style={{
-                    padding: '5px 12px', borderRadius: '100px', cursor: 'pointer',
-                    background: 'var(--accent-subtle)',
-                    border: '1px solid rgba(99,102,241,0.15)',
-                    color: 'var(--text-tertiary)', fontSize: '11px', fontWeight: 500,
-                    transition: 'all 140ms', fontFamily: 'inherit',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = 'var(--accent-subtle)'
-                    e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'
-                    e.currentTarget.style.color = 'var(--text-secondary)'
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = 'var(--accent-subtle)'
-                    e.currentTarget.style.borderColor = 'rgba(99,102,241,0.15)'
-                    e.currentTarget.style.color = 'var(--text-tertiary)'
-                  }}
-                >
-                  {action.label}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Context-aware follow-up suggestions after assistant response */}
+          {messages.length > 0 && !isLoading && messages[messages.length - 1]?.role === 'assistant' && (() => {
+            const intent = detectConversationIntent(messages)
+            const followUps = getFollowUpActions(intent, activeDeal?.company)
+            // If intent-aware follow-ups exist, show those; otherwise skip (don't show generic buttons)
+            if (followUps.length === 0) return null
+            return (
+              <div style={{
+                display: 'flex', flexWrap: 'wrap', gap: '6px',
+                paddingTop: '4px',
+              }}>
+                {followUps.map(action => (
+                  <button
+                    key={action.label}
+                    onClick={() => handleQuickAction(action)}
+                    style={{
+                      padding: '5px 12px', borderRadius: '100px', cursor: 'pointer',
+                      background: 'var(--accent-subtle)',
+                      border: '1px solid rgba(99,102,241,0.15)',
+                      color: 'var(--text-tertiary)', fontSize: '11px', fontWeight: 500,
+                      transition: 'all 140ms', fontFamily: 'inherit',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'var(--accent-subtle)'
+                      e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'
+                      e.currentTarget.style.color = 'var(--text-secondary)'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'var(--accent-subtle)'
+                      e.currentTarget.style.borderColor = 'rgba(99,102,241,0.15)'
+                      e.currentTarget.style.color = 'var(--text-tertiary)'
+                    }}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            )
+          })()}
 
-          {/* Error display */}
+          {/* Error display — friendly message, no raw error details */}
           {(chatError || error) && (
             <div style={{
               margin: '8px 0',
               padding: '10px 14px',
-              background: 'rgba(239,68,68,0.1)',
-              border: '1px solid rgba(239,68,68,0.2)',
+              background: 'rgba(239,68,68,0.06)',
+              border: '1px solid rgba(239,68,68,0.15)',
               borderRadius: '8px',
               color: '#FCA5A5',
               fontSize: '12px',
               lineHeight: '1.5',
             }}>
-              <strong>Error:</strong> {chatError || error?.message || 'Something went wrong'}
+              I ran into an issue. Could you rephrase what you&apos;d like me to do?
             </div>
           )}
 
