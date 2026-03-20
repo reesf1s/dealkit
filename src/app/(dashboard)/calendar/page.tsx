@@ -83,6 +83,87 @@ function cleanSnippet(text: string): string {
     .slice(0, 80)
 }
 
+// ── Extract dates from meeting notes text ────────────────────────────────────
+// Parses patterns like "Monday 23 March 12:00", "25th March at 2pm",
+// "call on March 25", "meeting 23/03/2026"
+
+const MONTH_MAP: Record<string, number> = {
+  jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
+  apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
+  aug: 7, august: 7, sep: 8, september: 8, oct: 9, october: 9,
+  nov: 10, november: 10, dec: 11, december: 11,
+}
+
+function extractDatesFromNotes(notes: string, dealId: string, dealName: string): CalEvent[] {
+  if (!notes || notes.length < 10) return []
+  const events: CalEvent[] = []
+  const seen = new Set<string>()
+  const currentYear = new Date().getFullYear()
+
+  // Pattern 1: "23 March 12:00" or "23rd March" or "March 23"
+  const datePatterns = [
+    // "23 March 12:00-13:00" or "23 March at 2pm"
+    /(\d{1,2})(?:st|nd|rd|th)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s*(?:(\d{4})\s*)?(?:(?:at\s+)?(\d{1,2}[:.]\d{2})\s*(?:-\s*\d{1,2}[:.]\d{2})?)?/gi,
+    // "March 23, 2026" or "March 23"
+    /(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?(?:\s+(?:at\s+)?(\d{1,2}[:.]\d{2}))?/gi,
+  ]
+
+  // Get ~200 chars of context around each date match for event title
+  for (const pattern of datePatterns) {
+    let match
+    while ((match = pattern.exec(notes)) !== null) {
+      let day: number, monthStr: string, year: number, time: string | null = null
+
+      if (/^\d/.test(match[1])) {
+        // Pattern 1: day first
+        day = parseInt(match[1])
+        monthStr = match[2].toLowerCase()
+        year = match[3] ? parseInt(match[3]) : currentYear
+        time = match[4] ? match[4].replace('.', ':') : null
+      } else {
+        // Pattern 2: month first
+        monthStr = match[1].toLowerCase()
+        day = parseInt(match[2])
+        year = match[3] ? parseInt(match[3]) : currentYear
+        time = match[4] ? match[4].replace('.', ':') : null
+      }
+
+      // Truncate month name to match lookup
+      const monthKey = Object.keys(MONTH_MAP).find(k => monthStr.startsWith(k))
+      if (!monthKey || day < 1 || day > 31) continue
+      const month = MONTH_MAP[monthKey]
+
+      const dateObj = new Date(year, month, day)
+      if (isNaN(dateObj.getTime())) continue
+
+      const dateKey = `${dealId}-${dateObj.toISOString().slice(0, 10)}`
+      if (seen.has(dateKey)) continue
+      seen.add(dateKey)
+
+      // Extract context around the match for a meaningful title
+      const start = Math.max(0, match.index - 60)
+      const end = Math.min(notes.length, match.index + match[0].length + 60)
+      let context = notes.slice(start, end).replace(/\n+/g, ' ').trim()
+      // Try to find a meaningful phrase
+      const phrases = context.match(/(?:call|meeting|session|demo|review|walkthrough|discussion|connect|check-in|sync|training|workshop|presentation|webinar|catch[- ]?up|follow[- ]?up|kick[- ]?off)[^.!?\n]*/i)
+      const subtitle = phrases ? phrases[0].trim().slice(0, 80) : context.slice(0, 80)
+
+      events.push({
+        id: `${dealId}-note-date-${dateObj.toISOString().slice(0, 10)}`,
+        title: dealName,
+        subtitle,
+        date: dateObj,
+        dealId,
+        type: 'meeting',
+        time,
+        isPast: dateObj < new Date(),
+      })
+    }
+  }
+
+  return events
+}
+
 // ── Build all calendar events from deals + brain data ────────────────────────
 // Uses getCalendarEvents() from the foundation module for scheduled events and
 // close dates. Keeps inline logic for contract dates, project plans, stale
@@ -220,6 +301,47 @@ function buildCalendarEvents(deals: any[], brainData: any): CalEvent[] {
               })
             }
           }
+        }
+      }
+    }
+  }
+
+  // Extract dates from meeting notes text (catches events not in scheduledEvents)
+  for (const deal of deals) {
+    const dealName = deal.prospectCompany || deal.dealName || 'Deal'
+    const notes = (deal.meetingNotes || '') + '\n' + (deal.hubspotNotes || '')
+    if (notes.trim().length > 10) {
+      const noteEvents = extractDatesFromNotes(notes, deal.id, dealName)
+      // Only add note-extracted events that don't duplicate existing events on the same date
+      const existingDateKeys = new Set(events.filter(e => e.dealId === deal.id).map(e => {
+        const d = e.date instanceof Date ? e.date : new Date(e.date)
+        return d.toISOString().slice(0, 10)
+      }))
+      for (const ne of noteEvents) {
+        const neDate = ne.date instanceof Date ? ne.date : new Date(ne.date)
+        if (!existingDateKeys.has(neDate.toISOString().slice(0, 10))) {
+          events.push(ne)
+        }
+      }
+    }
+  }
+
+  // Todo items with due dates
+  for (const deal of deals) {
+    const dealName = deal.prospectCompany || deal.dealName || 'Deal'
+    const todos = (deal.todos as any[]) || []
+    for (const todo of todos) {
+      if (todo.dueDate && !todo.done) {
+        const d = new Date(todo.dueDate)
+        if (!isNaN(d.getTime())) {
+          events.push({
+            id: `${deal.id}-todo-${todo.id || todo.text?.slice(0, 20)}`,
+            title: dealName,
+            subtitle: `Action: ${(todo.text || '').slice(0, 60)}`,
+            date: d,
+            dealId: deal.id,
+            type: 'task',
+          })
         }
       }
     }
