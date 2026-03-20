@@ -15,11 +15,18 @@ export async function GET() {
     // Auto-rebuild in background if brain is stale (version mismatch) or missing
     if (!brain || (brain.brainVersion ?? 0) < BRAIN_VERSION) {
       after(async () => {
-        try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ }
+        console.log(`[brain] Rebuild triggered by: stale_version at ${new Date().toISOString()}`)
+        try { await rebuildWorkspaceBrain(workspaceId, 'stale_version') } catch { /* non-fatal */ }
       })
     }
 
-    return NextResponse.json({ data: brain })
+    return NextResponse.json({
+      data: brain,
+      meta: {
+        lastRebuilt: brain?.updatedAt ?? null,
+        isStale: brain?.updatedAt ? (Date.now() - new Date(brain.updatedAt).getTime() > 3600000) : true,
+      },
+    })
   } catch (err) { return dbErrResponse(err) }
 }
 
@@ -29,7 +36,8 @@ export async function POST() {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { workspaceId } = await getWorkspaceContext(userId)
-    const brain = await rebuildWorkspaceBrain(workspaceId)
+    console.log(`[brain] Rebuild triggered by: manual_refresh at ${new Date().toISOString()}`)
+    const brain = await rebuildWorkspaceBrain(workspaceId, 'manual_refresh')
     return NextResponse.json({ data: brain })
   } catch (err) { return dbErrResponse(err) }
 }

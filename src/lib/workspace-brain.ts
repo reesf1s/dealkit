@@ -319,19 +319,19 @@ const _lastRebuildAt = new Map<string, number>()
 const REBUILD_COOLDOWN_MS = 10_000 // 10 seconds
 
 /** Rebuild and persist the brain from current deal state. Call in background after any deal mutation. */
-export async function rebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceBrain> {
+export async function rebuildWorkspaceBrain(workspaceId: string, reason = 'unknown'): Promise<WorkspaceBrain> {
   // Cooldown: skip if rebuilt very recently and no rebuild is in flight
   const lastAt = _lastRebuildAt.get(workspaceId) ?? 0
   if (!_rebuildInFlight.has(workspaceId) && Date.now() - lastAt < REBUILD_COOLDOWN_MS) {
     // Return current brain from DB without rebuilding
-    return getWorkspaceBrain(workspaceId).then(b => b ?? _doRebuildWorkspaceBrain(workspaceId))
+    return getWorkspaceBrain(workspaceId).then(b => b ?? _doRebuildWorkspaceBrain(workspaceId, reason))
   }
 
   // Deduplicate: if a rebuild is already running for this workspace, wait for it
   const existing = _rebuildInFlight.get(workspaceId)
   if (existing) return existing
 
-  const promise = _doRebuildWorkspaceBrain(workspaceId).finally(() => {
+  const promise = _doRebuildWorkspaceBrain(workspaceId, reason).finally(() => {
     _rebuildInFlight.delete(workspaceId)
     _lastRebuildAt.set(workspaceId, Date.now())
   })
@@ -340,37 +340,47 @@ export async function rebuildWorkspaceBrain(workspaceId: string): Promise<Worksp
 }
 
 // ── Debounced brain rebuild ───────────────────────────────────────────────────
-// For rapid successive mutations (e.g. 5 notes added in a row), use
-// scheduleBrainRebuild instead of calling rebuildWorkspaceBrain directly.
-// Any pending rebuild for the workspace is cancelled and rescheduled so only
-// one rebuild fires after the burst settles.
-const _pendingRebuildTimers = new Map<string, ReturnType<typeof setTimeout>>()
+// queueBrainRebuild provides a 5-second debounce for rapid successive mutations
+// (e.g. 5 notes added in a row). Within a single long-lived process this helps
+// coalesce bursts. On Vercel serverless each request runs in its own execution
+// context so the debounce only helps within one request — for critical events
+// (deal close, HubSpot sync) always call rebuildWorkspaceBrain directly inside
+// after() so Vercel keeps the execution alive for the awaited promise.
+const _pendingRebuilds = new Map<string, { timer: NodeJS.Timeout; reason: string }>()
 
 /**
- * Schedule a debounced brain rebuild. Cancels any existing pending rebuild for
- * this workspace and schedules a new one after `delayMs` (default 10 s).
+ * Queue a debounced brain rebuild (5-second window). Cancels any existing
+ * pending rebuild for this workspace and re-queues.
  *
- * Use this instead of `rebuildWorkspaceBrain` when calling from background
- * `after()` handlers where bursts are likely (e.g. batch note saves).
- * For manual/explicit triggers (refresh button, cron) call `rebuildWorkspaceBrain`
- * directly so the rebuild runs immediately.
+ * NOTE: on Vercel serverless the timer won't survive across requests. For
+ * critical triggers use `rebuildWorkspaceBrain` directly inside `after()`.
+ *
+ * @deprecated Prefer `after(async () => { await rebuildWorkspaceBrain(id) })`.
+ *             This shim is kept for callers that haven't been migrated yet.
  */
-export function scheduleBrainRebuild(workspaceId: string, trigger = 'scheduled', delayMs = REBUILD_COOLDOWN_MS): void {
-  // Cancel any pending rebuild for this workspace
-  const existing = _pendingRebuildTimers.get(workspaceId)
-  if (existing) clearTimeout(existing)
+export function queueBrainRebuild(workspaceId: string, reason: string): void {
+  const existing = _pendingRebuilds.get(workspaceId)
+  if (existing) clearTimeout(existing.timer)
 
-  // Schedule a new rebuild after the debounce window
   const timer = setTimeout(async () => {
-    _pendingRebuildTimers.delete(workspaceId)
+    _pendingRebuilds.delete(workspaceId)
     try {
-      await _doRebuildWorkspaceBrain(workspaceId)
-      _lastRebuildAt.set(workspaceId, Date.now())
+      await rebuildWorkspaceBrain(workspaceId, reason)
     } catch (e) {
-      console.error(`[brain] scheduleBrainRebuild(${trigger}) failed for ${workspaceId}:`, e)
+      console.error(`[brain] queueBrainRebuild(${reason}) failed for ${workspaceId}:`, e)
     }
-  }, delayMs)
-  _pendingRebuildTimers.set(workspaceId, timer)
+  }, 5000)
+
+  _pendingRebuilds.set(workspaceId, { timer, reason })
+}
+
+/**
+ * @deprecated Use `queueBrainRebuild` or call `rebuildWorkspaceBrain` directly
+ * inside `after(async () => { ... })`. Kept as a shim so callers that haven't
+ * been updated yet still compile.
+ */
+export function scheduleBrainRebuild(workspaceId: string, trigger = 'scheduled'): void {
+  queueBrainRebuild(workspaceId, trigger)
 }
 
 // ── One-time extraction backfill ──────────────────────────────────────────────
@@ -477,8 +487,9 @@ Return this JSON:
   return stats
 }
 
-async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceBrain> {
+async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown'): Promise<WorkspaceBrain> {
   const rebuildStartMs = Date.now()
+  console.log(`[brain] Rebuild started for workspace ${workspaceId} — triggered by: ${reason}`)
   await ensureBrainColumn()
 
   // ── Backfill outcome field for deals closed before this column existed ───────
@@ -2226,6 +2237,9 @@ async function _doRebuildWorkspaceBrain(workspaceId: string): Promise<WorkspaceB
     // Hard cap: never hold the after() lifecycle open longer than 30 seconds
     new Promise<void>(resolve => setTimeout(resolve, 30_000)),
   ])
+
+  const duration = Date.now() - rebuildStartMs
+  console.log(`[brain] Rebuild complete for workspace ${workspaceId}: ${activeDeals.length} open deals, ${(wonDeals.length + lostDeals.length)} closed, ${duration}ms`)
 
   return brain
 }
