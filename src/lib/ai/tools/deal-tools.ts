@@ -1293,6 +1293,10 @@ const MeetingNotesSchema = z.object({
     decisionTimeline: z.string().nullable().optional(),
     nextMeetingBooked: z.boolean().default(false),
   }).optional(),
+  closeDateUpdate: z.object({
+    newDate: z.string().nullable(),
+    reason: z.string(),
+  }).nullable().optional(),
 })
 
 export const process_meeting_notes = {
@@ -1389,7 +1393,7 @@ DEFINITIONS — read these carefully:
 ${previousContext ? `${previousContext}\n\n---\n\n` : ''}NEW MEETING NOTES:
 ${params.notes}
 
-Deal: ${deal.dealName} with ${deal.prospectCompany} (current stage: ${deal.stage})${capabilitiesContext}${existingTodosContext}${existingCriteriaContext}${existingProjectPlanContext}
+Deal: ${deal.dealName} with ${deal.prospectCompany} (current stage: ${deal.stage}${deal.closeDate ? `, current close date: ${new Date(deal.closeDate).toISOString().split('T')[0]}` : ''})${capabilitiesContext}${existingTodosContext}${existingCriteriaContext}${existingProjectPlanContext}
 
 Return this exact JSON:
 {
@@ -1409,7 +1413,11 @@ Return this exact JSON:
   "criteriaUpdates": [{"criterionId": "id", "achieved": true, "note": "Demonstrated in meeting"}],
   "projectPlanUpdates": [{"taskId": "id", "status": "complete", "note": "Completed — session confirmed for 19 Mar"}],
   "suggestedStage": "proposal or null if no stage change implied",
-  "stageReason": "reason for stage change or null"
+  "stageReason": "reason for stage change or null",
+  "closeDateUpdate": {
+    "newDate": "2026-05-15 or null if no timeline change mentioned",
+    "reason": "Trial extended 30 days"
+  }
 }
 
 Rules:
@@ -1423,6 +1431,7 @@ Rules:
 - criteriaUpdates: ONLY if the meeting notes clearly demonstrate a criterion was met. Don't guess. Return [] if none confirmed.
 - projectPlanUpdates: CRITICAL — if the notes describe completing or progressing a task, match it to the task ID and set status to "complete" or "in_progress". Be smart: "agreed on plan and dates" = complete any planning tasks; "session confirmed for 19 Mar" = complete any attendance-confirmation tasks. Return [] if no task progress.
 - suggestedStage: ONLY if notes clearly imply a stage transition (e.g., "sent proposal" = proposal, "received signed contract" = closed_won). Return null if current stage still appropriate.
+- closeDateUpdate: If the notes mention a timeline change (extended, pushed back, delayed, moved to, new deadline, trial extended), calculate the new close date. If "pushed back 30 days" and current close date is known, add 30 days to it. If an absolute date is given ("moving to June"), use that date. Return null for newDate if no timeline change is mentioned.
 - DO NOT infer things that weren't said. If the notes don't mention budget, leave budgetStatus as "not_discussed".`,
       }],
     })
@@ -1575,6 +1584,11 @@ Rules:
       if (parsed.suggestedStage === 'closed_lost') updateFields.lostDate = new Date()
     }
 
+    // Apply close date update from timeline change
+    if (parsed.closeDateUpdate?.newDate) {
+      updateFields.closeDate = new Date(parsed.closeDateUpdate.newDate)
+    }
+
     // Phase 2: Score computation — re-score unless user has explicitly pinned the score
     if (!(deal as any).conversionScorePinned) {
       try {
@@ -1644,7 +1658,13 @@ Rules:
       }
     } catch { /* non-fatal — insights stay as-is if narration fails */ }
 
-    await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, dealId))
+    const updateResult = await db.update(dealLogs).set(updateFields)
+      .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .returning({ id: dealLogs.id })
+
+    if (updateResult.length === 0) {
+      return { result: `I wasn't able to update that deal — it wasn't found or there was a workspace mismatch.` }
+    }
 
     // Create product gaps
     const createdGaps: string[] = []
@@ -1714,6 +1734,9 @@ Rules:
     }
     if (parsed.suggestedStage && parsed.suggestedStage !== deal.stage) {
       resultLines.push(`\n**Stage changed:** ${deal.stage} → ${parsed.suggestedStage}${parsed.stageReason ? ` (${parsed.stageReason})` : ''}`)
+    }
+    if (parsed.closeDateUpdate?.newDate) {
+      resultLines.push(`\n**Close date updated:** ${new Date(parsed.closeDateUpdate.newDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} (${parsed.closeDateUpdate.reason})`)
     }
     if (updateFields.conversionScore != null) {
       resultLines.push(`\n**Updated conversion score:** ${updateFields.conversionScore}%`)
