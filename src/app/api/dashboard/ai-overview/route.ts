@@ -109,8 +109,33 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
       const daysSinceLastNote = lastEntry?.date ? Math.round((Date.now() - lastEntry.date.getTime()) / 86400000) : null
       const lastNoteOneLiner = lastEntry?.text ? lastEntry.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().slice(0, 100) : null
 
-      // Open action count
-      const openActionCount = ((d.todos as any[]) ?? []).filter((t: any) => !t.done).length
+      // Action items from todos (with status)
+      const todos = ((d.todos as any[]) ?? [])
+      const pendingActions = todos.filter((t: any) => !t.done).map((t: any) => ({ text: t.text, status: 'pending' as const }))
+      const inProgressActions: { text: string; status: string }[] = []
+      const completedActions: { text: string; status: string }[] = []
+
+      // Action items from project plan tasks
+      const projectPlan = d.projectPlan as any
+      if (projectPlan?.phases) {
+        for (const phase of projectPlan.phases) {
+          for (const task of (phase.tasks ?? [])) {
+            if (task.status === 'in_progress') {
+              inProgressActions.push({ text: task.text, status: 'in_progress' })
+            } else if (task.status === 'complete') {
+              completedActions.push({ text: task.text, status: 'complete' })
+            } else if (task.status === 'not_started') {
+              pendingActions.push({ text: task.text, status: 'pending' })
+            }
+          }
+        }
+      }
+
+      // Recent completed todos (done=true)
+      const recentlyDoneTodos = todos.filter((t: any) => t.done).map((t: any) => ({ text: t.text, status: 'complete' }))
+      const allRecentlyCompleted = [...completedActions, ...recentlyDoneTodos].slice(0, 5)
+
+      const openActionCount = pendingActions.length + inProgressActions.length
 
       // Deal risks for unique risk
       const dealRisks = (d.dealRisks as string[]) ?? []
@@ -119,6 +144,13 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
       // AI summary as one-line context
       const oneLineContext = d.aiSummary ? d.aiSummary.split('.')[0].trim().slice(0, 100) : null
 
+      // Last 3 note summaries
+      const last3Notes = sortedEntries.slice(0, 3).map(e => {
+        const dateStr = e.date ? e.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '?'
+        const summary = e.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().slice(0, 120)
+        return `${dateStr}: ${summary}`
+      })
+
       const parts = [
         `- "${d.dealName}" @ ${d.prospectCompany} | Stage: ${sl(d.stage)} | Value: ${fmt(d.dealValue ?? 0)} | Score: ${d.conversionScore ?? 'N/A'} | Close: ${d.closeDate ? new Date(d.closeDate).toLocaleDateString('en-GB') : 'TBD'} | Competitors: ${((d.competitors as string[]) ?? []).join(', ') || 'none'}`,
         oneLineContext ? `  Context: ${oneLineContext}` : null,
@@ -126,6 +158,10 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
         daysSinceLastNote != null ? `  Days since last note: ${daysSinceLastNote}` : null,
         lastNoteDate ? `  Last note (${lastNoteDate}): "${lastNoteOneLiner}"` : null,
         openActionCount > 0 ? `  Open actions: ${openActionCount}` : null,
+        inProgressActions.length > 0 ? `  IN-PROGRESS actions (already being worked on — DO NOT suggest these):\n${inProgressActions.map(a => `    - [in_progress] ${a.text}`).join('\n')}` : null,
+        pendingActions.length > 0 ? `  PENDING actions (not started — these are candidates for today's actions):\n${pendingActions.slice(0, 5).map(a => `    - [pending] ${a.text}`).join('\n')}` : null,
+        allRecentlyCompleted.length > 0 ? `  RECENTLY COMPLETED (already done — DO NOT suggest these):\n${allRecentlyCompleted.map(a => `    - [complete] ${a.text}`).join('\n')}` : null,
+        last3Notes.length > 0 ? `  Recent notes:\n${last3Notes.map(n => `    - ${n}`).join('\n')}` : null,
       ]
       return parts.filter(Boolean).join('\n')
     }),
@@ -282,6 +318,15 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
 
 CRITICAL: Every action MUST be unique. If two deals have similar scores, their actions must STILL differ because their context differs. Reference the specific last meeting, specific risk, specific person, or specific next step for each deal.
 
+CRITICAL — ACTION DEDUPLICATION:
+When generating today's actions for each deal:
+1. CHECK the deal's action items. Do NOT suggest actions that are already completed or in-progress. If an action is marked "in_progress", the user is already working on it — suggest the NEXT thing instead.
+2. CHECK the deal's recent notes. If the user mentioned that something is already done (e.g., "all calls have been scheduled"), do not suggest scheduling calls.
+3. Prioritise actions that are genuinely NEXT — things that haven't been started, aren't scheduled, and would move the deal forward.
+
+BAD: "Confirm BOE QA call for Monday" (already scheduled and in-progress)
+GOOD: "Prepare QA test scenarios for the BOE Monday call — ensure the floor plan data covers all 3 buildings Phil mentioned."
+
 DO NOT use these phrases for any deal:
 - "Define the final step"
 - "Confirm the next concrete step"
@@ -299,9 +344,55 @@ These are generic filler. Replace with what the ACTUAL next step is from the dea
   const cleaned = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
   const parsed = JSON.parse(cleaned)
 
+  // ── Action deduplication: filter out suggested actions semantically similar to existing in-progress/completed items ──
+  const existingActionTexts: string[] = []
+  for (const d of openDeals) {
+    // Collect completed + in-progress todos
+    for (const t of ((d.todos as any[]) ?? [])) {
+      if (t.done) existingActionTexts.push(String(t.text))
+    }
+    // Collect completed + in-progress project plan tasks
+    const plan = d.projectPlan as any
+    if (plan?.phases) {
+      for (const phase of plan.phases) {
+        for (const task of (phase.tasks ?? [])) {
+          if (task.status === 'in_progress' || task.status === 'complete') {
+            existingActionTexts.push(String(task.text))
+          }
+        }
+      }
+    }
+  }
+
+  const normaliseWords = (s: string): Set<string> => {
+    const words = s.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 2)
+    return new Set(words)
+  }
+
+  const existingWordSets = existingActionTexts.map(normaliseWords)
+
+  const isDuplicate = (action: string): boolean => {
+    const actionWords = normaliseWords(action)
+    if (actionWords.size === 0) return false
+    for (const existingWords of existingWordSets) {
+      if (existingWords.size === 0) continue
+      let overlap = 0
+      for (const w of actionWords) {
+        if (existingWords.has(w)) overlap++
+      }
+      // If >60% of the existing action's words appear in the suggested action, it's a duplicate
+      const overlapRatio = overlap / Math.min(actionWords.size, existingWords.size)
+      if (overlapRatio > 0.6) return true
+    }
+    return false
+  }
+
+  const rawActions: string[] = Array.isArray(parsed.keyActions) ? parsed.keyActions.map(String) : []
+  const dedupedActions = rawActions.filter(a => !isDuplicate(a))
+
   return {
     summary: String(parsed.summary ?? ''),
-    keyActions: Array.isArray(parsed.keyActions) ? parsed.keyActions.map(String) : [],
+    keyActions: dedupedActions,
     pipelineHealth: String(parsed.pipelineHealth ?? ''),
     momentum: parsed.momentum ? String(parsed.momentum) : null,
     topRisk: parsed.topRisk ? String(parsed.topRisk) : null,
