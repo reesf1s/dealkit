@@ -983,7 +983,13 @@ export const update_deal = {
       return { result: 'No changes specified.' }
     }
 
-    await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, params.dealId))
+    const updated = await db.update(dealLogs).set(updateFields)
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .returning({ id: dealLogs.id })
+    if (updated.length === 0) {
+      console.error(`[update_deal] 0 rows updated for dealId=${params.dealId} workspace=${ctx.workspaceId}`)
+      return { result: 'Update failed: deal not found or workspace mismatch.' }
+    }
 
     // Auto-refresh score + summary when meeting notes are added
     if (params.meetingNotes) {
