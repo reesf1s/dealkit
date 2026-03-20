@@ -1,10 +1,10 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import useSWR, { mutate } from 'swr'
 import Link from 'next/link'
-import { Sparkles, TrendingUp, AlertTriangle, ArrowUpRight, RefreshCw, Brain, Target, CheckCircle, Clock, DollarSign, Zap, ChevronRight, ChevronDown, Thermometer, TrendingDown, AlertCircle } from 'lucide-react'
+import { Sparkles, TrendingUp, AlertTriangle, ArrowUpRight, RefreshCw, Brain, Target, CheckCircle, Clock, DollarSign, Zap, ChevronRight, ChevronDown, Thermometer, TrendingDown, AlertCircle, Calendar } from 'lucide-react'
 import { useSidebar } from '@/components/layout/SidebarContext'
 import { formatCurrency } from '@/lib/format'
 
@@ -21,6 +21,8 @@ export default function DashboardPage() {
   const { data: dealsRes } = useSWR('/api/deals', fetcher, { revalidateOnFocus: false })
   const [regenerating, setRegenerating] = useState(false)
   const [forecastExpanded, setForecastExpanded] = useState(false)
+  const [closeDateOverrides, setCloseDateOverrides] = useState<Record<string, string>>({})
+  const dateInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const overview = overviewRes?.data
   const brain = brainRes?.data
@@ -33,17 +35,61 @@ export default function DashboardPage() {
   // Weighted forecast: dealValue * (score / 100), sorted descending
   const forecastDeals = activeDeals
     .filter((d: any) => (d.dealValue ?? 0) > 0)
-    .map((d: any) => ({
-      id: d.id,
-      dealName: d.dealName,
-      company: d.prospectCompany,
-      dealValue: d.dealValue ?? 0,
-      score: d.conversionScore ?? 50,
-      weightedValue: Math.round((d.dealValue ?? 0) * ((d.conversionScore ?? 50) / 100)),
-      closeDate: d.closeDate,
-    }))
+    .map((d: any) => {
+      const effectiveCloseDate = closeDateOverrides[d.id] ?? d.closeDate ?? null
+      return {
+        id: d.id,
+        dealName: d.dealName,
+        company: d.prospectCompany,
+        dealValue: d.dealValue ?? 0,
+        score: d.conversionScore ?? 50,
+        weightedValue: Math.round((d.dealValue ?? 0) * ((d.conversionScore ?? 50) / 100)),
+        closeDate: effectiveCloseDate,
+      }
+    })
     .sort((a: any, b: any) => b.weightedValue - a.weightedValue)
   const weightedForecast = forecastDeals.reduce((s: number, d: any) => s + d.weightedValue, 0)
+
+  // Monthly breakdown: group forecastDeals by month
+  const monthlyBreakdown = (() => {
+    const months: Record<string, { label: string; sortKey: string; weighted: number; count: number }> = {}
+    for (const d of forecastDeals) {
+      let key: string
+      let label: string
+      if (d.closeDate) {
+        const dt = new Date(d.closeDate)
+        key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`
+        label = dt.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+      } else {
+        key = '9999-99'
+        label = 'No close date'
+      }
+      if (!months[key]) months[key] = { label, sortKey: key, weighted: 0, count: 0 }
+      months[key].weighted += d.weightedValue
+      months[key].count += 1
+    }
+    return Object.values(months).sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+  })()
+
+  const handleCloseDateChange = useCallback(async (dealId: string, newDate: string) => {
+    setCloseDateOverrides(prev => ({ ...prev, [dealId]: newDate }))
+    try {
+      await fetch(`/api/deals/${dealId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ closeDate: newDate }),
+      })
+      // Refresh deals data in background
+      mutate('/api/deals')
+    } catch {
+      // Revert on failure
+      setCloseDateOverrides(prev => {
+        const next = { ...prev }
+        delete next[dealId]
+        return next
+      })
+    }
+  }, [])
 
   const winRate = brain?.winLossIntel?.winRate
   const winCount = brain?.winLossIntel?.winCount ?? 0
@@ -286,25 +332,84 @@ export default function DashboardPage() {
                         <ChevronDown size={12} style={{ color: 'var(--text-tertiary)', transform: forecastExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
                       </button>
                       {forecastExpanded && (
-                        <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '240px', overflowY: 'auto' }}>
-                          {forecastDeals.map((d: any) => (
-                            <Link
-                              key={d.id}
-                              href={`/deals/${d.id}`}
-                              style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', borderRadius: '7px', background: 'var(--surface)', border: '1px solid var(--border)', textDecoration: 'none', transition: 'background 0.1s' }}
-                              onMouseEnter={e => (e.currentTarget.style.background = 'color-mix(in srgb, var(--accent) 5%, var(--surface))')}
-                              onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface)')}
-                            >
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.dealName}</div>
-                                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '1px' }}>
-                                  {formatCurrency(d.dealValue, true)} × {d.score}%
-                                  {d.closeDate ? ` · ${new Date(d.closeDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}` : ''}
-                                </div>
+                        <div style={{ marginTop: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+                          {/* Summary header */}
+                          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                              <span style={{ color: 'var(--text-tertiary)' }}>Total pipeline</span>
+                              <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{formatCurrency(totalPipeline)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                              <span style={{ color: 'var(--text-tertiary)' }}>Weighted forecast</span>
+                              <span style={{ fontWeight: '600', color: 'var(--accent)' }}>{formatCurrency(weightedForecast)} <span style={{ fontWeight: '400', color: 'var(--text-tertiary)' }}>(probability-adjusted)</span></span>
+                            </div>
+                          </div>
+
+                          {/* Column headers */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 58px 36px 62px 62px', gap: '4px', padding: '6px 12px', borderBottom: '1px solid var(--border)', fontSize: '9px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            <span>Deal</span>
+                            <span style={{ textAlign: 'right' }}>Value</span>
+                            <span style={{ textAlign: 'right' }}>Score</span>
+                            <span style={{ textAlign: 'right' }}>Weighted</span>
+                            <span style={{ textAlign: 'right' }}>Close</span>
+                          </div>
+
+                          {/* Deal rows */}
+                          <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                            {forecastDeals.map((d: any) => (
+                              <div
+                                key={d.id}
+                                style={{ display: 'grid', gridTemplateColumns: '1fr 58px 36px 62px 62px', gap: '4px', padding: '6px 12px', borderBottom: '1px solid color-mix(in srgb, var(--border) 50%, transparent)', alignItems: 'center', fontSize: '11px', transition: 'background 0.1s' }}
+                                onMouseEnter={e => (e.currentTarget.style.background = 'color-mix(in srgb, var(--accent) 3%, transparent)')}
+                                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                              >
+                                <Link
+                                  href={`/deals/${d.id}`}
+                                  style={{ color: 'var(--text-primary)', fontWeight: '600', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                  title={d.dealName}
+                                >
+                                  {d.dealName}
+                                </Link>
+                                <span style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{formatCurrency(d.dealValue, true)}</span>
+                                <span style={{ textAlign: 'right', color: d.score >= 70 ? 'var(--success)' : d.score >= 40 ? 'var(--warning)' : 'var(--danger)', fontWeight: '600' }}>{d.score}%</span>
+                                <span style={{ textAlign: 'right', color: 'var(--accent)', fontWeight: '600' }}>{formatCurrency(d.weightedValue, true)}</span>
+                                <button
+                                  onClick={() => dateInputRefs.current[d.id]?.showPicker()}
+                                  style={{ textAlign: 'right', color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', position: 'relative' }}
+                                  title="Change close date"
+                                >
+                                  <span>{d.closeDate ? new Date(d.closeDate).toLocaleDateString('en-GB', { month: 'short' }) : '--'}</span>
+                                  <Calendar size={9} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+                                  <input
+                                    ref={el => { dateInputRefs.current[d.id] = el }}
+                                    type="date"
+                                    value={d.closeDate ? new Date(d.closeDate).toISOString().split('T')[0] : ''}
+                                    onChange={e => { if (e.target.value) handleCloseDateChange(d.id, e.target.value) }}
+                                    style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+                                    tabIndex={-1}
+                                  />
+                                </button>
                               </div>
-                              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--accent)', flexShrink: 0 }}>{formatCurrency(d.weightedValue, true)}</div>
-                            </Link>
-                          ))}
+                            ))}
+                          </div>
+
+                          {/* Monthly breakdown */}
+                          {monthlyBreakdown.length > 0 && (
+                            <div style={{ padding: '8px 12px', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              <div style={{ fontSize: '9px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Monthly breakdown</div>
+                              {monthlyBreakdown.map(m => (
+                                <div key={m.sortKey} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
+                                  <span style={{ color: 'var(--text-secondary)' }}>{m.label}</span>
+                                  <span style={{ color: m.weighted > 0 ? 'var(--text-primary)' : 'var(--text-tertiary)', fontWeight: m.weighted > 0 ? '600' : '400' }}>
+                                    {formatCurrency(m.weighted, true)}
+                                    <span style={{ color: 'var(--text-tertiary)', fontWeight: '400', marginLeft: '4px' }}>
+                                      ({m.count} {m.count === 1 ? 'deal' : 'deals'})
+                                    </span>
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
