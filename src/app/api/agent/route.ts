@@ -659,8 +659,9 @@ export async function POST(req: NextRequest) {
         maxTokens: 8192,
         onFinish: async () => {
           after(async () => {
+            console.log(`[brain] Rebuild triggered by: agent_tool_call at ${new Date().toISOString()}`)
             try {
-              await rebuildWorkspaceBrain(wsCtx.workspaceId)
+              await rebuildWorkspaceBrain(wsCtx.workspaceId, 'agent_tool_call')
             } catch {
               // Non-fatal — brain will rebuild on next access
             }
@@ -730,7 +731,8 @@ async function executeConfirmedAction(
         .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId)))
 
       after(async () => {
-        try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ }
+        console.log(`[brain] Rebuild triggered by: agent_tool_call at ${new Date().toISOString()}`)
+        try { await rebuildWorkspaceBrain(workspaceId, 'agent_tool_call') } catch { /* non-fatal */ }
       })
 
       return {

@@ -474,7 +474,7 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
     })
   }
 
-  after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+  after(async () => { console.log(`[brain] Rebuild triggered by: chat_tool_call at ${new Date().toISOString()}`); try { await rebuildWorkspaceBrain(workspaceId, 'chat_tool_call') } catch { /* non-fatal */ } })
   after(async () => {
     try {
       const qaMsg = await anthropic.messages.create({
@@ -984,7 +984,7 @@ ${text.slice(0, 8000)}`,
     .set({ projectPlan, updatedAt: new Date() } as any)
     .where(eq(dealLogs.id, matchedDeal.id))
 
-  after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch {} })
+  after(async () => { console.log(`[brain] Rebuild triggered by: chat_tool_call at ${new Date().toISOString()}`); try { await rebuildWorkspaceBrain(workspaceId, 'chat_tool_call') } catch {} })
 
   const totalTasks = parsed.phases?.reduce((sum: number, p: any) => sum + (p.tasks?.length ?? 0), 0) ?? 0
   const linkedCount = parsed.phases?.reduce((sum: number, p: any) => sum + (p.tasks?.filter((t: any) => t.linkedTodoId).length ?? 0), 0) ?? 0
@@ -1046,7 +1046,7 @@ Text: ${text.slice(0, 3000)}`,
   }).returning()
 
   await db.insert(events).values({ workspaceId, userId, type: 'deal_log.created', metadata: { dealId: deal.id, dealName: deal.dealName, source: 'ai_chat' }, createdAt: now })
-  after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+  after(async () => { console.log(`[brain] Rebuild triggered by: chat_tool_call at ${new Date().toISOString()}`); try { await rebuildWorkspaceBrain(workspaceId, 'chat_tool_call') } catch { /* non-fatal */ } })
 
   return {
     reply: `Created deal **${deal.dealName}** at **${deal.prospectCompany}**${deal.dealValue ? ` (£${deal.dealValue.toLocaleString('en-GB')})` : ''}. Stage: **${deal.stage}**.\n\nView and edit it in [Deal Log](/deals/${deal.id}).`,
@@ -1187,7 +1187,7 @@ Return ONLY JSON:
   if (identified.action === 'update_stage' && identified.stageValue) {
     await db.update(dealLogs).set({ stage: identified.stageValue as any, updatedAt: new Date() }).where(eq(dealLogs.id, targetDeal.id))
     await db.insert(events).values({ workspaceId, userId, type: 'deal_log.updated', metadata: { dealId: targetDeal.id, field: 'stage', value: identified.stageValue, source: 'ai_chat' }, createdAt: new Date() })
-    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+    after(async () => { console.log(`[brain] Rebuild triggered by: chat_tool_call at ${new Date().toISOString()}`); try { await rebuildWorkspaceBrain(workspaceId, 'chat_tool_call') } catch { /* non-fatal */ } })
     return {
       reply: `Updated **${targetDeal.dealName}** stage to **${identified.stageValue}**.`,
       actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: [`stage → ${identified.stageValue}`] }],
@@ -1196,7 +1196,7 @@ Return ONLY JSON:
 
   if (identified.action === 'update_value' && identified.valueInDollars != null) {
     await db.update(dealLogs).set({ dealValue: identified.valueInDollars, updatedAt: new Date() }).where(eq(dealLogs.id, targetDeal.id))
-    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+    after(async () => { console.log(`[brain] Rebuild triggered by: chat_tool_call at ${new Date().toISOString()}`); try { await rebuildWorkspaceBrain(workspaceId, 'chat_tool_call') } catch { /* non-fatal */ } })
     return {
       reply: `Updated **${targetDeal.dealName}** deal value to **£${identified.valueInDollars.toLocaleString('en-GB')}**.`,
       actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: [`value → £${identified.valueInDollars.toLocaleString('en-GB')}`] }],
@@ -1206,7 +1206,7 @@ Return ONLY JSON:
   if (identified.action === 'update_notes' && identified.notesText) {
     const newNotes = ((targetDeal.notes ?? '') + '\n\n' + identified.notesText).trim()
     await db.update(dealLogs).set({ notes: newNotes, updatedAt: new Date() }).where(eq(dealLogs.id, targetDeal.id))
-    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+    after(async () => { console.log(`[brain] Rebuild triggered by: chat_tool_call at ${new Date().toISOString()}`); try { await rebuildWorkspaceBrain(workspaceId, 'chat_tool_call') } catch { /* non-fatal */ } })
     return {
       reply: `Added notes to **${targetDeal.dealName}**.`,
       actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: ['notes updated'] }],
@@ -1217,7 +1217,7 @@ Return ONLY JSON:
     const closeDate = new Date(identified.closeDateISO)
     if (!isNaN(closeDate.getTime())) {
       await db.update(dealLogs).set({ closeDate, updatedAt: new Date() } as any).where(eq(dealLogs.id, targetDeal.id))
-      after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+      after(async () => { console.log(`[brain] Rebuild triggered by: chat_tool_call at ${new Date().toISOString()}`); try { await rebuildWorkspaceBrain(workspaceId, 'chat_tool_call') } catch { /* non-fatal */ } })
       return {
         reply: `Set close date for **${targetDeal.dealName}** to **${closeDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}**.`,
         actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: [`close date → ${identified.closeDateISO}`] }],
@@ -1227,7 +1227,7 @@ Return ONLY JSON:
 
   if (identified.action === 'update_next_steps' && identified.nextStepsText) {
     await db.update(dealLogs).set({ nextSteps: identified.nextStepsText, updatedAt: new Date() } as any).where(eq(dealLogs.id, targetDeal.id))
-    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+    after(async () => { console.log(`[brain] Rebuild triggered by: chat_tool_call at ${new Date().toISOString()}`); try { await rebuildWorkspaceBrain(workspaceId, 'chat_tool_call') } catch { /* non-fatal */ } })
     return {
       reply: `Updated next steps for **${targetDeal.dealName}**: "${identified.nextStepsText}"`,
       actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: ['next steps updated'] }],
@@ -1238,7 +1238,7 @@ Return ONLY JSON:
     const currentComp: string[] = (targetDeal as any).competitors ?? []
     if (!currentComp.map((c: string) => c.toLowerCase()).includes(identified.competitorName.toLowerCase())) {
       await db.update(dealLogs).set({ competitors: [...currentComp, identified.competitorName], updatedAt: new Date() } as any).where(eq(dealLogs.id, targetDeal.id))
-      after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+      after(async () => { console.log(`[brain] Rebuild triggered by: chat_tool_call at ${new Date().toISOString()}`); try { await rebuildWorkspaceBrain(workspaceId, 'chat_tool_call') } catch { /* non-fatal */ } })
     }
     return {
       reply: `Added **${identified.competitorName}** as a competitor on **${targetDeal.dealName}**.`,
@@ -1250,7 +1250,7 @@ Return ONLY JSON:
     const currentComp: string[] = (targetDeal as any).competitors ?? []
     const updated = currentComp.filter((c: string) => c.toLowerCase() !== identified.competitorName!.toLowerCase())
     await db.update(dealLogs).set({ competitors: updated, updatedAt: new Date() } as any).where(eq(dealLogs.id, targetDeal.id))
-    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+    after(async () => { console.log(`[brain] Rebuild triggered by: chat_tool_call at ${new Date().toISOString()}`); try { await rebuildWorkspaceBrain(workspaceId, 'chat_tool_call') } catch { /* non-fatal */ } })
     return {
       reply: `Removed **${identified.competitorName}** from competitors on **${targetDeal.dealName}**.`,
       actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: [`competitor removed: ${identified.competitorName}`] }],
@@ -1262,7 +1262,7 @@ Return ONLY JSON:
     const currentContacts: any[] = (existing[0]?.contacts as any[]) ?? []
     const newContact = { name: identified.contactName, title: identified.contactTitle ?? undefined, email: identified.contactEmail ?? undefined }
     await db.update(dealLogs).set({ contacts: [...currentContacts, newContact], updatedAt: new Date() } as any).where(eq(dealLogs.id, targetDeal.id))
-    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+    after(async () => { console.log(`[brain] Rebuild triggered by: chat_tool_call at ${new Date().toISOString()}`); try { await rebuildWorkspaceBrain(workspaceId, 'chat_tool_call') } catch { /* non-fatal */ } })
     return {
       reply: `Added **${identified.contactName}**${identified.contactTitle ? ` (${identified.contactTitle})` : ''} to **${targetDeal.dealName}**.`,
       actions: [{ type: 'deal_updated', dealId: targetDeal.id, dealName: targetDeal.dealName, changes: [`contact added: ${identified.contactName}`] }],
@@ -1373,7 +1373,7 @@ Be conservative — only remove todos that are clearly stale, already handled, o
     metadata: { dealId: deal.id, removed: 0, completed: completeIds.length, source: 'ai_chat' },
     createdAt: new Date(),
   })
-  after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+  after(async () => { console.log(`[brain] Rebuild triggered by: chat_tool_call at ${new Date().toISOString()}`); try { await rebuildWorkspaceBrain(workspaceId, 'chat_tool_call') } catch { /* non-fatal */ } })
 
   const completedTexts = allTodos.filter(t => completeIds.includes(t.id)).map(t => t.text)
   let reply = `✅ **${deal.dealName}** — Marked ${completeIds.length} todo${completeIds.length > 1 ? 's' : ''} done:`
@@ -1397,7 +1397,7 @@ async function executeConfirmedAction(
     if (removeIds[0] === '__delete_deal__') {
       await db.delete(dealLogs).where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId)))
       await db.insert(events).values({ workspaceId, userId, type: 'deal_log.deleted', metadata: { dealId, dealName, source: 'ai_chat_confirmed' }, createdAt: new Date() })
-      after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+      after(async () => { console.log(`[brain] Rebuild triggered by: chat_tool_call at ${new Date().toISOString()}`); try { await rebuildWorkspaceBrain(workspaceId, 'chat_tool_call') } catch { /* non-fatal */ } })
       return { reply: `🗑️ **${dealName}** has been permanently deleted.`, actions: [{ type: 'deal_updated', dealId, dealName, changes: ['deal deleted'] }] }
     }
 
@@ -1420,7 +1420,7 @@ async function executeConfirmedAction(
       metadata: { dealId, removed: removeIds.length, completed: completeIds.length, source: 'ai_chat_confirmed' },
       createdAt: new Date(),
     })
-    after(async () => { try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ } })
+    after(async () => { console.log(`[brain] Rebuild triggered by: chat_tool_call at ${new Date().toISOString()}`); try { await rebuildWorkspaceBrain(workspaceId, 'chat_tool_call') } catch { /* non-fatal */ } })
 
     let reply = `✅ **${dealName}** — Todos updated`
     if (removeIds.length > 0) {

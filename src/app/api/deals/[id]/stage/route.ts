@@ -6,7 +6,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { scheduleBrainRebuild, rebuildWorkspaceBrain } from '@/lib/workspace-brain'
+import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
 
 // ── Ensure prediction log table (idempotent, cached per cold-start) ───────────
 let _predLogEnsured = false
@@ -113,16 +113,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       } catch { /* non-fatal — table may not exist yet on first run */ }
     })
 
-    // Closing a deal: rebuild the brain immediately so ML counts update right away.
-    // Other stage changes use the debounced scheduler (timer inside after() doesn't
-    // survive Vercel's execution window, so we call rebuildWorkspaceBrain directly here).
-    if (stage === 'closed_won' || stage === 'closed_lost') {
-      after(async () => {
-        try { await rebuildWorkspaceBrain(workspaceId) } catch { /* non-fatal */ }
-      })
-    } else {
-      after(() => { scheduleBrainRebuild(workspaceId, 'stage_change') })
-    }
+    // Always call rebuildWorkspaceBrain directly inside after() — Vercel keeps the
+    // execution alive for awaited promises but NOT for fire-and-forget timers.
+    const rebuildReason = (stage === 'closed_won' || stage === 'closed_lost') ? 'deal_closed' : 'stage_change'
+    after(async () => {
+      console.log(`[brain] Rebuild triggered by: ${rebuildReason} (deal: ${deal.dealName}, stage: ${stage}) at ${new Date().toISOString()}`)
+      try { await rebuildWorkspaceBrain(workspaceId, rebuildReason) } catch { /* non-fatal */ }
+    })
     return NextResponse.json({ data: deal })
   } catch (e: unknown) {
     console.error('[deals/stage] failed:', e instanceof Error ? e.message : e)

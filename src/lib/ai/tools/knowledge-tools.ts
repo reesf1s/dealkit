@@ -57,7 +57,7 @@ export const create_competitor = {
       .returning()
 
     after(async () => {
-      try { await rebuildWorkspaceBrain(ctx.workspaceId) } catch { /* non-fatal */ }
+      try { console.log(`[brain] Rebuild triggered by: knowledge_tool_call at ${new Date().toISOString()}`); await rebuildWorkspaceBrain(ctx.workspaceId, 'knowledge_tool_call') } catch { /* non-fatal */ }
     })
 
     return {
@@ -140,7 +140,7 @@ export const update_competitor = {
     await db.update(competitors).set(updateFields).where(eq(competitors.id, params.competitorId))
 
     after(async () => {
-      try { await rebuildWorkspaceBrain(ctx.workspaceId) } catch { /* non-fatal */ }
+      try { console.log(`[brain] Rebuild triggered by: knowledge_tool_call at ${new Date().toISOString()}`); await rebuildWorkspaceBrain(ctx.workspaceId, 'knowledge_tool_call') } catch { /* non-fatal */ }
     })
 
     return {
@@ -267,7 +267,7 @@ export const create_case_study = {
       .returning()
 
     after(async () => {
-      try { await rebuildWorkspaceBrain(ctx.workspaceId) } catch { /* non-fatal */ }
+      try { console.log(`[brain] Rebuild triggered by: knowledge_tool_call at ${new Date().toISOString()}`); await rebuildWorkspaceBrain(ctx.workspaceId, 'knowledge_tool_call') } catch { /* non-fatal */ }
     })
 
     return {

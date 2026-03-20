@@ -165,7 +165,8 @@ export async function syncHubspotDeals(workspaceId: string, userId: string): Pro
     .where(eq(hubspotIntegrations.workspaceId, workspaceId))
 
   // ── 7. Rebuild brain in the background ───────────────────────────────────────
-  rebuildWorkspaceBrain(workspaceId).catch(() => {})
+  console.log(`[brain] Rebuild triggered by: hubspot_sync_complete at ${new Date().toISOString()}`)
+  rebuildWorkspaceBrain(workspaceId, 'hubspot_sync_complete').catch(() => {})
 
   return {
     workspaceId,
