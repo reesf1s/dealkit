@@ -523,6 +523,26 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
+      {/* Empty state — no notes yet */}
+      {!deal?.meetingNotes && (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: '12px', padding: '32px 24px',
+          background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: '14px',
+          textAlign: 'center',
+        }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--accent-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Clipboard size={18} color="var(--accent)" />
+          </div>
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>No meeting notes yet</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '340px' }}>
+              Paste your first meeting note or transcript below to get AI-powered insights, risk detection, and action items.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Previous meeting history */}
       {deal?.meetingNotes && (() => {
         // Parse entries separated by --- with [date] headers
@@ -1465,8 +1485,21 @@ function TodosTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: a
 
       {/* Pending todos */}
       {pending.length === 0 && done.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-tertiary)', fontSize: '13px' }}>
-          No action items yet. Add updates or meeting notes and analyze to auto-generate them.
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: '10px', padding: '40px 24px',
+          background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: '12px',
+          textAlign: 'center',
+        }}>
+          <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: 'var(--accent-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CheckCircle size={16} color="var(--accent)" />
+          </div>
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>No action items yet</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '300px' }}>
+              Action items are automatically extracted when you add meeting notes and run AI analysis.
+            </div>
+          </div>
         </div>
       ) : (
         <>
@@ -3029,9 +3062,9 @@ function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
             <FileText size={22} color="var(--accent)" />
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>No collateral for this deal</div>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>No documents uploaded</div>
             <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '320px' }}>
-              Generate proposals, one-pagers, email sequences, and battle cards tailored to this deal.
+              Upload proposals, contracts, or decks to keep everything in one place — or generate AI-tailored collateral in seconds.
             </div>
           </div>
           <Link

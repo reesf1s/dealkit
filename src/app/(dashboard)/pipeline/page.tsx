@@ -154,6 +154,13 @@ function DealCard({
   const score = deal.conversionScore ?? 0
   const scoreColor = score >= 70 ? '#30D158' : score >= 40 ? '#FFD60A' : score > 0 ? '#FF453A' : 'rgba(255,255,255,0.15)'
   const scoreBg = score >= 70 ? 'rgba(48,209,88,0.12)' : score >= 40 ? 'rgba(255,214,10,0.10)' : score > 0 ? 'rgba(255,69,58,0.12)' : 'rgba(255,255,255,0.05)'
+  const [scoreHover, setScoreHover] = useState(false)
+
+  // Parse score breakdown for tooltip
+  const breakdown = (() => {
+    try { return deal.score_breakdown ? JSON.parse(deal.score_breakdown) : null }
+    catch { return null }
+  })()
 
   const value = deal.dealValue ?? 0
   const valueLabel = value >= 1_000_000
@@ -225,8 +232,65 @@ function DealCard({
           )}
         </div>
         {score > 0 && (
-          <div style={{ flexShrink: 0, width: '30px', height: '30px', borderRadius: '50%', background: scoreBg, border: `1.5px solid ${scoreColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: '10px', fontWeight: '800', color: scoreColor, lineHeight: 1 }}>{score}</span>
+          <div
+            style={{ position: 'relative', flexShrink: 0 }}
+            onMouseEnter={e => { e.stopPropagation(); setScoreHover(true) }}
+            onMouseLeave={() => setScoreHover(false)}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: scoreBg, border: `1.5px solid ${scoreColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }}>
+              <span style={{ fontSize: '10px', fontWeight: '800', color: scoreColor, lineHeight: 1 }}>{score}</span>
+            </div>
+            {scoreHover && (
+              <div style={{
+                position: 'absolute', top: '36px', right: 0, zIndex: 100,
+                background: 'var(--card-bg)', border: '1px solid var(--border)',
+                borderRadius: '10px', padding: '10px 12px', minWidth: '200px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                pointerEvents: 'none',
+              }}>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: scoreColor, marginBottom: '8px' }}>
+                  {score}% win probability
+                </div>
+                <div style={{ height: '1px', background: 'var(--border)', marginBottom: '8px' }} />
+                {breakdown ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                      <span>Text signals</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                        {Math.round(breakdown.text_signal_score)} × {breakdown.text_weight?.toFixed(2) ?? '0.70'}
+                      </span>
+                    </div>
+                    {breakdown.momentum_component != null && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                        <span>Momentum</span>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                          {breakdown.momentum_component > 50 ? '+' : ''}{(breakdown.momentum_component - 50).toFixed(1)}
+                        </span>
+                      </div>
+                    )}
+                    {breakdown.ml_active && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                        <span>ML model</span>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                          {Math.round(breakdown.ml_score)}% × {breakdown.ml_weight?.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    <div style={{ height: '1px', background: 'var(--border)', margin: '4px 0' }} />
+                    <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>
+                      {breakdown.ml_active
+                        ? `ML active · ${breakdown.training_deals ?? 0} closed deals`
+                        : `No private ML yet (${breakdown.training_deals ?? 0}/10 closed deals)`}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                    Score based on text signals from meeting notes.
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

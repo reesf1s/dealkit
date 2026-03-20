@@ -129,15 +129,18 @@ export default function Sidebar() {
     )
   }
 
-  const brainAge = brain?.updatedAt
+  const brainAgeInfo = brain?.updatedAt
     ? (() => {
         const mins = Math.floor((Date.now() - new Date(brain.updatedAt).getTime()) / 60000)
-        if (mins < 1) return 'live'
-        if (mins < 60) return `${mins}m`
-        const hrs = Math.floor(mins / 60)
-        return `${hrs}h`
+        const label = mins < 1 ? 'live' : mins < 60 ? `${mins}m ago` : mins < 1440 ? `${Math.floor(mins / 60)}h ago` : `${Math.floor(mins / 1440)}d ago`
+        const color = mins < 60 ? '#30D158' : mins < 1440 ? '#FFD60A' : '#FF453A'
+        const glow = mins < 60 ? 'rgba(48,209,88,0.5)' : mins < 1440 ? 'rgba(255,214,10,0.5)' : 'rgba(255,69,58,0.6)'
+        const bg = mins < 60 ? 'rgba(48,209,88,0.06)' : mins < 1440 ? 'rgba(255,214,10,0.07)' : 'rgba(255,69,58,0.07)'
+        const border = mins < 60 ? 'rgba(48,209,88,0.15)' : mins < 1440 ? 'rgba(255,214,10,0.20)' : 'rgba(255,69,58,0.15)'
+        return { label, color, glow, bg, border }
       })()
     : null
+  const brainAge = brainAgeInfo?.label ?? null
 
   const SidebarContent = (
     <aside style={{
@@ -360,24 +363,24 @@ export default function Sidebar() {
       <div style={{ borderTop: '1px solid var(--border)', padding: collapsed ? '8px 4px' : '8px', flexShrink: 0 }}>
 
         {/* Brain indicator */}
-        {!collapsed && brainAge && (
+        {!collapsed && brainAgeInfo && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: '6px',
             padding: '5px 8px', marginBottom: '6px', borderRadius: '7px',
-            background: urgentCount > 0 ? 'rgba(255,69,58,0.07)' : 'rgba(48,209,88,0.06)',
-            border: `1px solid ${urgentCount > 0 ? 'rgba(255,69,58,0.15)' : 'rgba(48,209,88,0.15)'}`,
+            background: brainAgeInfo.bg,
+            border: `1px solid ${brainAgeInfo.border}`,
           }}>
             <div style={{
               width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
-              background: urgentCount > 0 ? '#FF453A' : '#30D158',
-              boxShadow: urgentCount > 0 ? '0 0 5px rgba(255,69,58,0.6)' : '0 0 5px rgba(48,209,88,0.5)',
+              background: brainAgeInfo.color,
+              boxShadow: `0 0 5px ${brainAgeInfo.glow}`,
             }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)' }}>
                 {urgentCount > 0 ? `${urgentCount} deals need attention` : 'AI ready'}
               </div>
               <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginTop: '1px' }}>
-                Updated {brainAge} ago
+                Updated {brainAge}
               </div>
             </div>
           </div>
