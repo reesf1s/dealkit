@@ -17,6 +17,7 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getWorkspaceBrain, formatBrainContext, rebuildWorkspaceBrain } from '@/lib/workspace-brain'
 import type { WorkspaceBrain } from '@/lib/workspace-brain'
 import { ensureLinksColumn } from '@/lib/api-helpers'
+import { upsertCollateral } from '@/lib/collateral-helpers'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -203,12 +204,10 @@ async function handleCompetitorBattlecard(
         if (!isWithinLimit(Number(cc), limits.collateral)) { savedOnly.push(`${name} (collateral limit)`); continue }
       }
 
-      const [colRecord] = await db.insert(collateral).values({
+      const colRecord = await upsertCollateral({
         workspaceId, userId, type: 'battlecard', title: `Battlecard: vs ${name}`,
         status: 'generating', sourceCompetitorId: competitor.id,
-        sourceCaseStudyId: null, sourceDealLogId: null, content: null, rawResponse: null,
-        generatedAt: null, createdAt: now, updatedAt: now,
-      }).returning()
+      })
       const colId = colRecord.id
       const competitorId = competitor.id
       try {
@@ -446,14 +445,12 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
           .where(eq(companyProfiles.workspaceId, workspaceId)).limit(1)
         if (!profileRow) return
 
-        const now = new Date()
-        const [colRecord] = await db.insert(collateral).values({
+        const colRecord = await upsertCollateral({
           workspaceId, userId, type: 'objection_handler',
           title: `Risk Response: ${matchedDeal?.dealName ?? 'Deal'}`,
-          status: 'generating', sourceCompetitorId: null, sourceCaseStudyId: null,
-          sourceDealLogId: parsed.matchedDealId, content: null, rawResponse: null,
-          generatedAt: null, createdAt: now, updatedAt: now,
-        }).returning()
+          status: 'generating',
+          sourceDealLogId: parsed.matchedDealId,
+        })
 
         const result = await generateCollateral({
           workspaceId, type: 'objection_handler',
@@ -811,14 +808,13 @@ Request: ${text.slice(0, 600)}`,
   const title = `${extracted.title}${dealSuffix}`
   const now = new Date()
 
-  const [record] = await db.insert(collateral).values({
+  const record = await upsertCollateral({
     workspaceId, userId, type: 'custom' as CollateralType,
     title: `Generating ${title}…`, status: 'generating',
     customTypeName: extracted.customTypeName,
     generationSource: 'chat',
-    sourceCompetitorId: null, sourceCaseStudyId: null, sourceDealLogId,
-    content: null, rawResponse: null, generatedAt: null, createdAt: now, updatedAt: now,
-  }).returning()
+    sourceDealLogId,
+  })
 
   const colId = record.id
   try {
@@ -1527,13 +1523,10 @@ Request: ${text.slice(0, 1000)}`
         limits.collateral,
       )
       if (withinLimit) {
-        const now = new Date()
-        const [colRecord] = await db.insert(collateral).values({
+        const colRecord = await upsertCollateral({
           workspaceId, userId, type: 'battlecard', title: `Battlecard: vs ${comp.name}`,
           status: 'generating', sourceCompetitorId: comp.id,
-          sourceCaseStudyId: null, sourceDealLogId: null, content: null, rawResponse: null,
-          generatedAt: null, createdAt: now, updatedAt: now,
-        }).returning()
+        })
         try {
           const result = await generateCollateral({ workspaceId, type: 'battlecard', competitorId: comp.id })
           await db.update(collateral).set({ title: result.title, status: 'ready', content: result.content, rawResponse: result.rawResponse, generatedAt: new Date(), updatedAt: new Date() }).where(eq(collateral.id, colRecord.id))

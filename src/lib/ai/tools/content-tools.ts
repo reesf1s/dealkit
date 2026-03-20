@@ -6,6 +6,7 @@ import { dealLogs, collateral, competitors } from '@/lib/db/schema'
 import { anthropic } from '@/lib/ai/client'
 import { generateCollateral, generateFreeformCollateral } from '@/lib/ai/generate'
 import { rebuildWorkspaceBrain } from '@/lib/workspace-brain'
+import { upsertCollateral } from '@/lib/collateral-helpers'
 import type { ToolContext, ToolResult } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,23 +67,20 @@ export const generate_content = {
       customPrompt: params.customPrompt,
     })
 
-    // Save to collateral table
-    const [saved] = await db
-      .insert(collateral)
-      .values({
-        workspaceId: ctx.workspaceId,
-        userId: ctx.userId,
-        type: 'custom',
-        title: generated.title,
-        status: 'ready',
-        content: generated.content,
-        rawResponse: generated.rawResponse,
-        generatedAt: new Date(),
-        customTypeName: params.title,
-        generationSource: 'agent',
-        sourceDealLogId: params.dealId ?? null,
-      })
-      .returning()
+    // Save to collateral table (custom type always inserts fresh via upsertCollateral)
+    const saved = await upsertCollateral({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      type: 'custom',
+      title: generated.title,
+      status: 'ready',
+      content: generated.content,
+      rawResponse: generated.rawResponse,
+      generatedAt: new Date(),
+      customTypeName: params.title,
+      generationSource: 'agent',
+      sourceDealLogId: params.dealId ?? null,
+    })
 
     return {
       result: `Content **"${generated.title}"** has been generated and saved to your collateral library.`,
@@ -126,22 +124,19 @@ export const generate_battlecard = {
       competitorId: params.competitorId,
     })
 
-    // Save to collateral table
-    const [saved] = await db
-      .insert(collateral)
-      .values({
-        workspaceId: ctx.workspaceId,
-        userId: ctx.userId,
-        type: 'battlecard',
-        title: generated.title,
-        status: 'ready',
-        content: generated.content,
-        rawResponse: generated.rawResponse,
-        generatedAt: new Date(),
-        sourceCompetitorId: params.competitorId,
-        generationSource: 'agent',
-      })
-      .returning()
+    // Save to collateral table — upsert prevents duplicate battlecards for same competitor
+    const saved = await upsertCollateral({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      type: 'battlecard',
+      title: generated.title,
+      status: 'ready',
+      content: generated.content,
+      rawResponse: generated.rawResponse,
+      generatedAt: new Date(),
+      sourceCompetitorId: params.competitorId,
+      generationSource: 'agent',
+    })
 
     return {
       result: `Battlecard **"${generated.title}"** has been generated and saved to your collateral library.`,

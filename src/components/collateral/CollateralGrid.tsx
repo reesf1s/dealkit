@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { FileText, Download, Eye, Trash2, RefreshCw } from 'lucide-react'
+import { FileText, Download, Eye, Trash2, RefreshCw, RotateCcw } from 'lucide-react'
 import { CollateralTypeBadge } from './CollateralTypeBadge'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -19,6 +19,15 @@ interface CollateralGridProps {
 function formatDate(d: Date | string | null) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+/** True when the item was regenerated (updated well after initial creation). */
+function wasRegenerated(item: Collateral): boolean {
+  if (!item.createdAt || !item.updatedAt) return false
+  const created = new Date(item.createdAt).getTime()
+  const updated = new Date(item.updatedAt).getTime()
+  // Consider "regenerated" if updated > 30 seconds after creation
+  return updated - created > 30_000
 }
 
 function CollateralCard({
@@ -87,6 +96,27 @@ function CollateralCard({
               letterSpacing: '0.02em',
             }}>
               Auto-generated
+            </span>
+          )}
+          {wasRegenerated(item) && item.status === 'ready' && (
+            <span
+              title={`Last updated ${formatDate(item.updatedAt)}`}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+                fontSize: '10px',
+                fontWeight: 500,
+                color: '#6B7280',
+                background: 'rgba(107,114,128,0.08)',
+                border: '1px solid rgba(107,114,128,0.15)',
+                borderRadius: '4px',
+                padding: '1px 5px',
+                letterSpacing: '0.02em',
+              }}
+            >
+              <RotateCcw size={8} strokeWidth={2.5} />
+              Updated
             </span>
           )}
         </div>

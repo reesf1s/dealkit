@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { and, count, eq, ilike, isNull, or } from 'drizzle-orm'
+import { and, count, eq, ilike } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { collateral, companyProfiles, competitors, dealLogs, events } from '@/lib/db/schema'
 import { PLAN_LIMITS, isWithinLimit } from '@/lib/stripe/plans'
@@ -12,6 +12,7 @@ import type { CollateralType } from '@/types'
 import { dbErrResponse, ensureLinksColumn } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { upsertCollateral } from '@/lib/collateral-helpers'
 
 async function logEvent(workspaceId: string, userId: string, type: string, metadata: Record<string, unknown>) {
   await db.insert(events).values({ workspaceId, userId, type, metadata, createdAt: new Date() })
@@ -96,40 +97,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const now = new Date()
-
-    // Reuse any existing non-ready record with the same key to prevent duplicates.
-    // A "stuck" generating record (e.g. from a timed-out previous request) or a stale
-    // record for the same competitor/case-study should be overwritten, not duplicated.
-    const competitorMatch = competitorId ? eq(collateral.sourceCompetitorId, competitorId) : isNull(collateral.sourceCompetitorId)
-    const caseStudyMatch = caseStudyId ? eq(collateral.sourceCaseStudyId, caseStudyId) : isNull(collateral.sourceCaseStudyId)
-
-    const [existing] = await db.select({ id: collateral.id }).from(collateral).where(
-      and(
-        eq(collateral.workspaceId, workspaceId),
-        eq(collateral.type, type),
-        competitorMatch,
-        caseStudyMatch,
-        or(eq(collateral.status, 'generating'), eq(collateral.status, 'stale')),
-      )
-    ).limit(1)
-
-    let record: { id: string }
-    if (existing) {
-      // Overwrite the stuck/stale record in-place — no new row created
-      const [updated] = await db.update(collateral)
-        .set({ userId, title: `Generating ${type.replace(/_/g, ' ')}…`, status: 'generating', content: null, rawResponse: null, generatedAt: null, sourceDealLogId, updatedAt: now })
-        .where(eq(collateral.id, existing.id))
-        .returning({ id: collateral.id })
-      record = updated
-    } else {
-      const [inserted] = await db.insert(collateral).values({
-        workspaceId, userId, type, title: `Generating ${type.replace(/_/g, ' ')}…`, status: 'generating',
-        sourceCompetitorId: competitorId ?? null, sourceCaseStudyId: caseStudyId ?? null,
-        sourceDealLogId, content: null, rawResponse: null, generatedAt: null, createdAt: now, updatedAt: now,
-      }).returning({ id: collateral.id })
-      record = inserted
-    }
+    // Upsert: reuse any existing row with the same (workspace, type, competitor, caseStudy)
+    // to prevent duplicate collateral. Ready/stale/generating rows are all matched.
+    const record = await upsertCollateral({
+      workspaceId,
+      userId,
+      type,
+      title: `Generating ${type.replace(/_/g, ' ')}…`,
+      status: 'generating',
+      sourceCompetitorId: competitorId ?? null,
+      sourceCaseStudyId: caseStudyId ?? null,
+      sourceDealLogId,
+    })
 
     // Run synchronously — Haiku at 1024 tokens typically completes in 3-8s, well within maxDuration=60
     try {

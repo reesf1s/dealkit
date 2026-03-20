@@ -252,6 +252,28 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
         ADD COLUMN IF NOT EXISTS scheduled_events jsonb NOT NULL DEFAULT '[]'::jsonb
     `,
   },
+  {
+    version: 19,
+    name: 'archive_duplicate_collateral',
+    sql: `
+      WITH ranked AS (
+        SELECT
+          id,
+          ROW_NUMBER() OVER (
+            PARTITION BY workspace_id, type,
+              COALESCE(source_competitor_id::text, ''),
+              COALESCE(source_case_study_id::text, '')
+            ORDER BY updated_at DESC
+          ) AS rn
+        FROM collateral
+        WHERE status != 'archived'
+          AND type != 'custom'
+      )
+      UPDATE collateral
+      SET status = 'archived', updated_at = NOW()
+      WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
+    `,
+  },
 ]
 
 // ── In-process cache — prevents redundant round-trips on the same cold-start ──
