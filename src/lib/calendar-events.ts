@@ -17,6 +17,7 @@ const EVENT_COLORS: Record<string, string> = {
   demo: '#34D399',
   deadline: '#F87171',
   decision: '#A855F7',
+  review: '#22D3EE',
   predicted_close: '#A78BFA',
   action_due: '#F59E0B',
   contract: '#2DD4BF',

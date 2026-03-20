@@ -18,7 +18,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 type CalEventType =
   | 'close' | 'contract_start' | 'contract_end'
   | 'follow_up' | 'urgent' | 'task' | 'phase'
-  | 'meeting' | 'demo' | 'deadline' | 'decision' | 'predicted_close'
+  | 'meeting' | 'demo' | 'deadline' | 'decision' | 'review' | 'predicted_close'
   | 'stale_followup'
 
 type CalEvent = {
@@ -44,6 +44,7 @@ const EVENT_CONFIG: Record<string, {
   follow_up:       { label: 'Follow-up',        color: '#FBBF24', icon: Clock },
   demo:            { label: 'Demo',             color: '#34D399', icon: Zap },
   deadline:        { label: 'Deadline',         color: '#F87171', icon: AlertCircle },
+  review:          { label: 'Review',           color: '#22D3EE', icon: CheckSquare },
   decision:        { label: 'Decision',         color: '#A855F7', icon: Target },
   predicted_close: { label: 'Predicted Close',  color: '#A855F7', borderStyle: 'dashed', icon: Target },
   close:           { label: 'Expected Close',   color: '#A855F7', borderStyle: 'dashed', icon: Target },
@@ -83,9 +84,9 @@ function cleanSnippet(text: string): string {
     .slice(0, 80)
 }
 
-// ── Extract dates from meeting notes text ────────────────────────────────────
-// Parses patterns like "Monday 23 March 12:00", "25th March at 2pm",
-// "call on March 25", "meeting 23/03/2026"
+// ── Extract structured events from meeting notes ─────────────────────────────
+// Intelligent date extraction that filters historical references and generates
+// clean, structured calendar events from note text.
 
 const MONTH_MAP: Record<string, number> = {
   jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
@@ -94,41 +95,120 @@ const MONTH_MAP: Record<string, number> = {
   nov: 10, november: 10, dec: 11, december: 11,
 }
 
-function extractDatesFromNotes(notes: string, dealId: string, dealName: string): CalEvent[] {
+// Event type detection from context keywords
+const EVENT_TYPE_PATTERNS: { type: CalEventType; patterns: RegExp }[] = [
+  { type: 'demo',      patterns: /\b(?:demo|walkthrough|presentation|show(?:case)?)\b/i },
+  { type: 'review',    patterns: /\b(?:review|QA|assessment|audit|inspection)\b/i },
+  { type: 'decision',  patterns: /\b(?:decision|approve|sign(?:ing)?|sign[- ]?off|go[/ ]no[- ]?go)\b/i },
+  { type: 'deadline',  patterns: /\b(?:deadline|due|expires?|end of|cutoff|cut[- ]?off|POC)\b/i },
+  { type: 'follow_up', patterns: /\b(?:follow[- ]?up|chase|reconnect|circle back|touch base|check back)\b/i },
+  { type: 'meeting',   patterns: /\b(?:meeting|call|connect|sync|check[- ]?in|catch[- ]?up|session|workshop|training|webinar|kick[- ]?off|huddle|stand[- ]?up)\b/i },
+]
+
+// Past-tense verbs that indicate a historical reference, not a future event
+const PAST_TENSE_RE = /\b(?:sent|received|discussed|reviewed|completed|finished|submitted|delivered|held|attended|had|was|were|did|made|gave|showed|ran|got|confirmed|agreed|signed|approved|decided|resolved|closed)\b/i
+
+// Markdown header patterns — dates in headers are note timestamps, not events
+const HEADER_DATE_RE = /^#{1,4}\s+/
+
+function detectEventType(context: string): CalEventType {
+  for (const { type, patterns } of EVENT_TYPE_PATTERNS) {
+    if (patterns.test(context)) return type
+  }
+  return 'meeting'
+}
+
+function extractPersonFromContext(context: string): string | null {
+  // Look for "with [Name]" or "- [Name]" patterns
+  const withMatch = context.match(/\b(?:with|w\/)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i)
+  if (withMatch) return withMatch[1]
+  // "[Name] -" at start of line context
+  const nameStart = context.match(/^\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*[-—]/i)
+  if (nameStart) return nameStart[1]
+  return null
+}
+
+function extractTopicFromContext(context: string, eventType: CalEventType): string | null {
+  // Try to find a topic like "floor plans", "POC", "contract" near the date
+  const topicMatch = context.match(/\b(floor\s*plans?|POC|proof of concept|contract|proposal|pricing|budget|integration|onboarding|pilot|scope|requirements|specifications?|timeline|roadmap|strategy)\b/i)
+  if (topicMatch) return topicMatch[1]
+  return null
+}
+
+function buildCleanTitle(context: string, eventType: CalEventType, time: string | null): string {
+  const cfg = EVENT_CONFIG[eventType] ?? EVENT_CONFIG.meeting
+  const person = extractPersonFromContext(context)
+  const topic = extractTopicFromContext(context, eventType)
+
+  // Build structured title
+  let title = cfg.label
+  if (topic) {
+    title = `${topic.charAt(0).toUpperCase() + topic.slice(1)} ${cfg.label.toLowerCase()}`
+  }
+  if (person) {
+    title += ` with ${person}`
+  }
+  if (time && !title.includes(time)) {
+    title += ` — ${time}`
+  }
+  return title.slice(0, 80)
+}
+
+function extractTimeRange(context: string): { time: string | null; timeEnd: string | null } {
+  // "12:00-13:00" or "1200-1300"
+  const rangeMatch = context.match(/(\d{1,2})[:.:](\d{2})\s*[-–—]\s*(\d{1,2})[:.:](\d{2})/)
+  if (rangeMatch) {
+    return {
+      time: `${rangeMatch[1].padStart(2, '0')}:${rangeMatch[2]}`,
+      timeEnd: `${rangeMatch[3].padStart(2, '0')}:${rangeMatch[4]}`,
+    }
+  }
+  // "at 2pm" or "at 14:00"
+  const atMatch = context.match(/(?:at\s+)?(\d{1,2})[:.:](\d{2})\s*(?:am|pm)?/i)
+  if (atMatch) {
+    return { time: `${atMatch[1].padStart(2, '0')}:${atMatch[2]}`, timeEnd: null }
+  }
+  // "at 2pm"
+  const pmMatch = context.match(/(?:at\s+)?(\d{1,2})\s*(am|pm)/i)
+  if (pmMatch) {
+    let h = parseInt(pmMatch[1])
+    if (pmMatch[2].toLowerCase() === 'pm' && h < 12) h += 12
+    if (pmMatch[2].toLowerCase() === 'am' && h === 12) h = 0
+    return { time: `${String(h).padStart(2, '0')}:00`, timeEnd: null }
+  }
+  return { time: null, timeEnd: null }
+}
+
+function extractStructuredEvents(notes: string, dealId: string, dealName: string): CalEvent[] {
   if (!notes || notes.length < 10) return []
   const events: CalEvent[] = []
   const seen = new Set<string>()
-  const currentYear = new Date().getFullYear()
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000)
 
-  // Pattern 1: "23 March 12:00" or "23rd March" or "March 23"
   const datePatterns = [
-    // "23 March 12:00-13:00" or "23 March at 2pm"
+    // "23 March 12:00-13:00" or "23rd March at 2pm"
     /(\d{1,2})(?:st|nd|rd|th)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s*(?:(\d{4})\s*)?(?:(?:at\s+)?(\d{1,2}[:.]\d{2})\s*(?:-\s*\d{1,2}[:.]\d{2})?)?/gi,
     // "March 23, 2026" or "March 23"
     /(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:\s*,?\s*(\d{4}))?(?:\s+(?:at\s+)?(\d{1,2}[:.]\d{2}))?/gi,
   ]
 
-  // Get ~200 chars of context around each date match for event title
   for (const pattern of datePatterns) {
     let match
     while ((match = pattern.exec(notes)) !== null) {
-      let day: number, monthStr: string, year: number, time: string | null = null
+      let day: number, monthStr: string, year: number
 
       if (/^\d/.test(match[1])) {
-        // Pattern 1: day first
         day = parseInt(match[1])
         monthStr = match[2].toLowerCase()
         year = match[3] ? parseInt(match[3]) : currentYear
-        time = match[4] ? match[4].replace('.', ':') : null
       } else {
-        // Pattern 2: month first
         monthStr = match[1].toLowerCase()
         day = parseInt(match[2])
         year = match[3] ? parseInt(match[3]) : currentYear
-        time = match[4] ? match[4].replace('.', ':') : null
       }
 
-      // Truncate month name to match lookup
       const monthKey = Object.keys(MONTH_MAP).find(k => monthStr.startsWith(k))
       if (!monthKey || day < 1 || day > 31) continue
       const month = MONTH_MAP[monthKey]
@@ -136,17 +216,53 @@ function extractDatesFromNotes(notes: string, dealId: string, dealName: string):
       const dateObj = new Date(year, month, day)
       if (isNaN(dateObj.getTime())) continue
 
+      // ── Filter 1: Skip dates older than 7 days (historical references) ──
+      if (dateObj < sevenDaysAgo) continue
+
       const dateKey = `${dealId}-${dateObj.toISOString().slice(0, 10)}`
       if (seen.has(dateKey)) continue
+
+      // Extract surrounding context (200 chars around the match)
+      const ctxStart = Math.max(0, match.index - 100)
+      const ctxEnd = Math.min(notes.length, match.index + match[0].length + 100)
+      const context = notes.slice(ctxStart, ctxEnd).replace(/\n+/g, ' ').trim()
+
+      // Get the line containing the date for header/context checks
+      const lineStart = notes.lastIndexOf('\n', match.index) + 1
+      const lineEnd = notes.indexOf('\n', match.index + match[0].length)
+      const line = notes.slice(lineStart, lineEnd === -1 ? undefined : lineEnd).trim()
+
+      // ── Filter 2: Skip markdown header dates (note timestamps) ──
+      if (HEADER_DATE_RE.test(line)) continue
+
+      // ── Filter 3: Skip past-tense narrative context ──
+      // Check the immediate vicinity (the sentence around the date)
+      const sentenceStart = Math.max(0, match.index - 80)
+      const sentenceEnd = Math.min(notes.length, match.index + match[0].length + 80)
+      const sentence = notes.slice(sentenceStart, sentenceEnd).replace(/\n+/g, ' ')
+
+      if (PAST_TENSE_RE.test(sentence)) {
+        // Past tense found — but allow if there's ALSO a forward-looking action verb
+        const hasActionVerb = /\b(?:call|meeting|demo|review|connect|sync|check[- ]?in|follow[- ]?up|presentation|walkthrough|deadline|due|expires?|decision|approve|sign)\b/i.test(sentence)
+        if (!hasActionVerb) continue
+      }
+
+      // ── Filter 4: Skip vague references with no action verb ──
+      const hasEventKeyword = /\b(?:call|meeting|demo|review|connect|sync|check[- ]?in|catch[- ]?up|follow[- ]?up|presentation|walkthrough|session|workshop|training|webinar|kick[- ]?off|deadline|due|expires?|POC|decision|approve|sign|extend|renew|schedule[d]?|book(?:ed)?)\b/i.test(context)
+      if (!hasEventKeyword) continue
+
       seen.add(dateKey)
 
-      // Extract context around the match for a meaningful title
-      const start = Math.max(0, match.index - 60)
-      const end = Math.min(notes.length, match.index + match[0].length + 60)
-      let context = notes.slice(start, end).replace(/\n+/g, ' ').trim()
-      // Try to find a meaningful phrase
-      const phrases = context.match(/(?:call|meeting|session|demo|review|walkthrough|discussion|connect|check-in|sync|training|workshop|presentation|webinar|catch[- ]?up|follow[- ]?up|kick[- ]?off)[^.!?\n]*/i)
-      const subtitle = phrases ? phrases[0].trim().slice(0, 80) : context.slice(0, 80)
+      // Detect event type and extract time
+      const eventType = detectEventType(context)
+      const { time, timeEnd } = extractTimeRange(context)
+      const timeDisplay = time
+        ? (timeEnd ? `${time}-${timeEnd}` : time)
+        : (match[4] ? match[4].replace('.', ':') : null)
+
+      // Build clean title
+      const subtitle = buildCleanTitle(context, eventType, timeDisplay)
+      const isPast = dateObj < now
 
       events.push({
         id: `${dealId}-note-date-${dateObj.toISOString().slice(0, 10)}`,
@@ -154,9 +270,9 @@ function extractDatesFromNotes(notes: string, dealId: string, dealName: string):
         subtitle,
         date: dateObj,
         dealId,
-        type: 'meeting',
-        time,
-        isPast: dateObj < new Date(),
+        type: eventType,
+        time: timeDisplay,
+        isPast,
       })
     }
   }
@@ -306,12 +422,12 @@ function buildCalendarEvents(deals: any[], brainData: any): CalEvent[] {
     }
   }
 
-  // Extract dates from meeting notes text (catches events not in scheduledEvents)
+  // Extract structured events from meeting notes (intelligent filtering)
   for (const deal of deals) {
     const dealName = deal.prospectCompany || deal.dealName || 'Deal'
     const notes = (deal.meetingNotes || '') + '\n' + (deal.hubspotNotes || '')
     if (notes.trim().length > 10) {
-      const noteEvents = extractDatesFromNotes(notes, deal.id, dealName)
+      const noteEvents = extractStructuredEvents(notes, deal.id, dealName)
       // Only add note-extracted events that don't duplicate existing events on the same date
       const existingDateKeys = new Set(events.filter(e => e.dealId === deal.id).map(e => {
         const d = e.date instanceof Date ? e.date : new Date(e.date)
@@ -382,7 +498,7 @@ function buildCalendarEvents(deals: any[], brainData: any): CalEvent[] {
 // ── Filter chip types (order matters for display) ────────────────────────────
 
 const FILTER_TYPES: CalEventType[] = [
-  'meeting', 'demo', 'follow_up', 'deadline', 'close',
+  'meeting', 'demo', 'follow_up', 'deadline', 'review', 'close',
   'contract_start', 'contract_end', 'phase', 'task',
   'stale_followup', 'urgent', 'decision', 'predicted_close',
 ]
@@ -392,17 +508,19 @@ const FILTER_TYPES: CalEventType[] = [
 function EventChip({
   event,
   isPast,
+  isToday,
   onClick,
 }: {
   event: CalEvent
   isPast: boolean
+  isToday?: boolean
   onClick: (ev: CalEvent) => void
 }) {
   const cfg = getConfig(event.type)
 
   return (
     <button
-      title={`[${event.title}] ${event.subtitle}`}
+      title={`${event.title} — ${event.subtitle}`}
       onClick={(e) => { e.stopPropagation(); onClick(event) }}
       style={{
         display: 'flex',
@@ -412,13 +530,14 @@ function EventChip({
         background: cfg.color + (isPast ? '18' : '22'),
         color: cfg.color,
         border: `1.5px ${cfg.borderStyle ?? 'solid'} ${cfg.color}${isPast ? '55' : '88'}`,
+        borderLeft: isToday ? `3px solid ${cfg.color}` : `1.5px ${cfg.borderStyle ?? 'solid'} ${cfg.color}${isPast ? '55' : '88'}`,
         borderRadius: '5px',
         padding: '2px 5px',
         fontSize: '11px',
         fontWeight: 500,
         cursor: 'pointer',
         textAlign: 'left',
-        opacity: isPast ? 0.5 : 1,
+        opacity: isPast ? 0.4 : 1,
         transition: 'opacity 0.15s, filter 0.15s',
         overflow: 'hidden',
       }}
@@ -428,10 +547,12 @@ function EventChip({
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
         fontWeight: 600,
       }}>
-        <span style={{ opacity: 0.7, fontWeight: 500 }}>[{event.title.length > 10 ? event.title.slice(0, 9) + '\u2026' : event.title}]</span>
-        {' '}{event.subtitle || getConfig(event.type).label}
+        <span style={{ opacity: 0.6, fontWeight: 500, fontSize: '10px' }}>
+          {event.title.length > 8 ? event.title.slice(0, 7) + '\u2026' : event.title}
+        </span>
+        {' '}{event.subtitle || cfg.label}
       </span>
-      {event.time && (
+      {event.time && !event.subtitle.includes(event.time) && (
         <span style={{ flexShrink: 0, opacity: 0.8, fontSize: '10px' }}>{event.time}</span>
       )}
     </button>
@@ -808,6 +929,7 @@ export default function CalendarPage() {
                         key={ev.id}
                         event={ev}
                         isPast={isPastDay}
+                        isToday={isToday}
                         onClick={setSelectedEvent}
                       />
                     ))}
@@ -835,16 +957,19 @@ export default function CalendarPage() {
               .sort((a, b) => a.date.getTime() - b.date.getTime())
               .map(ev => {
                 const cfg = getConfig(ev.type)
-                const evIsPast = ev.date < today && !(ev.date.getDate() === today.getDate() && ev.date.getMonth() === today.getMonth() && ev.date.getFullYear() === today.getFullYear())
+                const evIsToday = ev.date.getDate() === today.getDate() && ev.date.getMonth() === today.getMonth() && ev.date.getFullYear() === today.getFullYear()
+                const evIsPast = ev.date < today && !evIsToday
                 const dateStr = ev.date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
-                const displayText = ev.description || cleanSnippet(ev.subtitle)
+                const subtitle = ev.subtitle || cfg.label
                 return (
                   <div key={ev.id} style={{
                     display: 'flex', alignItems: 'center', gap: '12px',
                     padding: '10px 14px',
                     background: 'var(--card-bg)',
-                    border: '1px solid var(--card-border)', borderRadius: '10px',
-                    opacity: evIsPast ? 0.5 : 1,
+                    border: '1px solid var(--card-border)',
+                    borderLeft: evIsToday ? `3px solid ${cfg.color}` : '1px solid var(--card-border)',
+                    borderRadius: '10px',
+                    opacity: evIsPast ? 0.4 : 1,
                     transition: 'opacity 0.1s',
                     cursor: 'pointer',
                   }}
@@ -852,7 +977,7 @@ export default function CalendarPage() {
                   >
                     <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {ev.title}
                         </span>
@@ -864,18 +989,17 @@ export default function CalendarPage() {
                         }}>
                           {cfg.label}
                         </span>
-                        {evIsPast && <span style={{ fontSize: '9px', color: 'var(--text-muted)', flexShrink: 0 }}>(past)</span>}
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>{dateStr}</span>
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {displayText}
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {subtitle}
                       </div>
                     </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>{dateStr}</div>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
                         const d = ev.date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
-                        window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query: `Prep me for ${ev.title} — ${displayText} on ${d}. Review the deal and tell me what I need to know and do before this date.` } }))
+                        window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query: `Prep me for ${ev.title} — ${subtitle} on ${d}. Review the deal and tell me what I need to know and do before this date.` } }))
                       }}
                       style={{
                         flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
