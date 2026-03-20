@@ -151,6 +151,19 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
         return `${dateStr}: ${summary}`
       })
 
+      // Scheduled events (CONFIRMED — do NOT suggest confirming/scheduling these)
+      const scheduledEvents = ((d as any).scheduledEvents as { type?: string; date?: string | null; description?: string; time?: string | null }[]) ?? []
+      const upcomingEvents = scheduledEvents
+        .filter(e => e.date && new Date(e.date).getTime() >= Date.now() - 7 * 86400000) // include recent past week too
+        .slice(0, 5)
+
+      // Recent notes mentioning confirmation/scheduling (first sentences)
+      const confirmationKeywords = /\b(confirmed|scheduled|booked|agreed|arranged|set up|locked in)\b/i
+      const recentConfirmationNotes = sortedEntries.slice(0, 5)
+        .map(e => e.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().split(/[.\n]/)[0].trim())
+        .filter(sentence => confirmationKeywords.test(sentence))
+        .slice(0, 3)
+
       const parts = [
         `- "${d.dealName}" @ ${d.prospectCompany} | Stage: ${sl(d.stage)} | Value: ${fmt(d.dealValue ?? 0)} | Score: ${d.conversionScore ?? 'N/A'} | Close: ${d.closeDate ? new Date(d.closeDate).toLocaleDateString('en-GB') : 'TBD'} | Competitors: ${((d.competitors as string[]) ?? []).join(', ') || 'none'}`,
         oneLineContext ? `  Context: ${oneLineContext}` : null,
@@ -158,6 +171,8 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
         daysSinceLastNote != null ? `  Days since last note: ${daysSinceLastNote}` : null,
         lastNoteDate ? `  Last note (${lastNoteDate}): "${lastNoteOneLiner}"` : null,
         openActionCount > 0 ? `  Open actions: ${openActionCount}` : null,
+        upcomingEvents.length > 0 ? `  SCHEDULED EVENTS (already confirmed — do NOT suggest "confirm" or "schedule" these):\n${upcomingEvents.map(e => `    - [confirmed] ${e.description ?? 'event'}${e.date ? ` — ${e.date}` : ''}${e.time ? ` ${e.time}` : ''}`).join('\n')}` : null,
+        recentConfirmationNotes.length > 0 ? `  CONFIRMED IN NOTES (already done — do NOT re-suggest):\n${recentConfirmationNotes.map(n => `    - "${n}"`).join('\n')}` : null,
         inProgressActions.length > 0 ? `  IN-PROGRESS actions (already being worked on — DO NOT suggest these):\n${inProgressActions.map(a => `    - [in_progress] ${a.text}`).join('\n')}` : null,
         pendingActions.length > 0 ? `  PENDING actions (not started — these are candidates for today's actions):\n${pendingActions.slice(0, 5).map(a => `    - [pending] ${a.text}`).join('\n')}` : null,
         allRecentlyCompleted.length > 0 ? `  RECENTLY COMPLETED (already done — DO NOT suggest these):\n${allRecentlyCompleted.map(a => `    - [complete] ${a.text}`).join('\n')}` : null,
@@ -327,6 +342,12 @@ When generating today's actions for each deal:
 BAD: "Confirm BOE QA call for Monday" (already scheduled and in-progress)
 GOOD: "Prepare QA test scenarios for the BOE Monday call — ensure the floor plan data covers all 3 buildings Phil mentioned."
 
+STALE ACTION DETECTION:
+- If a deal has a scheduled event (in SCHEDULED EVENTS), do NOT suggest "confirm" or "schedule" that event — it's already done.
+- If a recent note mentions "confirmed", "scheduled", "booked", "agreed" for a specific action, that action is DONE — do not suggest it.
+- If the user told Ask AI something was confirmed, that information is stored in meeting notes. CHECK the notes before suggesting actions.
+- Example: If BOE has a scheduled event "Floor Plans QA call — Monday 23 March 12:00-13:00", do NOT suggest "Confirm the BOE QA call" — it's already confirmed. Instead suggest preparation for the call.
+
 DO NOT use these phrases for any deal:
 - "Define the final step"
 - "Confirm the next concrete step"
@@ -346,6 +367,12 @@ These are generic filler. Replace with what the ACTUAL next step is from the dea
 
   // ── Action deduplication: filter out suggested actions semantically similar to existing in-progress/completed items ──
   const existingActionTexts: string[] = []
+  // Build a map of deal name → scheduled event descriptions for stale-confirm detection
+  const dealScheduledDescriptions: { dealName: string; description: string }[] = []
+  // Collect confirmation phrases from recent notes
+  const confirmedNoteTexts: string[] = []
+  const confirmKw = /\b(confirmed|scheduled|booked|agreed|arranged|set up|locked in)\b/i
+
   for (const d of openDeals) {
     // Collect completed + in-progress todos
     for (const t of ((d.todos as any[]) ?? [])) {
@@ -362,6 +389,23 @@ These are generic filler. Replace with what the ACTUAL next step is from the dea
         }
       }
     }
+    // Collect scheduled events per deal
+    const events = ((d as any).scheduledEvents as { description?: string; date?: string | null }[]) ?? []
+    for (const ev of events) {
+      if (ev.description) {
+        dealScheduledDescriptions.push({ dealName: d.dealName, description: ev.description })
+      }
+    }
+    // Collect confirmation notes
+    const allNotes = [d.meetingNotes, d.hubspotNotes].filter(Boolean).join('\n---\n')
+    const noteEntries = parseMeetingEntries(allNotes)
+    const sortedNotes = noteEntries.filter(e => e.date).sort((a, b) => (b.date!.getTime() - a.date!.getTime()))
+    for (const entry of sortedNotes.slice(0, 5)) {
+      const firstSentence = entry.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().split(/[.\n]/)[0].trim()
+      if (confirmKw.test(firstSentence)) {
+        confirmedNoteTexts.push(`${d.dealName}: ${firstSentence}`)
+      }
+    }
   }
 
   const normaliseWords = (s: string): Set<string> => {
@@ -371,7 +415,46 @@ These are generic filler. Replace with what the ACTUAL next step is from the dea
 
   const existingWordSets = existingActionTexts.map(normaliseWords)
 
+  // Check if an action is suggesting to "confirm" or "schedule" something that's already a scheduled event
+  const isStaleConfirmAction = (action: string): boolean => {
+    const lower = action.toLowerCase()
+    const isConfirmAction = /\b(confirm|schedule|book|arrange|set up|lock in)\b/.test(lower)
+    if (!isConfirmAction) return false
+
+    // Check against scheduled events
+    for (const { dealName, description } of dealScheduledDescriptions) {
+      const dealNameLower = dealName.toLowerCase()
+      const descLower = description.toLowerCase()
+      // If the action mentions the deal name and the event description overlaps
+      if (lower.includes(dealNameLower) || lower.includes(descLower.slice(0, 20))) {
+        const descWords = normaliseWords(description)
+        const actionWords = normaliseWords(action)
+        let overlap = 0
+        for (const w of descWords) {
+          if (actionWords.has(w)) overlap++
+        }
+        if (descWords.size > 0 && overlap / descWords.size > 0.4) return true
+      }
+    }
+
+    // Check against confirmation notes
+    for (const noteText of confirmedNoteTexts) {
+      const noteWords = normaliseWords(noteText)
+      const actionWords = normaliseWords(action)
+      let overlap = 0
+      for (const w of noteWords) {
+        if (actionWords.has(w)) overlap++
+      }
+      if (noteWords.size > 0 && overlap / noteWords.size > 0.4) return true
+    }
+
+    return false
+  }
+
   const isDuplicate = (action: string): boolean => {
+    // First check stale confirm/schedule actions against scheduled events & notes
+    if (isStaleConfirmAction(action)) return true
+
     const actionWords = normaliseWords(action)
     if (actionWords.size === 0) return false
     for (const existingWords of existingWordSets) {
