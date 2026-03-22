@@ -220,6 +220,8 @@ export const dealLogs = pgTable('deal_logs', {
   wonDate: timestamp('won_date', { withTimezone: true }),
   lostDate: timestamp('lost_date', { withTimezone: true }),
   lostReason: text('lost_reason'),
+  winReason: text('win_reason'),
+  competitorLostTo: text('competitor_lost_to'),
   dealType: text('deal_type').notNull().default('one_off'),       // 'one_off' | 'recurring'
   recurringInterval: text('recurring_interval'),                   // 'monthly' | 'quarterly' | 'annual'
   kanbanOrder: integer('kanban_order').notNull().default(0),

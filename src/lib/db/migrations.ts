@@ -326,6 +326,20 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
       WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
     `,
   },
+  {
+    version: 23,
+    name: 'backfill_lost_reason_from_notes',
+    sql: `
+      UPDATE deal_logs
+      SET lost_reason = TRIM(SUBSTRING(
+        meeting_notes FROM 'Primary reason: ([^\n]+)'
+      ))
+      WHERE stage = 'closed_lost'
+        AND (lost_reason IS NULL OR lost_reason = '')
+        AND meeting_notes LIKE '%[Win/Loss Interview]%'
+        AND meeting_notes ~ 'Primary reason: [^\n]+'
+    `,
+  },
 ]
 
 // ── In-process cache — prevents redundant round-trips on the same cold-start ──

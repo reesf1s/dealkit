@@ -44,12 +44,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       update.meetingNotes = existingNotes + interviewBlock
       // Structured columns — primary ML training signal
       if (stage === 'closed_won') {
-        update.win_reason = winLossData.primaryReason || null
+        update.winReason = winLossData.primaryReason || null
       } else {
-        update.loss_reason = winLossData.primaryReason || null
-        // competitor_lost_to: only set when loss reason is competitor-related
+        update.lostReason = winLossData.primaryReason || null
         if (winLossData.competitor && winLossData.competitor !== 'None' && winLossData.competitor !== '') {
-          update.competitor_lost_to = winLossData.competitor
+          update.competitorLostTo = winLossData.competitor
         }
       }
     } else if (!winLossData) {
