@@ -1368,6 +1368,16 @@ export default function PipelinePage() {
   const [aiInput, setAiInput] = useState('')
   const aiInputRef = useRef<HTMLInputElement>(null)
 
+  const [isMobile, setIsMobile] = useState(false)
+  const [mobileStageIdx, setMobileStageIdx] = useState(0)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    setIsMobile(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<string | null>(null)
   const [winLossModal, setWinLossModal] = useState<{ dealId: string; deal: any; outcome: 'closed_won' | 'closed_lost' } | null>(null)
@@ -1589,6 +1599,73 @@ export default function PipelinePage() {
           )}
 
           {/* Kanban board */}
+          {isMobile ? (
+            /* ── Mobile: stage selector + stacked cards ── */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <select
+                value={mobileStageIdx}
+                onChange={e => setMobileStageIdx(Number(e.target.value))}
+                style={{
+                  width: '100%', padding: '12px 14px', fontSize: '14px', fontWeight: 700,
+                  background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px',
+                  color: 'var(--text-primary)', cursor: 'pointer', outline: 'none',
+                  fontFamily: 'inherit', appearance: 'none',
+                  backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M3 5l3 3 3-3%27 stroke=%27%23999%27 stroke-width=%271.5%27 fill=%27none%27/%3E%3C/svg%3E")',
+                  backgroundRepeat: 'no-repeat', backgroundPosition: 'right 14px center',
+                  minHeight: '48px',
+                }}
+              >
+                {activeStages.map((stage: any, idx: number) => {
+                  const count = deals.filter((d: any) => d.stage === stage.id && (!engagementFilter || d.engagementType === engagementFilter)).length
+                  return <option key={stage.id} value={idx}>{stage.label} ({count})</option>
+                })}
+              </select>
+              {(() => {
+                const stage = activeStages[mobileStageIdx] ?? activeStages[0]
+                if (!stage) return null
+                const stageDeals = sortBoardDeals(
+                  deals.filter((d: any) => d.stage === stage.id && (!engagementFilter || d.engagementType === engagementFilter)),
+                  boardSort,
+                )
+                const stageValue = stageDeals.reduce((s: number, d: any) => s + annualizedValue(d.dealValue ?? 0, d.dealType, d.recurringInterval), 0)
+                return (
+                  <>
+                    {stageValue > 0 && (
+                      <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '-4px' }}>
+                        {currencySymbol}{stageValue >= 1_000_000 ? `${(stageValue / 1_000_000).toFixed(1)}m` : stageValue >= 1_000 ? `${Math.round(stageValue / 1_000)}k` : stageValue.toLocaleString()} annualised
+                      </div>
+                    )}
+                    {stageDeals.length === 0 ? (
+                      <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '13px', background: 'var(--surface)', borderRadius: '10px', border: '1px dashed var(--border)' }}>
+                        No deals in this stage
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {stageDeals.map((deal: any) => (
+                          <DealCard
+                            key={deal.id}
+                            deal={deal}
+                            onMoveStage={moveStage}
+                            onDragStart={() => {}}
+                            onDragEnd={() => {}}
+                            isDragging={false}
+                            urgentReason={urgentMap[deal.id]}
+                            staleDays={staleMap[deal.id]}
+                            churnRisk={mlMap[deal.id]?.churnRisk}
+                            daysInStage={daysInStageMap[deal.id]}
+                            momentum={momentumMap[deal.id]}
+                            currencySymbol={currencySymbol}
+                            allStages={configStages}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
+            </div>
+          ) : (
+          /* ── Desktop: horizontal kanban ── */
           <div style={{ overflowX: 'auto', paddingBottom: '8px', maxWidth: `calc(100vw - ${sidebarWidth}px - 48px)` }}>
             <div style={{ display: 'flex', gap: '12px', minWidth: 'max-content' }}>
               {activeStages.map((stage: any) => {
@@ -1792,6 +1869,7 @@ export default function PipelinePage() {
                 })}
             </div>
           </div>
+          )}
         </div>
       )}
 

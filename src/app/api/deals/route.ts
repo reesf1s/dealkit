@@ -50,6 +50,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { dealName, prospectCompany, prospectName, prospectTitle, contacts, description, dealValue, stage, dealType, recurringInterval, competitors: dealCompetitors, notes, nextSteps, closeDate, wonDate, lostDate, lostReason, contractStartDate, contractEndDate } = body
     if (!dealName || !prospectCompany) return NextResponse.json({ error: 'dealName and prospectCompany are required' }, { status: 400 })
+    // Fix 2-digit year issue: new Date("0026-...") produces year 26 AD instead of 2026
+    const fixDateYear = (d: Date): Date => { if (d.getFullYear() < 100) d.setFullYear(d.getFullYear() + 2000); return d }
+    const safeDate = (v: string | null | undefined): Date | null => v ? fixDateYear(new Date(v)) : null
     const now = new Date()
     const [deal] = await db.insert(dealLogs).values({
       workspaceId, userId, dealName, prospectCompany,
@@ -58,11 +61,11 @@ export async function POST(req: NextRequest) {
       dealValue: dealValue ?? null,
       stage: stage ?? 'prospecting', dealType: dealType ?? 'one_off', recurringInterval: recurringInterval ?? null,
       competitors: dealCompetitors ?? [], notes: notes ?? null,
-      nextSteps: nextSteps ?? null, closeDate: closeDate ? new Date(closeDate) : null,
-      wonDate: wonDate ? new Date(wonDate) : null, lostDate: lostDate ? new Date(lostDate) : null,
+      nextSteps: nextSteps ?? null, closeDate: safeDate(closeDate),
+      wonDate: safeDate(wonDate), lostDate: safeDate(lostDate),
       lostReason: lostReason ?? null,
-      contractStartDate: contractStartDate ? new Date(contractStartDate) : null,
-      contractEndDate: contractEndDate ? new Date(contractEndDate) : null,
+      contractStartDate: safeDate(contractStartDate),
+      contractEndDate: safeDate(contractEndDate),
       createdAt: now, updatedAt: now,
     }).returning()
     let eventType = 'deal_log.created'

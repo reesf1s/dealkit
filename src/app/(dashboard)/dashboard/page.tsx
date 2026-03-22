@@ -1,7 +1,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import useSWR, { mutate } from 'swr'
 import Link from 'next/link'
 import { Sparkles, TrendingUp, AlertTriangle, ArrowUpRight, RefreshCw, Brain, Target, CheckCircle, Clock, DollarSign, Zap, ChevronRight, ChevronDown, Thermometer, TrendingDown, AlertCircle, Calendar } from 'lucide-react'
@@ -18,6 +18,14 @@ function SkeletonLine({ w = '100%', h = '14px' }: { w?: string; h?: string }) {
 
 export default function DashboardPage() {
   const { sendToCopilot } = useSidebar()
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    setIsMobile(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
   const { data: overviewRes, isLoading: overviewLoading } = useSWR('/api/dashboard/ai-overview', fetcher, { revalidateOnFocus: false })
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
   const { data: dealsRes } = useSWR('/api/deals', fetcher, { revalidateOnFocus: false })
@@ -175,9 +183,9 @@ export default function DashboardPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1080px' }}>
 
       {/* ── Greeting header ── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
         <div>
-          <h1 style={{ fontSize: '30px', fontWeight: '500', color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: '4px' }} className="text-display">
+          <h1 style={{ fontSize: isMobile ? '24px' : '30px', fontWeight: '500', color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: '4px' }} className="text-display">
             {greeting}
           </h1>
           <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
@@ -195,7 +203,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── 2-column layout ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 320px', gap: '20px', alignItems: 'start' }}>
 
         {/* ── LEFT column ── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -357,12 +365,12 @@ export default function DashboardPage() {
                           </div>
 
                           {/* Column headers */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 58px 36px 62px 62px', gap: '4px', padding: '6px 12px', borderBottom: '1px solid var(--border)', fontSize: '9px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 52px 32px 56px' : '1fr 58px 36px 62px 62px', gap: '4px', padding: '6px 12px', borderBottom: '1px solid var(--border)', fontSize: '9px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                             <span>Deal</span>
                             <span style={{ textAlign: 'right' }}>Value</span>
                             <span style={{ textAlign: 'right' }}>Score</span>
                             <span style={{ textAlign: 'right' }}>Weighted</span>
-                            <span style={{ textAlign: 'right' }}>Close</span>
+                            {!isMobile && <span style={{ textAlign: 'right' }}>Close</span>}
                           </div>
 
                           {/* Deal rows */}
@@ -370,7 +378,7 @@ export default function DashboardPage() {
                             {forecastDeals.map((d: any) => (
                               <div
                                 key={d.id}
-                                style={{ display: 'grid', gridTemplateColumns: '1fr 58px 36px 62px 62px', gap: '4px', padding: '6px 12px', borderBottom: '1px solid color-mix(in srgb, var(--border) 50%, transparent)', alignItems: 'center', fontSize: '11px', transition: 'background 0.1s' }}
+                                style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 52px 32px 56px' : '1fr 58px 36px 62px 62px', gap: '4px', padding: '6px 12px', borderBottom: '1px solid color-mix(in srgb, var(--border) 50%, transparent)', alignItems: 'center', fontSize: '11px', transition: 'background 0.1s' }}
                                 onMouseEnter={e => (e.currentTarget.style.background = 'color-mix(in srgb, var(--accent) 3%, transparent)')}
                                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                               >
@@ -384,6 +392,7 @@ export default function DashboardPage() {
                                 <span style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>{formatCurrency(d.dealValue, true)}</span>
                                 <span style={{ textAlign: 'right', color: getScoreColor(d.score, false), fontWeight: '600' }}>{d.score}%</span>
                                 <span style={{ textAlign: 'right', color: 'var(--accent)', fontWeight: '600' }}>{formatCurrency(d.weightedValue, true)}</span>
+                                {!isMobile && (
                                 <button
                                   onClick={() => dateInputRefs.current[d.id]?.showPicker()}
                                   style={{ textAlign: 'right', color: 'var(--text-secondary)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', position: 'relative' }}
@@ -400,6 +409,7 @@ export default function DashboardPage() {
                                     tabIndex={-1}
                                   />
                                 </button>
+                                )}
                               </div>
                             ))}
                           </div>

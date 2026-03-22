@@ -4336,6 +4336,27 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                 if (!companyName) return text
                 return text.replace(new RegExp(`\\s*\\(${companyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`, 'gi'), '')
               }
+              // Clean raw todo text: strip JSON artifacts, field names, and truncate
+              const cleanTodoText = (raw: string): string => {
+                if (!raw) return ''
+                let text = raw
+                // Strip anything that looks like raw JSON
+                try { JSON.parse(text); return 'Action item' } catch {}
+                // Remove JSON-like artifacts: {, }, [, ], "key":
+                text = text.replace(/\{[^}]{0,20}\}/g, '').replace(/\[[^\]]{0,20}\]/g, '')
+                text = text.replace(/"?\w+"\s*:\s*/g, '')
+                // Remove leftover braces/brackets
+                text = text.replace(/[{}\[\]]/g, '')
+                // Strip markdown headers
+                text = text.replace(/^#+\s*/gm, '')
+                // Collapse whitespace
+                text = text.replace(/\s+/g, ' ').trim()
+                // Strip company name parenthetical
+                text = stripCompanyParens(text)
+                // Truncate to 120 chars with ellipsis
+                if (text.length > 120) text = text.slice(0, 117).trimEnd() + '...'
+                return text || 'Action item'
+              }
               if (openTodos.length === 0) return null
               return (
                 <div>
@@ -4344,7 +4365,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                     {openTodos.slice(0, 5).map((todo: any, i: number) => (
                       <div key={todo.id ?? i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', padding: '7px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '7px' }}>
                         <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, marginTop: '5px' }} />
-                        <span style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.5, flex: 1 }}>{stripCompanyParens(todo.text)}</span>
+                        <span style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.5, flex: 1 }}>{cleanTodoText(todo.text)}</span>
                       </div>
                     ))}
                     {openTodos.length > 5 && (
@@ -4367,7 +4388,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
               return (
                 <div>
                   <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Intent Signals</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '6px' }}>
                     <div style={{ padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
                       <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '3px' }}>Champion</div>
                       <div style={{ fontSize: '12px', fontWeight: 600, color: champColor }}>{champLabel}</div>
@@ -4826,6 +4847,15 @@ export default function DealDetailPage() {
   const [winStoryOpen, setWinStoryOpen] = useState(false)
   const [wonDeal, setWonDeal] = useState<any>(null)
 
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    setIsMobile(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
   // Register this deal as active context for the AI chat sidebar
   useEffect(() => {
     if (deal) {
@@ -4895,10 +4925,10 @@ export default function DealDetailPage() {
         })()}
 
         {deal ? (
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-start', justifyContent: 'space-between', gap: isMobile ? '12px' : undefined }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-                <h1 style={{ fontSize: '22px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-primary)', margin: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                <h1 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-primary)', margin: 0 }}>
                   {deal.prospectCompany}
                 </h1>
                 <span style={{
@@ -4932,24 +4962,26 @@ export default function DealDetailPage() {
                   </span>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'var(--text-tertiary)' }}>
+              <div style={{ display: 'flex', gap: isMobile ? '10px' : '16px', fontSize: '12px', color: 'var(--text-tertiary)', flexWrap: 'wrap' }}>
                 {deal.prospectName && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><User size={11} />{deal.prospectName}</span>}
                 {deal.dealValue && <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--success)', fontWeight: '600' }}><Banknote size={11} />{currencySymbol}{Number(deal.dealValue).toLocaleString()}</span>}
                 {deal.closeDate && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} />Close {new Date(deal.closeDate).toLocaleDateString()}</span>}
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: isMobile ? 'wrap' : undefined }}>
               <button onClick={() => setEditOpen(true)} style={{
-                display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
+                display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '10px 14px' : '8px 14px',
                 background: 'var(--surface-hover)', border: '1px solid var(--border-strong)',
                 borderRadius: '8px', color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                minHeight: isMobile ? '44px' : undefined,
               }}>
                 <Edit size={13} /> Edit
               </button>
               <Link href={`/collateral?dealId=${id}`} style={{
-                display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
+                display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '10px 14px' : '8px 14px',
                 background: 'linear-gradient(135deg, #6366F1, #7C3AED)', boxShadow: 'var(--shadow)',
                 border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none',
+                minHeight: isMobile ? '44px' : undefined,
               }}>
                 <Sparkles size={13} /> Generate Collateral
               </Link>
@@ -4961,7 +4993,7 @@ export default function DealDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border)', paddingBottom: '0' }}>
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border)', paddingBottom: '0', overflowX: isMobile ? 'auto' : undefined, whiteSpace: isMobile ? 'nowrap' : undefined, WebkitOverflowScrolling: 'touch' as any, msOverflowStyle: 'none', scrollbarWidth: 'none' }}>
         {[
           { id: 'overview', label: 'Overview' },
           { id: 'activity', label: 'Activity' },
@@ -4976,10 +5008,11 @@ export default function DealDetailPage() {
           { id: 'collateral', label: 'Collateral' },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{
-            padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '500',
+            padding: isMobile ? '12px 16px' : '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '500',
             color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-tertiary)',
             borderBottom: activeTab === tab.id ? '2px solid #6366F1' : '2px solid transparent',
             marginBottom: '-1px', transition: 'color 0.1s',
+            minHeight: isMobile ? '44px' : undefined, flexShrink: 0,
           }}>
             {tab.label}
           </button>

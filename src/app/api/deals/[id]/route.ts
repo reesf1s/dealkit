@@ -53,11 +53,18 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const updateData: Record<string, unknown> = { updatedAt: new Date() }
     const fields = ['dealName','prospectCompany','prospectName','prospectTitle','contacts','description','dealValue','stage','competitors','notes','meetingNotes','aiSummary','conversionScore','conversionInsights','dealRisks','todos','nextSteps','closeDate','wonDate','lostDate','lostReason','dealType','recurringInterval','engagementType','kanbanOrder','projectPlan','links','parentDealId','expansionType','contractStartDate','contractEndDate','successCriteria','successCriteriaTodos','conversionScorePinned','note_signals_json']
     // Date fields need explicit conversion — Drizzle expects Date objects for timestamptz
+    // Fix 2-digit year issue: new Date("0026-...") produces year 26 AD instead of 2026
+    const fixDateYear = (d: Date): Date => {
+      if (d.getFullYear() < 100) {
+        d.setFullYear(d.getFullYear() + 2000)
+      }
+      return d
+    }
     const dateFields = new Set(['closeDate', 'wonDate', 'lostDate', 'contractStartDate', 'contractEndDate'])
     for (const f of fields) {
       if (body[f] === undefined) continue
       if (dateFields.has(f)) {
-        updateData[f] = body[f] ? new Date(body[f]) : null
+        updateData[f] = body[f] ? fixDateYear(new Date(body[f])) : null
       } else {
         updateData[f] = body[f]
       }

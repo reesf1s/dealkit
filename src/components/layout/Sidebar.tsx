@@ -451,6 +451,13 @@ export default function Sidebar() {
     </aside>
   )
 
+  const MOBILE_TABS = [
+    { href: '/dashboard',  icon: LayoutDashboard, label: 'Today' },
+    { href: '/pipeline',   icon: Home,            label: 'Pipeline' },
+    { href: '/calendar',   icon: CalendarDays,    label: 'Calendar' },
+    { href: '/deals',      icon: Building2,       label: 'Deals' },
+  ]
+
   return (
     <>
       <div className="desktop-sidebar">{SidebarContent}</div>
@@ -471,12 +478,59 @@ export default function Sidebar() {
       >
         {SidebarContent}
       </div>
+
+      {/* Mobile bottom tab bar */}
+      <nav className="mobile-bottom-nav" style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        height: '56px', background: 'var(--sidebar-bg, #0F0F11)',
+        borderTop: '1px solid rgba(255,255,255,0.08)',
+        display: 'none',
+        alignItems: 'center', justifyContent: 'space-around',
+        zIndex: 1000, padding: '0 8px',
+      }}>
+        {MOBILE_TABS.map(tab => {
+          const active = isActive(tab.href, tab.href === '/pipeline' ? ['/pipeline', '/deals'] : [tab.href])
+          return (
+            <Link
+              key={tab.href}
+              href={tab.href}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: '2px', textDecoration: 'none', padding: '6px 12px', borderRadius: '8px',
+                minWidth: '48px', minHeight: '44px',
+              }}
+            >
+              <tab.icon size={16} style={{ color: active ? 'var(--accent, #7C6AF5)' : 'var(--text-tertiary)' }} />
+              <span style={{
+                fontSize: '10px', fontWeight: active ? 600 : 500,
+                color: active ? 'var(--accent, #7C6AF5)' : 'var(--text-tertiary)',
+                lineHeight: 1,
+              }}>{tab.label}</span>
+            </Link>
+          )
+        })}
+        <button
+          onClick={toggleCopilot}
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            gap: '2px', background: 'none', border: 'none', cursor: 'pointer',
+            padding: '6px 12px', borderRadius: '8px',
+            minWidth: '48px', minHeight: '44px',
+          }}
+        >
+          <MessageSquare size={16} style={{ color: 'var(--accent, #7C6AF5)' }} />
+          <span style={{ fontSize: '10px', fontWeight: 500, color: 'var(--accent, #7C6AF5)', lineHeight: 1 }}>Ask AI</span>
+        </button>
+      </nav>
+
       <style>{`
         .desktop-sidebar { display: block; }
         .mobile-sidebar  { display: none; }
         @media (max-width: 768px) {
-          .desktop-sidebar { display: none; }
+          .desktop-sidebar { display: none !important; }
           .mobile-sidebar  { display: block; }
+          .mobile-bottom-nav { display: flex !important; }
+          main { margin-left: 0 !important; padding-bottom: 64px !important; }
         }
       `}</style>
     </>

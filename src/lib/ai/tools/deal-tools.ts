@@ -1619,7 +1619,10 @@ Rules:
 
     // Apply close date update from timeline change
     if (parsed.closeDateUpdate?.newDate) {
-      updateFields.closeDate = new Date(parsed.closeDateUpdate.newDate)
+      const d = new Date(parsed.closeDateUpdate.newDate)
+      // Fix 2-digit year: "0026" → 2026
+      if (d.getFullYear() < 100) d.setFullYear(d.getFullYear() + 2000)
+      updateFields.closeDate = d
     }
 
     // Phase 2: Score computation — re-score unless user has explicitly pinned the score
