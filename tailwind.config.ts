@@ -3,6 +3,7 @@ import type { Config } from 'tailwindcss'
 // Note: This project uses Tailwind v4. The canonical design tokens live in
 // src/app/globals.css inside the @theme block. This file is kept for editor
 // intellisense and any tooling that still reads tailwind.config.ts.
+// Colors aligned with Linear-style design system (design-system.css).
 const config: Config = {
   darkMode: 'class',
   content: [
@@ -14,38 +15,38 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // ── Backgrounds ──────────────────────────────────────────────
-        background: '#0E0E0E',
-        surface: '#181818',
-        elevated: '#1E1E1E',
-        overlay: '#222222',
+        // ── Backgrounds (Linear design system) ─────────────────────────
+        background: '#09090B',
+        surface: '#141416',
+        elevated: '#1C1C20',
+        overlay: '#1F1F23',
 
         // ── Text (rgba white at opacity) ─────────────────────────────
-        'text-primary': 'rgba(255,255,255,0.90)',
-        'text-secondary': 'rgba(255,255,255,0.50)',
-        'text-tertiary': 'rgba(255,255,255,0.30)',
-        'text-disabled': 'rgba(255,255,255,0.15)',
+        'text-primary': 'rgba(255,255,255,0.93)',
+        'text-secondary': 'rgba(255,255,255,0.56)',
+        'text-tertiary': 'rgba(255,255,255,0.32)',
+        'text-disabled': 'rgba(255,255,255,0.16)',
 
         // ── Accent ───────────────────────────────────────────────────
         accent: {
-          DEFAULT: '#6366F1',
-          hover: '#4F46E5',
-          muted: 'rgba(99,102,241,0.15)',
-          subtle: 'rgba(99,102,241,0.08)',
+          DEFAULT: '#5B5BD6',
+          hover: '#6E6EE0',
+          muted: 'rgba(91,91,214,0.14)',
+          subtle: 'rgba(91,91,214,0.08)',
         },
 
         // ── Semantic ─────────────────────────────────────────────────
         success: {
-          DEFAULT: '#22C55E',
-          muted: 'rgba(34,197,94,0.15)',
+          DEFAULT: '#3CCB7F',
+          muted: 'rgba(60,203,127,0.14)',
         },
         warning: {
-          DEFAULT: '#F59E0B',
-          muted: 'rgba(245,158,11,0.15)',
+          DEFAULT: '#FFB224',
+          muted: 'rgba(255,178,36,0.14)',
         },
         danger: {
-          DEFAULT: '#EF4444',
-          muted: 'rgba(239,68,68,0.15)',
+          DEFAULT: '#E5484D',
+          muted: 'rgba(229,72,77,0.14)',
         },
         info: {
           DEFAULT: '#3B82F6',
@@ -54,25 +55,25 @@ const config: Config = {
 
         // ── Borders ──────────────────────────────────────────────────
         border: {
-          DEFAULT: 'rgba(255,255,255,0.06)',
+          DEFAULT: 'rgba(255,255,255,0.08)',
           subtle: 'rgba(255,255,255,0.04)',
-          strong: 'rgba(255,255,255,0.12)',
-          accent: 'rgba(99,102,241,0.4)',
+          strong: 'rgba(255,255,255,0.13)',
+          accent: 'rgba(91,91,214,0.4)',
         },
       },
       fontFamily: {
-        sans: ['var(--font-geist-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-geist-mono)', 'ui-monospace', 'monospace'],
+        sans: ['-apple-system', 'BlinkMacSystemFont', "'Segoe UI'", "'Roboto'", 'sans-serif'],
+        mono: ["'SF Mono'", "'Menlo'", "'Consolas'", 'monospace'],
       },
       fontSize: {
         '2xs': ['0.625rem', { lineHeight: '0.875rem' }],
-        xs: ['0.75rem', { lineHeight: '1rem' }],
-        sm: ['0.8125rem', { lineHeight: '1.25rem' }],
-        base: ['0.875rem', { lineHeight: '1.5rem' }],
+        xs: ['0.6875rem', { lineHeight: '1rem' }],       // 11px — labels
+        sm: ['0.8125rem', { lineHeight: '1.25rem' }],     // 13px — body
+        base: ['0.8125rem', { lineHeight: '1.5rem' }],    // 13px — body
         md: ['0.9375rem', { lineHeight: '1.5rem' }],
         lg: ['1rem', { lineHeight: '1.625rem' }],
         xl: ['1.125rem', { lineHeight: '1.75rem' }],
-        '2xl': ['1.25rem', { lineHeight: '1.875rem' }],
+        '2xl': ['1.25rem', { lineHeight: '1.875rem' }],   // 20px — titles
         '3xl': ['1.5rem', { lineHeight: '2rem' }],
         '4xl': ['1.875rem', { lineHeight: '2.25rem' }],
       },
@@ -80,10 +81,10 @@ const config: Config = {
         none: '0',
         sm: '4px',
         DEFAULT: '6px',
-        md: '8px',
-        lg: '10px',
-        xl: '12px',
-        '2xl': '16px',
+        md: '6px',
+        lg: '8px',
+        xl: '10px',
+        '2xl': '10px',
         full: '9999px',
       },
       spacing: {
@@ -129,9 +130,9 @@ const config: Config = {
         md: '0 4px 16px rgba(0,0,0,0.6)',
         lg: '0 8px 32px rgba(0,0,0,0.7)',
         xl: '0 16px 48px rgba(0,0,0,0.8)',
-        accent: '0 0 0 1px rgba(99,102,241,0.5), 0 4px 16px rgba(99,102,241,0.15)',
+        accent: '0 0 0 2px rgba(91,91,214,0.5)',
         'inset-border': 'inset 0 0 0 1px rgba(255,255,255,0.06)',
-        glow: '0 0 20px rgba(99,102,241,0.3)',
+        glow: '0 0 20px rgba(91,91,214,0.3)',
       },
       animation: {
         'skeleton-pulse': 'skeleton-pulse 1.5s ease-in-out infinite',

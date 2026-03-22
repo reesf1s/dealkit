@@ -61,32 +61,32 @@ export default function Sidebar() {
           display: 'flex', alignItems: 'center', gap: '8px',
           padding: collapsed ? '0' : '0 8px',
           justifyContent: collapsed ? 'center' : 'flex-start',
-          height: '30px', borderRadius: '7px',
+          height: '30px', borderRadius: '6px',
           marginBottom: '1px', textDecoration: 'none',
           fontSize: '13px',
           fontWeight: 500,
           letterSpacing: '-0.01em',
-          color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-          background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
-          transition: 'background 0.08s ease, color 0.08s ease',
+          color: active ? 'var(--ds-text-1)' : 'var(--ds-text-2)',
+          background: active ? 'var(--ds-bg-active)' : 'transparent',
+          transition: 'background 0.1s ease, color 0.1s ease',
           position: 'relative', flexShrink: 0,
           width: collapsed ? '30px' : undefined,
           margin: collapsed ? '0 auto 2px' : undefined,
         }}
         onMouseEnter={e => { if (!active) {
-          (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
-          ;(e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'
+          (e.currentTarget as HTMLElement).style.background = 'var(--ds-bg-hover)'
+          ;(e.currentTarget as HTMLElement).style.color = 'var(--ds-text-1)'
         }}}
         onMouseLeave={e => { if (!active) {
           (e.currentTarget as HTMLElement).style.background = 'transparent'
-          ;(e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'
+          ;(e.currentTarget as HTMLElement).style.color = 'var(--ds-text-2)'
         }}}
       >
         <div style={{ position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Icon
             size={14}
             style={{
-              color: active ? 'var(--text-primary)' : 'var(--text-tertiary)',
+              color: active ? 'var(--ds-text-1)' : 'var(--ds-text-3)',
               display: 'block',
             }}
           />
@@ -103,8 +103,8 @@ export default function Sidebar() {
         {!collapsed && badge && badge.count > 0 && (
           <span style={{
             fontSize: '10px', fontWeight: 500,
-            color: '#FF453A',
-            background: 'rgba(255,69,58,0.12)',
+            color: 'var(--ds-red)',
+            background: 'var(--ds-red-soft)',
             padding: '1px 5px', borderRadius: '100px',
           }}>{badge.count}</span>
         )}
@@ -113,7 +113,7 @@ export default function Sidebar() {
   }
 
   function Divider() {
-    return <div style={{ height: '1px', background: 'var(--border)', margin: '6px 0' }} />
+    return <div style={{ height: '1px', background: 'var(--ds-border)', margin: '6px 0' }} />
   }
 
   function SectionLabel({ children }: { children: string }) {
@@ -121,7 +121,7 @@ export default function Sidebar() {
     return (
       <div style={{
         padding: '8px 8px 3px',
-        fontSize: '10px', fontWeight: 500, color: 'var(--text-tertiary)',
+        fontSize: '10px', fontWeight: 500, color: 'var(--ds-text-3)',
         textTransform: 'uppercase', letterSpacing: '0.07em',
       }}>
         {children}
@@ -145,10 +145,8 @@ export default function Sidebar() {
   const SidebarContent = (
     <aside style={{
       position: 'fixed', left: 0, top: 0, bottom: 0, width: w,
-      background: 'var(--sidebar-bg)',
-      backdropFilter: 'blur(var(--glass-blur))',
-      WebkitBackdropFilter: 'blur(var(--glass-blur))',
-      borderRight: '1px solid var(--border)',
+      background: 'var(--ds-bg-sidebar)',
+      borderRight: '1px solid var(--ds-border)',
       display: 'flex', flexDirection: 'column', zIndex: 40,
       transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)',
       overflow: 'hidden',
@@ -165,24 +163,24 @@ export default function Sidebar() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{
               width: '24px', height: '24px',
-              background: 'linear-gradient(135deg, #7C6AF5 0%, #9B6DFF 100%)',
+              background: 'linear-gradient(135deg, var(--ds-accent) 0%, var(--ds-accent-hover) 100%)',
               borderRadius: '6px',
               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              boxShadow: '0 0 14px rgba(124,106,245,0.40)',
+              boxShadow: '0 0 10px rgba(91,91,214,0.35)',
             }}>
               <Brain size={12} color="#fff" strokeWidth={2.5} />
             </div>
             <span style={{
-              fontWeight: '600', fontSize: '14px',
+              fontWeight: 600, fontSize: '14px',
               letterSpacing: '-0.025em',
-              color: 'var(--text-primary)',
+              color: 'var(--ds-text-1)',
             }}>SellSight</span>
           </div>
         )}
         {collapsed && (
           <div style={{
             width: '24px', height: '24px',
-            background: 'linear-gradient(135deg, #7C6AF5 0%, #9B6DFF 100%)',
+            background: 'linear-gradient(135deg, var(--ds-accent) 0%, var(--ds-accent-hover) 100%)',
             borderRadius: '6px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 0 14px rgba(124,106,245,0.40)',
@@ -194,12 +192,12 @@ export default function Sidebar() {
           onClick={() => { mobileOpen ? closeMobile() : toggleCollapsed() }}
           style={{
             background: 'none', border: 'none',
-            color: 'var(--text-tertiary)', cursor: 'pointer',
-            padding: '3px', borderRadius: '5px', display: 'flex',
+            color: 'var(--ds-text-3)', cursor: 'pointer',
+            padding: '3px', borderRadius: '4px', display: 'flex',
             transition: 'color 0.1s',
           }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--ds-text-1)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--ds-text-3)'}
         >
           {mobileOpen ? <X size={13} /> : collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
         </button>
@@ -211,23 +209,23 @@ export default function Sidebar() {
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
             style={{
-              width: '100%', height: '28px', borderRadius: '7px',
+              width: '100%', height: '28px', borderRadius: '6px',
               background: 'var(--surface)',
               border: 'none',
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', padding: '0 8px',
-              transition: 'background 0.08s ease',
+              transition: 'background 0.1s ease',
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
+              (e.currentTarget as HTMLElement).style.background = 'var(--ds-bg-hover)'
             }}
             onMouseLeave={e => {
               (e.currentTarget as HTMLElement).style.background = 'var(--surface)'
             }}
           >
-            <Search size={11} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: '12px', color: 'var(--text-tertiary)', textAlign: 'left' }}>Search</span>
+            <Search size={11} style={{ color: 'var(--ds-text-3)', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: '12px', color: 'var(--ds-text-3)', textAlign: 'left' }}>Search</span>
             <span style={{
-              fontSize: '10px', color: 'var(--text-tertiary)',
+              fontSize: '10px', color: 'var(--ds-text-3)',
               background: 'rgba(255,255,255,0.06)', padding: '1px 4px',
               borderRadius: '4px', border: 'none',
               letterSpacing: '0.02em',
@@ -237,12 +235,12 @@ export default function Sidebar() {
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
             style={{
-              width: '30px', height: '28px', borderRadius: '7px',
+              width: '30px', height: '28px', borderRadius: '6px',
               background: 'var(--surface)', border: 'none',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <Search size={11} style={{ color: 'var(--text-tertiary)' }} />
+            <Search size={11} style={{ color: 'var(--ds-text-3)' }} />
           </button>
         )}
       </div>
@@ -253,27 +251,25 @@ export default function Sidebar() {
           <button
             onClick={toggleCopilot}
             style={{
-              width: '100%', height: '30px', borderRadius: '8px',
-              background: 'linear-gradient(135deg, rgba(124,106,245,0.12), rgba(155,109,255,0.08))',
-              border: '1px solid rgba(124,106,245,0.22)',
+              width: '100%', height: '30px', borderRadius: '6px',
+              background: 'var(--ds-accent-soft)',
+              border: 'none',
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', padding: '0 9px',
-              transition: 'all 0.12s',
+              transition: 'background 0.1s ease',
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(124,106,245,0.20), rgba(155,109,255,0.14))'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,106,245,0.40)'
+              (e.currentTarget as HTMLElement).style.background = 'rgba(91,91,214,0.22)'
             }}
             onMouseLeave={e => {
-              (e.currentTarget as HTMLElement).style.background = 'linear-gradient(135deg, rgba(124,106,245,0.12), rgba(155,109,255,0.08))'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,106,245,0.22)'
+              (e.currentTarget as HTMLElement).style.background = 'var(--ds-accent-soft)'
             }}
           >
-            <MessageSquare size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: '12px', fontWeight: 500, color: 'var(--accent-text)', textAlign: 'left', letterSpacing: '-0.01em' }}>
+            <MessageSquare size={12} style={{ color: 'var(--ds-accent)', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: '12px', fontWeight: 500, color: 'var(--ds-accent-hover)', textAlign: 'left', letterSpacing: '-0.01em' }}>
               Ask AI
             </span>
             <span style={{
-              fontSize: '10px', color: 'var(--text-tertiary)',
+              fontSize: '10px', color: 'var(--ds-text-3)',
               background: 'rgba(0,0,0,0.2)', padding: '1px 5px',
               borderRadius: '4px', border: 'none',
             }}>⌘K</span>
@@ -283,13 +279,13 @@ export default function Sidebar() {
             onClick={toggleCopilot}
             title="Ask AI (⌘K)"
             style={{
-              width: '30px', height: '28px', borderRadius: '7px',
-              background: 'linear-gradient(135deg, rgba(124,106,245,0.12), rgba(155,109,255,0.08))',
-              border: '1px solid rgba(124,106,245,0.22)',
+              width: '30px', height: '28px', borderRadius: '6px',
+              background: 'var(--ds-accent-soft)',
+              border: 'none',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            <MessageSquare size={11} style={{ color: 'var(--accent)' }} />
+            <MessageSquare size={11} style={{ color: 'var(--ds-accent)' }} />
           </button>
         )}
       </div>
@@ -301,7 +297,7 @@ export default function Sidebar() {
           <NavItem
             key={item.href}
             {...item}
-            badge={item.href === '/pipeline' && urgentCount > 0 ? { count: urgentCount, color: '#FF453A' } : undefined}
+            badge={item.href === '/pipeline' && urgentCount > 0 ? { count: urgentCount, color: 'var(--ds-red)' } : undefined}
           />
         ))}
 
@@ -318,26 +314,26 @@ export default function Sidebar() {
             onClick={toggleTheme}
             style={{
               display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '0 8px', height: '30px', borderRadius: '7px',
+              padding: '0 8px', height: '30px', borderRadius: '6px',
               marginBottom: '1px', border: 'none',
               fontSize: '13px', fontWeight: 500, letterSpacing: '-0.01em',
-              color: 'var(--text-secondary)',
+              color: 'var(--ds-text-2)',
               background: 'transparent',
               cursor: 'pointer', width: '100%', textAlign: 'left',
-              transition: 'background 0.08s ease, color 0.08s ease',
+              transition: 'background 0.1s ease, color 0.1s ease',
             }}
             onMouseEnter={e => {
-              (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
-              ;(e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'
+              (e.currentTarget as HTMLElement).style.background = 'var(--ds-bg-hover)'
+              ;(e.currentTarget as HTMLElement).style.color = 'var(--ds-text-1)'
             }}
             onMouseLeave={e => {
               (e.currentTarget as HTMLElement).style.background = 'transparent'
-              ;(e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'
+              ;(e.currentTarget as HTMLElement).style.color = 'var(--ds-text-2)'
             }}
           >
             {theme === 'light'
-              ? <Moon size={13} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
-              : <Sun  size={13} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />}
+              ? <Moon size={13} style={{ color: 'var(--ds-text-3)', flexShrink: 0 }} />
+              : <Sun  size={13} style={{ color: 'var(--ds-text-3)', flexShrink: 0 }} />}
             <span>{theme === 'light' ? 'Dark mode' : 'Light mode'}</span>
           </button>
         ) : (
@@ -346,9 +342,9 @@ export default function Sidebar() {
             title={theme === 'light' ? 'Dark mode' : 'Light mode'}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              height: '30px', width: '30px', borderRadius: '7px',
+              height: '30px', width: '30px', borderRadius: '6px',
               border: 'none', background: 'transparent',
-              color: 'var(--text-tertiary)', cursor: 'pointer',
+              color: 'var(--ds-text-3)', cursor: 'pointer',
               margin: '0 auto 2px',
             }}
           >
@@ -358,13 +354,13 @@ export default function Sidebar() {
       </nav>
 
       {/* ── Brain status + user footer ── */}
-      <div style={{ borderTop: '1px solid var(--border)', padding: collapsed ? '8px 4px' : '8px', flexShrink: 0 }}>
+      <div style={{ borderTop: '1px solid var(--ds-border)', padding: collapsed ? '8px 4px' : '8px', flexShrink: 0 }}>
 
         {/* Brain indicator */}
         {!collapsed && brainAgeInfo && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: '6px',
-            padding: '5px 8px', marginBottom: '6px', borderRadius: '7px',
+            padding: '5px 8px', marginBottom: '6px', borderRadius: '6px',
             background: brainAgeInfo.bg,
             border: 'none',
           }}>
@@ -374,10 +370,10 @@ export default function Sidebar() {
               boxShadow: `0 0 5px ${brainAgeInfo.glow}`,
             }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '10px', fontWeight: 500, color: 'var(--text-secondary)' }}>
+              <div style={{ fontSize: '10px', fontWeight: 500, color: 'var(--ds-text-2)' }}>
                 {urgentCount > 0 ? `${urgentCount} deals need attention` : 'AI ready'}
               </div>
-              <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginTop: '1px' }}>
+              <div style={{ fontSize: '9px', color: 'var(--ds-text-3)', marginTop: '1px' }}>
                 Updated {brainAge}
               </div>
             </div>
@@ -390,27 +386,27 @@ export default function Sidebar() {
             onClick={() => signOut({ redirectUrl: '/' })}
             title="Sign out"
             style={{
-              width: '30px', height: '30px', borderRadius: '7px',
+              width: '30px', height: '30px', borderRadius: '6px',
               background: 'var(--surface)', border: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: 'var(--text-tertiary)', margin: '0 auto',
+              cursor: 'pointer', color: 'var(--ds-text-3)', margin: '0 auto',
               transition: 'color 0.1s',
             }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--ds-text-1)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--ds-text-3)'}
           >
             <LogOut size={12} />
           </button>
         ) : (
           <div style={{
             display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '6px 8px', borderRadius: '8px',
+            padding: '6px 8px', borderRadius: '6px',
             background: 'var(--surface)',
             border: 'none',
           }}>
             <div style={{
               width: '22px', height: '22px', borderRadius: '50%',
-              background: 'linear-gradient(135deg, #7C6AF5, #9B6DFF)',
+              background: 'linear-gradient(135deg, var(--ds-accent), var(--ds-accent-hover))',
               flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '9px', fontWeight: 700, color: '#fff',
             }}>
@@ -419,13 +415,13 @@ export default function Sidebar() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
                 fontSize: '12px', fontWeight: 500, letterSpacing: '-0.01em',
-                color: 'var(--text-primary)',
+                color: 'var(--ds-text-1)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
                 {user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Account'}
               </div>
               <div style={{
-                fontSize: '10px', color: 'var(--text-tertiary)',
+                fontSize: '10px', color: 'var(--ds-text-3)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px',
               }}>
                 {user?.emailAddresses?.[0]?.emailAddress ?? ''}
@@ -435,12 +431,12 @@ export default function Sidebar() {
               onClick={() => signOut({ redirectUrl: '/' })}
               style={{
                 background: 'none', border: 'none', padding: '3px',
-                color: 'var(--text-tertiary)', borderRadius: '4px',
+                color: 'var(--ds-text-3)', borderRadius: '4px',
                 display: 'flex', alignItems: 'center', cursor: 'pointer',
                 transition: 'color 0.1s',
               }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--ds-text-1)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--ds-text-3)'}
               title="Sign out"
             >
               <LogOut size={11} />

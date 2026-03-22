@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
-/* ─── SF Pro / system font — matches macOS Raycast aesthetic ──────────────── */
+/* ─── System font stack ──────────────────────────────────────────────────── */
 :root {
-  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', system-ui, sans-serif;
-  --font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  --font-mono: 'SF Mono', 'Menlo', 'Consolas', monospace;
 }
 
 /* ── Light mode ─────────────────────────────────────────────────────────────── */
@@ -18,13 +18,13 @@
   --text-primary: #1A1A1A;
   --text-secondary: rgba(0, 0, 0, 0.50);
   --text-tertiary: rgba(0, 0, 0, 0.30);
-  --accent: #5E5CE6;
-  --accent-hover: #4B48C8;
-  --accent-subtle: rgba(94, 92, 230, 0.10);
-  --accent-text: #5E5CE6;
-  --success: #30D158;
-  --warning: #FF9F0A;
-  --danger: #FF453A;
+  --accent: #5B5BD6;
+  --accent-hover: #6E6EE0;
+  --accent-subtle: rgba(91, 91, 214, 0.10);
+  --accent-text: #5B5BD6;
+  --success: #3CCB7F;
+  --warning: #FFB224;
+  --danger: #E5484D;
   --card-bg: rgba(255, 255, 255, 0.90);
   --card-border: rgba(0, 0, 0, 0.07);
   --sidebar-bg: rgba(245, 245, 247, 0.94);
@@ -39,65 +39,65 @@
   --glass: rgba(255, 255, 255, 0.80);
   --glass-border: rgba(0, 0, 0, 0.08);
   --glass-blur: 40px;
-  --badge-bg: rgba(94, 92, 230, 0.10);
+  --badge-bg: rgba(91, 91, 214, 0.10);
   --scrollbar-thumb: rgba(0,0,0,0.12);
   --copilot-bg: rgba(250, 250, 250, 0.96);
   --copilot-msg-bg: rgba(0, 0, 0, 0.03);
-  --copilot-user-bg: rgba(94, 92, 230, 0.08);
+  --copilot-user-bg: rgba(91, 91, 214, 0.08);
   --data-accent: #0A84FF;
   --data-accent-subtle: rgba(10, 132, 255, 0.08);
-  --color-success: #30D158;
-  --color-warning: #FF9F0A;
-  --color-danger: #FF453A;
-  --color-ml: #5E5CE6;
+  --color-success: #3CCB7F;
+  --color-warning: #FFB224;
+  --color-danger: #E5484D;
+  --color-ml: #5B5BD6;
   --color-locked: #3A3A3C;
   --color-info: #32ADE6;
 }
 
-/* ── Dark mode — Raycast / #0E0E0E deep dark aesthetic ─────────────────────── */
+/* ── Dark mode — Linear-style deep dark ──────────────────────────────────── */
 .dark {
-  --bg: #0E0E0E;
-  --bg-secondary: #141414;
+  --bg: var(--ds-bg-page, #09090B);
+  --bg-secondary: var(--ds-bg-card, #141416);
   --surface: rgba(255, 255, 255, 0.04);
-  --surface-hover: rgba(255, 255, 255, 0.06);
-  --elevated: rgba(255, 255, 255, 0.06);
-  --border: rgba(255, 255, 255, 0.07);
-  --border-strong: rgba(255, 255, 255, 0.12);
-  --text-primary: rgba(255, 255, 255, 0.90);
-  --text-secondary: rgba(255, 255, 255, 0.50);
-  --text-tertiary: rgba(255, 255, 255, 0.30);
-  --accent: #7C6AF5;
-  --accent-hover: #9086F7;
-  --accent-subtle: rgba(124, 106, 245, 0.14);
-  --accent-text: #9D91F8;
-  --success: #30D158;
-  --warning: #FFD60A;
-  --danger: #FF453A;
-  --card-bg: #181818;
+  --surface-hover: var(--ds-bg-hover, #1A1A1D);
+  --elevated: var(--ds-bg-elevated, #1C1C20);
+  --border: var(--ds-border, rgba(255,255,255,0.08));
+  --border-strong: var(--ds-border-hover, rgba(255,255,255,0.13));
+  --text-primary: var(--ds-text-1, rgba(255,255,255,0.93));
+  --text-secondary: var(--ds-text-2, rgba(255,255,255,0.56));
+  --text-tertiary: var(--ds-text-3, rgba(255,255,255,0.32));
+  --accent: var(--ds-accent, #5B5BD6);
+  --accent-hover: var(--ds-accent-hover, #6E6EE0);
+  --accent-subtle: var(--ds-accent-soft, rgba(91,91,214,0.14));
+  --accent-text: var(--ds-accent-hover, #6E6EE0);
+  --success: var(--ds-green, #3CCB7F);
+  --warning: var(--ds-amber, #FFB224);
+  --danger: var(--ds-red, #E5484D);
+  --card-bg: var(--ds-bg-card, #141416);
   --card-border: transparent;
-  --sidebar-bg: rgba(14, 14, 14, 0.97);
-  --topnav-bg: rgba(14, 14, 14, 0.92);
+  --sidebar-bg: var(--ds-bg-sidebar, #0F0F11);
+  --topnav-bg: rgba(9, 9, 11, 0.92);
   --shadow-sm: none;
   --shadow: none;
   --shadow-lg: none;
-  --glass: rgba(24, 24, 24, 0.88);
-  --glass-border: rgba(255, 255, 255, 0.07);
+  --glass: rgba(20, 20, 22, 0.88);
+  --glass-border: var(--ds-border, rgba(255,255,255,0.08));
   --glass-blur: 40px;
-  --badge-bg: rgba(124, 106, 245, 0.14);
+  --badge-bg: var(--ds-accent-soft, rgba(91,91,214,0.14));
   --scrollbar-thumb: rgba(255,255,255,0.06);
   --skeleton-from: rgba(255,255,255,0.04);
   --skeleton-mid: rgba(255,255,255,0.08);
-  --row-hover: rgba(255,255,255,0.03);
-  --copilot-bg: rgba(16, 16, 16, 0.97);
+  --row-hover: var(--ds-bg-hover, #1A1A1D);
+  --copilot-bg: rgba(15, 15, 17, 0.97);
   --copilot-msg-bg: rgba(255,255,255,0.03);
-  --copilot-user-bg: rgba(124,106,245,0.12);
+  --copilot-user-bg: var(--ds-accent-soft, rgba(91,91,214,0.14));
   --data-accent: #0A84FF;
   --data-accent-subtle: rgba(10, 132, 255, 0.10);
-  --input-bg: rgba(255, 255, 255, 0.05);
-  --color-success: #30D158;
-  --color-warning: #FFD60A;
-  --color-danger: #FF453A;
-  --color-ml: #7C6AF5;
+  --input-bg: var(--ds-bg-input, #141416);
+  --color-success: var(--ds-green, #3CCB7F);
+  --color-warning: var(--ds-amber, #FFB224);
+  --color-danger: var(--ds-red, #E5484D);
+  --color-ml: var(--ds-accent, #5B5BD6);
   --color-locked: #3A3A3C;
   --color-info: #32ADE6;
 }
@@ -126,7 +126,7 @@ html, body {
   border-radius: 3px;
 }
 
-::selection { background: rgba(124,106,245,0.22); color: var(--text-primary); }
+::selection { background: rgba(91,91,214,0.22); color: var(--text-primary); }
 
 /* ─── Skeletons ──────────────────────────────────────────────────────────── */
 @keyframes shimmer {
@@ -161,7 +161,7 @@ input, textarea, select {
   background: var(--input-bg);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 7px 11px;
   font-size: 13px;
   font-family: var(--font-sans);
@@ -173,8 +173,8 @@ input, textarea, select {
   -webkit-font-smoothing: antialiased;
 }
 input:focus, textarea:focus, select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-subtle);
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--ds-accent, var(--accent));
 }
 input::placeholder, textarea::placeholder { color: var(--text-tertiary); }
 input:hover:not(:focus), textarea:hover:not(:focus) { border-color: var(--border-strong); }
@@ -222,9 +222,9 @@ body, * {
   letter-spacing: -0.01em;
 }
 
-/* Label utility */
+/* Label utility — 11px labels per design system */
 .label-xs {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -240,46 +240,96 @@ body, * {
   letter-spacing: -0.03em;
 }
 
-/* Standard card */
+/* Standard card — 8px radius */
 .card-standard {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 18px;
 }
 .card-hover:hover {
-  background: rgba(255,255,255,0.06);
+  background: var(--ds-bg-hover, rgba(255,255,255,0.06));
 }
 
 /* Score badge colours */
-.score-high { color: #30D158; background: rgba(48,209,88,0.12);  border: 1px solid rgba(48,209,88,0.22);  }
-.score-mid  { color: #FFD60A; background: rgba(255,214,10,0.10); border: 1px solid rgba(255,214,10,0.22); }
-.score-low  { color: #FF453A; background: rgba(255,69,58,0.12);  border: 1px solid rgba(255,69,58,0.22);  }
+.score-high { color: var(--ds-green, #3CCB7F); background: var(--ds-green-soft, rgba(60,203,127,0.14)); border: 1px solid transparent; }
+.score-mid  { color: var(--ds-amber, #FFB224); background: var(--ds-amber-soft, rgba(255,178,36,0.14)); border: 1px solid transparent; }
+.score-low  { color: var(--ds-red, #E5484D);   background: var(--ds-red-soft, rgba(229,72,77,0.14));    border: 1px solid transparent; }
 
 /* ============================================================
-   SELLSIGHT DESIGN OVERRIDES — Raycast/Dark Pro
-   Applied after base styles — surgical overrides only
+   LINEAR DESIGN SYSTEM OVERRIDES
+   10 absolute rules applied globally
    ============================================================ */
 
-/* INPUTS — no border, tinted surface only */
+/* RULE 1: No visible borders on cards */
+.dark .card-standard,
+.dark [class*="card"],
+.dark [class*="Card"] {
+  border-color: transparent !important;
+}
+
+/* RULE 2: No borders on buttons except primary */
+.dark button:not([class*="primary"]) {
+  border-color: transparent;
+}
+
+/* RULE 3: No borders on inputs — focus gets accent ring */
 .dark input, .dark textarea, .dark select {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--ds-bg-input);
   border-color: transparent;
 }
 .dark input:focus, .dark textarea:focus, .dark select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-subtle);
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--ds-accent);
 }
 .dark input:hover:not(:focus), .dark textarea:hover:not(:focus) {
   border-color: transparent;
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--ds-bg-hover);
 }
 
-/* CARDS — no borders in dark mode, surface contrast only */
+/* RULE 4: Tight border-radius — 6px components, 8px cards */
 .dark .card-standard,
-.dark [class*="card"] {
-  border-color: transparent;
+.dark [class*="card"],
+.dark [class*="Card"],
+.dark [class*="modal"],
+.dark [class*="Modal"],
+.dark [class*="dialog"],
+.dark [class*="Dialog"],
+.dark [class*="popover"],
+.dark [class*="Popover"],
+.dark [class*="dropdown"],
+.dark [class*="Dropdown"] {
+  border-radius: 8px !important;
 }
+
+/* Override any overly-large radii on components */
+.dark [style*="border-radius: 12px"],
+.dark [style*="border-radius: 14px"],
+.dark [style*="border-radius: 16px"] {
+  border-radius: 8px !important;
+}
+
+/* RULE 5: Font-weight 500 everywhere, 600 for page titles only */
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+  font-weight: 500;
+}
+.dark h1 {
+  font-weight: 600;
+  font-size: 20px;
+}
+
+/* RULE 7: Score colours already handled by .score-high/mid/low above */
+
+/* RULE 8: Hover states — bg change ONLY, no border/shadow/transform */
+.dark *:hover {
+  text-decoration: none;
+}
+
+/* RULE 9: Active nav — bg-active + text-1, no accent colour */
+/* (Applied directly in Sidebar.tsx) */
+
+/* RULE 10: Typography sizes — 13px body, 11px labels, 20px titles */
+/* Already set via body rule and .label-xs above */
 
 /* SCROLLBARS — ultra subtle */
 .dark * {
@@ -293,15 +343,13 @@ body, * {
 .dark th { border: none; }
 .dark td { border: none; }
 .dark tbody tr { border-top: 1px solid rgba(255,255,255,0.04); }
-.dark tbody tr:hover { background: rgba(255,255,255,0.04); }
+.dark tbody tr:hover { background: var(--ds-bg-hover); }
 
-/* SCORE BADGES — no borders in dark mode */
-.dark .score-high { border-color: transparent; }
-.dark .score-mid  { border-color: transparent; }
-.dark .score-low  { border-color: transparent; }
-
-/* TRANSITIONS — Raycast-fast 0.08s everywhere */
+/* TRANSITIONS — fast 0.1s everywhere */
 .dark *, .dark *::before, .dark *::after {
-  transition-duration: 0.08s;
+  transition-duration: 0.1s;
   transition-timing-function: ease;
 }
+
+/* ─── Import design system tokens LAST ───────────────────────────────────── */
+@import '../styles/design-system.css';

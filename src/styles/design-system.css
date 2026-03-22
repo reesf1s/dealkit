@@ -1,0 +1,57 @@
+/* ============================================================
+   LINEAR-STYLE DESIGN SYSTEM
+   Imported LAST in globals.css to override all base styles.
+   ============================================================ */
+
+:root {
+  /* Surfaces */
+  --ds-bg-page: #09090B;
+  --ds-bg-sidebar: #0F0F11;
+  --ds-bg-card: #141416;
+  --ds-bg-hover: #1A1A1D;
+  --ds-bg-active: #1F1F23;
+  --ds-bg-input: #141416;
+  --ds-bg-elevated: #1C1C20;
+
+  /* Text — rgba white, NOT hex greys */
+  --ds-text-1: rgba(255,255,255,0.93);
+  --ds-text-2: rgba(255,255,255,0.56);
+  --ds-text-3: rgba(255,255,255,0.32);
+  --ds-text-4: rgba(255,255,255,0.16);
+
+  /* Borders — sparingly */
+  --ds-border: rgba(255,255,255,0.08);
+  --ds-border-hover: rgba(255,255,255,0.13);
+
+  /* Accent */
+  --ds-accent: #5B5BD6;
+  --ds-accent-hover: #6E6EE0;
+  --ds-accent-soft: rgba(91,91,214,0.14);
+
+  /* Semantic */
+  --ds-green: #3CCB7F;
+  --ds-green-soft: rgba(60,203,127,0.14);
+  --ds-amber: #FFB224;
+  --ds-amber-soft: rgba(255,178,36,0.14);
+  --ds-red: #E5484D;
+  --ds-red-soft: rgba(229,72,77,0.14);
+
+  /* Radii — TIGHT like Linear */
+  --ds-radius-sm: 4px;
+  --ds-radius-md: 6px;
+  --ds-radius-lg: 8px;
+  --ds-radius-xl: 10px;
+
+  /* Font */
+  --ds-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  --ds-font-mono: 'SF Mono', 'Menlo', 'Consolas', monospace;
+}
+
+body {
+  background: var(--ds-bg-page) !important;
+  font-family: var(--ds-font) !important;
+  font-weight: 500 !important;
+  color: var(--ds-text-1) !important;
+  font-size: 13px !important;
+  -webkit-font-smoothing: antialiased !important;
+}
