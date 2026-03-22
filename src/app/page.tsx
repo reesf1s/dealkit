@@ -1,770 +1,299 @@
-import React from 'react'
 import Link from 'next/link'
-import { ArrowRight, Zap, Shield, CheckCircle, FileText, Users, Target, BookOpen, Mail, ChevronRight, TrendingUp, Lock, Brain, BarChart3, MessageSquare, AlertTriangle, Layers } from 'lucide-react'
-import ROICalc from '@/components/marketing/ROICalc'
-import FeaturesTab from '@/components/marketing/FeaturesTab'
+import { auth } from '@clerk/nextjs/server'
+import { redirect } from 'next/navigation'
 
-const NAV: React.CSSProperties = {
-  position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
-  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-  padding: '0 40px', height: '56px',
-  background: 'var(--topnav-bg)', backdropFilter: 'blur(16px)',
-  WebkitBackdropFilter: 'blur(16px)',
-  borderBottom: '1px solid var(--border)',
-}
+export default async function LandingPage() {
+  const { userId } = await auth()
+  if (userId) redirect('/dashboard')
 
-const COLLATERAL_TYPES = [
-  { icon: Shield, label: 'Battlecard', desc: 'Auto-generated competitive intel on every rival — rebuilt when your win/loss record shifts.' },
-  { icon: BookOpen, label: 'Case Study', desc: 'Turns closed-won deals into proof stories autonomously. Always current.' },
-  { icon: FileText, label: 'One-Pager', desc: 'Outcome-focused product overviews the brain writes and keeps fresh.' },
-  { icon: Target, label: 'Objection Handler', desc: 'Every pushback your team faces, with responses grounded in what actually closed deals.' },
-  { icon: Users, label: 'Talk Track', desc: 'Tailored messaging per buyer persona — generated and updated without lifting a finger.' },
-  { icon: Mail, label: 'Email Sequence', desc: 'Follow-up sequences built from real deal outcomes and proven win patterns.' },
-]
-
-const PRICING = [
-  {
-    name: 'Free', price: '\u00A30', period: '',
-    features: ['1 product', '2 competitors', '5 case studies', '10 deal logs', '5 collateral items'],
-    cta: 'Get started', highlight: false,
-  },
-  {
-    name: 'Starter', price: '\u00A379', period: '/mo',
-    features: ['3 products', '10 competitors', 'Unlimited case studies', 'Unlimited deals', 'Unlimited collateral', '.docx export', 'No watermark'],
-    cta: 'Start free trial', highlight: true,
-  },
-  {
-    name: 'Pro', price: '\u00A3149', period: '/mo',
-    features: ['Everything in Starter', 'Unlimited products', 'Batch regenerate', 'Email sequences', 'AI meeting prep', 'Team features'],
-    cta: 'Start free trial', highlight: false,
-  },
-]
-
-export default function LandingPage() {
   return (
     <div style={{
-      background: 'var(--bg)',
-      minHeight: '100vh', color: 'var(--text-primary)',
+      background: '#09090B',
+      color: 'rgba(255,255,255,0.93)',
       fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif',
-      position: 'relative', overflow: 'hidden',
+      minHeight: '100vh',
     }}>
-
-      {/* Background blobs */}
-      <div style={{ position: 'fixed', top: '-120px', left: '-80px', width: '500px', height: '500px', background: 'radial-gradient(circle, var(--accent-subtle) 0%, transparent 70%)', filter: 'blur(60px)', pointerEvents: 'none', zIndex: 0 }} />
-      <div style={{ position: 'fixed', bottom: '-120px', right: '-80px', width: '600px', height: '600px', background: 'radial-gradient(circle, var(--accent-subtle) 0%, transparent 70%)', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0 }} />
-      <div style={{ position: 'fixed', top: '40%', left: '50%', transform: 'translate(-50%, -50%)', width: '700px', height: '700px', background: 'radial-gradient(circle, var(--accent-subtle) 0%, transparent 70%)', filter: 'blur(80px)', pointerEvents: 'none', zIndex: 0 }} />
-
-      {/* Nav */}
-      <nav style={NAV}>
+      {/* ── Nav ──────────────────────────────────────────────────── */}
+      <nav style={{
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 24px', height: '56px',
+        background: 'rgba(9,9,11,0.85)', backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        <span style={{ fontWeight: 600, fontSize: '15px', letterSpacing: '-0.02em' }}>SellSight</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ width: '26px', height: '26px', background: 'linear-gradient(135deg, var(--accent), #8B5CF6)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FileText size={13} color="#fff" />
-          </div>
-          <span style={{ fontWeight: '700', fontSize: '15px', letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>SellSight</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <a href="#how-it-works" style={{ padding: '6px 14px', borderRadius: '6px', color: 'var(--text-tertiary)', fontSize: '13px', textDecoration: 'none' }}>How it works</a>
-          <a href="#features" style={{ padding: '6px 14px', borderRadius: '6px', color: 'var(--text-tertiary)', fontSize: '13px', textDecoration: 'none' }}>Features</a>
-          <a href="#pricing" style={{ padding: '6px 14px', borderRadius: '6px', color: 'var(--text-tertiary)', fontSize: '13px', textDecoration: 'none' }}>Pricing</a>
-          <Link href="/sign-in" style={{ padding: '6px 14px', borderRadius: '6px', color: 'var(--text-tertiary)', fontSize: '13px', textDecoration: 'none' }}>Sign in</Link>
-          <Link href="/sign-up" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 16px', background: 'linear-gradient(135deg, var(--accent), #7C3AED)', boxShadow: '0 0 14px var(--accent-subtle)', borderRadius: '7px', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>
-            Start Free <ArrowRight size={13} />
-          </Link>
+          <Link href="/sign-in" style={{
+            padding: '8px 16px', borderRadius: '6px',
+            color: 'rgba(255,255,255,0.56)', fontSize: '13px', fontWeight: 500,
+            textDecoration: 'none',
+          }}>Sign in</Link>
+          <Link href="/sign-up" style={{
+            display: 'inline-flex', alignItems: 'center', gap: '6px',
+            padding: '0 18px', height: '36px', background: '#5B5BD6',
+            borderRadius: '6px', color: '#fff', fontSize: '13px', fontWeight: 500,
+            textDecoration: 'none',
+          }}>Start free &rarr;</Link>
         </div>
       </nav>
 
-      {/* ── HERO ─────────────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, paddingTop: '160px', paddingBottom: '80px', textAlign: 'center', maxWidth: '760px', margin: '0 auto', padding: '160px 32px 80px' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 12px', background: 'var(--accent-subtle)', border: '1px solid var(--border)', borderRadius: '100px', fontSize: '12px', color: 'var(--accent)', fontWeight: '600', marginBottom: '28px' }}>
-          <Brain size={11} />
-          Autonomous sales intelligence
-        </div>
-        <h1 style={{ fontSize: '58px', fontWeight: '800', letterSpacing: '-0.05em', lineHeight: '1.06', marginBottom: '22px', color: 'var(--text-primary)' }}>
-          An AI brain that runs<br />your sales intelligence
-        </h1>
-        <p style={{ fontSize: '18px', color: 'var(--text-secondary)', lineHeight: '1.7', marginBottom: '36px', maxWidth: '560px', margin: '0 auto 36px' }}>
-          SellSight learns from every deal you close, identifies risks and opportunities autonomously, and creates the collateral your team needs — before they ask for it.
-        </p>
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link href="/sign-up" style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '12px 24px', background: 'linear-gradient(135deg, var(--accent), #7C3AED)', boxShadow: 'var(--shadow-lg)', borderRadius: '9px', color: '#fff', fontSize: '14px', fontWeight: '700', textDecoration: 'none' }}>
-            Start for free <ArrowRight size={14} />
-          </Link>
-          <a href="#how-it-works" style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '12px 24px', background: 'var(--surface)', backdropFilter: 'blur(12px)', border: '1px solid var(--border)', borderRadius: '9px', color: 'var(--accent)', fontSize: '14px', fontWeight: '500', textDecoration: 'none' }}>
-            See how it works
-          </a>
-        </div>
-        <p style={{ marginTop: '18px', fontSize: '12px', color: 'var(--text-tertiary)' }}>Free forever · No credit card required · Set up in under 10 minutes</p>
-      </section>
+      <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 24px' }}>
 
-      {/* ── APP PREVIEW ─────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '1000px', margin: '0 auto', padding: '0 32px 80px' }}>
-        <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden', boxShadow: 'var(--shadow-lg)' }}>
-          <div style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--border-strong)' }} />
-            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--border-strong)' }} />
-            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--border-strong)' }} />
-            <div style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--text-tertiary)' }}>sellsight.app/dashboard</div>
+        {/* ── Hero ──────────────────────────────────────────────── */}
+        <section style={{ paddingTop: '160px', paddingBottom: '120px', maxWidth: '720px' }}>
+          <h1 style={{
+            fontSize: '48px', fontWeight: 600, letterSpacing: '-0.035em',
+            lineHeight: 1.1, marginBottom: '24px',
+          }}>Your CRM stores data.<br />We read it.</h1>
+          <p style={{
+            fontSize: '17px', color: 'rgba(255,255,255,0.56)',
+            lineHeight: 1.7, marginBottom: '16px', maxWidth: '600px',
+          }}>
+            Every meeting note your team writes contains buying signals, risk patterns, and competitive intelligence. SellSight extracts them, scores every deal against your own win/loss history, and tells you exactly what to do about it.
+          </p>
+          <p style={{
+            fontSize: '15px', color: 'rgba(255,255,255,0.40)',
+            lineHeight: 1.7, marginBottom: '40px', maxWidth: '600px',
+          }}>
+            Not industry benchmarks. Not generic AI. Intelligence trained on what winning looks like for your team.
+          </p>
+          <Link href="/sign-up" style={{
+            display: 'inline-flex', alignItems: 'center', gap: '8px',
+            padding: '0 24px', height: '44px', background: '#5B5BD6',
+            borderRadius: '6px', color: '#fff', fontSize: '14px', fontWeight: 500,
+            textDecoration: 'none',
+          }}>Start free &rarr;</Link>
+        </section>
+
+        {/* ── The Problem ──────────────────────────────────────── */}
+        <section style={{ paddingBottom: '120px' }}>
+          <h2 style={{
+            fontSize: '32px', fontWeight: 600, letterSpacing: '-0.03em',
+            marginBottom: '40px',
+          }}>The Problem</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '640px' }}>
+            {[
+              'Your forecast is a spreadsheet of optimism.',
+              'Your reps self-report deal status.',
+              'Nobody reads the meeting notes except the rep who wrote them.',
+            ].map((line) => (
+              <div key={line} style={{
+                background: '#141416', borderRadius: '8px',
+                padding: '20px 24px', fontSize: '16px',
+                color: 'rgba(255,255,255,0.56)', lineHeight: 1.6,
+              }}>{line}</div>
+            ))}
           </div>
-          <div style={{ display: 'flex', height: '500px' }}>
-            {/* Sidebar */}
-            <div style={{ width: '188px', padding: '12px 8px', borderRight: '1px solid var(--border)', flexShrink: 0, background: 'var(--surface)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <div style={{ padding: '6px 10px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '22px', height: '22px', background: 'linear-gradient(135deg, var(--accent), #8B5CF6)', borderRadius: '6px', flexShrink: 0 }} />
-                <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>SellSight</span>
-              </div>
-              {[['Dashboard', true], ['Pipeline', false], ['Collateral', false], ['Intelligence', false], ['Company', false]].map(([label, active]) => (
-                <div key={String(label)} style={{ padding: '6px 10px', borderRadius: '6px', fontSize: '12px', color: active ? 'var(--accent)' : 'var(--text-tertiary)', background: active ? 'var(--accent-subtle)' : 'transparent', border: active ? '1px solid var(--border)' : '1px solid transparent', display: 'flex', alignItems: 'center', gap: '7px' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: active ? 'var(--accent-subtle)' : 'var(--border)', flexShrink: 0 }} />
-                  {String(label)}
-                </div>
-              ))}
-            </div>
+        </section>
 
-            {/* Main */}
-            <div style={{ flex: 1, padding: '16px 20px', overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        {/* ── How It Works ─────────────────────────────────────── */}
+        <section style={{ paddingBottom: '120px' }}>
+          <h2 style={{
+            fontSize: '32px', fontWeight: 600, letterSpacing: '-0.03em',
+            marginBottom: '48px',
+          }}>How It Works</h2>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', maxWidth: '720px' }}>
+            {[
+              {
+                num: '1',
+                title: 'Paste meeting notes',
+                desc: 'Signals extracted automatically — champion identified, budget status, risks, competitive mentions, product gaps.',
+              },
+              {
+                num: '2',
+                title: 'ML scores every deal',
+                desc: 'Win probability trained on your closed deals, not industry data. Every score is pure math from your own history.',
+              },
+              {
+                num: '3',
+                title: 'Morning briefing',
+                desc: 'Specific actions for each deal, every day. Which deals need attention, what changed overnight, and exactly what to do next.',
+              },
+            ].map(({ num, title, desc }) => (
+              <div key={num} style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+                <div style={{
+                  width: '32px', height: '32px', borderRadius: '8px',
+                  background: '#141416', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', fontSize: '14px', fontWeight: 600,
+                  color: '#5B5BD6', flexShrink: 0,
+                }}>{num}</div>
                 <div>
-                  <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>Good morning, Rees</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '1px' }}>6 open deals · 3 need attention today</div>
-                </div>
-                <div style={{ display: 'flex', gap: '5px' }}>
-                  <div style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '10px', fontWeight: '600', color: '#fff', background: 'linear-gradient(135deg, var(--accent), #7C3AED)', boxShadow: '0 0 10px var(--accent-subtle)' }}>✦ AI Briefing</div>
-                </div>
-              </div>
-
-              {/* AI Briefing */}
-              <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px', boxShadow: 'var(--shadow-sm)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                  <div style={{ width: '18px', height: '18px', borderRadius: '5px', background: 'var(--accent-subtle)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px' }}>✦</div>
-                  <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-primary)' }}>Today&apos;s briefing</span>
-                  <span style={{ fontSize: '9px', color: 'var(--accent)', background: 'var(--accent-subtle)', border: '1px solid var(--border)', padding: '1px 6px', borderRadius: '100px' }}>ML-scored · updated nightly</span>
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.55', marginBottom: '8px' }}>
-                  Pipeline healthy at £148k ARR across 6 deals. Acme Corp (score 71) is your highest-value opportunity — send the proposal today. Notion has gone quiet for 14 days; follow up or mark at risk.
-                </div>
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '7px', padding: '7px 10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <div style={{ fontSize: '9px', color: 'var(--accent)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>⚡ Priority actions</div>
-                  {['Send proposal to Acme Corp (£32k · score 71 · Negotiation)', 'Follow up Notion — 14 days silent, score dropped to 38', 'Stripe discovery call booked Thu — review battlecard vs Salesforce'].map((a, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '5px' }}>
-                      <div style={{ width: '9px', height: '9px', borderRadius: '50%', border: '1px solid var(--border-strong)', flexShrink: 0, marginTop: '1px' }} />
-                      <span style={{ fontSize: '10px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>{a}</span>
-                    </div>
-                  ))}
+                  <div style={{
+                    fontSize: '16px', fontWeight: 600, marginBottom: '6px',
+                    color: 'rgba(255,255,255,0.93)',
+                  }}>{title}</div>
+                  <div style={{
+                    fontSize: '14px', color: 'rgba(255,255,255,0.56)', lineHeight: 1.7,
+                  }}>{desc}</div>
                 </div>
               </div>
+            ))}
+          </div>
 
-              {/* KPIs + deal strip */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '7px' }}>
-                {[['Pipeline', '£148k ARR', '#8B5CF6', true], ['Won (90d)', '£89k', '#22C55E', false], ['Win Rate', '68%', '#6366F1', false], ['Avg Close', '38 days', '#F59E0B', false]].map(([label, val, color, feat]) => (
-                  <div key={String(label)} style={{ background: feat ? 'var(--card-bg)' : 'var(--surface)', border: `1px solid ${feat ? 'var(--border-strong)' : 'var(--border)'}`, borderRadius: '8px', padding: '10px 11px', boxShadow: feat ? 'var(--shadow-sm)' : 'none' }}>
-                    <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>{String(label)}</div>
-                    <div style={{ fontSize: '15px', fontWeight: '700', color: String(color), letterSpacing: '-0.03em', lineHeight: 1 }}>{String(val)}</div>
-                  </div>
-                ))}
-              </div>
+          <div style={{
+            marginTop: '48px', background: '#141416', borderRadius: '8px',
+            padding: '20px 24px', maxWidth: '720px',
+          }}>
+            <p style={{
+              fontSize: '15px', color: 'rgba(255,255,255,0.56)',
+              lineHeight: 1.7, marginBottom: '8px',
+            }}>
+              The LLM extracts. The ML predicts. The LLM explains.
+            </p>
+            <p style={{
+              fontSize: '14px', color: 'rgba(255,255,255,0.40)', lineHeight: 1.6,
+            }}>
+              No score is ever generated by AI — it&apos;s pure math from your own data.
+            </p>
+          </div>
+        </section>
 
-              {/* Deal list */}
-              <div style={{ background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden', flex: 1 }}>
-                <div style={{ padding: '7px 12px', borderBottom: '1px solid var(--border)', fontSize: '10px', fontWeight: '600', color: 'var(--text-tertiary)' }}>Open deals — sorted by AI score</div>
+        {/* ── Pricing ──────────────────────────────────────────── */}
+        <section style={{ paddingBottom: '120px' }}>
+          <h2 style={{
+            fontSize: '32px', fontWeight: 600, letterSpacing: '-0.03em',
+            marginBottom: '48px',
+          }}>Pricing</h2>
+
+          <div data-pricing-grid="" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: '16px',
+          }}>
+            {/* Free */}
+            <div style={{
+              background: '#141416', borderRadius: '8px', padding: '32px 28px',
+              display: 'flex', flexDirection: 'column',
+            }}>
+              <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px', color: 'rgba(255,255,255,0.56)' }}>Free</div>
+              <div style={{ fontSize: '36px', fontWeight: 600, letterSpacing: '-0.03em', marginBottom: '4px' }}>&pound;0</div>
+              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.40)', marginBottom: '28px' }}>For getting started</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px', flex: 1 }}>
                 {[
-                  ['Acme Corp', '£32k', 71, '#22C55E', 'Negotiation', '↑ Strong'],
-                  ['Stripe', '£18k', 58, '#F59E0B', 'Discovery', '→ Steady'],
-                  ['Notion', '£24k', 38, '#EF4444', 'Proposal', '↓ Stalling'],
-                ].map(([co, val, score, color, stage, trend], i) => (
-                  <div key={String(co)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 12px', borderBottom: i < 2 ? '1px solid var(--border)' : 'none' }}>
-                    <div style={{ width: '26px', height: '26px', borderRadius: '7px', background: `${String(color)}15`, border: `1px solid ${String(color)}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: String(color), flexShrink: 0 }}>{Number(score)}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '11px', color: 'var(--text-primary)', fontWeight: '600' }}>{String(co)}</div>
-                      <div style={{ fontSize: '9px', color: 'var(--text-tertiary)' }}>{String(stage)}</div>
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: '700' }}>{String(val)}</div>
-                    <span style={{ fontSize: '9px', color: String(color), background: `${String(color)}12`, padding: '2px 6px', borderRadius: '100px', flexShrink: 0 }}>{String(trend)}</span>
+                  '5 deals',
+                  'Text signal extraction',
+                  'Manual deal scoring',
+                  'Basic pipeline view',
+                ].map((f) => (
+                  <div key={f} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <span style={{ color: '#5B5BD6', fontSize: '14px', lineHeight: '20px', flexShrink: 0 }}>&check;</span>
+                    <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.56)', lineHeight: '20px' }}>{f}</span>
                   </div>
                 ))}
               </div>
+              <Link href="/sign-up" style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                height: '44px', borderRadius: '6px',
+                border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.93)',
+                fontSize: '13px', fontWeight: 500, textDecoration: 'none',
+              }}>Get started</Link>
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* ── HOW IT WORKS ──────────────────────────────────────────────────────── */}
-      <section id="how-it-works" style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '56px' }}>
-          <h2 style={{ fontSize: '34px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '12px', color: 'var(--text-primary)' }}>Three steps. Then it runs itself.</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '15px', maxWidth: '500px', margin: '0 auto', lineHeight: '1.65' }}>Set up once, then let the brain do the work. It rebuilds every 4 hours for active workspaces.</p>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-          {[
-            {
-              n: '01', icon: '🏢', title: 'Set up your company profile',
-              desc: 'Add your product, value props, and competitors. Takes 10 minutes. The brain immediately generates your first battlecards, objection handlers, and talk tracks.',
-            },
-            {
-              n: '02', icon: '📋', title: 'Log deals and paste your notes',
-              desc: 'After each meeting, paste in your notes. The brain extracts intelligence, scores the deal, identifies risks, and tracks competitors — all automatically.',
-            },
-            {
-              n: '03', icon: '🧠', title: 'The brain works autonomously',
-              desc: 'Proactive alerts when deals stall. Auto-generated collateral when patterns shift. ML models that improve with every outcome. It never stops learning.',
-            },
-          ].map(({ n, icon, title, desc }) => (
-            <div key={n} style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid var(--card-border)', borderRadius: '14px', padding: '26px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '2px' }}>
-                <div style={{ fontSize: '22px', lineHeight: 1 }}>{icon}</div>
-                <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-tertiary)', fontFamily: 'monospace', letterSpacing: '0.05em' }}>{n}</span>
+            {/* Starter — highlighted */}
+            <div style={{
+              background: '#141416', borderRadius: '8px', padding: '32px 28px',
+              display: 'flex', flexDirection: 'column',
+              border: '1px solid #5B5BD6',
+              position: 'relative',
+            }}>
+              <div style={{
+                position: 'absolute', top: '-12px', left: '24px',
+                background: '#5B5BD6', color: '#fff',
+                fontSize: '11px', fontWeight: 600,
+                padding: '4px 12px', borderRadius: '100px',
+              }}>Most popular</div>
+              <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px', color: 'rgba(255,255,255,0.56)' }}>Starter</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '36px', fontWeight: 600, letterSpacing: '-0.03em' }}>&pound;79</span>
+                <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.40)' }}>/mo</span>
               </div>
-              <div style={{ fontSize: '15px', fontWeight: '700', letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>{title}</div>
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.65' }}>{desc}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── THE DEAL VIEW ─────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', alignItems: 'center' }}>
-          {/* Left: copy */}
-          <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: 'var(--accent-subtle)', border: '1px solid var(--border)', borderRadius: '100px', fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginBottom: '20px' }}>
-              <Target size={10} />
-              Every deal, intelligently scored
-            </div>
-            <h2 style={{ fontSize: '30px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '16px', color: 'var(--text-primary)', lineHeight: '1.15' }}>
-              Paste your notes.<br />Get a scored deal back.
-            </h2>
-            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.7', marginBottom: '20px' }}>
-              After every meeting, paste your notes into SellSight. The brain extracts action items, surfaces risks, identifies product gaps, and scores the deal — using models trained on your own win history.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {[
-                { icon: '🎯', label: 'Deal score', desc: 'Win probability trained on your closed deals — not industry benchmarks' },
-                { icon: '⚡', label: 'Action items extracted', desc: 'Todos auto-pulled from notes and added to your deal' },
-                { icon: '⚠️', label: 'Risk flags', desc: 'Observable signals from this meeting only — no hallucinated assumptions' },
-                { icon: '🏁', label: 'Competitor tracking', desc: 'Competitors mentioned in notes logged automatically to your W/L record' },
-              ].map(({ icon, label, desc }) => (
-                <div key={label} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                  <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'var(--accent-subtle)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0 }}>{icon}</div>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '2px' }}>{label}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>{desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Right: deal card mockup */}
-          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {/* Deal header */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '2px' }}>Acme Corp</div>
-                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>Sarah Chen · VP Product · £32,000</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '26px', fontWeight: '800', color: 'var(--success)', letterSpacing: '-0.04em', lineHeight: 1 }}>71</div>
-                <div style={{ fontSize: '8px', color: 'var(--success)', marginTop: '1px' }}>Win probability</div>
-              </div>
-            </div>
-
-            {/* Score insights */}
-            <div style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)', borderRadius: '8px', padding: '10px 12px' }}>
-              <div style={{ fontSize: '9px', color: 'var(--success)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Score Insights</div>
-              {['Champion confirmed: Sarah advocating internally for SellSight', 'Budget approved — finance sign-off confirmed in last call', 'Evaluating Salesforce: our win rate vs Salesforce is 70%'].map((ins, i) => (
-                <div key={i} style={{ fontSize: '10px', color: 'var(--text-secondary)', lineHeight: '1.4', marginBottom: i < 2 ? '4px' : 0 }}>• {ins}</div>
-              ))}
-            </div>
-
-            {/* Risks */}
-            <div style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: '8px', padding: '10px 12px' }}>
-              <div style={{ fontSize: '9px', color: 'var(--warning)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Risk Signals</div>
-              {['No formal close date set', 'Legal review not yet started'].map((r, i) => (
-                <div key={i} style={{ fontSize: '10px', color: 'var(--warning)', lineHeight: '1.4', marginBottom: i < 1 ? '3px' : 0 }}>⚠ {r}</div>
-              ))}
-            </div>
-
-            {/* Todos */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 12px' }}>
-              <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Auto-extracted actions</div>
-              {['Send pricing deck with enterprise tier breakdown', 'Schedule legal review intro call', 'Share Acme case study with Sarah before Friday'].map((t, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginBottom: i < 2 ? '4px' : 0 }}>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', border: '1px solid var(--border-strong)', flexShrink: 0, marginTop: '2px' }} />
-                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>{t}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Stage badge */}
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <span style={{ fontSize: '10px', color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '3px 9px', borderRadius: '100px', fontWeight: '600' }}>Negotiation</span>
-              <span style={{ fontSize: '10px', color: 'var(--accent)', background: 'var(--accent-subtle)', border: '1px solid var(--border)', padding: '3px 9px', borderRadius: '100px' }}>Similar to 3 won deals</span>
-              <span style={{ fontSize: '10px', color: 'var(--success)', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)', padding: '3px 9px', borderRadius: '100px' }}>Close: ~12 days</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── THE INTELLIGENCE ENGINE ────────────────────────────────────────────── */}
-      <section id="intelligence" style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
-
-        <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 12px', background: 'var(--accent-subtle)', border: '1px solid var(--border)', borderRadius: '100px', fontSize: '12px', color: 'var(--accent)', fontWeight: '600', marginBottom: '20px' }}>
-            <Brain size={11} />
-            One brain, three capabilities
-          </div>
-          <h2 style={{ fontSize: '36px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '16px', color: 'var(--text-primary)' }}>
-            It reads. It learns.<br />It acts on its own.
-          </h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '16px', lineHeight: '1.7', maxWidth: '560px', margin: '0 auto' }}>
-            Three autonomous capabilities working together — reading your deals, learning from your outcomes, and taking action before you have to ask.
-          </p>
-        </div>
-
-        {/* Three layer cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '40px' }}>
-          {[
-            {
-              num: '1', icon: '📡', color: '#6366F1',
-              title: 'Reads and understands',
-              badge: 'Auto-extraction',
-              desc: 'Every meeting note is scanned for buying signals, risks, stall signs, competitor mentions, and product gaps. No forms, no tagging — just paste your notes and the brain extracts what matters.',
-              outputs: ['Champion and budget status', 'Risk signals and stall indicators', 'Competitor mentions logged to W/L', 'Product gaps tracked automatically'],
-            },
-            {
-              num: '2', icon: '🤖', color: '#8B5CF6',
-              title: 'Learns and predicts',
-              badge: 'Private ML models',
-              desc: 'Every closed deal trains your private models. Win probability, stage stall detection, close-date prediction, and competitive win conditions all improve as your history grows. Your data never trains anyone else.',
-              outputs: ['Win probability per deal', 'Deals likely to stall', 'Predicted close dates', 'Per-competitor win conditions'],
-            },
-            {
-              num: '3', icon: '✦', color: '#A78BFA',
-              title: 'Acts autonomously',
-              badge: 'Proactive intelligence',
-              desc: 'The brain doesn\'t wait for you to ask. It proactively generates collateral when patterns shift, alerts you to risks before deals slip, and tells you exactly what to do next — every morning.',
-              outputs: ['Daily pipeline briefing', 'Auto-generated battlecards', 'Stall alerts before deals slip', 'Recommended next actions'],
-            },
-          ].map(({ num, icon, color, title, badge, desc, outputs }) => (
-            <div key={num} style={{ background: 'var(--card-bg)', border: `1px solid ${color}25`, borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '14px', position: 'relative', overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: `linear-gradient(90deg, ${color}80, transparent)` }} />
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: `${color}18`, border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>{icon}</div>
-                <span style={{ fontSize: '9px', fontWeight: '700', color, background: `${color}14`, border: `1px solid ${color}25`, padding: '2px 8px', borderRadius: '100px' }}>{badge}</span>
-              </div>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '6px', letterSpacing: '-0.02em' }}>{title}</div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.65' }}>{desc}</div>
-              </div>
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 12px' }}>
-                <div style={{ fontSize: '9px', fontWeight: '700', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>Outputs</div>
-                {outputs.map((o, i) => (
-                  <div key={i} style={{ fontSize: '10.5px', color: 'var(--accent)', marginBottom: i < outputs.length - 1 ? '3px' : 0 }}>→ {o}</div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* What the brain does — outcomes */}
-        <div style={{ background: 'var(--accent-subtle)', border: '1px solid var(--border)', borderRadius: '16px', padding: '36px' }}>
-          <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'var(--accent-subtle)', border: '1px solid var(--border)', borderRadius: '20px', padding: '4px 12px', marginBottom: '14px' }}>
-              <Brain size={11} color="var(--accent)" />
-              <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>What the brain does</span>
-            </div>
-            <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-primary)', letterSpacing: '-0.03em', marginBottom: '8px' }}>Five things happening autonomously, every night</div>
-            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '520px', margin: '0 auto' }}>Private ML models trained exclusively on your closed deal history. No shared infrastructure.</div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            {[
-              { icon: '🎯', title: 'Scores every deal nightly with YOUR win probability', detail: 'Each open deal gets a 0-100 score trained on your own closed deals. Not benchmarks — your conversion patterns.' },
-              { icon: '⚠️', title: 'Flags stalling deals before they slip', detail: 'Knows how long your deals normally spend in each stage. Alerts you the moment something takes longer than your baseline.' },
-              { icon: '🏆', title: 'Learns per-competitor win conditions from your record', detail: 'A separate model per competitor. Learns what signals predict beating Salesforce vs. HubSpot — and your battlecards reflect it.' },
-              { icon: '📅', title: 'Predicts close dates driving probability-weighted forecasts', detail: 'Trained on your won deals to predict days-to-close for every open deal. Your pipeline forecast uses real probabilities, not gut feel.' },
-              { icon: '📈', title: 'Detects trends before they show in your numbers', detail: 'Win rate improving? Close times slowing? Losing more against a specific rival? The brain spots it across monthly cohorts before it becomes a missed quarter.' },
-            ].map(({ icon, title, detail }) => (
-              <div key={title} style={{ display: 'flex', gap: '12px', padding: '14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' }}>
-                <div style={{ fontSize: '18px', flexShrink: 0, paddingTop: '2px' }}>{icon}</div>
-                <div>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--accent)', marginBottom: '4px', letterSpacing: '-0.01em' }}>{title}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.55' }}>{detail}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-      </section>
-
-      {/* ── PIPELINE INTELLIGENCE ─────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-          <h2 style={{ fontSize: '32px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '12px', color: 'var(--text-primary)' }}>
-            Autonomous pipeline intelligence
-          </h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '15px', maxWidth: '500px', margin: '0 auto', lineHeight: '1.65' }}>
-            The brain surfaces patterns across your entire pipeline — proactively, without you asking.
-          </p>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-          {[
-            { icon: '📊', title: 'Probability-weighted forecast, rebuilt nightly', desc: 'Your pipeline value multiplied by actual win probability per deal — not a made-up 30% multiplier. The brain recalculates every night as deals move.', badge: 'Auto-updating', badgeColor: '#8B5CF6' },
-            { icon: '🧑‍💼', title: 'Rep performance surfaced autonomously', desc: 'Win rate, to-do completion, deals with a next step, and days since last note — per rep. Generated every morning without a manager lifting a finger.', badge: 'Per-rep stats', badgeColor: '#6366F1' },
-            { icon: '⏰', title: 'Follow-up cadence learned from your wins', desc: 'The brain learns how long deals in each stage can go silent before going cold — based on your own won deals. Alerts you before the silence becomes a problem.', badge: 'Cadence intelligence', badgeColor: '#22C55E' },
-            { icon: '🏆', title: 'Objections you\'ve beaten before', desc: 'Budget concern on this deal? The brain shows every time you\'ve faced that objection — and whether you closed anyway. Autonomously matched and surfaced.', badge: 'Objection Win Map', badgeColor: '#F59E0B' },
-            { icon: '⚠️', title: 'Deterioration detected automatically', desc: 'The brain compares recent note sentiment against earlier ones — flags deals going quiet or where engagement is dropping before they ghost you.', badge: 'Proactive alerts', badgeColor: '#EF4444' },
-            { icon: '💬', title: 'Ask anything about your pipeline', desc: '"Which deals have budget concerns?" "Show me our win rate vs Salesforce this quarter." Answers grounded in your actual data, instantly.', badge: 'AI Chat', badgeColor: '#A78BFA' },
-          ].map(({ icon, title, desc, badge, badgeColor }) => (
-            <div key={title} style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-                <div style={{ fontSize: '22px', lineHeight: 1 }}>{icon}</div>
-                <div style={{ fontSize: '9px', fontWeight: '700', color: badgeColor, background: `${badgeColor}14`, border: `1px solid ${badgeColor}30`, padding: '2px 7px', borderRadius: '100px', whiteSpace: 'nowrap' }}>{badge}</div>
-              </div>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{title}</div>
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.6', flex: 1 }}>{desc}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── INDUSTRY INTELLIGENCE ─────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', alignItems: 'center' }}>
-          <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: 'var(--accent-subtle)', border: '1px solid var(--border)', borderRadius: '100px', fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginBottom: '20px' }}>
-              <Brain size={10} />
-              Industry Intelligence
-            </div>
-            <h2 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '14px', color: 'var(--text-primary)', lineHeight: '1.2' }}>
-              See how you stack up<br />against the industry
-            </h2>
-            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.7', marginBottom: '20px' }}>
-              Opt in and your performance benchmarks anonymously against similar deals across the platform — giving you an industry win rate, close-speed comparison, and per-objection benchmark to measure against. Zero identifying information ever leaves your workspace.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-              {[
-                'New workspace? Get ML predictions from day one based on industry patterns',
-                'See your win rate vs. industry median — and exactly how far above or below',
-                'Compare your close speed to the industry median and 75th percentile',
-                'Per-objection benchmarks: is your budget-concern win rate above or below average?',
-              ].map((item, i) => (
-                <div key={i} style={{ display: 'flex', gap: '9px', fontSize: '13px', color: 'var(--text-secondary)', alignItems: 'flex-start' }}>
-                  <CheckCircle size={13} color="var(--accent)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                  {item}
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {['Opt-in only', 'Zero PII', 'GDPR Art.17 erasure', 'One-way anonymisation'].map(tag => (
-                <div key={tag} style={{ fontSize: '11px', color: 'var(--accent)', background: 'var(--accent-subtle)', border: '1px solid var(--border)', padding: '3px 9px', borderRadius: '100px' }}>{tag}</div>
-              ))}
-            </div>
-          </div>
-
-          {/* Industry benchmark mockup */}
-          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>vs Industry</div>
-
-            {/* Win rate comparison */}
-            <div style={{ background: 'var(--accent-subtle)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' }}>
-              <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Win rate</div>
-              <div style={{ marginBottom: '6px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Your team</span>
-                  <span style={{ fontSize: '11px', color: 'var(--success)', fontWeight: '700' }}>68%</span>
-                </div>
-                <div style={{ height: '5px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden', marginBottom: '6px' }}>
-                  <div style={{ height: '100%', width: '68%', background: 'var(--success)', borderRadius: '3px' }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
-                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Industry median</span>
-                  <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: '600' }}>52%</span>
-                </div>
-                <div style={{ height: '5px', background: 'var(--border)', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: '52%', background: 'var(--accent)', borderRadius: '3px' }} />
-                </div>
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--success)', fontWeight: '600' }}>▲ 16pts above industry median</div>
-            </div>
-
-            {/* Objection benchmarks */}
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' }}>
-              <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Objection Win Map vs Industry</div>
-              {[
-                { theme: 'budget concerns', yours: 61, industry: 48, delta: 13 },
-                { theme: 'competitor pressure', yours: 55, industry: 51, delta: 4 },
-                { theme: 'timeline slippage', yours: 38, industry: 44, delta: -6 },
-              ].map(({ theme, yours, industry, delta }) => {
-                const deltaColor = delta >= 5 ? 'var(--success)' : delta <= -5 ? 'var(--danger)' : 'var(--text-secondary)'
-                return (
-                  <div key={theme} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
-                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)', flex: 1, textTransform: 'capitalize' }}>{theme}</span>
-                    <span style={{ fontSize: '11px', color: 'var(--text-primary)', fontWeight: '700', width: '28px', textAlign: 'right' }}>{yours}%</span>
-                    <span style={{ fontSize: '10px', color: deltaColor, fontWeight: '600', width: '44px', textAlign: 'right' }}>
-                      {delta >= 5 ? `▲ +${delta}` : delta <= -5 ? `▼ ${delta}` : `≈ ${industry}%`}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-
-            <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', textAlign: 'center' }}>Based on 2,400+ anonymised industry deals · Updated nightly</div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── COMPETITIVE INTELLIGENCE ─────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', alignItems: 'center' }}>
-          <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '100px', fontSize: '11px', color: 'var(--success)', fontWeight: '600', marginBottom: '20px' }}>
-              <Shield size={10} />
-              Competitive intelligence
-            </div>
-            <h2 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '14px', color: 'var(--text-primary)', lineHeight: '1.2' }}>
-              Know why you&apos;re winning —<br />and why you&apos;re losing
-            </h2>
-            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.7', marginBottom: '20px' }}>
-              Every deal note that mentions a competitor automatically updates your win/loss record. After a few deals, you&apos;ll know whether you beat Salesforce on budget, on features, or on speed — and your battlecards will say exactly that.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {[
-                'Live W/L record updated automatically from meeting notes',
-                'Per-competitor ML model — what signals predict beating each rival',
-                'Battlecards auto-regenerate when competitive patterns shift',
-                'Losing streak alerts — flag when the same competitor beats you twice',
-              ].map((item, i) => (
-                <div key={i} style={{ display: 'flex', gap: '9px', fontSize: '13px', color: 'var(--text-secondary)', alignItems: 'flex-start' }}>
-                  <CheckCircle size={13} color="var(--success)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Competitor record mockup */}
-          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Competitor win/loss record</div>
-            {[
-              { name: 'Salesforce', w: 7, l: 3, winCondition: 'You win on speed + price. Lead with ROI.' },
-              { name: 'HubSpot', w: 4, l: 4, winCondition: 'Even record. Champion presence key differentiator.' },
-              { name: 'Pipedrive', w: 5, l: 1, winCondition: 'Strong lead. Win on reporting + intelligence.' },
-            ].map(({ name, w, l, winCondition }) => {
-              const pct = Math.round((w / (w + l)) * 100)
-              const color = pct >= 60 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)'
-              return (
-                <div key={name} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>{name}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--success)', fontWeight: '700', fontFamily: 'monospace' }}>{w}W</div>
-                    <div style={{ fontSize: '9px', color: 'var(--text-tertiary)' }}>·</div>
-                    <div style={{ fontSize: '11px', color: 'var(--danger)', fontWeight: '700', fontFamily: 'monospace' }}>{l}L</div>
-                    <div style={{ fontSize: '13px', fontWeight: '800', color, minWidth: '36px', textAlign: 'right' }}>{pct}%</div>
-                  </div>
-                  <div style={{ width: '100%', height: '3px', background: 'var(--border)', borderRadius: '100px', marginBottom: '6px' }}>
-                    <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '100px' }} />
-                  </div>
-                  <div style={{ fontSize: '10px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>📌 {winCondition}</div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ── PRODUCT GAPS ─────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', alignItems: 'center' }}>
-          {/* Product gap mockup */}
-          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--warning)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Product gaps — auto-extracted from deals</div>
-            {[
-              { title: 'HubSpot native sync', freq: 4, revenue: '£89k', priority: 'critical', priorityColor: '#EF4444' },
-              { title: 'Custom reporting builder', freq: 3, revenue: '£62k', priority: 'high', priorityColor: '#F59E0B' },
-              { title: 'Mobile app', freq: 2, revenue: '£41k', priority: 'medium', priorityColor: '#8B5CF6' },
-            ].map(({ title, freq, revenue, priority, priorityColor }) => (
-              <div key={title} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '9px', padding: '12px 14px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>{title}</div>
-                  <span style={{ fontSize: '9px', color: priorityColor, background: `${priorityColor}14`, border: `1px solid ${priorityColor}30`, padding: '2px 7px', borderRadius: '100px', fontWeight: '700' }}>{priority}</span>
-                </div>
-                <div style={{ display: 'flex', gap: '12px', fontSize: '10px', color: 'var(--text-tertiary)' }}>
-                  <span>{freq} deals mentioning this</span>
-                  <span style={{ color: 'var(--warning)' }}>{revenue} affected revenue</span>
-                </div>
-              </div>
-            ))}
-            <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', textAlign: 'center', paddingTop: '4px' }}>Pulled automatically from meeting notes · Updated per deal</div>
-          </div>
-
-          <div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 10px', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '100px', fontSize: '11px', color: 'var(--warning)', fontWeight: '600', marginBottom: '20px' }}>
-              <AlertTriangle size={10} />
-              Product gap intelligence
-            </div>
-            <h2 style={{ fontSize: '28px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '14px', color: 'var(--text-primary)', lineHeight: '1.2' }}>
-              Turn lost deals into<br />your product roadmap
-            </h2>
-            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.7', marginBottom: '20px' }}>
-              Every time a prospect says your product is missing something, the brain extracts and tracks it automatically. You get a prioritised list of product gaps — ranked by how many deals they appear in and how much revenue they put at risk.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {[
-                'Auto-extracted from meeting notes — no manual tagging needed',
-                'Ranked by frequency × affected revenue',
-                'Links back to source deals so you can talk to the prospects',
-                'Status workflow: open → in review → on roadmap → shipped',
-              ].map((item, i) => (
-                <div key={i} style={{ display: 'flex', gap: '9px', fontSize: '13px', color: 'var(--text-secondary)', alignItems: 'flex-start' }}>
-                  <CheckCircle size={13} color="var(--warning)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── FEATURES TAB ─────────────────────────────────────────────────────── */}
-      <FeaturesTab />
-
-      {/* ── ROI CALCULATOR ───────────────────────────────────────────────────── */}
-      <ROICalc />
-
-      {/* ── COLLATERAL TYPES ─────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-          <h2 style={{ fontSize: '32px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '12px', color: 'var(--text-primary)' }}>
-            Collateral the brain creates for you
-          </h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '15px', maxWidth: '480px', margin: '0 auto' }}>Six types of sales collateral — generated autonomously and rebuilt when your deal data changes.</p>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-          {COLLATERAL_TYPES.map(({ icon: Icon, label, desc }) => (
-            <div key={label} style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '22px' }}>
-              <div style={{ width: '34px', height: '34px', background: 'var(--accent-subtle)', border: '1px solid var(--border)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
-                <Icon size={15} color="var(--accent)" />
-              </div>
-              <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '6px', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>{label}</div>
-              <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>{desc}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── BEFORE / AFTER ───────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-          <h2 style={{ fontSize: '32px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '12px', color: 'var(--text-primary)' }}>Before and after</h2>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-          <div style={{ background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '12px', padding: '28px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--danger)', marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Without SellSight</div>
-            {[
-              'Battlecards in a Google Doc no one updates',
-              'No idea which deals are about to go cold',
-              'Pipeline forecast based on gut feel',
-              'Rep walks into a call cold on competitor objections',
-              'Lost deal knowledge disappears with the rep',
-            ].map(p => (
-              <div key={p} style={{ display: 'flex', gap: '8px', marginBottom: '11px', fontSize: '13px', color: 'var(--text-secondary)', alignItems: 'flex-start' }}>
-                <span style={{ color: 'var(--danger)', flexShrink: 0, marginTop: '1px', fontWeight: '700' }}>×</span> {p}
-              </div>
-            ))}
-          </div>
-          <div style={{ background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '12px', padding: '28px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--success)', marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>With SellSight</div>
-            {[
-              'Battlecards that regenerate autonomously when competitive patterns shift',
-              'Every morning: which deals need you, why, and what to do',
-              'Probability-weighted forecast from your real conversion data',
-              'Rep walks in knowing risks, competitor record, and open actions',
-              'Every closed deal trains the brain and compounds your advantage',
-            ].map(p => (
-              <div key={p} style={{ display: 'flex', gap: '8px', marginBottom: '11px', fontSize: '13px', color: 'var(--text-secondary)', alignItems: 'flex-start' }}>
-                <CheckCircle size={13} color="var(--success)" style={{ flexShrink: 0, marginTop: '2px' }} /> {p}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── PRICING ──────────────────────────────────────────────────────────── */}
-      <section id="pricing" style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 80px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-          <h2 style={{ fontSize: '32px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '12px', color: 'var(--text-primary)' }}>Simple pricing</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Start free. Upgrade when your team is ready.</p>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-          {PRICING.map(({ name, price, period, features, cta, highlight }) => (
-            <div key={name} style={{ background: highlight ? 'var(--accent-subtle)' : 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: `1px solid ${highlight ? 'var(--accent)' : 'var(--card-border)'}`, borderRadius: '12px', padding: '24px', position: 'relative', boxShadow: highlight ? 'var(--shadow-lg)' : 'var(--shadow-sm)' }}>
-              {highlight && <div style={{ position: 'absolute', top: '-1px', left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(135deg, var(--accent), #7C3AED)', padding: '3px 14px', borderRadius: '0 0 8px 8px', fontSize: '10px', fontWeight: '700', color: '#fff', letterSpacing: '0.06em' }}>MOST POPULAR</div>}
-              <div style={{ fontSize: '15px', fontWeight: '700', marginBottom: '4px', color: 'var(--text-primary)' }}>{name}</div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '2px', marginBottom: '20px' }}>
-                <span style={{ fontSize: '32px', fontWeight: '800', letterSpacing: '-0.04em', color: 'var(--text-primary)' }}>{price}</span>
-                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{period}</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '9px', marginBottom: '24px' }}>
-                {features.map(f => (
-                  <div key={f} style={{ display: 'flex', gap: '8px', fontSize: '13px', color: 'var(--text-secondary)', alignItems: 'flex-start' }}>
-                    <CheckCircle size={13} color={highlight ? 'var(--accent)' : 'var(--text-tertiary)'} style={{ flexShrink: 0, marginTop: '2px' }} />
-                    {f}
+              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.40)', marginBottom: '28px' }}>For growing teams</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px', flex: 1 }}>
+                {[
+                  'Unlimited deals',
+                  'ML deal scoring',
+                  'Daily AI briefing',
+                  'Score simulator',
+                  'Meeting note extraction',
+                  'Risk & stall detection',
+                ].map((f) => (
+                  <div key={f} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <span style={{ color: '#5B5BD6', fontSize: '14px', lineHeight: '20px', flexShrink: 0 }}>&check;</span>
+                    <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.56)', lineHeight: '20px' }}>{f}</span>
                   </div>
                 ))}
               </div>
-              <Link href="/sign-up" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', padding: '10px', background: highlight ? 'linear-gradient(135deg, var(--accent), #7C3AED)' : 'var(--surface)', boxShadow: highlight ? '0 0 16px var(--accent-subtle)' : 'none', border: `1px solid ${highlight ? 'transparent' : 'var(--border)'}`, borderRadius: '8px', color: highlight ? '#fff' : 'var(--text-primary)', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>
-                {cta} <ChevronRight size={12} />
-              </Link>
+              <Link href="/sign-up" style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                height: '44px', borderRadius: '6px',
+                background: '#5B5BD6', color: '#fff',
+                fontSize: '13px', fontWeight: 500, textDecoration: 'none',
+              }}>Start free &rarr;</Link>
             </div>
-          ))}
-        </div>
-      </section>
 
-      {/* ── FOUNDER QUOTE ────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, maxWidth: '640px', margin: '0 auto', padding: '0 32px 80px', textAlign: 'center' }}>
-        <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid var(--card-border)', borderRadius: '16px', padding: '40px' }}>
-          <div style={{ fontSize: '36px', color: 'var(--accent)', marginBottom: '12px', lineHeight: 1, opacity: 0.4 }}>&ldquo;</div>
-          <p style={{ fontSize: '16px', lineHeight: '1.7', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '20px' }}>
-            I built SellSight after watching us lose deals we should have won — because our battlecards were outdated and nobody could tell which deals were genuinely at risk until it was too late. The insight was simple: our institutional knowledge was the asset. SellSight makes it work.
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-            <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent), #8B5CF6)', border: '2px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: '#fff' }}>R</div>
-            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Rees Foulkes, Founder · SellSight</span>
+            {/* Pro */}
+            <div style={{
+              background: '#141416', borderRadius: '8px', padding: '32px 28px',
+              display: 'flex', flexDirection: 'column',
+            }}>
+              <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px', color: 'rgba(255,255,255,0.56)' }}>Pro</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '36px', fontWeight: 600, letterSpacing: '-0.03em' }}>&pound;149</span>
+                <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.40)' }}>/mo</span>
+              </div>
+              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.40)', marginBottom: '28px' }}>For scaling revenue teams</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px', flex: 1 }}>
+                {[
+                  'Everything in Starter',
+                  'Collateral generation',
+                  'HubSpot sync',
+                  'Battlecards & case studies',
+                  'Priority support',
+                  'Team analytics',
+                ].map((f) => (
+                  <div key={f} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <span style={{ color: '#5B5BD6', fontSize: '14px', lineHeight: '20px', flexShrink: 0 }}>&check;</span>
+                    <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.56)', lineHeight: '20px' }}>{f}</span>
+                  </div>
+                ))}
+              </div>
+              <Link href="/sign-up" style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                height: '44px', borderRadius: '6px',
+                border: '1px solid rgba(255,255,255,0.10)', color: 'rgba(255,255,255,0.93)',
+                fontSize: '13px', fontWeight: 500, textDecoration: 'none',
+              }}>Start free &rarr;</Link>
+            </div>
           </div>
-        </div>
-      </section>
 
-      {/* ── FINAL CTA ────────────────────────────────────────────────────────── */}
-      <section style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '0 32px 120px' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '5px 12px', background: 'var(--accent-subtle)', border: '1px solid var(--border)', borderRadius: '100px', fontSize: '12px', color: 'var(--accent)', fontWeight: '600', marginBottom: '20px' }}>
-          <Brain size={11} />
-          Every deal you close makes the brain smarter
-        </div>
-        <h2 style={{ fontSize: '38px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '16px', color: 'var(--text-primary)' }}>
-          Start building your autonomous sales brain today
-        </h2>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '32px', fontSize: '15px', maxWidth: '480px', margin: '0 auto 32px' }}>
-          Free to start. No credit card. Your first collateral generates in under 5 minutes.
+          {/* Responsive overrides for mobile */}
+          <style>{`
+            @media (max-width: 768px) {
+              h1 { font-size: 32px !important; }
+              section { padding-bottom: 80px !important; }
+              [data-pricing-grid] { grid-template-columns: 1fr !important; }
+            }
+          `}</style>
+        </section>
+      </div>
+
+      {/* ── Footer ──────────────────────────────────────────────── */}
+      <footer style={{
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+        padding: '48px 24px 64px',
+        textAlign: 'center',
+      }}>
+        <p style={{
+          fontSize: '15px', color: 'rgba(255,255,255,0.56)',
+          lineHeight: 1.7, maxWidth: '520px', margin: '0 auto 16px',
+        }}>
+          Built by a PM who collapsed a 12-month enterprise sales cycle to 30 days.
         </p>
-        <Link href="/sign-up" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '13px 28px', background: 'linear-gradient(135deg, var(--accent), #7C3AED)', boxShadow: 'var(--shadow-lg)', borderRadius: '10px', color: '#fff', fontSize: '15px', fontWeight: '700', textDecoration: 'none' }}>
-          Start for free <ArrowRight size={15} />
-        </Link>
-        <p style={{ marginTop: '14px', fontSize: '12px', color: 'var(--text-tertiary)' }}>Free forever · No credit card · Set up in 10 minutes</p>
-      </section>
-
-      {/* Footer */}
-      <footer style={{ position: 'relative', zIndex: 1, borderTop: '1px solid var(--border)', padding: '24px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ width: '22px', height: '22px', background: 'linear-gradient(135deg, var(--accent), #8B5CF6)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FileText size={11} color="#fff" />
-          </div>
-          <span style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-primary)' }}>SellSight</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>&copy; 2026 SellSight. All rights reserved.</span>
-          <a href="/privacy" style={{ fontSize: '12px', color: 'var(--text-tertiary)', textDecoration: 'none' }}>Privacy Policy</a>
-          <a href="/terms" style={{ fontSize: '12px', color: 'var(--text-tertiary)', textDecoration: 'none' }}>Terms of Service</a>
-        </div>
+        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)' }}>
+          London, UK &middot; SellSight Ltd
+        </p>
       </footer>
     </div>
   )
