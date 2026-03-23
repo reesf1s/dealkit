@@ -4767,7 +4767,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
       )}
 
       {/* Product Issues panel — Linear bidirectional link */}
-      <ProductIssuesPanel dealId={id} />
+      <ProductIssuesPanel dealId={dealId} />
 
       {/* Deal info grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
