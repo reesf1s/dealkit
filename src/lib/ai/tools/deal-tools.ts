@@ -583,7 +583,7 @@ Rules:
     const dealEmb = await generateDealEmbedding({
       name: deal.dealName || '',
       company: deal.prospectCompany || '',
-      stage: (updateFields.stage as string | undefined) ?? deal.stage || '',
+      stage: String(updateFields.stage || deal.stage || ''),
       meetingNotes: appendedNotes,
       signals: updateFields.intentSignals ?? deal.intentSignals,
     })
