@@ -516,25 +516,30 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
     // Main deal update (without embeddings — those need raw SQL for pgvector)
     const [updatedDeal] = await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, id)).returning()
 
-    // Generate embeddings after main update (non-blocking)
-    try {
-      const { generateEmbedding, generateDealEmbedding } = await import('@/lib/openai-embeddings')
-      const noteEmb = await generateEmbedding(appendedNotes)
-      const dealEmb = await generateDealEmbedding({
-        name: deal.dealName || '',
-        company: deal.prospectCompany || '',
-        stage: deal.stage || '',
-        meetingNotes: appendedNotes,
-        signals: updateFields.intentSignals ?? undefined,
-      })
-      const noteVec = `'[${noteEmb.join(',')}]'::vector`
-      const dealVec = `'[${dealEmb.join(',')}]'::vector`
-      await db.execute(sql.raw(
-        `UPDATE deal_logs SET note_embedding = ${noteVec}, deal_embedding = ${dealVec} WHERE id = '${id}' AND workspace_id = '${workspaceId}'`
-      ))
-    } catch (err) {
-      console.error('[embeddings] Failed to generate embeddings:', err)
-    }
+    // Generate embeddings via after() — non-blocking, survives Vercel serverless
+    const _embId = id, _embWs = workspaceId, _embNotes = appendedNotes
+    const _embDeal = deal, _embSignals = updateFields.intentSignals
+    after(async () => {
+      try {
+        const { generateEmbedding, generateDealEmbedding } = await import('@/lib/openai-embeddings')
+        const noteEmb = await generateEmbedding(_embNotes)
+        const dealEmb = await generateDealEmbedding({
+          name: _embDeal.dealName || '',
+          company: _embDeal.prospectCompany || '',
+          stage: _embDeal.stage || '',
+          meetingNotes: _embNotes,
+          signals: _embSignals ?? undefined,
+        })
+        const noteVec = `'[${noteEmb.join(',')}]'::vector`
+        const dealVec = `'[${dealEmb.join(',')}]'::vector`
+        await db.execute(sql.raw(
+          `UPDATE deal_logs SET note_embedding = ${noteVec}, deal_embedding = ${dealVec} WHERE id = '${_embId}' AND workspace_id = '${_embWs}'`
+        ))
+        console.log(`[embeddings] Generated for deal ${_embId}`)
+      } catch (err) {
+        console.error('[embeddings] Failed to generate embeddings:', err)
+      }
+    })
     const createdGaps = []
     for (const gap of (parsed.productGaps ?? [])) {
       if (!gap.title) continue

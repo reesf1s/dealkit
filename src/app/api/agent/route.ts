@@ -539,8 +539,8 @@ export async function POST(req: NextRequest) {
         system: systemPrompt,
         messages: trimmedMessages,
         tools: sdkTools,
-        maxSteps: 20,
-        maxTokens: 8192,
+        maxSteps: 5,
+        maxTokens: 4096,
         onFinish: async () => {
           after(async () => { await requestBrainRebuild(wsCtx.workspaceId, 'agent_tool_call') })
         },

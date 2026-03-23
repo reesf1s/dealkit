@@ -583,7 +583,8 @@ Rules:
   const _embDeal = deal
   const _embStage = updateFields.stage || deal.stage || ''
   const _embSignals = updateFields.intentSignals ?? deal.intentSignals
-  setTimeout(async () => {
+  // Generate embeddings in after() — setTimeout is killed by Vercel serverless
+  after(async () => {
     try {
       const { generateEmbedding, generateDealEmbedding } = await import('@/lib/openai-embeddings')
       const { sql: rawSql } = await import('drizzle-orm')
@@ -600,10 +601,11 @@ Rules:
       await db.execute(rawSql.raw(
         `UPDATE deal_logs SET note_embedding = ${noteVec}, deal_embedding = ${dealVec} WHERE id = '${_embDealId}' AND workspace_id = '${_embWorkspaceId}'`
       ))
+      console.log(`[embeddings] Generated for deal ${_embDealId}`)
     } catch (err) {
       console.error('[embeddings] Failed to generate embeddings:', err)
     }
-  }, 0)
+  })
 
   // Build changes summary
   const changes: string[] = []

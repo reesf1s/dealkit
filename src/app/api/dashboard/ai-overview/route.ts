@@ -556,6 +556,25 @@ export async function POST() {
 
     const { workspaceId } = await getWorkspaceContext(userId)
 
+    // Check if cached briefing is less than 4 hours old — skip regeneration
+    const cachedRows = await db.execute<{ ai_overview_generated_at: Date | null }>(
+      sql`SELECT ai_overview_generated_at FROM workspaces WHERE id = ${workspaceId} LIMIT 1`
+    )
+    const lastGenAt = cachedRows[0]?.ai_overview_generated_at
+    if (lastGenAt) {
+      const ageMs = Date.now() - new Date(lastGenAt).getTime()
+      const fourHours = 4 * 60 * 60 * 1000
+      if (ageMs < fourHours) {
+        // Return cached — don't burn LLM tokens
+        const cachedData = await db.execute<{ ai_overview: any }>(
+          sql`SELECT ai_overview FROM workspaces WHERE id = ${workspaceId} LIMIT 1`
+        )
+        if (cachedData[0]?.ai_overview) {
+          return NextResponse.json({ data: cachedData[0].ai_overview, cached: true })
+        }
+      }
+    }
+
     const overview = await generateOverview(workspaceId)
 
     await db.execute(sql`

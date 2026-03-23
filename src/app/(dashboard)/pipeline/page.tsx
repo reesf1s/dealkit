@@ -2,6 +2,7 @@
 export const dynamic = 'force-dynamic'
 
 import useSWR, { mutate } from 'swr'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useState, useRef, useEffect } from 'react'
 import { useSidebar } from '@/components/layout/SidebarContext'
@@ -387,14 +388,14 @@ function DealCard({
         )}
       </div>
 
-      {/* Hover preview tooltip */}
-      {previewVisible && (
+      {/* Hover preview tooltip — portal to body to escape stacking context */}
+      {previewVisible && typeof document !== 'undefined' && createPortal(
         <div
           onClick={e => e.stopPropagation()}
           style={{
             position: 'fixed',
-            top: previewPos.top,
-            left: previewPos.left,
+            top: Math.min(previewPos.top, window.innerHeight - 220),
+            left: Math.max(8, Math.min(previewPos.left, window.innerWidth - 260)),
             zIndex: 9999,
             background: 'var(--glass-card-bg, rgba(255,255,255,0.06))',
             backdropFilter: 'blur(20px)',
@@ -436,7 +437,8 @@ function DealCard({
               <span style={{ lineHeight: 1.3 }}>{typeof risks[0] === 'string' ? risks[0] : (risks[0] as any)?.text || (risks[0] as any)?.description || 'Risk identified'}</span>
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
