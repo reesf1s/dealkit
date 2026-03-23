@@ -1,11 +1,11 @@
 /**
  * Embedding Backfill — generates embeddings for deals that don't have them yet.
  *
- * Called as a background task during brain rebuilds. Non-fatal: if OPENAI_API_KEY
+ * Called as a background task during brain rebuilds. Non-fatal: if VOYAGE_API_KEY
  * is not set or the API fails, it logs an error and moves on.
  *
- * Rate-limited to ~5 requests/second (200ms between calls) to avoid hitting
- * OpenAI rate limits.
+ * Rate-limited to ~5 requests/second (200ms between calls) to stay within
+ * Voyage AI rate limits.
  */
 
 import { db } from '@/lib/db'
@@ -15,8 +15,8 @@ import { generateEmbedding, generateDealEmbedding } from './openai-embeddings'
 
 export async function backfillEmbeddings(workspaceId: string): Promise<number> {
   // Bail early if no API key configured
-  if (!process.env.OPENAI_API_KEY) {
-    console.warn('[embeddings] Skipping backfill — OPENAI_API_KEY not set')
+  if (!process.env.VOYAGE_API_KEY) {
+    console.warn('[embeddings] Skipping backfill — VOYAGE_API_KEY not set')
     return 0
   }
 

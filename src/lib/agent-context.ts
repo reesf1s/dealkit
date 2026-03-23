@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { eq, sql } from 'drizzle-orm'
-import { generateEmbedding } from './openai-embeddings'
+import { generateQueryEmbedding } from './openai-embeddings'
 
 interface AgentContext {
   relevantDeals: any[]
@@ -38,7 +38,7 @@ export async function getRelevantContext(
   let semanticIds: string[] = []
   if (mentionedIds.size < maxDeals) {
     try {
-      const queryEmbedding = await generateEmbedding(userMessage)
+      const queryEmbedding = await generateQueryEmbedding(userMessage)
       const results = await db.execute(sql`
         SELECT id, 1 - (deal_embedding::vector <=> ${JSON.stringify(queryEmbedding)}::vector) as similarity
         FROM deal_logs

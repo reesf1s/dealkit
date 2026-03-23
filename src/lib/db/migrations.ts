@@ -369,8 +369,8 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
     name: 'enable_pgvector',
     sql: `
       CREATE EXTENSION IF NOT EXISTS vector;
-      ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS note_embedding vector(1536);
-      ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS deal_embedding vector(1536)
+      ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS note_embedding vector(1024);
+      ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS deal_embedding vector(1024)
     `,
   },
   {
@@ -415,6 +415,33 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
         ON signal_outcomes (workspace_id, outcome);
       CREATE UNIQUE INDEX IF NOT EXISTS idx_signal_outcomes_deal
         ON signal_outcomes (workspace_id, deal_id)
+    `,
+  },
+  {
+    version: 28,
+    name: 'resize_embeddings_to_1024',
+    sql: `
+      DO $$
+      BEGIN
+        -- If columns exist as vector(1536), drop and recreate as vector(1024)
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'deal_logs' AND column_name = 'note_embedding'
+        ) THEN
+          ALTER TABLE deal_logs DROP COLUMN IF EXISTS note_embedding;
+          ALTER TABLE deal_logs ADD COLUMN note_embedding vector(1024);
+          ALTER TABLE deal_logs DROP COLUMN IF EXISTS deal_embedding;
+          ALTER TABLE deal_logs ADD COLUMN deal_embedding vector(1024);
+          DROP INDEX IF EXISTS idx_note_embedding;
+          DROP INDEX IF EXISTS idx_deal_embedding;
+          CREATE INDEX IF NOT EXISTS idx_note_embedding
+            ON deal_logs USING hnsw (note_embedding vector_cosine_ops)
+            WITH (m = 16, ef_construction = 64);
+          CREATE INDEX IF NOT EXISTS idx_deal_embedding
+            ON deal_logs USING hnsw (deal_embedding vector_cosine_ops)
+            WITH (m = 16, ef_construction = 64);
+        END IF;
+      END $$
     `,
   },
 ]
