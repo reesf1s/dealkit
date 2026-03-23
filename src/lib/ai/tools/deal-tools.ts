@@ -1,52 +1,48 @@
+/**
+ * Consolidated Deal Tools — 5 tools only
+ *
+ * 1. get_deal       — Look up any deal's full context
+ * 2. update_deal    — ONE tool for ALL deal mutations
+ * 3. search_deals   — Find deals by name, company, or contact
+ * 4. generate_content — Create battlecards, emails, talking points
+ * 5. answer_question — Answer pipeline questions using brain context
+ */
+
 import { z } from 'zod'
 import { eq, and, or, ilike } from 'drizzle-orm'
 import { after } from 'next/server'
 import { db } from '@/lib/db'
-import { dealLogs, productGaps, companyProfiles } from '@/lib/db/schema'
+import { dealLogs, productGaps, companyProfiles, competitors } from '@/lib/db/schema'
 import { anthropic } from '@/lib/ai/client'
 import { getWorkspaceBrain } from '@/lib/workspace-brain'
 import { requestBrainRebuild } from '@/lib/brain-rebuild'
 import { extractTextSignals, heuristicScore } from '@/lib/text-signals'
 import { computeCompositeScore } from '@/lib/deal-ml'
 import { buildDealBriefing, scoreNarrationPrompt } from '@/lib/brain-narrator'
+import { generateCollateral, generateFreeformCollateral } from '@/lib/ai/generate'
+import { upsertCollateral } from '@/lib/collateral-helpers'
+import { executeWithVerification } from '@/lib/ai/tool-wrapper'
 import type { ToolContext, ToolResult } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Shared constants
+// Shared constants & helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const DEAL_STAGES = [
-  'prospecting',
-  'qualification',
-  'discovery',
-  'proposal',
-  'negotiation',
-  'closed_won',
-  'closed_lost',
-] as const
-
-const stageEnum = z.string().describe('Deal stage: prospecting, qualification, discovery, proposal, negotiation, closed_won, closed_lost, or any custom stage ID')
-
-/** Active (non-closed) stages in default pipeline order. */
 const ACTIVE_STAGES = ['prospecting', 'qualification', 'discovery', 'proposal', 'negotiation']
 
-/**
- * Convert a deal's stage string to a 0–1 normalised position within the pipeline.
- * 0 = earliest active stage, 1 = latest active stage before closed.
- * Unknown/custom stages default to 0.5 (mid-pipeline).
- * pipelineStages allows custom pipelines to pass their ordered active stage IDs.
- */
 function stageToNorm(stage: string | null | undefined, pipelineStages?: string[]): number {
   if (!stage) return 0.5
   const stages = pipelineStages ?? ACTIVE_STAGES
   const idx = stages.indexOf(stage)
-  if (idx === -1) return 0.5 // custom / unknown — treat as mid-pipeline
+  if (idx === -1) return 0.5
   return stages.length > 1 ? idx / (stages.length - 1) : 0.5
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function normalize(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 60)
+}
 
 function formatDealSummary(deal: any, stageLabels?: Record<string, string>): string {
   const lines = [
@@ -59,9 +55,6 @@ function formatDealSummary(deal: any, stageLabels?: Record<string, string>): str
   if (deal.aiSummary) lines.push(`- Summary: ${deal.aiSummary}`)
   return lines.join('\n')
 }
-
-// UUID v4 pattern
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function formatDealDetailed(deal: any, stageLabels?: Record<string, string>): string {
   const lines = [
@@ -113,7 +106,6 @@ function formatDealDetailed(deal: any, stageLabels?: Record<string, string>): st
 
   if (deal.lostReason) lines.push(`\n**Lost Reason:** ${deal.lostReason}`)
 
-  // Project plan
   const projectPlan = deal.projectPlan as any
   if (projectPlan?.phases?.length > 0) {
     lines.push('\n**Project Plan:**')
@@ -132,7 +124,6 @@ function formatDealDetailed(deal: any, stageLabels?: Record<string, string>): st
     }
   }
 
-  // Success criteria
   const criteria = (deal.successCriteriaTodos as any[]) ?? []
   if (criteria.length > 0) {
     const achieved = criteria.filter((c: any) => c.achieved).length
@@ -151,1132 +142,72 @@ function formatDealDetailed(deal: any, stageLabels?: Record<string, string>): st
   return lines.join('\n')
 }
 
-function normalize(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 60)
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// search_deals
+// Helper: Score computation (reused by multiple mutation paths)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const search_deals = {
-  description: 'Search for deals by name, company, or stage. Returns a concise list of matching deals with key metrics.',
-  parameters: z.object({
-    query: z.string().optional().describe('Search term to match against deal name or company'),
-    stage: stageEnum.optional().describe('Filter by deal stage'),
-  }),
-  execute: async (params: { query?: string; stage?: string }, ctx: ToolContext): Promise<ToolResult> => {
-    const conditions = [eq(dealLogs.workspaceId, ctx.workspaceId)]
-
-    if (params.stage) {
-      conditions.push(eq(dealLogs.stage, params.stage as any))
-    }
-
-    if (params.query) {
-      const pattern = `%${params.query}%`
-      conditions.push(
-        or(
-          ilike(dealLogs.dealName, pattern),
-          ilike(dealLogs.prospectCompany, pattern),
-        )!,
+async function computeAndUpdateScore(
+  dealId: string,
+  workspaceId: string,
+  allText: string,
+  createdAt: Date,
+  stage: string | null | undefined,
+  ctx: ToolContext,
+  intentSignals?: any,
+): Promise<{ score?: number; insights?: string[] }> {
+  try {
+    if (allText.length < 20) return {}
+    const signals = extractTextSignals(allText, createdAt, new Date())
+    const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
+    const mlPred = brain?.mlPredictions?.find((p: any) => p.dealId === dealId)
+    const sNorm = stageToNorm(stage)
+    let finalScore: number
+    if (mlPred && brain?.mlModel) {
+      const { composite } = computeCompositeScore(
+        heuristicScore(signals, sNorm),
+        mlPred.winProbability,
+        brain.mlModel.trainingSize,
       )
+      finalScore = composite
+    } else {
+      finalScore = heuristicScore(signals, sNorm)
     }
 
-    const deals = await db
-      .select()
-      .from(dealLogs)
-      .where(and(...conditions))
-      .orderBy(dealLogs.updatedAt)
-      .limit(20)
-
-    if (deals.length === 0) {
-      return { result: 'No deals found matching your search criteria.' }
+    // Intent signal adjustments
+    if (intentSignals) {
+      if (intentSignals.championStatus === 'confirmed') finalScore = Math.min(100, finalScore + 6)
+      if (intentSignals.championStatus === 'suspected') finalScore = Math.min(100, finalScore + 3)
+      if (intentSignals.budgetStatus === 'approved') finalScore = Math.min(100, finalScore + 8)
+      if (intentSignals.budgetStatus === 'awaiting') finalScore = Math.min(100, finalScore + 2)
+      if (intentSignals.budgetStatus === 'blocked') finalScore = Math.max(0, finalScore - 8)
+      if (intentSignals.nextMeetingBooked) finalScore = Math.min(100, finalScore + 3)
     }
 
-    const summaries = deals.map(d => formatDealSummary(d, ctx.stageLabels))
-    return {
-      result: `Found **${deals.length}** deal${deals.length === 1 ? '' : 's'}:\n\n${summaries.join('\n\n')}`,
-    }
-  },
+    const score = Math.max(0, Math.min(100, Math.round(finalScore)))
+
+    const insights: string[] = []
+    if (signals.championStrength > 0.5) insights.push('Strong internal champion identified')
+    else if (signals.championStrength > 0) insights.push('Potential champion — needs confirmation')
+    if (signals.budgetConfirmed) insights.push('Budget confirmed')
+    if (signals.decisionMakerSignal) insights.push('Decision maker engaged')
+    if (signals.momentumScore > 0.7) insights.push('Strong forward momentum')
+    else if (signals.momentumScore < 0.3) insights.push('Momentum stalling — needs re-engagement')
+    if (signals.stakeholderDepth > 0.5) insights.push('Multiple stakeholders engaged')
+    if (signals.nextStepDefined) insights.push('Clear next steps defined')
+    if (signals.objectionCount > 0) insights.push(`${signals.objectionCount} objection${signals.objectionCount > 1 ? 's' : ''} identified`)
+    if (insights.length === 0) insights.push('Early stage — limited signals available')
+
+    await db.update(dealLogs).set({
+      conversionScore: score,
+      conversionInsights: insights,
+    }).where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId)))
+
+    return { score, insights }
+  } catch { return {} }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// get_deal_details
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const get_deal_details = {
-  description: 'Get full details of a specific deal. Accepts a UUID deal ID OR a deal name/company name — will auto-search if a non-UUID is provided.',
-  parameters: z.object({
-    dealId: z.string().describe('The UUID of the deal, OR a deal name / company name to search for'),
-  }),
-  execute: async (params: { dealId: string }, ctx: ToolContext): Promise<ToolResult> => {
-    let deal: any = null
-
-    // If it looks like a UUID, do a direct lookup
-    if (UUID_RE.test(params.dealId)) {
-      const [row] = await db
-        .select()
-        .from(dealLogs)
-        .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-        .limit(1)
-      deal = row
-    }
-
-    // If no UUID match (or it wasn't a UUID), fall back to name/company search
-    if (!deal) {
-      const pattern = `%${params.dealId}%`
-      const matches = await db
-        .select()
-        .from(dealLogs)
-        .where(and(
-          eq(dealLogs.workspaceId, ctx.workspaceId),
-          or(
-            ilike(dealLogs.dealName, pattern),
-            ilike(dealLogs.prospectCompany, pattern),
-          ),
-        ))
-        .orderBy(dealLogs.updatedAt)
-        .limit(5)
-
-      if (matches.length === 1) {
-        deal = matches[0]
-      } else if (matches.length > 1) {
-        // Multiple matches — return summaries so the agent can pick
-        const summaries = matches.map(d => formatDealSummary(d, ctx.stageLabels))
-        return {
-          result: `Found **${matches.length}** deals matching "${params.dealId}". Which one?\n\n${summaries.join('\n\n')}`,
-        }
-      }
-    }
-
-    if (!deal) {
-      return { result: `Deal "${params.dealId}" not found. Try searching with a different name.` }
-    }
-
-    return { result: formatDealDetailed(deal, ctx.stageLabels) }
-  },
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// create_deal
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const create_deal = {
-  description: 'Create a new deal in the pipeline. For large deal imports with contacts, notes, todos, risks, etc., use import_deal instead — it handles everything in one operation.',
-  parameters: z.object({
-    dealName: z.string().describe('Name of the deal'),
-    prospectCompany: z.string().describe('Company name of the prospect'),
-    prospectName: z.string().optional().describe('Name of the main contact'),
-    prospectTitle: z.string().optional().describe('Title/role of the main contact'),
-    dealValue: z.number().optional().describe('Estimated deal value in dollars'),
-    stage: stageEnum.optional().describe('Initial deal stage (defaults to prospecting)'),
-    competitors: z.array(z.string()).optional().describe('List of competitor names'),
-    notes: z.string().optional().describe('Initial notes for the deal'),
-  }),
-  execute: async (
-    params: {
-      dealName: string
-      prospectCompany: string
-      prospectName?: string
-      prospectTitle?: string
-      dealValue?: number
-      stage?: string
-      competitors?: string[]
-      notes?: string
-    },
-    ctx: ToolContext,
-  ): Promise<ToolResult> => {
-    const [created] = await db
-      .insert(dealLogs)
-      .values({
-        workspaceId: ctx.workspaceId,
-        userId: ctx.userId,
-        dealName: params.dealName,
-        prospectCompany: params.prospectCompany,
-        prospectName: params.prospectName ?? null,
-        prospectTitle: params.prospectTitle ?? null,
-        dealValue: params.dealValue ?? null,
-        stage: (params.stage as any) ?? 'prospecting',
-        competitors: params.competitors ?? [],
-        notes: params.notes ?? null,
-      })
-      .returning()
-
-    after(async () => {
-      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
-    })
-
-    return {
-      result: `Deal **${created.dealName}** with ${created.prospectCompany} created successfully in **${created.stage}** stage.${params.dealValue ? ` Value: $${params.dealValue.toLocaleString()}.` : ''}`,
-      actions: [{
-        type: 'deal_created',
-        dealId: created.id,
-        dealName: created.dealName,
-        company: created.prospectCompany,
-      }],
-      uiHint: 'refresh_deals',
-    }
-  },
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// import_deal  (single-operation deal creation with all data)
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const import_deal = {
-  description: 'Import a complete deal with ALL data in one operation — contacts, notes, todos, risks, summary, next steps, success criteria, competitors, project plan, and more. Use this when the user pastes a large deal description, interaction history, or CRM export. This is the preferred tool for creating deals with rich context.',
-  parameters: z.object({
-    dealName: z.string().describe('Name of the deal'),
-    prospectCompany: z.string().describe('Company name'),
-    stage: stageEnum.optional().describe('Deal stage — infer from context (e.g., "proposal" if proposals were sent)'),
-    dealValue: z.number().optional().describe('Deal value in dollars'),
-    closeDate: z.string().optional().describe('Expected close date (ISO format)'),
-    prospectName: z.string().optional().describe('Primary contact name'),
-    prospectTitle: z.string().optional().describe('Primary contact title'),
-    contacts: z.array(z.object({
-      name: z.string(),
-      title: z.string().optional(),
-      email: z.string().optional(),
-      phone: z.string().optional(),
-      role: z.string().optional().describe('Role in deal: Champion, Decision Maker, Technical Evaluator, Internal Sales Rep, etc.'),
-    })).optional().describe('All contacts involved in the deal'),
-    competitors: z.array(z.string()).optional().describe('Competitor names being evaluated'),
-    notes: z.string().optional().describe('Deal notes — preserve the user\'s exact wording and detail'),
-    meetingHistory: z.array(z.object({
-      date: z.string().describe('Date of the interaction (e.g. "Oct 23, 2025", "3 Dec 2025")'),
-      content: z.string().describe('What happened — preserve exact detail'),
-    })).optional().describe('Chronological interaction history — each entry is a dated event. Parse ALL dates from the source text.'),
-    aiSummary: z.string().optional().describe('Comprehensive deal summary preserving all key details: names, dates, decisions, requirements, history'),
-    nextSteps: z.string().optional().describe('Current next steps'),
-    dealRisks: z.array(z.string()).optional().describe('Deal-closing risks (NOT product gaps)'),
-    todos: z.array(z.string()).optional().describe('Action items — preserve exact wording'),
-    successCriteria: z.array(z.object({
-      text: z.string().describe('Exact criterion text'),
-      category: z.string().optional().describe('Category: Security, Integration, Reporting, etc.'),
-    })).optional().describe('Success criteria / requirements'),
-    projectPlan: z.object({
-      phases: z.array(z.object({
-        name: z.string(),
-        description: z.string().optional(),
-        targetDate: z.string().optional(),
-        tasks: z.array(z.object({
-          text: z.string(),
-          status: z.string().optional().describe('pending, in_progress, or complete'),
-          owner: z.string().optional(),
-        })).optional(),
-      })),
-    }).optional().describe('Project plan with phases and tasks'),
-    dealType: z.string().optional().describe('one_off or recurring'),
-    recurringInterval: z.string().optional().describe('monthly, quarterly, or annual'),
-  }),
-  execute: async (
-    params: {
-      dealName: string
-      prospectCompany: string
-      stage?: string
-      dealValue?: number
-      closeDate?: string
-      prospectName?: string
-      prospectTitle?: string
-      contacts?: { name: string; title?: string; email?: string; phone?: string; role?: string }[]
-      competitors?: string[]
-      notes?: string
-      meetingHistory?: { date: string; content: string }[]
-      aiSummary?: string
-      nextSteps?: string
-      dealRisks?: string[]
-      todos?: string[]
-      successCriteria?: { text: string; category?: string }[]
-      projectPlan?: { phases: { name: string; description?: string; targetDate?: string; tasks?: { text: string; status?: string; owner?: string }[] }[] }
-      dealType?: string
-      recurringInterval?: string
-    },
-    ctx: ToolContext,
-  ): Promise<ToolResult> => {
-    // Build contacts array with IDs
-    const contacts = (params.contacts ?? []).map(c => ({
-      id: crypto.randomUUID(),
-      name: c.name,
-      ...(c.title ? { title: c.title } : {}),
-      ...(c.email ? { email: c.email } : {}),
-      ...(c.phone ? { phone: c.phone } : {}),
-      ...(c.role ? { role: c.role } : {}),
-    }))
-
-    // Build todos with IDs
-    const todos = (params.todos ?? []).map(text => ({
-      id: crypto.randomUUID(),
-      text,
-      done: false,
-      createdAt: new Date().toISOString(),
-    }))
-
-    // Build success criteria with IDs
-    const successCriteriaTodos = (params.successCriteria ?? []).map(c => ({
-      id: crypto.randomUUID(),
-      text: c.text,
-      category: c.category ?? 'General',
-      achieved: false,
-      note: '',
-      createdAt: new Date().toISOString(),
-    }))
-
-    // Build project plan
-    const projectPlan = params.projectPlan ? {
-      phases: params.projectPlan.phases.map(phase => ({
-        id: crypto.randomUUID(),
-        name: phase.name,
-        description: phase.description ?? '',
-        targetDate: phase.targetDate ?? null,
-        tasks: (phase.tasks ?? []).map(t => ({
-          id: crypto.randomUUID(),
-          text: t.text,
-          status: t.status ?? 'pending',
-          owner: t.owner ?? null,
-          dueDate: null,
-          notes: '',
-          createdAt: new Date().toISOString(),
-        })),
-      })),
-    } : null
-
-    // Parse close date
-    let closeDate: Date | null = null
-    if (params.closeDate) {
-      try { closeDate = new Date(params.closeDate) } catch { /* ignore invalid dates */ }
-    }
-
-    // Single DB insert with everything
-    const [created] = await db
-      .insert(dealLogs)
-      .values({
-        workspaceId: ctx.workspaceId,
-        userId: ctx.userId,
-        dealName: params.dealName,
-        prospectCompany: params.prospectCompany,
-        prospectName: params.prospectName ?? null,
-        prospectTitle: params.prospectTitle ?? null,
-        dealValue: params.dealValue ?? null,
-        stage: (params.stage as any) ?? 'prospecting',
-        closeDate,
-        competitors: params.competitors ?? [],
-        contacts,
-        notes: params.notes ?? null,
-        meetingNotes: params.meetingHistory?.length
-          ? params.meetingHistory.map(e => `[${e.date}] ${e.content}`).join('\n---\n')
-          : null,
-        aiSummary: params.aiSummary ?? null,
-        nextSteps: params.nextSteps ?? null,
-        dealRisks: params.dealRisks ?? [],
-        todos,
-        successCriteria: params.successCriteria ? JSON.stringify(params.successCriteria) : null,
-        successCriteriaTodos,
-        projectPlan,
-        dealType: (params.dealType as any) ?? 'one_off',
-        recurringInterval: params.recurringInterval ?? null,
-      })
-      .returning()
-
-    // Score the deal with ML signals
-    try {
-      const meetingText = params.meetingHistory?.map(e => e.content).join('\n') ?? ''
-      const allText = [params.notes, meetingText, params.aiSummary].filter(Boolean).join('\n')
-      if (allText.length > 20) {
-        const signals = extractTextSignals(allText, created.createdAt ?? new Date(), new Date())
-        const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
-        const mlPred = brain?.mlPredictions?.find(p => p.dealId === created.id)
-        const sNorm = stageToNorm(params.stage)
-        let finalScore: number
-        if (mlPred && brain?.mlModel) {
-          const { composite } = computeCompositeScore(
-            heuristicScore(signals, sNorm),
-            mlPred.winProbability,
-            brain.mlModel.trainingSize,
-          )
-          finalScore = composite
-        } else {
-          finalScore = heuristicScore(signals, sNorm)
-        }
-        // Generate human-readable insights, not raw floats
-        const insights: string[] = []
-        if (signals.championStrength > 0.5) insights.push('Strong internal champion identified')
-        else if (signals.championStrength > 0) insights.push('Potential champion — needs confirmation')
-        if (signals.budgetConfirmed) insights.push('Budget confirmed')
-        if (signals.decisionMakerSignal) insights.push('Decision maker engaged')
-        if (signals.momentumScore > 0.7) insights.push('Strong forward momentum')
-        else if (signals.momentumScore < 0.3) insights.push('Momentum stalling — needs re-engagement')
-        if (signals.stakeholderDepth > 0.5) insights.push('Multiple stakeholders engaged')
-        if (signals.nextStepDefined) insights.push('Clear next steps defined')
-        if (signals.objectionCount > 0) insights.push(`${signals.objectionCount} objection${signals.objectionCount > 1 ? 's' : ''} identified`)
-        if (insights.length === 0) insights.push('Early stage — limited signals available')
-
-        await db.update(dealLogs).set({
-          conversionScore: Math.max(0, Math.min(100, Math.round(finalScore))),
-          conversionInsights: insights,
-        }).where(eq(dealLogs.id, created.id))
-      }
-    } catch { /* scoring is non-fatal */ }
-
-    after(async () => {
-      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
-    })
-
-    // Build summary
-    const parts: string[] = []
-    if (contacts.length) parts.push(`${contacts.length} contact(s)`)
-    if (todos.length) parts.push(`${todos.length} action item(s)`)
-    if (successCriteriaTodos.length) parts.push(`${successCriteriaTodos.length} success criteria`)
-    if (params.dealRisks?.length) parts.push(`${params.dealRisks.length} risk(s)`)
-    if (params.competitors?.length) parts.push(`${params.competitors.length} competitor(s)`)
-    if (projectPlan) {
-      const taskCount = projectPlan.phases.reduce((sum, p) => sum + p.tasks.length, 0)
-      parts.push(`${projectPlan.phases.length} phase(s) / ${taskCount} task(s)`)
-    }
-    if (params.meetingHistory?.length) parts.push(`${params.meetingHistory.length} interaction(s)`)
-    if (params.aiSummary) parts.push('deal summary')
-
-    const detailStr = parts.length > 0 ? ` with ${parts.join(', ')}` : ''
-
-    return {
-      result: `Deal **${created.dealName}** (${created.prospectCompany}) imported successfully into **${created.stage}**${params.dealValue ? ` — $${params.dealValue.toLocaleString()}` : ''}${detailStr}.`,
-      actions: [{
-        type: 'deal_created',
-        dealId: created.id,
-        dealName: created.dealName,
-        company: created.prospectCompany,
-      }],
-      uiHint: 'refresh_deals',
-    }
-  },
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// enrich_deal
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const enrich_deal = {
-  description: 'Comprehensively enrich an existing deal with contacts, meeting history, todos, success criteria, project plan, risks, and more — all in one operation. Use this when the user pastes detailed information about a deal that already exists. Merges new data with existing data.',
-  parameters: z.object({
-    dealId: z.string().describe('The UUID of the existing deal to enrich'),
-    contacts: z.array(z.object({
-      name: z.string(),
-      title: z.string().optional(),
-      email: z.string().optional(),
-      phone: z.string().optional(),
-      role: z.string().optional().describe('e.g. Champion, Decision Maker, Technical Evaluator, Internal Sales Rep'),
-    })).optional().describe('Contacts to add (merged with existing, deduped by name)'),
-    todos: z.array(z.string()).optional().describe('Action items to add (exact user wording, merged with existing)'),
-    meetingHistory: z.array(z.object({
-      date: z.string().describe('Date of the interaction (e.g. "Oct 23, 2025")'),
-      content: z.string().describe('What happened — preserve exact detail'),
-    })).optional().describe('Interaction history entries to add — each with its own date'),
-    notes: z.string().optional().describe('General notes to append'),
-    aiSummary: z.string().optional().describe('Updated deal summary (replaces existing)'),
-    nextSteps: z.string().optional().describe('Next steps (replaces existing)'),
-    dealRisks: z.array(z.string()).optional().describe('Risks to add (merged with existing)'),
-    competitors: z.array(z.string()).optional().describe('Competitors to add (merged with existing)'),
-    successCriteria: z.array(z.object({
-      text: z.string(),
-      category: z.string().optional(),
-    })).optional().describe('Success criteria to add'),
-    projectPlan: z.object({
-      phases: z.array(z.object({
-        name: z.string(),
-        description: z.string().optional(),
-        targetDate: z.string().optional(),
-        tasks: z.array(z.object({
-          text: z.string(),
-          status: z.string().optional().describe('pending, in_progress, or complete'),
-          owner: z.string().optional(),
-        })).optional(),
-      })),
-    }).optional().describe('Project plan phases/tasks to add or merge'),
-    stage: z.string().optional().describe('Update deal stage'),
-    dealValue: z.number().optional().describe('Update deal value'),
-    closeDate: z.string().optional().describe('Update close date'),
-    dealType: z.string().optional().describe('one_off or recurring'),
-    recurringInterval: z.string().optional().describe('monthly, quarterly, or annual'),
-  }),
-  execute: async (
-    params: {
-      dealId: string
-      contacts?: { name: string; title?: string; email?: string; phone?: string; role?: string }[]
-      todos?: string[]
-      meetingHistory?: { date: string; content: string }[]
-      notes?: string
-      aiSummary?: string
-      nextSteps?: string
-      dealRisks?: string[]
-      competitors?: string[]
-      successCriteria?: { text: string; category?: string }[]
-      projectPlan?: { phases: { name: string; description?: string; targetDate?: string; tasks?: { text: string; status?: string; owner?: string }[] }[] }
-      stage?: string
-      dealValue?: number
-      closeDate?: string
-      dealType?: string
-      recurringInterval?: string
-    },
-    ctx: ToolContext,
-  ): Promise<ToolResult> => {
-    const [existing] = await db
-      .select()
-      .from(dealLogs)
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .limit(1)
-
-    if (!existing) return { result: 'Deal not found.' }
-
-    const updateFields: Record<string, unknown> = { updatedAt: new Date() }
-    const changes: string[] = []
-
-    // Merge contacts (dedup by name)
-    if (params.contacts?.length) {
-      const existingContacts = ((existing.contacts as any[]) ?? []).slice()
-      const existingNames = new Set(existingContacts.map((c: any) => c.name?.toLowerCase()))
-      let added = 0
-      for (const c of params.contacts) {
-        if (!existingNames.has(c.name.toLowerCase())) {
-          existingContacts.push({
-            id: crypto.randomUUID(),
-            name: c.name,
-            ...(c.title ? { title: c.title } : {}),
-            ...(c.email ? { email: c.email } : {}),
-            ...(c.phone ? { phone: c.phone } : {}),
-            ...(c.role ? { role: c.role } : {}),
-          })
-          existingNames.add(c.name.toLowerCase())
-          added++
-        }
-      }
-      if (added > 0) {
-        updateFields.contacts = existingContacts
-        changes.push(`${added} contact(s) added`)
-      }
-    }
-
-    // Merge todos (dedup by normalized text)
-    if (params.todos?.length) {
-      const existingTodos = ((existing.todos as any[]) ?? []).slice()
-      const existingTexts = new Set(existingTodos.map((t: any) => t.text?.toLowerCase().trim()))
-      let added = 0
-      for (const text of params.todos) {
-        if (!existingTexts.has(text.toLowerCase().trim())) {
-          existingTodos.push({
-            id: crypto.randomUUID(),
-            text,
-            done: false,
-            createdAt: new Date().toISOString(),
-          })
-          added++
-        }
-      }
-      if (added > 0) {
-        updateFields.todos = existingTodos
-        changes.push(`${added} action item(s) added`)
-      }
-    }
-
-    // Merge meeting history entries (each with its own date)
-    if (params.meetingHistory?.length) {
-      const newEntries = params.meetingHistory.map(e => `[${e.date}] ${e.content}`).join('\n---\n')
-      const existingNotes = existing.meetingNotes ?? ''
-      updateFields.meetingNotes = existingNotes ? `${newEntries}\n---\n${existingNotes}` : newEntries
-      changes.push(`${params.meetingHistory.length} meeting(s) added`)
-    }
-
-    // Append notes
-    if (params.notes) {
-      const existingNotes = existing.notes ?? ''
-      updateFields.notes = existingNotes ? `${existingNotes}\n\n${params.notes}` : params.notes
-      changes.push('notes appended')
-    }
-
-    // Merge risks
-    if (params.dealRisks?.length) {
-      const existingRisks = ((existing.dealRisks as string[]) ?? []).slice()
-      const existingSet = new Set(existingRisks.map(r => r.toLowerCase()))
-      let added = 0
-      for (const risk of params.dealRisks) {
-        if (!existingSet.has(risk.toLowerCase())) {
-          existingRisks.push(risk)
-          added++
-        }
-      }
-      if (added > 0) {
-        updateFields.dealRisks = existingRisks
-        changes.push(`${added} risk(s) added`)
-      }
-    }
-
-    // Merge competitors
-    if (params.competitors?.length) {
-      const existingComps = ((existing.competitors as string[]) ?? []).slice()
-      const existingSet = new Set(existingComps.map(c => c.toLowerCase()))
-      let added = 0
-      for (const comp of params.competitors) {
-        if (!existingSet.has(comp.toLowerCase())) {
-          existingComps.push(comp)
-          added++
-        }
-      }
-      if (added > 0) {
-        updateFields.competitors = existingComps
-        changes.push(`${added} competitor(s) added`)
-      }
-    }
-
-    // Add success criteria
-    if (params.successCriteria?.length) {
-      const existingCriteria = ((existing.successCriteriaTodos as any[]) ?? []).slice()
-      for (const c of params.successCriteria) {
-        existingCriteria.push({
-          id: crypto.randomUUID(),
-          text: c.text,
-          category: c.category ?? 'General',
-          achieved: false,
-          note: '',
-          createdAt: new Date().toISOString(),
-        })
-      }
-      updateFields.successCriteriaTodos = existingCriteria
-      changes.push(`${params.successCriteria.length} success criteria added`)
-    }
-
-    // Merge project plan
-    if (params.projectPlan?.phases?.length) {
-      const existingPlan = (existing.projectPlan as any) ?? { phases: [] }
-      const existingPhases = existingPlan.phases?.slice() ?? []
-
-      for (const newPhase of params.projectPlan.phases) {
-        const existingPhase = existingPhases.find((p: any) => p.name?.toLowerCase() === newPhase.name.toLowerCase())
-        if (existingPhase) {
-          // Add tasks to existing phase
-          const existingTaskTexts = new Set((existingPhase.tasks ?? []).map((t: any) => t.text?.toLowerCase()))
-          for (const task of (newPhase.tasks ?? [])) {
-            if (!existingTaskTexts.has(task.text.toLowerCase())) {
-              existingPhase.tasks = existingPhase.tasks ?? []
-              existingPhase.tasks.push({
-                id: crypto.randomUUID(),
-                text: task.text,
-                status: task.status ?? 'pending',
-                owner: task.owner ?? null,
-                dueDate: null,
-                notes: '',
-                createdAt: new Date().toISOString(),
-              })
-            }
-          }
-        } else {
-          // Add new phase
-          existingPhases.push({
-            id: crypto.randomUUID(),
-            name: newPhase.name,
-            description: newPhase.description ?? '',
-            targetDate: newPhase.targetDate ?? null,
-            tasks: (newPhase.tasks ?? []).map(t => ({
-              id: crypto.randomUUID(),
-              text: t.text,
-              status: t.status ?? 'pending',
-              owner: t.owner ?? null,
-              dueDate: null,
-              notes: '',
-              createdAt: new Date().toISOString(),
-            })),
-          })
-        }
-      }
-      updateFields.projectPlan = { phases: existingPhases }
-      changes.push('project plan updated')
-    }
-
-    // Simple field replacements
-    if (params.aiSummary) {
-      updateFields.aiSummary = params.aiSummary
-      changes.push('summary updated')
-    }
-    if (params.nextSteps) {
-      updateFields.nextSteps = params.nextSteps
-      changes.push('next steps updated')
-    }
-    if (params.stage) {
-      updateFields.stage = params.stage
-      changes.push(`stage → ${params.stage}`)
-      if (params.stage === 'closed_won') updateFields.wonDate = new Date()
-      if (params.stage === 'closed_lost') updateFields.lostDate = new Date()
-    }
-    if (params.dealValue !== undefined) {
-      updateFields.dealValue = params.dealValue
-      changes.push(`value → $${params.dealValue.toLocaleString()}`)
-    }
-    if (params.closeDate) {
-      try { updateFields.closeDate = new Date(params.closeDate) } catch {}
-      changes.push(`close date → ${params.closeDate}`)
-    }
-    if (params.dealType) {
-      updateFields.dealType = params.dealType
-    }
-    if (params.recurringInterval) {
-      updateFields.recurringInterval = params.recurringInterval
-    }
-
-    if (changes.length === 0) {
-      return { result: 'No new data to add.' }
-    }
-
-    const enrichResult = await db.update(dealLogs).set(updateFields)
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .returning({ id: dealLogs.id })
-    if (enrichResult.length === 0) {
-      return { result: `⚠ TOOL FAILED: Could not update deal — not found or workspace mismatch.` }
-    }
-
-    // Score the deal if it doesn't already have a score
-    let scoreSet = false
-    if (existing.conversionScore == null || existing.conversionScore === 0) {
-      try {
-        const meetingText = params.meetingHistory?.map(e => e.content).join('\n') ?? ''
-        const allText = [params.notes, meetingText, params.aiSummary, existing.notes, existing.meetingNotes, existing.aiSummary].filter(Boolean).join('\n')
-        if (allText.length > 20) {
-          const signals = extractTextSignals(allText, existing.createdAt ?? new Date(), new Date())
-          const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
-          const mlPred = brain?.mlPredictions?.find((p: any) => p.dealId === params.dealId)
-          const sNorm = stageToNorm(params.stage ?? existing.stage)
-          let finalScore: number
-          if (mlPred && brain?.mlModel) {
-            const { composite } = computeCompositeScore(
-              heuristicScore(signals, sNorm),
-              mlPred.winProbability,
-              brain.mlModel.trainingSize,
-            )
-            finalScore = composite
-          } else {
-            finalScore = heuristicScore(signals, sNorm)
-          }
-          const insights: string[] = []
-          if (signals.championStrength > 0.5) insights.push('Strong internal champion identified')
-          else if (signals.championStrength > 0) insights.push('Potential champion — needs confirmation')
-          if (signals.budgetConfirmed) insights.push('Budget confirmed')
-          if (signals.decisionMakerSignal) insights.push('Decision maker engaged')
-          if (signals.momentumScore > 0.7) insights.push('Strong forward momentum')
-          else if (signals.momentumScore < 0.3) insights.push('Momentum stalling — needs re-engagement')
-          if (signals.stakeholderDepth > 0.5) insights.push('Multiple stakeholders engaged')
-          if (signals.nextStepDefined) insights.push('Clear next steps defined')
-          if (signals.objectionCount > 0) insights.push(`${signals.objectionCount} objection${signals.objectionCount > 1 ? 's' : ''} identified`)
-          if (insights.length === 0) insights.push('Early stage — limited signals available')
-          await db.update(dealLogs).set({
-            conversionScore: Math.max(0, Math.min(100, Math.round(finalScore))),
-            conversionInsights: insights,
-          }).where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-          scoreSet = true
-          changes.push(`conversion score: ${Math.round(finalScore)}%`)
-        }
-      } catch { /* scoring is non-fatal */ }
-    }
-
-    after(async () => {
-      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
-    })
-
-    return {
-      result: `Enriched **${existing.dealName}** (${existing.prospectCompany}):\n${changes.map(c => `- ${c}`).join('\n')}`,
-      actions: [{
-        type: 'deal_updated',
-        dealId: params.dealId,
-        dealName: existing.dealName,
-        changes,
-      }],
-      uiHint: 'refresh_deals',
-    }
-  },
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// update_deal
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const update_deal = {
-  description: 'Update fields on an existing deal. Preserve the user\'s exact wording for notes and next steps — do not rephrase. Use meetingNotes to log updates to the Activity Log (Updates + Notes tab).',
-  parameters: z.object({
-    dealId: z.string().describe('The UUID of the deal to update'),
-    stage: stageEnum.optional().describe('New deal stage'),
-    dealValue: z.number().optional().describe('Updated deal value in dollars'),
-    closeDate: z.string().optional().describe('Expected close date (ISO format or natural date)'),
-    nextSteps: z.string().optional().describe('Next steps for the deal — preserve user\'s exact wording'),
-    notes: z.string().optional().describe('Additional notes to append to the Notes field — preserve user\'s exact wording'),
-    meetingNotes: z.string().optional().describe('Update/activity to log in the Activity Log (Updates + Notes tab). Use this when the user reports a conversation, meeting outcome, or deal update. Preserve exact wording.'),
-    lostReason: z.string().optional().describe('Reason deal was lost (only for closed_lost)'),
-    aiSummary: z.string().optional().describe('Replace the AI-generated deal summary'),
-    dealRisks: z.array(z.string()).optional().describe('Replace the deal risks array entirely'),
-    competitors: z.array(z.string()).optional().describe('Replace the competitors array entirely'),
-  }),
-  execute: async (
-    params: {
-      dealId: string
-      stage?: string
-      dealValue?: number
-      closeDate?: string
-      nextSteps?: string
-      notes?: string
-      meetingNotes?: string
-      lostReason?: string
-      aiSummary?: string
-      dealRisks?: string[]
-      competitors?: string[]
-    },
-    ctx: ToolContext,
-  ): Promise<ToolResult> => {
-    const [existing] = await db
-      .select()
-      .from(dealLogs)
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .limit(1)
-
-    if (!existing) {
-      return { result: 'Deal not found.' }
-    }
-
-    const updateFields: Record<string, unknown> = { updatedAt: new Date() }
-    const changes: string[] = []
-
-    if (params.stage) {
-      updateFields.stage = params.stage
-      changes.push(`Stage: ${existing.stage} -> ${params.stage}`)
-      if (params.stage === 'closed_won') updateFields.wonDate = new Date()
-      if (params.stage === 'closed_lost') updateFields.lostDate = new Date()
-    }
-    if (params.dealValue !== undefined) {
-      updateFields.dealValue = params.dealValue
-      changes.push(`Value: $${params.dealValue.toLocaleString()}`)
-    }
-    if (params.closeDate) {
-      updateFields.closeDate = new Date(params.closeDate)
-      changes.push(`Close date: ${params.closeDate}`)
-    }
-    if (params.nextSteps) {
-      updateFields.nextSteps = params.nextSteps
-      changes.push(`Next steps updated`)
-    }
-    if (params.notes) {
-      const existingNotes = existing.notes ?? ''
-      updateFields.notes = existingNotes ? `${existingNotes}\n\n${params.notes}` : params.notes
-      changes.push('Notes appended')
-    }
-    if (params.meetingNotes) {
-      const dateHeader = `[${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}]`
-      const newEntry = `${dateHeader} ${params.meetingNotes}`
-      const existingMeetingNotes = existing.meetingNotes ?? ''
-      updateFields.meetingNotes = existingMeetingNotes ? `${newEntry}\n---\n${existingMeetingNotes}` : newEntry
-      changes.push('Activity log updated')
-    }
-    if (params.lostReason) {
-      updateFields.lostReason = params.lostReason
-      changes.push(`Lost reason: ${params.lostReason}`)
-    }
-    if (params.aiSummary) {
-      updateFields.aiSummary = params.aiSummary
-      changes.push('Summary updated')
-    }
-    if (params.dealRisks) {
-      updateFields.dealRisks = params.dealRisks
-      changes.push(`Risks replaced (${params.dealRisks.length} total)`)
-    }
-    if (params.competitors) {
-      updateFields.competitors = params.competitors
-      changes.push(`Competitors replaced (${params.competitors.length} total)`)
-    }
-
-    if (changes.length === 0) {
-      return { result: 'No changes specified.' }
-    }
-
-    const updated = await db.update(dealLogs).set(updateFields)
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .returning({ id: dealLogs.id })
-    if (updated.length === 0) {
-      console.error(`[update_deal] 0 rows updated for dealId=${params.dealId} workspace=${ctx.workspaceId}`)
-      return { result: 'Update failed: deal not found or workspace mismatch.' }
-    }
-
-    // Auto-refresh score + summary when meeting notes are added
-    if (params.meetingNotes) {
-      try {
-        if (!(existing as any).conversionScorePinned) {
-        const allText = [existing.notes, existing.meetingNotes, params.meetingNotes, existing.aiSummary].filter(Boolean).join('\n')
-        if (allText.length > 20) {
-          const signals = extractTextSignals(allText, existing.createdAt ?? new Date(), new Date())
-          const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
-          const mlPred = brain?.mlPredictions?.find((p: any) => p.dealId === params.dealId)
-          const sNorm = stageToNorm(params.stage ?? existing.stage)
-          let finalScore: number
-          if (mlPred && brain?.mlModel) {
-            const { composite } = computeCompositeScore(
-              heuristicScore(signals, sNorm),
-              mlPred.winProbability,
-              brain.mlModel.trainingSize,
-            )
-            finalScore = composite
-          } else {
-            finalScore = heuristicScore(signals, sNorm)
-          }
-          const insights: string[] = []
-          if (signals.championStrength > 0.5) insights.push('Strong internal champion identified')
-          else if (signals.championStrength > 0) insights.push('Potential champion — needs confirmation')
-          if (signals.budgetConfirmed) insights.push('Budget confirmed')
-          if (signals.decisionMakerSignal) insights.push('Decision maker engaged')
-          if (signals.momentumScore > 0.7) insights.push('Strong forward momentum')
-          else if (signals.momentumScore < 0.3) insights.push('Momentum stalling — needs re-engagement')
-          if (signals.stakeholderDepth > 0.5) insights.push('Multiple stakeholders engaged')
-          if (signals.nextStepDefined) insights.push('Clear next steps defined')
-          if (signals.objectionCount > 0) insights.push(`${signals.objectionCount} objection${signals.objectionCount > 1 ? 's' : ''} identified`)
-          if (insights.length === 0) insights.push('Early stage — limited signals available')
-          await db.update(dealLogs).set({
-            conversionScore: Math.max(0, Math.min(100, Math.round(finalScore))),
-            conversionInsights: insights,
-          }).where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-        }
-        } // end conversionScorePinned check
-      } catch { /* scoring is non-fatal */ }
-    }
-
-    after(async () => {
-      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
-    })
-
-    return {
-      result: `Updated **${existing.dealName}**:\n${changes.map(c => `- ${c}`).join('\n')}`,
-      actions: [{
-        type: 'deal_updated',
-        dealId: params.dealId,
-        dealName: existing.dealName,
-        changes,
-      }],
-      uiHint: 'refresh_deals',
-    }
-  },
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// manage_todos
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const manage_todos = {
-  description: 'Add, complete, or remove action items (todos) on a deal. IMPORTANT: When adding todos, copy-paste the user\'s exact text. Do NOT rephrase, summarize, or shorten. If user said "What percentage of the time do employees in Sydney sit at the same desk area", that exact sentence is the todo text.',
-  parameters: z.object({
-    dealId: z.string().describe('The UUID of the deal'),
-    add: z.array(z.string()).optional().describe('New todo texts — COPY the user\'s exact words, do not rephrase or summarize'),
-    completeTexts: z.array(z.string()).optional().describe('Todo texts to mark as completed (fuzzy matched)'),
-    removeTexts: z.array(z.string()).optional().describe('Todo texts to remove entirely (fuzzy matched)'),
-  }),
-  execute: async (
-    params: {
-      dealId: string
-      add?: string[]
-      completeTexts?: string[]
-      removeTexts?: string[]
-    },
-    ctx: ToolContext,
-  ): Promise<ToolResult> => {
-    const [deal] = await db
-      .select({ id: dealLogs.id, dealName: dealLogs.dealName, todos: dealLogs.todos })
-      .from(dealLogs)
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .limit(1)
-
-    if (!deal) return { result: 'Deal not found.' }
-
-    let todos = ((deal.todos as any[]) ?? []).slice()
-    let added = 0, completed = 0, removed = 0
-
-    // Fuzzy match helper: find best matching todo by normalized text
-    function fuzzyFind(text: string): any | undefined {
-      const norm = normalize(text)
-      return todos.find((t: any) => normalize(t.text).includes(norm) || norm.includes(normalize(t.text)))
-    }
-
-    // Complete todos
-    if (params.completeTexts) {
-      for (const text of params.completeTexts) {
-        const match = fuzzyFind(text)
-        if (match && !match.done) {
-          match.done = true
-          match.completedAt = new Date().toISOString()
-          completed++
-        }
-      }
-    }
-
-    // Remove todos
-    if (params.removeTexts) {
-      for (const text of params.removeTexts) {
-        const match = fuzzyFind(text)
-        if (match) {
-          todos = todos.filter((t: any) => t.id !== match.id)
-          removed++
-        }
-      }
-    }
-
-    // Add new todos (dedup against existing)
-    if (params.add) {
-      const existingKeys = new Set(todos.map((t: any) => normalize(t.text)))
-      for (const text of params.add) {
-        if (!existingKeys.has(normalize(text))) {
-          todos.push({
-            id: crypto.randomUUID(),
-            text,
-            done: false,
-            createdAt: new Date().toISOString(),
-          })
-          added++
-        }
-      }
-    }
-
-    const todoResult = await db.update(dealLogs).set({ todos, updatedAt: new Date() })
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .returning({ id: dealLogs.id })
-    if (todoResult.length === 0) {
-      return { result: `⚠ TOOL FAILED: Could not update todos — deal not found or workspace mismatch.` }
-    }
-
-    const parts: string[] = []
-    if (added > 0) parts.push(`${added} added`)
-    if (completed > 0) parts.push(`${completed} completed`)
-    if (removed > 0) parts.push(`${removed} removed`)
-
-    return {
-      result: `Todos updated on **${deal.dealName}**: ${parts.join(', ')}.`,
-      actions: [{
-        type: 'todos_updated',
-        added,
-        removed,
-        completed,
-        dealName: deal.dealName,
-      }],
-      uiHint: 'refresh_deals',
-    }
-  },
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// add_contact
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const add_contact = {
-  description: 'Add a contact person to a deal. Adding a contact does NOT change anything else about the deal.',
-  parameters: z.object({
-    dealId: z.string().describe('The UUID of the deal'),
-    name: z.string().describe('Contact name'),
-    title: z.string().optional().describe('Job title or role'),
-    email: z.string().optional().describe('Email address'),
-    phone: z.string().optional().describe('Phone number'),
-    role: z.string().optional().describe('Role in the deal (e.g., "Champion", "Decision Maker", "Internal Sales Rep")'),
-  }),
-  execute: async (
-    params: { dealId: string; name: string; title?: string; email?: string; phone?: string; role?: string },
-    ctx: ToolContext,
-  ): Promise<ToolResult> => {
-    const [deal] = await db
-      .select({ id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany, stage: dealLogs.stage, contacts: dealLogs.contacts })
-      .from(dealLogs)
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .limit(1)
-
-    if (!deal) return { result: 'Deal not found.' }
-
-    const contacts = ((deal.contacts as any[]) ?? []).slice()
-    const newContact: Record<string, string> = {
-      id: crypto.randomUUID(),
-      name: params.name,
-    }
-    if (params.title) newContact.title = params.title
-    if (params.email) newContact.email = params.email
-    if (params.phone) newContact.phone = params.phone
-    if (params.role) newContact.role = params.role
-
-    contacts.push(newContact)
-    const contactResult = await db.update(dealLogs).set({ contacts, updatedAt: new Date() })
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .returning({ id: dealLogs.id })
-    if (contactResult.length === 0) {
-      return { result: `⚠ TOOL FAILED: Could not add contact — deal not found or workspace mismatch.` }
-    }
-
-    const totalContacts = contacts.length
-    return {
-      result: `Added **${params.name}**${params.title ? ` (${params.title})` : ''}${params.role ? ` as ${params.role}` : ''} to **${deal.dealName}** (${deal.prospectCompany}, ${deal.stage}). Deal now has ${totalContacts} contact(s).`,
-      actions: [{
-        type: 'deal_updated',
-        dealId: params.dealId,
-        dealName: deal.dealName,
-        changes: [`Contact added: ${params.name}`],
-      }],
-      uiHint: 'refresh_deals',
-    }
-  },
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// delete_deal
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const delete_deal = {
-  description: 'Delete a deal from the pipeline. Requires confirmation from the user before proceeding.',
-  parameters: z.object({
-    dealId: z.string().describe('The UUID of the deal to delete'),
-  }),
-  execute: async (params: { dealId: string }, ctx: ToolContext): Promise<ToolResult> => {
-    const [deal] = await db
-      .select({ id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany })
-      .from(dealLogs)
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .limit(1)
-
-    if (!deal) return { result: 'Deal not found.' }
-
-    return {
-      result: `Are you sure you want to delete the deal **${deal.dealName}** (${deal.prospectCompany})? This action cannot be undone. Reply "yes" to confirm.`,
-      confirmationRequired: true,
-      pendingAction: {
-        tool: 'delete_deal_confirmed',
-        dealId: params.dealId,
-        dealName: deal.dealName,
-      },
-    }
-  },
-}
-
-// Internal: actually deletes the deal after confirmation
-export const delete_deal_confirmed = {
-  description: 'Internal: Execute a confirmed deal deletion. Do not call directly — called after user confirms delete_deal.',
-  parameters: z.object({
-    dealId: z.string().describe('The UUID of the deal to delete'),
-  }),
-  execute: async (params: { dealId: string }, ctx: ToolContext): Promise<ToolResult> => {
-    const [deal] = await db
-      .select({ id: dealLogs.id, dealName: dealLogs.dealName })
-      .from(dealLogs)
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .limit(1)
-
-    if (!deal) return { result: 'Deal not found.' }
-
-    await db.delete(dealLogs).where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-
-    after(async () => {
-      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
-    })
-
-    return {
-      result: `Deal **${deal.dealName}** has been permanently deleted.`,
-      actions: [{ type: 'deal_deleted', dealId: params.dealId, dealName: deal.dealName }],
-      uiHint: 'refresh_deals',
-    }
-  },
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// process_meeting_notes
+// Helper: Process meeting notes via LLM extraction (moved from old process_meeting_notes)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const MeetingNotesSchema = z.object({
@@ -1322,962 +253,712 @@ const MeetingNotesSchema = z.object({
   })).optional().default([]),
 })
 
-export const process_meeting_notes = {
-  description: 'Process meeting notes or transcript for a deal. Holistic deal update: extracts summary, action items, risks, product gaps, competitors, and intent signals. Cross-references success criteria, project plan tasks, and existing todos. Suggests stage changes when warranted. Updates the deal automatically.',
-  parameters: z.object({
-    notes: z.string().describe('The meeting notes or transcript text'),
-    dealId: z.string().optional().describe('The UUID of the deal these notes relate to. If omitted, the active deal context is used.'),
-  }),
-  execute: async (
-    params: { notes: string; dealId?: string },
-    ctx: ToolContext,
-  ): Promise<ToolResult> => {
-    const dealId = params.dealId ?? ctx.activeDealId
-    if (!dealId) {
-      return { result: 'No deal specified. Please provide a dealId or navigate to a deal first.' }
-    }
+/**
+ * Full meeting notes processing pipeline: LLM extraction, merge, scoring, insights.
+ * Returns the changes made for reporting.
+ */
+async function processMeetingNotesHelper(
+  notes: string,
+  deal: any,
+  ctx: ToolContext,
+): Promise<{ updateFields: Record<string, unknown>; changes: string[]; parsed: z.infer<typeof MeetingNotesSchema> }> {
+  // Fetch known capabilities to prevent false product gap detection
+  const [profile] = await db
+    .select({ knownCapabilities: companyProfiles.knownCapabilities })
+    .from(companyProfiles)
+    .where(eq(companyProfiles.workspaceId, ctx.workspaceId))
+    .limit(1)
+  const knownCapabilities = (profile?.knownCapabilities as string[]) ?? []
+  const capabilitiesContext = knownCapabilities.length > 0
+    ? `\n\nCONFIRMED PRODUCT CAPABILITIES (do NOT flag these as product gaps):\n${knownCapabilities.map(c => `- ${c}`).join('\n')}`
+    : ''
 
-    const [deal] = await db
-      .select()
-      .from(dealLogs)
-      .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .limit(1)
+  function compressMeetingHistory(raw: string | null): string {
+    if (!raw) return ''
+    const blocks = raw.split(/\n---\n/).map(b => b.trim()).filter(Boolean)
+    return blocks.slice(-5).join('\n---\n')
+  }
 
-    if (!deal) return { result: 'Deal not found.' }
+  const compressedHistory = compressMeetingHistory(deal.meetingNotes as string | null)
+  const previousContext = [
+    compressedHistory ? `MEETING HISTORY (last 5 updates):\n${compressedHistory}` : '',
+    deal.aiSummary ? `CURRENT DEAL SUMMARY: ${deal.aiSummary}` : '',
+    (deal.dealRisks as string[])?.length ? `KNOWN RISKS: ${(deal.dealRisks as string[]).join('; ')}` : '',
+  ].filter(Boolean).join('\n\n')
 
-    // Fetch known capabilities to prevent false product gap detection
-    const [profile] = await db
-      .select({ knownCapabilities: companyProfiles.knownCapabilities })
-      .from(companyProfiles)
-      .where(eq(companyProfiles.workspaceId, ctx.workspaceId))
-      .limit(1)
-    const knownCapabilities = (profile?.knownCapabilities as string[]) ?? []
-    const capabilitiesContext = knownCapabilities.length > 0
-      ? `\n\nCONFIRMED PRODUCT CAPABILITIES (do NOT flag these as product gaps):\n${knownCapabilities.map(c => `- ${c}`).join('\n')}`
-      : ''
+  const existingTodos = (deal.todos as any[]) ?? []
+  const openTodos = existingTodos.filter((t: any) => !t.done)
+  const existingTodosContext = openTodos.length > 0
+    ? `\n\nEXISTING OPEN ACTION ITEMS:\n${openTodos.map((t: any) => `- [${t.id}] ${t.text}`).join('\n')}\n\nRules:\n- Do NOT add duplicates of existing items\n- Return obsoleteTodoIds: IDs of items now done, superseded, or irrelevant`
+    : ''
 
-    // Compress meeting history to last 5 entries (entries separated by \n---\n)
-    function compressMeetingHistory(raw: string | null): string {
-      if (!raw) return ''
-      const blocks = raw.split(/\n---\n/).map(b => b.trim()).filter(Boolean)
-      return blocks.slice(-5).join('\n---\n')
-    }
+  const criteria = (deal.successCriteriaTodos as any[]) ?? []
+  const openCriteria = criteria.filter((c: any) => !c.achieved)
+  const existingCriteriaContext = openCriteria.length > 0
+    ? `\n\nOPEN SUCCESS CRITERIA (mark achieved if meeting notes confirm they were demonstrated/met):\n${openCriteria.map((c: any) => `- [${c.id}] ${c.text} (${c.category})`).join('\n')}`
+    : ''
 
-    const compressedHistory = compressMeetingHistory(deal.meetingNotes as string | null)
-    const previousContext = [
-      compressedHistory ? `MEETING HISTORY (last 5 updates):\n${compressedHistory}` : '',
-      deal.aiSummary ? `CURRENT DEAL SUMMARY: ${deal.aiSummary}` : '',
-      (deal.dealRisks as string[])?.length ? `KNOWN RISKS: ${(deal.dealRisks as string[]).join('; ')}` : '',
-    ].filter(Boolean).join('\n\n')
-
-    const existingTodos = (deal.todos as any[]) ?? []
-    const openTodos = existingTodos.filter((t: any) => !t.done)
-    const existingTodosContext = openTodos.length > 0
-      ? `\n\nEXISTING OPEN ACTION ITEMS:\n${openTodos.map((t: any) => `- [${t.id}] ${t.text}`).join('\n')}\n\nRules:\n- Do NOT add duplicates of existing items\n- Return obsoleteTodoIds: IDs of items now done, superseded, or irrelevant`
-      : ''
-
-    // Build success criteria context
-    const criteria = (deal.successCriteriaTodos as any[]) ?? []
-    const openCriteria = criteria.filter((c: any) => !c.achieved)
-    const existingCriteriaContext = openCriteria.length > 0
-      ? `\n\nOPEN SUCCESS CRITERIA (mark achieved if meeting notes confirm they were demonstrated/met):\n${openCriteria.map((c: any) => `- [${c.id}] ${c.text} (${c.category})`).join('\n')}`
-      : ''
-
-    // Build project plan context
-    const projectPlan = deal.projectPlan as any
-    let existingProjectPlanContext = ''
-    if (projectPlan?.phases?.length > 0) {
-      const taskLines: string[] = []
-      for (const phase of projectPlan.phases) {
-        for (const task of (phase.tasks ?? [])) {
-          if (task.status !== 'complete') {
-            taskLines.push(`- [${task.id}] ${task.text} (${phase.name}, status: ${task.status})`)
-          }
+  const projectPlan = deal.projectPlan as any
+  let existingProjectPlanContext = ''
+  if (projectPlan?.phases?.length > 0) {
+    const taskLines: string[] = []
+    for (const phase of projectPlan.phases) {
+      for (const task of (phase.tasks ?? [])) {
+        if (task.status !== 'complete') {
+          taskLines.push(`- [${task.id}] ${task.text} (${phase.name}, status: ${task.status})`)
         }
       }
-      if (taskLines.length > 0) {
-        existingProjectPlanContext = `\n\nOPEN PROJECT PLAN TASKS (update status if meeting notes indicate progress):\n${taskLines.join('\n')}`
-      }
     }
+    if (taskLines.length > 0) {
+      existingProjectPlanContext = `\n\nOPEN PROJECT PLAN TASKS (update status if meeting notes indicate progress):\n${taskLines.join('\n')}`
+    }
+  }
 
-    // Phase 1: LLM extraction (no scoring)
-    const extractionMsg = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2000,
-      messages: [{
-        role: 'user',
-        content: `Extract structured data from these sales meeting notes. Return ONLY valid JSON.
+  // LLM extraction
+  const extractionMsg = await anthropic.messages.create({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 2000,
+    messages: [{
+      role: 'user',
+      content: `Extract structured data from these sales meeting notes. Return ONLY valid JSON.
 
 Today's date is ${new Date().toISOString().split('T')[0]}.
 
 DEFINITIONS — read these carefully:
 - DEAL RISKS: Concerns about whether this deal will CLOSE. Examples: budget freeze, champion leaving, competitor preferred, timeline slipping, decision-maker disengaged. NOT about product features.
 - PRODUCT GAPS: Features/capabilities that OUR PRODUCT is MISSING that the prospect explicitly said they need. Only if they said "your product can't do X" or "we need X and you don't have it". NOT general concerns or nice-to-haves.
-- ACTION ITEMS: Specific things someone needs to DO. Preserve exact wording — if they said "send the pricing deck to Sarah by Friday", that's the todo text.
+- ACTION ITEMS: Specific things someone needs to DO. Preserve exact wording.
 
 ${previousContext ? `${previousContext}\n\n---\n\n` : ''}NEW MEETING NOTES:
-${params.notes}
+${notes}
 
 Deal: ${deal.dealName} with ${deal.prospectCompany} (current stage: ${deal.stage}${deal.closeDate ? `, current close date: ${new Date(deal.closeDate).toISOString().split('T')[0]}` : ''})${capabilitiesContext}${existingTodosContext}${existingCriteriaContext}${existingProjectPlanContext}
 
 Return this exact JSON:
 {
-  "summary": "2-4 sentence factual summary preserving key specifics: names, dates, numbers, decisions, and exact requirements discussed",
-  "risks": ["NEW deal-closing risks introduced in these notes only"],
-  "resolvedRisks": ["substring matching an existing risk that is now resolved — e.g. 'attendance unconfirmed' if attendance is now confirmed"],
-  "todos": [{"text": "Exact action item preserving original wording, names, and deadlines"}],
-  "obsoleteTodoIds": ["id-of-existing-todo-now-done-or-irrelevant"],
-  "productGaps": [{"title": "Missing feature name", "description": "What our product cannot do that prospect explicitly said they need", "priority": "high"}],
-  "competitors": ["competitor name only if explicitly mentioned as being evaluated"],
+  "summary": "2-4 sentence factual summary preserving key specifics",
+  "risks": ["NEW deal-closing risks only"],
+  "resolvedRisks": ["substring matching existing risk now resolved"],
+  "todos": [{"text": "Exact action item preserving original wording"}],
+  "obsoleteTodoIds": ["id-of-existing-todo-now-done"],
+  "productGaps": [{"title": "Missing feature", "description": "What we can't do", "priority": "high"}],
+  "competitors": ["competitor name only if explicitly evaluated"],
   "intentSignals": {
     "championStatus": "confirmed|suspected|none",
     "budgetStatus": "approved|awaiting|not_discussed|blocked",
-    "decisionTimeline": "e.g. Q2 2026 or null if not mentioned",
+    "decisionTimeline": "e.g. Q2 2026 or null",
     "nextMeetingBooked": false
   },
-  "criteriaUpdates": [{"criterionId": "id", "achieved": true, "note": "Demonstrated in meeting"}],
-  "projectPlanUpdates": [{"taskId": "id", "status": "complete", "note": "Completed — session confirmed for 19 Mar"}],
-  "suggestedStage": "proposal or null if no stage change implied",
-  "stageReason": "reason for stage change or null",
-  "closeDateUpdate": {
-    "newDate": "2026-05-15 or null if no timeline change mentioned",
-    "reason": "Trial extended 30 days"
-  },
-  "scheduledEvents": [
-    {
-      "type": "meeting",
-      "description": "Product demo with Morgan and IT team",
-      "date": "2026-03-24",
-      "time": "14:00",
-      "participants": ["Morgan", "IT team"]
-    }
-  ]
+  "criteriaUpdates": [{"criterionId": "id", "achieved": true, "note": "Demonstrated"}],
+  "projectPlanUpdates": [{"taskId": "id", "status": "complete", "note": "Done"}],
+  "suggestedStage": "null if no stage change",
+  "stageReason": "null",
+  "closeDateUpdate": {"newDate": "null if no change", "reason": "reason"},
+  "scheduledEvents": [{"type": "meeting", "description": "...", "date": "YYYY-MM-DD", "time": "HH:MM", "participants": []}]
 }
 
 Rules:
-- PRESERVE EXACT WORDING from the notes. If someone said "we need to demo desk utilization by team", that exact phrase goes in todos — not "prepare desk analytics demo".
-- risks: NEW deal-closing risks from these notes ONLY (not repeats of known risks). Return [] if no new risks.
-- resolvedRisks: CRITICAL — if a known risk is now resolved by these notes, add a short substring from it here. Examples: if "attendance unconfirmed" is a known risk and the notes say "confirmed attendance", add "attendance unconfirmed". If "session not scheduled" was a risk and notes say "session agreed for 19 Mar", add "session not scheduled". Be generous — if notes clearly indicate a risk is gone, resolve it.
-- todos: New items only, no duplicates. Include who is responsible and deadlines if mentioned. Return [] if none.
-- productGaps: ONLY if prospect explicitly said our product lacks something. General concerns are risks, not gaps. Return [] if no explicit product gaps.
-- competitors: Only if named as an explicit alternative being evaluated. Return [] if none.
-- intentSignals: Extract ONLY what is explicitly stated, never infer.
-- criteriaUpdates: ONLY if the meeting notes clearly demonstrate a criterion was met. Don't guess. Return [] if none confirmed.
-- projectPlanUpdates: CRITICAL — if the notes describe completing or progressing a task, match it to the task ID and set status to "complete" or "in_progress". Be smart: "agreed on plan and dates" = complete any planning tasks; "session confirmed for 19 Mar" = complete any attendance-confirmation tasks. Return [] if no task progress.
-- suggestedStage: ONLY if notes clearly imply a stage transition (e.g., "sent proposal" = proposal, "received signed contract" = closed_won). Return null if current stage still appropriate.
-- closeDateUpdate: If the notes mention a timeline change (extended, pushed back, delayed, moved to, new deadline, trial extended), calculate the new close date. If "pushed back 30 days" and current close date is known, add 30 days to it. If an absolute date is given ("moving to June"), use that date. Return null for newDate if no timeline change is mentioned.
-- scheduledEvents: Extract any events mentioned with dates. Resolve relative dates ("next Tuesday", "this Friday", "in two weeks") relative to today's date shown above. Include event type (meeting|follow_up|deadline|demo|decision), description, ISO date (YYYY-MM-DD), time if mentioned (HH:MM 24-hour), and participants. Return [] if no concrete events with dates are mentioned.
-- DO NOT infer things that weren't said. If the notes don't mention budget, leave budgetStatus as "not_discussed".`,
-      }],
-    })
+- PRESERVE EXACT WORDING from the notes for todos.
+- risks: NEW risks from these notes ONLY. Return [] if none.
+- resolvedRisks: if a known risk is now resolved, add substring here.
+- todos: New items only, no duplicates. Return [] if none.
+- productGaps: ONLY explicit product gaps. Return [] if none.
+- competitors: Only if named as alternative being evaluated. Return [] if none.
+- intentSignals: Extract ONLY what is explicitly stated.
+- criteriaUpdates: ONLY if clearly demonstrated. Return [] if none.
+- projectPlanUpdates: If notes describe completing/progressing a task, match by ID. Return [] if none.
+- suggestedStage: ONLY if notes clearly imply stage transition. Return null otherwise.
+- closeDateUpdate: If timeline change mentioned. Return null if none.
+- scheduledEvents: Extract dated events. Resolve relative dates. Return [] if none.
+- DO NOT infer things that weren't said.`,
+    }],
+  })
 
-    const rawText = ((extractionMsg.content[0] as any).text ?? '').trim()
+  const rawText = ((extractionMsg.content[0] as any).text ?? '').trim()
 
-    // Parse with retry
-    let parsed: z.infer<typeof MeetingNotesSchema>
-    try {
-      const jsonStr = rawText.replace(/^```json?\n?/i, '').replace(/\n?```$/i, '').trim()
-      const braceIdx = jsonStr.indexOf('{')
-      const cleanJson = braceIdx > 0 ? jsonStr.slice(braceIdx) : jsonStr
-      const result = MeetingNotesSchema.safeParse(JSON.parse(cleanJson))
-      if (result.success) {
-        parsed = result.data
-      } else {
-        // Retry with correction
-        const retryMsg = await anthropic.messages.create({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 2000,
-          messages: [{
-            role: 'user',
-            content: `Return ONLY valid JSON. No markdown.\n\nOriginal:\n${rawText}\n\nErrors: ${result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')}\n\nFix and return only the corrected object.`,
-          }],
-        })
-        const retryRaw = ((retryMsg.content[0] as any).text ?? '').trim()
-        const retryClean = retryRaw.replace(/^```json?\n?/i, '').replace(/\n?```$/i, '').trim()
-        const retryBrace = retryClean.indexOf('{')
-        parsed = MeetingNotesSchema.parse(JSON.parse(retryBrace > 0 ? retryClean.slice(retryBrace) : retryClean))
-      }
-    } catch {
-      parsed = MeetingNotesSchema.parse({})
-    }
-
-    // Build update fields
-    const newTodos = (parsed.todos ?? []).map(t => ({
-      id: crypto.randomUUID(),
-      text: t.text,
-      done: false,
-      createdAt: new Date().toISOString(),
-    }))
-
-    const obsoleteIds = new Set(parsed.obsoleteTodoIds ?? [])
-    const dateStamp = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-    const risksLine = (parsed.risks ?? []).length > 0 ? ` Risks: ${parsed.risks.join('; ')}.` : ''
-    const actionLine = newTodos.length > 0 ? ` Actions: ${newTodos.map(t => t.text).join('; ')}.` : ''
-    const compactEntry = parsed.summary
-      ? `[${dateStamp}] ${parsed.summary}${risksLine}${actionLine}`
-      : `[${dateStamp}] Meeting notes processed.${actionLine}`
-
-    const appendedNotes = deal.meetingNotes ? `${deal.meetingNotes}\n---\n${compactEntry}` : compactEntry
-
-    // Merge todos: remove obsolete, dedup, append new
-    const existingKept = existingTodos.filter((t: any) => !obsoleteIds.has(t.id))
-    const existingKeys = new Set(existingKept.map((t: any) => normalize(t.text)))
-    const dedupedNew = newTodos.filter(t => !existingKeys.has(normalize(t.text)))
-    const mergedTodos = [...existingKept, ...dedupedNew]
-
-    // Merge competitors
-    const extractedComps = (parsed.competitors ?? []).filter(c => typeof c === 'string' && c.trim())
-    const existingComps = (deal.competitors as string[]) ?? []
-    const existingCompKeys = new Set(existingComps.map(c => c.toLowerCase()))
-    const newComps = extractedComps.filter(c => !existingCompKeys.has(c.toLowerCase()))
-    const mergedCompetitors = newComps.length > 0 ? [...existingComps, ...newComps] : undefined
-
-    // Smart risk merge: keep existing unresolved risks, add new ones
-    const existingRisks = (deal.dealRisks as string[]) ?? []
-    const resolvedPatterns = (parsed.resolvedRisks ?? []).map(r => r.toLowerCase())
-    const survivingRisks = existingRisks.filter(r =>
-      !resolvedPatterns.some(pattern => r.toLowerCase().includes(pattern) || pattern.includes(r.toLowerCase().slice(0, 30)))
-    )
-    const existingRiskKeys = new Set(survivingRisks.map(r => r.toLowerCase().slice(0, 40)))
-    const newRisks = (parsed.risks ?? []).filter(r => !existingRiskKeys.has(r.toLowerCase().slice(0, 40)))
-    const mergedRisks = [...survivingRisks, ...newRisks]
-
-    const updateFields: Record<string, unknown> = {
-      meetingNotes: appendedNotes,
-      dealRisks: mergedRisks,
-      todos: mergedTodos,
-      updatedAt: new Date(),
-    }
-    if (mergedCompetitors) updateFields.competitors = mergedCompetitors
-    if (parsed.summary) updateFields.aiSummary = parsed.summary
-    if (parsed.intentSignals) updateFields.intentSignals = parsed.intentSignals
-
-    // Merge scheduled events: append new ones (deduplicate by date+description)
-    if ((parsed.scheduledEvents ?? []).length > 0) {
-      const existingEvents = ((deal as any).scheduledEvents as any[]) ?? []
-      const existingKeys = new Set(existingEvents.map((e: any) => `${e.date}|${e.description?.slice(0, 40).toLowerCase()}`))
-      const newEvents = (parsed.scheduledEvents ?? [])
-        .filter(e => e.date && e.description)
-        .map(e => ({ ...e, id: crypto.randomUUID(), extractedAt: new Date().toISOString() }))
-        .filter(e => !existingKeys.has(`${e.date}|${e.description.slice(0, 40).toLowerCase()}`))
-      if (newEvents.length > 0) {
-        updateFields.scheduledEvents = [...existingEvents, ...newEvents]
-      }
-    }
-
-    // Apply success criteria updates
-    if (parsed.criteriaUpdates?.length) {
-      const criteriaUpdateMap = new Map(parsed.criteriaUpdates.map(u => [u.criterionId, u]))
-      const existingCriteria = ((deal.successCriteriaTodos as any[]) ?? []).slice()
-      const updatedCriteria = existingCriteria.map((c: any) => {
-        const update = criteriaUpdateMap.get(c.id)
-        if (!update) return c
-        return {
-          ...c,
-          ...(update.achieved !== undefined ? { achieved: update.achieved } : {}),
-          ...(update.note ? { note: (c.note ? `${c.note}\n${update.note}` : update.note) } : {}),
-        }
+  let parsed: z.infer<typeof MeetingNotesSchema>
+  try {
+    const jsonStr = rawText.replace(/^```json?\n?/i, '').replace(/\n?```$/i, '').trim()
+    const braceIdx = jsonStr.indexOf('{')
+    const cleanJson = braceIdx > 0 ? jsonStr.slice(braceIdx) : jsonStr
+    const result = MeetingNotesSchema.safeParse(JSON.parse(cleanJson))
+    if (result.success) {
+      parsed = result.data
+    } else {
+      const retryMsg = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2000,
+        messages: [{
+          role: 'user',
+          content: `Return ONLY valid JSON. No markdown.\n\nOriginal:\n${rawText}\n\nErrors: ${result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')}\n\nFix and return only the corrected object.`,
+        }],
       })
-      updateFields.successCriteriaTodos = updatedCriteria
+      const retryRaw = ((retryMsg.content[0] as any).text ?? '').trim()
+      const retryClean = retryRaw.replace(/^```json?\n?/i, '').replace(/\n?```$/i, '').trim()
+      const retryBrace = retryClean.indexOf('{')
+      parsed = MeetingNotesSchema.parse(JSON.parse(retryBrace > 0 ? retryClean.slice(retryBrace) : retryClean))
     }
+  } catch {
+    parsed = MeetingNotesSchema.parse({})
+  }
 
-    // Apply project plan task updates (match by ID, fallback to text similarity)
-    if (parsed.projectPlanUpdates?.length) {
-      const taskUpdateMap = new Map(parsed.projectPlanUpdates.map(u => [u.taskId, u]))
-      const existingPlan = (deal.projectPlan as any) ?? { phases: [] }
+  // Build update fields
+  const newTodos = (parsed.todos ?? []).map(t => ({
+    id: crypto.randomUUID(),
+    text: t.text,
+    done: false,
+    createdAt: new Date().toISOString(),
+  }))
 
-      // Build a text→update map for fuzzy fallback matching
-      const textFallbackMap = new Map<string, typeof parsed.projectPlanUpdates[0]>()
-      for (const u of parsed.projectPlanUpdates) {
-        // Sometimes LLM returns partial task text instead of ID
-        if (!u.taskId.match(/^[0-9a-f-]{36}$/i)) {
-          textFallbackMap.set(u.taskId.toLowerCase(), u)
-        }
+  const obsoleteIds = new Set(parsed.obsoleteTodoIds ?? [])
+  const dateStamp = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  const risksLine = (parsed.risks ?? []).length > 0 ? ` Risks: ${parsed.risks.join('; ')}.` : ''
+  const actionLine = newTodos.length > 0 ? ` Actions: ${newTodos.map(t => t.text).join('; ')}.` : ''
+  const compactEntry = parsed.summary
+    ? `[${dateStamp}] ${parsed.summary}${risksLine}${actionLine}`
+    : `[${dateStamp}] Meeting notes processed.${actionLine}`
+
+  const appendedNotes = deal.meetingNotes ? `${deal.meetingNotes}\n---\n${compactEntry}` : compactEntry
+
+  // Merge todos
+  const existingKept = existingTodos.filter((t: any) => !obsoleteIds.has(t.id))
+  const existingKeys = new Set(existingKept.map((t: any) => normalize(t.text)))
+  const dedupedNew = newTodos.filter(t => !existingKeys.has(normalize(t.text)))
+  const mergedTodos = [...existingKept, ...dedupedNew]
+
+  // Merge competitors
+  const extractedComps = (parsed.competitors ?? []).filter(c => typeof c === 'string' && c.trim())
+  const existingComps = (deal.competitors as string[]) ?? []
+  const existingCompKeys = new Set(existingComps.map(c => c.toLowerCase()))
+  const newComps = extractedComps.filter(c => !existingCompKeys.has(c.toLowerCase()))
+  const mergedCompetitors = newComps.length > 0 ? [...existingComps, ...newComps] : undefined
+
+  // Smart risk merge
+  const existingRisks = (deal.dealRisks as string[]) ?? []
+  const resolvedPatterns = (parsed.resolvedRisks ?? []).map(r => r.toLowerCase())
+  const survivingRisks = existingRisks.filter(r =>
+    !resolvedPatterns.some(pattern => r.toLowerCase().includes(pattern) || pattern.includes(r.toLowerCase().slice(0, 30)))
+  )
+  const existingRiskKeys = new Set(survivingRisks.map(r => r.toLowerCase().slice(0, 40)))
+  const newRisks = (parsed.risks ?? []).filter(r => !existingRiskKeys.has(r.toLowerCase().slice(0, 40)))
+  const mergedRisks = [...survivingRisks, ...newRisks]
+
+  const updateFields: Record<string, unknown> = {
+    meetingNotes: appendedNotes,
+    dealRisks: mergedRisks,
+    todos: mergedTodos,
+    updatedAt: new Date(),
+  }
+  if (mergedCompetitors) updateFields.competitors = mergedCompetitors
+  if (parsed.summary) updateFields.aiSummary = parsed.summary
+  if (parsed.intentSignals) updateFields.intentSignals = parsed.intentSignals
+
+  // Merge scheduled events
+  if ((parsed.scheduledEvents ?? []).length > 0) {
+    const existingEvents = ((deal as any).scheduledEvents as any[]) ?? []
+    const existingEvtKeys = new Set(existingEvents.map((e: any) => `${e.date}|${e.description?.slice(0, 40).toLowerCase()}`))
+    const newEvents = (parsed.scheduledEvents ?? [])
+      .filter(e => e.date && e.description)
+      .map(e => ({ ...e, id: crypto.randomUUID(), extractedAt: new Date().toISOString() }))
+      .filter(e => !existingEvtKeys.has(`${e.date}|${e.description.slice(0, 40).toLowerCase()}`))
+    if (newEvents.length > 0) {
+      updateFields.scheduledEvents = [...existingEvents, ...newEvents]
+    }
+  }
+
+  // Apply success criteria updates
+  if (parsed.criteriaUpdates?.length) {
+    const criteriaUpdateMap = new Map(parsed.criteriaUpdates.map(u => [u.criterionId, u]))
+    const existingCriteriaArr = ((deal.successCriteriaTodos as any[]) ?? []).slice()
+    const updatedCriteria = existingCriteriaArr.map((c: any) => {
+      const update = criteriaUpdateMap.get(c.id)
+      if (!update) return c
+      return {
+        ...c,
+        ...(update.achieved !== undefined ? { achieved: update.achieved } : {}),
+        ...(update.note ? { note: (c.note ? `${c.note}\n${update.note}` : update.note) } : {}),
       }
+    })
+    updateFields.successCriteriaTodos = updatedCriteria
+  }
 
-      const updatedPlan = {
-        ...existingPlan,
-        updatedAt: new Date().toISOString(),
-        phases: (existingPlan.phases ?? []).map((phase: any) => ({
-          ...phase,
-          tasks: (phase.tasks ?? []).map((task: any) => {
-            // Try ID match first
-            let update = taskUpdateMap.get(task.id)
-            // Fallback: fuzzy text match
-            if (!update && textFallbackMap.size > 0) {
-              const taskTextLower = (task.text ?? '').toLowerCase()
-              for (const [key, u] of textFallbackMap) {
-                if (taskTextLower.includes(key.slice(0, 20)) || key.includes(taskTextLower.slice(0, 20))) {
-                  update = u
-                  break
-                }
+  // Apply project plan task updates
+  if (parsed.projectPlanUpdates?.length) {
+    const taskUpdateMap = new Map(parsed.projectPlanUpdates.map(u => [u.taskId, u]))
+    const existingPlan = (deal.projectPlan as any) ?? { phases: [] }
+    const textFallbackMap = new Map<string, typeof parsed.projectPlanUpdates[0]>()
+    for (const u of parsed.projectPlanUpdates) {
+      if (!u.taskId.match(/^[0-9a-f-]{36}$/i)) {
+        textFallbackMap.set(u.taskId.toLowerCase(), u)
+      }
+    }
+    const updatedPlan = {
+      ...existingPlan,
+      updatedAt: new Date().toISOString(),
+      phases: (existingPlan.phases ?? []).map((phase: any) => ({
+        ...phase,
+        tasks: (phase.tasks ?? []).map((task: any) => {
+          let update = taskUpdateMap.get(task.id)
+          if (!update && textFallbackMap.size > 0) {
+            const taskTextLower = (task.text ?? '').toLowerCase()
+            for (const [key, u] of textFallbackMap) {
+              if (taskTextLower.includes(key.slice(0, 20)) || key.includes(taskTextLower.slice(0, 20))) {
+                update = u
+                break
               }
             }
-            if (!update) return task
-            return {
-              ...task,
-              status: update.status ?? task.status,
-              notes: update.note ? (task.notes ? `${task.notes}\n${update.note}` : update.note) : task.notes,
-            }
-          }),
-        })),
-      }
-      updateFields.projectPlan = updatedPlan
+          }
+          if (!update) return task
+          return {
+            ...task,
+            status: update.status ?? task.status,
+            notes: update.note ? (task.notes ? `${task.notes}\n${update.note}` : update.note) : task.notes,
+          }
+        }),
+      })),
     }
+    updateFields.projectPlan = updatedPlan
+  }
 
-    // Apply suggested stage change
-    if (parsed.suggestedStage && parsed.suggestedStage !== deal.stage) {
-      updateFields.stage = parsed.suggestedStage
-      if (parsed.suggestedStage === 'closed_won') updateFields.wonDate = new Date()
-      if (parsed.suggestedStage === 'closed_lost') updateFields.lostDate = new Date()
-    }
+  // Apply suggested stage change
+  if (parsed.suggestedStage && parsed.suggestedStage !== deal.stage) {
+    updateFields.stage = parsed.suggestedStage
+    if (parsed.suggestedStage === 'closed_won') updateFields.wonDate = new Date()
+    if (parsed.suggestedStage === 'closed_lost') updateFields.lostDate = new Date()
+  }
 
-    // Apply close date update from timeline change
-    if (parsed.closeDateUpdate?.newDate) {
-      const d = new Date(parsed.closeDateUpdate.newDate)
-      // Fix 2-digit year: "0026" → 2026
-      if (d.getFullYear() < 100) d.setFullYear(d.getFullYear() + 2000)
-      updateFields.closeDate = d
-    }
+  // Apply close date update
+  if (parsed.closeDateUpdate?.newDate) {
+    const d = new Date(parsed.closeDateUpdate.newDate)
+    if (d.getFullYear() < 100) d.setFullYear(d.getFullYear() + 2000)
+    updateFields.closeDate = d
+  }
 
-    // Phase 2: Score computation — re-score unless user has explicitly pinned the score
-    if (!(deal as any).conversionScorePinned) {
-      try {
-        const signals = extractTextSignals(appendedNotes, deal.createdAt ?? new Date(), new Date())
-        const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
-        const mlPred = brain?.mlPredictions?.find(p => p.dealId === dealId)
-        const effectiveStage = (updateFields.stage as string | undefined) ?? deal.stage
-        const sNorm = stageToNorm(effectiveStage)
+  // Score computation (unless pinned)
+  if (!(deal as any).conversionScorePinned) {
+    await computeAndUpdateScore(
+      deal.id, ctx.workspaceId, appendedNotes,
+      deal.createdAt ?? new Date(),
+      (updateFields.stage as string | undefined) ?? deal.stage,
+      ctx, parsed.intentSignals,
+    )
+  }
 
-        let finalScore: number
-        if (mlPred && brain?.mlModel) {
-          const { composite } = computeCompositeScore(
-            heuristicScore(signals, sNorm),
-            mlPred.winProbability,
-            brain.mlModel.trainingSize,
-          )
-          finalScore = composite
-        } else {
-          finalScore = heuristicScore(signals, sNorm)
-        }
-
-        // Intent signal adjustments
-        if (parsed.intentSignals) {
-          const is = parsed.intentSignals
-          if (is.championStatus === 'confirmed') finalScore = Math.min(100, finalScore + 6)
-          if (is.championStatus === 'suspected') finalScore = Math.min(100, finalScore + 3)
-          if (is.budgetStatus === 'approved') finalScore = Math.min(100, finalScore + 8)
-          if (is.budgetStatus === 'awaiting') finalScore = Math.min(100, finalScore + 2)
-          if (is.budgetStatus === 'blocked') finalScore = Math.max(0, finalScore - 8)
-          if (is.nextMeetingBooked) finalScore = Math.min(100, finalScore + 3)
-        }
-
-        updateFields.conversionScore = Math.max(0, Math.min(100, Math.round(finalScore)))
-      } catch { /* non-fatal */ }
-    }
-
-    // Phase 3: Regenerate conversionInsights — always, even when score is pinned.
-    // Insights must reflect current reality (post-merge risks, new summary), not stale state.
-    // This is what the UI shows as "INSIGHTS" — critical to keep accurate.
-    try {
-      const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
-      const currentScore = (updateFields.conversionScore as number | undefined) ?? (deal as any).conversionScore ?? 50
-      const signals = extractTextSignals(appendedNotes, deal.createdAt ?? new Date(), new Date())
-      const briefing = buildDealBriefing(brain ?? null, dealId, {
-        dealName: deal.dealName,
-        company: deal.prospectCompany ?? '',
-        stage: (updateFields.stage as string | undefined) ?? deal.stage,
-        dealRisks: mergedRisks,          // use POST-merge risks so resolved ones don't appear
-        dealCompetitors: mergedCompetitors ?? (deal.competitors as string[]) ?? [],
-        conversionScore: currentScore,
-        meetingNotes: appendedNotes,
-      }, signals)
-      const narrationMsg = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 400,
-        messages: [{ role: 'user', content: scoreNarrationPrompt(briefing) }],
-      })
-      const narration = (narrationMsg.content[0] as any)?.text?.trim() ?? ''
-      const freshInsights = narration
-        .split('\n')
-        .map((l: string) => l.replace(/^[-•*·]\s*/, '').trim())
-        .filter((l: string) => l.length > 8)
-        .filter((l: string) => !/\d+\/100/i.test(l))
-        .slice(0, 3)
-      if (freshInsights.length > 0) {
-        updateFields.conversionInsights = freshInsights
-      }
-    } catch { /* non-fatal — insights stay as-is if narration fails */ }
-
-    const updateResult = await db.update(dealLogs).set(updateFields)
-      .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .returning({ id: dealLogs.id })
-
-    if (updateResult.length === 0) {
-      return { result: `I wasn't able to update that deal — it wasn't found or there was a workspace mismatch.` }
-    }
-
-    // Create product gaps
-    const createdGaps: string[] = []
-    for (const gap of (parsed.productGaps ?? [])) {
-      if (!gap.title) continue
-      const [existing] = await db
-        .select()
-        .from(productGaps)
-        .where(and(eq(productGaps.workspaceId, ctx.workspaceId), eq(productGaps.title, gap.title)))
-        .limit(1)
-
-      if (existing) {
-        await db.update(productGaps).set({
-          frequency: (existing.frequency ?? 1) + 1,
-          sourceDeals: [...((existing.sourceDeals as string[]) ?? []), dealId],
-          updatedAt: new Date(),
-        }).where(eq(productGaps.id, existing.id))
-      } else {
-        await db.insert(productGaps).values({
-          workspaceId: ctx.workspaceId,
-          userId: ctx.userId,
-          title: gap.title,
-          description: gap.description ?? '',
-          priority: gap.priority ?? 'medium',
-          frequency: 1,
-          sourceDeals: [dealId],
-          status: 'open',
-          affectedRevenue: deal.dealValue ?? null,
-        })
-      }
-      createdGaps.push(gap.title)
-    }
-
-    after(async () => {
-      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
+  // Regenerate conversion insights
+  try {
+    const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
+    const currentScore = (updateFields.conversionScore as number | undefined) ?? (deal as any).conversionScore ?? 50
+    const signals = extractTextSignals(appendedNotes, deal.createdAt ?? new Date(), new Date())
+    const briefing = buildDealBriefing(brain ?? null, deal.id, {
+      dealName: deal.dealName,
+      company: deal.prospectCompany ?? '',
+      stage: (updateFields.stage as string | undefined) ?? deal.stage,
+      dealRisks: mergedRisks,
+      dealCompetitors: mergedCompetitors ?? (deal.competitors as string[]) ?? [],
+      conversionScore: currentScore,
+      meetingNotes: appendedNotes,
+    }, signals)
+    const narrationMsg = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 400,
+      messages: [{ role: 'user', content: scoreNarrationPrompt(briefing) }],
     })
+    const narration = (narrationMsg.content[0] as any)?.text?.trim() ?? ''
+    const freshInsights = narration
+      .split('\n')
+      .map((l: string) => l.replace(/^[-•*·]\s*/, '').trim())
+      .filter((l: string) => l.length > 8)
+      .filter((l: string) => !/\d+\/100/i.test(l))
+      .slice(0, 3)
+    if (freshInsights.length > 0) {
+      updateFields.conversionInsights = freshInsights
+    }
+  } catch { /* non-fatal */ }
 
-    // Build response
-    const resultLines = [`Meeting notes processed for **${deal.dealName}**.`]
-    if (parsed.summary) resultLines.push(`\n**Summary:** ${parsed.summary}`)
-    if (parsed.risks.length > 0) {
-      resultLines.push(`\n**Risks identified:**`)
-      parsed.risks.forEach(r => resultLines.push(`- ${r}`))
+  // Build changes summary
+  const changes: string[] = []
+  if (parsed.summary) changes.push(`Summary updated`)
+  if (parsed.risks.length > 0) changes.push(`${parsed.risks.length} new risk(s) identified`)
+  if (dedupedNew.length > 0) changes.push(`${dedupedNew.length} new action item(s)`)
+  if (obsoleteIds.size > 0) changes.push(`${obsoleteIds.size} obsolete todo(s) removed`)
+  if (newComps.length > 0) changes.push(`Competitors: ${newComps.join(', ')}`)
+  if (parsed.criteriaUpdates?.length) {
+    const achievedCount = parsed.criteriaUpdates.filter(u => u.achieved).length
+    if (achievedCount > 0) changes.push(`${achievedCount} success criteria achieved`)
+  }
+  if (parsed.projectPlanUpdates?.length) changes.push(`${parsed.projectPlanUpdates.length} project plan task(s) updated`)
+  if (parsed.suggestedStage && parsed.suggestedStage !== deal.stage) changes.push(`Stage: ${deal.stage} → ${parsed.suggestedStage}`)
+  if (parsed.closeDateUpdate?.newDate) changes.push(`Close date updated`)
+  if ((parsed.scheduledEvents ?? []).length > 0) changes.push(`${(parsed.scheduledEvents ?? []).length} calendar event(s) extracted`)
+
+  return { updateFields, changes, parsed }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOOL 1: get_deal
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const get_deal = {
+  description: 'Look up any deal\'s full context by ID or name. Returns full deal data including score, stage, contacts, todos, notes summary, risks, signals, project plan, and success criteria.',
+  parameters: z.object({
+    dealId: z.string().optional().describe('The UUID of the deal'),
+    dealName: z.string().optional().describe('Deal name or company name to search for'),
+  }),
+  execute: async (
+    params: { dealId?: string; dealName?: string },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    let deal: any = null
+    const searchTerm = params.dealId || params.dealName
+
+    if (!searchTerm) {
+      return { result: 'Please provide a dealId or dealName to look up.' }
     }
-    if (dedupedNew.length > 0) {
-      resultLines.push(`\n**New action items:**`)
-      dedupedNew.forEach(t => resultLines.push(`- ${t.text}`))
+
+    // If it looks like a UUID, direct lookup
+    if (UUID_RE.test(searchTerm)) {
+      const [row] = await db
+        .select()
+        .from(dealLogs)
+        .where(and(eq(dealLogs.id, searchTerm), eq(dealLogs.workspaceId, ctx.workspaceId)))
+        .limit(1)
+      deal = row
     }
-    if (obsoleteIds.size > 0) {
-      resultLines.push(`\n*${obsoleteIds.size} obsolete todo(s) removed.*`)
-    }
-    if (createdGaps.length > 0) {
-      resultLines.push(`\n**Product gaps logged:**`)
-      createdGaps.forEach(g => resultLines.push(`- ${g}`))
-    }
-    if (newComps.length > 0) {
-      resultLines.push(`\n**New competitors detected:** ${newComps.join(', ')}`)
-    }
-    if (parsed.criteriaUpdates?.length) {
-      const achievedCount = parsed.criteriaUpdates.filter(u => u.achieved).length
-      if (achievedCount > 0) {
-        resultLines.push(`\n**Success criteria:** ${achievedCount} marked as achieved`)
+
+    // If no UUID match, search by name/company
+    if (!deal) {
+      const term = params.dealName || params.dealId || ''
+      const pattern = `%${term}%`
+      const matches = await db
+        .select()
+        .from(dealLogs)
+        .where(and(
+          eq(dealLogs.workspaceId, ctx.workspaceId),
+          or(
+            ilike(dealLogs.dealName, pattern),
+            ilike(dealLogs.prospectCompany, pattern),
+          ),
+        ))
+        .orderBy(dealLogs.updatedAt)
+        .limit(5)
+
+      if (matches.length === 1) {
+        deal = matches[0]
+      } else if (matches.length > 1) {
+        const summaries = matches.map(d => formatDealSummary(d, ctx.stageLabels))
+        return {
+          result: `Found **${matches.length}** deals matching "${term}". Which one?\n\n${summaries.join('\n\n')}`,
+        }
       }
     }
-    if (parsed.projectPlanUpdates?.length) {
-      resultLines.push(`\n**Project plan:** ${parsed.projectPlanUpdates.length} task(s) updated`)
-    }
-    if (parsed.suggestedStage && parsed.suggestedStage !== deal.stage) {
-      resultLines.push(`\n**Stage changed:** ${deal.stage} → ${parsed.suggestedStage}${parsed.stageReason ? ` (${parsed.stageReason})` : ''}`)
-    }
-    if (parsed.closeDateUpdate?.newDate) {
-      resultLines.push(`\n**Close date updated:** ${new Date(parsed.closeDateUpdate.newDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} (${parsed.closeDateUpdate.reason})`)
-    }
-    const newExtractedEvents = (parsed.scheduledEvents ?? []).filter(e => e.date && e.description)
-    if (newExtractedEvents.length > 0) {
-      resultLines.push(`\n**Calendar events extracted:** ${newExtractedEvents.length} event(s) added`)
-      newExtractedEvents.forEach(e => resultLines.push(`- ${e.type}: ${e.description} (${e.date}${e.time ? ' ' + e.time : ''})`))
 
-    }
-    if (updateFields.conversionScore != null) {
-      resultLines.push(`\n**Updated conversion score:** ${updateFields.conversionScore}%`)
+    if (!deal) {
+      return { result: `Deal "${searchTerm}" not found. Try searching with a different name.` }
     }
 
-    const actions: any[] = []
-    if (dedupedNew.length > 0 || obsoleteIds.size > 0) {
-      actions.push({
-        type: 'todos_updated',
-        added: dedupedNew.length,
-        removed: obsoleteIds.size,
-        completed: 0,
-        dealName: deal.dealName,
-      })
-    }
-    if (createdGaps.length > 0) {
-      actions.push({
-        type: 'gaps_logged',
-        gaps: createdGaps,
-        count: createdGaps.length,
-      })
-    }
-
-    return {
-      result: resultLines.join('\n'),
-      actions,
-      uiHint: 'refresh_deals',
-    }
+    return { result: formatDealDetailed(deal, ctx.stageLabels) }
   },
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// update_project_plan
+// TOOL 2: update_deal — ONE tool for ALL deal mutations
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const update_project_plan = {
-  description: 'Add tasks or phases to a deal\'s project plan. Preserves the EXACT text provided — do not summarize or rephrase the user\'s words. Can also update task status or remove tasks.',
+export const update_deal = {
+  description: `ONE tool for ALL deal mutations. Handles notes, todos, stage, value, contacts, close date, corrections, project plan, success criteria, and more. Pass ALL changes in the "changes" object in one call. When "addNote" is provided, full meeting notes processing runs automatically (extracts todos, risks, signals, updates score). For corrections (user says "that's wrong"), use the replace* fields.`,
   parameters: z.object({
-    dealId: z.string().describe('The UUID of the deal'),
-    addPhase: z.object({
-      name: z.string().describe('Phase name'),
-      description: z.string().optional().describe('Phase description'),
-      targetDate: z.string().optional().describe('Target date YYYY-MM-DD'),
-      tasks: z.array(z.object({
-        text: z.string().describe('EXACT task text — preserve the user\'s wording verbatim'),
-        owner: z.string().optional().describe('Owner/assignee'),
-        dueDate: z.string().optional().describe('Due date YYYY-MM-DD'),
-        notes: z.string().optional().describe('Additional context or notes'),
-      })).describe('Tasks in this phase'),
-    }).optional().describe('Add a new phase with tasks'),
-    addTasks: z.object({
-      phaseId: z.string().optional().describe('Phase ID to add tasks to (if omitted, adds to first/default phase)'),
-      phaseName: z.string().optional().describe('Phase name to find or create'),
-      tasks: z.array(z.object({
-        text: z.string().describe('EXACT task text — preserve the user\'s wording verbatim'),
-        owner: z.string().optional().describe('Owner/assignee'),
-        dueDate: z.string().optional().describe('Due date YYYY-MM-DD'),
-        notes: z.string().optional().describe('Additional context'),
-      })).describe('Tasks to add'),
-    }).optional().describe('Add tasks to an existing phase'),
-    updateTask: z.object({
-      taskId: z.string().describe('Task ID to update'),
-      status: z.enum(['not_started', 'in_progress', 'complete']).optional(),
-      text: z.string().optional(),
-      owner: z.string().optional(),
-      notes: z.string().optional(),
-    }).optional().describe('Update a specific task'),
-    removeTaskId: z.string().optional().describe('Task ID to remove'),
-    replaceEntirePlan: z.object({
-      phases: z.array(z.object({
+    dealId: z.string().describe('The UUID of the deal to update'),
+    changes: z.object({
+      // --- Append / Add operations ---
+      addNote: z.string().optional().describe('Meeting notes or update text to process. Triggers full LLM extraction (todos, risks, signals, score). Preserve user\'s exact wording.'),
+      addTodo: z.union([z.string(), z.array(z.string())]).optional().describe('Todo item(s) to add. Preserve exact user wording.'),
+      completeTodo: z.union([z.string(), z.array(z.string())]).optional().describe('Todo text(s) to mark as completed (fuzzy matched)'),
+      removeTodo: z.union([z.string(), z.array(z.string())]).optional().describe('Todo text(s) to remove (fuzzy matched)'),
+      addContact: z.object({
+        name: z.string(),
+        role: z.string().optional(),
+        title: z.string().optional(),
+        email: z.string().optional(),
+        phone: z.string().optional(),
+      }).optional().describe('Add a contact to the deal'),
+      // --- Set operations (simple field updates) ---
+      setStage: z.string().optional().describe('Set deal stage'),
+      setValue: z.number().optional().describe('Set deal value in dollars'),
+      setCloseDate: z.string().optional().describe('Set close date (ISO or natural date)'),
+      setNextSteps: z.string().optional().describe('Set next steps text'),
+      setLostReason: z.string().optional().describe('Set lost reason (only for closed_lost)'),
+      appendNotes: z.string().optional().describe('Append to the general Notes field (NOT meeting notes processing)'),
+      // --- Correction / Replace operations ---
+      replaceSummary: z.string().optional().describe('Replace the AI summary'),
+      replaceRisks: z.array(z.string()).optional().describe('Replace all deal risks. Pass [] to clear.'),
+      replaceCompetitors: z.array(z.string()).optional().describe('Replace competitors array'),
+      replaceNextSteps: z.string().optional().describe('Replace next steps'),
+      removeContactIds: z.array(z.string()).optional().describe('Contact IDs to remove'),
+      updateContact: z.object({
+        contactId: z.string(),
+        name: z.string().optional(),
+        title: z.string().optional(),
+        email: z.string().optional(),
+        phone: z.string().optional(),
+        role: z.string().optional(),
+      }).optional().describe('Update a specific contact'),
+      resetConversionScore: z.boolean().optional().describe('Clear score + insights so AI can re-score'),
+      replaceConversionScore: z.number().optional().describe('Pin score at this value (0-100)'),
+      replaceConversionInsights: z.array(z.string()).optional().describe('Replace insights array'),
+      replaceMeetingNotes: z.string().optional().describe('Replace entire meeting history'),
+      // --- Project plan ---
+      addProjectPhase: z.object({
         name: z.string(),
         description: z.string().optional(),
         targetDate: z.string().optional(),
         tasks: z.array(z.object({
           text: z.string(),
-          status: z.string().optional(),
           owner: z.string().optional(),
+          dueDate: z.string().optional(),
         })).optional(),
-      })),
-    }).optional().describe('If provided, COMPLETELY REPLACES the entire project plan. Use when user says reset/rebuild the plan. Do not use with other params.'),
+      }).optional().describe('Add a phase to the project plan'),
+      addProjectTasks: z.object({
+        phaseName: z.string().optional(),
+        tasks: z.array(z.object({
+          text: z.string(),
+          owner: z.string().optional(),
+          dueDate: z.string().optional(),
+        })),
+      }).optional().describe('Add tasks to a project plan phase'),
+      updateProjectTask: z.object({
+        taskId: z.string(),
+        status: z.string().optional(),
+        text: z.string().optional(),
+        owner: z.string().optional(),
+        notes: z.string().optional(),
+      }).optional().describe('Update a project plan task'),
+      replaceProjectPlan: z.object({
+        phases: z.array(z.object({
+          name: z.string(),
+          description: z.string().optional(),
+          targetDate: z.string().optional(),
+          tasks: z.array(z.object({
+            text: z.string(),
+            status: z.string().optional(),
+            owner: z.string().optional(),
+          })).optional(),
+        })),
+      }).nullable().optional().describe('Replace entire project plan. Pass null to clear.'),
+      clearProjectPlan: z.boolean().optional().describe('Clear the project plan entirely'),
+      // --- Success criteria ---
+      addSuccessCriteria: z.array(z.object({
+        text: z.string(),
+        category: z.string().optional(),
+      })).optional().describe('Add success criteria'),
+      achieveCriteria: z.array(z.string()).optional().describe('Criterion IDs to mark achieved'),
+      removeCriteria: z.array(z.string()).optional().describe('Criterion IDs to remove'),
+      // --- Deal creation fields (for create/import) ---
+      dealName: z.string().optional().describe('Deal name (for creating new deals)'),
+      prospectCompany: z.string().optional().describe('Company name (for creating new deals)'),
+      // --- Delete ---
+      deleteDeal: z.boolean().optional().describe('Delete this deal permanently'),
+    }),
   }),
   execute: async (
-    params: {
-      dealId: string
-      addPhase?: { name: string; description?: string; targetDate?: string; tasks: { text: string; owner?: string; dueDate?: string; notes?: string }[] }
-      addTasks?: { phaseId?: string; phaseName?: string; tasks: { text: string; owner?: string; dueDate?: string; notes?: string }[] }
-      updateTask?: { taskId: string; status?: string; text?: string; owner?: string; notes?: string }
-      removeTaskId?: string
-      replaceEntirePlan?: { phases: { name: string; description?: string; targetDate?: string; tasks?: { text: string; status?: string; owner?: string }[] }[] }
-    },
+    params: { dealId: string; changes: any },
     ctx: ToolContext,
   ): Promise<ToolResult> => {
-    const [deal] = await db
-      .select({ id: dealLogs.id, dealName: dealLogs.dealName, projectPlan: dealLogs.projectPlan })
-      .from(dealLogs)
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .limit(1)
+    const c = params.changes
+    const dealId = params.dealId
 
-    if (!deal) return { result: 'Deal not found.' }
+    // Handle deletion separately
+    if (c.deleteDeal) {
+      const [deal] = await db
+        .select({ id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany })
+        .from(dealLogs)
+        .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+        .limit(1)
+      if (!deal) return { result: `TOOL FAILED: Deal not found.` }
 
-    const now = new Date().toISOString()
-    const existing = (deal.projectPlan as any) ?? { title: `Project Plan — ${deal.dealName}`, createdAt: now, phases: [] }
-    let plan = { ...existing, updatedAt: now }
-    const changes: string[] = []
-
-    // Replace entire plan — skip all other operations
-    if (params.replaceEntirePlan) {
-      const newPhases = params.replaceEntirePlan.phases.map((phase, pi) => ({
-        id: `p${pi + 1}_${Date.now()}`,
-        name: phase.name,
-        description: phase.description || '',
-        order: pi + 1,
-        targetDate: phase.targetDate || null,
-        tasks: (phase.tasks ?? []).map((t, ti) => ({
-          id: `t${pi + 1}_${ti + 1}_${Date.now()}`,
-          text: t.text,
-          status: t.status ?? 'not_started',
-          owner: t.owner || null,
-          dueDate: null,
-          notes: null,
-          linkedTodoId: null,
-        })),
-      }))
-      plan = {
-        title: existing.title ?? `Project Plan — ${deal.dealName}`,
-        createdAt: existing.createdAt ?? now,
-        updatedAt: now,
-        phases: newPhases,
-      }
-      const totalTasks = newPhases.reduce((sum, p) => sum + p.tasks.length, 0)
-      changes.push(`Replaced entire plan: ${newPhases.length} phase(s), ${totalTasks} task(s)`)
-
-      await db.update(dealLogs)
-        .set({ projectPlan: plan, updatedAt: new Date() } as any)
-        .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-
-      after(async () => {
-        await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
-      })
-
+      await db.delete(dealLogs).where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      after(async () => { await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call') })
       return {
-        result: `Project plan replaced on **${deal.dealName}**:\n${changes.map(c => `- ${c}`).join('\n')}`,
-        actions: [{ type: 'deal_updated', dealId: params.dealId, dealName: deal.dealName, changes }],
+        result: `Deal **${deal.dealName}** has been permanently deleted.`,
+        actions: [{ type: 'deal_deleted', dealId, dealName: deal.dealName }],
         uiHint: 'refresh_deals',
       }
     }
 
-    // Add a new phase
-    if (params.addPhase) {
-      const newPhase = {
-        id: `p${(plan.phases?.length ?? 0) + 1}_${Date.now()}`,
-        name: params.addPhase.name,
-        description: params.addPhase.description || '',
-        order: (plan.phases?.length ?? 0) + 1,
-        targetDate: params.addPhase.targetDate || null,
-        tasks: params.addPhase.tasks.map((t, i) => ({
-          id: `t${i + 1}_${Date.now()}`,
-          text: t.text,
-          status: 'not_started',
-          owner: t.owner || null,
-          dueDate: t.dueDate || null,
-          notes: t.notes || null,
-          linkedTodoId: null,
-        })),
-      }
-      plan.phases = [...(plan.phases ?? []), newPhase]
-      changes.push(`Added phase "${params.addPhase.name}" with ${params.addPhase.tasks.length} task(s)`)
+    // Verify deal exists
+    const verifyResult = await executeWithVerification(
+      'update_deal', ctx.workspaceId, dealId,
+      async () => {
+        return await db.select().from(dealLogs)
+          .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+          .limit(1)
+      },
+    )
+    if (!verifyResult.success) {
+      return { result: verifyResult.error! }
     }
-
-    // Add tasks to existing phase
-    if (params.addTasks) {
-      let targetPhase: any = null
-
-      if (params.addTasks.phaseId) {
-        targetPhase = plan.phases?.find((p: any) => p.id === params.addTasks!.phaseId)
-      }
-      if (!targetPhase && params.addTasks.phaseName) {
-        targetPhase = plan.phases?.find((p: any) =>
-          p.name.toLowerCase().includes(params.addTasks!.phaseName!.toLowerCase())
-        )
-        // Create phase if not found
-        if (!targetPhase) {
-          targetPhase = {
-            id: `p${(plan.phases?.length ?? 0) + 1}_${Date.now()}`,
-            name: params.addTasks.phaseName,
-            description: '',
-            order: (plan.phases?.length ?? 0) + 1,
-            targetDate: null,
-            tasks: [],
-          }
-          plan.phases = [...(plan.phases ?? []), targetPhase]
-        }
-      }
-      if (!targetPhase && plan.phases?.length > 0) {
-        targetPhase = plan.phases[0]
-      }
-      if (!targetPhase) {
-        targetPhase = {
-          id: `p1_${Date.now()}`,
-          name: 'Tasks',
-          description: '',
-          order: 1,
-          targetDate: null,
-          tasks: [],
-        }
-        plan.phases = [targetPhase]
-      }
-
-      const newTasks = params.addTasks.tasks.map((t, i) => ({
-        id: `t${(targetPhase.tasks?.length ?? 0) + i + 1}_${Date.now()}`,
-        text: t.text,
-        status: 'not_started' as const,
-        owner: t.owner || null,
-        dueDate: t.dueDate || null,
-        notes: t.notes || null,
-        linkedTodoId: null,
-      }))
-
-      // Mutate in-place within the phases array
-      plan.phases = plan.phases.map((p: any) =>
-        p.id === targetPhase.id
-          ? { ...p, tasks: [...(p.tasks ?? []), ...newTasks] }
-          : p
-      )
-      changes.push(`Added ${newTasks.length} task(s) to "${targetPhase.name}"`)
-    }
-
-    // Update a task
-    if (params.updateTask) {
-      const { taskId, ...updates } = params.updateTask
-      plan.phases = plan.phases.map((p: any) => ({
-        ...p,
-        tasks: (p.tasks ?? []).map((t: any) => {
-          if (t.id !== taskId) return t
-          const upd = { ...t }
-          if (updates.status) upd.status = updates.status
-          if (updates.text) upd.text = updates.text
-          if (updates.owner) upd.owner = updates.owner
-          if (updates.notes !== undefined) upd.notes = updates.notes
-          return upd
-        }),
-      }))
-      changes.push(`Updated task ${taskId}`)
-    }
-
-    // Remove a task
-    if (params.removeTaskId) {
-      plan.phases = plan.phases.map((p: any) => ({
-        ...p,
-        tasks: (p.tasks ?? []).filter((t: any) => t.id !== params.removeTaskId),
-      }))
-      changes.push(`Removed task ${params.removeTaskId}`)
-    }
-
-    await db.update(dealLogs)
-      .set({ projectPlan: plan, updatedAt: new Date() } as any)
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-
-    after(async () => {
-      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
-    })
-
-    return {
-      result: `Project plan updated on **${deal.dealName}**:\n${changes.map(c => `- ${c}`).join('\n')}`,
-      actions: [{
-        type: 'deal_updated',
-        dealId: params.dealId,
-        dealName: deal.dealName,
-        changes,
-      }],
-      uiHint: 'refresh_deals',
-    }
-  },
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// update_success_criteria
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const update_success_criteria = {
-  description: 'Add, update, or remove success criteria on a deal. Preserves the EXACT text provided — do not summarize or rephrase. Each criterion should capture the specific requirement the customer stated.',
-  parameters: z.object({
-    dealId: z.string().describe('The UUID of the deal'),
-    add: z.array(z.object({
-      text: z.string().describe('EXACT criterion text — preserve the user/customer\'s wording verbatim. Include the full specific question or requirement.'),
-      category: z.string().optional().describe('Category/theme (e.g., Reporting, Integration, Security, Demo)'),
-      note: z.string().optional().describe('Additional context (e.g., who requested it, when)'),
-    })).optional().describe('Criteria to add'),
-    achieve: z.array(z.string()).optional().describe('Criterion IDs to mark as achieved'),
-    remove: z.array(z.string()).optional().describe('Criterion IDs to remove'),
-    updateNote: z.object({
-      criterionId: z.string(),
-      note: z.string(),
-    }).optional().describe('Update the note on a specific criterion'),
-  }),
-  execute: async (
-    params: {
-      dealId: string
-      add?: { text: string; category?: string; note?: string }[]
-      achieve?: string[]
-      remove?: string[]
-      updateNote?: { criterionId: string; note: string }
-    },
-    ctx: ToolContext,
-  ): Promise<ToolResult> => {
-    const [deal] = await db
-      .select({ id: dealLogs.id, dealName: dealLogs.dealName, successCriteriaTodos: dealLogs.successCriteriaTodos })
-      .from(dealLogs)
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .limit(1)
-
-    if (!deal) return { result: 'Deal not found.' }
-
-    let criteria = ((deal.successCriteriaTodos as any[]) ?? []).slice()
-    const changes: string[] = []
-
-    // Add new criteria
-    if (params.add?.length) {
-      for (const item of params.add) {
-        criteria.push({
-          id: crypto.randomUUID(),
-          text: item.text,
-          category: item.category || 'General',
-          achieved: false,
-          note: item.note || '',
-          createdAt: new Date().toISOString(),
-        })
-      }
-      changes.push(`Added ${params.add.length} criterion/criteria`)
-    }
-
-    // Mark as achieved
-    if (params.achieve?.length) {
-      const achieveSet = new Set(params.achieve)
-      criteria = criteria.map((c: any) =>
-        achieveSet.has(c.id) ? { ...c, achieved: true } : c
-      )
-      changes.push(`Marked ${params.achieve.length} as achieved`)
-    }
-
-    // Remove criteria
-    if (params.remove?.length) {
-      const removeSet = new Set(params.remove)
-      criteria = criteria.filter((c: any) => !removeSet.has(c.id))
-      changes.push(`Removed ${params.remove.length} criterion/criteria`)
-    }
-
-    // Update note
-    if (params.updateNote) {
-      criteria = criteria.map((c: any) =>
-        c.id === params.updateNote!.criterionId
-          ? { ...c, note: params.updateNote!.note }
-          : c
-      )
-      changes.push('Updated criterion note')
-    }
-
-    await db.update(dealLogs)
-      .set({ successCriteriaTodos: criteria, updatedAt: new Date() })
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-
-    after(async () => {
-      await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
-    })
-
-    const achieved = criteria.filter((c: any) => c.achieved).length
-    return {
-      result: `Success criteria updated on **${deal.dealName}** (${achieved}/${criteria.length} met):\n${changes.map(c => `- ${c}`).join('\n')}`,
-      actions: [{
-        type: 'deal_updated',
-        dealId: params.dealId,
-        dealName: deal.dealName,
-        changes,
-      }],
-      uiHint: 'refresh_deals',
-    }
-  },
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// correct_deal_data
-// ─────────────────────────────────────────────────────────────────────────────
-
-export const correct_deal_data = {
-  description: 'Correct or override specific data on a deal. Use when the user says something is wrong and needs fixing — risks, contacts, summary, competitors, or any field. Applies the correction immediately without questioning.',
-  parameters: z.object({
-    dealId: z.string().describe('The UUID of the deal'),
-    replaceRisks: z.array(z.string()).optional().describe('Complete replacement for deal risks. Pass [] to clear all risks.'),
-    replaceSummary: z.string().optional().describe('New AI summary to replace the current one'),
-    replaceNextSteps: z.string().optional().describe('New next steps'),
-    replaceCompetitors: z.array(z.string()).optional().describe('Complete replacement for competitors array'),
-    removeContactIds: z.array(z.string()).optional().describe('Contact IDs to remove'),
-    updateContact: z.object({
-      contactId: z.string(),
-      name: z.string().optional(),
-      title: z.string().optional(),
-      email: z.string().optional(),
-      phone: z.string().optional(),
-      role: z.string().optional(),
-    }).optional().describe('Update a specific contact\'s details'),
-    resetConversionScore: z.boolean().optional().describe('Set to true to clear the conversion score and insights (reset to null). Use when the AI wrongly set a score.'),
-    replaceConversionScore: z.number().optional().describe('Override the conversion score (0-100). Only use when the user explicitly provides a score.'),
-    replaceConversionInsights: z.array(z.string()).optional().describe('Replace conversion insights entirely. Pass [] to clear.'),
-    replaceMeetingNotes: z.string().optional().describe('Replace the entire meeting history (Activity Log). Use when the user says the history is wrong/corrupted.'),
-    replaceProjectPlan: z.object({
-      phases: z.array(z.object({
-        name: z.string(),
-        description: z.string().optional(),
-        targetDate: z.string().optional(),
-        tasks: z.array(z.object({
-          text: z.string(),
-          status: z.string().optional().describe('pending, in_progress, or complete'),
-          owner: z.string().optional(),
-          dueDate: z.string().optional(),
-          notes: z.string().optional(),
-        })).optional(),
-      })),
-    }).nullable().optional().describe('Completely replace the project plan. Pass null to clear it. Use when user says "reset project plan" or "replace the project plan".'),
-    clearProjectPlan: z.boolean().optional().describe('Set true to completely wipe the project plan'),
-    replaceStage: stageEnum.optional().describe('Override the deal stage'),
-    correctionNote: z.string().optional().describe('Why this correction was made — appended to meeting notes for audit trail'),
-  }),
-  execute: async (
-    params: {
-      dealId: string
-      replaceRisks?: string[]
-      replaceSummary?: string
-      replaceNextSteps?: string
-      replaceCompetitors?: string[]
-      removeContactIds?: string[]
-      updateContact?: { contactId: string; name?: string; title?: string; email?: string; phone?: string; role?: string }
-      resetConversionScore?: boolean
-      replaceConversionScore?: number
-      replaceConversionInsights?: string[]
-      replaceMeetingNotes?: string
-      replaceProjectPlan?: { phases: { name: string; description?: string; targetDate?: string; tasks?: { text: string; status?: string; owner?: string; dueDate?: string; notes?: string }[] }[] } | null
-      clearProjectPlan?: boolean
-      replaceStage?: string
-      correctionNote?: string
-    },
-    ctx: ToolContext,
-  ): Promise<ToolResult> => {
-    const [deal] = await db
-      .select()
-      .from(dealLogs)
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .limit(1)
-
-    if (!deal) return { result: 'Deal not found.' }
+    const deal = verifyResult.result
 
     const updateFields: Record<string, unknown> = { updatedAt: new Date() }
-    const corrections: string[] = []
+    const changesList: string[] = []
 
-    if (params.replaceRisks !== undefined) {
-      updateFields.dealRisks = params.replaceRisks
-      corrections.push(`Risks replaced (${params.replaceRisks.length} total)`)
-    }
-    if (params.replaceSummary) {
-      updateFields.aiSummary = params.replaceSummary
-      corrections.push('Summary corrected')
-    }
-    if (params.replaceNextSteps) {
-      updateFields.nextSteps = params.replaceNextSteps
-      corrections.push('Next steps corrected')
-    }
-    if (params.replaceCompetitors !== undefined) {
-      updateFields.competitors = params.replaceCompetitors
-      corrections.push(`Competitors corrected (${params.replaceCompetitors.length} total)`)
+    // ── addNote: full meeting notes processing ──────────────────────────
+    if (c.addNote) {
+      const { updateFields: noteFields, changes: noteChanges, parsed } = await processMeetingNotesHelper(c.addNote, deal, ctx)
+      Object.assign(updateFields, noteFields)
+      changesList.push(...noteChanges)
+
+      // Create product gaps
+      for (const gap of (parsed.productGaps ?? [])) {
+        if (!gap.title) continue
+        const [existing] = await db
+          .select()
+          .from(productGaps)
+          .where(and(eq(productGaps.workspaceId, ctx.workspaceId), eq(productGaps.title, gap.title)))
+          .limit(1)
+        if (existing) {
+          await db.update(productGaps).set({
+            frequency: (existing.frequency ?? 1) + 1,
+            sourceDeals: [...((existing.sourceDeals as string[]) ?? []), dealId],
+            updatedAt: new Date(),
+          }).where(eq(productGaps.id, existing.id))
+        } else {
+          await db.insert(productGaps).values({
+            workspaceId: ctx.workspaceId,
+            userId: ctx.userId,
+            title: gap.title,
+            description: gap.description ?? '',
+            priority: gap.priority ?? 'medium',
+            frequency: 1,
+            sourceDeals: [dealId],
+            status: 'open',
+            affectedRevenue: deal.dealValue ?? null,
+          })
+        }
+        changesList.push(`Product gap: ${gap.title}`)
+      }
     }
 
-    // Remove contacts
-    if (params.removeContactIds?.length) {
-      const removeSet = new Set(params.removeContactIds)
-      const contacts = ((deal.contacts as any[]) ?? []).filter((c: any) => !removeSet.has(c.id))
+    // ── Todo operations ─────────────────────────────────────────────────
+    if (c.addTodo || c.completeTodo || c.removeTodo) {
+      let todos = ((updateFields.todos as any[]) ?? (deal.todos as any[]) ?? []).slice()
+
+      const fuzzyFind = (text: string) => {
+        const norm = normalize(text)
+        return todos.find((t: any) => normalize(t.text).includes(norm) || norm.includes(normalize(t.text)))
+      }
+
+      // Complete
+      const completeItems = Array.isArray(c.completeTodo) ? c.completeTodo : c.completeTodo ? [c.completeTodo] : []
+      for (const text of completeItems) {
+        const match = fuzzyFind(text)
+        if (match && !match.done) {
+          match.done = true
+          match.completedAt = new Date().toISOString()
+          changesList.push(`Completed todo: "${text}"`)
+        }
+      }
+
+      // Remove
+      const removeItems = Array.isArray(c.removeTodo) ? c.removeTodo : c.removeTodo ? [c.removeTodo] : []
+      for (const text of removeItems) {
+        const match = fuzzyFind(text)
+        if (match) {
+          todos = todos.filter((t: any) => t.id !== match.id)
+          changesList.push(`Removed todo: "${text}"`)
+        }
+      }
+
+      // Add
+      const addItems = Array.isArray(c.addTodo) ? c.addTodo : c.addTodo ? [c.addTodo] : []
+      const existingTodoKeys = new Set(todos.map((t: any) => normalize(t.text)))
+      for (const text of addItems) {
+        if (!existingTodoKeys.has(normalize(text))) {
+          todos.push({
+            id: crypto.randomUUID(),
+            text,
+            done: false,
+            createdAt: new Date().toISOString(),
+          })
+          changesList.push(`Added todo: "${text}"`)
+        }
+      }
+
+      updateFields.todos = todos
+    }
+
+    // ── Add contact ─────────────────────────────────────────────────────
+    if (c.addContact) {
+      const contacts = ((deal.contacts as any[]) ?? []).slice()
+      const newContact: Record<string, string> = {
+        id: crypto.randomUUID(),
+        name: c.addContact.name,
+      }
+      if (c.addContact.title) newContact.title = c.addContact.title
+      if (c.addContact.email) newContact.email = c.addContact.email
+      if (c.addContact.phone) newContact.phone = c.addContact.phone
+      if (c.addContact.role) newContact.role = c.addContact.role
+      contacts.push(newContact)
       updateFields.contacts = contacts
-      corrections.push(`Removed ${params.removeContactIds.length} contact(s)`)
+      changesList.push(`Added contact: ${c.addContact.name}${c.addContact.role ? ` (${c.addContact.role})` : ''}`)
     }
 
-    // Update a contact
-    if (params.updateContact) {
-      const { contactId, ...updates } = params.updateContact
-      const contacts = ((deal.contacts as any[]) ?? []).map((c: any) => {
-        if (c.id !== contactId) return c
-        const upd = { ...c }
+    // ── Simple set operations ───────────────────────────────────────────
+    if (c.setStage) {
+      updateFields.stage = c.setStage
+      if (c.setStage === 'closed_won') updateFields.wonDate = new Date()
+      if (c.setStage === 'closed_lost') updateFields.lostDate = new Date()
+      changesList.push(`Stage → ${c.setStage}`)
+    }
+    if (c.setValue !== undefined) {
+      updateFields.dealValue = c.setValue
+      changesList.push(`Value → $${c.setValue.toLocaleString()}`)
+    }
+    if (c.setCloseDate) {
+      try { updateFields.closeDate = new Date(c.setCloseDate) } catch {}
+      changesList.push(`Close date → ${c.setCloseDate}`)
+    }
+    if (c.setNextSteps) {
+      updateFields.nextSteps = c.setNextSteps
+      changesList.push('Next steps updated')
+    }
+    if (c.setLostReason) {
+      updateFields.lostReason = c.setLostReason
+      changesList.push(`Lost reason: ${c.setLostReason}`)
+    }
+    if (c.appendNotes) {
+      const existingNotes = deal.notes ?? ''
+      updateFields.notes = existingNotes ? `${existingNotes}\n\n${c.appendNotes}` : c.appendNotes
+      changesList.push('Notes appended')
+    }
+
+    // ── Correction / Replace operations ─────────────────────────────────
+    if (c.replaceSummary) {
+      updateFields.aiSummary = c.replaceSummary
+      changesList.push('Summary replaced')
+    }
+    if (c.replaceRisks !== undefined) {
+      updateFields.dealRisks = c.replaceRisks
+      changesList.push(`Risks replaced (${c.replaceRisks.length} total)`)
+    }
+    if (c.replaceCompetitors !== undefined) {
+      updateFields.competitors = c.replaceCompetitors
+      changesList.push(`Competitors replaced (${c.replaceCompetitors.length} total)`)
+    }
+    if (c.replaceNextSteps) {
+      updateFields.nextSteps = c.replaceNextSteps
+      changesList.push('Next steps replaced')
+    }
+    if (c.removeContactIds?.length) {
+      const removeSet = new Set(c.removeContactIds)
+      const contacts = ((deal.contacts as any[]) ?? []).filter((ct: any) => !removeSet.has(ct.id))
+      updateFields.contacts = contacts
+      changesList.push(`Removed ${c.removeContactIds.length} contact(s)`)
+    }
+    if (c.updateContact) {
+      const { contactId, ...updates } = c.updateContact
+      const contacts = ((deal.contacts as any[]) ?? []).map((ct: any) => {
+        if (ct.id !== contactId) return ct
+        const upd = { ...ct }
         if (updates.name) upd.name = updates.name
         if (updates.title) upd.title = updates.title
         if (updates.email) upd.email = updates.email
@@ -2286,81 +967,180 @@ export const correct_deal_data = {
         return upd
       })
       updateFields.contacts = contacts
-      corrections.push('Contact details updated')
+      changesList.push('Contact updated')
     }
-
-    // Reset or replace conversion score
-    if (params.resetConversionScore) {
+    if (c.resetConversionScore) {
       updateFields.conversionScore = null
       updateFields.conversionInsights = []
-      updateFields.conversionScorePinned = false  // unlock so AI can re-score
-      corrections.push('Conversion score cleared — AI will re-score on next update')
-    } else if (params.replaceConversionScore !== undefined) {
-      updateFields.conversionScore = Math.max(0, Math.min(100, params.replaceConversionScore))
-      updateFields.conversionScorePinned = true   // pin — AI must not overwrite this
-      corrections.push(`Conversion score pinned at ${params.replaceConversionScore}%`)
+      updateFields.conversionScorePinned = false
+      changesList.push('Conversion score cleared — AI will re-score')
+    } else if (c.replaceConversionScore !== undefined) {
+      updateFields.conversionScore = Math.max(0, Math.min(100, c.replaceConversionScore))
+      updateFields.conversionScorePinned = true
+      changesList.push(`Conversion score pinned at ${c.replaceConversionScore}%`)
     }
-    if (params.replaceConversionInsights !== undefined) {
-      updateFields.conversionInsights = params.replaceConversionInsights
-      corrections.push(`Conversion insights replaced (${params.replaceConversionInsights.length} total)`)
+    if (c.replaceConversionInsights !== undefined) {
+      updateFields.conversionInsights = c.replaceConversionInsights
+      changesList.push('Insights replaced')
     }
-
-    // Replace meeting history entirely
-    if (params.replaceMeetingNotes !== undefined) {
-      updateFields.meetingNotes = params.replaceMeetingNotes || null
-      corrections.push('Activity log / meeting history replaced')
+    if (c.replaceMeetingNotes !== undefined) {
+      updateFields.meetingNotes = c.replaceMeetingNotes || null
+      changesList.push('Meeting history replaced')
     }
 
-    // Replace or clear project plan entirely
-    if (params.clearProjectPlan || params.replaceProjectPlan === null) {
+    // ── Project plan operations ─────────────────────────────────────────
+    if (c.clearProjectPlan || c.replaceProjectPlan === null) {
       updateFields.projectPlan = null
-      corrections.push('Project plan cleared')
-    } else if (params.replaceProjectPlan) {
+      changesList.push('Project plan cleared')
+    } else if (c.replaceProjectPlan) {
       const newPlan = {
-        phases: params.replaceProjectPlan.phases.map(phase => ({
+        phases: c.replaceProjectPlan.phases.map((phase: any) => ({
           id: crypto.randomUUID(),
           name: phase.name,
           description: phase.description ?? '',
           targetDate: phase.targetDate ?? null,
-          tasks: (phase.tasks ?? []).map(t => ({
+          tasks: (phase.tasks ?? []).map((t: any) => ({
             id: crypto.randomUUID(),
             text: t.text,
             status: t.status ?? 'pending',
             owner: t.owner ?? null,
-            dueDate: t.dueDate ?? null,
-            notes: t.notes ?? '',
+            dueDate: null,
+            notes: '',
             createdAt: new Date().toISOString(),
           })),
         })),
       }
       updateFields.projectPlan = newPlan
-      const taskCount = newPlan.phases.reduce((sum, p) => sum + p.tasks.length, 0)
-      corrections.push(`Project plan replaced: ${newPlan.phases.length} phase(s), ${taskCount} task(s)`)
+      const taskCount = newPlan.phases.reduce((sum: number, p: any) => sum + p.tasks.length, 0)
+      changesList.push(`Project plan replaced: ${newPlan.phases.length} phase(s), ${taskCount} task(s)`)
+    } else if (c.addProjectPhase) {
+      const existing = (deal.projectPlan as any) ?? { phases: [] }
+      const newPhase = {
+        id: crypto.randomUUID(),
+        name: c.addProjectPhase.name,
+        description: c.addProjectPhase.description || '',
+        targetDate: c.addProjectPhase.targetDate || null,
+        tasks: (c.addProjectPhase.tasks ?? []).map((t: any) => ({
+          id: crypto.randomUUID(),
+          text: t.text,
+          status: 'not_started',
+          owner: t.owner || null,
+          dueDate: t.dueDate || null,
+          notes: '',
+        })),
+      }
+      updateFields.projectPlan = { ...existing, phases: [...(existing.phases ?? []), newPhase], updatedAt: new Date().toISOString() }
+      changesList.push(`Added phase "${c.addProjectPhase.name}" with ${newPhase.tasks.length} task(s)`)
+    } else if (c.addProjectTasks) {
+      const existing = (deal.projectPlan as any) ?? { phases: [] }
+      let targetPhase = c.addProjectTasks.phaseName
+        ? existing.phases?.find((p: any) => p.name.toLowerCase().includes(c.addProjectTasks.phaseName!.toLowerCase()))
+        : existing.phases?.[0]
+      if (!targetPhase) {
+        targetPhase = {
+          id: crypto.randomUUID(),
+          name: c.addProjectTasks.phaseName || 'Tasks',
+          description: '',
+          targetDate: null,
+          tasks: [],
+        }
+        existing.phases = [...(existing.phases ?? []), targetPhase]
+      }
+      const newTasks = c.addProjectTasks.tasks.map((t: any) => ({
+        id: crypto.randomUUID(),
+        text: t.text,
+        status: 'not_started',
+        owner: t.owner || null,
+        dueDate: t.dueDate || null,
+        notes: '',
+      }))
+      updateFields.projectPlan = {
+        ...existing,
+        updatedAt: new Date().toISOString(),
+        phases: existing.phases.map((p: any) =>
+          p.id === targetPhase.id ? { ...p, tasks: [...(p.tasks ?? []), ...newTasks] } : p
+        ),
+      }
+      changesList.push(`Added ${newTasks.length} task(s) to "${targetPhase.name}"`)
+    } else if (c.updateProjectTask) {
+      const existing = (deal.projectPlan as any) ?? { phases: [] }
+      const { taskId, ...updates } = c.updateProjectTask
+      updateFields.projectPlan = {
+        ...existing,
+        updatedAt: new Date().toISOString(),
+        phases: (existing.phases ?? []).map((p: any) => ({
+          ...p,
+          tasks: (p.tasks ?? []).map((t: any) => {
+            if (t.id !== taskId) return t
+            const upd = { ...t }
+            if (updates.status) upd.status = updates.status
+            if (updates.text) upd.text = updates.text
+            if (updates.owner) upd.owner = updates.owner
+            if (updates.notes !== undefined) upd.notes = updates.notes
+            return upd
+          }),
+        })),
+      }
+      changesList.push(`Updated project task ${taskId}`)
     }
 
-    // Override stage
-    if (params.replaceStage) {
-      updateFields.stage = params.replaceStage
-      if (params.replaceStage === 'closed_won') updateFields.wonDate = new Date()
-      if (params.replaceStage === 'closed_lost') updateFields.lostDate = new Date()
-      corrections.push(`Stage corrected to ${params.replaceStage}`)
+    // ── Success criteria operations ─────────────────────────────────────
+    if (c.addSuccessCriteria?.length) {
+      const existingCriteria = ((deal.successCriteriaTodos as any[]) ?? []).slice()
+      for (const item of c.addSuccessCriteria) {
+        existingCriteria.push({
+          id: crypto.randomUUID(),
+          text: item.text,
+          category: item.category || 'General',
+          achieved: false,
+          note: '',
+          createdAt: new Date().toISOString(),
+        })
+      }
+      updateFields.successCriteriaTodos = existingCriteria
+      changesList.push(`Added ${c.addSuccessCriteria.length} success criteria`)
+    }
+    if (c.achieveCriteria?.length) {
+      const achieveSet = new Set(c.achieveCriteria)
+      const criteria = ((updateFields.successCriteriaTodos as any[]) ?? (deal.successCriteriaTodos as any[]) ?? []).map((ct: any) =>
+        achieveSet.has(ct.id) ? { ...ct, achieved: true } : ct
+      )
+      updateFields.successCriteriaTodos = criteria
+      changesList.push(`Marked ${c.achieveCriteria.length} criteria as achieved`)
+    }
+    if (c.removeCriteria?.length) {
+      const removeSet = new Set(c.removeCriteria)
+      const criteria = ((updateFields.successCriteriaTodos as any[]) ?? (deal.successCriteriaTodos as any[]) ?? []).filter((ct: any) => !removeSet.has(ct.id))
+      updateFields.successCriteriaTodos = criteria
+      changesList.push(`Removed ${c.removeCriteria.length} criteria`)
     }
 
-    // Correction note is logged server-side only, not appended to meeting history
-    // Meeting history should only contain real interactions, not system corrections
-    if (params.correctionNote) {
-      console.log(`[correct_deal_data] ${deal.dealName}: ${params.correctionNote}`)
+    // ── Execute the update with verification ────────────────────────────
+    if (changesList.length === 0) {
+      return { result: 'No changes specified.' }
     }
 
-    if (corrections.length === 0) {
-      return { result: 'No corrections specified.' }
+    const writeResult = await executeWithVerification(
+      'update_deal', ctx.workspaceId, dealId,
+      async () => {
+        return await db.update(dealLogs).set(updateFields)
+          .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+          .returning({ id: dealLogs.id })
+      },
+    )
+
+    if (!writeResult.success) {
+      return { result: writeResult.error! }
     }
 
-    const corrResult = await db.update(dealLogs).set(updateFields)
-      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
-      .returning({ id: dealLogs.id })
-    if (corrResult.length === 0) {
-      return { result: `⚠ TOOL FAILED: Could not correct deal — not found or workspace mismatch.` }
+    // Auto-refresh score after mutations if no addNote (addNote already handles scoring)
+    if (!c.addNote && !c.resetConversionScore && c.replaceConversionScore === undefined) {
+      if (!(deal as any).conversionScorePinned && (c.setStage || c.appendNotes || c.addTodo)) {
+        try {
+          const allText = [deal.notes, deal.meetingNotes, deal.aiSummary].filter(Boolean).join('\n')
+          await computeAndUpdateScore(dealId, ctx.workspaceId, allText, deal.createdAt ?? new Date(), (c.setStage ?? deal.stage), ctx)
+        } catch { /* non-fatal */ }
+      }
     }
 
     after(async () => {
@@ -2368,14 +1148,309 @@ export const correct_deal_data = {
     })
 
     return {
-      result: `Corrected **${deal.dealName}**:\n${corrections.map(c => `- ${c}`).join('\n')}`,
+      result: `Updated **${deal.dealName}**:\n${changesList.map(ch => `- ${ch}`).join('\n')}`,
       actions: [{
         type: 'deal_updated',
-        dealId: params.dealId,
+        dealId,
         dealName: deal.dealName,
-        changes: corrections,
+        changes: changesList,
       }],
       uiHint: 'refresh_deals',
     }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOOL 3: search_deals
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const search_deals = {
+  description: 'Search for deals by name, company, contact, or stage. Returns a list of matching deals with id, name, company, stage, and score.',
+  parameters: z.object({
+    searchQuery: z.string().optional().describe('Search term to match against deal name, company, or contact'),
+    stage: z.string().optional().describe('Filter by deal stage'),
+  }),
+  execute: async (
+    params: { searchQuery?: string; stage?: string },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const conditions = [eq(dealLogs.workspaceId, ctx.workspaceId)]
+
+    if (params.stage) {
+      conditions.push(eq(dealLogs.stage, params.stage as any))
+    }
+
+    if (params.searchQuery) {
+      const pattern = `%${params.searchQuery}%`
+      conditions.push(
+        or(
+          ilike(dealLogs.dealName, pattern),
+          ilike(dealLogs.prospectCompany, pattern),
+        )!,
+      )
+    }
+
+    const deals = await db
+      .select()
+      .from(dealLogs)
+      .where(and(...conditions))
+      .orderBy(dealLogs.updatedAt)
+      .limit(20)
+
+    if (deals.length === 0) {
+      return { result: 'No deals found matching your search criteria.' }
+    }
+
+    const summaries = deals.map(d => formatDealSummary(d, ctx.stageLabels))
+    return {
+      result: `Found **${deals.length}** deal${deals.length === 1 ? '' : 's'}:\n\n${summaries.join('\n\n')}`,
+    }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOOL 4: generate_content
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Build deal context string for content generation */
+async function buildDealContext(dealId: string, workspaceId: string): Promise<string | undefined> {
+  const [deal] = await db
+    .select()
+    .from(dealLogs)
+    .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId)))
+    .limit(1)
+
+  if (!deal) return undefined
+
+  const lines = [
+    `Deal: ${deal.dealName} with ${deal.prospectCompany}`,
+    `Stage: ${deal.stage}`,
+  ]
+  if (deal.dealValue) lines.push(`Value: $${deal.dealValue.toLocaleString()}`)
+  if (deal.aiSummary) lines.push(`Summary: ${deal.aiSummary}`)
+  const risks = (deal.dealRisks as string[]) ?? []
+  if (risks.length > 0) lines.push(`Risks: ${risks.join('; ')}`)
+  const comps = (deal.competitors as string[]) ?? []
+  if (comps.length > 0) lines.push(`Competitors: ${comps.join(', ')}`)
+  return lines.join('\n')
+}
+
+export const generate_content = {
+  description: 'Generate ANY type of sales content — emails, battlecards, talking points, proposals, timelines, integration plans, risk assessments, executive summaries, or any freeform document. Saved to the collateral library.',
+  parameters: z.object({
+    dealId: z.string().optional().describe('Optional deal ID to tailor content for a specific deal'),
+    contentType: z.string().describe('Type of content: email, battlecard, talking_points, proposal, timeline, one_pager, or any freeform type'),
+    topic: z.string().optional().describe('Topic or title for the content'),
+    recipient: z.string().optional().describe('Recipient role/name for emails or personalized content'),
+    customPrompt: z.string().optional().describe('Additional instructions for content generation'),
+    competitorId: z.string().optional().describe('Competitor UUID for battlecard generation'),
+    tone: z.string().optional().describe('Desired tone (professional, casual, urgent)'),
+  }),
+  execute: async (
+    params: {
+      dealId?: string
+      contentType: string
+      topic?: string
+      recipient?: string
+      customPrompt?: string
+      competitorId?: string
+      tone?: string
+    },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const contentType = params.contentType.toLowerCase()
+
+    // Battlecard generation
+    if (contentType === 'battlecard' && params.competitorId) {
+      const [comp] = await db
+        .select({ id: competitors.id, name: competitors.name })
+        .from(competitors)
+        .where(and(eq(competitors.id, params.competitorId), eq(competitors.workspaceId, ctx.workspaceId)))
+        .limit(1)
+      if (!comp) return { result: 'Competitor not found.' }
+
+      const generated = await generateCollateral({
+        workspaceId: ctx.workspaceId,
+        type: 'battlecard',
+        competitorId: params.competitorId,
+      })
+      await upsertCollateral({
+        workspaceId: ctx.workspaceId,
+        userId: ctx.userId,
+        type: 'battlecard',
+        title: generated.title,
+        status: 'ready',
+        content: generated.content,
+        rawResponse: generated.rawResponse,
+        generatedAt: new Date(),
+        sourceCompetitorId: params.competitorId,
+        generationSource: 'agent',
+      })
+      return {
+        result: `Battlecard **"${generated.title}"** generated and saved to your collateral library.`,
+        actions: [{ type: 'collateral_generating', colType: 'battlecard', title: generated.title }],
+        uiHint: 'refresh_collateral',
+      }
+    }
+
+    // Email drafting
+    if (contentType === 'email') {
+      const dealContext = params.dealId
+        ? await buildDealContext(params.dealId, ctx.workspaceId)
+        : undefined
+
+      const promptParts = ['Draft a sales email with the following parameters:']
+      if (params.recipient) promptParts.push(`Recipient role: ${params.recipient}`)
+      if (params.tone) promptParts.push(`Tone: ${params.tone}`)
+      if (params.topic) promptParts.push(`Topic: ${params.topic}`)
+      if (params.customPrompt) promptParts.push(`Additional instructions: ${params.customPrompt}`)
+      if (dealContext) promptParts.push(`\nDeal context:\n${dealContext}`)
+      promptParts.push(
+        '\nReturn the email with clear Subject: and Body: sections.',
+        'Make it personalized, concise, and actionable.',
+        'Use {{first_name}} and {{company_name}} as placeholders if deal context is not available.',
+      )
+
+      const msg = await anthropic.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1500,
+        messages: [{ role: 'user', content: promptParts.join('\n') }],
+      })
+      const emailText = ((msg.content[0] as any).text ?? '').trim()
+      return { result: `Here's the drafted email:\n\n${emailText}` }
+    }
+
+    // General content generation
+    const dealContext = params.dealId
+      ? await buildDealContext(params.dealId, ctx.workspaceId)
+      : undefined
+
+    const title = params.topic || `${params.contentType} Content`
+    const description = [
+      `Generate a ${params.contentType}`,
+      params.topic ? `about: ${params.topic}` : '',
+      params.recipient ? `for: ${params.recipient}` : '',
+    ].filter(Boolean).join(' ')
+
+    const generated = await generateFreeformCollateral({
+      workspaceId: ctx.workspaceId,
+      title,
+      description,
+      dealContext,
+      customPrompt: params.customPrompt,
+    })
+
+    await upsertCollateral({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      type: 'custom',
+      title: generated.title,
+      status: 'ready',
+      content: generated.content,
+      rawResponse: generated.rawResponse,
+      generatedAt: new Date(),
+      customTypeName: title,
+      generationSource: 'agent',
+      sourceDealLogId: params.dealId ?? null,
+    })
+
+    return {
+      result: `Content **"${generated.title}"** generated and saved to your collateral library.`,
+      actions: [{ type: 'collateral_generating', colType: 'custom', title: generated.title }],
+      uiHint: 'refresh_collateral',
+    }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOOL 5: answer_question
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const answer_question = {
+  description: 'Answer pipeline questions using workspace brain data — pipeline health, win rates, stage velocity, forecasts, deal patterns, competitor intel, score trends, and performance analytics. Use this for any analytical question that doesn\'t require looking up or modifying a specific deal.',
+  parameters: z.object({
+    question: z.string().describe('The pipeline or analytics question to answer'),
+    focus: z.string().optional().describe('Focus area: pipeline, forecast, competitors, risks, velocity, performance, trends, overview'),
+  }),
+  execute: async (
+    params: { question: string; focus?: string },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const brain = ctx.brain ?? await getWorkspaceBrain(ctx.workspaceId)
+
+    if (!brain) {
+      return { result: 'No pipeline data available yet. Add some deals to get started.' }
+    }
+
+    // Build comprehensive context from brain
+    const contextParts: string[] = []
+
+    // Pipeline overview
+    contextParts.push(`Pipeline: ${brain.pipeline.totalActive} active deals, $${brain.pipeline.totalValue.toLocaleString()} total value`)
+    if (brain.pipeline.avgConversionScore != null) {
+      contextParts.push(`Average conversion score: ${brain.pipeline.avgConversionScore}%`)
+    }
+
+    // Stage breakdown
+    const stages = brain.pipeline.stageBreakdown
+    if (Object.keys(stages).length > 0) {
+      const stageStr = Object.entries(stages).map(([s, c]) => `${ctx.stageLabels?.[s] ?? s}: ${c}`).join(', ')
+      contextParts.push(`Stages: ${stageStr}`)
+    }
+
+    // Win/loss intel
+    if (brain.winLossIntel) {
+      const wl = brain.winLossIntel
+      contextParts.push(`Win rate: ${wl.winRate}% (${wl.winCount}W/${wl.lossCount}L)`)
+      if (wl.avgDaysToClose > 0) contextParts.push(`Avg days to close: ${wl.avgDaysToClose}`)
+      if (wl.topLossReasons.length > 0) contextParts.push(`Loss reasons: ${wl.topLossReasons.join(', ')}`)
+    }
+
+    // Deal summaries
+    if (brain.deals?.length) {
+      contextParts.push('\nDeals:')
+      for (const d of brain.deals.slice(0, 20)) {
+        const parts = [`${d.name} (${d.company}) — ${ctx.stageLabels?.[d.stage] ?? d.stage}`]
+        if (d.conversionScore != null) parts.push(`${d.conversionScore}%`)
+        if (d.dealValue != null) parts.push(`$${d.dealValue.toLocaleString()}`)
+        if (d.risks.length > 0) parts.push(`Risks: ${d.risks.join(', ')}`)
+        contextParts.push(`- ${parts.join(' | ')}`)
+      }
+    }
+
+    // ML insights
+    if (brain.mlModel) {
+      contextParts.push(`\nML Model: trained on ${brain.mlModel.trainingSize} deals, accuracy ${(brain.mlModel.accuracy * 100).toFixed(0)}%`)
+    }
+
+    // Competitor intelligence
+    if (brain.competitorIntel?.length) {
+      contextParts.push('\nCompetitor Intel:')
+      for (const ci of brain.competitorIntel) {
+        contextParts.push(`- ${ci.name}: ${ci.activeDeals} active deal(s)`)
+      }
+    }
+
+    const brainContext = contextParts.join('\n')
+
+    // Use LLM to answer the question with brain context
+    const msg = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2000,
+      messages: [{
+        role: 'user',
+        content: `You are a sales analytics expert. Answer this question using ONLY the data provided below. Be specific with numbers and deal names. Use £ for currency values.
+
+WORKSPACE DATA:
+${brainContext}
+
+QUESTION: ${params.question}${params.focus ? `\nFOCUS: ${params.focus}` : ''}
+
+Answer concisely with specific data points. If the data doesn't contain enough info to answer, say what's missing.`,
+      }],
+    })
+
+    const answer = ((msg.content[0] as any).text ?? '').trim()
+    return { result: answer }
   },
 }

@@ -43,9 +43,9 @@ function getQuickActions(activeDealCompany?: string, currentPage?: string): Quic
 
 // ── Context-aware follow-up suggestions based on conversation content ────────
 
-const CONTENT_TOOLS = new Set(['generate_content', 'generate_battlecard', 'draft_email'])
-const DEAL_MUTATION_TOOLS = new Set(['update_deal', 'create_deal', 'import_deal', 'enrich_deal', 'process_meeting_notes', 'manage_todos', 'add_contact', 'correct_deal_data', 'update_project_plan', 'update_success_criteria'])
-const INFO_TOOLS = new Set(['search_deals', 'get_deal_details', 'query_pipeline', 'get_deal_intelligence', 'get_win_playbook', 'get_pipeline_forecast', 'get_deal_score_history', 'get_score_trends', 'get_rep_performance', 'search_workspace', 'find_similar_deals', 'get_workspace_overview', 'get_competitor_intel'])
+const CONTENT_TOOLS = new Set(['generate_content'])
+const DEAL_MUTATION_TOOLS = new Set(['update_deal'])
+const INFO_TOOLS = new Set(['search_deals', 'get_deal', 'answer_question'])
 
 type ConversationIntent = 'content' | 'deal_update' | 'information' | 'generic'
 

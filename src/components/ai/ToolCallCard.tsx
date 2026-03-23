@@ -3,25 +3,12 @@
 import React, { useState } from 'react'
 
 const TOOL_LABELS: Record<string, { pending: string; done: string }> = {
-  search_deals: { pending: 'Searching deals...', done: 'Found deals' },
+  // 5 consolidated tools
   get_deal: { pending: 'Loading deal...', done: 'Deal loaded' },
   update_deal: { pending: 'Updating deal...', done: 'Deal updated' },
-  create_deal: { pending: 'Creating deal...', done: 'Deal created' },
-  delete_deal: { pending: 'Deleting deal...', done: 'Deal deleted' },
-  search_contacts: { pending: 'Searching contacts...', done: 'Found contacts' },
-  get_pipeline: { pending: 'Loading pipeline...', done: 'Pipeline loaded' },
-  update_todos: { pending: 'Updating todos...', done: 'Todos updated' },
-  generate_collateral: { pending: 'Generating asset...', done: 'Asset generated' },
-  add_competitor: { pending: 'Adding competitor...', done: 'Competitor added' },
-  get_brain: { pending: 'Loading workspace brain...', done: 'Brain loaded' },
-  analyze_pipeline: { pending: 'Analyzing pipeline...', done: 'Analysis complete' },
-  draft_email: { pending: 'Drafting email...', done: 'Email drafted' },
-  process_notes: { pending: 'Processing notes...', done: 'Notes processed' },
-  get_competitors: { pending: 'Loading competitors...', done: 'Competitors loaded' },
-  get_company: { pending: 'Loading company profile...', done: 'Profile loaded' },
-  update_company: { pending: 'Updating company...', done: 'Company updated' },
-  log_gaps: { pending: 'Logging product gaps...', done: 'Gaps logged' },
-  create_case_study: { pending: 'Creating case study...', done: 'Case study created' },
+  search_deals: { pending: 'Searching deals...', done: 'Found deals' },
+  generate_content: { pending: 'Generating content...', done: 'Content generated' },
+  answer_question: { pending: 'Analysing pipeline...', done: 'Analysis complete' },
 }
 
 interface ToolInvocation {
