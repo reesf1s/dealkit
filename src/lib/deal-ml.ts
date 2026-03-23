@@ -347,26 +347,65 @@ function labelArchetype(c: number[]): string {
   if (c.length === 0) return 'Mixed pipeline'
   // Indices: 0=stage, 1=value, 2=age, 3=risk, 4=comp, 5=todo, 6=text, 7=momentum, 8=stakeholder, 9=urgency
   const [stage, value, age, risk,,, text, momentum, stakeholder] = c
-  if ((age ?? 0) > 0.6 || (risk ?? 0) > 0.6) return 'At-risk deals'
-  if ((value ?? 0) > 0.65 && (stage ?? 0) > 0.55) return 'Enterprise opportunities'
-  if ((stage ?? 0) > 0.65 && (text ?? 0) > 0.6) return 'High-confidence closes'
-  if ((momentum ?? 0) > 0.65 && (stakeholder ?? 0) > 0.5) return 'High-momentum deals'
-  if ((stage ?? 0) < 0.3 && (value ?? 0) < 0.4) return 'Early-stage leads'
-  if ((value ?? 0) > 0.5) return 'High-value opportunities'
+  // At-risk: elevated risk flags OR aging pipeline with declining momentum — check first
+  if ((risk ?? 0) > 0.6) return 'At-risk deals'
+  if ((age ?? 0) > 0.65 && (momentum ?? 0) < 0.35) return 'Stalling pipeline'
+  // Fast-close SMB: advanced stage, recently entered, lower value (quick movers)
+  if ((stage ?? 0) > 0.55 && (age ?? 0) < 0.35 && (value ?? 0) < 0.55) return 'Fast-close SMB'
+  // Large-deal enterprise: high value + advanced stage
+  if ((value ?? 0) > 0.65 && (stage ?? 0) > 0.55) return 'Enterprise pipeline'
+  // Long-cycle: aged in pipeline, not at risk
+  if ((age ?? 0) > 0.6) return 'Long-cycle deals'
+  // Champion-led: strong stakeholder depth + high note engagement
+  if ((stakeholder ?? 0) > 0.6 && (text ?? 0) > 0.55) return 'Champion-led'
+  // Multi-stakeholder with active momentum
+  if ((stakeholder ?? 0) > 0.55 && (momentum ?? 0) > 0.6) return 'Multi-stakeholder'
+  // High-momentum, broad engagement
+  if ((momentum ?? 0) > 0.65) return 'High-momentum deals'
+  // Early stage
+  if ((stage ?? 0) < 0.3) return 'Early-stage prospects'
+  // High value, mid-stage
+  if ((value ?? 0) > 0.55) return 'High-value pipeline'
   return 'Mid-market pipeline'
 }
 
 function winningCharacteristic(c: number[]): string {
   if (c.length === 0) return 'Mixed characteristics'
-  let maxDev = 0, topIdx = 0, topDir = 1
-  for (let i = 0; i < c.length; i++) {
-    const dev = Math.abs((c[i] ?? 0.5) - 0.5)
-    if (dev > maxDev) { maxDev = dev; topIdx = i; topDir = (c[i] ?? 0.5) > 0.5 ? 1 : -1 }
-  }
-  // One label per feature (11 features — indices 0-10)
-  const pos = ['Advanced stage','High deal value','Long pipeline age','Multiple risk flags','Strong comp record','High action completion','Strong notes engagement','Building momentum','Broad stakeholder coverage','High urgency from prospect','High-performing rep']
-  const neg = ['Early stage','Smaller deal','Fresh entry','No risk flags','Weak comp record','Low action completion','Weak notes engagement','Declining momentum','Narrow stakeholder reach','Low urgency from prospect','Rep win rate below average']
-  return (topDir > 0 ? pos[topIdx] : neg[topIdx]) ?? 'Mixed'
+  // Indices: 0=stage, 1=value, 2=age, 3=risk, 4=comp, 5=todo, 6=text, 7=momentum, 8=stakeholder, 9=urgency
+  const [stage, value, age, risk,,, text, momentum, stakeholder] = c
+  const traits: string[] = []
+
+  // Stage
+  if ((stage ?? 0) > 0.7) traits.push('late-stage deals')
+  else if ((stage ?? 0) < 0.25) traits.push('early-stage pipeline')
+
+  // Value
+  if ((value ?? 0) > 0.7) traits.push('high deal value')
+  else if ((value ?? 0) < 0.25) traits.push('smaller deal size')
+
+  // Momentum
+  if ((momentum ?? 0) > 0.65) traits.push('strong deal momentum')
+  else if ((momentum ?? 0) < 0.3) traits.push('declining momentum')
+
+  // Stakeholder depth
+  if ((stakeholder ?? 0) > 0.65) traits.push('broad stakeholder coverage')
+  else if ((stakeholder ?? 0) < 0.25) traits.push('single-contact engagement')
+
+  // Note engagement
+  if ((text ?? 0) > 0.65) traits.push('high engagement in notes')
+  else if ((text ?? 0) < 0.3) traits.push('low engagement signals')
+
+  // Risk
+  if ((risk ?? 0) > 0.6) traits.push('elevated risk flags')
+  else if ((risk ?? 0) < 0.15) traits.push('low-risk profile')
+
+  // Age
+  if ((age ?? 0) > 0.7) traits.push('long pipeline cycle')
+  else if ((age ?? 0) < 0.2) traits.push('recently entered pipeline')
+
+  if (traits.length === 0) return 'Mid-market characteristics'
+  const desc = traits.slice(0, 2).join(', ')
+  return desc.charAt(0).toUpperCase() + desc.slice(1)
 }
 
 // ─── Stage velocity intelligence ──────────────────────────────────────────────
@@ -820,7 +859,7 @@ export function runMLEngine(
   const k = Math.min(3, Math.max(2, Math.floor(allDeals.length / 4)))
   const { centroids, assignments } = kMeans(allFeats.map(f => f.features), k)
 
-  const archetypes: DealArchetype[] = Array.from({ length: k }, (_, ci) => {
+  const rawArchetypes: DealArchetype[] = Array.from({ length: k }, (_, ci) => {
     const members = allDeals.filter((_, j) => assignments[j] === ci)
     const won  = members.filter(d => d.stage === 'closed_won')
     const lost = members.filter(d => d.stage === 'closed_lost')
@@ -830,7 +869,7 @@ export function runMLEngine(
     return {
       id: ci,
       label: labelArchetype(centroids[ci] ?? []),
-      winRate: total > 0 ? Math.round((won.length / total) * 100) : 0,
+      winRate: total > 0 ? Math.round((won.length / total) * 100) : -1,  // -1 = no closed deals in cluster
       dealCount: members.length,
       avgDealValue: withVal.length > 0
         ? Math.round(withVal.reduce((s, d) => s + (d.dealValue ?? 0), 0) / withVal.length)
@@ -840,6 +879,27 @@ export function runMLEngine(
       winningCharacteristic: winningCharacteristic(centroids[ci] ?? []),
     }
   }).sort((a, b) => b.dealCount - a.dealCount)
+
+  // ── Post-process archetypes: filter no-history clusters, deduplicate labels ──
+  // 1. Filter out clusters with no closed deal history — win rate is meaningless (was 0%)
+  //    Exception: if ALL clusters lack history, keep them all (early-stage workspace)
+  const hasHistory = rawArchetypes.filter(a => a.winRate >= 0)
+  const archetypesBeforeDedup = hasHistory.length > 0 ? hasHistory : rawArchetypes.map(a => ({ ...a, winRate: 0 }))
+
+  // 2. Deduplicate labels — if two clusters share a label, differentiate the second
+  //    by using the deal value signal (large vs SMB) from its centroid
+  const usedLabels = new Set<string>()
+  const archetypes: DealArchetype[] = archetypesBeforeDedup.map(arch => {
+    if (!usedLabels.has(arch.label)) {
+      usedLabels.add(arch.label)
+      return arch
+    }
+    const [, value] = arch.centroidFeatures
+    const qualifier = (value ?? 0) > 0.5 ? 'Large' : (value ?? 0) < 0.25 ? 'SMB' : 'Mid-market'
+    const newLabel = `${arch.label} · ${qualifier}`
+    usedLabels.add(newLabel)
+    return { ...arch, label: newLabel }
+  })
 
   // ── Predictions for open deals ────────────────────────────────────────────
   const knn = Math.max(2, Math.min(5, Math.floor(closed.length / 4)))

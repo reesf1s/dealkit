@@ -330,10 +330,13 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
   })
   const briefingHealth: 'green' | 'amber' | 'red' = hasRed ? 'red' : hasAmber ? 'amber' : 'green'
 
-  const msg = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1500,
-    system: `You are a senior sales strategist reviewing a sales team's pipeline. Analyse the data and respond with ONLY a JSON object — no markdown, no explanation — with these exact keys:
+  // ── Try AI generation — gracefully degrade if Claude API fails or returns non-JSON ──
+  let aiParsed: Record<string, unknown> | null = null
+  try {
+    const msg = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1500,
+      system: `You are a senior sales strategist reviewing a sales team's pipeline. Analyse the data and respond with ONLY a JSON object — no markdown, no explanation — with these exact keys:
 - "summary": string — 2–3 sentences summarising pipeline health and outlook, using specific numbers (deals, values, win rate). Be direct and honest.
 - "keyActions": string[] — exactly 3–5 specific, actionable items the rep should do TODAY. Each must start with a verb and be under 15 words. Prioritise by urgency/value. CRITICAL: Each action must reference at least ONE specific signal from the deal data — a named deal, a person, a specific objection, a day count, a competitor, or a missing qualifier. DO NOT use generic phrases like "check in on progress", "ensure next steps are clear", or "follow up with prospects". BAD: "Follow up on stalled deals". GOOD: "Push RELX for budget confirmation — 14d to close date, still in Proposal".
 
@@ -367,13 +370,24 @@ GOOD: "Prepare QA test scenarios for the BOE Monday call — ensure the floor pl
 - "momentum": string | null — one short positive signal or win to note, or null if there is none. If a deal's score improved, include the delta and before/after: e.g. "BOE +18pts (74→92%) — POC trial started". Never use vague phrases like "Engagement strengthening"; cite the specific event.
 - "topRisk": string | null — the single biggest risk or blocker across the pipeline, or null if pipeline is empty or risk-free.
 - "singleMostImportantAction": string — one sentence describing the single most impactful action the rep should take today, chosen from the full context. Must be specific, start with a verb, reference a specific deal or person, and be under 20 words.`,
-    messages: [{ role: 'user', content: `Pipeline data for ${today}:\n\n${contextStr}${brainContext}` }],
-  })
+      messages: [{ role: 'user', content: `Pipeline data for ${today}:\n\n${contextStr}${brainContext}` }],
+    })
+    const rawText = (msg.content[0] as { type: string; text: string }).text.trim()
+    const cleaned = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+    aiParsed = JSON.parse(cleaned)
+  } catch (aiErr) {
+    console.error('[ai-overview] AI generation failed — returning deterministic fallback:', aiErr)
+  }
 
-  const rawText = (msg.content[0] as { type: string; text: string }).text.trim()
-  // Strip markdown code fences if Claude wraps in ```json
-  const cleaned = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
-  const parsed = JSON.parse(cleaned)
+  // ── Deterministic fallback if AI layer failed ──────────────────────────────
+  const parsed: Record<string, unknown> = aiParsed ?? {
+    summary: `${openDeals.length} open deal${openDeals.length !== 1 ? 's' : ''} worth ${fmt(totalPipelineValue)} total pipeline value. Win rate: ${winRate}% (${wonDeals.length} won, ${lostDeals.length} lost). AI briefing temporarily unavailable — check back shortly.`,
+    keyActions: topAttentionDeals.slice(0, 3).map(d => `Review ${d.dealName} — ${d.reason.slice(0, 80)}`),
+    pipelineHealth: openDeals.length > 5 ? `Active — ${openDeals.length} deals in pipeline` : openDeals.length > 0 ? `${openDeals.length} deal${openDeals.length !== 1 ? 's' : ''} in pipeline` : 'No active deals',
+    momentum: null,
+    topRisk: allRisks.length > 0 ? `${allRisks[0].deal}: ${allRisks[0].risk}` : null,
+    singleMostImportantAction: topAttentionDeals[0] ? `Review ${topAttentionDeals[0].dealName} — ${topAttentionDeals[0].reason.slice(0, 80)}` : 'Review your pipeline and update deal statuses.',
+  }
 
   // ── Action deduplication: filter out suggested actions semantically similar to existing in-progress/completed items ──
   const existingActionTexts: string[] = []
@@ -562,7 +576,8 @@ export async function POST() {
     )
     const cached = cachedRows[0]
     if (cached?.ai_overview && cached?.ai_overview_generated_at) {
-      const ageMs = Date.now() - new Date(cached.ai_overview_generated_at).getTime()
+      const genDate = new Date(String(cached.ai_overview_generated_at))
+      const ageMs = isNaN(genDate.getTime()) ? Infinity : Date.now() - genDate.getTime()
       if (ageMs < 4 * 60 * 60 * 1000) {
         return NextResponse.json({ data: cached.ai_overview, cached: true })
       }
