@@ -577,7 +577,7 @@ Rules:
   } catch { /* non-fatal */ }
 
   // Generate embeddings AFTER the main update (raw SQL needed for pgvector)
-  const _embDealId = dealId
+  const _embDealId = deal.id
   const _embWorkspaceId = ctx.workspaceId
   const _embNotes = appendedNotes
   const _embDeal = deal
