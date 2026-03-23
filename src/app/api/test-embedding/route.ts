@@ -55,7 +55,8 @@ export async function GET() {
         FROM deal_logs
         WHERE id = (SELECT id FROM deal_logs LIMIT 1)
       `)
-      dbVerify = JSON.stringify(check.rows?.[0] || check[0] || 'no rows')
+      const rows = Array.isArray(check) ? check : (check as any).rows ?? []
+      dbVerify = JSON.stringify(rows[0] || 'no rows')
     } catch (vErr: any) {
       dbVerify = `failed: ${vErr.message}`
     }
