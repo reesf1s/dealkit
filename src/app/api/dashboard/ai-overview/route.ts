@@ -10,6 +10,13 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getWorkspaceBrain, formatBrainContext } from '@/lib/workspace-brain'
 import { parseMeetingEntries } from '@/lib/text-signals'
 
+// Safe date construction — never throws "Invalid time value"
+function safeDate(val: unknown): Date | null {
+  if (!val) return null
+  const d = new Date(val as string)
+  return isNaN(d.getTime()) ? null : d
+}
+
 // Helper to load pipeline stage labels
 async function loadStageLabels(workspaceId: string): Promise<Record<string, string>> {
   try {
@@ -155,7 +162,7 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
       // Scheduled events (CONFIRMED — do NOT suggest confirming/scheduling these)
       const scheduledEvents = ((d as any).scheduledEvents as { type?: string; date?: string | null; description?: string; time?: string | null }[]) ?? []
       const upcomingEvents = scheduledEvents
-        .filter(e => e.date && new Date(e.date).getTime() >= Date.now() - 7 * 86400000) // include recent past week too
+        .filter(e => { const d = safeDate(e.date); return d !== null && d.getTime() >= Date.now() - 7 * 86400000 }) // include recent past week too
         .slice(0, 5)
 
       // Recent notes mentioning confirmation/scheduling (first sentences)
@@ -170,7 +177,7 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
       const allTodosForDeal = todos.map((t: any) => `    - [${t.done ? 'done' : 'not done'}] ${t.text}`).join('\n')
 
       const parts = [
-        `- "${d.dealName}" @ ${d.prospectCompany} | Stage: ${sl(d.stage)} | Value: ${fmt(d.dealValue ?? 0)} | Score: ${d.conversionScore ?? 'N/A'} | Close: ${(() => { if (!d.closeDate) return 'TBD'; const cd = new Date(d.closeDate); return !isNaN(cd.getTime()) ? cd.toLocaleDateString('en-GB') : 'TBD' })() } | Competitors: ${((d.competitors as string[]) ?? []).join(', ') || 'none'}`,
+        `- "${d.dealName}" @ ${d.prospectCompany} | Stage: ${sl(d.stage)} | Value: ${fmt(d.dealValue ?? 0)} | Score: ${d.conversionScore ?? 'N/A'} | Close: ${safeDate(d.closeDate)?.toLocaleDateString('en-GB') ?? 'TBD'} | Competitors: ${((d.competitors as string[]) ?? []).join(', ') || 'none'}`,
         oneLineContext ? `  Context: ${oneLineContext}` : null,
         uniqueRisk ? `  Top risk: ${uniqueRisk}` : null,
         daysSinceLastNote != null ? `  Days since last note: ${daysSinceLastNote}` : null,
@@ -245,8 +252,7 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
     const pred = predictions.find(p => p.dealId === d.id)
     const churnRisk = pred?.churnRisk ?? 0
     const score = d.conversionScore ?? 100
-    const closeDateRaw = d.closeDate ? new Date(d.closeDate) : null
-    const closeDateMs = (closeDateRaw && !isNaN(closeDateRaw.getTime())) ? closeDateRaw.getTime() : null
+    const closeDateMs = safeDate(d.closeDate)?.getTime() ?? null
     const daysToClose = closeDateMs != null ? Math.round((closeDateMs - nowMs) / 86400000) : null
     const closeSoon = daysToClose != null && daysToClose <= 14 && !['negotiation', 'closed_won', 'closed_lost'].includes(d.stage)
 
@@ -578,14 +584,59 @@ export async function POST() {
     )
     const cached = cachedRows[0]
     if (cached?.ai_overview && cached?.ai_overview_generated_at) {
-      const genDate = new Date(String(cached.ai_overview_generated_at))
-      const ageMs = isNaN(genDate.getTime()) ? Infinity : Date.now() - genDate.getTime()
+      const genDate = safeDate(cached.ai_overview_generated_at)
+      const ageMs = genDate ? Date.now() - genDate.getTime() : Infinity
       if (ageMs < 4 * 60 * 60 * 1000) {
         return NextResponse.json({ data: cached.ai_overview, cached: true })
       }
     }
 
-    const overview = await generateOverview(workspaceId)
+    let overview: AIOverview
+    try {
+      overview = await generateOverview(workspaceId)
+    } catch (genErr) {
+      console.error('[ai-overview] generateOverview crashed — returning fallback:', genErr)
+      // Never return 500 — build a real fallback from DB deal counts
+      try {
+        const fallbackDeals = await db
+          .select({ stage: dealLogs.stage, dealValue: dealLogs.dealValue })
+          .from(dealLogs)
+          .where(eq(dealLogs.workspaceId, workspaceId))
+        const open = fallbackDeals.filter(d => !['closed_won', 'closed_lost'].includes(d.stage))
+        const won  = fallbackDeals.filter(d => d.stage === 'closed_won')
+        const lost = fallbackDeals.filter(d => d.stage === 'closed_lost')
+        const totalValue = open.reduce((s, d) => s + (d.dealValue ?? 0), 0)
+        const fmtFb = (v: number) => v >= 1000 ? `£${(v / 1000).toFixed(0)}k` : `£${v}`
+        const closedCount = won.length + lost.length
+        const winRate = closedCount > 0 ? Math.round((won.length / closedCount) * 100) : 0
+        overview = {
+          summary: `${open.length} open deal${open.length !== 1 ? 's' : ''} worth ${fmtFb(totalValue)} in pipeline. Win rate: ${winRate}%. AI briefing temporarily unavailable — refresh to retry.`,
+          keyActions: [],
+          pipelineHealth: open.length > 0 ? `${open.length} active deal${open.length !== 1 ? 's' : ''}` : 'No active deals',
+          momentum: null,
+          topRisk: null,
+          generatedAt: new Date().toISOString(),
+          briefingHealth: 'amber',
+          topAttentionDeals: [],
+          singleMostImportantAction: open.length > 0
+            ? `Review your ${open.length} open deal${open.length !== 1 ? 's' : ''} and update statuses.`
+            : 'Add new deals to your pipeline.',
+        }
+      } catch {
+        // Absolute last-resort — no DB access, no date calculations
+        overview = {
+          summary: 'AI briefing temporarily unavailable. Refresh to retry.',
+          keyActions: [],
+          pipelineHealth: 'Unknown',
+          momentum: null,
+          topRisk: null,
+          generatedAt: new Date().toISOString(),
+          briefingHealth: 'amber',
+          topAttentionDeals: [],
+          singleMostImportantAction: 'Review your pipeline manually.',
+        }
+      }
+    }
 
     await db.execute(sql`
       UPDATE workspaces
