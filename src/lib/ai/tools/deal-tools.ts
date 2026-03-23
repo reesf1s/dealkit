@@ -576,23 +576,37 @@ Rules:
     }
   } catch { /* non-fatal */ }
 
-  // Generate embeddings (non-blocking — don't fail the note processing if embeddings fail)
-  try {
-    const { generateEmbedding, generateDealEmbedding } = await import('@/lib/openai-embeddings')
-    const noteEmb = await generateEmbedding(appendedNotes)
-    const dealEmb = await generateDealEmbedding({
-      name: deal.dealName || '',
-      company: deal.prospectCompany || '',
-      stage: String(updateFields.stage || deal.stage || ''),
-      meetingNotes: appendedNotes,
-      signals: updateFields.intentSignals ?? deal.intentSignals,
-    })
-    updateFields.noteEmbedding = JSON.stringify(noteEmb)
-    updateFields.dealEmbedding = JSON.stringify(dealEmb)
-  } catch (err) {
-    console.error('[embeddings] Failed to generate embeddings:', err)
-    // Non-fatal — deal update still succeeds
-  }
+  // Generate embeddings AFTER the main update (raw SQL needed for pgvector)
+  const _embDealId = dealId
+  const _embWorkspaceId = ctx.workspaceId
+  const _embNotes = appendedNotes
+  const _embDeal = deal
+  const _embStage = updateFields.stage || deal.stage || ''
+  const _embSignals = updateFields.intentSignals ?? deal.intentSignals
+  setTimeout(async () => {
+    try {
+      const { generateEmbedding, generateDealEmbedding } = await import('@/lib/openai-embeddings')
+      const { sql: rawSql } = await import('drizzle-orm')
+      const noteEmb = await generateEmbedding(_embNotes)
+      const dealEmb = await generateDealEmbedding({
+        name: _embDeal.dealName || '',
+        company: _embDeal.prospectCompany || '',
+        stage: String(_embStage),
+        meetingNotes: _embNotes,
+        signals: _embSignals,
+      })
+      const noteVec = `[${noteEmb.join(',')}]`
+      const dealVec = `[${dealEmb.join(',')}]`
+      await db.execute(rawSql`
+        UPDATE deal_logs
+        SET note_embedding = ${noteVec}::vector,
+            deal_embedding = ${dealVec}::vector
+        WHERE id = ${_embDealId} AND workspace_id = ${_embWorkspaceId}
+      `)
+    } catch (err) {
+      console.error('[embeddings] Failed to generate embeddings:', err)
+    }
+  }, 0)
 
   // Build changes summary
   const changes: string[] = []

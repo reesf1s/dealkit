@@ -3,7 +3,7 @@ export const maxDuration = 60
 import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { db } from '@/lib/db'
@@ -513,7 +513,10 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
       }
     }
 
-    // Generate embeddings (non-blocking — don't fail the note processing if embeddings fail)
+    // Main deal update (without embeddings — those need raw SQL for pgvector)
+    const [updatedDeal] = await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, id)).returning()
+
+    // Generate embeddings after main update (non-blocking)
     try {
       const { generateEmbedding, generateDealEmbedding } = await import('@/lib/openai-embeddings')
       const noteEmb = await generateEmbedding(appendedNotes)
@@ -524,14 +527,17 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
         meetingNotes: appendedNotes,
         signals: updateFields.intentSignals ?? undefined,
       })
-      updateFields.noteEmbedding = JSON.stringify(noteEmb)
-      updateFields.dealEmbedding = JSON.stringify(dealEmb)
+      const noteVec = `[${noteEmb.join(',')}]`
+      const dealVec = `[${dealEmb.join(',')}]`
+      await db.execute(sql`
+        UPDATE deal_logs
+        SET note_embedding = ${noteVec}::vector,
+            deal_embedding = ${dealVec}::vector
+        WHERE id = ${id} AND workspace_id = ${workspaceId}
+      `)
     } catch (err) {
       console.error('[embeddings] Failed to generate embeddings:', err)
-      // Non-fatal — deal update still succeeds
     }
-
-    const [updatedDeal] = await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, id)).returning()
     const createdGaps = []
     for (const gap of (parsed.productGaps ?? [])) {
       if (!gap.title) continue

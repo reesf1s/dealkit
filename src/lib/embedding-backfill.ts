@@ -10,7 +10,7 @@
 
 import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
-import { eq, and, isNull } from 'drizzle-orm'
+import { eq, and, isNull, sql } from 'drizzle-orm'
 import { generateEmbedding, generateDealEmbedding } from './openai-embeddings'
 
 export async function backfillEmbeddings(workspaceId: string): Promise<number> {
@@ -51,10 +51,15 @@ export async function backfillEmbeddings(workspaceId: string): Promise<number> {
         signals: deal.intentSignals as any,
       })
 
-      await db.update(dealLogs).set({
-        noteEmbedding: JSON.stringify(noteEmb),
-        dealEmbedding: JSON.stringify(dealEmb),
-      }).where(eq(dealLogs.id, deal.id))
+      // Write vectors using raw SQL — Drizzle text type can't cast to pgvector
+      const noteVec = `[${noteEmb.join(',')}]`
+      const dealVec = `[${dealEmb.join(',')}]`
+      await db.execute(sql`
+        UPDATE deal_logs
+        SET note_embedding = ${noteVec}::vector,
+            deal_embedding = ${dealVec}::vector
+        WHERE id = ${deal.id}
+      `)
 
       count++
       // Rate limit: 200ms between calls
