@@ -364,6 +364,59 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
         ADD COLUMN IF NOT EXISTS note_source TEXT DEFAULT 'manual'
     `,
   },
+  {
+    version: 25,
+    name: 'enable_pgvector',
+    sql: `
+      CREATE EXTENSION IF NOT EXISTS vector;
+      ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS note_embedding vector(1536);
+      ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS deal_embedding vector(1536)
+    `,
+  },
+  {
+    version: 26,
+    name: 'embedding_indexes',
+    sql: `
+      CREATE INDEX IF NOT EXISTS idx_note_embedding
+        ON deal_logs USING hnsw (note_embedding vector_cosine_ops)
+        WITH (m = 16, ef_construction = 64);
+      CREATE INDEX IF NOT EXISTS idx_deal_embedding
+        ON deal_logs USING hnsw (deal_embedding vector_cosine_ops)
+        WITH (m = 16, ef_construction = 64)
+    `,
+  },
+  {
+    version: 27,
+    name: 'create_signal_outcomes',
+    sql: `
+      CREATE TABLE IF NOT EXISTS signal_outcomes (
+        id                    TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        workspace_id          TEXT NOT NULL,
+        deal_id               TEXT NOT NULL,
+        outcome               TEXT NOT NULL,
+        close_date            TIMESTAMPTZ,
+        champion_identified   BOOLEAN,
+        budget_confirmed      BOOLEAN,
+        competitor_present    BOOLEAN,
+        competitor_name       TEXT,
+        objection_themes      JSONB DEFAULT '[]'::jsonb,
+        sentiment_trajectory  TEXT,
+        days_to_close         INTEGER,
+        total_meetings        INTEGER,
+        stakeholder_count     INTEGER,
+        deal_value            INTEGER,
+        stage                 TEXT,
+        win_reason            TEXT,
+        loss_reason           TEXT,
+        deal_embedding        TEXT,
+        created_at            TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_signal_outcomes_workspace
+        ON signal_outcomes (workspace_id, outcome);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_signal_outcomes_deal
+        ON signal_outcomes (workspace_id, deal_id)
+    `,
+  },
 ]
 
 // ── In-process cache — prevents redundant round-trips on the same cold-start ──

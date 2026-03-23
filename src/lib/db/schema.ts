@@ -244,6 +244,9 @@ export const dealLogs = pgTable('deal_logs', {
   // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS scheduled_events jsonb NOT NULL DEFAULT '[]'::jsonb;
   noteSource: text('note_source').default('manual'),               // 'manual' | 'email' | 'hubspot' — where the last note came from
   // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS note_source text DEFAULT 'manual';
+  noteEmbedding: text('note_embedding'),   // stored as text, cast to vector in SQL
+  dealEmbedding: text('deal_embedding'),   // stored as text, cast to vector in SQL
+  // Migration v25: actual column type is vector(1536) — Drizzle uses text since it lacks native vector support
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
@@ -264,6 +267,40 @@ export const unmatchedEmails = pgTable('unmatched_emails', {
   assignedDealId: text('assigned_deal_id'),
   receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// signal_outcomes  (pattern memory — structured snapshots when deals close)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const signalOutcomes = pgTable('signal_outcomes', {
+  id: text('id').primaryKey().default(sql`gen_random_uuid()::text`),
+  workspaceId: text('workspace_id').notNull(),
+  dealId: text('deal_id').notNull(),
+  outcome: text('outcome').notNull(), // 'won' | 'lost'
+  closeDate: timestamp('close_date', { withTimezone: true }),
+
+  // Structured signals at close time
+  championIdentified: boolean('champion_identified'),
+  budgetConfirmed: boolean('budget_confirmed'),
+  competitorPresent: boolean('competitor_present'),
+  competitorName: text('competitor_name'),
+  objectionThemes: jsonb('objection_themes').default([]),
+  sentimentTrajectory: text('sentiment_trajectory'), // 'improving' | 'declining' | 'stable'
+  daysToClose: integer('days_to_close'),
+  totalMeetings: integer('total_meetings'),
+  stakeholderCount: integer('stakeholder_count'),
+  dealValue: integer('deal_value'),
+  stage: text('stage'),
+
+  // Outcome context
+  winReason: text('win_reason'),
+  lossReason: text('loss_reason'),
+
+  // Embedding (will be populated by Agent 2 later)
+  dealEmbedding: text('deal_embedding'),
+
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
 
@@ -568,3 +605,6 @@ export type NewGlobalMlModelRow = typeof globalMlModel.$inferInsert
 
 export type GlobalContributionAuditRow = typeof globalContributionAudit.$inferSelect
 export type GlobalBenchmarkCacheRow = typeof globalBenchmarkCache.$inferSelect
+
+export type SignalOutcomeRow = typeof signalOutcomes.$inferSelect
+export type NewSignalOutcomeRow = typeof signalOutcomes.$inferInsert

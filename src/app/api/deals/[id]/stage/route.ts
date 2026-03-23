@@ -7,6 +7,7 @@ import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { requestBrainRebuild } from '@/lib/brain-rebuild'
+import { recordSignalOutcome } from '@/lib/pattern-memory'
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -72,6 +73,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
               (${workspaceId}, ${id}, ${score}, ${predictedOutcome}, ${actualOutcome}, NOW(), ${deal.dealValue ?? null})
           `)
         } catch { /* non-fatal — never block deal close */ }
+      })
+    }
+
+    // ── Record signal-to-outcome pattern memory ────────────────────────────────
+    if (stage === 'closed_won' || stage === 'closed_lost') {
+      after(async () => {
+        try { await recordSignalOutcome(id, workspaceId, deal) }
+        catch { /* non-fatal — never block deal close */ }
       })
     }
 

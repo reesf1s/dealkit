@@ -16,6 +16,7 @@ import { dealLogs, productGaps, companyProfiles, competitors } from '@/lib/db/sc
 import { anthropic } from '@/lib/ai/client'
 import { getWorkspaceBrain } from '@/lib/workspace-brain'
 import { requestBrainRebuild } from '@/lib/brain-rebuild'
+import { recordSignalOutcome } from '@/lib/pattern-memory'
 import { extractTextSignals, heuristicScore } from '@/lib/text-signals'
 import { computeCompositeScore } from '@/lib/deal-ml'
 import { buildDealBriefing, scoreNarrationPrompt } from '@/lib/brain-narrator'
@@ -1141,6 +1142,15 @@ export const update_deal = {
           await computeAndUpdateScore(dealId, ctx.workspaceId, allText, deal.createdAt ?? new Date(), (c.setStage ?? deal.stage), ctx)
         } catch { /* non-fatal */ }
       }
+    }
+
+    // Record signal-to-outcome pattern memory when deal is closed via agent
+    const finalStage = c.setStage ?? deal.stage
+    if (finalStage === 'closed_won' || finalStage === 'closed_lost') {
+      after(async () => {
+        try { await recordSignalOutcome(dealId, ctx.workspaceId, { ...deal, ...updateFields }) }
+        catch { /* non-fatal */ }
+      })
     }
 
     after(async () => {
