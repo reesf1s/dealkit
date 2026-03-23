@@ -103,10 +103,11 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
       // Parse meeting notes to extract last note info
       const allNotes = [d.meetingNotes, d.hubspotNotes].filter(Boolean).join('\n---\n')
       const entries = parseMeetingEntries(allNotes)
-      const sortedEntries = entries.filter(e => e.date).sort((a, b) => (b.date!.getTime() - a.date!.getTime()))
+      // Guard: filter out invalid Date objects (truthy but isNaN) — they throw on toISOString/toLocaleDateString
+      const sortedEntries = entries.filter(e => e.date && !isNaN(e.date.getTime())).sort((a, b) => (b.date!.getTime() - a.date!.getTime()))
       const lastEntry = sortedEntries[0]
-      const lastNoteDate = lastEntry?.date ? lastEntry.date.toISOString().split('T')[0] : null
-      const daysSinceLastNote = lastEntry?.date ? Math.round((Date.now() - lastEntry.date.getTime()) / 86400000) : null
+      const lastNoteDate = (lastEntry?.date && !isNaN(lastEntry.date.getTime())) ? lastEntry.date.toISOString().split('T')[0] : null
+      const daysSinceLastNote = (lastEntry?.date && !isNaN(lastEntry.date.getTime())) ? Math.round((Date.now() - lastEntry.date.getTime()) / 86400000) : null
       const lastNoteOneLiner = lastEntry?.text ? lastEntry.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().slice(0, 100) : null
 
       // Action items from todos (with status)
@@ -146,7 +147,7 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
 
       // Last 3 note summaries
       const last3Notes = sortedEntries.slice(0, 3).map(e => {
-        const dateStr = e.date ? e.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '?'
+        const dateStr = (e.date && !isNaN(e.date.getTime())) ? e.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '?'
         const summary = e.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().slice(0, 120)
         return `${dateStr}: ${summary}`
       })
@@ -169,7 +170,7 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
       const allTodosForDeal = todos.map((t: any) => `    - [${t.done ? 'done' : 'not done'}] ${t.text}`).join('\n')
 
       const parts = [
-        `- "${d.dealName}" @ ${d.prospectCompany} | Stage: ${sl(d.stage)} | Value: ${fmt(d.dealValue ?? 0)} | Score: ${d.conversionScore ?? 'N/A'} | Close: ${d.closeDate ? new Date(d.closeDate).toLocaleDateString('en-GB') : 'TBD'} | Competitors: ${((d.competitors as string[]) ?? []).join(', ') || 'none'}`,
+        `- "${d.dealName}" @ ${d.prospectCompany} | Stage: ${sl(d.stage)} | Value: ${fmt(d.dealValue ?? 0)} | Score: ${d.conversionScore ?? 'N/A'} | Close: ${(() => { if (!d.closeDate) return 'TBD'; const cd = new Date(d.closeDate); return !isNaN(cd.getTime()) ? cd.toLocaleDateString('en-GB') : 'TBD' })() } | Competitors: ${((d.competitors as string[]) ?? []).join(', ') || 'none'}`,
         oneLineContext ? `  Context: ${oneLineContext}` : null,
         uniqueRisk ? `  Top risk: ${uniqueRisk}` : null,
         daysSinceLastNote != null ? `  Days since last note: ${daysSinceLastNote}` : null,
@@ -244,7 +245,8 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
     const pred = predictions.find(p => p.dealId === d.id)
     const churnRisk = pred?.churnRisk ?? 0
     const score = d.conversionScore ?? 100
-    const closeDateMs = d.closeDate ? new Date(d.closeDate).getTime() : null
+    const closeDateRaw = d.closeDate ? new Date(d.closeDate) : null
+    const closeDateMs = (closeDateRaw && !isNaN(closeDateRaw.getTime())) ? closeDateRaw.getTime() : null
     const daysToClose = closeDateMs != null ? Math.round((closeDateMs - nowMs) / 86400000) : null
     const closeSoon = daysToClose != null && daysToClose <= 14 && !['negotiation', 'closed_won', 'closed_lost'].includes(d.stage)
 
@@ -423,7 +425,7 @@ GOOD: "Prepare QA test scenarios for the BOE Monday call — ensure the floor pl
     // Collect confirmation notes from meeting notes
     const allNotes = [d.meetingNotes, d.hubspotNotes].filter(Boolean).join('\n---\n')
     const noteEntries = parseMeetingEntries(allNotes)
-    const sortedNotes = noteEntries.filter(e => e.date).sort((a, b) => (b.date!.getTime() - a.date!.getTime()))
+    const sortedNotes = noteEntries.filter(e => e.date && !isNaN(e.date.getTime())).sort((a, b) => (b.date!.getTime() - a.date!.getTime()))
     for (const entry of sortedNotes.slice(0, 5)) {
       const firstSentence = entry.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().split(/[.\n]/)[0].trim()
       if (confirmKw.test(firstSentence)) {
