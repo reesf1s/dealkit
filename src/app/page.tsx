@@ -42,7 +42,7 @@ export default async function LandingPage() {
       style={{
         background: bg,
         color: textPrimary,
-        fontFamily: 'var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Inter", sans-serif',
+        fontFamily: 'var(--ds-font)',
         minHeight: '100vh',
         overflowX: 'hidden',
       }}
@@ -157,8 +157,8 @@ export default async function LandingPage() {
 
           <h1
             data-hero-headline=""
-            className="font-brand"
             style={{
+              fontFamily: 'var(--ds-font-brand)',
               fontSize: '52px',
               fontWeight: 400,
               lineHeight: 1.15,

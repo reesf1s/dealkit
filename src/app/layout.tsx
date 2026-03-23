@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono, Playfair_Display } from 'next/font/google'
+import { Geist, Geist_Mono, Playfair_Display, Poppins } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import { Toaster } from '@/components/shared/Toast'
 import CookieBanner from '@/components/shared/CookieBanner'
@@ -23,6 +23,13 @@ const playfair = Playfair_Display({
   display: 'swap',
 })
 
+const poppins = Poppins({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-heading',
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
   title: 'SellSight',
   description: 'Autonomous sales intelligence',
@@ -35,7 +42,7 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en" className={playfair.variable} suppressHydrationWarning>
+      <html lang="en" className={`${playfair.variable} ${poppins.variable}`} suppressHydrationWarning>
         <head>
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

@@ -2,7 +2,7 @@
 
 /* ─── System font stack ──────────────────────────────────────────────────── */
 :root {
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  --font-sans: var(--font-heading), 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'SF Mono', 'Menlo', 'Consolas', monospace;
 }
 
@@ -216,24 +216,24 @@ body, * {
   font-family: var(--font-mono);
 }
 
-/* Brand accent font — page titles & key headings */
+/* Brand accent font — page titles & key headings (Poppins) */
 .font-brand, .font-serif-display, .font-serif, .text-display {
-  font-family: var(--ds-font-brand, var(--font-brand, 'Playfair Display', Georgia, serif));
+  font-family: var(--ds-font-heading) !important;
   font-weight: 500;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
 }
 
-/* Card section titles — smaller brand treatment */
+/* Card section titles — smaller brand treatment (Poppins) */
 .font-brand-section {
-  font-family: var(--ds-font-brand, var(--font-brand, 'Playfair Display', Georgia, serif));
+  font-family: var(--ds-font-heading) !important;
   font-weight: 500;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.005em;
   text-transform: none;
 }
 
-/* Sidebar wordmark — letterspaced brand treatment */
+/* Sidebar wordmark — letterspaced brand treatment (Playfair Display) */
 .font-brand-wordmark {
-  font-family: var(--ds-font-brand, var(--font-brand, 'Playfair Display', Georgia, serif));
+  font-family: var(--ds-font-brand) !important;
   font-size: 13px;
   letter-spacing: 4px;
   text-transform: uppercase;
