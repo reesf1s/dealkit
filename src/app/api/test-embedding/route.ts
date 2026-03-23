@@ -43,7 +43,7 @@ export async function GET() {
       },
       body: JSON.stringify({
         model: 'text-embedding-3-small',
-        input: 'test embedding generation for SellSight deal intelligence',
+        input: 'test embedding generation for Halvex deal intelligence',
       }),
     })
 

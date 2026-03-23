@@ -1,6 +1,6 @@
 /**
  * POST /api/integrations/hubspot/sync
- * Imports (or updates) deals from HubSpot into SellSight deal_logs.
+ * Imports (or updates) deals from HubSpot into Halvex deal_logs.
  * Core sync logic lives in src/lib/hubspot-sync.ts (shared with the cron job).
  */
 export const dynamic = 'force-dynamic'

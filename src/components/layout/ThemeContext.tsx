@@ -18,7 +18,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>('dark')
 
   useEffect(() => {
-    const stored = localStorage.getItem('sellsight-theme') as Theme | null
+    const stored = localStorage.getItem('halvex-theme') as Theme | null
     if (stored === 'light' || stored === 'dark') {
       setTheme(stored)
       document.documentElement.classList.toggle('dark', stored === 'dark')
@@ -32,7 +32,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const toggleTheme = () => {
     setTheme(prev => {
       const next = prev === 'light' ? 'dark' : 'light'
-      localStorage.setItem('sellsight-theme', next)
+      localStorage.setItem('halvex-theme', next)
       document.documentElement.classList.toggle('dark', next === 'dark')
       return next
     })

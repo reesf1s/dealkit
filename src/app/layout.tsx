@@ -31,7 +31,7 @@ const poppins = Poppins({
 })
 
 export const metadata: Metadata = {
-  title: 'SellSight',
+  title: 'Halvex',
   description: 'Autonomous sales intelligence',
 }
 

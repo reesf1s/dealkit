@@ -208,7 +208,7 @@ function DealCard({
       style={{
         background: 'var(--card-bg)',
         border: `1px solid ${isUrgent ? 'color-mix(in srgb, var(--danger) 30%, var(--card-border))' : 'var(--card-border)'}`,
-        borderRadius: '10px',
+        borderRadius: '8px',
         padding: '12px 13px',
         cursor: 'pointer',
         opacity: isDragging ? 0.4 : 1,
@@ -300,7 +300,7 @@ function DealCard({
               <div style={{
                 position: 'absolute', top: '36px', right: 0, zIndex: 100,
                 background: 'var(--card-bg)', border: 'none',
-                borderRadius: '10px', padding: '10px 12px', minWidth: '200px',
+                borderRadius: '8px', padding: '10px 12px', minWidth: '200px',
                 boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
                 pointerEvents: 'none',
               }}>
@@ -1031,7 +1031,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <div style={labelStyle}>Top Objections</div>
-            <InfoTooltip text="SellSight detects objection themes from your meeting notes and tracks whether deals with each objection type tend to close." />
+            <InfoTooltip text="Halvex detects objection themes from your meeting notes and tracks whether deals with each objection type tend to close." />
           </div>
           {objectionWinMap.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '16px 8px', color: 'var(--text-tertiary)' }}>
@@ -1235,7 +1235,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
             {archetypes.slice(0, 6).map((a: any, i: number) => (
-              <div key={i} style={{ padding: '12px 14px', background: 'var(--surface)', borderRadius: '10px', border: 'none' }}>
+              <div key={i} style={{ padding: '12px 14px', background: 'var(--surface)', borderRadius: '8px', border: 'none' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <div style={{ flexShrink: 0, width: '22px', height: '22px', borderRadius: '6px', background: 'var(--accent-subtle)', border: '1px solid var(--border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--accent)' }}>{i + 1}</div>
                   <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>{a.label ?? a.name ?? `Archetype ${i + 1}`}</div>
@@ -1570,7 +1570,7 @@ export default function PipelinePage() {
   }
   const tabBtn = (active: boolean): React.CSSProperties => ({
     display: 'flex', alignItems: 'center', gap: '6px',
-    padding: '7px 14px', borderRadius: '8px',
+    padding: '7px 14px', borderRadius: '6px',
     fontSize: '12px', fontWeight: '500',
     cursor: 'pointer', border: 'none', outline: 'none',
     background: active ? 'var(--accent)' : 'var(--surface)',
@@ -1602,7 +1602,7 @@ export default function PipelinePage() {
               padding: '8px 14px',
               background: 'var(--surface)',
               border: 'none',
-              borderRadius: '9px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', cursor: 'pointer',
+              borderRadius: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', cursor: 'pointer',
             }}
           >
             <Settings size={14} /> Columns
@@ -1612,7 +1612,7 @@ export default function PipelinePage() {
             padding: '8px 16px',
             background: 'linear-gradient(135deg, var(--accent), var(--accent-hover))',
             boxShadow: 'var(--shadow-lg)',
-            borderRadius: '9px', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none',
+            borderRadius: '6px', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none',
           }}>
             <Plus size={14} /> Add Deal
           </Link>
@@ -1689,7 +1689,7 @@ export default function PipelinePage() {
                 onChange={e => setMobileStageIdx(Number(e.target.value))}
                 style={{
                   width: '100%', padding: '12px 14px', fontSize: '14px', fontWeight: 700,
-                  background: 'var(--surface)', border: 'none', borderRadius: '10px',
+                  background: 'var(--surface)', border: 'none', borderRadius: '8px',
                   color: 'var(--text-primary)', cursor: 'pointer', outline: 'none',
                   fontFamily: 'inherit', appearance: 'none',
                   backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M3 5l3 3 3-3%27 stroke=%27%23999%27 stroke-width=%271.5%27 fill=%27none%27/%3E%3C/svg%3E")',
@@ -1718,7 +1718,7 @@ export default function PipelinePage() {
                       </div>
                     )}
                     {stageDeals.length === 0 ? (
-                      <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '13px', background: 'var(--surface)', borderRadius: '10px', border: '1px dashed var(--border)' }}>
+                      <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '13px', background: 'var(--surface)', borderRadius: '8px', border: '1px dashed var(--border)' }}>
                         No deals in this stage
                       </div>
                     ) : (
@@ -1787,7 +1787,7 @@ export default function PipelinePage() {
                       padding: '10px 12px',
                       background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.06)` : 'var(--card-bg)',
                       border: isDropTarget ? `1px solid ${stage.color}33` : '1px solid var(--card-border)',
-                      borderRadius: '10px',
+                      borderRadius: '8px',
                       transition: 'background 0.15s, border-color 0.15s',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1803,7 +1803,7 @@ export default function PipelinePage() {
 
                     {/* Cards */}
                     {isLoading ? (
-                      <div style={{ height: '80px', background: 'var(--surface)', borderRadius: '10px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ height: '80px', background: 'var(--surface)', borderRadius: '8px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Loading...</div>
                       </div>
                     ) : stageDeals.length === 0 ? (
@@ -1811,7 +1811,7 @@ export default function PipelinePage() {
                         height: '80px',
                         background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.06)` : 'var(--surface)',
                         border: isDropTarget ? `1px dashed ${stage.color}88` : '1px dashed var(--border)',
-                        borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         transition: 'background 0.15s, border-color 0.15s',
                       }}>
                         <span style={{ fontSize: '11px', color: isDropTarget ? stage.color : 'var(--text-tertiary)' }}>
@@ -1900,7 +1900,7 @@ export default function PipelinePage() {
                       padding: '10px 12px',
                       background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.06)` : 'var(--card-bg)',
                       border: isDropTarget ? `1px solid ${stage.color}33` : '1px solid var(--card-border)',
-                      borderRadius: '10px',
+                      borderRadius: '8px',
                       transition: 'background 0.15s, border-color 0.15s',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1920,7 +1920,7 @@ export default function PipelinePage() {
                         height: '80px',
                         background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.06)` : 'var(--surface)',
                         border: isDropTarget ? `1px dashed ${stage.color}88` : '1px dashed var(--border)',
-                        borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
                         transition: 'background 0.15s, border-color 0.15s',
                       }}>
                         <span style={{ fontSize: '11px', color: isDropTarget ? stage.color : 'var(--text-tertiary)' }}>

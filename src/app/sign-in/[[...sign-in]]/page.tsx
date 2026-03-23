@@ -13,7 +13,7 @@ export default function SignInPage() {
           <div style={{ width: '32px', height: '32px', background: 'linear-gradient(135deg, var(--accent), #7C3AED)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 16px var(--accent-subtle)' }}>
             <FileText size={15} color="#fff" strokeWidth={2.5} />
           </div>
-          <span style={{ fontWeight: '700', fontSize: '17px', letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>SellSight</span>
+          <span style={{ fontWeight: '700', fontSize: '17px', letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>Halvex</span>
         </div>
 
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>

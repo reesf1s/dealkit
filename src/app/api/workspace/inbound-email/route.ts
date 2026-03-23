@@ -32,7 +32,7 @@ export async function GET() {
         .where(eq(workspaces.id, workspaceId))
     }
 
-    const email = `ws-${token}@inbound.sellsight.ai`
+    const email = `ws-${token}@inbound.halvex.ai`
     return NextResponse.json({ data: { email, token } })
   } catch (err) {
     return dbErrResponse(err)

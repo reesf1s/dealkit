@@ -59,9 +59,9 @@ function extractDate(body: Record<string, unknown>): string {
 }
 
 function extractTokenFromTo(toAddresses: string[]): string | null {
-  // Look for ws-{token}@inbound.sellsight.ai in any of the To addresses
+  // Look for ws-{token}@inbound.halvex.ai in any of the To addresses
   for (const addr of toAddresses) {
-    const match = addr.match(/^ws-([a-f0-9]{8})@inbound\.sellsight\.ai$/)
+    const match = addr.match(/^ws-([a-f0-9]{8})@inbound\.halvex\.ai$/)
     if (match) return match[1]
   }
   return null

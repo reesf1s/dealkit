@@ -24,7 +24,7 @@ export async function POST() {
       .where(eq(workspaces.id, workspaceId))
       .returning({ inboundEmailToken: workspaces.inboundEmailToken })
 
-    const email = `ws-${updated.inboundEmailToken}@inbound.sellsight.ai`
+    const email = `ws-${updated.inboundEmailToken}@inbound.halvex.ai`
     return NextResponse.json({ data: { email, token: updated.inboundEmailToken } })
   } catch (err) {
     return dbErrResponse(err)

@@ -85,7 +85,7 @@ export default async function SharePage({ params }: SharePageProps) {
               letterSpacing: '-0.03em',
             }}
           >
-            SellSight
+            Halvex
           </span>
           <span
             style={{
@@ -101,7 +101,7 @@ export default async function SharePage({ params }: SharePageProps) {
               border: '1px solid rgba(255,255,255,0.08)',
             }}
           >
-            Powered by SellSight
+            Powered by Halvex
           </span>
         </div>
 
@@ -149,12 +149,12 @@ export default async function SharePage({ params }: SharePageProps) {
           <p style={{ fontSize: '12px', color: '#555', margin: 0 }}>
             Create your own AI sales collateral at{' '}
             <a
-              href="https://sellsight.vercel.app"
+              href="https://halvex.ai"
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: '#6366F1', textDecoration: 'none' }}
             >
-              sellsight.vercel.app
+              halvex.ai
             </a>
           </p>
         </div>

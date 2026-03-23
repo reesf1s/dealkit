@@ -133,7 +133,7 @@ function parseSenderInfo(from: string): { email: string; name: string | null } {
 }
 
 function extractWorkspaceId(toField: string): string | null {
-  // Format: {workspaceId}@ingest.sellsight.ai or ws-{token}@inbound.sellsight.ai
+  // Format: {workspaceId}@ingest.halvex.ai or ws-{token}@inbound.halvex.ai
   // Support both formats
   const addresses = toField.split(',').map(a => a.trim())
   for (const addr of addresses) {
@@ -141,12 +141,12 @@ function extractWorkspaceId(toField: string): string | null {
     const emailMatch = addr.match(/<([^>]+)>/)
     const email = emailMatch ? emailMatch[1] : addr
 
-    // New format: {workspaceId}@ingest.sellsight.ai
-    const ingestMatch = email.match(/^([a-f0-9-]{36})@ingest\.sellsight\.ai$/i)
+    // New format: {workspaceId}@ingest.halvex.ai
+    const ingestMatch = email.match(/^([a-f0-9-]{36})@ingest\.halvex\.ai$/i)
     if (ingestMatch) return ingestMatch[1]
 
-    // Legacy format: ws-{token}@inbound.sellsight.ai
-    const legacyMatch = email.match(/^ws-([a-f0-9]{8})@inbound\.sellsight\.ai$/i)
+    // Legacy format: ws-{token}@inbound.halvex.ai
+    const legacyMatch = email.match(/^ws-([a-f0-9]{8})@inbound\.halvex\.ai$/i)
     if (legacyMatch) return legacyMatch[1] // Returns the token, resolved below
   }
   return null

@@ -33,7 +33,7 @@ function getPageInfo(pathname: string) {
   for (const [key, val] of Object.entries(PAGE_MAP)) {
     if (pathname.startsWith(key + '/')) return val
   }
-  return { label: 'SellSight', Icon: LayoutDashboard }
+  return { label: 'Halvex', Icon: LayoutDashboard }
 }
 
 export default function TopNav() {
@@ -96,7 +96,7 @@ export default function TopNav() {
         {/* Breadcrumb */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
           <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontWeight: 400, letterSpacing: '-0.01em' }}>
-            SellSight
+            Halvex
           </span>
           <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', opacity: 0.5 }}>/</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>

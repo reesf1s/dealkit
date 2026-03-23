@@ -2,14 +2,14 @@
  * HubSpot CRM Integration — Private App token auth
  *
  * Uses HubSpot Private Apps (long-lived token, no OAuth needed).
- * Users create a private app inside their HubSpot account → copy the token → paste into SellSight.
+ * Users create a private app inside their HubSpot account → copy the token → paste into Halvex.
  *
  * How to get a token:
  *   HubSpot CRM → Settings (gear icon) → Integrations → Private Apps → Create private app
  *   Required scopes: crm.objects.deals.read, crm.objects.contacts.read, crm.objects.companies.read
  *   (No extra scopes needed for emails/notes — we use the Engagements v1 API which is
  *    covered by crm.objects.contacts.read)
- *   Copy the access token and paste it into SellSight Settings → Integrations.
+ *   Copy the access token and paste it into Halvex Settings → Integrations.
  *
  * Stage strategy:
  *   Closed stages are normalised to closed_won / closed_lost so the ML model can use them.
@@ -463,7 +463,7 @@ export function buildMeetingNotes(
 // ─── Pipeline config builder ──────────────────────────────────────────────────
 
 /**
- * Build a SellSight pipelineConfig.stages array from HubSpot's ordered stage list.
+ * Build a Halvex pipelineConfig.stages array from HubSpot's ordered stage list.
  * Closed stages are always normalised to closed_won / closed_lost.
  * All other stages keep their native HubSpot ID so deal.stage values match column IDs.
  */
@@ -494,7 +494,7 @@ export function buildHubspotPipelineConfig(orderedStages: HubspotPipelineStage[]
 // ─── Field mapping ────────────────────────────────────────────────────────────
 
 /**
- * Map a HubSpot stage ID to a SellSight stage ID.
+ * Map a HubSpot stage ID to a Halvex stage ID.
  * Only closed stages are normalised — every other stage keeps its native HubSpot ID
  * so the pipeline board can show HubSpot's real column names.
  */

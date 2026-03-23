@@ -17,7 +17,7 @@ function formatAge(iso: string): string {
 }
 
 function getStorageKey(generatedAt: string) {
-  return `sellsight_actions_done_${generatedAt}`
+  return `halvex_actions_done_${generatedAt}`
 }
 
 export default function AIOverviewCard() {

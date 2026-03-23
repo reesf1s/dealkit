@@ -1,8 +1,9 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
 
 /* ─── System font stack ──────────────────────────────────────────────────── */
 :root {
-  --font-sans: var(--font-heading), 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'SF Mono', 'Menlo', 'Consolas', monospace;
 }
 
@@ -73,8 +74,8 @@
   --success: var(--ds-green, #3CCB7F);
   --warning: var(--ds-amber, #F59E0B);
   --danger: var(--ds-red, #E5484D);
-  --card-bg: var(--ds-bg-card, #141416);
-  --card-border: transparent;
+  --card-bg: var(--ds-bg-card, rgba(255,255,255,0.03));
+  --card-border: var(--ds-border, rgba(255,255,255,0.06));
   --sidebar-bg: var(--ds-bg-sidebar, #0F0F11);
   --topnav-bg: rgba(9, 9, 11, 0.92);
   --shadow-sm: none;
@@ -258,11 +259,11 @@ body, * {
   letter-spacing: -0.03em;
 }
 
-/* Standard card — 8px radius */
+/* Standard card — 12px glass radius */
 .card-standard {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 18px;
 }
 .card-hover:hover {
@@ -279,11 +280,11 @@ body, * {
    10 absolute rules applied globally
    ============================================================ */
 
-/* RULE 1: No visible borders on cards */
+/* RULE 1: Glass borders on cards */
 .dark .card-standard,
 .dark [class*="card"],
 .dark [class*="Card"] {
-  border-color: transparent !important;
+  border-color: rgba(255,255,255,0.06) !important;
 }
 
 /* RULE 2: No borders on buttons except primary */
@@ -305,7 +306,7 @@ body, * {
   background: var(--ds-bg-hover);
 }
 
-/* RULE 4: Tight border-radius — 6px components, 8px cards */
+/* RULE 4: Glass border-radius — 6px components, 12px cards */
 .dark .card-standard,
 .dark [class*="card"],
 .dark [class*="Card"],
@@ -317,14 +318,7 @@ body, * {
 .dark [class*="Popover"],
 .dark [class*="dropdown"],
 .dark [class*="Dropdown"] {
-  border-radius: 8px !important;
-}
-
-/* Override any overly-large radii on components */
-.dark [style*="border-radius: 12px"],
-.dark [style*="border-radius: 14px"],
-.dark [style*="border-radius: 16px"] {
-  border-radius: 8px !important;
+  border-radius: 12px !important;
 }
 
 /* RULE 5: Font-weight 500 everywhere, 600 for page titles only */

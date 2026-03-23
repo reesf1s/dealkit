@@ -192,7 +192,7 @@ function buildActiveDealContext(
 // ── System prompt builder ────────────────────────────────────────────────────
 
 function buildSystemPrompt(brainContext: string, activeDealContext: string, pipelineStageContext: string = ''): string {
-  return `You are SellSight AI — a sales copilot with complete CRM access. You are the interface between the user and their pipeline intelligence brain.
+  return `You are Halvex AI — a sales copilot with complete CRM access. You are the interface between the user and their pipeline intelligence brain.
 
 ═══ YOUR 5 TOOLS ═══
 

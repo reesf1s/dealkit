@@ -604,7 +604,7 @@ export default function CommandPalette() {
             </span>
           </div>
           <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', letterSpacing: '-0.01em' }}>
-            SellSight AI
+            Halvex AI
           </div>
         </div>
       </div>

@@ -224,7 +224,7 @@ export default function SettingsPage() {
     try {
       const res = await fetch('/api/integrations/hubspot/disconnect', { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to disconnect')
-      toast('HubSpot disconnected. Your imported deals remain in SellSight.', 'success')
+      toast('HubSpot disconnected. Your imported deals remain in Halvex.', 'success')
       mutateHubspot()
     } catch (e: unknown) {
       toast(e instanceof Error ? e.message : 'Failed to disconnect', 'error')
@@ -242,7 +242,7 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `sellsight-export-${new Date().toISOString().split('T')[0]}.json`
+      a.download = `halvex-export-${new Date().toISOString().split('T')[0]}.json`
       a.click()
       URL.revokeObjectURL(url)
       toast('Data exported successfully', 'success')
@@ -719,7 +719,7 @@ export default function SettingsPage() {
                     </div>
                   ) : (
                     <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                      Import your entire HubSpot pipeline — deals, stages, contacts, and values — directly into SellSight.
+                      Import your entire HubSpot pipeline — deals, stages, contacts, and values — directly into Halvex.
                     </div>
                   )}
                 </div>
@@ -774,7 +774,7 @@ export default function SettingsPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
                   {[
                     { n: '1', text: 'Click the link above to open HubSpot Private Apps (or go to Settings → Integrations → Private Apps)' },
-                    { n: '2', text: 'Click Create a private app, give it a name like "SellSight"' },
+                    { n: '2', text: 'Click Create a private app, give it a name like "Halvex"' },
                     { n: '3', text: 'On the Scopes tab, enable these 3 read scopes:' },
                     { n: '4', text: 'Click Create app, then copy the access token and paste it below' },
                   ].map(({ n, text }) => (
@@ -840,7 +840,7 @@ export default function SettingsPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {[
                 { n: '1', text: 'BCC your unique address below when emailing customers or forward emails to it' },
-                { n: '2', text: 'SellSight auto-matches emails to the right deal by contact email, company domain, or deal name in the subject' },
+                { n: '2', text: 'Halvex auto-matches emails to the right deal by contact email, company domain, or deal name in the subject' },
                 { n: '3', text: 'Matched emails are appended to the deal\'s notes and trigger AI signal extraction — unmatched emails go to a review queue' },
               ].map(({ n, text }) => (
                 <div key={n} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
@@ -921,7 +921,7 @@ export default function SettingsPage() {
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 14px', borderRadius: '10px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.14)' }}>
               <Key size={14} strokeWidth={2} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: '1px' }} />
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.7 }}>
-                Use this key with Zapier, Make, or any HTTP integration to push deals into SellSight. Send it as <code style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--surface)', padding: '1px 5px', borderRadius: '4px', border: '1px solid var(--border)' }}>apiKey</code> in the JSON body.
+                Use this key with Zapier, Make, or any HTTP integration to push deals into Halvex. Send it as <code style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--surface)', padding: '1px 5px', borderRadius: '4px', border: '1px solid var(--border)' }}>apiKey</code> in the JSON body.
               </p>
             </div>
 
@@ -930,7 +930,7 @@ export default function SettingsPage() {
               <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>Webhook URL</p>
               <input
                 readOnly
-                value="https://app.sellsight.ai/api/webhooks/zapier"
+                value="https://app.halvex.ai/api/webhooks/zapier"
                 style={{
                   width: '100%', height: '32px', padding: '0 10px', borderRadius: '7px', fontSize: '12px',
                   background: 'var(--surface)', border: '1px solid var(--border)',
@@ -987,7 +987,7 @@ export default function SettingsPage() {
             {/* Explainer */}
             <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.14)' }}>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.7 }}>
-                When enabled, SellSight contributes <strong style={{ color: 'var(--text-primary)' }}>10 anonymised behavioural signals</strong> per closed deal to a shared learning pool.
+                When enabled, Halvex contributes <strong style={{ color: 'var(--text-primary)' }}>10 anonymised behavioural signals</strong> per closed deal to a shared learning pool.
                 In return, your predictions are benchmarked against industry data and new workspaces start with a pre-calibrated model instead of a 50/50 coin flip.
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginTop: '10px' }}>
@@ -1054,7 +1054,7 @@ export default function SettingsPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Privacy & compliance" description="How SellSight handles your data">
+        <SectionCard title="Privacy & compliance" description="How Halvex handles your data">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
             {/* Key facts */}
@@ -1101,7 +1101,7 @@ export default function SettingsPage() {
             <div style={{ padding: '10px 14px', borderRadius: '9px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.15)' }}>
               <p style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600, margin: '0 0 6px' }}>Your rights (GDPR / CCPA)</p>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>
-                Access, correct, export, or delete your data at any time using the buttons below, or email <a href="mailto:privacy@sellsight.io" style={{ color: 'var(--accent)' }}>privacy@sellsight.io</a>. We respond within 30 days.
+                Access, correct, export, or delete your data at any time using the buttons below, or email <a href="mailto:privacy@halvex.ai" style={{ color: 'var(--accent)' }}>privacy@halvex.ai</a>. We respond within 30 days.
               </p>
             </div>
 

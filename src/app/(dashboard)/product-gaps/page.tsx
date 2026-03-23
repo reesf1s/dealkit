@@ -408,7 +408,7 @@ export default function ProductGapsPage() {
             No open product gaps detected
           </div>
           <div style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '420px', margin: '0 auto 20px', lineHeight: 1.6 }}>
-            This is either great news — or you haven&apos;t pasted enough meeting notes yet. Every time a prospect says &ldquo;we&apos;d need X to move forward,&rdquo; SellSight captures it here automatically.
+            This is either great news — or you haven&apos;t pasted enough meeting notes yet. Every time a prospect says &ldquo;we&apos;d need X to move forward,&rdquo; Halvex captures it here automatically.
           </div>
           <a
             href="/pipeline"

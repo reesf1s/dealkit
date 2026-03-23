@@ -4,14 +4,14 @@
    ============================================================ */
 
 :root {
-  /* Surfaces */
+  /* Surfaces — glassmorphism */
   --ds-bg-page: #09090B;
-  --ds-bg-sidebar: #0F0F11;
-  --ds-bg-card: #141416;
-  --ds-bg-hover: #1A1A1D;
-  --ds-bg-active: #1F1F23;
+  --ds-bg-sidebar: rgba(15,15,17,0.85);
+  --ds-bg-card: rgba(255,255,255,0.03);
+  --ds-bg-hover: rgba(255,255,255,0.06);
+  --ds-bg-active: rgba(255,255,255,0.08);
   --ds-bg-input: #141416;
-  --ds-bg-elevated: #1C1C20;
+  --ds-bg-elevated: rgba(255,255,255,0.05);
 
   /* Text — rgba white, NOT hex greys */
   --ds-text-1: rgba(255,255,255,0.93);
@@ -19,9 +19,9 @@
   --ds-text-3: rgba(255,255,255,0.32);
   --ds-text-4: rgba(255,255,255,0.16);
 
-  /* Borders — sparingly */
-  --ds-border: rgba(255,255,255,0.08);
-  --ds-border-hover: rgba(255,255,255,0.13);
+  /* Borders — glassmorphism */
+  --ds-border: rgba(255,255,255,0.06);
+  --ds-border-hover: rgba(255,255,255,0.10);
 
   /* Accent */
   --ds-accent: #5B5BD6;
@@ -43,10 +43,10 @@
   --ds-radius-xl: 10px;
 
   /* Font */
-  --ds-font: var(--font-heading), 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+  --ds-font: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
   --ds-font-mono: 'SF Mono', 'Menlo', 'Consolas', monospace;
-  --ds-font-brand: var(--font-brand), 'Playfair Display', Georgia, serif;
-  --ds-font-heading: var(--font-heading), 'Poppins', sans-serif;
+  --ds-font-brand: 'Playfair Display', Georgia, serif;
+  --ds-font-heading: 'Poppins', sans-serif;
 }
 
 body {

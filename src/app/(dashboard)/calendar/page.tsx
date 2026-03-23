@@ -376,7 +376,7 @@ function EventPopover({
           zIndex: 1000,
           background: 'var(--card-bg)',
           border: 'none',
-          borderRadius: '14px',
+          borderRadius: '12px',
           padding: '20px',
           minWidth: '320px',
           maxWidth: '420px',
@@ -388,7 +388,7 @@ function EventPopover({
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '14px' }}>
           <div>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text)', marginBottom: '6px' }}>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>
               {event.title}
             </div>
             <span style={{
@@ -401,20 +401,20 @@ function EventPopover({
               {cfg.label}
             </span>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px', display: 'flex', alignItems: 'center' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '2px', display: 'flex', alignItems: 'center' }}>
             <X size={16} />
           </button>
         </div>
 
         {/* Description */}
         {displayText && (
-          <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text)', marginBottom: '10px', lineHeight: 1.5 }}>
+          <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '10px', lineHeight: 1.5 }}>
             {displayText}
           </div>
         )}
 
         {/* Date + time */}
-        <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Calendar size={13} />
           <span>{dateStr}{event.time ? ` at ${event.time}` : ''}</span>
         </div>
@@ -422,7 +422,7 @@ function EventPopover({
         {/* Source quote */}
         {event.source && (
           <div style={{
-            fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: '14px',
+            fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '14px',
             padding: '8px 10px', background: 'var(--bg)', borderRadius: '6px',
             borderLeft: `3px solid ${cfg.color}`,
           }}>
@@ -560,7 +560,7 @@ export default function CalendarPage() {
   const cardStyle: React.CSSProperties = {
     background: 'var(--card-bg)',
     border: 'none',
-    borderRadius: '16px',
+    borderRadius: '12px',
   }
 
   return (
@@ -568,12 +568,12 @@ export default function CalendarPage() {
       {/* Header */}
       <div style={{ marginBottom: '24px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: '12px' }}>
         <div>
-          <h1 className="font-brand" style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: 500, color: 'var(--text)', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', letterSpacing: '0.01em' }}>
+          <h1 className="font-brand" style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: 500, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', letterSpacing: '0.01em' }}>
             <Calendar size={isMobile ? 20 : 24} style={{ color: 'var(--accent)' }} />
             Calendar
           </h1>
           {!isMobile && (
-            <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: '4px 0 0' }}>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
               Meetings, demos, deadlines, close dates, contracts, and tasks across all deals
             </p>
           )}
@@ -581,18 +581,18 @@ export default function CalendarPage() {
 
         {/* Month navigation */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: isMobile ? 'space-between' : undefined }}>
-          <button onClick={prevMonth} style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text)', minHeight: isMobile ? '44px' : undefined }}>
+          <button onClick={prevMonth} style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-primary)', minHeight: isMobile ? '44px' : undefined }}>
             <ChevronLeft size={16} />
           </button>
-          <span style={{ fontSize: isMobile ? '15px' : '16px', fontWeight: 600, color: 'var(--text)', minWidth: isMobile ? undefined : '160px', textAlign: 'center', flex: isMobile ? 1 : undefined }}>
+          <span style={{ fontSize: isMobile ? '15px' : '16px', fontWeight: 600, color: 'var(--text-primary)', minWidth: isMobile ? undefined : '160px', textAlign: 'center', flex: isMobile ? 1 : undefined }}>
             {MONTH_NAMES[month]} {year}
           </span>
-          <button onClick={nextMonth} style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text)', minHeight: isMobile ? '44px' : undefined }}>
+          <button onClick={nextMonth} style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-primary)', minHeight: isMobile ? '44px' : undefined }}>
             <ChevronRight size={16} />
           </button>
           <button
             onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()) }}
-            style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: 'var(--text)', minHeight: isMobile ? '44px' : undefined }}
+            style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', minHeight: isMobile ? '44px' : undefined }}
           >
             Today
           </button>
@@ -608,7 +608,7 @@ export default function CalendarPage() {
             padding: '5px 12px', borderRadius: '20px', flexShrink: 0,
             border: `1.5px solid ${typeFilter === 'all' ? 'var(--accent)' : 'var(--card-border)'}`,
             background: typeFilter === 'all' ? 'var(--accent)22' : 'transparent',
-            color: typeFilter === 'all' ? 'var(--accent)' : 'var(--text-muted)',
+            color: typeFilter === 'all' ? 'var(--accent)' : 'var(--text-secondary)',
             fontSize: '12px', fontWeight: 500, cursor: 'pointer',
             transition: 'all 0.15s',
           }}
@@ -617,8 +617,8 @@ export default function CalendarPage() {
           {monthEvents.length > 0 && (
             <span style={{
               background: typeFilter === 'all' ? 'var(--accent)' : 'var(--card-border)',
-              color: typeFilter === 'all' ? '#fff' : 'var(--text-muted)',
-              borderRadius: '10px', padding: '0 6px', fontSize: '11px', fontWeight: 600,
+              color: typeFilter === 'all' ? '#fff' : 'var(--text-secondary)',
+              borderRadius: '8px', padding: '0 6px', fontSize: '11px', fontWeight: 600,
             }}>
               {monthEvents.length}
             </span>
@@ -637,7 +637,7 @@ export default function CalendarPage() {
                 padding: '5px 12px', borderRadius: '20px', flexShrink: 0,
                 border: `1.5px solid ${typeFilter === type ? cfg.color : 'var(--card-border)'}`,
                 background: typeFilter === type ? cfg.color + '22' : 'transparent',
-                color: typeFilter === type ? cfg.color : 'var(--text-muted)',
+                color: typeFilter === type ? cfg.color : 'var(--text-secondary)',
                 fontSize: '12px', fontWeight: 500, cursor: 'pointer',
                 transition: 'all 0.15s',
               }}
@@ -646,8 +646,8 @@ export default function CalendarPage() {
               {cfg.label}
               <span style={{
                 background: typeFilter === type ? cfg.color : 'var(--card-border)',
-                color: typeFilter === type ? '#fff' : 'var(--text-muted)',
-                borderRadius: '10px', padding: '0 6px', fontSize: '11px', fontWeight: 600,
+                color: typeFilter === type ? '#fff' : 'var(--text-secondary)',
+                borderRadius: '8px', padding: '0 6px', fontSize: '11px', fontWeight: 600,
               }}>
                 {count}
               </span>
@@ -661,7 +661,7 @@ export default function CalendarPage() {
         {/* Day headers */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid var(--card-border)' }}>
           {DAY_NAMES.map(d => (
-            <div key={d} style={{ padding: isMobile ? '8px 2px' : '10px 8px', textAlign: 'center', fontSize: isMobile ? '10px' : '12px', fontWeight: 600, color: 'var(--text-muted)', background: 'var(--bg)' }}>
+            <div key={d} style={{ padding: isMobile ? '8px 2px' : '10px 8px', textAlign: 'center', fontSize: isMobile ? '10px' : '12px', fontWeight: 600, color: 'var(--text-secondary)', background: 'var(--bg)' }}>
               {isMobile ? d.charAt(0) : d}
             </div>
           ))}
@@ -669,7 +669,7 @@ export default function CalendarPage() {
 
         {/* Calendar cells */}
         {isLoading ? (
-          <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
+          <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '14px' }}>
             Loading events...
           </div>
         ) : (
@@ -709,7 +709,7 @@ export default function CalendarPage() {
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       borderRadius: '50%',
                       background: isToday ? 'var(--accent)' : 'transparent',
-                      color: isToday ? '#fff' : isPastDay ? 'var(--text-muted)' : 'var(--text)',
+                      color: isToday ? '#fff' : isPastDay ? 'var(--text-secondary)' : 'var(--text-primary)',
                       fontSize: isMobile ? '11px' : '13px', fontWeight: isToday ? 700 : 400,
                       marginBottom: isMobile ? '2px' : '4px',
                       flexShrink: 0,
@@ -730,7 +730,7 @@ export default function CalendarPage() {
                       />
                     ))}
                     {dayEvents.length > (isMobile ? 2 : 4) && (
-                      <div style={{ fontSize: isMobile ? '9px' : '10px', color: 'var(--text-muted)', padding: '1px 4px' }}>
+                      <div style={{ fontSize: isMobile ? '9px' : '10px', color: 'var(--text-secondary)', padding: '1px 4px' }}>
                         +{dayEvents.length - (isMobile ? 2 : 4)} more
                       </div>
                     )}
@@ -745,7 +745,7 @@ export default function CalendarPage() {
       {/* Events list for this month (below grid) */}
       {!isLoading && filteredEvents.length > 0 && (
         <div style={{ marginTop: '24px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '12px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '12px' }}>
             Events this month ({filteredEvents.length})
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -765,7 +765,7 @@ export default function CalendarPage() {
                     background: 'var(--card-bg)',
                     border: 'none',
                     borderLeft: evIsToday ? `3px solid ${cfg.color}` : '1px solid var(--card-border)',
-                    borderRadius: '10px',
+                    borderRadius: '8px',
                     opacity: evIsPast ? 0.4 : 1,
                     transition: 'opacity 0.1s',
                     cursor: 'pointer',
@@ -775,20 +775,20 @@ export default function CalendarPage() {
                     <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {ev.title}
                         </span>
                         <span style={{
-                          fontSize: '9px', fontWeight: 600, padding: '1px 5px', borderRadius: '10px',
+                          fontSize: '9px', fontWeight: 600, padding: '1px 5px', borderRadius: '8px',
                           background: cfg.color + '22', color: cfg.color,
                           border: `1px ${cfg.borderStyle ?? 'solid'} ${cfg.color}44`, flexShrink: 0,
                           textTransform: 'uppercase', letterSpacing: '0.04em',
                         }}>
                           {cfg.label}
                         </span>
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>{dateStr}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)', flexShrink: 0 }}>{dateStr}</span>
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {subtitle}
                       </div>
                     </div>
@@ -819,7 +819,7 @@ export default function CalendarPage() {
 
       {/* Empty state */}
       {!isLoading && monthEvents.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)' }}>
+        <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-secondary)' }}>
           <Calendar size={40} style={{ opacity: 0.3, marginBottom: '12px' }} />
           <div style={{ fontSize: '15px', fontWeight: 500, marginBottom: '6px' }}>No events this month</div>
           <div style={{ fontSize: '13px' }}>

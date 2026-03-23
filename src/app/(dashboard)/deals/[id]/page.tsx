@@ -2265,7 +2265,7 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate, members }: { dealId: strin
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
       {/* Progress bar */}
       {criteria.length > 0 && (
-        <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '14px' }}>
+        <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Progress</span>
             <span style={{ fontSize: '12px', fontWeight: 600, color: achieved === criteria.length ? 'var(--success)' : 'var(--text-primary)' }}>
@@ -2303,7 +2303,7 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate, members }: { dealId: strin
 
       {/* Criteria list grouped by category */}
       {categories.map(cat => (
-        <div key={cat} style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '14px' }}>
+        <div key={cat} style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '14px' }}>
           <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '10px' }}>{cat}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {criteria.filter((c: any) => (c.category ?? 'General') === cat).map((c: any) => (
@@ -2358,7 +2358,7 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate, members }: { dealId: strin
       ))}
 
       {/* Paste new criteria */}
-      <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '14px' }}>
+      <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '14px' }}>
         <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '10px' }}>
           {criteria.length > 0 ? 'Add More Criteria' : 'Paste Success Criteria'}
         </div>
@@ -2476,7 +2476,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate, members }: { dealId: string; d
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
       {/* Progress bar */}
       {totalTasks > 0 && (
-        <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '14px' }}>
+        <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Plan Progress</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -2605,7 +2605,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate, members }: { dealId: string; d
       })}
 
       {/* Paste new plan */}
-      <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '14px' }}>
+      <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '14px' }}>
         <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '10px' }}>
           {phases.length > 0 ? 'Add More Phases' : 'Create Project Plan'}
         </div>
@@ -3263,7 +3263,7 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
 
       {/* Score Breakdown Detail (expanded) */}
       {showBreakdown && (
-        <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '14px', fontFamily: 'monospace', fontSize: '11px', lineHeight: '1.7', color: 'var(--text-secondary)' }}>
+        <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '14px', fontFamily: 'monospace', fontSize: '11px', lineHeight: '1.7', color: 'var(--text-secondary)' }}>
           <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>{score} / 100 — Score breakdown</div>
           <div style={{ borderBottom: '1px solid var(--border)', marginBottom: '6px' }} />
 
@@ -3445,7 +3445,7 @@ function DealLinksSection({ deal, patchDeal }: { deal: any; patchDeal: (payload:
   }
 
   return (
-    <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '12px 14px' }}>
+    <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '12px 14px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: links.length > 0 || adding ? '10px' : '0' }}>
         <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>Links</div>
         {!adding && (
@@ -4774,7 +4774,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
           { label: 'Notes', value: deal.notes, preWrap: true },
           { label: 'Next Steps', value: deal.nextSteps, preWrap: true },
         ].filter(f => f.value).map(({ label, value, preWrap }) => (
-          <div key={label} style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '12px 14px' }}>
+          <div key={label} style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '12px 14px' }}>
             <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>{label}</div>
             <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '500', lineHeight: 1.5, whiteSpace: preWrap ? 'pre-wrap' : undefined }}>{value}</div>
           </div>
@@ -4782,7 +4782,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
       </div>
 
       {/* Contract dates */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '12px 14px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '12px 14px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 auto', minWidth: '200px' }}>
           <label style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, whiteSpace: 'nowrap' }}>Contract Start</label>
           <input
@@ -4826,7 +4826,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
 
       {/* Contacts */}
       {Array.isArray(deal.contacts) && deal.contacts.length > 0 && (
-        <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '12px 14px' }}>
+        <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '12px 14px' }}>
           <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>Contacts</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {(deal.contacts as any[]).map((c: any, i: number) => (
@@ -5031,7 +5031,7 @@ export default function DealDetailPage() {
               <button onClick={() => setEditOpen(true)} style={{
                 display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '10px 14px' : '8px 14px',
                 background: 'var(--surface-hover)', border: '1px solid var(--border-strong)',
-                borderRadius: '8px', color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
                 minHeight: isMobile ? '44px' : undefined,
               }}>
                 <Edit size={13} /> Edit
@@ -5039,7 +5039,7 @@ export default function DealDetailPage() {
               <Link href={`/collateral?dealId=${id}`} style={{
                 display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '10px 14px' : '8px 14px',
                 background: 'linear-gradient(135deg, #6366F1, #7C3AED)', boxShadow: 'var(--shadow)',
-                border: 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none',
+                border: 'none', borderRadius: '6px', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none',
                 minHeight: isMobile ? '44px' : undefined,
               }}>
                 <Sparkles size={13} /> Generate Collateral

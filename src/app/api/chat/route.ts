@@ -2011,7 +2011,7 @@ When user says "this deal", "this company", "here", "this prospect" → they mea
     const queryComplexity = classifyComplexity(lastText)
     const qaModel = queryComplexity === 'simple' ? 'claude-haiku-4-5-20251001' : 'claude-sonnet-4-6'
 
-    const systemPrompt = `You are SellSight AI — the autonomous intelligence layer for this sales operation. You have COMPLETE, real-time knowledge of everything in this workspace and can act on any of it.${pageContext}
+    const systemPrompt = `You are Halvex AI — the autonomous intelligence layer for this sales operation. You have COMPLETE, real-time knowledge of everything in this workspace and can act on any of it.${pageContext}
 
 ${SCORING_GROUNDING}
 

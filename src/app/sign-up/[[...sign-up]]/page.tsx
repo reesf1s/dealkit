@@ -25,7 +25,7 @@ export default function SignUpPage() {
           <div style={{ width: '36px', height: '36px', background: 'linear-gradient(135deg, var(--accent), #7C3AED)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px var(--accent-subtle)' }}>
             <FileText size={17} color="#fff" strokeWidth={2.5} />
           </div>
-          <span style={{ fontWeight: '700', fontSize: '18px', letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>SellSight</span>
+          <span style={{ fontWeight: '700', fontSize: '18px', letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>Halvex</span>
         </div>
 
         {/* Headline */}
@@ -54,11 +54,11 @@ export default function SignUpPage() {
         {/* Founder note */}
         <div style={{ marginTop: '48px', padding: '16px 20px', background: 'var(--accent-subtle)', border: '1px solid var(--border)', borderRadius: '10px', maxWidth: '360px' }}>
           <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontStyle: 'italic', lineHeight: '1.6', marginBottom: '10px' }}>
-            &ldquo;I built SellSight because we kept losing deals to competitors we couldn&apos;t track. Two hours of prep per call. I wanted that time back.&rdquo;
+            &ldquo;I built Halvex because we kept losing deals to competitors we couldn&apos;t track. Two hours of prep per call. I wanted that time back.&rdquo;
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent), #8B5CF6)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff' }}>R</div>
-            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Rees Foulkes · Founder, SellSight</span>
+            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Rees Foulkes · Founder, Halvex</span>
           </div>
         </div>
       </div>

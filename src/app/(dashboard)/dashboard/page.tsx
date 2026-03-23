@@ -232,13 +232,13 @@ export default function DashboardPage() {
                 <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                   Your AI briefing hasn&apos;t been generated yet. Click refresh to get today&apos;s pipeline intelligence.
                 </p>
-                <button onClick={regenerate} disabled={regenerating} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', background: 'var(--accent)', color: '#fff', fontSize: '12px', fontWeight: '600', cursor: 'pointer', border: 'none' }}>
+                <button onClick={regenerate} disabled={regenerating} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#fff', fontSize: '12px', fontWeight: '600', cursor: 'pointer', border: 'none' }}>
                   <Sparkles size={11} /> Generate briefing
                 </button>
               </div>
             )}
             {overview?.singleMostImportantAction && (
-              <div style={{ marginTop: '14px', padding: '12px 14px', background: 'var(--accent-subtle)', border: 'none', borderRadius: '10px' }}>
+              <div style={{ marginTop: '14px', padding: '12px 14px', background: 'var(--accent-subtle)', border: 'none', borderRadius: '8px' }}>
                 <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Most important action</div>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1.5 }}>{overview.singleMostImportantAction}</div>
               </div>
@@ -251,12 +251,12 @@ export default function DashboardPage() {
               <div className="font-brand-section" style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '12px' }}>Deals Needing Attention</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {overviewLoading ? [1,2,3].map(i => (
-                  <div key={i} style={{ padding: '12px', borderRadius: '10px', background: 'var(--surface)', border: 'none', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div key={i} style={{ padding: '12px', borderRadius: '8px', background: 'var(--surface)', border: 'none', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <SkeletonLine w="50%" h="14px" />
                     <SkeletonLine w="80%" h="12px" />
                   </div>
                 )) : overview?.topAttentionDeals?.map((item: any) => (
-                  <div key={item.dealId} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', background: item.urgency === 'high' ? 'color-mix(in srgb, var(--danger) 4%, transparent)' : 'var(--surface)', border: `1px solid ${item.urgency === 'high' ? 'color-mix(in srgb, var(--danger) 15%, transparent)' : 'var(--border)'}`, borderRadius: '10px', cursor: 'pointer' }}
+                  <div key={item.dealId} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', background: item.urgency === 'high' ? 'color-mix(in srgb, var(--danger) 4%, transparent)' : 'var(--surface)', border: `1px solid ${item.urgency === 'high' ? 'color-mix(in srgb, var(--danger) 15%, transparent)' : 'var(--border)'}`, borderRadius: '8px', cursor: 'pointer' }}
                     onClick={() => sendToCopilot(`Tell me about the ${item.dealName} deal and what I should do right now: ${item.reason}`)}>
                     <div style={{ flexShrink: 0, marginTop: '1px' }}>
                       {item.urgency === 'high' ? <AlertTriangle size={13} style={{ color: 'var(--danger)' }} /> : <Clock size={13} style={{ color: 'var(--warning)' }} />}
@@ -325,7 +325,7 @@ export default function DashboardPage() {
               <div className="font-brand-section" style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '12px' }}>Proactive Alerts</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {proactiveAlerts.slice(0, 5).map((alert) => (
-                  <div key={alert.dealId} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'var(--surface)', borderRadius: '10px', border: `1px solid ${alert.severity === 'critical' ? 'color-mix(in srgb, var(--danger) 20%, transparent)' : 'var(--border)'}` }}>
+                  <div key={alert.dealId} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px', border: `1px solid ${alert.severity === 'critical' ? 'color-mix(in srgb, var(--danger) 20%, transparent)' : 'var(--border)'}` }}>
                     {alert.severity === 'critical'
                       ? <AlertCircle size={13} style={{ color: 'var(--danger)', flexShrink: 0 }} />
                       : <AlertCircle size={13} style={{ color: 'var(--warning)', flexShrink: 0 }} />
@@ -378,7 +378,7 @@ export default function DashboardPage() {
                         <ChevronDown size={12} style={{ color: 'var(--text-tertiary)', transform: forecastExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.1s ease', flexShrink: 0 }} />
                       </button>
                       {forecastExpanded && (
-                        <div style={{ marginTop: '8px', background: 'var(--surface)', border: 'none', borderRadius: '10px', overflow: 'hidden' }}>
+                        <div style={{ marginTop: '8px', background: 'var(--surface)', border: 'none', borderRadius: '8px', overflow: 'hidden' }}>
                           {/* Summary header */}
                           <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>

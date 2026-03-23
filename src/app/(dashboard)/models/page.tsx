@@ -1064,10 +1064,10 @@ export default function ModelsPage() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={labelStyle}>Forecast Accuracy</div>
-              <InfoButton text="How SellSight's deal score predictions compare to actual close outcomes. Tracked per prediction logged at close time." />
+              <InfoButton text="How Halvex's deal score predictions compare to actual close outcomes. Tracked per prediction logged at close time." />
             </div>
             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              How SellSight&apos;s deal score predictions compare to actual close outcomes.
+              How Halvex&apos;s deal score predictions compare to actual close outcomes.
             </div>
           </div>
           {forecastData && forecastData.totalPredictions >= 5 && (
@@ -1197,7 +1197,7 @@ export default function ModelsPage() {
           <Brain size={48} style={{ margin: '0 auto 16px', display: 'block', color: 'var(--text-tertiary)' }} />
           <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>Building your ML model</h2>
           <p style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto 24px', lineHeight: 1.6 }}>
-            As you close deals (wins AND losses), SellSight trains private ML models on your data.
+            As you close deals (wins AND losses), Halvex trains private ML models on your data.
             Close 10 deals to unlock predictions. Close 50 for per-competitor models.
           </p>
           <Link href="/pipeline" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 20px', borderRadius: '10px', background: 'var(--accent)', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>

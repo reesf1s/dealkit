@@ -68,7 +68,7 @@ export default function SetupBanner({ inline, context }: SetupBannerProps) {
           Connect your database to unlock the app
         </div>
         <div style={{ fontSize: '12px', color: '#666', lineHeight: '1.7', marginBottom: '14px' }}>
-          SellSight needs a PostgreSQL database to save your data. Get a <strong style={{ color: '#888' }}>free database</strong> from Neon in 60 seconds — no credit card needed.
+          Halvex needs a PostgreSQL database to save your data. Get a <strong style={{ color: '#888' }}>free database</strong> from Neon in 60 seconds — no credit card needed.
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <a

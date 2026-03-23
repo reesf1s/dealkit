@@ -1,5 +1,5 @@
 /**
- * SellSight ML Engine — v2
+ * Halvex ML Engine — v2
  *
  * A multi-model machine learning pipeline trained exclusively on each
  * workspace's own closed deal history. Every model is unique to the

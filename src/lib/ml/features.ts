@@ -1,4 +1,4 @@
-// ─── Canonical feature schema for SellSight ML engine ────────────────────────
+// ─── Canonical feature schema for Halvex ML engine ────────────────────────
 // This is the single source of truth for all 12 ML features.
 // deal-ml.ts imports FEATURE_NAMES from here; all other ml/ modules use this list.
 

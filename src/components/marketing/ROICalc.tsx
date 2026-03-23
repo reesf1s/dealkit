@@ -12,7 +12,7 @@ function formatCurrency(value: number): string {
   return `£${value.toFixed(0)}`
 }
 
-const SELLSIGHT_COST = 79 // GBP/month (Starter plan)
+const HALVEX_COST = 79 // GBP/month (Starter plan)
 
 export default function ROICalc() {
   const [monthlyDeals, setMonthlyDeals] = useState(20)
@@ -26,11 +26,11 @@ export default function ROICalc() {
   const extraDealsPerMonth = monthlyDeals * 0.10
   const extraRevenuePerMonth = extraDealsPerMonth * avgDealValue
 
-  const roi = extraRevenuePerMonth > 0 ? Math.round(extraRevenuePerMonth / SELLSIGHT_COST) : 0
+  const roi = extraRevenuePerMonth > 0 ? Math.round(extraRevenuePerMonth / HALVEX_COST) : 0
 
   const paybackDays =
     extraRevenuePerMonth > 0
-      ? Math.max(1, Math.round((SELLSIGHT_COST / extraRevenuePerMonth) * 30))
+      ? Math.max(1, Math.round((HALVEX_COST / extraRevenuePerMonth) * 30))
       : 0
 
   const inputStyle: React.CSSProperties = {
@@ -96,7 +96,7 @@ export default function ROICalc() {
           See your return before you sign up
         </h2>
         <p style={{ fontSize: '15px', color: '#888', lineHeight: 1.6 }}>
-          Enter your deal metrics and see how SellSight pays for itself
+          Enter your deal metrics and see how Halvex pays for itself
         </p>
       </div>
 
@@ -195,7 +195,7 @@ export default function ROICalc() {
         </div>
 
         <div style={{ fontSize: '12px', color: '#555', textAlign: 'center' }}>
-          With SellSight targeting a +10% win rate improvement
+          With Halvex targeting a +10% win rate improvement
         </div>
       </div>
 
@@ -255,7 +255,7 @@ export default function ROICalc() {
         color: '#444',
         lineHeight: 1.5,
       }}>
-        {`Based on SellSight Starter at £${SELLSIGHT_COST}/mo. Assumes a 10% win rate improvement from better collateral.`}
+        {`Based on Halvex Starter at £${HALVEX_COST}/mo. Assumes a 10% win rate improvement from better collateral.`}
       </p>
     </section>
   )

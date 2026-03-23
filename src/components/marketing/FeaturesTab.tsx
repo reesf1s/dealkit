@@ -63,7 +63,7 @@ const TABS = [
         { label: 'Their strength', value: 'Brand recognition + marketing suite bundling', color: '#EF4444' },
         { label: 'Their weakness', value: 'Sales-only teams overpay for unused features', color: '#22C55E' },
         { label: 'Win rate vs them', value: '71% (9 wins, 4 losses)', color: '#818CF8' },
-        { label: 'Key differentiator', value: 'SellSight costs 4x less for sales-only teams', color: '#22C55E' },
+        { label: 'Key differentiator', value: 'Halvex costs 4x less for sales-only teams', color: '#22C55E' },
       ],
     },
   },
@@ -101,7 +101,7 @@ export default function FeaturesTab() {
           Everything in one place
         </h2>
         <p style={{ color: '#7E7A9A', fontSize: '15px' }}>
-          From first call to closed deal — SellSight has the context you need at every stage.
+          From first call to closed deal — Halvex has the context you need at every stage.
         </p>
       </div>
 
