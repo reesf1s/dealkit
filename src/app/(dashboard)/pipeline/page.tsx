@@ -163,6 +163,7 @@ function DealCard({
   // Hover preview state
   const [previewVisible, setPreviewVisible] = useState(false)
   const [previewSide, setPreviewSide] = useState<'right' | 'left'>('right')
+  const [previewPos, setPreviewPos] = useState({ top: 0, left: 0 })
   const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cardRef = useRef<HTMLDivElement>(null)
 
@@ -234,7 +235,9 @@ function DealCard({
           // Decide side based on viewport position
           if (cardRef.current) {
             const rect = cardRef.current.getBoundingClientRect()
-            setPreviewSide(rect.right + 260 > window.innerWidth ? 'left' : 'right')
+            const side = rect.right + 260 > window.innerWidth ? 'left' : 'right'
+            setPreviewSide(side)
+            setPreviewPos({ top: rect.top, left: side === 'right' ? rect.right + 8 : rect.left - 248 })
           }
           setPreviewVisible(true)
         }, 200)
@@ -389,10 +392,10 @@ function DealCard({
         <div
           onClick={e => e.stopPropagation()}
           style={{
-            position: 'absolute',
-            top: 0,
-            [previewSide === 'right' ? 'left' : 'right']: 'calc(100% + 8px)',
-            zIndex: 200,
+            position: 'fixed',
+            top: previewPos.top,
+            left: previewPos.left,
+            zIndex: 9999,
             background: 'var(--glass-card-bg, rgba(255,255,255,0.06))',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
