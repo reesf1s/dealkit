@@ -4135,7 +4135,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
           {/* Header row with score */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
             <Sparkles size={14} color="var(--accent)" />
-            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--accent)' }}>Deal Intelligence</span>
+            <span className="font-brand-section" style={{ fontSize: '15px', fontWeight: '500', color: 'var(--accent)' }}>Deal Intelligence</span>
             {(() => {
               const isClosed = deal.stage === 'closed_won' || deal.stage === 'closed_lost'
               const scoreDisplay = getScoreDisplay({
@@ -4388,7 +4388,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
               if (openTodos.length === 0) return null
               return (
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>What To Do Next</div>
+                  <div className="font-brand-section" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '6px' }}>What To Do Next</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     {openTodos.slice(0, 5).map((todo: any, i: number) => (
                       <div key={todo.id ?? i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', padding: '7px 10px', background: 'var(--surface)', border: 'none', borderRadius: '7px' }}>
@@ -4987,7 +4987,7 @@ export default function DealDetailPage() {
           <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-start', justifyContent: 'space-between', gap: isMobile ? '12px' : undefined }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                <h1 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-primary)', margin: 0 }}>
+                <h1 className="font-brand" style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '500', letterSpacing: '0.01em', color: 'var(--text-primary)', margin: 0 }}>
                   {deal.prospectCompany}
                 </h1>
                 <span style={{

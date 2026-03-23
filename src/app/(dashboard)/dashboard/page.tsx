@@ -185,7 +185,7 @@ export default function DashboardPage() {
       {/* ── Greeting header ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
         <div>
-          <h1 style={{ fontSize: isMobile ? '24px' : '30px', fontWeight: '500', color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: '4px' }} className="text-display">
+          <h1 style={{ fontSize: isMobile ? '24px' : '30px', fontWeight: '500', color: 'var(--text-primary)', letterSpacing: '0.01em', lineHeight: 1.1, marginBottom: '4px' }} className="font-brand">
             {greeting}
           </h1>
           <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
@@ -212,7 +212,7 @@ export default function DashboardPage() {
           <div style={{ ...cardStyle, background: overview?.briefingHealth === 'green' ? 'linear-gradient(135deg, rgba(5,150,105,0.04) 0%, var(--card-bg) 60%)' : overview?.briefingHealth === 'red' ? 'linear-gradient(135deg, rgba(220,38,38,0.04) 0%, var(--card-bg) 60%)' : 'var(--card-bg)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               <Sparkles size={14} style={{ color: 'var(--accent)' }} />
-              <span style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Today&apos;s Briefing</span>
+              <span className="font-brand-section" style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-secondary)' }}>Today&apos;s Briefing</span>
               {overview?.briefingHealth && (
                 <div style={{ marginLeft: 'auto', width: '8px', height: '8px', borderRadius: '50%', background: healthColor, boxShadow: `0 0 6px ${healthColor}` }} />
               )}
@@ -248,7 +248,7 @@ export default function DashboardPage() {
           {/* Action cards — top deals needing attention */}
           {(overviewLoading || (overview?.topAttentionDeals?.length ?? 0) > 0) && (
             <div style={cardStyle}>
-              <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Deals needing attention</div>
+              <div className="font-brand-section" style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '12px' }}>Deals Needing Attention</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {overviewLoading ? [1,2,3].map(i => (
                   <div key={i} style={{ padding: '12px', borderRadius: '10px', background: 'var(--surface)', border: 'none', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -277,7 +277,7 @@ export default function DashboardPage() {
           {/* Key actions from AI */}
           {overview?.keyActions?.length > 0 && (
             <div style={cardStyle}>
-              <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Today&apos;s actions</div>
+              <div className="font-brand-section" style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '12px' }}>Today&apos;s Actions</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {overview.keyActions.map((action: string, i: number) => {
                   // Try to match action text to a deal by dealName or prospectCompany
@@ -322,7 +322,7 @@ export default function DashboardPage() {
           {/* ── Proactive Alerts ── */}
           {proactiveAlerts.length > 0 && (
             <div style={cardStyle}>
-              <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Proactive Alerts</div>
+              <div className="font-brand-section" style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '12px' }}>Proactive Alerts</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {proactiveAlerts.slice(0, 5).map((alert) => (
                   <div key={alert.dealId} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'var(--surface)', borderRadius: '10px', border: `1px solid ${alert.severity === 'critical' ? 'color-mix(in srgb, var(--danger) 20%, transparent)' : 'var(--border)'}` }}>
@@ -356,7 +356,7 @@ export default function DashboardPage() {
 
           {/* Pipeline health */}
           <div style={cardStyle}>
-            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '14px' }}>Pipeline</div>
+            <div className="font-brand-section" style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '14px' }}>Pipeline</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {totalPipeline > 0 && (
                 <div>
@@ -551,7 +551,7 @@ export default function DashboardPage() {
 
           {/* Model status */}
           <div style={cardStyle}>
-            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>ML Model</div>
+            <div className="font-brand-section" style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '12px' }}>ML Model</div>
             {brain?.mlModel ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div>
@@ -580,7 +580,7 @@ export default function DashboardPage() {
 
           {/* Quick links */}
           <div style={cardStyle}>
-            <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>Intelligence</div>
+            <div className="font-brand-section" style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '10px' }}>Intelligence</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {[
                 { href: '/playbook', icon: <Target size={12} />, label: 'Win Playbook' },

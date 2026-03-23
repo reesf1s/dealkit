@@ -104,10 +104,9 @@ export default function UnmatchedEmailsPage() {
           <ArrowLeft size={12} />
           Back to Settings
         </Link>
-        <h1 style={{
-          fontSize: '20px', fontWeight: 800, letterSpacing: '-0.04em', margin: 0, marginBottom: '4px',
-          background: 'linear-gradient(135deg, var(--ds-text-1) 0%, var(--ds-text-2) 100%)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+        <h1 className="font-brand" style={{
+          fontSize: '20px', fontWeight: 500, letterSpacing: '0.01em', margin: 0, marginBottom: '4px',
+          color: 'var(--text-primary)',
         }}>Unmatched Emails</h1>
         <p style={{ fontSize: '12px', color: 'var(--ds-text-2)', margin: 0 }}>
           Emails that could not be automatically matched to a deal. Assign them manually or dismiss.

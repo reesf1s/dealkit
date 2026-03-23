@@ -103,7 +103,7 @@ export default function CompetitorDetailPage() {
       ) : (
         <>
           <div style={{ marginBottom: '24px' }}>
-            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0, marginBottom: '4px' }}>
+            <h1 className="font-brand" style={{ fontSize: '22px', fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '0.01em', margin: 0, marginBottom: '4px' }}>
               {competitor.name}
             </h1>
             {competitor.website && (

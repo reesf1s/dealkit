@@ -72,7 +72,7 @@ export default function DealsPage() {
             <div style={{ width: '32px', height: '32px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <ClipboardList size={15} color="var(--accent)" />
             </div>
-            <h1 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>
+            <h1 className="font-brand" style={{ fontSize: '20px', fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '0.01em', margin: 0 }}>
               Deal Log
             </h1>
           </div>

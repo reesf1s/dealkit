@@ -172,11 +172,9 @@ export default function Sidebar() {
             }}>
               <Brain size={12} color="#fff" strokeWidth={2.5} />
             </div>
-            <span style={{
-              fontWeight: 600, fontSize: '14px',
-              letterSpacing: '-0.025em',
+            <span className="font-brand-wordmark" style={{
               color: 'var(--ds-text-1)',
-            }}>SellSight</span>
+            }}>HALVEX</span>
           </div>
         )}
         {collapsed && (

@@ -399,10 +399,9 @@ export default function SettingsPage() {
     <div style={{ padding: '24px 24px 24px 24px', maxWidth: '700px', margin: '0 auto' }}>
       <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
       <div style={{ marginBottom: '20px' }}>
-        <h1 style={{
-          fontSize: '20px', fontWeight: 800, letterSpacing: '-0.04em', margin: 0, marginBottom: '4px',
-          background: 'linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%)',
-          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+        <h1 className="font-brand" style={{
+          fontSize: '20px', fontWeight: 500, letterSpacing: '0.01em', margin: 0, marginBottom: '4px',
+          color: 'var(--text-primary)',
         }}>Settings</h1>
         <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Manage your workspace, team, and billing</p>
       </div>

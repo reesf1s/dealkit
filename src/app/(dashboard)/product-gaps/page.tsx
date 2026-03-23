@@ -264,7 +264,7 @@ export default function ProductGapsPage() {
               <Package size={18} style={{ color: 'var(--warning)' }} />
             </div>
             <div>
-              <h1 style={{ fontSize: '26px', fontWeight: '600', letterSpacing: '-0.03em', color: 'var(--text-primary)', lineHeight: 1.1 }}>
+              <h1 className="font-brand" style={{ fontSize: '26px', fontWeight: '500', letterSpacing: '0.01em', color: 'var(--text-primary)', lineHeight: 1.1 }}>
                 Product Gaps
               </h1>
               <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>

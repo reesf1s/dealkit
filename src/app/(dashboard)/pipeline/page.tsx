@@ -810,7 +810,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
 
       {/* Header */}
       <div>
-        <h1 style={{ fontSize: '20px', fontWeight: '600', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '4px' }}>
+        <h1 className="font-brand" style={{ fontSize: '20px', fontWeight: '500', letterSpacing: '0.01em', color: 'var(--text-primary)', marginBottom: '4px' }}>
           ML Insights
         </h1>
         <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
@@ -1624,7 +1624,7 @@ export default function PipelinePage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Header */}
           <div>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '4px' }}>
+            <h1 className="font-brand" style={{ fontSize: '20px', fontWeight: '500', letterSpacing: '0.01em', color: 'var(--text-primary)', marginBottom: '4px' }}>
               Sales Pipeline
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'nowrap' }}>

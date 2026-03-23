@@ -45,6 +45,7 @@
   /* Font */
   --ds-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   --ds-font-mono: 'SF Mono', 'Menlo', 'Consolas', monospace;
+  --ds-font-brand: var(--font-brand), 'Playfair Display', Georgia, serif;
 }
 
 body {

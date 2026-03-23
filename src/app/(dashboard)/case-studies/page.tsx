@@ -62,7 +62,7 @@ export default function CaseStudiesPage() {
             <div style={{ width: '32px', height: '32px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <BookOpen size={15} color="var(--success)" />
             </div>
-            <h1 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>
+            <h1 className="font-brand" style={{ fontSize: '20px', fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '0.01em', margin: 0 }}>
               Case Studies
             </h1>
           </div>

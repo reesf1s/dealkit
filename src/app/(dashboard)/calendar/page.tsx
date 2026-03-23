@@ -568,7 +568,7 @@ export default function CalendarPage() {
       {/* Header */}
       <div style={{ marginBottom: '24px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: '12px' }}>
         <div>
-          <h1 style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: 700, color: 'var(--text)', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <h1 className="font-brand" style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: 500, color: 'var(--text)', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', letterSpacing: '0.01em' }}>
             <Calendar size={isMobile ? 20 : 24} style={{ color: 'var(--accent)' }} />
             Calendar
           </h1>

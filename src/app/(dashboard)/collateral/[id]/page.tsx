@@ -168,7 +168,7 @@ export default function CollateralDetailPage() {
                 <CollateralTypeBadge type={item.type} customTypeName={item.customTypeName} />
                 <StatusBadge status={item.status as 'ready' | 'stale' | 'generating' | 'archived'} />
               </div>
-              <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0, marginBottom: '4px' }}>
+              <h1 className="font-brand" style={{ fontSize: '20px', fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '0.01em', margin: 0, marginBottom: '4px' }}>
                 {item.title}
               </h1>
               <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: 0 }}>

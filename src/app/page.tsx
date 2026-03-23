@@ -1,14 +1,7 @@
 import Link from 'next/link'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
-import { Playfair_Display } from 'next/font/google'
 import type { Metadata } from 'next'
-
-const playfair = Playfair_Display({
-  subsets: ['latin'],
-  weight: ['400', '700'],
-  display: 'swap',
-})
 
 export const metadata: Metadata = {
   title: 'Halvex — The intelligence layer for B2B sales',
@@ -94,12 +87,9 @@ export default async function LandingPage() {
         }}
       >
         <span
+          className="font-brand-wordmark"
           style={{
-            fontSize: '13px',
-            fontWeight: 500,
-            letterSpacing: '4px',
             color: 'rgba(255,255,255,0.35)',
-            textTransform: 'uppercase',
           }}
         >
           HALVEX
@@ -156,13 +146,10 @@ export default async function LandingPage() {
           }}
         >
           <div
+            className="font-brand-wordmark"
             style={{
-              fontSize: '13px',
-              letterSpacing: '4px',
               color: 'rgba(255,255,255,0.35)',
               marginBottom: '32px',
-              textTransform: 'uppercase',
-              fontWeight: 500,
             }}
           >
             HALVEX
@@ -170,7 +157,7 @@ export default async function LandingPage() {
 
           <h1
             data-hero-headline=""
-            className={playfair.className}
+            className="font-brand"
             style={{
               fontSize: '52px',
               fontWeight: 400,

@@ -216,10 +216,28 @@ body, * {
   font-family: var(--font-mono);
 }
 
-/* Serif ONLY on the dashboard greeting */
-.font-serif-display, .font-serif, .text-display {
-  font-family: 'Instrument Serif', Georgia, serif;
-  letter-spacing: -0.01em;
+/* Brand accent font — page titles & key headings */
+.font-brand, .font-serif-display, .font-serif, .text-display {
+  font-family: var(--ds-font-brand, var(--font-brand, 'Playfair Display', Georgia, serif));
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* Card section titles — smaller brand treatment */
+.font-brand-section {
+  font-family: var(--ds-font-brand, var(--font-brand, 'Playfair Display', Georgia, serif));
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+
+/* Sidebar wordmark — letterspaced brand treatment */
+.font-brand-wordmark {
+  font-family: var(--ds-font-brand, var(--font-brand, 'Playfair Display', Georgia, serif));
+  font-size: 13px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  font-weight: 500;
 }
 
 /* Label utility — 11px labels per design system */

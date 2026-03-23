@@ -671,7 +671,7 @@ export default function ModelsPage() {
             <Brain size={20} style={{ color: 'var(--accent)' }} />
           </div>
           <div>
-            <h1 style={{ fontSize: '28px', fontWeight: '600', letterSpacing: '-0.03em', color: 'var(--text-primary)', lineHeight: 1.1 }} className="text-display">
+            <h1 style={{ fontSize: '28px', fontWeight: '500', letterSpacing: '0.01em', color: 'var(--text-primary)', lineHeight: 1.1 }} className="font-brand">
               Your ML Model
             </h1>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '2px' }}>

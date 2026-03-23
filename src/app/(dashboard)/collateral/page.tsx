@@ -229,7 +229,7 @@ function CollateralPageInner() {
             <div style={{ width: '32px', height: '32px', background: 'rgba(245,158,11,0.1)', border: 'none', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <FileText size={15} color="var(--warning)" />
             </div>
-            <h1 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>
+            <h1 className="font-brand" style={{ fontSize: '20px', fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '0.01em', margin: 0 }}>
               Collateral
             </h1>
           </div>

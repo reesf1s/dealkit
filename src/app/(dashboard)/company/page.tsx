@@ -49,7 +49,7 @@ export default function CompanyPage() {
             <div style={{ width: '32px', height: '32px', background: 'var(--accent-subtle)', border: 'none', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Building2 size={15} color="var(--accent)" />
             </div>
-            <h1 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>
+            <h1 className="font-brand" style={{ fontSize: '20px', fontWeight: '500', color: 'var(--text-primary)', letterSpacing: '0.01em', margin: 0 }}>
               Company Profile
             </h1>
           </div>
