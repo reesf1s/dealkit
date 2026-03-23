@@ -358,10 +358,18 @@ GROUNDING RULES — read carefully before writing:
 1. Cite ONLY the signals listed above. Do not invent claims, infer motives, or reference information not explicitly provided.
 2. Lead with the single highest-impact signal in this priority order: ML win probability > stall warning > top risk > top positive signal.
 3. Every sentence must be traceable to a specific listed signal or fact. If a signal is absent, do not mention its category.
-4. Write 2–3 sentences total (not bullets). Plain prose. No headers, no JSON, no markdown.
-5. Never say "AI", "model", "algorithm", or "scoring engine". Use "your pipeline" or "this deal".
-6. NEVER mention the numeric score (e.g. "82/100" or "rates at 82"). The score is shown separately in the UI — mentioning it in prose creates confusing duplicate displays. Focus on the qualitative signals instead.
-7. End with one concrete, specific next action grounded in the recommendation above.`
+4. Never say "AI", "model", "algorithm", or "scoring engine". Use "your pipeline" or "this deal".
+5. NEVER mention the numeric score (e.g. "82/100" or "rates at 82"). The score is shown separately in the UI — mentioning it in prose creates confusing duplicate displays. Focus on the qualitative signals instead.
+
+OUTPUT FORMAT — return exactly 3 bullet lines (each starting with "- "):
+- Line 1: analytical observation about the deal's current state (pattern, risk, or signal — what the data shows)
+- Line 2: a second analytical observation (different angle — momentum, competitive position, stakeholder coverage, or timeline)
+- Line 3: ONE specific, concrete next action for this week (what to do — grounded in the recommendation above)
+
+CRITICAL: Lines 1-2 (insights) and Line 3 (action) MUST contain different text.
+- Lines 1-2: analytical observations about the deal's state (patterns, risks, signals)
+- Line 3: ONE sentence describing the single most important action this week
+If you find yourself writing similar text for both, make lines 1-2 more analytical and line 3 more actionable.`
 }
 
 export function overviewNarrationPrompt(briefing: OverviewBriefing, dateStr: string): string {

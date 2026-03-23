@@ -4198,24 +4198,30 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
               <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: 0, fontStyle: 'italic' }}>No summary yet — add updates via the AI assistant to generate insights.</p>
             )}
 
-            {/* Insights — filter out score-summary insights (e.g. "rates X at 82/100") to avoid conflicting with ML score */}
-            {(deal.conversionInsights as string[])?.filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins))?.length > 0 && (
-              <div>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Insights</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {(deal.conversionInsights as string[]).filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins)).map((insight: string, i: number) => (
-                    <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: 'var(--text-secondary)' }}
-                      onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-insight-ov') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
-                      onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-insight-ov') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
-                    >
-                      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, marginTop: '5px' }} />
-                      <span style={{ flex: 1 }}>{insight}</span>
-                      <button className="del-insight-ov" onClick={() => deleteInsight(i)} style={{ opacity: 0, fontSize: '10px', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s', padding: '0 2px' }}>✕</button>
-                    </div>
-                  ))}
+            {/* Insights — show analytical observations only (exclude last item which is the action line shown in "What to Focus On") */}
+            {(() => {
+              const filtered = ((deal.conversionInsights as string[]) ?? []).filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins))
+              // Show all except last (action line) to avoid duplicating "What to Focus On" content
+              const analyticalOnly = filtered.length > 1 ? filtered.slice(0, -1) : filtered
+              if (analyticalOnly.length === 0) return null
+              return (
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Insights</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {analyticalOnly.map((insight: string, i: number) => (
+                      <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: 'var(--text-secondary)' }}
+                        onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-insight-ov') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
+                        onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-insight-ov') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
+                      >
+                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, marginTop: '5px' }} />
+                        <span style={{ flex: 1 }}>{insight}</span>
+                        <button className="del-insight-ov" onClick={() => deleteInsight(i)} style={{ opacity: 0, fontSize: '10px', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s', padding: '0 2px' }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
 
             {/* Risks */}
             {(deal.dealRisks as string[])?.length > 0 && (
@@ -4336,12 +4342,31 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                 if (!companyName) return text
                 return text.replace(new RegExp(`\\s*\\(${companyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`, 'gi'), '')
               }
-              // Clean raw todo text: strip JSON artifacts, field names, and truncate
+              // Clean raw todo text: strip JSON artifacts, pipe-delimited project plan data, and truncate
               const cleanTodoText = (raw: string): string => {
                 if (!raw) return ''
                 let text = raw
                 // Strip anything that looks like raw JSON
                 try { JSON.parse(text); return 'Action item' } catch {}
+
+                // Pipe-delimited project plan data (e.g. "Rees | QA call with gospace | 23 - 25 March | 30 mins | ...")
+                // Take the second segment (topic/title) and optionally the date range
+                if (text.includes('|')) {
+                  const parts = text.split('|').map(p => p.trim())
+                  if (parts.length >= 2) {
+                    const topic = parts[1] || parts[0]
+                    // Look for a date-like segment (3rd part often has date range)
+                    const datePart = parts.length >= 3 && /\d/.test(parts[2]) && parts[2].length < 30 ? ` (${parts[2].replace(/\s+/g, ' ').trim()})` : ''
+                    text = topic + datePart
+                  }
+                }
+
+                // Strip date/time availability matrices (lines with "Available", "Not Available", "Potentially")
+                const firstLine = text.split('\n')[0]
+                if (/\b(Available|Not Available|Potentially)\b/i.test(text) && text.includes('\n')) {
+                  text = firstLine
+                }
+
                 // Remove JSON-like artifacts: {, }, [, ], "key":
                 text = text.replace(/\{[^}]{0,20}\}/g, '').replace(/\[[^\]]{0,20}\]/g, '')
                 text = text.replace(/"?\w+"\s*:\s*/g, '')
@@ -4439,13 +4464,19 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                         <span style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.5 }}>{(deal.dealRisks as string[])[0]}</span>
                       </div>
                     )}
-                    {/* First insight if no risks — filter out score summaries */}
-                    {((deal.dealRisks as string[]) ?? []).length === 0 && ((deal.conversionInsights as string[]) ?? []).filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins)).length > 0 && (
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--accent)', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '4px', padding: '1px 6px', flexShrink: 0, marginTop: '1px', letterSpacing: '0.04em' }}>KEY</span>
-                        <span style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.5 }}>{((deal.conversionInsights as string[]) ?? []).filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins))[0]}</span>
-                      </div>
-                    )}
+                    {/* Last insight (action line) if no risks — filter out score summaries */}
+                    {((deal.dealRisks as string[]) ?? []).length === 0 && (() => {
+                      const filtered = ((deal.conversionInsights as string[]) ?? []).filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins))
+                      if (filtered.length === 0) return null
+                      // Use the last insight (action/recommendation line) to avoid duplicating analytical insights shown above
+                      const actionLine = filtered[filtered.length - 1]
+                      return (
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--accent)', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '4px', padding: '1px 6px', flexShrink: 0, marginTop: '1px', letterSpacing: '0.04em' }}>KEY</span>
+                          <span style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.5 }}>{actionLine}</span>
+                        </div>
+                      )
+                    })()}
                     {/* Fallback when no specific data */}
                     {!deal.nextSteps && ((deal.dealRisks as string[]) ?? []).length === 0 && ((deal.conversionInsights as string[]) ?? []).filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins)).length === 0 && (
                       <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.6 }}>

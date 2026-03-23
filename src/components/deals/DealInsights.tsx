@@ -23,7 +23,7 @@ function makeFmt(sym: string) {
 }
 
 function WinRateGauge({ rate }: { rate: number }) {
-  const color = rate >= 60 ? '#22C55E' : rate >= 40 ? '#F59E0B' : '#EF4444'
+  const color = rate >= 60 ? 'var(--ds-green, #3CCB7F)' : rate >= 40 ? 'var(--ds-amber, #F59E0B)' : 'var(--ds-red, #E5484D)'
   const circumference = 2 * Math.PI * 40
   const offset = circumference - (rate / 100) * circumference
 

@@ -71,7 +71,7 @@
   --accent-subtle: var(--ds-accent-soft, rgba(91,91,214,0.14));
   --accent-text: var(--ds-accent-hover, #6E6EE0);
   --success: var(--ds-green, #3CCB7F);
-  --warning: var(--ds-amber, #FFB224);
+  --warning: var(--ds-amber, #F59E0B);
   --danger: var(--ds-red, #E5484D);
   --card-bg: var(--ds-bg-card, #141416);
   --card-border: transparent;
@@ -95,7 +95,7 @@
   --data-accent-subtle: rgba(10, 132, 255, 0.10);
   --input-bg: var(--ds-bg-input, #141416);
   --color-success: var(--ds-green, #3CCB7F);
-  --color-warning: var(--ds-amber, #FFB224);
+  --color-warning: var(--ds-amber, #F59E0B);
   --color-danger: var(--ds-red, #E5484D);
   --color-ml: var(--ds-accent, #5B5BD6);
   --color-locked: #3A3A3C;
@@ -253,7 +253,7 @@ body, * {
 
 /* Score badge colours */
 .score-high { color: var(--ds-green, #3CCB7F); background: var(--ds-green-soft, rgba(60,203,127,0.14)); border: 1px solid transparent; }
-.score-mid  { color: var(--ds-amber, #FFB224); background: var(--ds-amber-soft, rgba(255,178,36,0.14)); border: 1px solid transparent; }
+.score-mid  { color: var(--ds-amber, #F59E0B); background: var(--ds-amber-soft, rgba(245,158,11,0.14)); border: 1px solid transparent; }
 .score-low  { color: var(--ds-red, #E5484D);   background: var(--ds-red-soft, rgba(229,72,77,0.14));    border: 1px solid transparent; }
 
 /* ============================================================
