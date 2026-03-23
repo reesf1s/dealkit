@@ -527,14 +527,11 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
         meetingNotes: appendedNotes,
         signals: updateFields.intentSignals ?? undefined,
       })
-      const noteVec = `[${noteEmb.join(',')}]`
-      const dealVec = `[${dealEmb.join(',')}]`
-      await db.execute(sql`
-        UPDATE deal_logs
-        SET note_embedding = ${noteVec}::vector,
-            deal_embedding = ${dealVec}::vector
-        WHERE id = ${id} AND workspace_id = ${workspaceId}
-      `)
+      const noteVec = `'[${noteEmb.join(',')}]'::vector`
+      const dealVec = `'[${dealEmb.join(',')}]'::vector`
+      await db.execute(sql.raw(
+        `UPDATE deal_logs SET note_embedding = ${noteVec}, deal_embedding = ${dealVec} WHERE id = '${id}' AND workspace_id = '${workspaceId}'`
+      ))
     } catch (err) {
       console.error('[embeddings] Failed to generate embeddings:', err)
     }

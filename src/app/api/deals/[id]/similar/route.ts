@@ -186,16 +186,18 @@ export async function GET(
     let semanticMatches: { id: string; similarity: number }[] = []
     if (sourceDeal.dealEmbedding) {
       try {
-        const results = await db.execute(sql`
-          SELECT id,
-                 1 - (deal_embedding <=> ${sourceDeal.dealEmbedding}::vector) as similarity
-          FROM deal_logs
-          WHERE workspace_id = ${workspaceId}
-            AND id != ${dealId}
-            AND deal_embedding IS NOT NULL
-          ORDER BY deal_embedding <=> ${sourceDeal.dealEmbedding}::vector
-          LIMIT 10
-        `)
+        // Use subquery to reference the source deal's embedding directly in Postgres
+        const results = await db.execute(sql.raw(
+          `SELECT dl.id,
+                  1 - (dl.deal_embedding <=> src.deal_embedding) as similarity
+           FROM deal_logs dl,
+                (SELECT deal_embedding FROM deal_logs WHERE id = '${dealId}') src
+           WHERE dl.workspace_id = '${workspaceId}'
+             AND dl.id != '${dealId}'
+             AND dl.deal_embedding IS NOT NULL
+           ORDER BY dl.deal_embedding <=> src.deal_embedding
+           LIMIT 10`
+        ))
         semanticMatches = (results as any[]).map(r => ({
           id: r.id,
           similarity: Number(r.similarity),

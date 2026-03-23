@@ -39,14 +39,15 @@ export async function getRelevantContext(
   if (mentionedIds.size < maxDeals) {
     try {
       const queryEmbedding = await generateQueryEmbedding(userMessage)
-      const results = await db.execute(sql`
-        SELECT id, 1 - (deal_embedding::vector <=> ${JSON.stringify(queryEmbedding)}::vector) as similarity
-        FROM deal_logs
-        WHERE workspace_id = ${workspaceId}
-          AND deal_embedding IS NOT NULL
-        ORDER BY deal_embedding::vector <=> ${JSON.stringify(queryEmbedding)}::vector
-        LIMIT ${maxDeals}
-      `)
+      const vecStr = `'[${queryEmbedding.join(',')}]'::vector`
+      const results = await db.execute(sql.raw(
+        `SELECT id, 1 - (deal_embedding <=> ${vecStr}) as similarity
+         FROM deal_logs
+         WHERE workspace_id = '${workspaceId}'
+           AND deal_embedding IS NOT NULL
+         ORDER BY deal_embedding <=> ${vecStr}
+         LIMIT ${maxDeals}`
+      ))
       semanticIds = (results as any[]).map(r => r.id)
     } catch (err) {
       console.error('[agent-context] Vector search failed, falling back:', err)

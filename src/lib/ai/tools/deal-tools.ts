@@ -595,14 +595,11 @@ Rules:
         meetingNotes: _embNotes,
         signals: _embSignals,
       })
-      const noteVec = `[${noteEmb.join(',')}]`
-      const dealVec = `[${dealEmb.join(',')}]`
-      await db.execute(rawSql`
-        UPDATE deal_logs
-        SET note_embedding = ${noteVec}::vector,
-            deal_embedding = ${dealVec}::vector
-        WHERE id = ${_embDealId} AND workspace_id = ${_embWorkspaceId}
-      `)
+      const noteVec = `'[${noteEmb.join(',')}]'::vector`
+      const dealVec = `'[${dealEmb.join(',')}]'::vector`
+      await db.execute(rawSql.raw(
+        `UPDATE deal_logs SET note_embedding = ${noteVec}, deal_embedding = ${dealVec} WHERE id = '${_embDealId}' AND workspace_id = '${_embWorkspaceId}'`
+      ))
     } catch (err) {
       console.error('[embeddings] Failed to generate embeddings:', err)
     }

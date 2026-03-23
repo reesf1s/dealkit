@@ -51,15 +51,12 @@ export async function backfillEmbeddings(workspaceId: string): Promise<number> {
         signals: deal.intentSignals as any,
       })
 
-      // Write vectors using raw SQL — Drizzle text type can't cast to pgvector
-      const noteVec = `[${noteEmb.join(',')}]`
-      const dealVec = `[${dealEmb.join(',')}]`
-      await db.execute(sql`
-        UPDATE deal_logs
-        SET note_embedding = ${noteVec}::vector,
-            deal_embedding = ${dealVec}::vector
-        WHERE id = ${deal.id}
-      `)
+      // Write vectors using sql.raw — parameterised queries escape the vector string
+      const noteVec = `'[${noteEmb.join(',')}]'::vector`
+      const dealVec = `'[${dealEmb.join(',')}]'::vector`
+      await db.execute(sql.raw(
+        `UPDATE deal_logs SET note_embedding = ${noteVec}, deal_embedding = ${dealVec} WHERE id = '${deal.id}'`
+      ))
 
       count++
       // Rate limit: 200ms between calls
