@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useUser } from '@clerk/nextjs'
 import useSWR from 'swr'
 import { useState, useEffect } from 'react'
-import { CheckCircle, AlertTriangle, ExternalLink, Download, Trash2, Copy, LogOut, RefreshCw, Plug, Unplug, Mail, Key } from 'lucide-react'
+import { CheckCircle, AlertTriangle, ExternalLink, Download, Trash2, Copy, LogOut, RefreshCw, Plug, Unplug, Mail, Key, Inbox } from 'lucide-react'
 import { SkeletonCard } from '@/components/shared/SkeletonCard'
 import { ConfirmModal } from '@/components/shared/ConfirmModal'
 import { useToast } from '@/components/shared/Toast'
@@ -54,7 +54,7 @@ function SectionCard({ title, description, children }: { title: string; descript
   return (
     <div style={{
       background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-      border: '1px solid var(--card-border)', borderRadius: '12px', overflow: 'hidden',
+      border: '1px solid var(--card-border)', borderRadius: '8px', overflow: 'hidden',
       boxShadow: 'var(--shadow)',
     }}>
       <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
@@ -837,12 +837,18 @@ export default function SettingsPage() {
         <SectionCard title="Email Forwarding" description="Auto-link customer emails to deals by BCC'ing your unique inbound address">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-            {/* Explainer */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 14px', borderRadius: '10px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.14)' }}>
-              <Mail size={14} strokeWidth={2} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: '1px' }} />
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.7 }}>
-                BCC this address on emails to/from customers. SellSight will automatically match them to the right deal using contact email addresses and append the email to the deal&apos;s notes.
-              </p>
+            {/* How it works — 3 steps */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {[
+                { n: '1', text: 'BCC your unique address below when emailing customers or forward emails to it' },
+                { n: '2', text: 'SellSight auto-matches emails to the right deal by contact email, company domain, or deal name in the subject' },
+                { n: '3', text: 'Matched emails are appended to the deal\'s notes and trigger AI signal extraction — unmatched emails go to a review queue' },
+              ].map(({ n, text }) => (
+                <div key={n} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                  <span style={{ flexShrink: 0, width: '18px', height: '18px', borderRadius: '50%', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, color: 'var(--accent)', marginTop: '1px' }}>{n}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{text}</span>
+                </div>
+              ))}
             </div>
 
             {/* Address display */}
@@ -851,7 +857,7 @@ export default function SettingsPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <input
                   readOnly
-                  value={inboundEmailRes?.data?.email ?? 'Loading…'}
+                  value={inboundEmailRes?.data?.email ?? 'Loading\u2026'}
                   style={{
                     flex: 1, height: '32px', padding: '0 10px', borderRadius: '7px', fontSize: '12px',
                     background: 'var(--surface)', border: '1px solid var(--border)',
@@ -878,6 +884,9 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            {/* Unmatched emails count + review link */}
+            <UnmatchedEmailsBanner />
+
             {/* Regenerate */}
             {(isOwner || dbUser?.role === 'admin') && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '10px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
@@ -897,7 +906,7 @@ export default function SettingsPage() {
                   }}
                 >
                   <RefreshCw size={11} style={{ animation: regeneratingInbound ? 'spin 1s linear infinite' : 'none' }} />
-                  {regeneratingInbound ? 'Regenerating…' : 'Regenerate'}
+                  {regeneratingInbound ? 'Regenerating\u2026' : 'Regenerate'}
                 </button>
               </div>
             )}
@@ -1018,13 +1027,13 @@ export default function SettingsPage() {
                   position: 'relative', width: '44px', height: '24px', borderRadius: '12px',
                   background: globalConsent ? 'var(--success)' : 'var(--border-strong)',
                   border: 'none', cursor: (consentLoading || (dbUser?.role !== 'owner' && dbUser?.role !== 'admin')) ? 'not-allowed' : 'pointer',
-                  opacity: consentLoading ? 0.6 : 1, transition: 'background 0.2s', flexShrink: 0,
+                  opacity: consentLoading ? 0.6 : 1, transition: 'background 0.1s ease', flexShrink: 0,
                 }}
                 title={dbUser?.role === 'member' ? 'Owner or admin required' : ''}
               >
                 <span style={{
                   position: 'absolute', top: '3px', width: '18px', height: '18px', borderRadius: '50%',
-                  background: '#fff', transition: 'left 0.2s', left: globalConsent ? '23px' : '3px',
+                  background: '#fff', transition: 'left 0.1s ease', left: globalConsent ? '23px' : '3px',
                   boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
                 }} />
               </button>
@@ -1200,5 +1209,43 @@ function JoinWorkspaceForm({ onJoined }: { onJoined: () => void }) {
         {loading ? 'Joining…' : 'Join workspace'}
       </button>
     </form>
+  )
+}
+
+function UnmatchedEmailsBanner() {
+  const { data } = useSWR<{ pendingCount: number }>('/api/ingest/email/unmatched', fetcher, { revalidateOnFocus: false })
+  const count = data?.pendingCount ?? 0
+
+  if (count === 0) return null
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '10px 14px', borderRadius: '10px',
+      background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.20)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <Inbox size={14} style={{ color: '#F59E0B', flexShrink: 0 }} />
+        <div>
+          <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
+            {count} unmatched email{count !== 1 ? 's' : ''} pending review
+          </p>
+          <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '2px 0 0' }}>
+            Emails that could not be auto-matched to a deal
+          </p>
+        </div>
+      </div>
+      <a
+        href="/settings/unmatched-emails"
+        style={{
+          display: 'flex', alignItems: 'center', gap: '5px',
+          height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
+          color: '#F59E0B', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)',
+          textDecoration: 'none', whiteSpace: 'nowrap', cursor: 'pointer',
+        }}
+      >
+        Review
+      </a>
+    </div>
   )
 }

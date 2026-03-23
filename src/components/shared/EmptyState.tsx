@@ -28,7 +28,7 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
         style={{
           width: '48px',
           height: '48px',
-          borderRadius: '12px',
+          borderRadius: '8px',
           backgroundColor: 'rgba(255, 255, 255, 0.04)',
           border: '1px solid rgba(255, 255, 255, 0.06)',
           display: 'flex',

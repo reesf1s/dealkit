@@ -340,6 +340,30 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
         AND meeting_notes ~ 'Primary reason: [^\n]+'
     `,
   },
+  {
+    version: 24,
+    name: 'create_unmatched_emails_and_note_source',
+    sql: `
+      CREATE TABLE IF NOT EXISTS unmatched_emails (
+        id                 TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        workspace_id       TEXT NOT NULL,
+        from_email         TEXT NOT NULL,
+        from_name          TEXT,
+        subject            TEXT,
+        body               TEXT,
+        suggested_deal_ids JSONB DEFAULT '[]'::jsonb,
+        status             TEXT NOT NULL DEFAULT 'pending',
+        assigned_deal_id   TEXT,
+        received_at        TIMESTAMPTZ NOT NULL,
+        resolved_at        TIMESTAMPTZ,
+        created_at         TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_unmatched_emails_workspace_status
+        ON unmatched_emails (workspace_id, status);
+      ALTER TABLE deal_logs
+        ADD COLUMN IF NOT EXISTS note_source TEXT DEFAULT 'manual'
+    `,
+  },
 ]
 
 // ── In-process cache — prevents redundant round-trips on the same cold-start ──

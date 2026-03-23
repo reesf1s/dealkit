@@ -21,16 +21,16 @@ function WinRateDeltaBar({ withGap, withoutGap }: { withGap: number; withoutGap:
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', width: '60px', flexShrink: 0 }}>Without gap</div>
         <div style={{ flex: 1, height: '5px', borderRadius: '3px', background: 'var(--border)', overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${(withoutGap / maxVal) * 100}%`, background: 'var(--success)', borderRadius: '3px', transition: 'width 0.5s' }} />
+          <div style={{ height: '100%', width: `${(withoutGap / maxVal) * 100}%`, background: 'var(--success)', borderRadius: '3px', transition: 'width 0.1s ease' }} />
         </div>
-        <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--success)', width: '28px' }}>{Math.round(withoutGap)}%</div>
+        <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--success)', width: '28px' }}>{Math.round(withoutGap)}%</div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', width: '60px', flexShrink: 0 }}>With gap</div>
         <div style={{ flex: 1, height: '5px', borderRadius: '3px', background: 'var(--border)', overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${(withGap / maxVal) * 100}%`, background: delta >= 20 ? 'var(--danger)' : delta >= 10 ? 'var(--warning)' : 'var(--text-tertiary)', borderRadius: '3px', transition: 'width 0.5s' }} />
+          <div style={{ height: '100%', width: `${(withGap / maxVal) * 100}%`, background: delta >= 20 ? 'var(--danger)' : delta >= 10 ? 'var(--warning)' : 'var(--text-tertiary)', borderRadius: '3px', transition: 'width 0.1s ease' }} />
         </div>
-        <div style={{ fontSize: '10px', fontWeight: '700', color: delta >= 20 ? 'var(--danger)' : delta >= 10 ? 'var(--warning)' : 'var(--text-secondary)', width: '28px' }}>{Math.round(withGap)}%</div>
+        <div style={{ fontSize: '10px', fontWeight: '600', color: delta >= 20 ? 'var(--danger)' : delta >= 10 ? 'var(--warning)' : 'var(--text-secondary)', width: '28px' }}>{Math.round(withGap)}%</div>
       </div>
     </div>
   )
@@ -40,7 +40,7 @@ function WinRateDeltaBar({ withGap, withoutGap }: { withGap: number; withoutGap:
 
 function GapCardSkeleton() {
   return (
-    <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '14px 16px' }}>
+    <div style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '14px 16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: 'var(--surface)', flexShrink: 0 }} />
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -102,7 +102,7 @@ function ScoreBadge({ score }: { score?: number | null }) {
     <span style={{
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
       width: '26px', height: '26px', borderRadius: '50%',
-      fontSize: '9px', fontWeight: '800', lineHeight: 1,
+      fontSize: '9px', fontWeight: '700', lineHeight: 1,
       color, border: `2px solid ${color}`,
       background: `color-mix(in srgb, ${color} 10%, transparent)`,
     }}>
@@ -264,7 +264,7 @@ export default function ProductGapsPage() {
               <Package size={18} style={{ color: 'var(--warning)' }} />
             </div>
             <div>
-              <h1 style={{ fontSize: '26px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-primary)', lineHeight: 1.1 }}>
+              <h1 style={{ fontSize: '26px', fontWeight: '600', letterSpacing: '-0.03em', color: 'var(--text-primary)', lineHeight: 1.1 }}>
                 Product Gaps
               </h1>
               <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
@@ -279,7 +279,7 @@ export default function ProductGapsPage() {
               <span style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>{totalGaps} gaps</span> tracked across{' '}
               <span style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>{uniqueDeals > 0 ? uniqueDeals : enrichedGaps.reduce((s, g) => s + (g.frequency ?? 0), 0)} deals</span>
               {totalRevRisk > 0 && (
-                <> — <span style={{ color: 'var(--danger)', fontWeight: '700' }}>
+                <> — <span style={{ color: 'var(--danger)', fontWeight: '600' }}>
                   {formatCurrency(totalRevRisk, true)} revenue at risk
                 </span></>
               )}
@@ -294,7 +294,7 @@ export default function ProductGapsPage() {
 
         {/* View toggle + Export */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-          <div style={{ display: 'flex', gap: '2px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '3px' }}>
+          <div style={{ display: 'flex', gap: '2px', background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '3px' }}>
             <button
               onClick={() => setView('list')}
               title="List view"
@@ -328,7 +328,7 @@ export default function ProductGapsPage() {
           style={{
             flexShrink: 0, display: 'flex', alignItems: 'center', gap: '6px',
             padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '600',
-            cursor: 'pointer', border: '1px solid var(--border)',
+            cursor: 'pointer', border: 'none',
             background: 'var(--surface)', color: 'var(--text-secondary)',
             transition: 'all 0.12s',
           }}
@@ -345,17 +345,17 @@ export default function ProductGapsPage() {
       {!isLoading && totalRevRisk > 0 && (
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <div style={{ padding: '12px 16px', background: 'color-mix(in srgb, var(--danger) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 15%, transparent)', borderRadius: '10px' }}>
-            <div style={{ fontSize: '22px', fontWeight: '800', color: 'var(--danger)', lineHeight: 1 }}>
+            <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--danger)', lineHeight: 1 }}>
               {formatCurrency(totalRevRisk, true)}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px' }}>Total revenue at risk</div>
           </div>
-          <div style={{ padding: '12px 16px', background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '10px' }}>
-            <div style={{ fontSize: '22px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>{openGapCount}</div>
+          <div style={{ padding: '12px 16px', background: 'var(--card-bg)', border: 'none', borderRadius: '10px' }}>
+            <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1 }}>{openGapCount}</div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px' }}>Open gaps</div>
           </div>
-          <div style={{ padding: '12px 16px', background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '10px' }}>
-            <div style={{ fontSize: '22px', fontWeight: '800', color: '#06b6d4', lineHeight: 1 }}>{enrichedGaps.filter(g => g.status === 'on_roadmap').length}</div>
+          <div style={{ padding: '12px 16px', background: 'var(--card-bg)', border: 'none', borderRadius: '10px' }}>
+            <div style={{ fontSize: '22px', fontWeight: '700', color: '#06b6d4', lineHeight: 1 }}>{enrichedGaps.filter(g => g.status === 'on_roadmap').length}</div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '3px' }}>On roadmap</div>
           </div>
         </div>
@@ -400,11 +400,11 @@ export default function ProductGapsPage() {
 
       {/* ── Gap list or empty state ── */}
       {!isLoading && sorted.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '64px 24px', background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '16px' }}>
-          <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: 'var(--surface)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+        <div style={{ textAlign: 'center', padding: '64px 24px', background: 'var(--card-bg)', border: 'none', borderRadius: '8px' }}>
+          <div style={{ width: '56px', height: '56px', borderRadius: '8px', background: 'var(--surface)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
             <Lock size={24} style={{ color: 'var(--text-tertiary)', opacity: 0.5 }} />
           </div>
-          <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>
+          <div style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>
             No open product gaps detected
           </div>
           <div style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '420px', margin: '0 auto 20px', lineHeight: 1.6 }}>
@@ -446,8 +446,8 @@ export default function ProductGapsPage() {
                 key={gap.id}
                 style={{
                   background: 'var(--card-bg)',
-                  border: '1px solid var(--card-border)',
-                  borderRadius: '12px',
+                  border: 'none',
+                  borderRadius: '8px',
                   overflow: 'hidden',
                   transition: 'box-shadow 0.15s, border-color 0.15s, opacity 0.15s',
                   opacity: deletingId === gap.id ? 0.5 : 1,
@@ -467,7 +467,7 @@ export default function ProductGapsPage() {
                     background: idx < 3 ? 'color-mix(in srgb, var(--danger) 10%, transparent)' : 'var(--surface)',
                     border: `1px solid ${idx < 3 ? 'color-mix(in srgb, var(--danger) 20%, transparent)' : 'var(--border)'}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '11px', fontWeight: '700',
+                    fontSize: '11px', fontWeight: '600',
                     color: idx < 3 ? 'var(--danger)' : 'var(--text-tertiary)',
                   }}>
                     {idx + 1}
@@ -484,7 +484,7 @@ export default function ProductGapsPage() {
                         {status.icon} {status.label}
                       </div>
                       {/* Priority badge */}
-                      <div style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '100px', color: priority.color, background: priority.bg, letterSpacing: '0.02em' }}>
+                      <div style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '100px', color: priority.color, background: priority.bg, letterSpacing: '0.02em' }}>
                         {priority.label}
                       </div>
                     </div>
@@ -506,7 +506,7 @@ export default function ProductGapsPage() {
                   <div style={{ flexShrink: 0, textAlign: 'right', minWidth: '80px' }}>
                     {revRisk > 0 ? (
                       <>
-                        <div style={{ fontSize: '16px', fontWeight: '800', color: revRisk >= 10000 ? 'var(--danger)' : revRisk >= 1000 ? 'var(--warning)' : 'var(--text-secondary)', lineHeight: 1 }}>
+                        <div style={{ fontSize: '16px', fontWeight: '700', color: revRisk >= 10000 ? 'var(--danger)' : revRisk >= 1000 ? 'var(--warning)' : 'var(--text-secondary)', lineHeight: 1 }}>
                           {formatCurrency(revRisk, true)}
                         </div>
                         <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>at risk</div>
@@ -566,7 +566,7 @@ export default function ProductGapsPage() {
                           </div>
                         </div>
                       ) : (
-                        <div style={{ padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', marginBottom: '12px' }}>
+                        <div style={{ padding: '10px 14px', background: 'var(--surface)', border: 'none', borderRadius: '8px', marginBottom: '12px' }}>
                           <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
                             Not enough data yet to calculate win rate impact for this gap.
                           </div>
@@ -592,7 +592,7 @@ export default function ProductGapsPage() {
                                 // Try to find deal info from brain
                                 const dealSnap = brain?.deals?.find((d: any) => d.id === dealId)
                                 return (
-                                  <div key={dealId} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                                  <div key={dealId} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: 'var(--surface)', borderRadius: '6px', border: 'none' }}>
                                     <ScoreBadge score={dealSnap?.conversionScore} />
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                       <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -671,9 +671,9 @@ export default function ProductGapsPage() {
                   background: cfg.bg, border: `1px solid color-mix(in srgb, ${cfg.color} 25%, transparent)`,
                 }}>
                   {cfg.icon}
-                  <span style={{ fontSize: '12px', fontWeight: '700', color: cfg.color }}>{cfg.label}</span>
+                  <span style={{ fontSize: '12px', fontWeight: '600', color: cfg.color }}>{cfg.label}</span>
                   <span style={{
-                    marginLeft: 'auto', fontSize: '11px', fontWeight: '700',
+                    marginLeft: 'auto', fontSize: '11px', fontWeight: '600',
                     background: `color-mix(in srgb, ${cfg.color} 18%, transparent)`,
                     color: cfg.color, borderRadius: '100px', padding: '1px 7px',
                   }}>{colGaps.length}</span>
@@ -690,7 +690,7 @@ export default function ProductGapsPage() {
                     <div
                       key={gap.id}
                       style={{
-                        background: 'var(--card-bg)', border: '1px solid var(--card-border)',
+                        background: 'var(--card-bg)', border: 'none',
                         borderRadius: '10px', padding: '10px 12px',
                         display: 'flex', flexDirection: 'column', gap: '6px',
                         opacity: deletingId === gap.id ? 0.5 : 1,
@@ -699,7 +699,7 @@ export default function ProductGapsPage() {
                     >
                       {/* Card header: title + delete */}
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                        <div style={{ flex: 1, fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1.3 }}>
+                        <div style={{ flex: 1, fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1.3 }}>
                           {gap.title}
                         </div>
                         {!String(gap.id).startsWith('brain-') && (
@@ -721,7 +721,7 @@ export default function ProductGapsPage() {
                       </div>
                       {/* Priority + revenue */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '10px', fontWeight: '700', padding: '1px 6px', borderRadius: '100px', color: priority.color, background: priority.bg }}>
+                        <span style={{ fontSize: '10px', fontWeight: '600', padding: '1px 6px', borderRadius: '100px', color: priority.color, background: priority.bg }}>
                           {priority.label}
                         </span>
                         {gap.revenueAtRisk > 0 && (
@@ -754,7 +754,7 @@ export default function ProductGapsPage() {
                                 }}
                                 style={{
                                   fontSize: '9px', fontWeight: '600', padding: '2px 6px',
-                                  borderRadius: '4px', cursor: 'pointer', border: '1px solid var(--border)',
+                                  borderRadius: '4px', cursor: 'pointer', border: 'none',
                                   background: 'var(--surface)', color: 'var(--text-tertiary)',
                                   transition: 'all 0.1s',
                                 }}

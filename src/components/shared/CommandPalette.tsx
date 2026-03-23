@@ -431,7 +431,7 @@ export default function CommandPalette() {
           backdropFilter: 'blur(28px)',
           WebkitBackdropFilter: 'blur(28px)',
           border: '1px solid var(--border-strong)',
-          borderRadius: '16px',
+          borderRadius: '8px',
           boxShadow: '0 40px 100px rgba(0,0,0,0.9), 0 0 0 1px rgba(99,102,241,0.1)',
           display: 'flex',
           flexDirection: 'column',

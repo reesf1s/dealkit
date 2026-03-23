@@ -106,7 +106,7 @@ export default function ROIWidget({ deals, collateralCount, currencySymbol = '£
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
       border: '1px solid rgba(124,58,237,0.18)',
-      borderRadius: '14px',
+      borderRadius: '8px',
       padding: '16px 20px',
     }}>
       {/* Header */}

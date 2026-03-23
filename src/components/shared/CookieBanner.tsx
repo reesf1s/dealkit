@@ -55,7 +55,7 @@ export default function CookieBanner() {
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         border: '1px solid rgba(139,92,246,0.25)',
-        borderRadius: '16px',
+        borderRadius: '8px',
         padding: '20px',
         boxShadow: '0 24px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,102,241,0.1)',
       }}>

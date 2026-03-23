@@ -174,8 +174,8 @@ export default function DashboardPage() {
 
   const cardStyle: React.CSSProperties = {
     background: 'var(--card-bg)',
-    border: '1px solid var(--card-border)',
-    borderRadius: '16px',
+    border: 'none',
+    borderRadius: '8px',
     padding: '20px 22px',
   }
 
@@ -195,7 +195,7 @@ export default function DashboardPage() {
         <button
           onClick={regenerate}
           disabled={regenerating}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '9px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500', cursor: regenerating ? 'not-allowed' : 'pointer', opacity: regenerating ? 0.6 : 1 }}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', borderRadius: '6px', background: 'var(--surface)', border: 'none', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500', cursor: regenerating ? 'not-allowed' : 'pointer', opacity: regenerating ? 0.6 : 1 }}
         >
           <RefreshCw size={12} style={{ animation: regenerating ? 'spin 1s linear infinite' : 'none' }} />
           {regenerating ? 'Refreshing\u2026' : 'Refresh briefing'}
@@ -238,7 +238,7 @@ export default function DashboardPage() {
               </div>
             )}
             {overview?.singleMostImportantAction && (
-              <div style={{ marginTop: '14px', padding: '12px 14px', background: 'var(--accent-subtle)', border: '1px solid rgba(79,70,229,0.15)', borderRadius: '10px' }}>
+              <div style={{ marginTop: '14px', padding: '12px 14px', background: 'var(--accent-subtle)', border: 'none', borderRadius: '10px' }}>
                 <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Most important action</div>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1.5 }}>{overview.singleMostImportantAction}</div>
               </div>
@@ -251,7 +251,7 @@ export default function DashboardPage() {
               <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Deals needing attention</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {overviewLoading ? [1,2,3].map(i => (
-                  <div key={i} style={{ padding: '12px', borderRadius: '10px', background: 'var(--surface)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div key={i} style={{ padding: '12px', borderRadius: '10px', background: 'var(--surface)', border: 'none', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <SkeletonLine w="50%" h="14px" />
                     <SkeletonLine w="80%" h="12px" />
                   </div>
@@ -279,15 +279,42 @@ export default function DashboardPage() {
             <div style={cardStyle}>
               <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>Today&apos;s actions</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {overview.keyActions.map((action: string, i: number) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)', cursor: 'pointer' }}
-                    onClick={() => sendToCopilot(`Help me with this: ${action}`)}>
-                    <div style={{ flexShrink: 0, width: '18px', height: '18px', borderRadius: '5px', background: 'var(--accent-subtle)', border: '1px solid rgba(79,70,229,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '1px' }}>
-                      <span style={{ fontSize: '9px', fontWeight: '700', color: 'var(--accent)' }}>{i + 1}</span>
+                {overview.keyActions.map((action: string, i: number) => {
+                  // Try to match action text to a deal by dealName or prospectCompany
+                  const matchedDeal = deals.find((d: any) => {
+                    const name = (d.dealName || '').toLowerCase()
+                    const company = (d.prospectCompany || '').toLowerCase()
+                    const actionLower = action.toLowerCase()
+                    return (name.length > 3 && actionLower.includes(name)) ||
+                           (company.length > 3 && actionLower.includes(company))
+                  })
+                  return (
+                    <div key={i} className="action-item-row" style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px', border: 'none', cursor: 'pointer', position: 'relative' }}
+                      onClick={() => sendToCopilot(`Help me with this: ${action}`)}>
+                      <div style={{ flexShrink: 0, width: '18px', height: '18px', borderRadius: '5px', background: 'var(--accent-subtle)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '1px' }}>
+                        <span style={{ fontSize: '9px', fontWeight: '700', color: 'var(--accent)' }}>{i + 1}</span>
+                      </div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5, flex: 1 }}>{action}</div>
+                      <div className="action-item-buttons" style={{ display: 'flex', gap: '4px', flexShrink: 0, alignSelf: 'center' }}>
+                        {matchedDeal && (
+                          <Link
+                            href={`/deals/${matchedDeal.id}`}
+                            onClick={e => e.stopPropagation()}
+                            style={{ padding: '3px 8px', borderRadius: '5px', fontSize: '10px', fontWeight: '600', color: 'var(--accent)', background: 'var(--accent-subtle)', border: 'none', textDecoration: 'none', whiteSpace: 'nowrap', transition: 'opacity 0.15s' }}
+                          >
+                            Open deal &rarr;
+                          </Link>
+                        )}
+                        <button
+                          onClick={e => { e.stopPropagation(); sendToCopilot(`Draft this for me: ${action}`) }}
+                          style={{ padding: '3px 8px', borderRadius: '5px', fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)', background: 'var(--surface)', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'opacity 0.15s' }}
+                        >
+                          Draft with AI &rarr;
+                        </button>
+                      </div>
                     </div>
-                    <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5, flex: 1 }}>{action}</div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
@@ -333,7 +360,7 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {totalPipeline > 0 && (
                 <div>
-                  <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1, letterSpacing: '-0.02em' }}>
+                  <div style={{ fontSize: '28px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1, letterSpacing: '-0.02em' }}>
                     {formatCurrency(totalPipeline, true)}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '3px' }}>total pipeline value</div>
@@ -341,17 +368,17 @@ export default function DashboardPage() {
                     <div style={{ marginTop: '10px' }}>
                       <button
                         onClick={() => setForecastExpanded(f => !f)}
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '8px 10px', cursor: 'pointer', width: '100%', textAlign: 'left' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '8px 10px', cursor: 'pointer', width: '100%', textAlign: 'left' }}
                       >
                         <DollarSign size={11} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Weighted forecast</div>
-                          <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--accent)', lineHeight: 1.1 }}>{formatCurrency(weightedForecast, true)}</div>
+                          <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--accent)', lineHeight: 1.1 }}>{formatCurrency(weightedForecast, true)}</div>
                         </div>
-                        <ChevronDown size={12} style={{ color: 'var(--text-tertiary)', transform: forecastExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s', flexShrink: 0 }} />
+                        <ChevronDown size={12} style={{ color: 'var(--text-tertiary)', transform: forecastExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.1s ease', flexShrink: 0 }} />
                       </button>
                       {forecastExpanded && (
-                        <div style={{ marginTop: '8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+                        <div style={{ marginTop: '8px', background: 'var(--surface)', border: 'none', borderRadius: '10px', overflow: 'hidden' }}>
                           {/* Summary header */}
                           <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
@@ -438,20 +465,20 @@ export default function DashboardPage() {
                 </div>
               )}
               <div style={{ display: 'flex', gap: '8px' }}>
-                <div style={{ flex: 1, padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                  <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1 }}>{activeDeals.length}</div>
+                <div style={{ flex: 1, padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px', border: 'none' }}>
+                  <div style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1 }}>{activeDeals.length}</div>
                   <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '3px' }}>active deals</div>
                 </div>
                 {winRate != null && (
-                  <div style={{ flex: 1, padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <div style={{ flex: 1, padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px', border: 'none' }}>
                     {totalClosed >= 5 ? (
                       <>
-                        <div style={{ fontSize: '18px', fontWeight: '700', color: winRate >= 50 ? 'var(--success)' : 'var(--warning)', lineHeight: 1 }}>{winRate}%</div>
+                        <div style={{ fontSize: '18px', fontWeight: '600', color: winRate >= 50 ? 'var(--success)' : 'var(--warning)', lineHeight: 1 }}>{winRate}%</div>
                         <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '3px' }}>win rate</div>
                       </>
                     ) : (
                       <>
-                        <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1 }}>{winCount}W / {lossCount}L</div>
+                        <div style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1 }}>{winCount}W / {lossCount}L</div>
                         <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '3px' }}>closed</div>
                       </>
                     )}
@@ -462,10 +489,10 @@ export default function DashboardPage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Avg deal score</div>
-                    <div style={{ fontSize: '11px', fontWeight: '700', color: getScoreColor(avgScore, false) }}>{avgScore}</div>
+                    <div style={{ fontSize: '11px', fontWeight: '600', color: getScoreColor(avgScore, false) }}>{avgScore}</div>
                   </div>
                   <div style={{ height: '4px', borderRadius: '2px', background: 'var(--border)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${avgScore}%`, background: getScoreColor(avgScore, false), borderRadius: '2px', transition: 'width 0.5s' }} />
+                    <div style={{ height: '100%', width: `${avgScore}%`, background: getScoreColor(avgScore, false), borderRadius: '2px', transition: 'width 0.1s ease' }} />
                   </div>
                 </div>
               )}
@@ -516,7 +543,7 @@ export default function DashboardPage() {
                   <div style={{ fontSize: '11px', color: 'var(--danger)', lineHeight: 1.4 }}>{overview.topRisk}</div>
                 </div>
               )}
-              <Link href="/pipeline" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', borderRadius: '8px', background: 'var(--surface)', border: '1px solid var(--border)', textDecoration: 'none', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500' }}>
+              <Link href="/pipeline" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', borderRadius: '8px', background: 'var(--surface)', border: 'none', textDecoration: 'none', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500' }}>
                 View pipeline <ChevronRight size={13} />
               </Link>
             </div>
@@ -528,13 +555,13 @@ export default function DashboardPage() {
             {brain?.mlModel ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div>
-                  <div style={{ fontSize: '26px', fontWeight: '800', color: 'var(--accent)', lineHeight: 1 }}>{Math.round(brain.mlModel.looAccuracy * 100)}%</div>
+                  <div style={{ fontSize: '26px', fontWeight: '700', color: 'var(--accent)', lineHeight: 1 }}>{Math.round(brain.mlModel.looAccuracy * 100)}%</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '3px' }}>prediction accuracy</div>
                 </div>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                   Trained on {brain.mlModel.trainingSize} closed deals
                 </div>
-                <Link href="/models" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', background: 'var(--accent-subtle)', border: '1px solid rgba(79,70,229,0.15)', textDecoration: 'none', color: 'var(--accent)', fontSize: '12px', fontWeight: '600' }}>
+                <Link href="/models" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: '8px', background: 'var(--accent-subtle)', border: 'none', textDecoration: 'none', color: 'var(--accent)', fontSize: '12px', fontWeight: '600' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><Brain size={11} /> View model</span>
                   <ChevronRight size={12} />
                 </Link>
@@ -578,6 +605,11 @@ export default function DashboardPage() {
           0% { opacity: 1; }
           50% { opacity: 0.5; }
           100% { opacity: 1; }
+        }
+        .action-item-buttons { opacity: 0; transition: opacity 0.15s ease; }
+        .action-item-row:hover .action-item-buttons { opacity: 1; }
+        @media (max-width: 768px) {
+          .action-item-buttons { opacity: 1; }
         }
       `}</style>
     </div>

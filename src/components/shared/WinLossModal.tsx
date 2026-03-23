@@ -68,7 +68,7 @@ export default function WinLossModal({ deal, outcome, onSubmit, onSkip }: WinLos
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: accentBg, border: `1px solid ${accentColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: accentBg, border: `1px solid ${accentColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {isWon ? <CheckCircle size={20} style={{ color: accentColor }} /> : <XCircle size={20} style={{ color: accentColor }} />}
             </div>
             <div>

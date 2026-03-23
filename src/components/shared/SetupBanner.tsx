@@ -18,7 +18,7 @@ export default function SetupBanner({ inline, context }: SetupBannerProps) {
         padding: '40px 24px', textAlign: 'center', gap: '12px',
       }}>
         <div style={{
-          width: '44px', height: '44px', borderRadius: '12px',
+          width: '44px', height: '44px', borderRadius: '8px',
           background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
@@ -53,7 +53,7 @@ export default function SetupBanner({ inline, context }: SetupBannerProps) {
     <div style={{
       background: 'rgba(99,102,241,0.05)',
       border: '1px solid rgba(99,102,241,0.18)',
-      borderRadius: '12px', padding: '20px 24px',
+      borderRadius: '8px', padding: '20px 24px',
       display: 'flex', alignItems: 'flex-start', gap: '16px',
     }}>
       <div style={{

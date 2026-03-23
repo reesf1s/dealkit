@@ -96,7 +96,7 @@ export default function AIOverviewCard() {
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         border: '1px solid var(--card-border)',
-        borderRadius: '16px',
+        borderRadius: '8px',
         overflow: 'hidden',
         boxShadow: 'var(--shadow-lg)',
       }}

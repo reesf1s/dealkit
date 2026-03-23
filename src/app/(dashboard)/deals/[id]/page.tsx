@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 
 import useSWR from 'swr'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import * as Dialog from '@radix-ui/react-dialog'
@@ -139,7 +139,7 @@ function AssigneePill({ assignee, onClick, size = 'sm' }: { assignee?: string; o
       <button
         onClick={e => { e.stopPropagation(); onClick() }}
         style={{
-          background: 'none', border: '1px dashed var(--border)', borderRadius: '12px',
+          background: 'none', border: '1px dashed var(--ds-border)', borderRadius: '8px',
           padding: isSm ? '1px 6px' : '2px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px',
           color: 'var(--text-tertiary)', fontSize: isSm ? '10px' : '11px', flexShrink: 0,
         }}
@@ -155,7 +155,7 @@ function AssigneePill({ assignee, onClick, size = 'sm' }: { assignee?: string; o
     <button
       onClick={e => { e.stopPropagation(); onClick() }}
       style={{
-        background: 'var(--accent-subtle)', border: 'none', borderRadius: '12px',
+        background: 'var(--accent-subtle)', border: 'none', borderRadius: '8px',
         padding: isSm ? '1px 8px 1px 2px' : '2px 10px 2px 3px', cursor: 'pointer', display: 'flex',
         alignItems: 'center', gap: '4px', flexShrink: 0,
       }}
@@ -216,7 +216,7 @@ function AssigneeDropdown({
       style={{
         position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 100,
         background: 'var(--card-bg)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-        border: '1px solid var(--border)', borderRadius: '10px', padding: '6px',
+        border: 'none', borderRadius: '10px', padding: '6px',
         boxShadow: '0 8px 32px rgba(0,0,0,0.2)', minWidth: '220px', maxHeight: '280px', overflowY: 'auto',
       }}
     >
@@ -227,7 +227,7 @@ function AssigneeDropdown({
           onChange={e => setCustomName(e.target.value)}
           placeholder="Type a name or email..."
           style={{
-            width: '100%', background: 'var(--input-bg)', border: '1px solid var(--border)',
+            width: '100%', background: 'var(--input-bg)', border: 'none',
             borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)',
             fontSize: '12px', outline: 'none', boxSizing: 'border-box', marginBottom: '4px',
           }}
@@ -356,7 +356,7 @@ function HubSpotActivityBlock({ deal, dealCompetitors }: { deal: any; dealCompet
   const blocks = raw.split(/\n\n(?=\[)/).map((b: string) => b.trim()).filter(Boolean)
 
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px' }}>
+    <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '14px' }}>
       <button
         onClick={() => setExpanded(v => !v)}
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
@@ -378,7 +378,7 @@ function HubSpotActivityBlock({ deal, dealCompetitors }: { deal: any; dealCompet
             const date = dateMatch?.[1] ?? ''
             const body = entry.slice(dateMatch?.[0].length ?? 0).trim()
             return (
-              <div key={i} style={{ padding: '9px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+              <div key={i} style={{ padding: '9px 12px', background: 'var(--surface)', border: 'none', borderRadius: '8px' }}>
                 {date && (
                   <div style={{ fontSize: '10px', fontWeight: 700, color: '#FF7A59', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '4px' }}>{date}</div>
                 )}
@@ -529,7 +529,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: '12px', padding: '32px 24px',
-          background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: '14px',
+          background: 'var(--surface)', border: '1px dashed var(--ds-border)', borderRadius: '8px',
           textAlign: 'center',
         }}>
           <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--accent-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -552,7 +552,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
         const entries = blocks.filter((b: string) => /^\[/.test(b))
         const legacy = blocks.filter((b: string) => !/^\[/.test(b))
         return (
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px' }}>
+          <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '14px' }}>
             <button
               onClick={() => setHistoryExpanded(v => !v)}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
@@ -595,7 +595,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
                   const date = dateMatch?.[1] ?? ''
                   const body = entry.slice(dateMatch?.[0].length ?? 0).trim()
                   return (
-                    <div key={i} style={{ padding: '9px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', position: 'relative' }}
+                    <div key={i} style={{ padding: '9px 12px', background: 'var(--surface)', border: 'none', borderRadius: '8px', position: 'relative' }}
                       onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.entry-del') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
                       onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.entry-del') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
                     >
@@ -629,7 +629,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
       <HubSpotActivityBlock deal={deal} dealCompetitors={deal?.competitors ?? []} />
 
       {/* Add update */}
-      <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '14px' }}>
+      <div style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '14px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
           <Sparkles size={13} color="var(--accent)" />
           <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
@@ -644,7 +644,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
           rows={6}
           style={{
             width: '100%', resize: 'vertical', background: 'var(--input-bg)',
-            border: '1px solid var(--border)', borderRadius: '8px',
+            border: 'none', borderRadius: '8px',
             color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6',
             padding: '12px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
           }}
@@ -667,7 +667,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
             style={{
               display: 'flex', alignItems: 'center', gap: '6px',
               padding: '7px 12px', borderRadius: '7px',
-              background: 'var(--surface)', border: '1px solid var(--border)',
+              background: 'var(--surface)', border: 'none',
               color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500',
               cursor: updateText.trim() ? 'pointer' : 'not-allowed', opacity: updateText.trim() ? 1 : 0.5,
             }}
@@ -713,7 +713,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
         const budgetLabel = budgetStatus === 'approved' ? '✓ Confirmed' : budgetStatus === 'awaiting' ? '~ Awaiting approval' : budgetStatus === 'blocked' ? '⚠ Blocked' : '— Not discussed'
         const budgetColor = budgetStatus === 'approved' ? 'var(--success)' : budgetStatus === 'blocked' ? 'var(--danger)' : budgetStatus === 'awaiting' ? 'var(--warning)' : 'var(--text-tertiary)'
         return (
-          <div style={{ background: 'color-mix(in srgb, var(--accent) 5%, var(--card-bg))', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', borderRadius: '12px', padding: '16px' }}>
+          <div style={{ background: 'color-mix(in srgb, var(--accent) 5%, var(--card-bg))', border: 'none', borderRadius: '8px', padding: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                 <CheckCircle size={14} color="var(--accent)" />
@@ -784,7 +784,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
               </button>
               <button
                 onClick={() => setLastExtraction(null)}
-                style={{ flex: 1, padding: '8px 14px', borderRadius: '8px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
+                style={{ flex: 1, padding: '8px 14px', borderRadius: '8px', background: 'var(--surface)', border: 'none', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
               >
                 Dismiss
               </button>
@@ -795,7 +795,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
 
       {/* AI Results */}
       {(deal?.aiSummary || (deal?.dealRisks as string[])?.length > 0) && (
-        <div style={{ background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '12px', padding: '16px' }}>
+        <div style={{ background: 'var(--accent-subtle)', border: 'none', borderRadius: '8px', padding: '16px' }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
             <Sparkles size={14} color="var(--accent)" />
@@ -803,7 +803,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
             {/* Conversion score — with clear button */}
             {deal?.conversionScore != null && (
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '20px', fontWeight: '800', color: getScoreColor(deal.conversionScore ?? 0, false) }}>
+                <span style={{ fontSize: '20px', fontWeight: '700', color: getScoreColor(deal.conversionScore ?? 0, false) }}>
                   {deal.conversionScore}%
                 </span>
                 <button
@@ -1026,7 +1026,7 @@ function ScoreSimulator({ deal, mlPrediction, brainData }: { deal: any; mlPredic
     border: 'none',
     cursor: 'pointer',
     flexShrink: 0,
-    transition: 'background 0.2s',
+    transition: 'background 0.1s ease',
     padding: 0,
   })
   const knobStyle = (active: boolean): React.CSSProperties => ({
@@ -1037,7 +1037,7 @@ function ScoreSimulator({ deal, mlPrediction, brainData }: { deal: any; mlPredic
     height: '16px',
     borderRadius: '50%',
     background: '#fff',
-    transition: 'left 0.2s',
+    transition: 'left 0.1s ease',
     boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
   })
 
@@ -1048,7 +1048,7 @@ function ScoreSimulator({ deal, mlPrediction, brainData }: { deal: any; mlPredic
   ]
 
   return (
-    <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '16px' }}>
+    <div style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '16px' }}>
       <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '4px' }}>Score Simulator</div>
       <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '14px' }}>See how toggling key signals affects this deal&apos;s score</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1071,7 +1071,7 @@ function ScoreSimulator({ deal, mlPrediction, brainData }: { deal: any; mlPredic
       <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Simulated score</span>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-          <span style={{ fontSize: '22px', fontWeight: 800, fontFamily: 'monospace', color: getScoreColor(simScore, false), lineHeight: 1 }}>
+          <span style={{ fontSize: '22px', fontWeight: 700, fontFamily: 'monospace', color: getScoreColor(simScore, false), lineHeight: 1 }}>
             {simScore}%
           </span>
           {delta !== 0 && (
@@ -1126,7 +1126,7 @@ function MeetingPrepTab({ dealId, deal, objectionWinMap = [], objectionCondition
   }
 
   const cardStyle: React.CSSProperties = {
-    background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '16px',
+    background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '16px',
   }
   const sectionTitle = (label: string, color = 'var(--text-secondary)') => (
     <div style={{ fontSize: '11px', fontWeight: 700, color, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: '10px' }}>
@@ -1213,7 +1213,7 @@ function MeetingPrepTab({ dealId, deal, objectionWinMap = [], objectionCondition
               const delta = hasGlobal ? o.winRateWithTheme - o.globalWinRate : 0
               return (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: `${color}06`, border: `1px solid ${color}18`, borderRadius: '8px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 800, color, minWidth: '38px', textAlign: 'right', flexShrink: 0 }}>{o.winRateWithTheme}%</span>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color, minWidth: '38px', textAlign: 'right', flexShrink: 0 }}>{o.winRateWithTheme}%</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 600, textTransform: 'capitalize' }}>{o.theme.replace(/_/g, ' ')}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '1px' }}>
@@ -1341,7 +1341,7 @@ function MeetingPrepTab({ dealId, deal, objectionWinMap = [], objectionCondition
           </button>
         </div>
       ) : (
-        <div style={{ background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '12px', padding: '20px' }}>
+        <div style={{ background: 'var(--accent-subtle)', border: 'none', borderRadius: '8px', padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Sparkles size={14} color="var(--accent)" />
@@ -1477,7 +1477,7 @@ function TodosTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: a
           onChange={e => setNewTodo(e.target.value)}
           placeholder="Add action item..."
           style={{
-            flex: 1, background: 'var(--input-bg)', border: '1px solid var(--border)',
+            flex: 1, background: 'var(--input-bg)', border: 'none',
             borderRadius: '8px', padding: '9px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none',
           }}
           onFocus={e => (e.target as HTMLElement).style.borderColor = 'var(--accent)'}
@@ -1496,7 +1496,7 @@ function TodosTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: a
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: '10px', padding: '40px 24px',
-          background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: '12px',
+          background: 'var(--surface)', border: '1px dashed var(--ds-border)', borderRadius: '8px',
           textAlign: 'center',
         }}>
           <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: 'var(--accent-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1516,7 +1516,7 @@ function TodosTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: a
               {pending.map((todo: any) => (
                 <div key={todo.id} style={{
                   display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
-                  background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px',
+                  background: 'var(--surface)', border: 'none', borderRadius: '8px',
                 }}>
                   <button onClick={() => toggleTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}>
                     <Square size={15} color="var(--text-tertiary)" />
@@ -1674,7 +1674,7 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
   const u = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
   const inputStyle: React.CSSProperties = {
     width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px',
-    background: 'var(--input-bg)', border: '1px solid var(--border)',
+    background: 'var(--input-bg)', border: 'none',
     color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box',
   }
   const labelStyle: React.CSSProperties = {
@@ -1726,7 +1726,7 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
           position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
           zIndex: 501, width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto',
           background: 'var(--elevated)', border: '1px solid var(--border-strong)',
-          borderRadius: '14px', padding: '24px', outline: 'none',
+          borderRadius: '8px', padding: '24px', outline: 'none',
           boxShadow: 'var(--shadow-lg)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
@@ -1780,7 +1780,7 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {contacts.map((contact, i) => (
-                  <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px', position: 'relative' }}>
+                  <div key={i} style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '10px', position: 'relative' }}>
                     {contacts.length > 1 && (
                       <button
                         type="button"
@@ -1822,7 +1822,7 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
                     color: form.dealType === type ? 'var(--text-primary)' : 'var(--text-tertiary)',
                     backgroundColor: form.dealType === type ? 'var(--accent-subtle)' : 'transparent',
                     border: `1px solid ${form.dealType === type ? 'var(--accent)' : 'var(--border)'}`,
-                    cursor: 'pointer', transition: 'all 150ms ease',
+                    cursor: 'pointer', transition: 'all 0.1s ease',
                   }}>
                     {type === 'one_off' ? 'One-off' : 'Recurring'}
                   </button>
@@ -1836,7 +1836,7 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
                       color: form.recurringInterval === interval ? 'var(--text-primary)' : 'var(--text-tertiary)',
                       backgroundColor: form.recurringInterval === interval ? 'var(--surface-hover)' : 'transparent',
                       border: `1px solid ${form.recurringInterval === interval ? 'var(--border-strong)' : 'var(--border)'}`,
-                      cursor: 'pointer', transition: 'all 150ms ease',
+                      cursor: 'pointer', transition: 'all 0.1s ease',
                     }}>
                       {interval}
                     </button>
@@ -1904,7 +1904,7 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '4px' }}>
               <Dialog.Close asChild>
-                <button style={{ height: '34px', padding: '0 14px', borderRadius: '7px', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', background: 'var(--surface-hover)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                <button style={{ height: '34px', padding: '0 14px', borderRadius: '7px', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', background: 'var(--surface-hover)', border: 'none', cursor: 'pointer' }}>
                   Cancel
                 </button>
               </Dialog.Close>
@@ -1948,7 +1948,7 @@ function WinStoryPromptModal({ wonDeal, open, onOpenChange, currencySymbol = '£
 
   const inputStyle: React.CSSProperties = {
     width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px',
-    background: 'var(--input-bg)', border: '1px solid var(--border)',
+    background: 'var(--input-bg)', border: 'none',
     color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box',
   }
   const labelStyle: React.CSSProperties = {
@@ -1986,7 +1986,7 @@ function WinStoryPromptModal({ wonDeal, open, onOpenChange, currencySymbol = '£
           position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
           zIndex: 601, width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto',
           background: 'var(--elevated)', border: '1px solid var(--accent)',
-          borderRadius: '14px', padding: '24px', outline: 'none',
+          borderRadius: '8px', padding: '24px', outline: 'none',
           boxShadow: 'var(--shadow-lg)',
         }}>
           {saved ? (
@@ -2056,7 +2056,7 @@ function WinStoryPromptModal({ wonDeal, open, onOpenChange, currencySymbol = '£
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '4px' }}>
                   <Dialog.Close asChild>
-                    <button style={{ height: '34px', padding: '0 14px', borderRadius: '7px', fontSize: '13px', fontWeight: 500, color: 'var(--text-tertiary)', background: 'var(--surface-hover)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                    <button style={{ height: '34px', padding: '0 14px', borderRadius: '7px', fontSize: '13px', fontWeight: 500, color: 'var(--text-tertiary)', background: 'var(--surface-hover)', border: 'none', cursor: 'pointer' }}>
                       Skip for now
                     </button>
                   </Dialog.Close>
@@ -2111,7 +2111,7 @@ function ActivityLog({ dealId, deal, onUpdate }: { dealId: string; deal: any; on
   }
 
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', overflow: 'hidden' }}>
+    <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
         <Clipboard size={13} color="var(--accent)" />
         <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Activity Log</span>
@@ -2126,7 +2126,7 @@ function ActivityLog({ dealId, deal, onUpdate }: { dealId: string; deal: any; on
           placeholder="Log an activity… e.g. 'Sent account access email to john@acme.com'"
           style={{
             flex: 1, height: '34px', padding: '0 10px', borderRadius: '7px',
-            background: 'var(--input-bg)', border: '1px solid var(--border)',
+            background: 'var(--input-bg)', border: 'none',
             color: 'var(--text-primary)', fontSize: '12px', outline: 'none', fontFamily: 'inherit',
           }}
           onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
@@ -2136,7 +2136,7 @@ function ActivityLog({ dealId, deal, onUpdate }: { dealId: string; deal: any; on
           height: '34px', padding: '0 14px', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
           color: '#fff', background: saving || !entry.trim() ? 'var(--surface)' : 'var(--accent)',
           border: '1px solid var(--accent)', cursor: saving || !entry.trim() ? 'not-allowed' : 'pointer',
-          transition: 'background 150ms', whiteSpace: 'nowrap',
+          transition: 'background 0.1s ease', whiteSpace: 'nowrap',
         }}>
           {saving ? '…' : 'Log'}
         </button>
@@ -2265,7 +2265,7 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate, members }: { dealId: strin
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
       {/* Progress bar */}
       {criteria.length > 0 && (
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px' }}>
+        <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Progress</span>
             <span style={{ fontSize: '12px', fontWeight: 600, color: achieved === criteria.length ? 'var(--success)' : 'var(--text-primary)' }}>
@@ -2273,7 +2273,7 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate, members }: { dealId: strin
             </span>
           </div>
           <div style={{ height: '6px', background: 'var(--surface-hover)', borderRadius: '3px', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${criteria.length ? (achieved / criteria.length) * 100 : 0}%`, background: 'linear-gradient(90deg, #6366F1, #22C55E)', borderRadius: '3px', transition: 'width 0.3s' }} />
+            <div style={{ height: '100%', width: `${criteria.length ? (achieved / criteria.length) * 100 : 0}%`, background: 'linear-gradient(90deg, #6366F1, #22C55E)', borderRadius: '3px', transition: 'width 0.1s ease' }} />
           </div>
         </div>
       )}
@@ -2303,7 +2303,7 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate, members }: { dealId: strin
 
       {/* Criteria list grouped by category */}
       {categories.map(cat => (
-        <div key={cat} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px' }}>
+        <div key={cat} style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '14px' }}>
           <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '10px' }}>{cat}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {criteria.filter((c: any) => (c.category ?? 'General') === cat).map((c: any) => (
@@ -2358,7 +2358,7 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate, members }: { dealId: strin
       ))}
 
       {/* Paste new criteria */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px' }}>
+      <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '14px' }}>
         <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '10px' }}>
           {criteria.length > 0 ? 'Add More Criteria' : 'Paste Success Criteria'}
         </div>
@@ -2367,7 +2367,7 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate, members }: { dealId: strin
           onChange={e => setText(e.target.value)}
           placeholder="Paste the success criteria from your proposal, RFP, or stakeholder requirements — AI will extract individual testable items..."
           rows={5}
-          style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, fontFamily: 'inherit' }}
+          style={{ width: '100%', background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '10px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, fontFamily: 'inherit' }}
         />
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '10px', flexWrap: 'wrap' }}>
           <button
@@ -2476,7 +2476,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate, members }: { dealId: string; d
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
       {/* Progress bar */}
       {totalTasks > 0 && (
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px' }}>
+        <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Plan Progress</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -2488,8 +2488,8 @@ function ProjectPlanTab({ dealId, deal, onUpdate, members }: { dealId: string; d
             </div>
           </div>
           <div style={{ height: '6px', background: 'var(--surface-hover)', borderRadius: '3px', overflow: 'hidden', display: 'flex' }}>
-            <div style={{ height: '100%', width: `${totalTasks ? (completeTasks / totalTasks) * 100 : 0}%`, background: 'linear-gradient(90deg, #6366F1, #22C55E)', borderRadius: '3px 0 0 3px', transition: 'width 0.3s' }} />
-            <div style={{ height: '100%', width: `${totalTasks ? (inProgressTasks / totalTasks) * 100 : 0}%`, background: 'var(--accent)', transition: 'width 0.3s' }} />
+            <div style={{ height: '100%', width: `${totalTasks ? (completeTasks / totalTasks) * 100 : 0}%`, background: 'linear-gradient(90deg, #6366F1, #22C55E)', borderRadius: '3px 0 0 3px', transition: 'width 0.1s ease' }} />
+            <div style={{ height: '100%', width: `${totalTasks ? (inProgressTasks / totalTasks) * 100 : 0}%`, background: 'var(--accent)', transition: 'width 0.1s ease' }} />
           </div>
         </div>
       )}
@@ -2499,7 +2499,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate, members }: { dealId: string; d
         const phaseTasks = phase.tasks ?? []
         const phaseComplete = phaseTasks.filter((t: any) => t.status === 'complete').length
         return (
-          <div key={phase.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+          <div key={phase.id} style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', overflow: 'hidden' }}>
             {/* Phase header */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
               <Layers size={13} color="var(--accent)" />
@@ -2588,7 +2588,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate, members }: { dealId: string; d
                   onChange={e => setNewTaskText(prev => ({ ...prev, [phase.id]: e.target.value }))}
                   placeholder="Add task..."
                   style={{
-                    flex: 1, background: 'var(--surface)', border: '1px solid var(--border)',
+                    flex: 1, background: 'var(--surface)', border: 'none',
                     borderRadius: '6px', padding: '6px 10px', color: 'var(--text-primary)', fontSize: '12px', outline: 'none',
                   }}
                 />
@@ -2605,7 +2605,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate, members }: { dealId: string; d
       })}
 
       {/* Paste new plan */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px' }}>
+      <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '14px' }}>
         <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '10px' }}>
           {phases.length > 0 ? 'Add More Phases' : 'Create Project Plan'}
         </div>
@@ -2618,7 +2618,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate, members }: { dealId: string; d
           onChange={e => setText(e.target.value)}
           placeholder="Paste your project plan, implementation timeline, POC milestones, or any structured task list..."
           rows={6}
-          style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', padding: '10px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, fontFamily: 'inherit' }}
+          style={{ width: '100%', background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '10px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, fontFamily: 'inherit' }}
         />
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '10px' }}>
           <button
@@ -2754,7 +2754,7 @@ function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; o
   }
 
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden' }}>
+    <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', overflow: 'hidden' }}>
       <button
         onClick={() => setExpanded(!expanded)}
         style={{
@@ -2794,7 +2794,7 @@ function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; o
                 style={{
                   display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
                   borderRadius: '6px', background: 'var(--card-bg)',
-                  border: '1px solid var(--border)', transition: 'border-color 0.15s',
+                  border: 'none', transition: 'border-color 0.15s',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
                 onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
@@ -2886,7 +2886,7 @@ function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; o
                 onKeyDown={e => { if (e.key === 'Enter' && urlInput.trim()) addLink(); if (e.key === 'Escape') { setAdding(false); setUrlInput(''); setLabelInput('') } }}
                 style={{
                   width: '100%', fontSize: '12px', padding: '8px 10px',
-                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  background: 'var(--surface)', border: 'none',
                   borderRadius: '6px', color: 'var(--text-primary)', outline: 'none',
                   fontFamily: 'inherit', boxSizing: 'border-box',
                 }}
@@ -2899,7 +2899,7 @@ function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; o
                 onKeyDown={e => { if (e.key === 'Enter' && urlInput.trim()) addLink(); if (e.key === 'Escape') { setAdding(false); setUrlInput(''); setLabelInput('') } }}
                 style={{
                   width: '100%', fontSize: '12px', padding: '8px 10px',
-                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  background: 'var(--surface)', border: 'none',
                   borderRadius: '6px', color: 'var(--text-primary)', outline: 'none',
                   fontFamily: 'inherit', boxSizing: 'border-box',
                 }}
@@ -2918,7 +2918,7 @@ function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; o
                   onClick={() => { setAdding(false); setUrlInput(''); setLabelInput('') }}
                   style={{
                     fontSize: '11px', padding: '5px 12px', background: 'none',
-                    border: '1px solid var(--border)', borderRadius: '6px',
+                    border: 'none', borderRadius: '6px',
                     color: 'var(--text-tertiary)', cursor: 'pointer',
                   }}
                 >
@@ -3000,10 +3000,13 @@ function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
   const { data: collateralRes } = useSWR('/api/collateral', fetcher)
   const allCollateral: any[] = collateralRes?.data ?? []
 
-  // Filter client-side: match by dealId reference in content, title, or metadata
+  // Filter client-side: prefer sourceDealLogId match, fall back to text matching
   const dealName: string = deal?.dealName ?? ''
   const company: string = deal?.prospectCompany ?? ''
   const dealCollateral = allCollateral.filter((c: any) => {
+    // Primary: linked via sourceDealLogId
+    if (c.sourceDealLogId === dealId) return true
+    // Legacy fallback: match by text content
     if (c.dealId === dealId) return true
     const content = [c.title ?? '', c.content ?? '', c.generationSource ?? ''].join(' ').toLowerCase()
     const terms = [dealId, dealName, company].filter(Boolean).map(s => s.toLowerCase())
@@ -3034,7 +3037,7 @@ function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {[1, 2].map(i => (
-          <div key={i} style={{ height: '80px', background: 'var(--surface)', borderRadius: '12px', animation: 'pulse 1.5s infinite' }} />
+          <div key={i} style={{ height: '80px', background: 'var(--surface)', borderRadius: '8px', animation: 'pulse 1.5s infinite' }} />
         ))}
       </div>
     )
@@ -3064,9 +3067,9 @@ function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: '16px', padding: '60px 24px',
-          background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: '14px',
+          background: 'var(--surface)', border: '1px dashed var(--ds-border)', borderRadius: '8px',
         }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--accent-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: 'var(--accent-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileText size={22} color="var(--accent)" />
           </div>
           <div style={{ textAlign: 'center' }}>
@@ -3096,8 +3099,8 @@ function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
               <div
                 key={c.id}
                 style={{
-                  background: 'var(--card-bg)', border: '1px solid var(--card-border)',
-                  borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px',
+                  background: 'var(--card-bg)', border: 'none',
+                  borderRadius: '8px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px',
                   transition: 'border-color 0.15s',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
@@ -3212,7 +3215,7 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
   const rawTotal = clampedTextScore * textWeight + mlScoreVal * mlWeight + momentumComponent * momWeight
 
   return (
-    <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '16px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Deal Score</div>
@@ -3225,8 +3228,8 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
 
       {/* Main score + bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div style={{ flexShrink: 0, width: '64px', height: '64px', borderRadius: '14px', background: scoreBg, border: `1px solid ${scoreBorder}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: '24px', fontWeight: '800', color: scoreColor, lineHeight: 1 }}>{score}</div>
+        <div style={{ flexShrink: 0, width: '64px', height: '64px', borderRadius: '8px', background: scoreBg, border: `1px solid ${scoreBorder}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ fontSize: '24px', fontWeight: '700', color: scoreColor, lineHeight: 1 }}>{score}</div>
           <div style={{ fontSize: '9px', color: scoreColor, marginTop: '1px' }}>/100</div>
         </div>
         <div style={{ flex: 1 }}>
@@ -3241,18 +3244,18 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
           >
             <div style={{ height: '8px', borderRadius: '4px', display: 'flex', overflow: 'hidden', gap: '1px', background: 'var(--border)' }}>
               {mlContrib != null && (
-                <div style={{ width: `${mlContrib}%`, background: 'var(--accent)', borderRadius: '4px 0 0 4px', transition: 'width 0.5s' }} title={`ML model: ${mlContrib}pts`} />
+                <div style={{ width: `${mlContrib}%`, background: 'var(--accent)', borderRadius: '4px 0 0 4px', transition: 'width 0.1s ease' }} title={`ML model: ${mlContrib}pts`} />
               )}
-              <div style={{ width: `${textContrib}%`, background: 'var(--data-accent)', transition: 'width 0.5s' }} title={`Text signals: ${textContrib}pts`} />
+              <div style={{ width: `${textContrib}%`, background: 'var(--data-accent)', transition: 'width 0.1s ease' }} title={`Text signals: ${textContrib}pts`} />
               {momentumContrib > 0 && (
-                <div style={{ width: `${momentumContrib}%`, background: 'var(--success)', borderRadius: '0 4px 4px 0', transition: 'width 0.5s' }} title={`Momentum: ${momentumContrib}pts`} />
+                <div style={{ width: `${momentumContrib}%`, background: 'var(--success)', borderRadius: '0 4px 4px 0', transition: 'width 0.1s ease' }} title={`Momentum: ${momentumContrib}pts`} />
               )}
             </div>
             <div style={{ display: 'flex', gap: '10px', marginTop: '6px', alignItems: 'center' }}>
               {mlContrib != null && <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-tertiary)' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'var(--accent)', flexShrink: 0 }} />ML {mlContrib}pt</div>}
               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-tertiary)' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'var(--data-accent)', flexShrink: 0 }} />Signals {textContrib}pt</div>
               {momentumContrib > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-tertiary)' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'var(--success)', flexShrink: 0 }} />Momentum {momentumContrib}pt</div>}
-              <ChevronDown size={10} style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', transition: 'transform 150ms', transform: showBreakdown ? 'rotate(180deg)' : 'rotate(0deg)' }} />
+              <ChevronDown size={10} style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', transition: 'transform 0.1s ease', transform: showBreakdown ? 'rotate(180deg)' : 'rotate(0deg)' }} />
             </div>
           </div>
         </div>
@@ -3260,7 +3263,7 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
 
       {/* Score Breakdown Detail (expanded) */}
       {showBreakdown && (
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px', fontFamily: 'monospace', fontSize: '11px', lineHeight: '1.7', color: 'var(--text-secondary)' }}>
+        <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '14px', fontFamily: 'monospace', fontSize: '11px', lineHeight: '1.7', color: 'var(--text-secondary)' }}>
           <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>{score} / 100 — Score breakdown</div>
           <div style={{ borderBottom: '1px solid var(--border)', marginBottom: '6px' }} />
 
@@ -3332,7 +3335,7 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <div style={{ width: '130px', fontSize: '11px', color: 'var(--text-secondary)', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
                   <div style={{ flex: 1, height: '4px', borderRadius: '2px', background: 'var(--border)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${barWidth}%`, background: isPos ? 'var(--success)' : 'var(--danger)', borderRadius: '2px', transition: 'width 0.4s' }} />
+                    <div style={{ height: '100%', width: `${barWidth}%`, background: isPos ? 'var(--success)' : 'var(--danger)', borderRadius: '2px', transition: 'width 0.1s ease' }} />
                   </div>
                   <div style={{ fontSize: '10px', color: isPos ? 'var(--success)' : 'var(--danger)', fontWeight: '600', width: '20px', textAlign: 'right', flexShrink: 0 }}>
                     {isPos ? '↑' : '↓'}
@@ -3359,7 +3362,7 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
           <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Similar Deals</div>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {similarWins.slice(0, 2).map((w: any, i: number) => (
-              <Link key={`w-${i}`} href={`/deals/${w.dealId}`} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'color-mix(in srgb, var(--success) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)', color: 'var(--success)', textDecoration: 'none', transition: 'opacity 150ms' }}
+              <Link key={`w-${i}`} href={`/deals/${w.dealId}`} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'color-mix(in srgb, var(--success) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)', color: 'var(--success)', textDecoration: 'none', transition: 'opacity 0.1s ease' }}
                 onMouseEnter={e => { e.currentTarget.style.opacity = '0.8' }}
                 onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
               >
@@ -3367,7 +3370,7 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
               </Link>
             ))}
             {similarLosses.slice(0, 2).map((l: any, i: number) => (
-              <Link key={`l-${i}`} href={`/deals/${l.dealId}`} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)', color: 'var(--danger)', textDecoration: 'none', transition: 'opacity 150ms' }}
+              <Link key={`l-${i}`} href={`/deals/${l.dealId}`} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)', color: 'var(--danger)', textDecoration: 'none', transition: 'opacity 0.1s ease' }}
                 onMouseEnter={e => { e.currentTarget.style.opacity = '0.8' }}
                 onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
               >
@@ -3410,7 +3413,7 @@ function DealLinksSection({ deal, patchDeal }: { deal: any; patchDeal: (payload:
 
   const inputSt: React.CSSProperties = {
     height: '30px', padding: '0 8px', borderRadius: '6px',
-    background: 'var(--input-bg)', border: '1px solid var(--border)',
+    background: 'var(--input-bg)', border: 'none',
     color: 'var(--text-primary)', fontSize: '12px', outline: 'none', boxSizing: 'border-box',
   }
 
@@ -3442,7 +3445,7 @@ function DealLinksSection({ deal, patchDeal }: { deal: any; patchDeal: (payload:
   }
 
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' }}>
+    <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '12px 14px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: links.length > 0 || adding ? '10px' : '0' }}>
         <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>Links</div>
         {!adding && (
@@ -3539,7 +3542,7 @@ function DealLinksSection({ deal, patchDeal }: { deal: any; patchDeal: (payload:
             </button>
             <button
               onClick={() => { setAdding(false); setNewLabel(''); setNewUrl(''); setNewType('document') }}
-              style={{ height: '28px', padding: '0 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, background: 'transparent', color: 'var(--text-tertiary)', border: '1px solid var(--border)', cursor: 'pointer' }}
+              style={{ height: '28px', padding: '0 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, background: 'transparent', color: 'var(--text-tertiary)', border: 'none', cursor: 'pointer' }}
             >
               Cancel
             </button>
@@ -3644,7 +3647,7 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
         const entries = blocks.filter((b: string) => /^\[/.test(b))
         const legacy = blocks.filter((b: string) => !/^\[/.test(b))
         return (
-          <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '14px' }}>
+          <div style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Clipboard size={13} color="var(--text-tertiary)" />
@@ -3697,7 +3700,7 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
                 if (dealCompetitors.some(c => c.trim() && bodyLower.includes(c.trim().toLowerCase()))) signalBadges.push({ label: 'Competitor', color: '#3B82F6', bg: 'rgba(59,130,246,0.1)' })
 
                 return (
-                  <div key={i} style={{ padding: '9px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px', position: 'relative' }}
+                  <div key={i} style={{ padding: '9px 12px', background: 'var(--surface)', border: 'none', borderRadius: '8px', position: 'relative' }}
                     onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.entry-del') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
                     onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.entry-del') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
                   >
@@ -3718,7 +3721,7 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none' }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                        <ChevronRight size={12} style={{ color: 'var(--text-tertiary)', flexShrink: 0, transition: 'transform 150ms', transform: isShown ? 'rotate(90deg)' : 'rotate(0deg)' }} />
+                        <ChevronRight size={12} style={{ color: 'var(--text-tertiary)', flexShrink: 0, transition: 'transform 0.1s ease', transform: isShown ? 'rotate(90deg)' : 'rotate(0deg)' }} />
                         <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{date}</div>
                         {signalBadges.map((badge, bi) => (
                           <span key={bi} style={{ fontSize: '9px', fontWeight: 600, padding: '1px 5px', borderRadius: '3px', background: badge.bg, color: badge.color }}>{badge.label}</span>
@@ -3755,7 +3758,7 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: '12px', padding: '32px 24px',
-          background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: '14px',
+          background: 'var(--surface)', border: '1px dashed var(--ds-border)', borderRadius: '8px',
           textAlign: 'center',
         }}>
           <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--accent-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -3773,7 +3776,7 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
       <HubSpotActivityBlock deal={deal} dealCompetitors={deal?.competitors ?? []} />
 
       {/* ── Add Update ── */}
-      <div style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px', padding: '14px' }}>
+      <div style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '14px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
           <Sparkles size={13} color="var(--accent)" />
           <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
@@ -3788,7 +3791,7 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
           rows={6}
           style={{
             width: '100%', resize: 'vertical', background: 'var(--input-bg)',
-            border: '1px solid var(--border)', borderRadius: '8px',
+            border: 'none', borderRadius: '8px',
             color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6',
             padding: '12px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
           }}
@@ -3811,7 +3814,7 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
             style={{
               display: 'flex', alignItems: 'center', gap: '6px',
               padding: '7px 12px', borderRadius: '7px',
-              background: 'var(--surface)', border: '1px solid var(--border)',
+              background: 'var(--surface)', border: 'none',
               color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500',
               cursor: updateText.trim() ? 'pointer' : 'not-allowed', opacity: updateText.trim() ? 1 : 0.5,
             }}
@@ -3857,7 +3860,7 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
         const budgetLabel = budgetStatus === 'approved' ? '\u2713 Confirmed' : budgetStatus === 'awaiting' ? '~ Awaiting approval' : budgetStatus === 'blocked' ? '\u26A0 Blocked' : '\u2014 Not discussed'
         const budgetColor = budgetStatus === 'approved' ? 'var(--success)' : budgetStatus === 'blocked' ? 'var(--danger)' : budgetStatus === 'awaiting' ? 'var(--warning)' : 'var(--text-tertiary)'
         return (
-          <div style={{ background: 'color-mix(in srgb, var(--accent) 5%, var(--card-bg))', border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)', borderRadius: '12px', padding: '16px' }}>
+          <div style={{ background: 'color-mix(in srgb, var(--accent) 5%, var(--card-bg))', border: 'none', borderRadius: '8px', padding: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                 <CheckCircle size={14} color="var(--accent)" />
@@ -3928,7 +3931,7 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
               </button>
               <button
                 onClick={() => setLastExtraction(null)}
-                style={{ flex: 1, padding: '8px 14px', borderRadius: '8px', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
+                style={{ flex: 1, padding: '8px 14px', borderRadius: '8px', background: 'var(--surface)', border: 'none', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
               >
                 Dismiss
               </button>
@@ -4023,8 +4026,8 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
       {/* Grow This Account — shown for closed_won deals */}
       {deal.stage === 'closed_won' && (
         <div style={{
-          background: 'var(--card-bg)', border: '1px solid var(--border)',
-          borderRadius: '12px', overflow: 'hidden', backdropFilter: 'blur(20px)',
+          background: 'var(--card-bg)', border: 'none',
+          borderRadius: '8px', overflow: 'hidden', backdropFilter: 'blur(20px)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
             <TrendingUp size={14} color="var(--success)" />
@@ -4083,8 +4086,8 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                         href={`/deals/${ed.id}`}
                         style={{
                           display: 'flex', alignItems: 'center', gap: '10px',
-                          padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)',
-                          borderRadius: '8px', textDecoration: 'none', transition: 'border-color 150ms ease',
+                          padding: '8px 12px', background: 'var(--surface)', border: 'none',
+                          borderRadius: '8px', textDecoration: 'none', transition: 'border-color 0.1s ease',
                         }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)' }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
@@ -4128,7 +4131,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
 
       {/* AI Analysis card — shown first if any AI data exists */}
       {(deal.aiSummary || deal.conversionScore != null || (deal.conversionInsights as string[])?.length > 0 || (deal.dealRisks as string[])?.length > 0) && (
-        <div style={{ background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ background: 'var(--accent-subtle)', border: 'none', borderRadius: '8px', overflow: 'hidden' }}>
           {/* Header row with score */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
             <Sparkles size={14} color="var(--accent)" />
@@ -4157,7 +4160,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                   <span style={{ fontSize: '11px', color: scoreDisplay.color }}>
                     {deal.conversionScore >= 70 ? 'High likelihood' : deal.conversionScore >= 40 ? 'Needs attention' : 'At risk'}
                   </span>
-                  <span style={{ fontSize: '22px', fontWeight: '800', letterSpacing: '-0.04em', color: scoreDisplay.color }}>
+                  <span style={{ fontSize: '22px', fontWeight: '700', letterSpacing: '-0.04em', color: scoreDisplay.color }}>
                     {scoreDisplay.text}
                   </span>
                   <button onClick={() => patchDeal({ conversionScore: null })} title="Clear score" style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}>✕</button>
@@ -4318,7 +4321,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                     <div style={{ fontSize: '11px', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                       Churn Risk
                     </div>
-                    <div style={{ fontSize: '13px', fontWeight: 800, color }}>{risk}%</div>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color }}>{risk}%</div>
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
                     {label}
@@ -4388,7 +4391,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                   <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>What To Do Next</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     {openTodos.slice(0, 5).map((todo: any, i: number) => (
-                      <div key={todo.id ?? i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', padding: '7px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '7px' }}>
+                      <div key={todo.id ?? i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', padding: '7px 10px', background: 'var(--surface)', border: 'none', borderRadius: '7px' }}>
                         <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, marginTop: '5px' }} />
                         <span style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.5, flex: 1 }}>{cleanTodoText(todo.text)}</span>
                       </div>
@@ -4414,19 +4417,19 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                 <div>
                   <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Intent Signals</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
-                    <div style={{ padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                    <div style={{ padding: '8px 10px', background: 'var(--surface)', border: 'none', borderRadius: '8px' }}>
                       <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '3px' }}>Champion</div>
                       <div style={{ fontSize: '12px', fontWeight: 600, color: champColor }}>{champLabel}</div>
                     </div>
-                    <div style={{ padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                    <div style={{ padding: '8px 10px', background: 'var(--surface)', border: 'none', borderRadius: '8px' }}>
                       <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '3px' }}>Budget</div>
                       <div style={{ fontSize: '12px', fontWeight: 600, color: budgetColor }}>{budgetLabel}</div>
                     </div>
-                    <div style={{ padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                    <div style={{ padding: '8px 10px', background: 'var(--surface)', border: 'none', borderRadius: '8px' }}>
                       <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '3px' }}>Decision Timeline</div>
                       <div style={{ fontSize: '12px', color: is.decisionTimeline ? 'var(--text-primary)' : 'var(--text-tertiary)', fontWeight: is.decisionTimeline ? 500 : 400 }}>{is.decisionTimeline ?? '— Not mentioned'}</div>
                     </div>
-                    <div style={{ padding: '8px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                    <div style={{ padding: '8px 10px', background: 'var(--surface)', border: 'none', borderRadius: '8px' }}>
                       <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '3px' }}>Next Meeting</div>
                       <div style={{ fontSize: '12px', fontWeight: 600, color: is.nextMeetingBooked ? 'var(--success)' : 'var(--text-tertiary)' }}>{is.nextMeetingBooked ? '✓ Booked' : '— Not set'}</div>
                     </div>
@@ -4525,7 +4528,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                       const isExpanded = expandedSimilar === sd.id
                       const oc = outcomeLabel(sd)
                       return (
-                        <div key={sd.id} style={{ background: 'var(--surface)', border: `1px solid ${isExpanded ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '8px', transition: 'border-color 150ms ease', overflow: 'hidden' }}>
+                        <div key={sd.id} style={{ background: 'var(--surface)', border: `1px solid ${isExpanded ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '8px', transition: 'border-color 0.1s ease', overflow: 'hidden' }}>
                           {/* Clickable header row */}
                           <div
                             role="button"
@@ -4540,7 +4543,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                             onMouseLeave={e => { if (!isExpanded) e.currentTarget.parentElement!.style.borderColor = 'var(--border)' }}
                           >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
-                              <ChevronRight size={12} style={{ color: 'var(--text-tertiary)', flexShrink: 0, transition: 'transform 150ms', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }} />
+                              <ChevronRight size={12} style={{ color: 'var(--text-tertiary)', flexShrink: 0, transition: 'transform 0.1s ease', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }} />
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                   <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -4759,7 +4762,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
           { label: 'Notes', value: deal.notes, preWrap: true },
           { label: 'Next Steps', value: deal.nextSteps, preWrap: true },
         ].filter(f => f.value).map(({ label, value, preWrap }) => (
-          <div key={label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' }}>
+          <div key={label} style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '12px 14px' }}>
             <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>{label}</div>
             <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '500', lineHeight: 1.5, whiteSpace: preWrap ? 'pre-wrap' : undefined }}>{value}</div>
           </div>
@@ -4767,7 +4770,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
       </div>
 
       {/* Contract dates */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '12px 14px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 auto', minWidth: '200px' }}>
           <label style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, whiteSpace: 'nowrap' }}>Contract Start</label>
           <input
@@ -4779,7 +4782,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
             }}
             style={{
               flex: 1, height: '30px', padding: '0 8px', borderRadius: '6px',
-              background: 'var(--input-bg)', border: '1px solid var(--border)',
+              background: 'var(--input-bg)', border: 'none',
               color: 'var(--text-primary)', fontSize: '12px', outline: 'none',
               boxSizing: 'border-box' as const, fontFamily: 'inherit',
             }}
@@ -4799,7 +4802,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
             }}
             style={{
               flex: 1, height: '30px', padding: '0 8px', borderRadius: '6px',
-              background: 'var(--input-bg)', border: '1px solid var(--border)',
+              background: 'var(--input-bg)', border: 'none',
               color: 'var(--text-primary)', fontSize: '12px', outline: 'none',
               boxSizing: 'border-box' as const, fontFamily: 'inherit',
             }}
@@ -4811,7 +4814,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
 
       {/* Contacts */}
       {Array.isArray(deal.contacts) && deal.contacts.length > 0 && (
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' }}>
+        <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', padding: '12px 14px' }}>
           <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>Contacts</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {(deal.contacts as any[]).map((c: any, i: number) => (
@@ -4848,8 +4851,21 @@ export default function DealDetailPage() {
   const objectionWinMap: any[] = brainRes?.data?.objectionWinMap ?? []
   const objectionConditionalWins: any[] = brainRes?.data?.objectionConditionalWins ?? []
   const globalPrior: any = brainRes?.data?.globalPrior ?? null
-  const { setActiveDeal } = useSidebar()
+  const { setActiveDeal, sendToCopilot: sidebarSendToCopilot } = useSidebar()
+  const searchParams = useSearchParams()
   const workspaceMembers = useWorkspaceMembers()
+
+  // Handle ?ai= query param from calendar Prep buttons
+  useEffect(() => {
+    const aiParam = searchParams.get('ai')
+    if (aiParam) {
+      // Slight delay to let copilot panel mount
+      const t = setTimeout(() => sidebarSendToCopilot(aiParam), 300)
+      // Clean up the URL
+      window.history.replaceState({}, '', `/deals/${id}`)
+      return () => clearTimeout(t)
+    }
+  }, [searchParams, id, sidebarSendToCopilot])
 
   // Fetch parent deal if this is an expansion deal
   const { data: parentDealRes } = useSWR(
@@ -5061,7 +5077,7 @@ export default function DealDetailPage() {
 
       {/* Tab content */}
       {!deal ? (
-        <div style={{ height: '200px', background: 'var(--surface)', borderRadius: '12px' }} />
+        <div style={{ height: '200px', background: 'var(--surface)', borderRadius: '8px' }} />
       ) : (
         <div>
           {activeTab === 'overview' && (

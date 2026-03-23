@@ -160,6 +160,12 @@ function DealCard({
   const scoreBg = score > 0 ? `color-mix(in srgb, ${scColor} 15%, transparent)` : 'rgba(255,255,255,0.05)'
   const [scoreHover, setScoreHover] = useState(false)
 
+  // Hover preview state
+  const [previewVisible, setPreviewVisible] = useState(false)
+  const [previewSide, setPreviewSide] = useState<'right' | 'left'>('right')
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
+
   // Parse score breakdown for tooltip
   const breakdown = (() => {
     try { return deal.score_breakdown ? JSON.parse(deal.score_breakdown) : null }
@@ -176,13 +182,26 @@ function DealCard({
   const isUrgent = !!urgentReason
   const isStale = staleDays != null && staleDays > 0
 
+  // Hover preview data
+  const intentSignals = (deal.intentSignals as any) || {}
+  const championOk = intentSignals.championStatus === 'confirmed'
+  const budgetOk = intentSignals.budgetStatus === 'confirmed' || intentSignals.budgetStatus === 'approved'
+  const stageLabel = allStages?.find(s => s.id === deal.stage)?.label ?? deal.stage
+  const risks: any[] = Array.isArray(deal.dealRisks) ? deal.dealRisks : []
+  const lastNoteDate = deal.updatedAt ? new Date(deal.updatedAt) : null
+  const lastNoteDaysAgo = lastNoteDate ? Math.floor((Date.now() - lastNoteDate.getTime()) / 86_400_000) : null
+
   return (
     <div
+      ref={cardRef}
       draggable
       onDragStart={e => {
         e.dataTransfer.effectAllowed = 'move'
         e.dataTransfer.setData('text/plain', deal.id)
         requestAnimationFrame(() => { onDragStart(deal.id) })
+        // Hide preview on drag
+        if (previewTimer.current) clearTimeout(previewTimer.current)
+        setPreviewVisible(false)
       }}
       onDragEnd={() => { onDragEnd() }}
       onClick={() => { window.location.href = `/deals/${deal.id}` }}
@@ -199,24 +218,37 @@ function DealCard({
         display: 'flex',
         flexDirection: 'column',
         gap: '8px',
+        position: 'relative',
       }}
       onMouseEnter={e => {
         ;(e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow)'
         ;(e.currentTarget as HTMLElement).style.borderColor = isUrgent
           ? 'color-mix(in srgb, var(--danger) 40%, transparent)'
           : 'var(--border-strong)'
+        // Start hover preview timer
+        if (previewTimer.current) clearTimeout(previewTimer.current)
+        previewTimer.current = setTimeout(() => {
+          // Decide side based on viewport position
+          if (cardRef.current) {
+            const rect = cardRef.current.getBoundingClientRect()
+            setPreviewSide(rect.right + 260 > window.innerWidth ? 'left' : 'right')
+          }
+          setPreviewVisible(true)
+        }, 200)
       }}
       onMouseLeave={e => {
         ;(e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-sm)'
         ;(e.currentTarget as HTMLElement).style.borderColor = isUrgent
           ? 'color-mix(in srgb, var(--danger) 30%, var(--card-border))'
           : 'var(--card-border)'
+        if (previewTimer.current) clearTimeout(previewTimer.current)
+        setPreviewVisible(false)
       }}
     >
       {/* Top row: company name + score circle */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div title={deal.prospectCompany} style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div title={deal.prospectCompany} style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {deal.prospectCompany}
           </div>
           {deal.dealName && deal.dealName !== deal.prospectCompany && (
@@ -258,7 +290,7 @@ function DealCard({
                 {/* Progress arc */}
                 <circle cx="17" cy="17" r="14" fill="none" stroke={scColor} strokeWidth="3" strokeLinecap="round"
                   strokeDasharray={`${(score / 100) * 2 * Math.PI * 14} ${2 * Math.PI * 14}`}
-                  transform="rotate(-90 17 17)" style={{ transition: 'stroke-dasharray 0.3s ease' }} />
+                  transform="rotate(-90 17 17)" style={{ transition: 'stroke-dasharray 0.1s ease' }} />
                 {/* Score text */}
                 <text x="17" y="17" textAnchor="middle" dominantBaseline="central"
                   style={{ fontSize: '11px', fontWeight: 700, fill: scColor }}>{score}</text>
@@ -267,7 +299,7 @@ function DealCard({
             {scoreHover && (
               <div style={{
                 position: 'absolute', top: '36px', right: 0, zIndex: 100,
-                background: 'var(--card-bg)', border: '1px solid var(--border)',
+                background: 'var(--card-bg)', border: 'none',
                 borderRadius: '10px', padding: '10px 12px', minWidth: '200px',
                 boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
                 pointerEvents: 'none',
@@ -347,6 +379,56 @@ function DealCard({
           </div>
         )}
       </div>
+
+      {/* Hover preview tooltip */}
+      {previewVisible && (
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            top: 0,
+            [previewSide === 'right' ? 'left' : 'right']: 'calc(100% + 8px)',
+            zIndex: 200,
+            background: 'var(--ds-bg-elevated, var(--card-bg))',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '10px 12px',
+            width: '230px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+            pointerEvents: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+          }}
+        >
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>
+            {deal.prospectCompany}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '11px', fontWeight: 600, color: scColor }}>{score}%</span>
+            <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{stageLabel}</span>
+            {daysInStage != null && daysInStage > 0 && (
+              <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{daysInStage}d in stage</span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '10px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+            <span>Champion: {championOk ? '\u2713' : '\u2014'}</span>
+            <span>Budget: {budgetOk ? '\u2713' : '\u2014'}</span>
+          </div>
+          {lastNoteDate && (
+            <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>
+              Last note: {lastNoteDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+              {lastNoteDaysAgo != null && lastNoteDaysAgo > 0 ? ` (${lastNoteDaysAgo}d ago)` : ' (today)'}
+            </div>
+          )}
+          {risks.length > 0 && (
+            <div style={{ fontSize: '10px', color: 'var(--danger)', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
+              <AlertTriangle size={10} style={{ flexShrink: 0, marginTop: '1px' }} />
+              <span style={{ lineHeight: 1.3 }}>{typeof risks[0] === 'string' ? risks[0] : (risks[0] as any)?.text || (risks[0] as any)?.description || 'Risk identified'}</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -448,7 +530,7 @@ function PipelineSettings({
         style={{
           width: '520px', maxHeight: '80vh', overflowY: 'auto',
           background: 'var(--elevated)', border: '1px solid var(--border-strong)',
-          borderRadius: '16px', padding: '24px',
+          borderRadius: '8px', padding: '24px',
           boxShadow: 'var(--shadow-lg)',
         }}
       >
@@ -484,7 +566,7 @@ function PipelineSettings({
               <div key={s.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px',
-                background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px',
+                background: 'var(--surface)', border: 'none', borderRadius: '8px',
                 opacity: s.isHidden ? 0.4 : 1,
               }}>
                 <button
@@ -543,7 +625,7 @@ function PipelineSettings({
               </div>
               {/* Inline colour picker */}
               {editingColorId === s.id && (
-                <div style={{ display: 'flex', gap: '5px', padding: '6px 12px', background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '5px', padding: '6px 12px', background: 'var(--elevated)', border: 'none', borderRadius: '8px', flexWrap: 'wrap' }}>
                   {PRESET_COLORS.map(c => (
                     <button key={c} onClick={() => updateColor(s.id, c)} style={{
                       width: '22px', height: '22px', borderRadius: '5px', background: c, padding: 0,
@@ -576,7 +658,7 @@ function PipelineSettings({
               value={newLabel}
               onChange={e => setNewLabel(e.target.value)}
               placeholder="Stage name..."
-              style={{ flex: 1, background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: '7px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }}
+              style={{ flex: 1, background: 'var(--input-bg)', border: 'none', borderRadius: '7px', padding: '8px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }}
             />
             <button type="submit" disabled={!newLabel.trim()} style={{
               padding: '8px 16px', background: !newLabel.trim() ? 'var(--surface)' : 'linear-gradient(135deg, var(--accent), var(--accent-hover))',
@@ -643,7 +725,7 @@ function AnimatedBar({ pct, color }: { pct: number; color: string }) {
   }, [pct])
   return (
     <div style={{ height: '6px', borderRadius: '3px', background: 'var(--border)', overflow: 'hidden', flex: 1 }}>
-      <div style={{ height: '100%', width: `${width}%`, background: color, borderRadius: '3px', transition: 'width 500ms ease-out' }} />
+      <div style={{ height: '100%', width: `${width}%`, background: color, borderRadius: '3px', transition: 'width 0.1s ease' }} />
     </div>
   )
 }
@@ -712,7 +794,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
 
   const cardStyle: React.CSSProperties = {
     background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid var(--card-border)', borderRadius: '16px', padding: '18px 20px',
+    border: 'none', borderRadius: '8px', padding: '18px 20px',
     display: 'flex', flexDirection: 'column', gap: '12px',
     transition: 'border-color 0.15s',
   }
@@ -728,7 +810,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
 
       {/* Header */}
       <div>
-        <h1 style={{ fontSize: '22px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '4px' }}>
+        <h1 style={{ fontSize: '20px', fontWeight: '600', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '4px' }}>
           ML Insights
         </h1>
         <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
@@ -752,7 +834,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
               <div style={{
-                fontSize: '42px', fontWeight: '800', lineHeight: 1,
+                fontSize: '42px', fontWeight: '700', lineHeight: 1,
                 color: phiScore >= 70 ? 'var(--success)' : phiScore >= 40 ? 'var(--warning)' : 'var(--danger)',
               }}>
                 <AnimatedNumber target={phiScore} />
@@ -789,13 +871,13 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
             <div style={labelStyle}>Win / Loss Record</div>
             <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-end' }}>
               <div>
-                <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--success)', lineHeight: 1 }}>{wl.winCount ?? 0}W</div>
+                <div style={{ fontSize: '32px', fontWeight: '700', color: 'var(--success)', lineHeight: 1 }}>{wl.winCount ?? 0}W</div>
                 {wl.avgWonValue ? (
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>avg {fmtCurrency(wl.avgWonValue)}</div>
                 ) : null}
               </div>
               <div>
-                <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--danger)', lineHeight: 1 }}>{wl.lossCount ?? 0}L</div>
+                <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--danger)', lineHeight: 1 }}>{wl.lossCount ?? 0}L</div>
               </div>
             </div>
             {wl.winRate != null && (
@@ -828,7 +910,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
             <div style={labelStyle}>ML Model</div>
             {ml.looAccuracy != null && (
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
-                <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--accent)', lineHeight: 1 }}>
+                <div style={{ fontSize: '32px', fontWeight: '700', color: 'var(--accent)', lineHeight: 1 }}>
                   <AnimatedNumber target={Math.round(ml.looAccuracy * 100)} />%
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', paddingBottom: '4px' }}>accuracy</div>
@@ -921,7 +1003,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
               <>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {rows.map((r: any) => (
-                    <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                    <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 10px', background: 'var(--surface)', borderRadius: '8px', border: 'none' }}>
                       <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: r.color, flexShrink: 0 }} />
                       <div style={{ flex: 1, fontSize: '12px', fontWeight: '500', color: 'var(--text-primary)' }}>{r.label}</div>
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{r.count} deal{r.count !== 1 ? 's' : ''}</div>
@@ -963,7 +1045,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
                 const wr = o.winRateWithTheme ?? 0
                 const wrColor = wr >= 60 ? '#059669' : wr >= 40 ? '#D97706' : '#DC2626'
                 return (
-                  <div key={i} style={{ padding: '8px 10px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <div key={i} style={{ padding: '8px 10px', background: 'var(--surface)', borderRadius: '8px', border: 'none' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                       <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', flex: 1 }}>{o.theme}</div>
                       <div style={{ fontSize: '11px', fontWeight: '700', color: wrColor, flexShrink: 0 }}>{wr}% win rate</div>
@@ -1005,12 +1087,12 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
                 const wins = p.wins != null ? p.wins : Math.round((p.totalDeals ?? 0) * (wr / 100))
                 const losses = p.losses != null ? p.losses : (p.totalDeals ?? 0) - wins
                 return (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 10px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 10px', background: 'var(--surface)', borderRadius: '8px', border: 'none' }}>
                     <div style={{ flex: 1, fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{p.competitor}</div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{wins}W {losses}L</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <div style={{ width: '50px', height: '5px', borderRadius: '3px', background: 'var(--border)', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${wr}%`, background: wrColor, borderRadius: '3px', transition: 'width 500ms ease-out' }} />
+                        <div style={{ height: '100%', width: `${wr}%`, background: wrColor, borderRadius: '3px', transition: 'width 0.1s ease' }} />
                       </div>
                       <div style={{ fontSize: '11px', fontWeight: '700', color: wrColor, width: '32px', textAlign: 'right' }}>{wr}%</div>
                     </div>
@@ -1043,7 +1125,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
             <>
               <div>
                 <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Weighted forecast</div>
-                <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }}>
+                <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1 }}>
                   {currencySymbol}<AnimatedNumber target={Math.round(weightedForecast)} format={true} />
                 </div>
               </div>
@@ -1093,7 +1175,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
             {scoreTrends.map((t: any, i: number) => {
               const isDown = t.trend === 'declining' || (t.delta ?? 0) < 0
               return (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 12px', background: 'var(--surface)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 12px', background: 'var(--surface)', borderRadius: '8px', border: 'none' }}>
                   {isDown ? <TrendingDown size={13} style={{ color: 'var(--danger)', flexShrink: 0 }} /> : <TrendingUp size={13} style={{ color: 'var(--success)', flexShrink: 0 }} />}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{t.company ?? t.dealName}</div>
@@ -1153,7 +1235,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px' }}>
             {archetypes.slice(0, 6).map((a: any, i: number) => (
-              <div key={i} style={{ padding: '12px 14px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+              <div key={i} style={{ padding: '12px 14px', background: 'var(--surface)', borderRadius: '10px', border: 'none' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <div style={{ flexShrink: 0, width: '22px', height: '22px', borderRadius: '6px', background: 'var(--accent-subtle)', border: '1px solid var(--border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--accent)' }}>{i + 1}</div>
                   <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>{a.label ?? a.name ?? `Archetype ${i + 1}`}</div>
@@ -1493,7 +1575,7 @@ export default function PipelinePage() {
     cursor: 'pointer', border: 'none', outline: 'none',
     background: active ? 'var(--accent)' : 'var(--surface)',
     color: active ? '#fff' : 'var(--text-secondary)',
-    ...(active ? {} : { border: '1px solid var(--border)' }),
+    ...(active ? {} : { border: 'none' }),
     transition: 'background 0.15s, color 0.15s',
   })
 
@@ -1519,7 +1601,7 @@ export default function PipelinePage() {
               display: 'flex', alignItems: 'center', gap: '6px',
               padding: '8px 14px',
               background: 'var(--surface)',
-              border: '1px solid var(--border)',
+              border: 'none',
               borderRadius: '9px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', cursor: 'pointer',
             }}
           >
@@ -1542,7 +1624,7 @@ export default function PipelinePage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Header */}
           <div>
-            <h1 style={{ fontSize: '22px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '4px' }}>
+            <h1 style={{ fontSize: '20px', fontWeight: '600', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '4px' }}>
               Sales Pipeline
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'nowrap' }}>
@@ -1555,7 +1637,7 @@ export default function PipelinePage() {
                 onChange={e => handleBoardSort(e.target.value)}
                 style={{
                   fontSize: '11px', padding: '4px 8px', background: 'var(--surface)',
-                  border: '1px solid var(--border)', borderRadius: '6px',
+                  border: 'none', borderRadius: '6px',
                   color: 'var(--text-secondary)', cursor: 'pointer', outline: 'none',
                   fontFamily: 'inherit', flexShrink: 0,
                 }}
@@ -1607,7 +1689,7 @@ export default function PipelinePage() {
                 onChange={e => setMobileStageIdx(Number(e.target.value))}
                 style={{
                   width: '100%', padding: '12px 14px', fontSize: '14px', fontWeight: 700,
-                  background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px',
+                  background: 'var(--surface)', border: 'none', borderRadius: '10px',
                   color: 'var(--text-primary)', cursor: 'pointer', outline: 'none',
                   fontFamily: 'inherit', appearance: 'none',
                   backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 12 12%27%3E%3Cpath d=%27M3 5l3 3 3-3%27 stroke=%27%23999%27 stroke-width=%271.5%27 fill=%27none%27/%3E%3C/svg%3E")',
@@ -1710,7 +1792,7 @@ export default function PipelinePage() {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>{stage.label}</span>
-                        <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)', background: 'var(--surface)', border: '1px solid var(--border)', padding: '1px 6px', borderRadius: '100px' }}>{stageDeals.length}</span>
+                        <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)', background: 'var(--surface)', border: 'none', padding: '1px 6px', borderRadius: '100px' }}>{stageDeals.length}</span>
                       </div>
                       {stageValue > 0 && (
                         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '3px' }}>
@@ -1721,7 +1803,7 @@ export default function PipelinePage() {
 
                     {/* Cards */}
                     {isLoading ? (
-                      <div style={{ height: '80px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ height: '80px', background: 'var(--surface)', borderRadius: '10px', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Loading...</div>
                       </div>
                     ) : stageDeals.length === 0 ? (
@@ -1823,7 +1905,7 @@ export default function PipelinePage() {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>{stage.label}</span>
-                        <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)', background: 'var(--surface)', border: '1px solid var(--border)', padding: '1px 6px', borderRadius: '100px' }}>{stageDeals.length}</span>
+                        <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)', background: 'var(--surface)', border: 'none', padding: '1px 6px', borderRadius: '100px' }}>{stageDeals.length}</span>
                       </div>
                       {stageValue > 0 && (
                         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '3px' }}>

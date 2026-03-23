@@ -750,7 +750,7 @@ export default function CopilotPanel() {
                   resize: 'none',
                   background: 'var(--bg-secondary)',
                   border: '1px solid rgba(99,102,241,0.15)',
-                  borderRadius: '12px',
+                  borderRadius: '8px',
                   color: 'var(--text-primary)',
                   fontSize: '13.5px',
                   lineHeight: '1.5',

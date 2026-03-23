@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { FileText, Download, Eye, Trash2, RefreshCw, RotateCcw } from 'lucide-react'
+import { FileText, Download, Eye, Trash2, RefreshCw, RotateCcw, Target } from 'lucide-react'
 import { CollateralTypeBadge } from './CollateralTypeBadge'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -14,6 +14,8 @@ interface CollateralGridProps {
   onExport?: (id: string) => void
   onDelete?: (id: string) => void
   onRegenerate?: (id: string) => void
+  /** Map from dealLogId to deal display name, used to show linked deal */
+  dealNameMap?: Record<string, string>
 }
 
 function formatDate(d: Date | string | null) {
@@ -35,11 +37,13 @@ function CollateralCard({
   onExport,
   onDelete,
   onRegenerate,
+  dealName,
 }: {
   item: Collateral
   onExport?: (id: string) => void
   onDelete?: (id: string) => void
   onRegenerate?: (id: string) => void
+  dealName?: string
 }) {
   const [confirming, setConfirming] = useState(false)
 
@@ -50,7 +54,7 @@ function CollateralCard({
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
         border: '1px solid rgba(255,255,255,0.07)',
-        borderRadius: '12px',
+        borderRadius: '8px',
         padding: '16px',
         display: 'flex',
         flexDirection: 'column',
@@ -80,6 +84,30 @@ function CollateralCard({
         >
           {item.title}
         </h3>
+        {dealName && (
+          <Link
+            href={`/deals/${item.sourceDealLogId}`}
+            onClick={e => e.stopPropagation()}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '3px',
+              fontSize: '10px', fontWeight: 600,
+              color: 'var(--accent, #6366F1)',
+              background: 'rgba(99,102,241,0.08)',
+              border: '1px solid rgba(99,102,241,0.18)',
+              borderRadius: '4px',
+              padding: '1px 6px',
+              textDecoration: 'none',
+              marginTop: '3px',
+              maxWidth: '100%',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <Target size={8} style={{ flexShrink: 0 }} />
+            {dealName}
+          </Link>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
           <p style={{ fontSize: '12px', color: '#555', margin: 0, fontVariantNumeric: 'tabular-nums' }}>
             Generated {formatDate(item.generatedAt)}
@@ -284,7 +312,7 @@ function CollateralCard({
   )
 }
 
-export function CollateralGrid({ collateral, onGenerate, onExport, onDelete, onRegenerate }: CollateralGridProps) {
+export function CollateralGrid({ collateral, onGenerate, onExport, onDelete, onRegenerate, dealNameMap }: CollateralGridProps) {
   if (collateral.length === 0) {
     return (
       <EmptyState
@@ -305,7 +333,14 @@ export function CollateralGrid({ collateral, onGenerate, onExport, onDelete, onR
       }}
     >
       {collateral.map((item) => (
-        <CollateralCard key={item.id} item={item} onExport={onExport} onDelete={onDelete} onRegenerate={onRegenerate} />
+        <CollateralCard
+          key={item.id}
+          item={item}
+          onExport={onExport}
+          onDelete={onDelete}
+          onRegenerate={onRegenerate}
+          dealName={item.sourceDealLogId && dealNameMap ? dealNameMap[item.sourceDealLogId] : undefined}
+        />
       ))}
     </div>
   )

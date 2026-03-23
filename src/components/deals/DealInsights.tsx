@@ -103,7 +103,7 @@ export function DealInsights({ deals, currencySymbol = '£' }: DealInsightsProps
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* MRR / ARR projection */}
       {recurringWon.length > 0 && (
-        <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', overflow: 'hidden' }}>
           <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB' }}>Revenue projection</span>
           </div>
@@ -124,7 +124,7 @@ export function DealInsights({ deals, currencySymbol = '£' }: DealInsightsProps
       )}
 
       {/* Win rate gauge */}
-      <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflow: 'hidden' }}>
+      <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', overflow: 'hidden' }}>
         <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <span style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB' }}>Win rate</span>
         </div>
@@ -150,7 +150,7 @@ export function DealInsights({ deals, currencySymbol = '£' }: DealInsightsProps
       </div>
 
       {/* Top loss reasons */}
-      <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflow: 'hidden' }}>
+      <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', overflow: 'hidden' }}>
         <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <span style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB' }}>Top loss reasons</span>
         </div>
@@ -175,7 +175,7 @@ export function DealInsights({ deals, currencySymbol = '£' }: DealInsightsProps
       </div>
 
       {/* Win rate by competitor */}
-      <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '12px', overflow: 'hidden' }}>
+      <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', overflow: 'hidden' }}>
         <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <span style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB' }}>Win rate vs competitors</span>
         </div>

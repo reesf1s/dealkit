@@ -179,7 +179,7 @@ export default function CollateralDetailPage() {
             <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
               <button
                 onClick={handleRegenerate}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', backgroundColor: 'var(--surface-hover)', border: '1px solid var(--surface-hover)', cursor: 'pointer', transition: 'background-color 150ms ease' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', backgroundColor: 'var(--surface-hover)', border: '1px solid var(--surface-hover)', cursor: 'pointer', transition: 'background-color 0.1s ease' }}
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--border-strong)' }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface-hover)' }}
               >
@@ -192,7 +192,7 @@ export default function CollateralDetailPage() {
                 disabled={deleting}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px',
-                  fontSize: '13px', fontWeight: 500, cursor: deleting ? 'not-allowed' : 'pointer', transition: 'all 150ms ease',
+                  fontSize: '13px', fontWeight: 500, cursor: deleting ? 'not-allowed' : 'pointer', transition: 'all 0.1s ease',
                   color: deleteConfirm ? '#fff' : 'var(--danger)',
                   backgroundColor: deleteConfirm ? 'var(--danger)' : 'rgba(239,68,68,0.08)',
                   border: deleteConfirm ? '1px solid var(--danger)' : '1px solid rgba(239,68,68,0.25)',
@@ -210,7 +210,7 @@ export default function CollateralDetailPage() {
                 <button
                   onClick={handleShare}
                   disabled={shareLoading}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, color: item.isShared ? 'var(--accent)' : 'var(--text-primary)', backgroundColor: item.isShared ? 'var(--accent-subtle)' : 'var(--surface-hover)', border: item.isShared ? '1px solid rgba(99,102,241,0.3)' : '1px solid var(--surface-hover)', cursor: shareLoading ? 'not-allowed' : 'pointer', opacity: shareLoading ? 0.6 : 1, transition: 'background-color 150ms ease' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, color: item.isShared ? 'var(--accent)' : 'var(--text-primary)', backgroundColor: item.isShared ? 'var(--accent-subtle)' : 'var(--surface-hover)', border: item.isShared ? '1px solid rgba(99,102,241,0.3)' : '1px solid var(--surface-hover)', cursor: shareLoading ? 'not-allowed' : 'pointer', opacity: shareLoading ? 0.6 : 1, transition: 'background-color 0.1s ease' }}
                   onMouseEnter={(e) => { if (!shareLoading) e.currentTarget.style.backgroundColor = item.isShared ? 'rgba(99,102,241,0.2)' : 'var(--border-strong)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = item.isShared ? 'var(--accent-subtle)' : 'var(--surface-hover)' }}
                 >
@@ -232,7 +232,7 @@ export default function CollateralDetailPage() {
                       </code>
                       <button
                         onClick={handleCopyLink}
-                        style={{ display: 'flex', alignItems: 'center', gap: '4px', height: '32px', padding: '0 10px', borderRadius: '5px', fontSize: '12px', fontWeight: 600, color: copied ? 'var(--success)' : 'var(--text-primary)', backgroundColor: copied ? 'rgba(34,197,94,0.1)' : 'var(--surface-hover)', border: '1px solid var(--surface-hover)', cursor: 'pointer', flexShrink: 0, transition: 'background-color 150ms ease' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', height: '32px', padding: '0 10px', borderRadius: '5px', fontSize: '12px', fontWeight: 600, color: copied ? 'var(--success)' : 'var(--text-primary)', backgroundColor: copied ? 'rgba(34,197,94,0.1)' : 'var(--surface-hover)', border: '1px solid var(--surface-hover)', cursor: 'pointer', flexShrink: 0, transition: 'background-color 0.1s ease' }}
                       >
                         {copied ? <Check size={11} strokeWidth={2} /> : <Copy size={11} strokeWidth={2} />}
                         {copied ? 'Copied' : 'Copy'}
@@ -255,7 +255,7 @@ export default function CollateralDetailPage() {
                   href={`/api/collateral/${id}/export`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: 'var(--accent)', textDecoration: 'none', transition: 'background-color 150ms ease' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: 'var(--accent)', textDecoration: 'none', transition: 'background-color 0.1s ease' }}
                   onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--accent-hover)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--accent)' }}
                 >

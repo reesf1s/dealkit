@@ -29,7 +29,7 @@ export function UpgradeBanner({ message, plan = 'starter', dismissKey }: Props) 
       padding: '12px 16px',
       background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(99,102,241,0.08))',
       border: '1px solid rgba(124,58,237,0.25)',
-      borderRadius: '12px', marginBottom: '16px',
+      borderRadius: '8px', marginBottom: '16px',
     }}>
       <div style={{
         width: '30px', height: '30px', borderRadius: '8px',

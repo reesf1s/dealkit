@@ -72,7 +72,7 @@ export default function DealsPage() {
             <div style={{ width: '32px', height: '32px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <ClipboardList size={15} color="var(--accent)" />
             </div>
-            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>
+            <h1 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>
               Deal Log
             </h1>
           </div>
@@ -93,7 +93,7 @@ export default function DealsPage() {
             border: '1px solid rgba(99,102,241,0.4)',
             cursor: 'pointer',
             boxShadow: 'var(--shadow)',
-            transition: 'opacity 150ms ease, box-shadow 150ms ease',
+            transition: 'opacity 0.1s ease',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.opacity = '0.9'
@@ -149,7 +149,7 @@ export default function DealsPage() {
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
             border: '1px solid var(--border-strong)',
-            borderRadius: '16px', padding: '24px',
+            borderRadius: '8px', padding: '24px',
             boxShadow: 'var(--shadow-lg)',
             outline: 'none',
           }}>

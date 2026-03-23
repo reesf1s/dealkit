@@ -37,7 +37,7 @@ function AnimatedBar({ pct, color = 'var(--accent)', height = 6 }: { pct: number
   }, [pct])
   return (
     <div style={{ width: '100%', height, borderRadius: 100, background: 'var(--border)', overflow: 'hidden' }}>
-      <div style={{ height: '100%', width: `${width}%`, background: color, borderRadius: 100, transition: 'width 500ms ease-out' }} />
+      <div style={{ height: '100%', width: `${width}%`, background: color, borderRadius: 100, transition: 'width 0.1s ease' }} />
     </div>
   )
 }
@@ -64,7 +64,7 @@ function Section({
         <div style={{ color: 'var(--accent)' }}>{icon}</div>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <h2 style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>{title}</h2>
+            <h2 style={{ fontSize: '17px', fontWeight: '600', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>{title}</h2>
             {tooltip && (
               <Tooltip text={tooltip}>
                 <span style={{ cursor: 'help', color: 'var(--text-tertiary)' }}>
@@ -94,15 +94,15 @@ function FactorRow({ rank, label, value, direction, detail, importance }: {
   const lineColor = direction === 'positive' ? 'var(--success)' : direction === 'negative' ? 'var(--danger)' : 'var(--text-secondary)'
   const barColor = direction === 'positive' ? 'var(--success)' : direction === 'negative' ? 'var(--danger)' : 'var(--text-secondary)'
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' }}>
-      <div style={{ flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', background: `color-mix(in srgb, ${rankColor} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${rankColor} 25%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '700', color: rankColor }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', background: 'var(--surface)', border: 'none', borderRadius: '10px' }}>
+      <div style={{ flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', background: `color-mix(in srgb, ${rankColor} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${rankColor} 25%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '600', color: rankColor }}>
         {rank}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
           <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{label}</div>
           {value != null && (
-            <span style={{ fontSize: '11px', fontWeight: '700', color: lineColor, background: `color-mix(in srgb, ${lineColor} 10%, transparent)`, padding: '2px 7px', borderRadius: '100px' }}>
+            <span style={{ fontSize: '11px', fontWeight: '600', color: lineColor, background: `color-mix(in srgb, ${lineColor} 10%, transparent)`, padding: '2px 7px', borderRadius: '100px' }}>
               {typeof value === 'number' ? `${value}%` : value}
             </span>
           )}
@@ -129,8 +129,8 @@ function LockedCard({ title, description, unlockText, iconColor, bgTint }: {
   return (
     <div style={{
       padding: '20px',
-      borderRadius: '12px',
-      border: '1px solid var(--border)',
+      borderRadius: '8px',
+      border: 'none',
       background: bgTint,
       display: 'flex',
       flexDirection: 'column',
@@ -139,7 +139,7 @@ function LockedCard({ title, description, unlockText, iconColor, bgTint }: {
       overflow: 'hidden',
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-        <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-primary)' }}>{title}</div>
+        <div style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-primary)' }}>{title}</div>
         <Lock size={15} style={{ color: iconColor, flexShrink: 0, marginTop: '1px', opacity: 0.7 }} />
       </div>
       <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{description}</div>
@@ -156,7 +156,7 @@ function LockedCard({ title, description, unlockText, iconColor, bgTint }: {
 function Skeleton() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ height: '80px', borderRadius: '12px', background: 'var(--skeleton-from)', animation: 'pulse 1.5s ease-in-out infinite' }} />
+      <div style={{ height: '80px', borderRadius: '8px', background: 'var(--skeleton-from)', animation: 'pulse 1.5s ease-in-out infinite' }} />
       {[1, 2, 3].map(i => (
         <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div style={{ height: '20px', width: '40%', borderRadius: '6px', background: 'var(--skeleton-from)', animation: 'pulse 1.5s ease-in-out infinite' }} />
@@ -191,11 +191,11 @@ function EmptyState({ totalDeals, winCount, lossCount, recentDeals }: { totalDea
       {/* Header */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 25%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'color-mix(in srgb, var(--accent) 12%, transparent)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <BookOpen size={20} style={{ color: 'var(--accent)' }} />
           </div>
           <div>
-            <h1 style={{ fontSize: '28px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-primary)', lineHeight: 1.1 }} className="text-display">
+            <h1 style={{ fontSize: '28px', fontWeight: '600', letterSpacing: '-0.03em', color: 'var(--text-primary)', lineHeight: 1.1 }} className="text-display">
               Your Win Playbook
             </h1>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '2px' }}>
@@ -205,10 +205,10 @@ function EmptyState({ totalDeals, winCount, lossCount, recentDeals }: { totalDea
         </div>
 
         {/* Progress bar */}
-        <div style={{ padding: '20px', borderRadius: '12px', background: 'var(--card-bg)', border: '1px solid var(--card-border)' }}>
+        <div style={{ padding: '20px', borderRadius: '8px', background: 'var(--card-bg)', border: 'none' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Building your playbook...</span>
-            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--accent)' }} className="font-mono">{totalDeals} / 10</span>
+            <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--accent)' }} className="font-mono">{totalDeals} / 10</span>
           </div>
           <ProgressBar current={totalDeals} total={10} />
           {hasFirstDeal ? (
@@ -231,7 +231,7 @@ function EmptyState({ totalDeals, winCount, lossCount, recentDeals }: { totalDea
 
       {/* What's coming */}
       <div>
-        <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>
+        <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '16px' }}>
           WHAT YOUR PLAYBOOK WILL CONTAIN:
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
@@ -281,7 +281,7 @@ function EmptyState({ totalDeals, winCount, lossCount, recentDeals }: { totalDea
       </div>
 
       {/* Encouragement */}
-      <div style={{ padding: '20px', borderRadius: '12px', background: 'color-mix(in srgb, var(--accent) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 15%, transparent)' }}>
+      <div style={{ padding: '20px', borderRadius: '8px', background: 'color-mix(in srgb, var(--accent) 5%, transparent)', border: 'none' }}>
         <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '16px' }}>
           Every deal you close — won or lost — makes your playbook more accurate. The fastest way to build it: paste meeting notes for your existing deals, then mark them as won or lost.
         </p>
@@ -347,11 +347,11 @@ export default function PlaybookPage() {
       {/* ── Header ── */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'color-mix(in srgb, var(--success) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'color-mix(in srgb, var(--success) 12%, transparent)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <BookOpen size={20} style={{ color: 'var(--success)' }} />
           </div>
           <div>
-            <h1 style={{ fontSize: '28px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-primary)', lineHeight: 1.1 }} className="text-display">
+            <h1 style={{ fontSize: '28px', fontWeight: '600', letterSpacing: '-0.03em', color: 'var(--text-primary)', lineHeight: 1.1 }} className="text-display">
               Win Playbook
             </h1>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '2px' }}>
@@ -369,8 +369,8 @@ export default function PlaybookPage() {
           { label: 'Avg won value', value: wl?.avgWonValue ? formatCurrency(Math.round(wl.avgWonValue)) : '—', color: 'var(--accent)' },
           { label: 'Closed deals', value: String(totalDeals), color: 'var(--text-secondary)' },
         ].map(s => (
-          <div key={s.label} style={{ padding: '12px 16px', background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '10px', minWidth: '110px' }}>
-            <div style={{ fontSize: '20px', fontWeight: '700', color: s.color, lineHeight: 1 }} className="font-mono">{s.value}</div>
+          <div key={s.label} style={{ padding: '12px 16px', background: 'var(--card-bg)', border: 'none', borderRadius: '10px', minWidth: '110px' }}>
+            <div style={{ fontSize: '20px', fontWeight: '600', color: s.color, lineHeight: 1 }} className="font-mono">{s.value}</div>
             <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</div>
           </div>
         ))}
@@ -458,12 +458,12 @@ export default function PlaybookPage() {
               const winConditions: string[] = p.winConditions ?? (p.topWinCondition ? [p.topWinCondition] : [])
               const lossConditions: string[] = p.lossConditions ?? (p.topLossRisk ? [p.topLossRisk] : [])
               return (
-                <div key={i} style={{ padding: '16px', background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px' }}>
+                <div key={i} style={{ padding: '16px', background: 'var(--card-bg)', border: 'none', borderRadius: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>vs {p.competitor}</div>
+                    <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)' }}>vs {p.competitor}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>{p.totalDeals} deals</div>
-                      <div style={{ fontSize: '22px', fontWeight: '800', color: winColor }} className="font-mono">{p.winRate}%</div>
+                      <div style={{ fontSize: '22px', fontWeight: '700', color: winColor }} className="font-mono">{p.winRate}%</div>
                     </div>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -506,7 +506,7 @@ export default function PlaybookPage() {
             </div>
           </div>
         ) : (
-          <div style={{ padding: '20px', textAlign: 'center', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+          <div style={{ padding: '20px', textAlign: 'center', background: 'var(--surface)', border: 'none', borderRadius: '10px' }}>
             <Target size={24} style={{ color: 'var(--text-tertiary)', margin: '0 auto 8px', display: 'block' }} />
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
               Mention competitors in your meeting notes to start tracking. E.g. "We&apos;re competing against Salesforce on this one."
@@ -523,7 +523,7 @@ export default function PlaybookPage() {
         tooltip="Win rate shows how often you close deals when this objection arises. Champion lift shows the extra win rate boost from having an internal champion when facing this objection."
       >
         {objectionMap.length > 0 ? (
-          <div style={{ borderRadius: '10px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+          <div style={{ borderRadius: '10px', border: 'none', overflow: 'hidden' }}>
             {/* Table header */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 90px', gap: '0', padding: '8px 14px', background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
               <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Objection theme</div>
@@ -545,7 +545,7 @@ export default function PlaybookPage() {
                   <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 80px 90px', gap: '0', padding: '10px 14px', borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none', alignItems: 'center' }}>
                     <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '500' }}>{String(o.theme ?? o.risk ?? o.objection ?? `Objection ${i + 1}`)}</div>
                     <div style={{ fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'right' }} className="font-mono">{freq} deals</div>
-                    <div style={{ fontSize: '14px', fontWeight: '700', color: winColor, textAlign: 'right' }} className="font-mono">{winRate}%</div>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: winColor, textAlign: 'right' }} className="font-mono">{winRate}%</div>
                     <div style={{ fontSize: '13px', color: champLift != null ? (champLift > 0 ? 'var(--success)' : 'var(--text-tertiary)') : 'var(--text-tertiary)', textAlign: 'right', fontWeight: champLift != null && champLift > 0 ? '700' : '400' }} className="font-mono">
                       {champLift != null ? `+${Math.round(champLift)}%` : '—'}
                     </div>
@@ -554,7 +554,7 @@ export default function PlaybookPage() {
               })}
           </div>
         ) : (
-          <div style={{ padding: '20px', textAlign: 'center', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+          <div style={{ padding: '20px', textAlign: 'center', background: 'var(--surface)', border: 'none', borderRadius: '10px' }}>
             <Shield size={24} style={{ color: 'var(--text-tertiary)', margin: '0 auto 8px', display: 'block' }} />
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
               No objection data yet. Risk themes extracted from your meeting notes will appear here once enough deals are closed.
@@ -575,13 +575,13 @@ export default function PlaybookPage() {
             {archetypes.sort((a: any, b: any) => b.winRate - a.winRate).map((a: any, i: number) => {
               const winColor = a.winRate >= 60 ? 'var(--success)' : a.winRate >= 40 ? 'var(--warning)' : 'var(--danger)'
               return (
-                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '14px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '14px 16px', background: 'var(--surface)', border: 'none', borderRadius: '10px' }}>
                   <div style={{ flexShrink: 0, width: '48px', height: '48px', borderRadius: '10px', background: `color-mix(in srgb, ${winColor} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${winColor} 20%, transparent)`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ fontSize: '16px', fontWeight: '800', color: winColor, lineHeight: 1 }} className="font-mono">{a.winRate}%</div>
+                    <div style={{ fontSize: '16px', fontWeight: '700', color: winColor, lineHeight: 1 }} className="font-mono">{a.winRate}%</div>
                     <div style={{ fontSize: '9px', color: winColor, marginTop: '1px' }}>win</div>
                   </div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>{a.label}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '4px' }}>{a.label}</div>
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{String(a.winningCharacteristic)}</div>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                       <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--border)', padding: '2px 7px', borderRadius: '4px' }}>{a.dealCount} closed deals</span>
@@ -603,7 +603,7 @@ export default function PlaybookPage() {
           subtitle="Stage-by-stage timing benchmarks derived from your won deals"
           tooltip="Based on your historical wins, these are the pacing benchmarks for each stage. Deals that move faster than the benchmark have higher win rates."
         >
-          <div style={{ padding: '16px 20px', background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px' }}>
+          <div style={{ padding: '16px 20px', background: 'var(--card-bg)', border: 'none', borderRadius: '8px' }}>
             {stageVel && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {mlTrends?.dealVelocity && (
@@ -612,7 +612,7 @@ export default function PlaybookPage() {
                       <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Median days to close</div>
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>Based on your win history</div>
                     </div>
-                    <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--data-accent)' }} className="font-mono">
+                    <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--data-accent)' }} className="font-mono">
                       {Math.round(stageVel.medianDaysToClose ?? mlTrends.dealVelocity.recentAvgDays)} days
                     </div>
                   </div>
@@ -625,7 +625,7 @@ export default function PlaybookPage() {
                       const isOver = s.currentAgeDays > s.p75GapDays
                       const statusColor = isOver ? 'var(--warning)' : 'var(--success)'
                       return (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 12px', background: 'var(--surface)', border: 'none', borderRadius: '8px' }}>
                           <ChevronRight size={12} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
                           <div style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)', fontWeight: '500' }}>{s.stage}</div>
                           <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -669,13 +669,13 @@ export default function PlaybookPage() {
         {(highScoreWinRate != null || latestCalibration != null) ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {highScoreWinRate != null && (
-              <div style={{ padding: '16px 20px', background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '12px' }}>
+              <div style={{ padding: '16px 20px', background: 'var(--card-bg)', border: 'none', borderRadius: '8px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <div>
                     <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Deals scored 70%+ that actually closed</div>
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>High-confidence prediction accuracy</div>
                   </div>
-                  <div style={{ fontSize: '28px', fontWeight: '800', color: highScoreWinRate >= 60 ? 'var(--success)' : highScoreWinRate >= 40 ? 'var(--warning)' : 'var(--danger)' }} className="font-mono">
+                  <div style={{ fontSize: '28px', fontWeight: '700', color: highScoreWinRate >= 60 ? 'var(--success)' : highScoreWinRate >= 40 ? 'var(--warning)' : 'var(--danger)' }} className="font-mono">
                     {Math.round(highScoreWinRate)}%
                   </div>
                 </div>
@@ -687,19 +687,19 @@ export default function PlaybookPage() {
                 {wl.scoreCalibration.avgScoreOnWins != null && (
                   <div style={{ padding: '12px 14px', background: 'color-mix(in srgb, var(--success) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 15%, transparent)', borderRadius: '10px' }}>
                     <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Avg score on wins</div>
-                    <div style={{ fontSize: '22px', fontWeight: '800', color: 'var(--success)' }} className="font-mono">{Math.round(wl.scoreCalibration.avgScoreOnWins)}%</div>
+                    <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--success)' }} className="font-mono">{Math.round(wl.scoreCalibration.avgScoreOnWins)}%</div>
                   </div>
                 )}
                 {wl.scoreCalibration.avgScoreOnLosses != null && (
                   <div style={{ padding: '12px 14px', background: 'color-mix(in srgb, var(--danger) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 15%, transparent)', borderRadius: '10px' }}>
                     <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Avg score on losses</div>
-                    <div style={{ fontSize: '22px', fontWeight: '800', color: 'var(--danger)' }} className="font-mono">{Math.round(wl.scoreCalibration.avgScoreOnLosses)}%</div>
+                    <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--danger)' }} className="font-mono">{Math.round(wl.scoreCalibration.avgScoreOnLosses)}%</div>
                   </div>
                 )}
               </div>
             )}
             {calibrationTimeline.length > 0 && (
-              <div style={{ padding: '14px 16px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+              <div style={{ padding: '14px 16px', background: 'var(--surface)', border: 'none', borderRadius: '10px' }}>
                 <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Monthly calibration history</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {calibrationTimeline.slice(-6).map((c: any, i: number) => (
@@ -722,7 +722,7 @@ export default function PlaybookPage() {
             )}
           </div>
         ) : (
-          <div style={{ padding: '20px', textAlign: 'center', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+          <div style={{ padding: '20px', textAlign: 'center', background: 'var(--surface)', border: 'none', borderRadius: '10px' }}>
             <BarChart3 size={24} style={{ color: 'var(--text-tertiary)', margin: '0 auto 8px', display: 'block' }} />
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
               Calibration data will appear after more deals close. It tracks how accurately the ML model scores deals over time.

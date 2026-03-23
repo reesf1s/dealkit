@@ -38,6 +38,8 @@ export default function Sidebar() {
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false, dedupingInterval: 30000 })
   const brain = brainRes?.data
   const urgentCount = brain?.urgentDeals?.length ?? 0
+  const { data: unmatchedRes } = useSWR('/api/ingest/email/unmatched', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
+  const unmatchedEmailCount = unmatchedRes?.pendingCount ?? 0
 
   const isActive = (href: string, matchPaths?: string[]) => {
     const paths = matchPaths ? [href, ...matchPaths] : [href]
@@ -306,7 +308,12 @@ export default function Sidebar() {
 
         <Divider />
 
-        <NavItem href="/settings" icon={Settings} label="Settings" />
+        <NavItem
+          href="/settings"
+          icon={Settings}
+          label="Settings"
+          badge={unmatchedEmailCount > 0 ? { count: unmatchedEmailCount, color: '#F59E0B' } : undefined}
+        />
 
         {/* Theme toggle */}
         {!collapsed ? (
@@ -496,10 +503,10 @@ export default function Sidebar() {
                 minWidth: '48px', minHeight: '44px',
               }}
             >
-              <tab.icon size={16} style={{ color: active ? 'var(--accent, #7C6AF5)' : 'var(--text-tertiary)' }} />
+              <tab.icon size={16} style={{ color: active ? 'var(--ds-text-1)' : 'var(--text-tertiary)' }} />
               <span style={{
                 fontSize: '10px', fontWeight: active ? 600 : 500,
-                color: active ? 'var(--accent, #7C6AF5)' : 'var(--text-tertiary)',
+                color: active ? 'var(--ds-text-1)' : 'var(--text-tertiary)',
                 lineHeight: 1,
               }}>{tab.label}</span>
             </Link>

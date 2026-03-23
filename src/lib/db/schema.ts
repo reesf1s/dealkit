@@ -9,6 +9,7 @@ import {
   uuid,
   unique,
 } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
 import { relations } from 'drizzle-orm'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -241,8 +242,29 @@ export const dealLogs = pgTable('deal_logs', {
   // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS engagement_type text;
   scheduledEvents: jsonb('scheduled_events').notNull().default([]), // ScheduledEvent[] — extracted from meeting notes
   // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS scheduled_events jsonb NOT NULL DEFAULT '[]'::jsonb;
+  noteSource: text('note_source').default('manual'),               // 'manual' | 'email' | 'hubspot' — where the last note came from
+  // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS note_source text DEFAULT 'manual';
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// unmatched_emails  (inbound emails that couldn't be auto-matched to a deal)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const unmatchedEmails = pgTable('unmatched_emails', {
+  id: text('id').primaryKey().default(sql`gen_random_uuid()::text`),
+  workspaceId: text('workspace_id').notNull(),
+  fromEmail: text('from_email').notNull(),
+  fromName: text('from_name'),
+  subject: text('subject'),
+  body: text('body'),
+  suggestedDealIds: jsonb('suggested_deal_ids').default([]),
+  status: text('status').notNull().default('pending'),   // pending | assigned | dismissed
+  assignedDealId: text('assigned_deal_id'),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -531,6 +553,9 @@ export type NewEventRow = typeof events.$inferInsert
 
 export type ProductGapRow = typeof productGaps.$inferSelect
 export type NewProductGapRow = typeof productGaps.$inferInsert
+
+export type UnmatchedEmailRow = typeof unmatchedEmails.$inferSelect
+export type NewUnmatchedEmailRow = typeof unmatchedEmails.$inferInsert
 
 export type WorkspaceGlobalConsentRow = typeof workspaceGlobalConsent.$inferSelect
 export type NewWorkspaceGlobalConsentRow = typeof workspaceGlobalConsent.$inferInsert

@@ -29,7 +29,7 @@ function StatCard({ label, value, icon: Icon, iconColor, iconBg, sub }: StatCard
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
         border: '1px solid rgba(255,255,255,0.07)',
-        borderRadius: '12px',
+        borderRadius: '8px',
         padding: '16px',
         display: 'flex',
         flexDirection: 'column',

@@ -56,7 +56,7 @@ export function ConfirmModal({
             background: 'rgba(20,20,20,0.85)',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '12px',
+            borderRadius: '8px',
             padding: '24px',
             boxShadow: '0 16px 48px rgba(0, 0, 0, 0.8)',
             animation: 'scale-in 0.15s ease-out',

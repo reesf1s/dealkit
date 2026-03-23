@@ -46,10 +46,10 @@ export default function CompanyPage() {
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '32px', height: '32px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '32px', height: '32px', background: 'var(--accent-subtle)', border: 'none', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Building2 size={15} color="var(--accent)" />
             </div>
-            <h1 style={{ fontSize: '22px', fontWeight: '700', color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>
+            <h1 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)', letterSpacing: '-0.03em', margin: 0 }}>
               Company Profile
             </h1>
           </div>
@@ -58,11 +58,11 @@ export default function CompanyPage() {
             disabled={brainState === 'rebuilding'}
             style={{
               display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '7px 14px', borderRadius: '8px', border: '1px solid rgba(99,102,241,0.25)',
+              padding: '7px 14px', borderRadius: '8px', border: 'none',
               background: brainState === 'done' ? 'rgba(34,197,94,0.1)' : brainState === 'error' ? 'rgba(239,68,68,0.1)' : 'var(--accent-subtle)',
               color: brainState === 'done' ? 'var(--success)' : brainState === 'error' ? 'var(--danger)' : 'var(--accent)',
               fontSize: '12px', fontWeight: 600, cursor: brainState === 'rebuilding' ? 'wait' : 'pointer',
-              transition: 'all 0.2s', opacity: brainState === 'rebuilding' ? 0.7 : 1,
+              transition: 'all 0.1s ease', opacity: brainState === 'rebuilding' ? 0.7 : 1,
             }}
           >
             {brainState === 'rebuilding' ? (

@@ -145,7 +145,7 @@ export default function OnboardingPage() {
       {/* Header */}
       <div style={{ textAlign: 'center' }}>
         <div style={{
-          width: '56px', height: '56px', borderRadius: '16px',
+          width: '56px', height: '56px', borderRadius: '8px',
           background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2))',
           border: '1px solid rgba(99,102,241,0.3)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
@@ -153,7 +153,7 @@ export default function OnboardingPage() {
         }}>
           <Sparkles size={24} color="var(--accent)" />
         </div>
-        <h1 style={{ fontSize: '24px', fontWeight: '700', letterSpacing: '-0.04em', color: 'var(--text-primary)', marginBottom: '8px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: '600', letterSpacing: '-0.04em', color: 'var(--text-primary)', marginBottom: '8px' }}>
           Train the brain in 30 seconds
         </h1>
         <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', lineHeight: '1.6' }}>
@@ -163,7 +163,7 @@ export default function OnboardingPage() {
 
       {step === 'paste' && (
         <>
-          <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid var(--card-border)', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <ClipboardPaste size={15} color="var(--accent)" />
               <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Paste your content</span>
@@ -192,7 +192,7 @@ export default function OnboardingPage() {
                 background: loading || !text.trim() ? 'rgba(99,102,241,0.2)' : 'linear-gradient(135deg, var(--accent), #7C3AED)',
                 color: '#fff', fontSize: '14px', fontWeight: '600',
                 boxShadow: loading || !text.trim() ? 'none' : '0 0 24px rgba(99,102,241,0.4)',
-                transition: 'all 0.2s',
+                transition: 'all 0.1s ease',
               }}
             >
               {loading ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Analyzing with AI...</> : <><Sparkles size={15} /> Auto-fill my profile</>}
@@ -209,7 +209,7 @@ export default function OnboardingPage() {
                 { icon: Sparkles, label: 'Value props & differentiators', desc: 'Key advantages and objections', color: '#6366F1' },
                 { icon: FileText, label: 'Battlecards (auto-generated)', desc: 'Full AI battlecard per competitor found', color: '#22C55E' },
               ].map(({ icon: Icon, label, desc, color }) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px', background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid var(--card-border)', borderRadius: '10px' }}>
+                <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px', background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '10px' }}>
                   <div style={{ width: '28px', height: '28px', background: `${color}14`, border: `1px solid ${color}22`, borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Icon size={13} color={color} />
                   </div>
@@ -223,7 +223,7 @@ export default function OnboardingPage() {
           </div>
 
           {/* AI workflows preview */}
-          <div style={{ background: 'var(--accent-subtle)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '12px', padding: '16px' }}>
+          <div style={{ background: 'var(--accent-subtle)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', padding: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
               <Zap size={13} color="var(--accent)" />
               <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--accent)' }}>After setup, you&apos;ll be able to:</span>
@@ -259,7 +259,7 @@ export default function OnboardingPage() {
 
       {step === 'join' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid var(--card-border)', borderRadius: '14px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <LogIn size={15} color="var(--accent)" />
               <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Join your team&apos;s workspace</span>
@@ -303,7 +303,7 @@ export default function OnboardingPage() {
                 background: joinLoading || !joinCode.trim() ? 'rgba(99,102,241,0.2)' : 'linear-gradient(135deg, var(--accent), #7C3AED)',
                 color: '#fff', fontSize: '14px', fontWeight: '600',
                 boxShadow: joinLoading || !joinCode.trim() ? 'none' : '0 0 24px rgba(99,102,241,0.4)',
-                transition: 'all 0.2s',
+                transition: 'all 0.1s ease',
               }}
             >
               {joinLoading ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Joining...</> : <>Join workspace <ArrowRight size={14} /></>}
@@ -320,13 +320,13 @@ export default function OnboardingPage() {
 
       {step === 'review' && parsed && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ background: 'rgba(34,197,94,0.06)', border: 'none', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <CheckCircle size={14} color="var(--success)" />
             <span style={{ fontSize: '13px', color: 'var(--success)', fontWeight: '500' }}>AI extracted your company info — review before saving</span>
           </div>
 
           {/* Company preview */}
-          <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid var(--card-border)', borderRadius: '14px', padding: '20px' }}>
+          <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', padding: '20px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
               <Building2 size={14} color="var(--accent)" />
               <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Company Profile</span>
@@ -354,7 +354,7 @@ export default function OnboardingPage() {
 
           {/* Competitors preview */}
           {parsed.competitors?.length > 0 && (
-            <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid var(--card-border)', borderRadius: '14px', padding: '20px' }}>
+            <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', padding: '20px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <Users size={14} color="var(--accent)" />
                 <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{parsed.competitors.length} Competitors Found</span>
@@ -366,7 +366,7 @@ export default function OnboardingPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {parsed.competitors.map((c: any, i: number) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', background: 'var(--accent-subtle)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '11px', fontWeight: '700', color: 'var(--accent)' }}>
+                    <div style={{ width: '28px', height: '28px', background: 'var(--accent-subtle)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '11px', fontWeight: '600', color: 'var(--accent)' }}>
                       {c.name?.[0]?.toUpperCase() ?? '?'}
                     </div>
                     <div style={{ flex: 1 }}>
@@ -421,7 +421,7 @@ export default function OnboardingPage() {
             <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>AI is building competitive intelligence for each competitor</p>
           </div>
 
-          <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid var(--card-border)', borderRadius: '14px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {generatingProgress.map((item, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px' }}>
                 <div style={{ width: '28px', height: '28px', background: item.done ? 'rgba(34,197,94,0.1)' : 'var(--accent-subtle)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -445,10 +445,10 @@ export default function OnboardingPage() {
       {step === 'done' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ width: '56px', height: '56px', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 0 24px rgba(34,197,94,0.15)' }}>
+            <div style={{ width: '56px', height: '56px', background: 'rgba(34,197,94,0.1)', border: 'none', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 0 24px rgba(34,197,94,0.15)' }}>
               <CheckCircle size={24} color="var(--success)" />
             </div>
-            <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px', letterSpacing: '-0.03em' }}>You&apos;re all set!</h2>
+            <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px', letterSpacing: '-0.03em' }}>You&apos;re all set!</h2>
             <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', lineHeight: '1.6' }}>
               Your company profile, competitors, and battlecards are ready.<br />Here&apos;s what to do next:
             </p>
@@ -464,7 +464,7 @@ export default function OnboardingPage() {
                 display: 'flex', alignItems: 'center', gap: '12px',
                 padding: '14px', background: 'var(--card-bg)',
                 backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-                border: '1px solid var(--card-border)',
+                border: 'none',
                 borderRadius: '10px', textDecoration: 'none',
                 transition: 'border-color 0.1s, background 0.1s',
               }}

@@ -141,7 +141,7 @@ function MilestoneRoadmap({ trainingSize }: { trainingSize: number }) {
           background: 'var(--success)', top: '16px',
           width: `${Math.min(100, (trainingSize / 50) * 100)}%`,
           maxWidth: 'calc(100% - 32px)',
-          transition: 'width 0.5s ease-out',
+          transition: 'width 0.1s ease',
         }} />
         {/* Nodes */}
         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', position: 'relative' }}>
@@ -155,13 +155,13 @@ function MilestoneRoadmap({ trainingSize }: { trainingSize: number }) {
                   background: isPast ? 'var(--success)' : 'var(--card-bg)',
                   border: `2px solid ${isPast ? 'var(--success)' : isCurrent ? 'var(--accent)' : 'var(--border)'}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'all 0.3s',
+                  transition: 'all 0.1s ease',
                   flexShrink: 0,
                 }}>
                   {isPast && idx > 0
                     ? <CheckCircle size={14} style={{ color: '#fff' }} />
                     : idx === 0
-                      ? <span style={{ fontSize: '10px', fontWeight: '700', color: trainingSize >= 10 ? '#fff' : 'var(--accent)' }}>{trainingSize}</span>
+                      ? <span style={{ fontSize: '10px', fontWeight: '600', color: trainingSize >= 10 ? '#fff' : 'var(--accent)' }}>{trainingSize}</span>
                       : <Lock size={12} style={{ color: 'var(--text-tertiary)' }} />
                   }
                 </div>
@@ -184,7 +184,7 @@ function MilestoneRoadmap({ trainingSize }: { trainingSize: number }) {
               border: `1px solid ${isCurrent ? 'color-mix(in srgb, var(--accent) 20%, transparent)' : isPast ? 'color-mix(in srgb, var(--success) 15%, transparent)' : 'var(--border)'}`,
               opacity: (!isCurrent && !isPast) ? 0.6 : 1,
             }}>
-              <div style={{ fontSize: '10px', fontWeight: '700', color: isCurrent ? 'var(--accent)' : isPast ? 'var(--success)' : 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>
+              <div style={{ fontSize: '10px', fontWeight: '600', color: isCurrent ? 'var(--accent)' : isPast ? 'var(--success)' : 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>
                 {m.label}
               </div>
               <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '6px' }}>
@@ -281,11 +281,11 @@ function ModelGrid({ trainingSize, brainData }: { trainingSize: number; brainDat
         return (
           <div key={i} style={{
             padding: '14px',
-            borderRadius: '12px',
+            borderRadius: '8px',
             background: status === 'active' ? 'var(--card-bg)' : 'var(--surface)',
             border: `1px solid ${status === 'active' ? 'var(--card-border)' : 'var(--border)'}`,
             opacity: status === 'locked' ? 0.65 : 1,
-            transition: 'opacity 0.2s',
+            transition: 'opacity 0.1s ease',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -364,7 +364,7 @@ function FeatureImportanceChart({ features, isPlaceholder }: { features: { name:
                 height: '100%', width: `${barWidth}%`,
                 background: isPlaceholder ? 'color-mix(in srgb, #6366f1 60%, transparent)' : 'var(--accent)',
                 borderRadius: '4px',
-                transition: 'width 0.5s ease-out',
+                transition: 'width 0.1s ease',
               }} />
             </div>
             <div style={{ width: '40px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: isPlaceholder ? 'var(--text-secondary)' : 'var(--text-primary)', flexShrink: 0, fontFamily: 'var(--font-mono, monospace)' }}>
@@ -491,8 +491,8 @@ function GlobalBenchmarksCard({ winRate, avgClose, mlAccuracy }: { winRate: numb
 
   return (
     <div style={{
-      background: 'var(--card-bg)', border: '1px solid var(--card-border)',
-      borderRadius: '16px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px',
+      background: 'var(--card-bg)', border: 'none',
+      borderRadius: '8px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -522,7 +522,7 @@ function GlobalBenchmarksCard({ winRate, avgClose, mlAccuracy }: { winRate: numb
           }}>
             <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '6px' }}>{m.label}</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-              <span style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', fontFamily: 'var(--font-mono, monospace)' }}>{m.yours}</span>
+              <span style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)', fontFamily: 'var(--font-mono, monospace)' }}>{m.yours}</span>
               <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>vs</span>
               <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono, monospace)', filter: 'blur(4px)', userSelect: 'none' }}>{m.benchmark}</span>
             </div>
@@ -565,8 +565,8 @@ export default function ModelsPage() {
 
   const cardStyle: React.CSSProperties = {
     background: 'var(--card-bg)',
-    border: '1px solid var(--card-border)',
-    borderRadius: '16px',
+    border: 'none',
+    borderRadius: '8px',
     padding: '24px',
     display: 'flex',
     flexDirection: 'column',
@@ -648,12 +648,12 @@ export default function ModelsPage() {
 
       {/* ── ML Milestone celebration banner ── */}
       {showMlMilestoneBanner && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 20px', borderRadius: '14px', background: 'linear-gradient(135deg, color-mix(in srgb, var(--success) 10%, transparent) 0%, color-mix(in srgb, var(--accent) 8%, transparent) 100%)', border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 20px', borderRadius: '8px', background: 'linear-gradient(135deg, color-mix(in srgb, var(--success) 10%, transparent) 0%, color-mix(in srgb, var(--accent) 8%, transparent) 100%)', border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)' }}>
           <div style={{ flexShrink: 0, width: '36px', height: '36px', borderRadius: '10px', background: 'color-mix(in srgb, var(--success) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 30%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Award size={18} style={{ color: 'var(--success)' }} />
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '2px' }}>Your ML model is now active!</div>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' }}>Your ML model is now active!</div>
             <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>Win probability predictions are now powered by your private data — {totalClosed} closed deals trained your model.</div>
           </div>
           <button
@@ -667,11 +667,11 @@ export default function ModelsPage() {
       {/* ── Header ── */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'var(--accent-subtle)', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'var(--accent-subtle)', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Brain size={20} style={{ color: 'var(--accent)' }} />
           </div>
           <div>
-            <h1 style={{ fontSize: '28px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-primary)', lineHeight: 1.1 }} className="text-display">
+            <h1 style={{ fontSize: '28px', fontWeight: '600', letterSpacing: '-0.03em', color: 'var(--text-primary)', lineHeight: 1.1 }} className="text-display">
               Your ML Model
             </h1>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '2px' }}>
@@ -696,7 +696,7 @@ export default function ModelsPage() {
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <AccuracyRing pct={accuracy} />
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ fontSize: '26px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }} className="font-mono">
+                    <div style={{ fontSize: '26px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1 }} className="font-mono">
                       <CountUp target={accuracy} suffix="%" />
                     </div>
                     <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '2px' }}>accurate</div>
@@ -772,11 +772,11 @@ export default function ModelsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', gap: '16px' }}>
               <div style={{ textAlign: 'center', flex: 1, padding: '12px', background: 'color-mix(in srgb, var(--success) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)', borderRadius: '10px' }}>
-                <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--success)', lineHeight: 1 }} className="font-mono">{wl?.winCount ?? 0}</div>
+                <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--success)', lineHeight: 1 }} className="font-mono">{wl?.winCount ?? 0}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>Wins</div>
               </div>
               <div style={{ textAlign: 'center', flex: 1, padding: '12px', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)', borderRadius: '10px' }}>
-                <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--danger)', lineHeight: 1 }} className="font-mono">{wl?.lossCount ?? 0}</div>
+                <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--danger)', lineHeight: 1 }} className="font-mono">{wl?.lossCount ?? 0}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>Losses</div>
               </div>
             </div>
@@ -960,7 +960,7 @@ export default function ModelsPage() {
                   key={a.id}
                   onClick={() => setSelectedArchetype(isSelected ? null : a.id)}
                   style={{
-                    textAlign: 'left', padding: '16px', borderRadius: '12px', cursor: 'pointer',
+                    textAlign: 'left', padding: '16px', borderRadius: '8px', cursor: 'pointer',
                     background: isSelected ? 'var(--accent-subtle)' : 'var(--surface)',
                     border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
                     transition: 'all 0.15s',
@@ -968,7 +968,7 @@ export default function ModelsPage() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                     <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1.3 }}>{a.label}</div>
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: winColor, lineHeight: 1 }} className="font-mono">{a.winRate}%</div>
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: winColor, lineHeight: 1 }} className="font-mono">{a.winRate}%</div>
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px', lineHeight: 1.4 }}>{a.winningCharacteristic}</div>
                   <div style={{ display: 'flex', gap: '8px' }}>
@@ -1007,7 +1007,7 @@ export default function ModelsPage() {
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 16px', background: 'var(--card-bg)', borderBottom: i < patterns.length - 1 ? '1px solid var(--border)' : 'none' }}>
                   <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', width: '120px', flexShrink: 0 }}>{p.competitor}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '20px', fontWeight: '800', color: winColor, flexShrink: 0 }} className="font-mono">{p.winRate}%</div>
+                    <div style={{ fontSize: '20px', fontWeight: '700', color: winColor, flexShrink: 0 }} className="font-mono">{p.winRate}%</div>
                     <BarChart value={p.winRate} max={100} color={winColor} />
                   </div>
                   <div style={{ flex: 2, minWidth: 0 }}>
@@ -1038,7 +1038,7 @@ export default function ModelsPage() {
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '22px', fontWeight: '700', color: 'var(--data-accent)' }} className="font-mono">
+              <div style={{ fontSize: '22px', fontWeight: '600', color: 'var(--data-accent)' }} className="font-mono">
                 {calibration[calibration.length - 1]?.discrimination?.toFixed(1) ?? '—'}
               </div>
               <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>discrimination score</div>
@@ -1072,7 +1072,7 @@ export default function ModelsPage() {
           </div>
           {forecastData && forecastData.totalPredictions >= 5 && (
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontSize: '22px', fontWeight: '700', color: forecastData.accuracy >= 0.7 ? 'var(--success)' : forecastData.accuracy >= 0.5 ? 'var(--warning)' : 'var(--danger)' }} className="font-mono">
+              <div style={{ fontSize: '22px', fontWeight: '600', color: forecastData.accuracy >= 0.7 ? 'var(--success)' : forecastData.accuracy >= 0.5 ? 'var(--warning)' : 'var(--danger)' }} className="font-mono">
                 {Math.round(forecastData.accuracy * 100)}%
               </div>
               <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>overall accuracy</div>
@@ -1089,11 +1089,11 @@ export default function ModelsPage() {
           <>
             <div style={{ display: 'flex', gap: '16px' }}>
               <div style={{ textAlign: 'center', flex: 1, padding: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' }}>
-                <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: 1 }} className="font-mono">{forecastData.totalPredictions}</div>
+                <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1 }} className="font-mono">{forecastData.totalPredictions}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>Predictions logged</div>
               </div>
               <div style={{ textAlign: 'center', flex: 1, padding: '12px', background: 'color-mix(in srgb, var(--success) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)', borderRadius: '10px' }}>
-                <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--success)', lineHeight: 1 }} className="font-mono">{forecastData.correctPredictions}</div>
+                <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--success)', lineHeight: 1 }} className="font-mono">{forecastData.correctPredictions}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>Correct predictions</div>
               </div>
             </div>
@@ -1150,7 +1150,7 @@ export default function ModelsPage() {
             {mlTrends.winRate && (
               <div>
                 <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '6px' }}>Win rate (recent)</div>
-                <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1 }} className="font-mono">
+                <div style={{ fontSize: '24px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1 }} className="font-mono">
                   {Math.round(mlTrends.winRate.recentPct)}%
                 </div>
                 <div style={{ fontSize: '11px', marginTop: '4px', color: mlTrends.winRate.direction === 'improving' ? 'var(--success)' : mlTrends.winRate.direction === 'declining' ? 'var(--danger)' : 'var(--text-tertiary)' }}>
@@ -1161,7 +1161,7 @@ export default function ModelsPage() {
             {mlTrends.dealVelocity && (
               <div>
                 <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '6px' }}>Avg close time</div>
-                <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1 }} className="font-mono">
+                <div style={{ fontSize: '24px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1 }} className="font-mono">
                   {Math.round(mlTrends.dealVelocity.recentAvgDays)}d
                 </div>
                 <div style={{ fontSize: '11px', marginTop: '4px', color: mlTrends.dealVelocity.direction === 'faster' ? 'var(--success)' : mlTrends.dealVelocity.direction === 'slower' ? 'var(--danger)' : 'var(--text-tertiary)' }}>
@@ -1172,7 +1172,7 @@ export default function ModelsPage() {
             {mlTrends.competitorThreats?.length > 0 && (
               <div>
                 <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '6px' }}>Rising threat</div>
-                <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1 }}>
+                <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1 }}>
                   {mlTrends.competitorThreats[0].name}
                 </div>
                 <div style={{ fontSize: '11px', marginTop: '4px', color: 'var(--danger)' }}>
@@ -1195,7 +1195,7 @@ export default function ModelsPage() {
       {!ml && !wl && archetypes.length === 0 && (
         <div style={{ textAlign: 'center', padding: '80px 20px' }}>
           <Brain size={48} style={{ margin: '0 auto 16px', display: 'block', color: 'var(--text-tertiary)' }} />
-          <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>Building your ML model</h2>
+          <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px' }}>Building your ML model</h2>
           <p style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto 24px', lineHeight: 1.6 }}>
             As you close deals (wins AND losses), SellSight trains private ML models on your data.
             Close 10 deals to unlock predictions. Close 50 for per-competitor models.

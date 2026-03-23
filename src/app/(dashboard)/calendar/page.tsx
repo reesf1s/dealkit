@@ -375,7 +375,7 @@ function EventPopover({
           transform: 'translate(-50%, -50%)',
           zIndex: 1000,
           background: 'var(--card-bg)',
-          border: '1px solid var(--card-border)',
+          border: 'none',
           borderRadius: '14px',
           padding: '20px',
           minWidth: '320px',
@@ -447,10 +447,9 @@ function EventPopover({
           <button
             onClick={() => {
               const d = event.date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
-              window.dispatchEvent(new CustomEvent('openCommandPalette', {
-                detail: { query: `Prep me for ${event.title} — ${displayText} on ${d}. Review the deal and tell me what I need to know and do before this date.` }
-              }))
+              const aiQuery = encodeURIComponent(`Prep me for ${event.title} — ${displayText} on ${d}. Review the deal and tell me what I need to know and do before this date.`)
               onClose()
+              window.location.href = `/deals/${event.dealId}?ai=${aiQuery}`
             }}
             style={{
               flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
@@ -560,7 +559,7 @@ export default function CalendarPage() {
 
   const cardStyle: React.CSSProperties = {
     background: 'var(--card-bg)',
-    border: '1px solid var(--card-border)',
+    border: 'none',
     borderRadius: '16px',
   }
 
@@ -582,18 +581,18 @@ export default function CalendarPage() {
 
         {/* Month navigation */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: isMobile ? 'space-between' : undefined }}>
-          <button onClick={prevMonth} style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text)', minHeight: isMobile ? '44px' : undefined }}>
+          <button onClick={prevMonth} style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text)', minHeight: isMobile ? '44px' : undefined }}>
             <ChevronLeft size={16} />
           </button>
           <span style={{ fontSize: isMobile ? '15px' : '16px', fontWeight: 600, color: 'var(--text)', minWidth: isMobile ? undefined : '160px', textAlign: 'center', flex: isMobile ? 1 : undefined }}>
             {MONTH_NAMES[month]} {year}
           </span>
-          <button onClick={nextMonth} style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text)', minHeight: isMobile ? '44px' : undefined }}>
+          <button onClick={nextMonth} style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text)', minHeight: isMobile ? '44px' : undefined }}>
             <ChevronRight size={16} />
           </button>
           <button
             onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()) }}
-            style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: 'var(--text)', minHeight: isMobile ? '44px' : undefined }}
+            style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: 'var(--text)', minHeight: isMobile ? '44px' : undefined }}
           >
             Today
           </button>
@@ -764,7 +763,7 @@ export default function CalendarPage() {
                     padding: isMobile ? '12px 12px' : '10px 14px',
                     minHeight: isMobile ? '44px' : undefined,
                     background: 'var(--card-bg)',
-                    border: '1px solid var(--card-border)',
+                    border: 'none',
                     borderLeft: evIsToday ? `3px solid ${cfg.color}` : '1px solid var(--card-border)',
                     borderRadius: '10px',
                     opacity: evIsPast ? 0.4 : 1,
@@ -797,7 +796,8 @@ export default function CalendarPage() {
                       onClick={(e) => {
                         e.stopPropagation()
                         const d = ev.date.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
-                        window.dispatchEvent(new CustomEvent('openCommandPalette', { detail: { query: `Prep me for ${ev.title} — ${subtitle} on ${d}. Review the deal and tell me what I need to know and do before this date.` } }))
+                        const aiQuery = encodeURIComponent(`Prep me for ${ev.title} — ${subtitle} on ${d}. Review the deal and tell me what I need to know and do before this date.`)
+                        window.location.href = `/deals/${ev.dealId}?ai=${aiQuery}`
                       }}
                       style={{
                         flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
