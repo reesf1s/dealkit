@@ -102,9 +102,9 @@ export function ProductIssuesPanel({ dealId }: Props) {
       })
       if (!res.ok) throw new Error('Failed to confirm')
       await mutateLinks()
-      toast({ title: 'Link confirmed', description: `${link.linearIssueId} linked to this deal` })
+      toast(`${link.linearIssueId} linked to this deal`, 'success')
     } catch {
-      toast({ title: 'Error', description: 'Could not confirm link', variant: 'destructive' })
+      toast('Could not confirm link', 'error')
     } finally {
       setActionLoading(null)
     }
@@ -119,7 +119,7 @@ export function ProductIssuesPanel({ dealId }: Props) {
       if (!res.ok) throw new Error('Failed to dismiss')
       await mutateLinks()
     } catch {
-      toast({ title: 'Error', description: 'Could not dismiss link', variant: 'destructive' })
+      toast('Could not dismiss link', 'error')
     } finally {
       setActionLoading(null)
     }
@@ -139,9 +139,9 @@ export function ProductIssuesPanel({ dealId }: Props) {
       await mutateLinks()
       setLinkInput('')
       setShowLinkInput(false)
-      toast({ title: 'Issue linked', description: `${issueId} linked to this deal` })
+      toast(`${issueId} linked to this deal`, 'success')
     } catch {
-      toast({ title: 'Error', description: 'Could not link issue', variant: 'destructive' })
+      toast('Could not link issue', 'error')
     } finally {
       setActionLoading(null)
     }
