@@ -1423,11 +1423,12 @@ export const answer_question = {
       contextParts.push(`\nML Model: trained on ${brain.mlModel.trainingSize} deals, accuracy ${((brain.mlModel.looAccuracy ?? 0) * 100).toFixed(0)}%`)
     }
 
-    // Competitor intelligence
-    if (brain.competitorIntel?.length) {
+    // Competitor intelligence (from keyPatterns)
+    const compPatterns = brain.keyPatterns?.filter(p => p.competitorNames?.length)
+    if (compPatterns?.length) {
       contextParts.push('\nCompetitor Intel:')
-      for (const ci of brain.competitorIntel) {
-        contextParts.push(`- ${ci.name}: ${ci.activeDeals} active deal(s)`)
+      for (const p of compPatterns) {
+        contextParts.push(`- ${p.competitorNames!.join(', ')}: appears in ${p.dealNames?.join(', ') || 'multiple deals'}`)
       }
     }
 
