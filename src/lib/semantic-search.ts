@@ -56,9 +56,11 @@ export interface EmbeddingCache {
   deals: { id: string; vector: number[]; hash: string }[]
   competitors: { id: string; vector: number[]; hash: string }[]
   collateral: { id: string; vector: number[]; hash: string }[]
+  /** Linear issue embeddings — populated by embedLinearIssues() */
+  linearIssues?: { id: string; vector: number[]; hash: string }[]
 }
 
-const CACHE_VERSION = 1
+const CACHE_VERSION = 2
 
 /**
  * Load the embedding cache from the workspace brain JSONB.
@@ -378,4 +380,107 @@ export async function findCompetitorDuplicates(
   }
 
   return duplicates
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MCP Phase 1 extension — Linear issue embeddings
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Embed all Linear issues from linear_issues_cache and store them in the
+ * workspace's embedding_cache.linearIssues array.
+ *
+ * Uses embedQuery() on "title + description" — the same TF-IDF system used for
+ * semantic search queries, which is semantically appropriate for topic-focused
+ * feature request / bug text.
+ *
+ * Non-breaking: if no issues are cached, this is a no-op.
+ */
+export async function embedLinearIssues(workspaceId: string): Promise<{ embedded: number }> {
+  const { linearIssuesCache } = await import('@/lib/db/schema')
+
+  const issues = await db
+    .select()
+    .from(linearIssuesCache)
+    .where(eq(linearIssuesCache.workspaceId, workspaceId))
+
+  if (issues.length === 0) return { embedded: 0 }
+
+  const existingCache = await loadCache(workspaceId)
+  const existingLinearHashes = new Map(
+    existingCache?.linearIssues?.map(i => [i.id, i.hash]) ?? [],
+  )
+
+  let embedded = 0
+  const newLinearEmbeddings: NonNullable<EmbeddingCache['linearIssues']> = []
+
+  for (const issue of issues) {
+    const text = `${issue.title} ${issue.description ?? ''}`.trim()
+    const hash = contentHash(text)
+
+    const existing = existingLinearHashes.get(issue.linearIssueId)
+    if (existing === hash && existingCache?.linearIssues) {
+      const cached = existingCache.linearIssues.find(i => i.id === issue.linearIssueId)
+      if (cached) {
+        newLinearEmbeddings.push(cached)
+        continue
+      }
+    }
+
+    const result = embedQuery(text)
+    newLinearEmbeddings.push({ id: issue.linearIssueId, vector: result.vector, hash })
+    embedded++
+  }
+
+  // Merge into existing cache (preserve deals/competitors/collateral)
+  const base = existingCache ?? {
+    version: CACHE_VERSION,
+    dims: EMBEDDING_DIMS,
+    deals: [],
+    competitors: [],
+    collateral: [],
+  }
+
+  const updatedCache: EmbeddingCache = {
+    ...base,
+    version: CACHE_VERSION,
+    linearIssues: newLinearEmbeddings,
+  }
+
+  await saveCache(workspaceId, updatedCache)
+
+  if (embedded > 0) {
+    console.log(`[semantic] Embedded ${embedded} Linear issues for workspace ${workspaceId.slice(0, 8)}`)
+  }
+
+  return { embedded }
+}
+
+/**
+ * Find the top Linear issues most semantically similar to a given text (e.g. deal signal text).
+ * Returns scored results from the workspace's Linear issue embedding cache.
+ */
+export async function findSimilarLinearIssues(
+  workspaceId: string,
+  signalText: string,
+  opts: { limit?: number; minSimilarity?: number } = {},
+): Promise<{ issueId: string; similarity: number }[]> {
+  const cache = await loadCache(workspaceId)
+  if (!cache?.linearIssues?.length) return []
+
+  const queryVec = embedQuery(signalText).vector
+  const limit = opts.limit ?? 20
+  const minSim = opts.minSimilarity ?? 0.15
+
+  const results: { issueId: string; similarity: number }[] = []
+
+  for (const issue of cache.linearIssues) {
+    const sim = cosineSimilarity(queryVec, issue.vector)
+    if (sim >= minSim) {
+      results.push({ issueId: issue.id, similarity: Math.round(sim * 1000) / 1000 })
+    }
+  }
+
+  results.sort((a, b) => b.similarity - a.similarity)
+  return results.slice(0, limit)
 }

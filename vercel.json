@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/brain-refresh",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/linear-match",
+      "schedule": "0 4 * * *"
     }
   ]
 }

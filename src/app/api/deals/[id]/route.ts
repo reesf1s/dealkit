@@ -79,9 +79,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
     const [updated] = await db.update(dealLogs).set(updateData).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).returning()
     await logEvent(workspaceId, userId, 'deal_log.updated', { dealLogId: id, dealName: updated.dealName })
+    // Check if note-related fields changed — if so, re-run signal matching
+    const noteFieldsChanged = ['notes', 'meetingNotes', 'dealRisks'].some(f => f in body)
     after(async () => {
       console.log(`[brain] Rebuild triggered by: deal_updated (deal: ${updated.dealName}) at ${new Date().toISOString()}`)
       await requestBrainRebuild(workspaceId, 'deal_updated')
+      if (noteFieldsChanged) {
+        try {
+          const { matchDealToIssues } = await import('@/lib/linear-signal-match')
+          await matchDealToIssues(workspaceId, id)
+        } catch (err) {
+          console.error('[deal-patch] linear signal match failed:', err)
+        }
+      }
     })
     return NextResponse.json({ data: updated })
   } catch (err) { return dbErrResponse(err) }

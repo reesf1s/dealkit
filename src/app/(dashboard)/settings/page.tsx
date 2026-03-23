@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useUser } from '@clerk/nextjs'
 import useSWR from 'swr'
 import { useState, useEffect } from 'react'
-import { CheckCircle, AlertTriangle, ExternalLink, Download, Trash2, Copy, LogOut, RefreshCw, Plug, Unplug, Mail, Key, Inbox } from 'lucide-react'
+import { CheckCircle, AlertTriangle, ExternalLink, Download, Trash2, Copy, LogOut, RefreshCw, Plug, Unplug, Mail, Key, Inbox, Loader2 } from 'lucide-react'
 import { SkeletonCard } from '@/components/shared/SkeletonCard'
 import { ConfirmModal } from '@/components/shared/ConfirmModal'
 import { useToast } from '@/components/shared/Toast'
@@ -102,6 +102,12 @@ export default function SettingsPage() {
   const [inboundEmailCopied, setInboundEmailCopied] = useState(false)
   const [regeneratingInbound, setRegeneratingInbound] = useState(false)
   const [apiKeyCopied, setApiKeyCopied] = useState(false)
+  // Linear state
+  const [linearApiKey, setLinearApiKey] = useState('')
+  const [showLinearInput, setShowLinearInput] = useState(false)
+  const [linearConnecting, setLinearConnecting] = useState(false)
+  const [linearDisconnecting, setLinearDisconnecting] = useState(false)
+  const [linearSyncing, setLinearSyncing] = useState(false)
 
   const { data: userRes, isLoading: loadingUser } = useSWR<{ data: DbUser }>('/api/user', fetcher)
   const { data: membersRes, isLoading: loadingMembers, mutate: mutateMembers } = useSWR<{ data: Member[] }>('/api/workspaces/members', fetcher)
@@ -110,7 +116,9 @@ export default function SettingsPage() {
   const { data: consentRes } = useSWR<{ consented: boolean }>('/api/global/consent', fetcher, { revalidateOnFocus: false })
   const { data: inboundEmailRes, mutate: mutateInboundEmail } = useSWR<{ data: { email: string; token: string } }>('/api/workspace/inbound-email', fetcher, { revalidateOnFocus: false })
   const { data: apiKeyRes } = useSWR<{ data: { apiKey: string } }>('/api/workspace/api-key', fetcher, { revalidateOnFocus: false })
+  const { data: linearRes, mutate: mutateLinear } = useSWR<{ data: { connected: boolean; teamName?: string | null; workspaceName?: string | null; lastSyncAt?: string | null; syncError?: string | null } }>('/api/integrations/linear/status', fetcher, { revalidateOnFocus: false })
   const hubspot = hubspotRes?.data
+  const linear = linearRes?.data
   const dbUser = userRes?.data
 
   // Sync consent state from server
@@ -911,6 +919,135 @@ export default function SettingsPage() {
               </div>
             )}
 
+          </div>
+        </SectionCard>
+
+        {/* Linear Integration */}
+        <SectionCard title="Linear" description="Link dying deals to Linear issues automatically">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {linear?.connected ? (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle size={14} style={{ color: 'var(--success, #22C55E)' }} />
+                    <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                      Connected — {linear.teamName ?? linear.workspaceName ?? 'Linear'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={async () => {
+                        setLinearSyncing(true)
+                        try {
+                          const res = await fetch('/api/integrations/linear/sync', { method: 'POST' })
+                          const j = await res.json()
+                          if (res.ok) toast({ title: 'Sync complete', description: `${j.data?.synced ?? 0} issues synced` })
+                          else toast({ title: 'Sync failed', description: j.error, variant: 'destructive' })
+                        } catch { toast({ title: 'Sync failed', variant: 'destructive' }) }
+                        finally { setLinearSyncing(false); mutateLinear() }
+                      }}
+                      disabled={linearSyncing}
+                      style={{ fontSize: '11px', padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-secondary)' }}
+                    >
+                      <RefreshCw size={11} style={linearSyncing ? { animation: 'spin 1s linear infinite' } : {}} />
+                      {linearSyncing ? 'Syncing…' : 'Sync now'}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setLinearDisconnecting(true)
+                        try {
+                          await fetch('/api/integrations/linear/disconnect', { method: 'POST' })
+                          mutateLinear()
+                          toast({ title: 'Linear disconnected' })
+                        } catch { toast({ title: 'Disconnect failed', variant: 'destructive' }) }
+                        finally { setLinearDisconnecting(false) }
+                      }}
+                      disabled={linearDisconnecting}
+                      style={{ fontSize: '11px', padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '5px', cursor: 'pointer', color: 'var(--danger, #EF4444)', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <Unplug size={11} />
+                      Disconnect
+                    </button>
+                  </div>
+                </div>
+                {linear.lastSyncAt && (
+                  <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: 0 }}>
+                    Last synced: {new Date(linear.lastSyncAt).toLocaleString()}
+                  </p>
+                )}
+                {linear.syncError && (
+                  <p style={{ fontSize: '11px', color: 'var(--danger, #EF4444)', margin: '4px 0 0' }}>
+                    Sync error: {linear.syncError}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '0 0 12px', lineHeight: 1.6 }}>
+                  Connect Linear to automatically match dying deals to relevant issues. Halvex will suggest links and update Linear issue descriptions with deal context.
+                </p>
+                {!showLinearInput ? (
+                  <button
+                    onClick={() => setShowLinearInput(true)}
+                    style={{ fontSize: '12px', padding: '7px 14px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Plug size={13} />
+                    Connect Linear
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ padding: '12px 14px', borderRadius: '8px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.14)', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                      Get your API key from <strong>Linear → Settings → API → Personal API keys</strong>. Create a key with read access to Issues.
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="password"
+                        value={linearApiKey}
+                        onChange={e => setLinearApiKey(e.target.value)}
+                        placeholder="lin_api_xxxxxxxxxxxxxxxx"
+                        style={{ flex: 1, height: '34px', padding: '0 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-primary)', fontSize: '12px', fontFamily: 'monospace' }}
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!linearApiKey.trim()) return
+                          setLinearConnecting(true)
+                          try {
+                            const res = await fetch('/api/integrations/linear/connect', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ apiKey: linearApiKey.trim() }),
+                            })
+                            const j = await res.json()
+                            if (res.ok) {
+                              toast({ title: 'Linear connected!', description: `Team: ${j.data?.teamName}` })
+                              setLinearApiKey('')
+                              setShowLinearInput(false)
+                              mutateLinear()
+                              // Kick off initial sync
+                              fetch('/api/integrations/linear/sync', { method: 'POST' })
+                            } else {
+                              toast({ title: 'Connection failed', description: j.error, variant: 'destructive' })
+                            }
+                          } catch { toast({ title: 'Connection failed', variant: 'destructive' }) }
+                          finally { setLinearConnecting(false) }
+                        }}
+                        disabled={linearConnecting || !linearApiKey.trim()}
+                        style={{ height: '34px', padding: '0 14px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                      >
+                        {linearConnecting ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={12} />}
+                        {linearConnecting ? 'Connecting…' : 'Save'}
+                      </button>
+                      <button
+                        onClick={() => { setShowLinearInput(false); setLinearApiKey('') }}
+                        style={{ height: '34px', padding: '0 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', color: 'var(--text-tertiary)' }}
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </SectionCard>
 
