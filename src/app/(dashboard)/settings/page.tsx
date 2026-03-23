@@ -941,9 +941,9 @@ export default function SettingsPage() {
                         try {
                           const res = await fetch('/api/integrations/linear/sync', { method: 'POST' })
                           const j = await res.json()
-                          if (res.ok) toast({ title: 'Sync complete', description: `${j.data?.synced ?? 0} issues synced` })
-                          else toast({ title: 'Sync failed', description: j.error, variant: 'destructive' })
-                        } catch { toast({ title: 'Sync failed', variant: 'destructive' }) }
+                          if (res.ok) toast(`Sync complete — ${j.data?.synced ?? 0} issues synced`, 'success')
+                          else toast(j.error ?? 'Sync failed', 'error')
+                        } catch { toast('Sync failed', 'error') }
                         finally { setLinearSyncing(false); mutateLinear() }
                       }}
                       disabled={linearSyncing}
@@ -958,8 +958,8 @@ export default function SettingsPage() {
                         try {
                           await fetch('/api/integrations/linear/disconnect', { method: 'POST' })
                           mutateLinear()
-                          toast({ title: 'Linear disconnected' })
-                        } catch { toast({ title: 'Disconnect failed', variant: 'destructive' }) }
+                          toast('Linear disconnected', 'success')
+                        } catch { toast('Disconnect failed', 'error') }
                         finally { setLinearDisconnecting(false) }
                       }}
                       disabled={linearDisconnecting}
@@ -1019,16 +1019,16 @@ export default function SettingsPage() {
                             })
                             const j = await res.json()
                             if (res.ok) {
-                              toast({ title: 'Linear connected!', description: `Team: ${j.data?.teamName}` })
+                              toast(`Linear connected! Team: ${j.data?.teamName}`, 'success')
                               setLinearApiKey('')
                               setShowLinearInput(false)
                               mutateLinear()
                               // Kick off initial sync
                               fetch('/api/integrations/linear/sync', { method: 'POST' })
                             } else {
-                              toast({ title: 'Connection failed', description: j.error, variant: 'destructive' })
+                              toast(j.error ?? 'Connection failed', 'error')
                             }
-                          } catch { toast({ title: 'Connection failed', variant: 'destructive' }) }
+                          } catch { toast('Connection failed', 'error') }
                           finally { setLinearConnecting(false) }
                         }}
                         disabled={linearConnecting || !linearApiKey.trim()}
