@@ -1613,11 +1613,12 @@ export default async function LandingPage() {
               data-starter-elevate=""
               className="glass-card glass-glow glass-glow-indigo"
               style={{
-                padding: '32px 28px',
+                padding: '40px 28px 32px',
                 display: 'flex',
                 flexDirection: 'column',
                 border: `1px solid rgba(91,91,214,0.4)`,
                 position: 'relative',
+                overflow: 'visible',
                 transform: 'translateY(-8px)',
                 boxShadow: '0 0 50px rgba(91,91,214,0.15), 0 0 100px rgba(91,91,214,0.06), 0 20px 60px rgba(0,0,0,0.3)',
                 background: 'rgba(255,255,255,0.06)',
