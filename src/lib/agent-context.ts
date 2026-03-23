@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
-import { eq, sql } from 'drizzle-orm'
-import { generateQueryEmbedding } from './openai-embeddings'
+import { eq } from 'drizzle-orm'
+import { semanticSearch } from './semantic-search'
 
 interface AgentContext {
   relevantDeals: any[]
@@ -34,30 +34,33 @@ export async function getRelevantContext(
     if (company && company.length > 2 && msg.includes(company)) mentionedIds.add(d.id)
   }
 
-  // 3. If we have enough mentioned deals, skip vector search
+  // 3. If we have enough mentioned deals, skip semantic search
   let semanticIds: string[] = []
+  let searchPath = 'name-match'
   if (mentionedIds.size < maxDeals) {
+    const needed = maxDeals - mentionedIds.size
     try {
-      const queryEmbedding = await generateQueryEmbedding(userMessage)
-      const vecStr = `'[${queryEmbedding.join(',')}]'::vector`
-      const results = await db.execute(sql.raw(
-        `SELECT id, 1 - (deal_embedding <=> ${vecStr}) as similarity
-         FROM deal_logs
-         WHERE workspace_id = '${workspaceId}'
-           AND deal_embedding IS NOT NULL
-         ORDER BY deal_embedding <=> ${vecStr}
-         LIMIT ${maxDeals}`
-      ))
-      semanticIds = (results as any[]).map(r => r.id)
-    } catch (err) {
-      console.error('[agent-context] Vector search failed, falling back:', err)
-      // Fallback: use most recently updated deals
+      const results = await semanticSearch(workspaceId, userMessage, {
+        entityTypes: ['deal'],
+        limit: needed,
+        minSimilarity: 0.1,
+      })
+      semanticIds = results.map(r => r.entityId)
+      if (semanticIds.length > 0) {
+        searchPath = mentionedIds.size > 0 ? 'name-match+semantic' : 'semantic'
+      } else {
+        throw new Error('no semantic results')
+      }
+    } catch {
+      // Last resort: most recently updated deals
+      searchPath = mentionedIds.size > 0 ? 'name-match+recency' : 'recency'
       semanticIds = allDeals
         .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime())
         .slice(0, maxDeals)
         .map(d => d.id)
     }
   }
+  console.log(`[agent-context] search path="${searchPath}" mentioned=${mentionedIds.size} semantic=${semanticIds.length}`)
 
   // 4. Merge mentioned + semantic (deduped)
   const targetIds = new Set([...mentionedIds, ...semanticIds])
