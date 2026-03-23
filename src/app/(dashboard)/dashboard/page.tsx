@@ -9,6 +9,7 @@ import { useSidebar } from '@/components/layout/SidebarContext'
 import { formatCurrency } from '@/lib/format'
 import { generateAlerts } from '@/lib/alerts'
 import { getScoreColor } from '@/lib/deal-context'
+import { track, Events } from '@/lib/analytics'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -160,6 +161,7 @@ export default function DashboardPage() {
     try {
       await fetch('/api/dashboard/ai-overview', { method: 'POST' })
       await mutate('/api/dashboard/ai-overview')
+      track(Events.AI_BRIEFING_GENERATED, { dealCount: activeDeals.length })
     } finally {
       setRegenerating(false)
     }

@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useClerk, useUser } from '@clerk/nextjs'
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 import { useTheme } from './ThemeContext'
+import { identify } from '@/lib/analytics'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -40,6 +42,17 @@ export default function Sidebar() {
   const urgentCount = brain?.urgentDeals?.length ?? 0
   const { data: unmatchedRes } = useSWR('/api/ingest/email/unmatched', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
   const unmatchedEmailCount = unmatchedRes?.pendingCount ?? 0
+
+  // Identify user in Mixpanel once auth loads
+  useEffect(() => {
+    if (user) {
+      identify(user.id, {
+        email: user.primaryEmailAddress?.emailAddress,
+        name: user.fullName,
+        $created: user.createdAt,
+      })
+    }
+  }, [user])
 
   const isActive = (href: string, matchPaths?: string[]) => {
     const paths = matchPaths ? [href, ...matchPaths] : [href]

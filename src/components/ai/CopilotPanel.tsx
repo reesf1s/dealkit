@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useChat, type Message } from 'ai/react'
 import { Sparkles, X, Maximize2, Minimize2, Send, Square } from 'lucide-react'
 import { useSidebar } from '@/components/layout/SidebarContext'
+import { track, Events } from '@/lib/analytics'
 import MarkdownRenderer from './MarkdownRenderer'
 import ToolCallCard from './ToolCallCard'
 
@@ -238,6 +239,7 @@ export default function CopilotPanel() {
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim()) return
+    track(Events.AI_CHAT_SENT, { dealId: activeDeal?.id ?? null, messageLength: input.trim().length })
     handleSubmit(e)
   }
 

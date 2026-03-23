@@ -20,6 +20,7 @@ import {
 import type { DealContact, DealLink as DealLinkType, DealLinkType as LinkTypeEnum } from '@/types'
 import { useSidebar } from '@/components/layout/SidebarContext'
 import { getScoreColor, getScoreDisplay } from '@/lib/deal-context'
+import { track, Events } from '@/lib/analytics'
 
 // ─── Signal highlighting helper ──────────────────────────────────────────────
 
@@ -480,6 +481,7 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
         setLastExtraction({ extraction: { ...extraction, signals }, analysedAt: new Date().toISOString() })
         setUpdateText('')
         onUpdate()
+        track(Events.AI_NOTE_ANALYZED, { dealId, signalsExtracted: signals ? Object.keys(signals).length : 0 })
       }
     } finally {
       setAnalysing(false)
@@ -3597,6 +3599,7 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
         setLastExtraction({ extraction: { ...extraction, signals }, analysedAt: new Date().toISOString() })
         setUpdateText('')
         onUpdate()
+        track(Events.AI_NOTE_ANALYZED, { dealId, signalsExtracted: signals ? Object.keys(signals).length : 0 })
       }
     } finally {
       setAnalysing(false)
@@ -4920,6 +4923,7 @@ export default function DealDetailPage() {
   useEffect(() => {
     if (deal) {
       setActiveDeal({ id: deal.id, name: deal.dealName, company: deal.prospectCompany, stage: deal.stage })
+      track(Events.DEAL_VIEWED, { dealId: deal.id, dealName: deal.dealName, score: deal.conversionScore ?? null })
     }
     return () => setActiveDeal(null)
   }, [deal?.id, deal?.dealName, deal?.prospectCompany, deal?.stage])

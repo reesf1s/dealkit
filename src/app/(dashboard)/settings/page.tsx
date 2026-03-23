@@ -791,6 +791,7 @@ export default function SettingsPage() {
                 </div>
                 <form onSubmit={handleHubspotConnect} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <input
+                    data-mp-block
                     type="password"
                     value={hubspotToken}
                     onChange={e => setHubspotToken(e.target.value)}
@@ -944,6 +945,7 @@ export default function SettingsPage() {
               <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>Workspace API key</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <input
+                  data-mp-block
                   readOnly
                   value={apiKeyRes?.data?.apiKey ?? 'Loading…'}
                   style={{
