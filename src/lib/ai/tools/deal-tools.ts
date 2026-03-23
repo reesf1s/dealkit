@@ -1420,7 +1420,7 @@ export const answer_question = {
 
     // ML insights
     if (brain.mlModel) {
-      contextParts.push(`\nML Model: trained on ${brain.mlModel.trainingSize} deals, accuracy ${(brain.mlModel.accuracy * 100).toFixed(0)}%`)
+      contextParts.push(`\nML Model: trained on ${brain.mlModel.trainingSize} deals, accuracy ${((brain.mlModel.looAccuracy ?? 0) * 100).toFixed(0)}%`)
     }
 
     // Competitor intelligence
