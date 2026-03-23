@@ -21,6 +21,7 @@ import type { DealContact, DealLink as DealLinkType, DealLinkType as LinkTypeEnu
 import { useSidebar } from '@/components/layout/SidebarContext'
 import { getScoreColor, getScoreDisplay } from '@/lib/deal-context'
 import { track, Events } from '@/lib/analytics'
+import { ProductIssuesPanel } from '@/components/deals/ProductIssuesPanel'
 
 // ─── Signal highlighting helper ──────────────────────────────────────────────
 
@@ -4764,6 +4765,9 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
           </div>
         </div>
       )}
+
+      {/* Product Issues panel — Linear bidirectional link */}
+      <ProductIssuesPanel dealId={id} />
 
       {/* Deal info grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>

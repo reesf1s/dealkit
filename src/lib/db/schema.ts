@@ -558,6 +558,116 @@ export const globalBenchmarkCache = pgTable('global_benchmark_cache', {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MCP Phase 1 — Linear bidirectional intelligence link
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * linear_integrations  (one per workspace — stores encrypted API key + team context)
+ * Follows the same pattern as hubspot_integrations.
+ */
+export const linearIntegrations = pgTable('linear_integrations', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  workspaceId:   uuid('workspace_id')
+    .notNull()
+    .references(() => workspaces.id, { onDelete: 'cascade' })
+    .unique(),                                               // one integration per workspace
+  apiKeyEnc:     text('api_key_enc').notNull(),              // AES-256-GCM encrypted Linear API key
+  teamId:        text('team_id').notNull(),                  // Linear team ID resolved on connect
+  teamName:      text('team_name'),                          // Display name e.g. "Engineering"
+  workspaceName: text('workspace_name'),                     // Linear workspace name e.g. "Acme"
+  webhookSecret: text('webhook_secret'),                     // HMAC secret for Linear webhooks
+  lastSyncAt:    timestamp('last_sync_at', { withTimezone: true }),
+  syncError:     text('sync_error'),
+  createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:     timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
+ * linear_issues_cache  (denormalised Linear issues with TF-IDF embeddings)
+ * Populated by the linear sync job. Embeddings live in workspace.embedding_cache (linearIssues).
+ */
+export const linearIssuesCache = pgTable('linear_issues_cache', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  workspaceId:    uuid('workspace_id')
+    .notNull()
+    .references(() => workspaces.id, { onDelete: 'cascade' }),
+  linearIssueId:  text('linear_issue_id').notNull(),         // e.g. "ENG-36"
+  linearIssueUrl: text('linear_issue_url'),
+  title:          text('title').notNull(),
+  description:    text('description'),
+  status:         text('status'),                            // e.g. "Todo", "In Progress"
+  cycleId:        text('cycle_id'),
+  assigneeId:     text('assignee_id'),
+  assigneeName:   text('assignee_name'),
+  priority:       integer('priority').notNull().default(0), // 0=no priority,1=urgent,2=high,3=medium,4=low
+  cachedAt:       timestamp('cached_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  unique().on(t.workspaceId, t.linearIssueId),
+])
+
+/**
+ * deal_linear_links  (the link between a Halvex deal and a Linear issue)
+ */
+export const dealLinearLinks = pgTable('deal_linear_links', {
+  id:              uuid('id').primaryKey().defaultRandom(),
+  workspaceId:     uuid('workspace_id')
+    .notNull()
+    .references(() => workspaces.id, { onDelete: 'cascade' }),
+  dealId:          uuid('deal_id')
+    .notNull()
+    .references(() => dealLogs.id, { onDelete: 'cascade' }),
+  linearIssueId:   text('linear_issue_id').notNull(),        // e.g. "ENG-36"
+  linearIssueUrl:  text('linear_issue_url'),
+  linearTitle:     text('linear_title'),
+  relevanceScore:  integer('relevance_score').notNull().default(0), // 0-100 (scaled from 0.0-1.0)
+  linkType:        text('link_type').notNull().default('feature_gap'), // 'feature_gap'|'competitor_signal'|'manual'
+  status:          text('status').notNull().default('suggested'),     // 'suggested'|'confirmed'|'dismissed'|'in_cycle'|'deployed'
+  scopedAt:        timestamp('scoped_at', { withTimezone: true }),
+  deployedAt:      timestamp('deployed_at', { withTimezone: true }),
+  createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:       timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  unique().on(t.dealId, t.linearIssueId),
+])
+
+/**
+ * mcp_action_log  (audit trail for all MCP actions — scope, email, slack, link events)
+ */
+export const mcpActionLog = pgTable('mcp_action_log', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  workspaceId:    uuid('workspace_id')
+    .notNull()
+    .references(() => workspaces.id, { onDelete: 'cascade' }),
+  actionType:     text('action_type').notNull(),             // 'scope_issue'|'draft_email'|'slack_notify'|'link_created'|'link_confirmed'|'link_dismissed'
+  dealId:         uuid('deal_id').references(() => dealLogs.id, { onDelete: 'set null' }),
+  linearIssueId:  text('linear_issue_id'),
+  triggeredBy:    text('triggered_by'),                      // 'slack'|'claude'|'cron'|'webhook'|'user'
+  payload:        jsonb('payload'),
+  result:         jsonb('result'),
+  status:         text('status').notNull().default('pending'), // 'pending'|'complete'|'error'
+  createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// Relations
+export const linearIntegrationsRelations = relations(linearIntegrations, ({ one }) => ({
+  workspace: one(workspaces, { fields: [linearIntegrations.workspaceId], references: [workspaces.id] }),
+}))
+
+export const linearIssuesCacheRelations = relations(linearIssuesCache, ({ one }) => ({
+  workspace: one(workspaces, { fields: [linearIssuesCache.workspaceId], references: [workspaces.id] }),
+}))
+
+export const dealLinearLinksRelations = relations(dealLinearLinks, ({ one }) => ({
+  workspace: one(workspaces, { fields: [dealLinearLinks.workspaceId], references: [workspaces.id] }),
+  deal: one(dealLogs, { fields: [dealLinearLinks.dealId], references: [dealLogs.id] }),
+}))
+
+export const mcpActionLogRelations = relations(mcpActionLog, ({ one }) => ({
+  workspace: one(workspaces, { fields: [mcpActionLog.workspaceId], references: [workspaces.id] }),
+  deal: one(dealLogs, { fields: [mcpActionLog.dealId], references: [dealLogs.id] }),
+}))
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Inferred row types
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -602,6 +712,18 @@ export type NewGlobalDealOutcomeRow = typeof globalDealOutcomes.$inferInsert
 
 export type GlobalMlModelRow = typeof globalMlModel.$inferSelect
 export type NewGlobalMlModelRow = typeof globalMlModel.$inferInsert
+
+export type LinearIntegrationRow = typeof linearIntegrations.$inferSelect
+export type NewLinearIntegrationRow = typeof linearIntegrations.$inferInsert
+
+export type LinearIssueCacheRow = typeof linearIssuesCache.$inferSelect
+export type NewLinearIssueCacheRow = typeof linearIssuesCache.$inferInsert
+
+export type DealLinearLinkRow = typeof dealLinearLinks.$inferSelect
+export type NewDealLinearLinkRow = typeof dealLinearLinks.$inferInsert
+
+export type McpActionLogRow = typeof mcpActionLog.$inferSelect
+export type NewMcpActionLogRow = typeof mcpActionLog.$inferInsert
 
 export type GlobalContributionAuditRow = typeof globalContributionAudit.$inferSelect
 export type GlobalBenchmarkCacheRow = typeof globalBenchmarkCache.$inferSelect
