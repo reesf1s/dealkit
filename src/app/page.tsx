@@ -23,15 +23,15 @@ export const metadata: Metadata = {
   },
 }
 
-/* ── Design tokens (inline) ─────────────────────────────────── */
+/* ── Design tokens ─────────────────────────────────────────── */
 const bg = '#09090B'
-const card = '#141416'
 const textPrimary = 'rgba(255,255,255,0.93)'
 const textSecondary = 'rgba(255,255,255,0.55)'
 const textTertiary = 'rgba(255,255,255,0.32)'
 const accent = '#5B5BD6'
+const green = '#3CCB7F'
+const amber = '#F59E0B'
 const maxW = '960px'
-const cardRadius = '8px'
 
 export default async function LandingPage() {
   const { userId } = await auth()
@@ -45,10 +45,84 @@ export default async function LandingPage() {
         fontFamily: 'var(--ds-font)',
         minHeight: '100vh',
         overflowX: 'hidden',
+        position: 'relative',
       }}
     >
-      {/* ── Responsive styles ──────────────────────────────────── */}
+      {/* ── Global styles + responsive + animations ──────────── */}
       <style>{`
+        @supports (backdrop-filter: blur(1px)) {
+          .glass-card {
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+          }
+          .glass-card-hero {
+            backdrop-filter: blur(40px);
+            -webkit-backdrop-filter: blur(40px);
+          }
+          .glass-nav {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+          }
+        }
+        @supports not (backdrop-filter: blur(1px)) {
+          .glass-card {
+            background: rgba(20,20,22,0.95) !important;
+          }
+          .glass-card-hero {
+            background: rgba(20,20,22,0.95) !important;
+          }
+          .glass-nav {
+            background: rgba(9,9,11,0.95) !important;
+          }
+        }
+
+        .glass-card {
+          background: rgba(255,255,255,0.03);
+          border: 1px solid rgba(255,255,255,0.06);
+          border-radius: 16px;
+          position: relative;
+          overflow: hidden;
+          transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .glass-card:hover {
+          border-color: rgba(255,255,255,0.12);
+          box-shadow: 0 0 40px rgba(91,91,214,0.08);
+        }
+
+        .glow-orb {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(120px);
+          pointer-events: none;
+          z-index: 0;
+        }
+
+        .gradient-text {
+          background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.6));
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+
+        @keyframes pulse-line {
+          0%, 100% { opacity: 0.15; }
+          50% { opacity: 0.4; }
+        }
+        .arch-line-pulse {
+          animation: pulse-line 3s ease-in-out infinite;
+        }
+
+        @keyframes float-orb {
+          0%, 100% { transform: translate(0, 0); }
+          50% { transform: translate(15px, -10px); }
+        }
+        .float-orb-slow {
+          animation: float-orb 12s ease-in-out infinite;
+        }
+        .float-orb-med {
+          animation: float-orb 8s ease-in-out infinite reverse;
+        }
+
         @media (max-width: 768px) {
           [data-hero-headline] { font-size: 32px !important; }
           [data-section] { padding-top: 64px !important; padding-bottom: 64px !important; }
@@ -64,11 +138,16 @@ export default async function LandingPage() {
           [data-compare-divider] { display: none !important; }
           [data-compare-mobile-divider] { display: block !important; }
           [data-arch-row] { flex-direction: column !important; }
+          [data-step-arrow] { display: none !important; }
+          .glow-orb { filter: blur(80px) !important; opacity: 0.7 !important; }
+          [data-stagger-grid] { grid-template-columns: 1fr !important; }
+          [data-starter-elevate] { transform: none !important; }
         }
       `}</style>
 
       {/* ── Nav ──────────────────────────────────────────────────── */}
       <nav
+        className="glass-nav"
         style={{
           position: 'fixed',
           top: 0,
@@ -80,9 +159,7 @@ export default async function LandingPage() {
           justifyContent: 'space-between',
           padding: '0 24px',
           height: '56px',
-          background: 'rgba(9,9,11,0.85)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
+          background: 'rgba(9,9,11,0.7)',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}
       >
@@ -122,6 +199,7 @@ export default async function LandingPage() {
               fontSize: '13px',
               fontWeight: 500,
               textDecoration: 'none',
+              boxShadow: '0 0 20px rgba(91,91,214,0.2)',
             }}
           >
             Start free &rarr;
@@ -143,13 +221,39 @@ export default async function LandingPage() {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
+            position: 'relative',
           }}
         >
+          {/* Hero gradient orbs */}
+          <div
+            className="glow-orb float-orb-slow"
+            style={{
+              width: '600px',
+              height: '600px',
+              background: 'radial-gradient(circle, rgba(91,91,214,0.20) 0%, transparent 70%)',
+              top: '-100px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+            }}
+          />
+          <div
+            className="glow-orb float-orb-med"
+            style={{
+              width: '500px',
+              height: '500px',
+              background: 'radial-gradient(circle, rgba(245,158,11,0.15) 0%, transparent 70%)',
+              top: '0px',
+              right: '-200px',
+            }}
+          />
+
           <div
             className="font-brand-wordmark"
             style={{
               color: 'rgba(255,255,255,0.35)',
               marginBottom: '32px',
+              position: 'relative',
+              zIndex: 1,
             }}
           >
             HALVEX
@@ -157,6 +261,7 @@ export default async function LandingPage() {
 
           <h1
             data-hero-headline=""
+            className="gradient-text"
             style={{
               fontFamily: 'var(--ds-font-brand)',
               fontSize: '52px',
@@ -165,6 +270,9 @@ export default async function LandingPage() {
               letterSpacing: '-0.01em',
               marginBottom: '24px',
               maxWidth: '720px',
+              position: 'relative',
+              zIndex: 1,
+              textShadow: '0 0 80px rgba(91,91,214,0.3)',
             }}
           >
             Every deal scored.
@@ -181,6 +289,8 @@ export default async function LandingPage() {
               lineHeight: 1.7,
               marginBottom: '40px',
               maxWidth: '640px',
+              position: 'relative',
+              zIndex: 1,
             }}
           >
             Private ML trained on your closed deals &mdash; not industry averages. Halvex tells you
@@ -195,6 +305,8 @@ export default async function LandingPage() {
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: '40px',
+              position: 'relative',
+              zIndex: 1,
             }}
           >
             <Link
@@ -208,11 +320,12 @@ export default async function LandingPage() {
                 padding: '0 28px',
                 height: '44px',
                 background: accent,
-                borderRadius: '6px',
+                borderRadius: '8px',
                 color: '#fff',
                 fontSize: '14px',
                 fontWeight: 500,
                 textDecoration: 'none',
+                boxShadow: '0 0 30px rgba(91,91,214,0.3), 0 0 60px rgba(91,91,214,0.1)',
               }}
             >
               Start free &rarr;
@@ -226,9 +339,9 @@ export default async function LandingPage() {
                 gap: '8px',
                 padding: '0 28px',
                 height: '44px',
-                background: 'transparent',
-                borderRadius: '6px',
-                border: '1px solid rgba(255,255,255,0.15)',
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: '8px',
+                border: '1px solid rgba(255,255,255,0.10)',
                 color: textPrimary,
                 fontSize: '14px',
                 fontWeight: 500,
@@ -239,16 +352,29 @@ export default async function LandingPage() {
             </a>
           </div>
 
-          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)' }}>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)', position: 'relative', zIndex: 1 }}>
             Trusted by teams managing &pound;1M+ pipelines
           </p>
+
+          {/* Hero bottom gradient divider */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: '-50vw',
+              right: '-50vw',
+              height: '1px',
+              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.10) 50%, transparent 100%)',
+            }}
+          />
         </section>
 
         {/* ══════════════════════════════════════════════════════════
             SECTION 2 — THE PROBLEM
         ══════════════════════════════════════════════════════════ */}
-        <section data-section="" style={{ paddingTop: '0', paddingBottom: '120px' }}>
+        <section data-section="" style={{ paddingTop: '0', paddingBottom: '120px', position: 'relative' }}>
           <h2
+            className="gradient-text"
             style={{
               fontSize: '32px',
               fontWeight: 600,
@@ -262,87 +388,137 @@ export default async function LandingPage() {
             It has no idea what&apos;s about to.
           </h2>
 
-          <div
-            data-compare-card=""
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1px 1fr',
-              background: card,
-              borderRadius: cardRadius,
-              overflow: 'hidden',
-            }}
-          >
-            {/* CRM side */}
-            <div style={{ padding: '32px' }}>
-              <div
-                style={{
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  letterSpacing: '1px',
-                  color: textTertiary,
-                  textTransform: 'uppercase',
-                  marginBottom: '20px',
-                }}
-              >
-                Your CRM says
-              </div>
-              <div
-                style={{
-                  fontSize: '36px',
-                  fontWeight: 700,
-                  color: '#22c55e',
-                  marginBottom: '12px',
-                }}
-              >
-                82
-              </div>
-              <div style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>
-                &ldquo;Deal is on track. Close date next month. Rep says champion is engaged.&rdquo;
-              </div>
-            </div>
-
-            {/* Divider */}
+          <div style={{ position: 'relative' }}>
+            {/* Background glow behind compare card */}
             <div
-              data-compare-divider=""
-              style={{ background: 'rgba(255,255,255,0.06)' }}
-            />
-            <div
-              data-compare-mobile-divider=""
+              className="glow-orb"
               style={{
-                display: 'none',
-                height: '1px',
-                background: 'rgba(255,255,255,0.06)',
-                gridColumn: '1 / -1',
+                width: '400px',
+                height: '400px',
+                background: 'radial-gradient(circle, rgba(239,68,68,0.12) 0%, transparent 70%)',
+                top: '-50px',
+                right: '-100px',
               }}
             />
 
-            {/* Halvex side */}
-            <div style={{ padding: '32px' }}>
-              <div
-                style={{
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  letterSpacing: '1px',
-                  color: textTertiary,
-                  textTransform: 'uppercase',
-                  marginBottom: '20px',
-                }}
-              >
-                Halvex says
+            <div
+              data-compare-card=""
+              className="glass-card"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1px 1fr',
+                position: 'relative',
+                zIndex: 1,
+              }}
+            >
+              {/* CRM side */}
+              <div style={{ padding: '32px' }}>
+                <div
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    letterSpacing: '1px',
+                    color: textTertiary,
+                    textTransform: 'uppercase',
+                    marginBottom: '20px',
+                  }}
+                >
+                  Your CRM says
+                </div>
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  {/* Green glow behind 82 */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      width: '80px',
+                      height: '80px',
+                      background: 'radial-gradient(circle, rgba(34,197,94,0.25) 0%, transparent 70%)',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      filter: 'blur(20px)',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                  <div
+                    style={{
+                      fontSize: '36px',
+                      fontWeight: 700,
+                      color: '#22c55e',
+                      marginBottom: '12px',
+                      position: 'relative',
+                    }}
+                  >
+                    82
+                  </div>
+                </div>
+                <div style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>
+                  &ldquo;Deal is on track. Close date next month. Rep says champion is engaged.&rdquo;
+                </div>
               </div>
+
+              {/* Gradient divider */}
               <div
+                data-compare-divider=""
                 style={{
-                  fontSize: '36px',
-                  fontWeight: 700,
-                  color: '#ef4444',
-                  marginBottom: '12px',
+                  background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)',
                 }}
-              >
-                38
-              </div>
-              <div style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>
-                &ldquo;Champion went silent 18 days ago. No technical validation. Budget
-                conversation stalled. Deals like this close 12% of the time.&rdquo;
+              />
+              <div
+                data-compare-mobile-divider=""
+                style={{
+                  display: 'none',
+                  height: '1px',
+                  background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)',
+                  gridColumn: '1 / -1',
+                }}
+              />
+
+              {/* Halvex side */}
+              <div style={{ padding: '32px' }}>
+                <div
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    letterSpacing: '1px',
+                    color: textTertiary,
+                    textTransform: 'uppercase',
+                    marginBottom: '20px',
+                  }}
+                >
+                  Halvex says
+                </div>
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  {/* Red glow behind 38 */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      width: '80px',
+                      height: '80px',
+                      background: 'radial-gradient(circle, rgba(239,68,68,0.25) 0%, transparent 70%)',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      filter: 'blur(20px)',
+                      pointerEvents: 'none',
+                    }}
+                  />
+                  <div
+                    style={{
+                      fontSize: '36px',
+                      fontWeight: 700,
+                      color: '#ef4444',
+                      marginBottom: '12px',
+                      position: 'relative',
+                    }}
+                  >
+                    38
+                  </div>
+                </div>
+                <div style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>
+                  &ldquo;Champion went silent 18 days ago. No technical validation. Budget
+                  conversation stalled. Deals like this close 12% of the time.&rdquo;
+                </div>
               </div>
             </div>
           </div>
@@ -368,9 +544,10 @@ export default async function LandingPage() {
         <section
           id="how-it-works"
           data-section=""
-          style={{ paddingTop: '0', paddingBottom: '120px' }}
+          style={{ paddingTop: '0', paddingBottom: '120px', position: 'relative' }}
         >
           <h2
+            className="gradient-text"
             style={{
               fontSize: '32px',
               fontWeight: 600,
@@ -387,6 +564,7 @@ export default async function LandingPage() {
               display: 'grid',
               gridTemplateColumns: 'repeat(3, 1fr)',
               gap: '20px',
+              position: 'relative',
             }}
           >
             {[
@@ -394,58 +572,115 @@ export default async function LandingPage() {
                 num: '1',
                 title: 'CONNECT',
                 desc: 'Add your deals and conversations. Halvex extracts signals automatically — champion status, budget, risks, competitive mentions, product gaps.',
+                glowColor: 'rgba(91,91,214,0.18)',
+                accentColor: accent,
               },
               {
                 num: '2',
                 title: 'SCORE',
                 desc: 'Private ML trained on your closed deals calculates win probability. Every score is pure math from your own history — never hallucinated.',
+                glowColor: 'rgba(60,203,127,0.18)',
+                accentColor: green,
               },
               {
                 num: '3',
                 title: 'ACT',
                 desc: 'Morning briefings with specific actions for each deal. Which deals need attention, what changed, and exactly what to do next.',
+                glowColor: 'rgba(245,158,11,0.18)',
+                accentColor: amber,
               },
-            ].map(({ num, title, desc }) => (
-              <div
-                key={num}
-                style={{
-                  background: card,
-                  borderRadius: cardRadius,
-                  padding: '28px',
-                }}
-              >
+            ].map(({ num, title, desc, glowColor, accentColor }, i) => (
+              <div key={num} style={{ position: 'relative', display: 'flex', alignItems: 'stretch' }}>
+                {/* Glow behind card */}
                 <div
+                  className="glow-orb"
                   style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '8px',
-                    background: 'rgba(91,91,214,0.12)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: accent,
-                    marginBottom: '16px',
+                    width: '200px',
+                    height: '200px',
+                    background: `radial-gradient(circle, ${glowColor} 0%, transparent 70%)`,
+                    top: '20%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                  }}
+                />
+
+                <div
+                  className="glass-card"
+                  style={{
+                    padding: '28px',
+                    position: 'relative',
+                    zIndex: 1,
+                    flex: 1,
                   }}
                 >
-                  {num}
+                  {/* Watermark number */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '16px',
+                      fontSize: '60px',
+                      fontWeight: 700,
+                      color: 'rgba(255,255,255,0.04)',
+                      lineHeight: 1,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    {num}
+                  </div>
+
+                  <div
+                    style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '10px',
+                      background: `rgba(${accentColor === accent ? '91,91,214' : accentColor === green ? '60,203,127' : '245,158,11'},0.12)`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                      color: accentColor,
+                      marginBottom: '16px',
+                    }}
+                  >
+                    {num}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      letterSpacing: '1.5px',
+                      color: textPrimary,
+                      marginBottom: '8px',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {title}
+                  </div>
+                  <div style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>
+                    {desc}
+                  </div>
                 </div>
-                <div
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    letterSpacing: '1.5px',
-                    color: textPrimary,
-                    marginBottom: '8px',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  {title}
-                </div>
-                <div style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>
-                  {desc}
-                </div>
+
+                {/* Arrow connector */}
+                {i < 2 && (
+                  <div
+                    data-step-arrow=""
+                    style={{
+                      position: 'absolute',
+                      right: '-14px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      zIndex: 2,
+                      color: 'rgba(255,255,255,0.15)',
+                      fontSize: '18px',
+                      fontWeight: 300,
+                    }}
+                  >
+                    &rarr;
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -454,8 +689,9 @@ export default async function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 4 — WHY NOT HUBSPOT?
         ══════════════════════════════════════════════════════════ */}
-        <section data-section="" style={{ paddingTop: '0', paddingBottom: '120px' }}>
+        <section data-section="" style={{ paddingTop: '0', paddingBottom: '120px', position: 'relative' }}>
           <h2
+            className="gradient-text"
             style={{
               fontSize: '32px',
               fontWeight: 600,
@@ -469,89 +705,133 @@ export default async function LandingPage() {
             Why would we need this?&rdquo;
           </h2>
 
-          <div
-            data-two-col=""
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '16px',
-            }}
-          >
-            {/* HubSpot side — dimmed */}
+          <div style={{ position: 'relative' }}>
+            {/* Purple glow behind Halvex side */}
             <div
+              className="glow-orb"
               style={{
-                background: card,
-                borderRadius: cardRadius,
-                padding: '28px',
-                opacity: 0.55,
+                width: '350px',
+                height: '350px',
+                background: 'radial-gradient(circle, rgba(91,91,214,0.12) 0%, transparent 70%)',
+                top: '-50px',
+                right: '0px',
               }}
-            >
-              <div
-                style={{
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  letterSpacing: '1px',
-                  color: textTertiary,
-                  textTransform: 'uppercase',
-                  marginBottom: '20px',
-                }}
-              >
-                HubSpot
-              </div>
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  fontSize: '14px',
-                  color: textSecondary,
-                  lineHeight: 1.7,
-                }}
-              >
-                <div>Scores on metadata: stage, amount, close date</div>
-                <div>Generic model trained on industry averages</div>
-                <div>No signal extraction from conversations</div>
-                <div>Forecast based on rep self-reporting</div>
-                <div>No specific daily actions</div>
-              </div>
-            </div>
+            />
 
-            {/* Halvex side — bright, accent border */}
             <div
+              data-two-col=""
+              className="glass-card"
               style={{
-                background: card,
-                borderRadius: cardRadius,
-                padding: '28px',
-                borderLeft: `3px solid ${accent}`,
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                position: 'relative',
+                zIndex: 1,
+                border: 'none',
               }}
             >
+              {/* HubSpot side — dimmed with red/grey tint */}
               <div
                 style={{
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  letterSpacing: '1px',
-                  color: accent,
-                  textTransform: 'uppercase',
-                  marginBottom: '20px',
+                  padding: '32px',
+                  borderRadius: '16px 0 0 16px',
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.04)',
+                  position: 'relative',
+                  overflow: 'hidden',
                 }}
               >
-                Halvex
+                {/* Subtle red/grey background tint */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'linear-gradient(135deg, rgba(127,29,29,0.06) 0%, transparent 60%)',
+                    pointerEvents: 'none',
+                  }}
+                />
+                <div
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    letterSpacing: '1px',
+                    color: textTertiary,
+                    textTransform: 'uppercase',
+                    marginBottom: '20px',
+                    position: 'relative',
+                  }}
+                >
+                  HubSpot
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    fontSize: '14px',
+                    color: 'rgba(255,255,255,0.38)',
+                    lineHeight: 1.7,
+                    position: 'relative',
+                  }}
+                >
+                  <div>Scores on metadata: stage, amount, close date</div>
+                  <div>Generic model trained on industry averages</div>
+                  <div>No signal extraction from conversations</div>
+                  <div>Forecast based on rep self-reporting</div>
+                  <div>No specific daily actions</div>
+                </div>
               </div>
+
+              {/* Halvex side — bright, gradient left border */}
               <div
                 style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                  fontSize: '14px',
-                  color: textSecondary,
-                  lineHeight: 1.7,
+                  padding: '32px',
+                  borderRadius: '0 16px 16px 0',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  borderLeft: 'none',
+                  position: 'relative',
+                  overflow: 'hidden',
                 }}
               >
-                <div>Scores on what actually happened in every interaction</div>
-                <div>Private ML trained on your own win/loss data</div>
-                <div>Extracts signals, risks, and gaps from conversations</div>
-                <div>Forecast based on behavioural evidence</div>
-                <div>Daily briefing with specific next actions</div>
+                {/* Gradient left border */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: '2px',
+                    background: `linear-gradient(180deg, ${accent} 0%, transparent 100%)`,
+                  }}
+                />
+                <div
+                  style={{
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    letterSpacing: '1px',
+                    color: accent,
+                    textTransform: 'uppercase',
+                    marginBottom: '20px',
+                  }}
+                >
+                  Halvex
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    fontSize: '14px',
+                    color: textSecondary,
+                    lineHeight: 1.7,
+                  }}
+                >
+                  <div>Scores on what actually happened in every interaction</div>
+                  <div>Private ML trained on your own win/loss data</div>
+                  <div>Extracts signals, risks, and gaps from conversations</div>
+                  <div>Forecast based on behavioural evidence</div>
+                  <div>Daily briefing with specific next actions</div>
+                </div>
               </div>
             </div>
           </div>
@@ -575,8 +855,9 @@ export default async function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 5 — WHAT YOU GET
         ══════════════════════════════════════════════════════════ */}
-        <section data-section="" style={{ paddingTop: '0', paddingBottom: '120px' }}>
+        <section data-section="" style={{ paddingTop: '0', paddingBottom: '120px', position: 'relative' }}>
           <h2
+            className="gradient-text"
             style={{
               fontSize: '32px',
               fontWeight: 600,
@@ -587,46 +868,103 @@ export default async function LandingPage() {
             Intelligence that compounds.
           </h2>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxWidth: '720px' }}>
+          {/* Ambient glow */}
+          <div
+            className="glow-orb float-orb-slow"
+            style={{
+              width: '400px',
+              height: '400px',
+              background: 'radial-gradient(circle, rgba(91,91,214,0.10) 0%, transparent 70%)',
+              top: '100px',
+              left: '-100px',
+            }}
+          />
+
+          <div
+            data-stagger-grid=""
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '16px',
+              maxWidth: '720px',
+              position: 'relative',
+              zIndex: 1,
+            }}
+          >
             {[
               {
+                icon: '\u2600',
                 title: 'Morning Briefing',
                 desc: 'Every deal that needs attention, what changed, and exactly what to do about it. Delivered before your first call.',
+                accentGrad: `linear-gradient(90deg, ${amber}, ${amber}88)`,
+                glowColor: 'rgba(245,158,11,0.08)',
+                span: false,
               },
               {
+                icon: '\u{1F3AF}',
                 title: 'Deal Intelligence',
                 desc: 'Win probability, risk signals, competitive threats, and champion health — for every deal, updated with every interaction.',
+                accentGrad: `linear-gradient(90deg, ${accent}, ${accent}88)`,
+                glowColor: 'rgba(91,91,214,0.08)',
+                span: false,
               },
               {
+                icon: '\u{1F9E0}',
                 title: 'Private ML',
                 desc: 'A model trained only on your data. What winning looks like for your team, your market, your deal shape. No generic benchmarks.',
+                accentGrad: `linear-gradient(90deg, ${green}, ${green}88)`,
+                glowColor: 'rgba(60,203,127,0.08)',
+                span: true,
               },
               {
+                icon: '\u{1F50D}',
                 title: 'Product Gap Detection',
                 desc: 'Automatically surfaces feature requests and missing capabilities mentioned across your pipeline. Ranked by revenue impact.',
+                accentGrad: `linear-gradient(90deg, #ef4444, #ef444488)`,
+                glowColor: 'rgba(239,68,68,0.08)',
+                span: false,
               },
               {
+                icon: '\u2694',
                 title: 'Collateral Engine',
                 desc: 'Generates deal-specific battlecards, objection handlers, and case study recommendations based on live competitive intelligence.',
+                accentGrad: `linear-gradient(90deg, ${accent}, ${amber})`,
+                glowColor: 'rgba(91,91,214,0.08)',
+                span: false,
               },
-            ].map(({ title, desc }) => (
+            ].map(({ icon, title, desc, accentGrad, glowColor, span }) => (
               <div
                 key={title}
+                className="glass-card"
                 style={{
-                  background: card,
-                  borderRadius: cardRadius,
                   padding: '24px 28px',
+                  gridColumn: span ? '1 / -1' : undefined,
                 }}
               >
+                {/* Colored accent line on top */}
                 <div
                   style={{
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    color: textPrimary,
-                    marginBottom: '6px',
+                    position: 'absolute',
+                    top: 0,
+                    left: '24px',
+                    right: '24px',
+                    height: '2px',
+                    background: accentGrad,
+                    borderRadius: '0 0 2px 2px',
+                    opacity: 0.6,
                   }}
-                >
-                  {title}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '16px' }}>{icon}</span>
+                  <div
+                    style={{
+                      fontSize: '15px',
+                      fontWeight: 600,
+                      color: textPrimary,
+                    }}
+                  >
+                    {title}
+                  </div>
                 </div>
                 <div style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>
                   {desc}
@@ -639,8 +977,9 @@ export default async function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 6 — THE ARCHITECTURE
         ══════════════════════════════════════════════════════════ */}
-        <section data-section="" style={{ paddingTop: '0', paddingBottom: '120px' }}>
+        <section data-section="" style={{ paddingTop: '0', paddingBottom: '120px', position: 'relative' }}>
           <h2
+            className="gradient-text"
             style={{
               fontSize: '32px',
               fontWeight: 600,
@@ -657,6 +996,7 @@ export default async function LandingPage() {
               flexDirection: 'column',
               gap: '2px',
               maxWidth: '720px',
+              position: 'relative',
             }}
           >
             {[
@@ -664,18 +1004,27 @@ export default async function LandingPage() {
                 label: 'Layer 1',
                 title: 'Signal Extraction',
                 desc: 'AI reads every conversation and extracts structured signals — champion status, budget indicators, risk markers, competitive mentions, and product gaps.',
+                dotColor: '#5B8DEF',
+                glowColor: 'rgba(91,141,239,0.15)',
+                lineColor: 'rgba(91,141,239,0.4)',
               },
               {
                 label: 'Layer 2',
                 title: 'Private ML Engine',
                 desc: 'A model trained exclusively on your closed deals. Win probability calculated from real patterns in your data. No industry averages. No hallucinated scores.',
+                dotColor: green,
+                glowColor: 'rgba(60,203,127,0.15)',
+                lineColor: 'rgba(60,203,127,0.4)',
               },
               {
                 label: 'Layer 3',
                 title: 'AI Narration',
                 desc: 'AI explains every score in plain language. Why is this deal at risk? What changed? What should you do next? Specific, actionable, grounded in evidence.',
+                dotColor: accent,
+                glowColor: 'rgba(91,91,214,0.15)',
+                lineColor: 'rgba(91,91,214,0.4)',
               },
-            ].map(({ label, title, desc }, i) => (
+            ].map(({ label, title, desc, dotColor, glowColor, lineColor }, i) => (
               <div
                 key={title}
                 data-arch-row=""
@@ -683,6 +1032,7 @@ export default async function LandingPage() {
                   display: 'flex',
                   gap: '24px',
                   alignItems: 'flex-start',
+                  position: 'relative',
                 }}
               >
                 {/* Left: flow indicator */}
@@ -696,36 +1046,66 @@ export default async function LandingPage() {
                     paddingTop: '28px',
                   }}
                 >
-                  <div
-                    style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: accent,
-                    }}
-                  />
+                  {/* Glowing dot */}
+                  <div style={{ position: 'relative' }}>
+                    <div
+                      style={{
+                        position: 'absolute',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        background: `radial-gradient(circle, ${glowColor} 0%, transparent 70%)`,
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        filter: 'blur(6px)',
+                      }}
+                    />
+                    <div
+                      style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: dotColor,
+                        position: 'relative',
+                        boxShadow: `0 0 12px ${lineColor}`,
+                      }}
+                    />
+                  </div>
                   {i < 2 && (
                     <div
+                      className="arch-line-pulse"
                       style={{
                         width: '1px',
                         height: '60px',
-                        background: 'rgba(255,255,255,0.08)',
+                        background: `linear-gradient(180deg, ${lineColor} 0%, transparent 100%)`,
                         marginTop: '4px',
                       }}
                     />
                   )}
                 </div>
 
-                {/* Right: card */}
+                {/* Right: glass card */}
                 <div
+                  className="glass-card"
                   style={{
-                    background: card,
-                    borderRadius: cardRadius,
                     padding: '24px 28px',
                     flex: 1,
-                    marginBottom: i < 2 ? '0' : '0',
+                    position: 'relative',
                   }}
                 >
+                  {/* Subtle glow inside card */}
+                  <div
+                    className="glow-orb"
+                    style={{
+                      width: '150px',
+                      height: '150px',
+                      background: `radial-gradient(circle, ${glowColor} 0%, transparent 70%)`,
+                      top: '-30px',
+                      left: '-30px',
+                      filter: 'blur(60px)',
+                    }}
+                  />
                   <div
                     style={{
                       fontSize: '11px',
@@ -734,6 +1114,7 @@ export default async function LandingPage() {
                       color: textTertiary,
                       textTransform: 'uppercase',
                       marginBottom: '4px',
+                      position: 'relative',
                     }}
                   >
                     {label}
@@ -744,11 +1125,12 @@ export default async function LandingPage() {
                       fontWeight: 600,
                       color: textPrimary,
                       marginBottom: '6px',
+                      position: 'relative',
                     }}
                   >
                     {title}
                   </div>
-                  <div style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>
+                  <div style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7, position: 'relative' }}>
                     {desc}
                   </div>
                 </div>
@@ -759,21 +1141,32 @@ export default async function LandingPage() {
           <p
             style={{
               fontSize: '15px',
-              color: textSecondary,
               lineHeight: 1.7,
               marginTop: '32px',
               maxWidth: '720px',
             }}
           >
-            AI extracts. ML predicts. AI explains. No score is ever hallucinated.
+            <span
+              style={{
+                background: `linear-gradient(135deg, ${accent}, ${green}, ${amber})`,
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                fontWeight: 600,
+              }}
+            >
+              AI extracts. ML predicts. AI explains.
+            </span>
+            <span style={{ color: textSecondary }}> No score is ever hallucinated.</span>
           </p>
         </section>
 
         {/* ══════════════════════════════════════════════════════════
             SECTION 7 — PRICING
         ══════════════════════════════════════════════════════════ */}
-        <section data-section="" style={{ paddingTop: '0', paddingBottom: '120px' }}>
+        <section data-section="" style={{ paddingTop: '0', paddingBottom: '120px', position: 'relative' }}>
           <h2
+            className="gradient-text"
             style={{
               fontSize: '32px',
               fontWeight: 600,
@@ -784,19 +1177,34 @@ export default async function LandingPage() {
             Start free. Pay when it&apos;s useful.
           </h2>
 
+          {/* Ambient glow behind pricing */}
+          <div
+            className="glow-orb"
+            style={{
+              width: '500px',
+              height: '500px',
+              background: 'radial-gradient(circle, rgba(91,91,214,0.10) 0%, transparent 70%)',
+              top: '50px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+            }}
+          />
+
           <div
             data-pricing-grid=""
             style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(3, 1fr)',
               gap: '16px',
+              position: 'relative',
+              zIndex: 1,
+              alignItems: 'start',
             }}
           >
             {/* Free */}
             <div
+              className="glass-card"
               style={{
-                background: card,
-                borderRadius: cardRadius,
                 padding: '32px 28px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -832,7 +1240,7 @@ export default async function LandingPage() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   height: '44px',
-                  borderRadius: '6px',
+                  borderRadius: '8px',
                   border: '1px solid rgba(255,255,255,0.10)',
                   color: textPrimary,
                   fontSize: '13px',
@@ -844,44 +1252,61 @@ export default async function LandingPage() {
               </Link>
             </div>
 
-            {/* Starter — highlighted */}
+            {/* Starter — highlighted & elevated */}
             <div
+              data-starter-elevate=""
+              className="glass-card"
               style={{
-                background: card,
-                borderRadius: cardRadius,
                 padding: '32px 28px',
                 display: 'flex',
                 flexDirection: 'column',
-                border: `1px solid ${accent}`,
+                border: `1px solid rgba(91,91,214,0.4)`,
                 position: 'relative',
+                transform: 'translateY(-8px)',
+                boxShadow: '0 0 50px rgba(91,91,214,0.12), 0 20px 60px rgba(0,0,0,0.3)',
+                background: 'rgba(255,255,255,0.05)',
               }}
             >
+              {/* Stronger glow behind starter */}
+              <div
+                className="glow-orb"
+                style={{
+                  width: '250px',
+                  height: '250px',
+                  background: 'radial-gradient(circle, rgba(91,91,214,0.15) 0%, transparent 70%)',
+                  top: '-60px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  filter: 'blur(80px)',
+                }}
+              />
               <div
                 style={{
                   position: 'absolute',
                   top: '-12px',
                   left: '24px',
-                  background: accent,
+                  background: `linear-gradient(135deg, ${accent}, #7B7BD8)`,
                   color: '#fff',
                   fontSize: '11px',
                   fontWeight: 600,
                   padding: '4px 12px',
                   borderRadius: '100px',
+                  zIndex: 2,
                 }}
               >
                 Most popular
               </div>
-              <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px', color: textSecondary }}>
+              <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px', color: textSecondary, position: 'relative' }}>
                 Starter
               </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '4px' }}>
-                <span style={{ fontSize: '36px', fontWeight: 600, letterSpacing: '-0.03em' }}>&pound;79</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '4px', position: 'relative' }}>
+                <span style={{ fontSize: '36px', fontWeight: 600, letterSpacing: '-0.03em', color: 'rgba(255,255,255,0.95)' }}>&pound;79</span>
                 <span style={{ fontSize: '14px', color: textTertiary }}>/mo</span>
               </div>
-              <div style={{ fontSize: '13px', color: textTertiary, marginBottom: '28px' }}>
+              <div style={{ fontSize: '13px', color: textTertiary, marginBottom: '28px', position: 'relative' }}>
                 For growing teams
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px', flex: 1 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px', flex: 1, position: 'relative' }}>
                 {[
                   'Unlimited deals',
                   'ML deal scoring',
@@ -904,12 +1329,14 @@ export default async function LandingPage() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   height: '44px',
-                  borderRadius: '6px',
+                  borderRadius: '8px',
                   background: accent,
                   color: '#fff',
                   fontSize: '13px',
                   fontWeight: 500,
                   textDecoration: 'none',
+                  boxShadow: '0 0 20px rgba(91,91,214,0.25)',
+                  position: 'relative',
                 }}
               >
                 Start free &rarr;
@@ -918,9 +1345,8 @@ export default async function LandingPage() {
 
             {/* Pro */}
             <div
+              className="glass-card"
               style={{
-                background: card,
-                borderRadius: cardRadius,
                 padding: '32px 28px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -959,7 +1385,7 @@ export default async function LandingPage() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   height: '44px',
-                  borderRadius: '6px',
+                  borderRadius: '8px',
                   border: '1px solid rgba(255,255,255,0.10)',
                   color: textPrimary,
                   fontSize: '13px',
@@ -983,10 +1409,25 @@ export default async function LandingPage() {
           paddingTop: '0',
           paddingBottom: '80px',
           textAlign: 'center',
+          position: 'relative',
         }}
       >
-        <div style={{ maxWidth: maxW, margin: '0 auto', padding: '0 24px' }}>
+        {/* Ambient glow */}
+        <div
+          className="glow-orb"
+          style={{
+            width: '500px',
+            height: '500px',
+            background: 'radial-gradient(circle, rgba(91,91,214,0.08) 0%, transparent 70%)',
+            top: '-100px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+          }}
+        />
+
+        <div style={{ maxWidth: maxW, margin: '0 auto', padding: '0 24px', position: 'relative', zIndex: 1 }}>
           <h2
+            className="gradient-text"
             style={{
               fontSize: '32px',
               fontWeight: 600,
@@ -1016,11 +1457,12 @@ export default async function LandingPage() {
               padding: '0 32px',
               height: '48px',
               background: accent,
-              borderRadius: '6px',
+              borderRadius: '8px',
               color: '#fff',
               fontSize: '15px',
               fontWeight: 500,
               textDecoration: 'none',
+              boxShadow: '0 0 30px rgba(91,91,214,0.3), 0 0 60px rgba(91,91,214,0.1)',
             }}
           >
             Start free &rarr;
@@ -1030,11 +1472,22 @@ export default async function LandingPage() {
 
       <footer
         style={{
-          borderTop: '1px solid rgba(255,255,255,0.06)',
+          position: 'relative',
           padding: '48px 24px 64px',
           textAlign: 'center',
         }}
       >
+        {/* Gradient line separator */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '1px',
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)',
+          }}
+        />
         <p
           style={{
             fontSize: '15px',
