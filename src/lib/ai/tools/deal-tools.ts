@@ -823,7 +823,12 @@ export const enrich_deal = {
       return { result: 'No new data to add.' }
     }
 
-    await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, params.dealId))
+    const enrichResult = await db.update(dealLogs).set(updateFields)
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .returning({ id: dealLogs.id })
+    if (enrichResult.length === 0) {
+      return { result: `⚠ TOOL FAILED: Could not update deal — not found or workspace mismatch.` }
+    }
 
     // Score the deal if it doesn't already have a score
     let scoreSet = false
@@ -861,7 +866,7 @@ export const enrich_deal = {
           await db.update(dealLogs).set({
             conversionScore: Math.max(0, Math.min(100, Math.round(finalScore))),
             conversionInsights: insights,
-          }).where(eq(dealLogs.id, params.dealId))
+          }).where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
           scoreSet = true
           changes.push(`conversion score: ${Math.round(finalScore)}%`)
         }
@@ -1027,7 +1032,7 @@ export const update_deal = {
           await db.update(dealLogs).set({
             conversionScore: Math.max(0, Math.min(100, Math.round(finalScore))),
             conversionInsights: insights,
-          }).where(eq(dealLogs.id, params.dealId))
+          }).where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
         }
         } // end conversionScorePinned check
       } catch { /* scoring is non-fatal */ }
@@ -1127,7 +1132,12 @@ export const manage_todos = {
       }
     }
 
-    await db.update(dealLogs).set({ todos, updatedAt: new Date() }).where(eq(dealLogs.id, params.dealId))
+    const todoResult = await db.update(dealLogs).set({ todos, updatedAt: new Date() })
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .returning({ id: dealLogs.id })
+    if (todoResult.length === 0) {
+      return { result: `⚠ TOOL FAILED: Could not update todos — deal not found or workspace mismatch.` }
+    }
 
     const parts: string[] = []
     if (added > 0) parts.push(`${added} added`)
@@ -1185,7 +1195,12 @@ export const add_contact = {
     if (params.role) newContact.role = params.role
 
     contacts.push(newContact)
-    await db.update(dealLogs).set({ contacts, updatedAt: new Date() }).where(eq(dealLogs.id, params.dealId))
+    const contactResult = await db.update(dealLogs).set({ contacts, updatedAt: new Date() })
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .returning({ id: dealLogs.id })
+    if (contactResult.length === 0) {
+      return { result: `⚠ TOOL FAILED: Could not add contact — deal not found or workspace mismatch.` }
+    }
 
     const totalContacts = contacts.length
     return {
@@ -1246,7 +1261,7 @@ export const delete_deal_confirmed = {
 
     if (!deal) return { result: 'Deal not found.' }
 
-    await db.delete(dealLogs).where(eq(dealLogs.id, params.dealId))
+    await db.delete(dealLogs).where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
 
     after(async () => {
       await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
@@ -1913,7 +1928,7 @@ export const update_project_plan = {
 
       await db.update(dealLogs)
         .set({ projectPlan: plan, updatedAt: new Date() } as any)
-        .where(eq(dealLogs.id, params.dealId))
+        .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
 
       after(async () => {
         await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
@@ -2035,7 +2050,7 @@ export const update_project_plan = {
 
     await db.update(dealLogs)
       .set({ projectPlan: plan, updatedAt: new Date() } as any)
-      .where(eq(dealLogs.id, params.dealId))
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
 
     after(async () => {
       await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
@@ -2138,7 +2153,7 @@ export const update_success_criteria = {
 
     await db.update(dealLogs)
       .set({ successCriteriaTodos: criteria, updatedAt: new Date() })
-      .where(eq(dealLogs.id, params.dealId))
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
 
     after(async () => {
       await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
@@ -2341,7 +2356,12 @@ export const correct_deal_data = {
       return { result: 'No corrections specified.' }
     }
 
-    await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, params.dealId))
+    const corrResult = await db.update(dealLogs).set(updateFields)
+      .where(and(eq(dealLogs.id, params.dealId), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .returning({ id: dealLogs.id })
+    if (corrResult.length === 0) {
+      return { result: `⚠ TOOL FAILED: Could not correct deal — not found or workspace mismatch.` }
+    }
 
     after(async () => {
       await requestBrainRebuild(ctx.workspaceId, 'deal_tool_call')
