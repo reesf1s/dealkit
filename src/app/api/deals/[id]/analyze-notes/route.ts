@@ -513,6 +513,24 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
       }
     }
 
+    // Generate embeddings (non-blocking — don't fail the note processing if embeddings fail)
+    try {
+      const { generateEmbedding, generateDealEmbedding } = await import('@/lib/openai-embeddings')
+      const noteEmb = await generateEmbedding(appendedNotes)
+      const dealEmb = await generateDealEmbedding({
+        name: deal.dealName || '',
+        company: deal.prospectCompany || '',
+        stage: deal.stage || '',
+        meetingNotes: appendedNotes,
+        signals: updateFields.intentSignals ?? undefined,
+      })
+      updateFields.noteEmbedding = JSON.stringify(noteEmb)
+      updateFields.dealEmbedding = JSON.stringify(dealEmb)
+    } catch (err) {
+      console.error('[embeddings] Failed to generate embeddings:', err)
+      // Non-fatal — deal update still succeeds
+    }
+
     const [updatedDeal] = await db.update(dealLogs).set(updateFields).where(eq(dealLogs.id, id)).returning()
     const createdGaps = []
     for (const gap of (parsed.productGaps ?? [])) {

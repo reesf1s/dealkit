@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { dbErrResponse, ensureLinksColumn } from '@/lib/api-helpers'
@@ -151,21 +151,18 @@ export async function GET(
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { workspaceId } = await getWorkspaceContext(userId)
     const { id: dealId } = await params
+    const limit = 5
 
-    // Dynamic import — semantic search may not be available if pgvector isn't installed
-    let similar: { entityId: string; similarity: number }[]
+    // ── Pass 1: Numerical/TF-IDF matching (existing in-memory approach) ───────
+    let numericalMatches: { entityId: string; similarity: number }[] = []
     try {
       const { findSimilarDeals } = await import('@/lib/semantic-search')
-      similar = await findSimilarDeals(workspaceId, dealId, 5)
+      numericalMatches = await findSimilarDeals(workspaceId, dealId, 10)
     } catch {
-      return NextResponse.json({ data: [], message: 'Semantic search not available' })
+      // TF-IDF not available — will rely on semantic pass if embeddings exist
     }
 
-    if (similar.length === 0) {
-      return NextResponse.json({ data: [] })
-    }
-
-    // Fetch source deal for comparison
+    // ── Fetch source deal (needed for both semantic search + reason generation) ─
     await ensureLinksColumn()
     const [sourceDeal] = await db
       .select({
@@ -175,13 +172,77 @@ export async function GET(
         description: dealLogs.description,
         dealRisks: dealLogs.dealRisks,
         notes: dealLogs.notes,
+        dealEmbedding: dealLogs.dealEmbedding,
       })
       .from(dealLogs)
       .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId)))
       .limit(1)
 
-    // Fetch deal details for similar deals (with extra fields for reason generation)
-    const ids = similar.map(s => s.entityId)
+    if (!sourceDeal) {
+      return NextResponse.json({ data: [] })
+    }
+
+    // ── Pass 2: Semantic similarity via pgvector (if embedding exists) ─────────
+    let semanticMatches: { id: string; similarity: number }[] = []
+    if (sourceDeal.dealEmbedding) {
+      try {
+        const results = await db.execute(sql`
+          SELECT id,
+                 1 - (deal_embedding <=> ${sourceDeal.dealEmbedding}::vector) as similarity
+          FROM deal_logs
+          WHERE workspace_id = ${workspaceId}
+            AND id != ${dealId}
+            AND deal_embedding IS NOT NULL
+          ORDER BY deal_embedding <=> ${sourceDeal.dealEmbedding}::vector
+          LIMIT 10
+        `)
+        semanticMatches = (results.rows as any[]).map(r => ({
+          id: r.id,
+          similarity: Number(r.similarity),
+        }))
+      } catch (err) {
+        console.error('[similar-deals] Semantic search failed:', err)
+      }
+    }
+
+    // ── Combine scores: numerical (40%) + semantic (60%) ──────────────────────
+    const combinedScores = new Map<string, { score: number; matchReasons: string[] }>()
+
+    // Add numerical/TF-IDF matches (40% weight)
+    for (const match of numericalMatches) {
+      combinedScores.set(match.entityId, {
+        score: (match.similarity || 0) * 0.4,
+        matchReasons: ['Similar deal profile'],
+      })
+    }
+
+    // Add semantic matches (60% weight)
+    for (const match of semanticMatches) {
+      const existing = combinedScores.get(match.id)
+      if (existing) {
+        existing.score += match.similarity * 0.6
+        existing.matchReasons.push('Similar conversation patterns')
+      } else {
+        combinedScores.set(match.id, {
+          score: match.similarity * 0.6,
+          matchReasons: ['Similar conversation patterns'],
+        })
+      }
+    }
+
+    // If neither pass produced results, return empty
+    if (combinedScores.size === 0) {
+      return NextResponse.json({ data: [] })
+    }
+
+    // Sort by combined score and take top N
+    const sortedEntries = Array.from(combinedScores.entries())
+      .sort(([, a], [, b]) => b.score - a.score)
+      .slice(0, limit)
+
+    const ids = sortedEntries.map(([id]) => id)
+
+    // ── Fetch deal details for the top matches ────────────────────────────────
     const deals = await db
       .select({
         id: dealLogs.id,
@@ -203,36 +264,34 @@ export async function GET(
       .where(and(eq(dealLogs.workspaceId, workspaceId), inArray(dealLogs.id, ids)))
 
     const dealMap = new Map(deals.map(d => [d.id, d]))
-    const data = similar
-      .map(s => {
-        const d = dealMap.get(s.entityId)
+    const data = sortedEntries
+      .map(([id, { score, matchReasons }]) => {
+        const d = dealMap.get(id)
         if (!d) return null
 
-        // Generate a human-readable reason for similarity
-        const reason = sourceDeal
-          ? generateSimilarityReason(
-              {
-                dealValue: sourceDeal.dealValue,
-                stage: sourceDeal.stage,
-                competitors: sourceDeal.competitors as string[],
-                description: sourceDeal.description,
-                dealRisks: sourceDeal.dealRisks as string[],
-                notes: sourceDeal.notes,
-              },
-              {
-                dealValue: d.dealValue,
-                stage: d.stage,
-                competitors: d.competitors as string[],
-                description: d.description,
-                dealRisks: d.dealRisks as string[],
-                prospectCompany: d.prospectCompany,
-                notes: d.notes,
-              },
-            )
-          : undefined
+        // Generate a human-readable heuristic reason for similarity
+        const reason = generateSimilarityReason(
+          {
+            dealValue: sourceDeal.dealValue,
+            stage: sourceDeal.stage,
+            competitors: sourceDeal.competitors as string[],
+            description: sourceDeal.description,
+            dealRisks: sourceDeal.dealRisks as string[],
+            notes: sourceDeal.notes,
+          },
+          {
+            dealValue: d.dealValue,
+            stage: d.stage,
+            competitors: d.competitors as string[],
+            description: d.description,
+            dealRisks: d.dealRisks as string[],
+            prospectCompany: d.prospectCompany,
+            notes: d.notes,
+          },
+        )
 
         // Compute overlapping risks between source deal and this similar deal
-        const srcRisks = (sourceDeal?.dealRisks as string[] ?? [])
+        const srcRisks = (sourceDeal.dealRisks as string[] ?? [])
         const matchRisks = (d.dealRisks as string[] ?? [])
         const overlappingRisks = findOverlappingRisks(srcRisks, matchRisks)
 
@@ -246,8 +305,9 @@ export async function GET(
           stage: d.stage,
           dealValue: d.dealValue,
           conversionScore: d.conversionScore,
-          similarity: Math.round(s.similarity * 100),
+          similarity: Math.round(score * 100),
           reason,
+          matchReasons,
           lostReason: d.lostReason,
           lostDate: d.lostDate?.toISOString() ?? null,
           wonDate: d.wonDate?.toISOString() ?? null,

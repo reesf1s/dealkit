@@ -15,6 +15,7 @@ import { getWorkspaceContext } from '@/lib/workspace'
 import { getWorkspaceBrain, formatBrainContext } from '@/lib/workspace-brain'
 import { requestBrainRebuild } from '@/lib/brain-rebuild'
 import type { DealSnapshot } from '@/lib/workspace-brain'
+import { getRelevantContext } from '@/lib/agent-context'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { PLAN_LIMITS } from '@/lib/stripe/plans'
 import { allTools } from '@/lib/ai/tools'
@@ -375,13 +376,84 @@ export async function POST(req: NextRequest) {
       }
     } catch { /* non-fatal */ }
 
-    // Re-format brain context with stage labels so the AI sees custom names
-    // FIX 3: Check if brain has deal data before building context
-    const brainContextWithLabels = brain && brain.deals?.length
-      ? formatBrainContext(brain, Object.keys(stageLabels).length > 0 ? stageLabels : undefined)
-      : brain
+    // ── Semantic context retrieval: send only relevant deals instead of full brain ──
+    // Fallback to full brain dump if semantic retrieval fails or brain has no deals
+    const sl = (stageId: string) => stageLabels?.[stageId] ?? stageId
+    let brainContextWithLabels: string
+
+    if (brain && brain.deals?.length) {
+      try {
+        const semanticCtx = await getRelevantContext(wsCtx.workspaceId, lastUserText, 5)
+
+        // Build compact deal list from semantic results
+        const dealLines = semanticCtx.relevantDeals.map(d => {
+          const score = d.conversionScore ?? 0
+          const stage = sl(d.stage || 'unknown')
+          const value = d.dealValue ? `£${d.dealValue.toLocaleString('en-GB')}` : '£0'
+          const closeDate = d.closeDate ? ` | Close: ${new Date(d.closeDate).toLocaleDateString('en-GB')}` : ''
+          return `• ${d.dealName} (${d.prospectCompany}): ${score}% | ${stage} | ${value}${closeDate}`
+        }).join('\n')
+
+        const ps = semanticCtx.pipelineSummary
+        const pipelineLine = `Pipeline: ${ps.dealCount} open deals, £${ps.totalValue.toLocaleString('en-GB')}, avg score ${ps.avgScore}%, ${ps.wins}W/${ps.losses}L`
+
+        // Preserve brain intelligence sections (ML, win/loss, archetypes, etc.) which are pipeline-wide
+        const brainIntelLines: string[] = []
+        const fullBrainCtx = formatBrainContext(brain, Object.keys(stageLabels).length > 0 ? stageLabels : undefined)
+
+        // Extract non-deal sections from brain context (everything after the DEALS block)
+        const sectionHeaders = [
+          'URGENT — NEEDS ATTENTION:',
+          'STALE DEALS',
+          'TOP RISKS ACROSS PIPELINE:',
+          'RECURRING PATTERNS:',
+          'SUGGESTED COLLATERAL:',
+          'PIPELINE RECOMMENDATIONS:',
+          'PROJECT PLANS:',
+          'HISTORICAL WIN/LOSS INTELLIGENCE:',
+          'WEIGHTED FORECAST',
+          'ML MODEL',
+          'ML WIN PROBABILITIES',
+          'TREND:',
+          'COMPETITIVE THREAT:',
+          'DEAL ARCHETYPES',
+          'STAGE VELOCITY ALERTS',
+          'COMPETITIVE INTELLIGENCE',
+        ]
+        for (const header of sectionHeaders) {
+          const idx = fullBrainCtx.indexOf(header)
+          if (idx !== -1) {
+            // Find the end of this section (next double newline or end of string)
+            const sectionStart = fullBrainCtx.lastIndexOf('\n', idx)
+            let sectionEnd = fullBrainCtx.indexOf('\n\n', idx + header.length)
+            if (sectionEnd === -1) sectionEnd = fullBrainCtx.length
+            brainIntelLines.push(fullBrainCtx.slice(sectionStart, sectionEnd).trim())
+          }
+        }
+
+        const totalDeals = brain.deals.length
+        const shownDeals = semanticCtx.relevantDeals.length
+        const otherCount = totalDeals - shownDeals
+
+        brainContextWithLabels = [
+          `PIPELINE OVERVIEW (brain updated ${brain.updatedAt ? new Date(brain.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : 'unknown'})`,
+          pipelineLine,
+          '',
+          `RELEVANT DEALS (${shownDeals} of ${totalDeals}${otherCount > 0 ? ` — ${otherCount} more available via search_deals` : ''}):`,
+          dealLines,
+          '',
+          ...brainIntelLines,
+        ].join('\n')
+      } catch (semanticErr) {
+        console.error('[agent] Semantic context failed, using full brain:', semanticErr)
+        brainContextWithLabels = formatBrainContext(brain, Object.keys(stageLabels).length > 0 ? stageLabels : undefined)
+      }
+    } else {
+      brainContextWithLabels = brain
         ? 'Pipeline data is loading — no deals recorded yet. Encourage the user to add their first deal.'
         : 'No workspace data loaded yet.'
+    }
+
     const systemPrompt = buildSystemPrompt(brainContextWithLabels, activeDealContext, pipelineStageContext)
 
     // ── Build tool context for tool execute() calls ──────────────────────────

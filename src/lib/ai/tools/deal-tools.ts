@@ -576,6 +576,24 @@ Rules:
     }
   } catch { /* non-fatal */ }
 
+  // Generate embeddings (non-blocking — don't fail the note processing if embeddings fail)
+  try {
+    const { generateEmbedding, generateDealEmbedding } = await import('@/lib/openai-embeddings')
+    const noteEmb = await generateEmbedding(appendedNotes)
+    const dealEmb = await generateDealEmbedding({
+      name: deal.dealName || '',
+      company: deal.prospectCompany || '',
+      stage: (updateFields.stage as string | undefined) ?? deal.stage || '',
+      meetingNotes: appendedNotes,
+      signals: updateFields.intentSignals ?? deal.intentSignals,
+    })
+    updateFields.noteEmbedding = JSON.stringify(noteEmb)
+    updateFields.dealEmbedding = JSON.stringify(dealEmb)
+  } catch (err) {
+    console.error('[embeddings] Failed to generate embeddings:', err)
+    // Non-fatal — deal update still succeeds
+  }
+
   // Build changes summary
   const changes: string[] = []
   if (parsed.summary) changes.push(`Summary updated`)

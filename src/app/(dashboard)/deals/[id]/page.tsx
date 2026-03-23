@@ -4558,6 +4558,11 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                                     {sd.reason}
                                   </div>
                                 )}
+                                {!isExpanded && sd.matchReasons?.length > 0 && (
+                                  <div style={{ fontSize: '10px', color: 'var(--ds-text-3, var(--text-tertiary))', marginTop: '1px' }}>
+                                    {sd.matchReasons.join(' \u00B7 ')}
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <span style={{
@@ -4580,6 +4585,13 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                                 <div>
                                   <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>Why similar</div>
                                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{sd.reason}</div>
+                                </div>
+                              )}
+
+                              {/* Match reasons (hybrid matching signals) */}
+                              {sd.matchReasons?.length > 0 && (
+                                <div style={{ fontSize: '11px', color: 'var(--ds-text-3, var(--text-tertiary))' }}>
+                                  {sd.matchReasons.join(' \u00B7 ')}
                                 </div>
                               )}
 

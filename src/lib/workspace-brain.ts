@@ -2475,6 +2475,13 @@ async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown')
   const duration = Date.now() - rebuildStartMs
   console.log(`[brain] Rebuild complete for workspace ${workspaceId}: ${activeDeals.length} open deals, ${(wonDeals.length + lostDeals.length)} closed, ${duration}ms`)
 
+  // Background embedding backfill — don't block the rebuild
+  import('./embedding-backfill').then(({ backfillEmbeddings }) =>
+    backfillEmbeddings(workspaceId).catch(err =>
+      console.error('[brain] Embedding backfill failed:', err)
+    )
+  )
+
   return brain
 }
 
