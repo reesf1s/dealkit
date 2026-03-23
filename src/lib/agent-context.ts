@@ -47,7 +47,7 @@ export async function getRelevantContext(
         ORDER BY deal_embedding::vector <=> ${JSON.stringify(queryEmbedding)}::vector
         LIMIT ${maxDeals}
       `)
-      semanticIds = (results.rows as any[]).map(r => r.id)
+      semanticIds = (results as any[]).map(r => r.id)
     } catch (err) {
       console.error('[agent-context] Vector search failed, falling back:', err)
       // Fallback: use most recently updated deals

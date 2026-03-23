@@ -196,7 +196,7 @@ export async function GET(
           ORDER BY deal_embedding <=> ${sourceDeal.dealEmbedding}::vector
           LIMIT 10
         `)
-        semanticMatches = (results.rows as any[]).map(r => ({
+        semanticMatches = (results as any[]).map(r => ({
           id: r.id,
           similarity: Number(r.similarity),
         }))
