@@ -528,11 +528,13 @@ Rules:
     if (parsed.suggestedStage === 'closed_lost') updateFields.lostDate = new Date()
   }
 
-  // Apply close date update
-  if (parsed.closeDateUpdate?.newDate) {
+  // Apply close date update — guard against LLM returning literal string "null"
+  if (parsed.closeDateUpdate?.newDate && parsed.closeDateUpdate.newDate !== 'null') {
     const d = new Date(parsed.closeDateUpdate.newDate)
-    if (d.getFullYear() < 100) d.setFullYear(d.getFullYear() + 2000)
-    updateFields.closeDate = d
+    if (!isNaN(d.getTime())) {
+      if (d.getFullYear() < 100) d.setFullYear(d.getFullYear() + 2000)
+      updateFields.closeDate = d
+    }
   }
 
   // Score computation (unless pinned)
@@ -946,7 +948,11 @@ export const update_deal = {
       changesList.push(`Value → $${c.setValue.toLocaleString()}`)
     }
     if (c.setCloseDate) {
-      try { updateFields.closeDate = new Date(c.setCloseDate) } catch {}
+      const cd = new Date(c.setCloseDate)
+      if (!isNaN(cd.getTime())) {
+        if (cd.getFullYear() < 100) cd.setFullYear(cd.getFullYear() + 2000)
+        updateFields.closeDate = cd
+      }
       changesList.push(`Close date → ${c.setCloseDate}`)
     }
     if (c.setNextSteps) {
