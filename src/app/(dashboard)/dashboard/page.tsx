@@ -173,9 +173,11 @@ export default function DashboardPage() {
   })()
 
   const cardStyle: React.CSSProperties = {
-    background: 'var(--card-bg)',
-    border: 'none',
-    borderRadius: '8px',
+    background: 'var(--glass-card-bg, rgba(255,255,255,0.04))',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    border: '1px solid var(--glass-card-border, rgba(255,255,255,0.08))',
+    borderRadius: '12px',
     padding: '20px 22px',
   }
 
@@ -183,7 +185,7 @@ export default function DashboardPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1080px' }}>
 
       {/* ── Greeting header ── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', background: 'linear-gradient(135deg, var(--glass-glow-accent, rgba(91,91,214,0.08)) 0%, rgba(139,92,246,0.05) 100%)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--glass-card-border, rgba(255,255,255,0.06))', borderRadius: '12px', padding: '20px 22px' }}>
         <div>
           <h1 style={{ fontSize: isMobile ? '24px' : '30px', fontWeight: '500', color: 'var(--text-primary)', letterSpacing: '0.01em', lineHeight: 1.1, marginBottom: '4px' }} className="font-brand">
             {greeting}
@@ -209,7 +211,7 @@ export default function DashboardPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
           {/* Morning briefing card */}
-          <div style={{ ...cardStyle, background: overview?.briefingHealth === 'green' ? 'linear-gradient(135deg, rgba(5,150,105,0.04) 0%, var(--card-bg) 60%)' : overview?.briefingHealth === 'red' ? 'linear-gradient(135deg, rgba(220,38,38,0.04) 0%, var(--card-bg) 60%)' : 'var(--card-bg)' }}>
+          <div style={{ ...cardStyle, borderLeft: '3px solid rgba(91,91,214,0.4)', background: overview?.briefingHealth === 'green' ? 'linear-gradient(135deg, rgba(5,150,105,0.06) 0%, rgba(255,255,255,0.04) 60%)' : overview?.briefingHealth === 'red' ? 'linear-gradient(135deg, rgba(220,38,38,0.06) 0%, rgba(255,255,255,0.04) 60%)' : 'var(--glass-card-bg, rgba(255,255,255,0.04))' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               <Sparkles size={14} style={{ color: 'var(--accent)' }} />
               <span className="font-brand-section" style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-secondary)' }}>Today&apos;s Briefing</span>
@@ -256,7 +258,7 @@ export default function DashboardPage() {
                     <SkeletonLine w="80%" h="12px" />
                   </div>
                 )) : overview?.topAttentionDeals?.map((item: any) => (
-                  <div key={item.dealId} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', background: item.urgency === 'high' ? 'color-mix(in srgb, var(--danger) 4%, transparent)' : 'var(--surface)', border: `1px solid ${item.urgency === 'high' ? 'color-mix(in srgb, var(--danger) 15%, transparent)' : 'var(--border)'}`, borderRadius: '8px', cursor: 'pointer' }}
+                  <div key={item.dealId} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', background: item.urgency === 'high' ? 'rgba(229,72,77,0.06)' : 'rgba(255,255,255,0.04)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: `1px solid ${item.urgency === 'high' ? 'rgba(229,72,77,0.20)' : 'rgba(255,255,255,0.06)'}`, borderRadius: '10px', cursor: 'pointer', transition: 'all 0.15s ease' }}
                     onClick={() => sendToCopilot(`Tell me about the ${item.dealName} deal and what I should do right now: ${item.reason}`)}>
                     <div style={{ flexShrink: 0, marginTop: '1px' }}>
                       {item.urgency === 'high' ? <AlertTriangle size={13} style={{ color: 'var(--danger)' }} /> : <Clock size={13} style={{ color: 'var(--warning)' }} />}
@@ -289,8 +291,10 @@ export default function DashboardPage() {
                            (company.length > 3 && actionLower.includes(company))
                   })
                   return (
-                    <div key={i} className="action-item-row" style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px', border: 'none', cursor: 'pointer', position: 'relative' }}
-                      onClick={() => sendToCopilot(`Help me with this: ${action}`)}>
+                    <div key={i} className="action-item-row" style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', position: 'relative', transition: 'all 0.15s ease' }}
+                      onClick={() => sendToCopilot(`Help me with this: ${action}`)}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.12)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 20px rgba(91,91,214,0.08)' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'; (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}>
                       <div style={{ flexShrink: 0, width: '18px', height: '18px', borderRadius: '5px', background: 'var(--accent-subtle)', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: '1px' }}>
                         <span style={{ fontSize: '9px', fontWeight: '700', color: 'var(--accent)' }}>{i + 1}</span>
                       </div>
@@ -300,14 +304,14 @@ export default function DashboardPage() {
                           <Link
                             href={`/deals/${matchedDeal.id}`}
                             onClick={e => e.stopPropagation()}
-                            style={{ padding: '3px 8px', borderRadius: '5px', fontSize: '10px', fontWeight: '600', color: 'var(--accent)', background: 'var(--accent-subtle)', border: 'none', textDecoration: 'none', whiteSpace: 'nowrap', transition: 'opacity 0.15s' }}
+                            style={{ padding: '3px 8px', borderRadius: '5px', fontSize: '10px', fontWeight: '600', color: 'var(--accent)', background: 'rgba(91,91,214,0.15)', border: 'none', textDecoration: 'none', whiteSpace: 'nowrap', transition: 'opacity 0.15s' }}
                           >
                             Open deal &rarr;
                           </Link>
                         )}
                         <button
                           onClick={e => { e.stopPropagation(); sendToCopilot(`Draft this for me: ${action}`) }}
-                          style={{ padding: '3px 8px', borderRadius: '5px', fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)', background: 'var(--surface)', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'opacity 0.15s' }}
+                          style={{ padding: '3px 8px', borderRadius: '5px', fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'opacity 0.15s' }}
                         >
                           Draft with AI &rarr;
                         </button>
@@ -325,7 +329,7 @@ export default function DashboardPage() {
               <div className="font-brand-section" style={{ fontSize: '14px', fontWeight: '500', color: 'var(--text-secondary)', marginBottom: '12px' }}>Proactive Alerts</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {proactiveAlerts.slice(0, 5).map((alert) => (
-                  <div key={alert.dealId} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px', border: `1px solid ${alert.severity === 'critical' ? 'color-mix(in srgb, var(--danger) 20%, transparent)' : 'var(--border)'}` }}>
+                  <div key={alert.dealId} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderRadius: '10px', border: `1px solid ${alert.severity === 'critical' ? 'rgba(229,72,77,0.25)' : 'rgba(245,158,11,0.20)'}`, boxShadow: alert.severity === 'critical' ? '0 0 20px rgba(229,72,77,0.08)' : '0 0 16px rgba(245,158,11,0.06)', transition: 'all 0.15s ease' }}>
                     {alert.severity === 'critical'
                       ? <AlertCircle size={13} style={{ color: 'var(--danger)', flexShrink: 0 }} />
                       : <AlertCircle size={13} style={{ color: 'var(--warning)', flexShrink: 0 }} />
@@ -360,7 +364,7 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {totalPipeline > 0 && (
                 <div>
-                  <div style={{ fontSize: '28px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1, letterSpacing: '-0.02em' }}>
+                  <div style={{ fontSize: '28px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1, letterSpacing: '-0.02em', textShadow: '0 0 20px rgba(60,203,127,0.25)' }}>
                     {formatCurrency(totalPipeline, true)}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '3px' }}>total pipeline value</div>
@@ -378,7 +382,7 @@ export default function DashboardPage() {
                         <ChevronDown size={12} style={{ color: 'var(--text-tertiary)', transform: forecastExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.1s ease', flexShrink: 0 }} />
                       </button>
                       {forecastExpanded && (
-                        <div style={{ marginTop: '8px', background: 'var(--surface)', border: 'none', borderRadius: '8px', overflow: 'hidden' }}>
+                        <div style={{ marginTop: '8px', background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', overflow: 'hidden' }}>
                           {/* Summary header */}
                           <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px' }}>
@@ -465,12 +469,12 @@ export default function DashboardPage() {
                 </div>
               )}
               <div style={{ display: 'flex', gap: '8px' }}>
-                <div style={{ flex: 1, padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px', border: 'none' }}>
+                <div style={{ flex: 1, padding: '10px 12px', background: 'var(--glass-card-bg, rgba(255,255,255,0.04))', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: '12px', border: '1px solid var(--glass-card-border, rgba(255,255,255,0.08))' }}>
                   <div style={{ fontSize: '18px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1 }}>{activeDeals.length}</div>
                   <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '3px' }}>active deals</div>
                 </div>
                 {winRate != null && (
-                  <div style={{ flex: 1, padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px', border: 'none' }}>
+                  <div style={{ flex: 1, padding: '10px 12px', background: 'var(--glass-card-bg, rgba(255,255,255,0.04))', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderRadius: '12px', border: '1px solid var(--glass-card-border, rgba(255,255,255,0.08))' }}>
                     {totalClosed >= 5 ? (
                       <>
                         <div style={{ fontSize: '18px', fontWeight: '600', color: winRate >= 50 ? 'var(--success)' : 'var(--warning)', lineHeight: 1 }}>{winRate}%</div>
@@ -489,7 +493,7 @@ export default function DashboardPage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Avg deal score</div>
-                    <div style={{ fontSize: '11px', fontWeight: '600', color: getScoreColor(avgScore, false) }}>{avgScore}</div>
+                    <div style={{ fontSize: '11px', fontWeight: '600', color: getScoreColor(avgScore, false), textShadow: `0 0 12px ${getScoreColor(avgScore, false)}40` }}>{avgScore}</div>
                   </div>
                   <div style={{ height: '4px', borderRadius: '2px', background: 'var(--border)', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${avgScore}%`, background: getScoreColor(avgScore, false), borderRadius: '2px', transition: 'width 0.1s ease' }} />

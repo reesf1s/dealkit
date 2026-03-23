@@ -1048,7 +1048,7 @@ function ScoreSimulator({ deal, mlPrediction, brainData }: { deal: any; mlPredic
   ]
 
   return (
-    <div style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '16px' }}>
+    <div style={{ background: 'var(--glass-card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--glass-card-border)', borderRadius: '12px', padding: '20px' }}>
       <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '4px' }}>Score Simulator</div>
       <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '14px' }}>See how toggling key signals affects this deal&apos;s score</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1126,7 +1126,8 @@ function MeetingPrepTab({ dealId, deal, objectionWinMap = [], objectionCondition
   }
 
   const cardStyle: React.CSSProperties = {
-    background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '16px',
+    background: 'var(--glass-card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+    border: '1px solid var(--glass-card-border)', borderRadius: '12px', padding: '20px',
   }
   const sectionTitle = (label: string, color = 'var(--text-secondary)') => (
     <div style={{ fontSize: '11px', fontWeight: 700, color, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: '10px' }}>
@@ -1341,7 +1342,7 @@ function MeetingPrepTab({ dealId, deal, objectionWinMap = [], objectionCondition
           </button>
         </div>
       ) : (
-        <div style={{ background: 'var(--accent-subtle)', border: 'none', borderRadius: '8px', padding: '20px' }}>
+        <div style={{ background: 'var(--glass-card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--glass-card-border)', borderRadius: '12px', padding: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Sparkles size={14} color="var(--accent)" />
@@ -3647,7 +3648,7 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
         const entries = blocks.filter((b: string) => /^\[/.test(b))
         const legacy = blocks.filter((b: string) => !/^\[/.test(b))
         return (
-          <div style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '14px' }}>
+          <div style={{ background: 'var(--glass-card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--glass-card-border)', borderRadius: '12px', padding: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Clipboard size={13} color="var(--text-tertiary)" />
@@ -3700,7 +3701,7 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
                 if (dealCompetitors.some(c => c.trim() && bodyLower.includes(c.trim().toLowerCase()))) signalBadges.push({ label: 'Competitor', color: '#3B82F6', bg: 'rgba(59,130,246,0.1)' })
 
                 return (
-                  <div key={i} style={{ padding: '9px 12px', background: 'var(--surface)', border: 'none', borderRadius: '8px', position: 'relative' }}
+                  <div key={i} style={{ padding: '9px 12px', background: 'var(--glass-card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid var(--glass-card-border)', borderRadius: '10px', position: 'relative', borderLeft: '2px solid var(--glass-card-border)' }}
                     onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.entry-del') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
                     onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.entry-del') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
                   >
@@ -3776,7 +3777,7 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
       <HubSpotActivityBlock deal={deal} dealCompetitors={deal?.competitors ?? []} />
 
       {/* ── Add Update ── */}
-      <div style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '14px' }}>
+      <div style={{ background: 'var(--glass-card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--glass-card-border)', borderRadius: '12px', padding: '14px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
           <Sparkles size={13} color="var(--accent)" />
           <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
@@ -4026,10 +4027,10 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
       {/* Grow This Account — shown for closed_won deals */}
       {deal.stage === 'closed_won' && (
         <div style={{
-          background: 'var(--card-bg)', border: 'none',
-          borderRadius: '8px', overflow: 'hidden', backdropFilter: 'blur(20px)',
+          background: 'var(--glass-card-bg)', border: '1px solid var(--glass-card-border)',
+          borderRadius: '12px', overflow: 'hidden', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid var(--glass-card-border)' }}>
             <TrendingUp size={14} color="var(--success)" />
             <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--success)' }}>Grow This Account</span>
           </div>
@@ -4131,9 +4132,9 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
 
       {/* AI Analysis card — shown first if any AI data exists */}
       {(deal.aiSummary || deal.conversionScore != null || (deal.conversionInsights as string[])?.length > 0 || (deal.dealRisks as string[])?.length > 0) && (
-        <div style={{ background: 'var(--accent-subtle)', border: 'none', borderRadius: '8px', overflow: 'hidden' }}>
+        <div style={{ background: 'var(--glass-card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--glass-card-border)', borderRadius: '12px', overflow: 'hidden' }}>
           {/* Header row with score */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid rgba(99,102,241,0.1)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid var(--glass-card-border)' }}>
             <Sparkles size={14} color="var(--accent)" />
             <span className="font-brand-section" style={{ fontSize: '15px', fontWeight: '500', color: 'var(--accent)' }}>Deal Intelligence</span>
             {(() => {
@@ -4984,7 +4985,7 @@ export default function DealDetailPage() {
         })()}
 
         {deal ? (
-          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-start', justifyContent: 'space-between', gap: isMobile ? '12px' : undefined }}>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-start', justifyContent: 'space-between', gap: isMobile ? '12px' : undefined, background: 'var(--glass-card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--glass-card-border)', borderRadius: '12px', padding: '16px 20px' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' }}>
                 <h1 className="font-brand" style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '500', letterSpacing: '0.01em', color: 'var(--text-primary)', margin: 0 }}>
@@ -5006,6 +5007,7 @@ export default function DealDetailPage() {
                       color: c,
                       border: `1px solid color-mix(in srgb, ${c} 25%, transparent)`,
                       display: 'flex', alignItems: 'center', gap: '4px',
+                      boxShadow: `0 0 16px color-mix(in srgb, ${c} 20%, transparent), 0 0 4px color-mix(in srgb, ${c} 12%, transparent)`,
                     }}>
                       <Target size={10} /> {deal.conversionScore}% win probability
                     </span>
@@ -5052,7 +5054,7 @@ export default function DealDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border)', paddingBottom: '0', overflowX: isMobile ? 'auto' : undefined, whiteSpace: isMobile ? 'nowrap' : undefined, WebkitOverflowScrolling: 'touch' as any, msOverflowStyle: 'none', scrollbarWidth: 'none' }}>
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--glass-card-border)', paddingBottom: '0', overflowX: isMobile ? 'auto' : undefined, whiteSpace: isMobile ? 'nowrap' : undefined, WebkitOverflowScrolling: 'touch' as any, msOverflowStyle: 'none', scrollbarWidth: 'none', background: 'var(--glass-card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderRadius: '12px 12px 0 0', padding: '0 8px' }}>
         {[
           { id: 'overview', label: 'Overview' },
           { id: 'activity', label: 'Activity' },

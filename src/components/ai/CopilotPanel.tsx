@@ -359,10 +359,10 @@ export default function CopilotPanel() {
           zIndex: 301,
           display: 'flex',
           flexDirection: 'column',
-          background: 'var(--copilot-bg)',
-          backdropFilter: 'blur(20px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-          borderLeft: '1px solid rgba(99,102,241,0.15)',
+          background: 'var(--glass-copilot-bg, var(--copilot-bg))',
+          backdropFilter: 'blur(24px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+          borderLeft: '1px solid var(--glass-card-border)',
           boxShadow: '-8px 0 40px rgba(0,0,0,0.5), -2px 0 16px rgba(99,102,241,0.08)',
           transform: copilotOpen ? 'translateX(0)' : 'translateX(100%)',
           transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1), width 0.2s ease',
@@ -592,8 +592,10 @@ export default function CopilotPanel() {
                     maxWidth: '85%',
                     padding: '10px 14px',
                     borderRadius: '14px 14px 4px 14px',
-                    background: 'var(--copilot-user-bg)',
-                    border: '1px solid rgba(99,102,241,0.22)',
+                    background: 'var(--glass-user-msg, var(--copilot-user-bg))',
+                    backdropFilter: 'blur(12px)',
+                    WebkitBackdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(99,102,241,0.18)',
                   }}>
                     <p style={{
                       fontSize: '13.5px', color: '#C7D2FE', margin: 0,
@@ -629,8 +631,10 @@ export default function CopilotPanel() {
                       <div style={{
                         padding: '10px 14px',
                         borderRadius: '4px 14px 14px 14px',
-                        background: 'var(--copilot-msg-bg)',
-                        border: '1px solid var(--border)',
+                        background: 'var(--glass-ai-msg, var(--copilot-msg-bg))',
+                        backdropFilter: 'blur(12px)',
+                        WebkitBackdropFilter: 'blur(12px)',
+                        border: '1px solid var(--glass-card-border)',
                       }}>
                         <MarkdownRenderer content={msg.content} />
                       </div>
@@ -656,8 +660,10 @@ export default function CopilotPanel() {
               <div style={{
                 padding: '10px 14px',
                 borderRadius: '4px 14px 14px 14px',
-                background: 'var(--copilot-msg-bg)',
-                border: '1px solid var(--border)',
+                background: 'var(--glass-ai-msg, var(--copilot-msg-bg))',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1px solid var(--glass-card-border)',
               }}>
                 <TypingDots />
               </div>

@@ -374,8 +374,10 @@ function EventPopover({
           top: '50%', left: '50%',
           transform: 'translate(-50%, -50%)',
           zIndex: 1000,
-          background: 'var(--card-bg)',
-          border: 'none',
+          background: 'var(--glass-card-bg)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid var(--glass-card-border)',
           borderRadius: '12px',
           padding: '20px',
           minWidth: '320px',
@@ -558,8 +560,10 @@ export default function CalendarPage() {
   const totalCells = Math.ceil((firstDay + numDays) / 7) * 7
 
   const cardStyle: React.CSSProperties = {
-    background: 'var(--card-bg)',
-    border: 'none',
+    background: 'var(--glass-card-bg)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    border: '1px solid var(--glass-card-border)',
     borderRadius: '12px',
   }
 
@@ -606,8 +610,9 @@ export default function CalendarPage() {
           style={{
             display: 'flex', alignItems: 'center', gap: '5px',
             padding: '5px 12px', borderRadius: '20px', flexShrink: 0,
-            border: `1.5px solid ${typeFilter === 'all' ? 'var(--accent)' : 'var(--card-border)'}`,
-            background: typeFilter === 'all' ? 'var(--accent)22' : 'transparent',
+            border: `1.5px solid ${typeFilter === 'all' ? 'var(--accent)' : 'var(--glass-card-border)'}`,
+            background: typeFilter === 'all' ? 'rgba(91,91,214,0.12)' : 'var(--glass-card-bg)',
+            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
             color: typeFilter === 'all' ? 'var(--accent)' : 'var(--text-secondary)',
             fontSize: '12px', fontWeight: 500, cursor: 'pointer',
             transition: 'all 0.15s',
@@ -635,8 +640,9 @@ export default function CalendarPage() {
               style={{
                 display: 'flex', alignItems: 'center', gap: '5px',
                 padding: '5px 12px', borderRadius: '20px', flexShrink: 0,
-                border: `1.5px solid ${typeFilter === type ? cfg.color : 'var(--card-border)'}`,
-                background: typeFilter === type ? cfg.color + '22' : 'transparent',
+                border: `1.5px solid ${typeFilter === type ? cfg.color : 'var(--glass-card-border)'}`,
+                background: typeFilter === type ? cfg.color + '18' : 'var(--glass-card-bg)',
+                backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
                 color: typeFilter === type ? cfg.color : 'var(--text-secondary)',
                 fontSize: '12px', fontWeight: 500, cursor: 'pointer',
                 transition: 'all 0.15s',
@@ -659,9 +665,9 @@ export default function CalendarPage() {
       {/* Calendar grid */}
       <div style={{ ...cardStyle, overflow: 'hidden' }}>
         {/* Day headers */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid var(--card-border)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid var(--glass-card-border)' }}>
           {DAY_NAMES.map(d => (
-            <div key={d} style={{ padding: isMobile ? '8px 2px' : '10px 8px', textAlign: 'center', fontSize: isMobile ? '10px' : '12px', fontWeight: 600, color: 'var(--text-secondary)', background: 'var(--bg)' }}>
+            <div key={d} style={{ padding: isMobile ? '8px 2px' : '10px 8px', textAlign: 'center', fontSize: isMobile ? '10px' : '12px', fontWeight: 600, color: 'var(--text-secondary)', background: 'var(--glass-card-bg)' }}>
               {isMobile ? d.charAt(0) : d}
             </div>
           ))}
@@ -690,14 +696,15 @@ export default function CalendarPage() {
                   onClick={isMobile && dayEvents.length > 0 ? () => setSelectedEvent(dayEvents[0]) : undefined}
                   style={{
                     minHeight: isMobile ? '52px' : '110px',
-                    borderRight: (idx + 1) % 7 === 0 ? 'none' : '1px solid var(--card-border)',
-                    borderBottom: idx < totalCells - 7 ? '1px solid var(--card-border)' : 'none',
+                    borderRight: (idx + 1) % 7 === 0 ? 'none' : '1px solid var(--glass-card-border)',
+                    borderBottom: idx < totalCells - 7 ? '1px solid var(--glass-card-border)' : 'none',
                     padding: isMobile ? '4px 3px' : '8px 6px',
                     background: isToday
-                      ? 'var(--accent)12'
+                      ? 'rgba(91,91,214,0.06)'
                       : !isCurrentMonth
                         ? 'var(--bg)'
-                        : 'transparent',
+                        : 'var(--glass-card-bg)',
+                    boxShadow: isToday ? 'inset 0 0 20px rgba(91,91,214,0.08)' : undefined,
                     position: 'relative',
                     cursor: isMobile && dayEvents.length > 0 ? 'pointer' : undefined,
                   }}

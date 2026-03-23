@@ -63,20 +63,24 @@ export default function Sidebar() {
           display: 'flex', alignItems: 'center', gap: '8px',
           padding: collapsed ? '0' : '0 8px',
           justifyContent: collapsed ? 'center' : 'flex-start',
-          height: '30px', borderRadius: '6px',
+          height: '30px', borderRadius: '8px',
           marginBottom: '1px', textDecoration: 'none',
           fontSize: '13px',
           fontWeight: 500,
           letterSpacing: '-0.01em',
           color: active ? 'var(--ds-text-1)' : 'var(--ds-text-2)',
-          background: active ? 'var(--ds-bg-active)' : 'transparent',
-          transition: 'background 0.1s ease, color 0.1s ease',
+          background: active ? 'var(--ds-glass-bg)' : 'transparent',
+          border: active ? '1px solid var(--ds-glass-border)' : '1px solid transparent',
+          boxShadow: active ? '0 0 8px var(--ds-glow-accent)' : 'none',
+          backdropFilter: active ? 'blur(12px)' : 'none',
+          WebkitBackdropFilter: active ? 'blur(12px)' : 'none',
+          transition: 'background 0.1s ease, color 0.1s ease, border-color 0.1s ease, box-shadow 0.1s ease',
           position: 'relative', flexShrink: 0,
           width: collapsed ? '30px' : undefined,
           margin: collapsed ? '0 auto 2px' : undefined,
         }}
         onMouseEnter={e => { if (!active) {
-          (e.currentTarget as HTMLElement).style.background = 'var(--ds-bg-hover)'
+          (e.currentTarget as HTMLElement).style.background = 'var(--ds-glass-hover)'
           ;(e.currentTarget as HTMLElement).style.color = 'var(--ds-text-1)'
         }}}
         onMouseLeave={e => { if (!active) {
@@ -147,8 +151,10 @@ export default function Sidebar() {
   const SidebarContent = (
     <aside style={{
       position: 'fixed', left: 0, top: 0, bottom: 0, width: w,
-      background: 'var(--ds-bg-sidebar)',
-      borderRight: '1px solid var(--ds-border)',
+      background: theme === 'dark' ? 'rgba(15,15,17,0.7)' : 'rgba(255,255,255,0.8)',
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      borderRight: '1px solid var(--ds-glass-border)',
       display: 'flex', flexDirection: 'column', zIndex: 40,
       transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)',
       overflow: 'hidden',
@@ -359,7 +365,7 @@ export default function Sidebar() {
       </nav>
 
       {/* ── Brain status + user footer ── */}
-      <div style={{ borderTop: '1px solid var(--ds-border)', padding: collapsed ? '8px 4px' : '8px', flexShrink: 0 }}>
+      <div style={{ borderTop: '1px solid var(--ds-glass-border)', padding: collapsed ? '8px 4px' : '8px', flexShrink: 0 }}>
 
         {/* Brain indicator */}
         {!collapsed && brainAgeInfo && (
@@ -483,8 +489,11 @@ export default function Sidebar() {
       {/* Mobile bottom tab bar */}
       <nav className="mobile-bottom-nav" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
-        height: '56px', background: 'var(--sidebar-bg, #0F0F11)',
-        borderTop: '1px solid rgba(255,255,255,0.08)',
+        height: '56px',
+        background: theme === 'dark' ? 'rgba(15,15,17,0.7)' : 'rgba(255,255,255,0.8)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderTop: '1px solid var(--ds-glass-border)',
         display: 'none',
         alignItems: 'center', justifyContent: 'space-around',
         zIndex: 1000, padding: '0 8px',

@@ -288,7 +288,7 @@ function CollateralPageInner() {
         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
           <button
             onClick={() => setTypeFilter('all')}
-            style={{ height: '28px', padding: '0 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, color: typeFilter === 'all' ? 'var(--text-primary)' : 'var(--text-tertiary)', backgroundColor: typeFilter === 'all' ? 'var(--surface-hover)' : 'transparent', border: 'none', cursor: 'pointer' }}
+            style={{ height: '28px', padding: '0 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 500, color: typeFilter === 'all' ? 'var(--text-primary)' : 'var(--text-tertiary)', backgroundColor: typeFilter === 'all' ? 'var(--glass-card-bg)' : 'transparent', backdropFilter: typeFilter === 'all' ? 'blur(12px)' : undefined, border: typeFilter === 'all' ? '1px solid var(--glass-card-border)' : 'none', cursor: 'pointer' }}
           >
             All types
           </button>
@@ -296,7 +296,7 @@ function CollateralPageInner() {
             <button
               key={type}
               onClick={() => setTypeFilter(type)}
-              style={{ height: '28px', padding: '0 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, color: typeFilter === type ? 'var(--text-primary)' : 'var(--text-tertiary)', backgroundColor: typeFilter === type ? 'var(--surface-hover)' : 'transparent', border: 'none', cursor: 'pointer' }}
+              style={{ height: '28px', padding: '0 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 500, color: typeFilter === type ? 'var(--text-primary)' : 'var(--text-tertiary)', backgroundColor: typeFilter === type ? 'var(--glass-card-bg)' : 'transparent', backdropFilter: typeFilter === type ? 'blur(12px)' : undefined, border: typeFilter === type ? '1px solid var(--glass-card-border)' : 'none', cursor: 'pointer' }}
             >
               {TYPE_META[type].label}
             </button>
@@ -310,7 +310,7 @@ function CollateralPageInner() {
           <button
             key={status}
             onClick={() => setStatusFilter(status)}
-            style={{ height: '28px', padding: '0 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, color: statusFilter === status ? 'var(--text-primary)' : 'var(--text-tertiary)', backgroundColor: statusFilter === status ? 'var(--surface-hover)' : 'transparent', border: 'none', cursor: 'pointer', textTransform: 'capitalize' }}
+            style={{ height: '28px', padding: '0 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 500, color: statusFilter === status ? 'var(--text-primary)' : 'var(--text-tertiary)', backgroundColor: statusFilter === status ? 'var(--glass-card-bg)' : 'transparent', backdropFilter: statusFilter === status ? 'blur(12px)' : undefined, border: statusFilter === status ? '1px solid var(--glass-card-border)' : 'none', cursor: 'pointer', textTransform: 'capitalize' }}
           >
             {status === 'all' ? 'All status' : status}
           </button>

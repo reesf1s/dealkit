@@ -39,6 +39,7 @@ export default async function LandingPage() {
 
   return (
     <div
+      className="landing-root"
       style={{
         background: bg,
         color: textPrimary,
@@ -50,10 +51,51 @@ export default async function LandingPage() {
     >
       {/* ── Global styles + responsive + animations ──────────── */}
       <style>{`
+        /* ── Floating background orbs ────────────────────────── */
+        @keyframes orb-float {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(30px, -30px) scale(1.05); }
+          66% { transform: translate(-20px, 20px) scale(0.95); }
+        }
+        @keyframes orb-float-reverse {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(-25px, 25px) scale(0.95); }
+          66% { transform: translate(20px, -15px) scale(1.05); }
+        }
+        @keyframes orb-drift {
+          0%, 100% { transform: translate(0, 0); }
+          50% { transform: translate(40px, -20px); }
+        }
+        .bg-orb-1 {
+          position: fixed; top: 8%; left: 18%;
+          width: 650px; height: 650px;
+          background: radial-gradient(circle, rgba(91,91,214,0.14) 0%, transparent 70%);
+          border-radius: 50%; filter: blur(80px);
+          animation: orb-float 20s ease-in-out infinite;
+          pointer-events: none; z-index: 0;
+        }
+        .bg-orb-2 {
+          position: fixed; top: 55%; right: 8%;
+          width: 550px; height: 550px;
+          background: radial-gradient(circle, rgba(139,92,246,0.11) 0%, transparent 70%);
+          border-radius: 50%; filter: blur(80px);
+          animation: orb-float-reverse 25s ease-in-out infinite;
+          pointer-events: none; z-index: 0;
+        }
+        .bg-orb-3 {
+          position: fixed; bottom: 10%; left: 40%;
+          width: 480px; height: 480px;
+          background: radial-gradient(circle, rgba(60,203,127,0.08) 0%, transparent 70%);
+          border-radius: 50%; filter: blur(80px);
+          animation: orb-drift 30s ease-in-out infinite;
+          pointer-events: none; z-index: 0;
+        }
+
+        /* ── Glass card ──────────────────────────────────────── */
         @supports (backdrop-filter: blur(1px)) {
           .glass-card {
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
           }
           .glass-card-hero {
             backdrop-filter: blur(40px);
@@ -77,16 +119,48 @@ export default async function LandingPage() {
         }
 
         .glass-card {
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.06);
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.08);
           border-radius: 16px;
           position: relative;
           overflow: hidden;
-          transition: border-color 0.3s ease, box-shadow 0.3s ease;
+          transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
         }
         .glass-card:hover {
-          border-color: rgba(255,255,255,0.12);
-          box-shadow: 0 0 40px rgba(91,91,214,0.08);
+          border-color: rgba(255,255,255,0.14);
+          box-shadow: 0 0 40px rgba(91,91,214,0.10), 0 8px 32px rgba(0,0,0,0.2);
+          background: rgba(255,255,255,0.06);
+        }
+
+        /* ── Glass card with colored glow pseudo-element ───── */
+        .glass-glow {
+          position: relative;
+        }
+        .glass-glow::before {
+          content: '';
+          position: absolute;
+          top: -40%; left: -20%; right: -20%; bottom: -40%;
+          border-radius: 50%;
+          filter: blur(60px);
+          opacity: 0.5;
+          pointer-events: none;
+          z-index: -1;
+          transition: opacity 0.3s ease;
+        }
+        .glass-glow:hover::before {
+          opacity: 0.7;
+        }
+        .glass-glow-indigo::before {
+          background: radial-gradient(circle, rgba(91,91,214,0.12) 0%, transparent 70%);
+        }
+        .glass-glow-purple::before {
+          background: radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%);
+        }
+        .glass-glow-green::before {
+          background: radial-gradient(circle, rgba(60,203,127,0.10) 0%, transparent 70%);
+        }
+        .glass-glow-amber::before {
+          background: radial-gradient(circle, rgba(245,158,11,0.10) 0%, transparent 70%);
         }
 
         .glow-orb {
@@ -104,6 +178,47 @@ export default async function LandingPage() {
           background-clip: text;
         }
 
+        /* ── CTA button glow + shimmer ───────────────────────── */
+        .cta-primary {
+          position: relative;
+          overflow: hidden;
+          box-shadow: 0 0 20px rgba(91,91,214,0.3), 0 0 60px rgba(91,91,214,0.1);
+          transition: box-shadow 0.3s ease, transform 0.2s ease;
+        }
+        .cta-primary:hover {
+          box-shadow: 0 0 30px rgba(91,91,214,0.5), 0 0 80px rgba(91,91,214,0.2);
+          transform: translateY(-1px);
+        }
+        .cta-primary::after {
+          content: '';
+          position: absolute;
+          top: -50%; left: -50%;
+          width: 200%; height: 200%;
+          background: linear-gradient(
+            115deg,
+            transparent 40%,
+            rgba(255,255,255,0.15) 50%,
+            transparent 60%
+          );
+          animation: cta-shimmer 3s ease-in-out infinite;
+          pointer-events: none;
+        }
+        @keyframes cta-shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+
+        /* ── Secondary button glow on hover ────────────────── */
+        .cta-secondary {
+          transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+        }
+        .cta-secondary:hover {
+          border-color: rgba(255,255,255,0.18) !important;
+          box-shadow: 0 0 20px rgba(91,91,214,0.12);
+          background: rgba(255,255,255,0.06) !important;
+        }
+
+        /* ── Animations ───────────────────────────────────────── */
         @keyframes pulse-line {
           0%, 100% { opacity: 0.15; }
           50% { opacity: 0.4; }
@@ -123,6 +238,130 @@ export default async function LandingPage() {
           animation: float-orb 8s ease-in-out infinite reverse;
         }
 
+        /* ── Section divider ────────────────────────────────── */
+        .section-divider {
+          width: 100%;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+          margin: 0 auto;
+        }
+
+        /* ── Badge shimmer (Most popular) ────────────────────── */
+        .badge-shimmer {
+          position: relative;
+          overflow: hidden;
+        }
+        .badge-shimmer::after {
+          content: '';
+          position: absolute;
+          top: 0; left: -100%; right: 0; bottom: 0;
+          width: 200%;
+          background: linear-gradient(
+            90deg,
+            transparent 40%,
+            rgba(255,255,255,0.25) 50%,
+            transparent 60%
+          );
+          animation: badge-shine 4s ease-in-out infinite;
+          pointer-events: none;
+        }
+        @keyframes badge-shine {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+
+        /* ── Score glow animation ─────────────────────────────── */
+        @keyframes score-pulse {
+          0%, 100% { opacity: 0.7; filter: blur(20px); }
+          50% { opacity: 1; filter: blur(25px); }
+        }
+        .score-glow {
+          animation: score-pulse 3s ease-in-out infinite;
+        }
+
+        /* ── Hero radial glow ─────────────────────────────────── */
+        .hero-glow {
+          position: absolute;
+          top: -200px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 900px;
+          height: 600px;
+          background: radial-gradient(ellipse at center, rgba(91,91,214,0.15) 0%, transparent 70%);
+          pointer-events: none;
+          z-index: 0;
+        }
+
+        /* ── Light mode ───────────────────────────────────────── */
+        @media (prefers-color-scheme: light) {
+          .landing-root {
+            background: #F5F5F7 !important;
+            color: #1A1A1A !important;
+          }
+          .glass-card {
+            background: rgba(255,255,255,0.7) !important;
+            backdrop-filter: blur(20px) !important;
+            -webkit-backdrop-filter: blur(20px) !important;
+            border: 1px solid rgba(0,0,0,0.08) !important;
+          }
+          .glass-card:hover {
+            background: rgba(255,255,255,0.85) !important;
+            border-color: rgba(0,0,0,0.12) !important;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.08) !important;
+          }
+          .glass-nav {
+            background: rgba(245,245,247,0.85) !important;
+            border-bottom-color: rgba(0,0,0,0.06) !important;
+          }
+          .bg-orb-1 {
+            background: radial-gradient(circle, rgba(91,91,214,0.08) 0%, transparent 70%) !important;
+          }
+          .bg-orb-2 {
+            background: radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%) !important;
+          }
+          .bg-orb-3 {
+            background: radial-gradient(circle, rgba(60,203,127,0.05) 0%, transparent 70%) !important;
+          }
+          .gradient-text {
+            background: linear-gradient(135deg, #1A1A1A, #444) !important;
+            -webkit-background-clip: text !important;
+            -webkit-text-fill-color: transparent !important;
+            background-clip: text !important;
+          }
+          .section-divider {
+            background: linear-gradient(90deg, transparent, rgba(0,0,0,0.06), transparent) !important;
+          }
+          .hero-glow {
+            background: radial-gradient(ellipse at center, rgba(91,91,214,0.08) 0%, transparent 70%) !important;
+          }
+          [data-light-text] { color: #1A1A1A !important; }
+          [data-light-text-secondary] { color: rgba(0,0,0,0.55) !important; }
+          [data-light-text-tertiary] { color: rgba(0,0,0,0.35) !important; }
+          [data-light-nav-wordmark] { color: rgba(0,0,0,0.35) !important; }
+          [data-light-border] { border-color: rgba(0,0,0,0.08) !important; }
+          .cta-primary {
+            box-shadow: 0 0 20px rgba(91,91,214,0.2), 0 4px 12px rgba(0,0,0,0.1) !important;
+          }
+          .cta-primary:hover {
+            box-shadow: 0 0 30px rgba(91,91,214,0.35), 0 8px 24px rgba(0,0,0,0.15) !important;
+          }
+          .cta-secondary {
+            background: rgba(255,255,255,0.8) !important;
+            border-color: rgba(0,0,0,0.1) !important;
+          }
+          .cta-secondary:hover {
+            background: rgba(255,255,255,0.95) !important;
+            border-color: rgba(0,0,0,0.15) !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+          }
+          .glow-orb { opacity: 0.5 !important; }
+          .glass-glow-indigo::before { background: radial-gradient(circle, rgba(91,91,214,0.06) 0%, transparent 70%) !important; }
+          .glass-glow-purple::before { background: radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%) !important; }
+          .glass-glow-green::before { background: radial-gradient(circle, rgba(60,203,127,0.06) 0%, transparent 70%) !important; }
+          .glass-glow-amber::before { background: radial-gradient(circle, rgba(245,158,11,0.06) 0%, transparent 70%) !important; }
+        }
+
+        /* ── Responsive ───────────────────────────────────────── */
         @media (max-width: 768px) {
           [data-hero-headline] { font-size: 32px !important; }
           [data-section] { padding-top: 64px !important; padding-bottom: 64px !important; }
@@ -142,8 +381,21 @@ export default async function LandingPage() {
           .glow-orb { filter: blur(80px) !important; opacity: 0.7 !important; }
           [data-stagger-grid] { grid-template-columns: 1fr !important; }
           [data-starter-elevate] { transform: none !important; }
+          .bg-orb-1, .bg-orb-2, .bg-orb-3 {
+            filter: blur(60px) !important;
+            opacity: 0.5 !important;
+          }
+          .bg-orb-1 { width: 350px !important; height: 350px !important; }
+          .bg-orb-2 { width: 300px !important; height: 300px !important; }
+          .bg-orb-3 { width: 280px !important; height: 280px !important; }
+          .hero-glow { width: 500px !important; height: 350px !important; }
         }
       `}</style>
+
+      {/* ── Floating background orbs ────────────────────────── */}
+      <div className="bg-orb-1" />
+      <div className="bg-orb-2" />
+      <div className="bg-orb-3" />
 
       {/* ── Nav ──────────────────────────────────────────────────── */}
       <nav
@@ -165,6 +417,7 @@ export default async function LandingPage() {
       >
         <span
           className="font-brand-wordmark"
+          data-light-nav-wordmark=""
           style={{
             color: 'rgba(255,255,255,0.35)',
           }}
@@ -174,6 +427,7 @@ export default async function LandingPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Link
             href="/sign-in"
+            data-light-text-secondary=""
             style={{
               padding: '8px 16px',
               borderRadius: '6px',
@@ -187,6 +441,7 @@ export default async function LandingPage() {
           </Link>
           <Link
             href="/sign-up"
+            className="cta-primary"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -199,7 +454,6 @@ export default async function LandingPage() {
               fontSize: '13px',
               fontWeight: 500,
               textDecoration: 'none',
-              boxShadow: '0 0 20px rgba(91,91,214,0.2)',
             }}
           >
             Start free &rarr;
@@ -207,10 +461,10 @@ export default async function LandingPage() {
         </div>
       </nav>
 
-      <div data-content-wrap="" style={{ maxWidth: maxW, margin: '0 auto', padding: '0 24px' }}>
-        {/* ══════════════════════════════════════════════════════════
+      <div data-content-wrap="" style={{ maxWidth: maxW, margin: '0 auto', padding: '0 24px', position: 'relative', zIndex: 1 }}>
+        {/* ======================================================
             SECTION 1 — HERO
-        ══════════════════════════════════════════════════════════ */}
+        ====================================================== */}
         <section
           data-hero-section=""
           data-section=""
@@ -224,6 +478,9 @@ export default async function LandingPage() {
             position: 'relative',
           }}
         >
+          {/* Large radial gradient glow behind hero */}
+          <div className="hero-glow" />
+
           {/* Hero gradient orbs */}
           <div
             className="glow-orb float-orb-slow"
@@ -249,6 +506,7 @@ export default async function LandingPage() {
 
           <div
             className="font-brand-wordmark"
+            data-light-text-tertiary=""
             style={{
               color: 'rgba(255,255,255,0.35)',
               marginBottom: '32px',
@@ -283,6 +541,7 @@ export default async function LandingPage() {
           </h1>
 
           <p
+            data-light-text-secondary=""
             style={{
               fontSize: '18px',
               color: 'rgba(255,255,255,0.60)',
@@ -312,6 +571,7 @@ export default async function LandingPage() {
             <Link
               href="/sign-up"
               data-cta-button=""
+              className="cta-primary"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -325,13 +585,13 @@ export default async function LandingPage() {
                 fontSize: '14px',
                 fontWeight: 500,
                 textDecoration: 'none',
-                boxShadow: '0 0 30px rgba(91,91,214,0.3), 0 0 60px rgba(91,91,214,0.1)',
               }}
             >
               Start free &rarr;
             </Link>
             <a
               href="#how-it-works"
+              className="cta-secondary"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -352,7 +612,7 @@ export default async function LandingPage() {
             </a>
           </div>
 
-          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)', position: 'relative', zIndex: 1 }}>
+          <p data-light-text-tertiary="" style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)', position: 'relative', zIndex: 1 }}>
             Trusted by teams managing &pound;1M+ pipelines
           </p>
 
@@ -369,10 +629,13 @@ export default async function LandingPage() {
           />
         </section>
 
-        {/* ══════════════════════════════════════════════════════════
+        {/* Section divider */}
+        <div className="section-divider" />
+
+        {/* ======================================================
             SECTION 2 — THE PROBLEM
-        ══════════════════════════════════════════════════════════ */}
-        <section data-section="" style={{ paddingTop: '0', paddingBottom: '120px', position: 'relative' }}>
+        ====================================================== */}
+        <section data-section="" style={{ paddingTop: '80px', paddingBottom: '120px', position: 'relative' }}>
           <h2
             className="gradient-text"
             style={{
@@ -411,9 +674,24 @@ export default async function LandingPage() {
                 zIndex: 1,
               }}
             >
-              {/* CRM side */}
-              <div style={{ padding: '32px' }}>
+              {/* CRM side — dimmed */}
+              <div style={{
+                padding: '32px',
+                opacity: 0.7,
+                position: 'relative',
+              }}>
+                {/* Subtle dark overlay for dimming */}
                 <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'linear-gradient(135deg, rgba(127,29,29,0.06) 0%, transparent 60%)',
+                    pointerEvents: 'none',
+                    borderRadius: '16px 0 0 16px',
+                  }}
+                />
+                <div
+                  data-light-text-tertiary=""
                   style={{
                     fontSize: '13px',
                     fontWeight: 600,
@@ -421,6 +699,7 @@ export default async function LandingPage() {
                     color: textTertiary,
                     textTransform: 'uppercase',
                     marginBottom: '20px',
+                    position: 'relative',
                   }}
                 >
                   Your CRM says
@@ -428,11 +707,12 @@ export default async function LandingPage() {
                 <div style={{ position: 'relative', display: 'inline-block' }}>
                   {/* Green glow behind 82 */}
                   <div
+                    className="score-glow"
                     style={{
                       position: 'absolute',
-                      width: '80px',
-                      height: '80px',
-                      background: 'radial-gradient(circle, rgba(34,197,94,0.25) 0%, transparent 70%)',
+                      width: '100px',
+                      height: '100px',
+                      background: 'radial-gradient(circle, rgba(34,197,94,0.30) 0%, transparent 70%)',
                       top: '50%',
                       left: '50%',
                       transform: 'translate(-50%, -50%)',
@@ -442,17 +722,19 @@ export default async function LandingPage() {
                   />
                   <div
                     style={{
-                      fontSize: '36px',
+                      fontSize: '48px',
                       fontWeight: 700,
                       color: '#22c55e',
                       marginBottom: '12px',
                       position: 'relative',
+                      fontFamily: 'var(--font-mono, monospace)',
+                      letterSpacing: '-0.03em',
                     }}
                   >
                     82
                   </div>
                 </div>
-                <div style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>
+                <div data-light-text-secondary="" style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7, position: 'relative' }}>
                   &ldquo;Deal is on track. Close date next month. Rep says champion is engaged.&rdquo;
                 </div>
               </div>
@@ -474,16 +756,32 @@ export default async function LandingPage() {
                 }}
               />
 
-              {/* Halvex side */}
-              <div style={{ padding: '32px' }}>
+              {/* Halvex side — indigo glow border */}
+              <div style={{
+                padding: '32px',
+                position: 'relative',
+                borderLeft: '2px solid rgba(91,91,214,0.4)',
+                boxShadow: 'inset 4px 0 20px rgba(91,91,214,0.08)',
+              }}>
+                {/* Subtle indigo tint */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'linear-gradient(135deg, rgba(91,91,214,0.04) 0%, transparent 60%)',
+                    pointerEvents: 'none',
+                    borderRadius: '0 16px 16px 0',
+                  }}
+                />
                 <div
                   style={{
                     fontSize: '13px',
                     fontWeight: 600,
                     letterSpacing: '1px',
-                    color: textTertiary,
+                    color: accent,
                     textTransform: 'uppercase',
                     marginBottom: '20px',
+                    position: 'relative',
                   }}
                 >
                   Halvex says
@@ -491,11 +789,12 @@ export default async function LandingPage() {
                 <div style={{ position: 'relative', display: 'inline-block' }}>
                   {/* Red glow behind 38 */}
                   <div
+                    className="score-glow"
                     style={{
                       position: 'absolute',
-                      width: '80px',
-                      height: '80px',
-                      background: 'radial-gradient(circle, rgba(239,68,68,0.25) 0%, transparent 70%)',
+                      width: '100px',
+                      height: '100px',
+                      background: 'radial-gradient(circle, rgba(239,68,68,0.35) 0%, transparent 70%)',
                       top: '50%',
                       left: '50%',
                       transform: 'translate(-50%, -50%)',
@@ -505,17 +804,19 @@ export default async function LandingPage() {
                   />
                   <div
                     style={{
-                      fontSize: '36px',
+                      fontSize: '48px',
                       fontWeight: 700,
                       color: '#ef4444',
                       marginBottom: '12px',
                       position: 'relative',
+                      fontFamily: 'var(--font-mono, monospace)',
+                      letterSpacing: '-0.03em',
                     }}
                   >
                     38
                   </div>
                 </div>
-                <div style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>
+                <div data-light-text-secondary="" style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7, position: 'relative' }}>
                   &ldquo;Champion went silent 18 days ago. No technical validation. Budget
                   conversation stalled. Deals like this close 12% of the time.&rdquo;
                 </div>
@@ -524,6 +825,7 @@ export default async function LandingPage() {
           </div>
 
           <p
+            data-light-text-secondary=""
             style={{
               fontSize: '15px',
               color: textSecondary,
@@ -538,13 +840,16 @@ export default async function LandingPage() {
           </p>
         </section>
 
-        {/* ══════════════════════════════════════════════════════════
+        {/* Section divider */}
+        <div className="section-divider" />
+
+        {/* ======================================================
             SECTION 3 — HOW IT WORKS
-        ══════════════════════════════════════════════════════════ */}
+        ====================================================== */}
         <section
           id="how-it-works"
           data-section=""
-          style={{ paddingTop: '0', paddingBottom: '120px', position: 'relative' }}
+          style={{ paddingTop: '80px', paddingBottom: '120px', position: 'relative' }}
         >
           <h2
             className="gradient-text"
@@ -574,22 +879,31 @@ export default async function LandingPage() {
                 desc: 'Add your deals and conversations. Halvex extracts signals automatically — champion status, budget, risks, competitive mentions, product gaps.',
                 glowColor: 'rgba(91,91,214,0.18)',
                 accentColor: accent,
+                badgeBg: 'rgba(91,141,239,0.15)',
+                badgeColor: '#5B8DEF',
+                glowClass: 'glass-glow-indigo',
               },
               {
                 num: '2',
                 title: 'SCORE',
                 desc: 'Private ML trained on your closed deals calculates win probability. Every score is pure math from your own history — never hallucinated.',
-                glowColor: 'rgba(60,203,127,0.18)',
-                accentColor: green,
+                glowColor: 'rgba(139,92,246,0.18)',
+                accentColor: '#8B5CF6',
+                badgeBg: 'rgba(139,92,246,0.15)',
+                badgeColor: '#8B5CF6',
+                glowClass: 'glass-glow-purple',
               },
               {
                 num: '3',
                 title: 'ACT',
                 desc: 'Morning briefings with specific actions for each deal. Which deals need attention, what changed, and exactly what to do next.',
-                glowColor: 'rgba(245,158,11,0.18)',
-                accentColor: amber,
+                glowColor: 'rgba(60,203,127,0.18)',
+                accentColor: green,
+                badgeBg: 'rgba(60,203,127,0.15)',
+                badgeColor: green,
+                glowClass: 'glass-glow-green',
               },
-            ].map(({ num, title, desc, glowColor, accentColor }, i) => (
+            ].map(({ num, title, desc, glowColor, accentColor, badgeBg, badgeColor, glowClass }, i) => (
               <div key={num} style={{ position: 'relative', display: 'flex', alignItems: 'stretch' }}>
                 {/* Glow behind card */}
                 <div
@@ -605,7 +919,7 @@ export default async function LandingPage() {
                 />
 
                 <div
-                  className="glass-card"
+                  className={`glass-card glass-glow ${glowClass}`}
                   style={{
                     padding: '28px',
                     position: 'relative',
@@ -629,24 +943,27 @@ export default async function LandingPage() {
                     {num}
                   </div>
 
+                  {/* Colored number badge */}
                   <div
                     style={{
-                      width: '32px',
-                      height: '32px',
+                      width: '36px',
+                      height: '36px',
                       borderRadius: '10px',
-                      background: `rgba(${accentColor === accent ? '91,91,214' : accentColor === green ? '60,203,127' : '245,158,11'},0.12)`,
+                      background: badgeBg,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      color: accentColor,
+                      fontSize: '15px',
+                      fontWeight: 700,
+                      color: badgeColor,
                       marginBottom: '16px',
+                      boxShadow: `0 0 16px ${glowColor}`,
                     }}
                   >
                     {num}
                   </div>
                   <div
+                    data-light-text=""
                     style={{
                       fontSize: '13px',
                       fontWeight: 600,
@@ -658,7 +975,7 @@ export default async function LandingPage() {
                   >
                     {title}
                   </div>
-                  <div style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>
+                  <div data-light-text-secondary="" style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>
                     {desc}
                   </div>
                 </div>
@@ -686,10 +1003,13 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* ══════════════════════════════════════════════════════════
+        {/* Section divider */}
+        <div className="section-divider" />
+
+        {/* ======================================================
             SECTION 4 — WHY NOT HUBSPOT?
-        ══════════════════════════════════════════════════════════ */}
-        <section data-section="" style={{ paddingTop: '0', paddingBottom: '120px', position: 'relative' }}>
+        ====================================================== */}
+        <section data-section="" style={{ paddingTop: '80px', paddingBottom: '120px', position: 'relative' }}>
           <h2
             className="gradient-text"
             style={{
@@ -738,6 +1058,7 @@ export default async function LandingPage() {
                   border: '1px solid rgba(255,255,255,0.04)',
                   position: 'relative',
                   overflow: 'hidden',
+                  opacity: 0.75,
                 }}
               >
                 {/* Subtle red/grey background tint */}
@@ -750,6 +1071,7 @@ export default async function LandingPage() {
                   }}
                 />
                 <div
+                  data-light-text-tertiary=""
                   style={{
                     fontSize: '13px',
                     fontWeight: 600,
@@ -781,16 +1103,17 @@ export default async function LandingPage() {
                 </div>
               </div>
 
-              {/* Halvex side — bright, gradient left border */}
+              {/* Halvex side — bright, indigo glow border */}
               <div
                 style={{
                   padding: '32px',
                   borderRadius: '0 16px 16px 0',
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.06)',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(91,91,214,0.25)',
                   borderLeft: 'none',
                   position: 'relative',
                   overflow: 'hidden',
+                  boxShadow: 'inset 0 0 30px rgba(91,91,214,0.06)',
                 }}
               >
                 {/* Gradient left border */}
@@ -801,7 +1124,16 @@ export default async function LandingPage() {
                     top: 0,
                     bottom: 0,
                     width: '2px',
-                    background: `linear-gradient(180deg, ${accent} 0%, transparent 100%)`,
+                    background: `linear-gradient(180deg, ${accent} 0%, rgba(139,92,246,0.5) 50%, transparent 100%)`,
+                  }}
+                />
+                {/* Subtle indigo background glow */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'linear-gradient(135deg, rgba(91,91,214,0.04) 0%, transparent 60%)',
+                    pointerEvents: 'none',
                   }}
                 />
                 <div
@@ -812,11 +1144,13 @@ export default async function LandingPage() {
                     color: accent,
                     textTransform: 'uppercase',
                     marginBottom: '20px',
+                    position: 'relative',
                   }}
                 >
                   Halvex
                 </div>
                 <div
+                  data-light-text-secondary=""
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
@@ -824,6 +1158,7 @@ export default async function LandingPage() {
                     fontSize: '14px',
                     color: textSecondary,
                     lineHeight: 1.7,
+                    position: 'relative',
                   }}
                 >
                   <div>Scores on what actually happened in every interaction</div>
@@ -837,6 +1172,7 @@ export default async function LandingPage() {
           </div>
 
           <p
+            data-light-text-secondary=""
             style={{
               fontSize: '15px',
               color: textSecondary,
@@ -852,10 +1188,13 @@ export default async function LandingPage() {
           </p>
         </section>
 
-        {/* ══════════════════════════════════════════════════════════
+        {/* Section divider */}
+        <div className="section-divider" />
+
+        {/* ======================================================
             SECTION 5 — WHAT YOU GET
-        ══════════════════════════════════════════════════════════ */}
-        <section data-section="" style={{ paddingTop: '0', paddingBottom: '120px', position: 'relative' }}>
+        ====================================================== */}
+        <section data-section="" style={{ paddingTop: '80px', paddingBottom: '120px', position: 'relative' }}>
           <h2
             className="gradient-text"
             style={{
@@ -897,7 +1236,7 @@ export default async function LandingPage() {
                 title: 'Morning Briefing',
                 desc: 'Every deal that needs attention, what changed, and exactly what to do about it. Delivered before your first call.',
                 accentGrad: `linear-gradient(90deg, ${amber}, ${amber}88)`,
-                glowColor: 'rgba(245,158,11,0.08)',
+                glowClass: 'glass-glow-amber',
                 span: false,
               },
               {
@@ -905,7 +1244,7 @@ export default async function LandingPage() {
                 title: 'Deal Intelligence',
                 desc: 'Win probability, risk signals, competitive threats, and champion health — for every deal, updated with every interaction.',
                 accentGrad: `linear-gradient(90deg, ${accent}, ${accent}88)`,
-                glowColor: 'rgba(91,91,214,0.08)',
+                glowClass: 'glass-glow-indigo',
                 span: false,
               },
               {
@@ -913,7 +1252,7 @@ export default async function LandingPage() {
                 title: 'Private ML',
                 desc: 'A model trained only on your data. What winning looks like for your team, your market, your deal shape. No generic benchmarks.',
                 accentGrad: `linear-gradient(90deg, ${green}, ${green}88)`,
-                glowColor: 'rgba(60,203,127,0.08)',
+                glowClass: 'glass-glow-green',
                 span: true,
               },
               {
@@ -921,7 +1260,7 @@ export default async function LandingPage() {
                 title: 'Product Gap Detection',
                 desc: 'Automatically surfaces feature requests and missing capabilities mentioned across your pipeline. Ranked by revenue impact.',
                 accentGrad: `linear-gradient(90deg, #ef4444, #ef444488)`,
-                glowColor: 'rgba(239,68,68,0.08)',
+                glowClass: 'glass-glow-purple',
                 span: false,
               },
               {
@@ -929,13 +1268,13 @@ export default async function LandingPage() {
                 title: 'Collateral Engine',
                 desc: 'Generates deal-specific battlecards, objection handlers, and case study recommendations based on live competitive intelligence.',
                 accentGrad: `linear-gradient(90deg, ${accent}, ${amber})`,
-                glowColor: 'rgba(91,91,214,0.08)',
+                glowClass: 'glass-glow-indigo',
                 span: false,
               },
-            ].map(({ icon, title, desc, accentGrad, glowColor, span }) => (
+            ].map(({ icon, title, desc, accentGrad, glowClass, span }) => (
               <div
                 key={title}
-                className="glass-card"
+                className={`glass-card glass-glow ${glowClass}`}
                 style={{
                   padding: '24px 28px',
                   gridColumn: span ? '1 / -1' : undefined,
@@ -957,6 +1296,7 @@ export default async function LandingPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                   <span style={{ fontSize: '16px' }}>{icon}</span>
                   <div
+                    data-light-text=""
                     style={{
                       fontSize: '15px',
                       fontWeight: 600,
@@ -966,7 +1306,7 @@ export default async function LandingPage() {
                     {title}
                   </div>
                 </div>
-                <div style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>
+                <div data-light-text-secondary="" style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>
                   {desc}
                 </div>
               </div>
@@ -974,10 +1314,13 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* ══════════════════════════════════════════════════════════
+        {/* Section divider */}
+        <div className="section-divider" />
+
+        {/* ======================================================
             SECTION 6 — THE ARCHITECTURE
-        ══════════════════════════════════════════════════════════ */}
-        <section data-section="" style={{ paddingTop: '0', paddingBottom: '120px', position: 'relative' }}>
+        ====================================================== */}
+        <section data-section="" style={{ paddingTop: '80px', paddingBottom: '120px', position: 'relative' }}>
           <h2
             className="gradient-text"
             style={{
@@ -1007,24 +1350,27 @@ export default async function LandingPage() {
                 dotColor: '#5B8DEF',
                 glowColor: 'rgba(91,141,239,0.15)',
                 lineColor: 'rgba(91,141,239,0.4)',
+                borderColor: '#5B8DEF',
               },
               {
                 label: 'Layer 2',
                 title: 'Private ML Engine',
                 desc: 'A model trained exclusively on your closed deals. Win probability calculated from real patterns in your data. No industry averages. No hallucinated scores.',
-                dotColor: green,
-                glowColor: 'rgba(60,203,127,0.15)',
-                lineColor: 'rgba(60,203,127,0.4)',
+                dotColor: '#8B5CF6',
+                glowColor: 'rgba(139,92,246,0.15)',
+                lineColor: 'rgba(139,92,246,0.4)',
+                borderColor: '#8B5CF6',
               },
               {
                 label: 'Layer 3',
                 title: 'AI Narration',
                 desc: 'AI explains every score in plain language. Why is this deal at risk? What changed? What should you do next? Specific, actionable, grounded in evidence.',
-                dotColor: accent,
-                glowColor: 'rgba(91,91,214,0.15)',
-                lineColor: 'rgba(91,91,214,0.4)',
+                dotColor: green,
+                glowColor: 'rgba(60,203,127,0.15)',
+                lineColor: 'rgba(60,203,127,0.4)',
+                borderColor: green,
               },
-            ].map(({ label, title, desc, dotColor, glowColor, lineColor }, i) => (
+            ].map(({ label, title, desc, dotColor, glowColor, lineColor, borderColor }, i) => (
               <div
                 key={title}
                 data-arch-row=""
@@ -1085,13 +1431,15 @@ export default async function LandingPage() {
                   )}
                 </div>
 
-                {/* Right: glass card */}
+                {/* Right: glass card with colored left border */}
                 <div
                   className="glass-card"
                   style={{
                     padding: '24px 28px',
                     flex: 1,
                     position: 'relative',
+                    borderLeft: `3px solid ${borderColor}`,
+                    boxShadow: `inset 4px 0 16px rgba(${borderColor === '#5B8DEF' ? '91,141,239' : borderColor === '#8B5CF6' ? '139,92,246' : '60,203,127'},0.06)`,
                   }}
                 >
                   {/* Subtle glow inside card */}
@@ -1107,6 +1455,7 @@ export default async function LandingPage() {
                     }}
                   />
                   <div
+                    data-light-text-tertiary=""
                     style={{
                       fontSize: '11px',
                       fontWeight: 600,
@@ -1120,6 +1469,7 @@ export default async function LandingPage() {
                     {label}
                   </div>
                   <div
+                    data-light-text=""
                     style={{
                       fontSize: '15px',
                       fontWeight: 600,
@@ -1130,7 +1480,7 @@ export default async function LandingPage() {
                   >
                     {title}
                   </div>
-                  <div style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7, position: 'relative' }}>
+                  <div data-light-text-secondary="" style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7, position: 'relative' }}>
                     {desc}
                   </div>
                 </div>
@@ -1157,14 +1507,17 @@ export default async function LandingPage() {
             >
               AI extracts. ML predicts. AI explains.
             </span>
-            <span style={{ color: textSecondary }}> No score is ever hallucinated.</span>
+            <span data-light-text-secondary="" style={{ color: textSecondary }}> No score is ever hallucinated.</span>
           </p>
         </section>
 
-        {/* ══════════════════════════════════════════════════════════
+        {/* Section divider */}
+        <div className="section-divider" />
+
+        {/* ======================================================
             SECTION 7 — PRICING
-        ══════════════════════════════════════════════════════════ */}
-        <section data-section="" style={{ paddingTop: '0', paddingBottom: '120px', position: 'relative' }}>
+        ====================================================== */}
+        <section data-section="" style={{ paddingTop: '80px', paddingBottom: '120px', position: 'relative' }}>
           <h2
             className="gradient-text"
             style={{
@@ -1203,20 +1556,20 @@ export default async function LandingPage() {
           >
             {/* Free */}
             <div
-              className="glass-card"
+              className="glass-card glass-glow"
               style={{
                 padding: '32px 28px',
                 display: 'flex',
                 flexDirection: 'column',
               }}
             >
-              <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px', color: textSecondary }}>
+              <div data-light-text-secondary="" style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px', color: textSecondary }}>
                 Free
               </div>
-              <div style={{ fontSize: '36px', fontWeight: 600, letterSpacing: '-0.03em', marginBottom: '4px' }}>
+              <div data-light-text="" style={{ fontSize: '36px', fontWeight: 600, letterSpacing: '-0.03em', marginBottom: '4px' }}>
                 &pound;0
               </div>
-              <div style={{ fontSize: '13px', color: textTertiary, marginBottom: '28px' }}>
+              <div data-light-text-tertiary="" style={{ fontSize: '13px', color: textTertiary, marginBottom: '28px' }}>
                 For getting started
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px', flex: 1 }}>
@@ -1228,13 +1581,16 @@ export default async function LandingPage() {
                 ].map((f) => (
                   <div key={f} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                     <span style={{ color: accent, fontSize: '14px', lineHeight: '20px', flexShrink: 0 }}>&#10003;</span>
-                    <span style={{ fontSize: '13px', color: textSecondary, lineHeight: '20px' }}>{f}</span>
+                    <span data-light-text-secondary="" style={{ fontSize: '13px', color: textSecondary, lineHeight: '20px' }}>{f}</span>
                   </div>
                 ))}
               </div>
               <Link
                 href="/sign-up"
                 data-cta-button=""
+                className="cta-secondary"
+                data-light-text=""
+                data-light-border=""
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1252,10 +1608,10 @@ export default async function LandingPage() {
               </Link>
             </div>
 
-            {/* Starter — highlighted & elevated */}
+            {/* Starter — highlighted & elevated with indigo glow */}
             <div
               data-starter-elevate=""
-              className="glass-card"
+              className="glass-card glass-glow glass-glow-indigo"
               style={{
                 padding: '32px 28px',
                 display: 'flex',
@@ -1263,8 +1619,8 @@ export default async function LandingPage() {
                 border: `1px solid rgba(91,91,214,0.4)`,
                 position: 'relative',
                 transform: 'translateY(-8px)',
-                boxShadow: '0 0 50px rgba(91,91,214,0.12), 0 20px 60px rgba(0,0,0,0.3)',
-                background: 'rgba(255,255,255,0.05)',
+                boxShadow: '0 0 50px rgba(91,91,214,0.15), 0 0 100px rgba(91,91,214,0.06), 0 20px 60px rgba(0,0,0,0.3)',
+                background: 'rgba(255,255,255,0.06)',
               }}
             >
               {/* Stronger glow behind starter */}
@@ -1280,30 +1636,33 @@ export default async function LandingPage() {
                   filter: 'blur(80px)',
                 }}
               />
+              {/* "Most popular" badge with shimmer */}
               <div
+                className="badge-shimmer"
                 style={{
                   position: 'absolute',
                   top: '-12px',
                   left: '24px',
-                  background: `linear-gradient(135deg, ${accent}, #7B7BD8)`,
+                  background: `linear-gradient(135deg, ${accent}, #8B5CF6)`,
                   color: '#fff',
                   fontSize: '11px',
                   fontWeight: 600,
-                  padding: '4px 12px',
+                  padding: '4px 14px',
                   borderRadius: '100px',
                   zIndex: 2,
+                  boxShadow: '0 0 16px rgba(91,91,214,0.3)',
                 }}
               >
                 Most popular
               </div>
-              <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px', color: textSecondary, position: 'relative' }}>
+              <div data-light-text-secondary="" style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px', color: textSecondary, position: 'relative' }}>
                 Starter
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '4px', position: 'relative' }}>
-                <span style={{ fontSize: '36px', fontWeight: 600, letterSpacing: '-0.03em', color: 'rgba(255,255,255,0.95)' }}>&pound;79</span>
-                <span style={{ fontSize: '14px', color: textTertiary }}>/mo</span>
+                <span data-light-text="" style={{ fontSize: '36px', fontWeight: 600, letterSpacing: '-0.03em', color: 'rgba(255,255,255,0.95)' }}>&pound;79</span>
+                <span data-light-text-tertiary="" style={{ fontSize: '14px', color: textTertiary }}>/mo</span>
               </div>
-              <div style={{ fontSize: '13px', color: textTertiary, marginBottom: '28px', position: 'relative' }}>
+              <div data-light-text-tertiary="" style={{ fontSize: '13px', color: textTertiary, marginBottom: '28px', position: 'relative' }}>
                 For growing teams
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px', flex: 1, position: 'relative' }}>
@@ -1317,13 +1676,14 @@ export default async function LandingPage() {
                 ].map((f) => (
                   <div key={f} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                     <span style={{ color: accent, fontSize: '14px', lineHeight: '20px', flexShrink: 0 }}>&#10003;</span>
-                    <span style={{ fontSize: '13px', color: textSecondary, lineHeight: '20px' }}>{f}</span>
+                    <span data-light-text-secondary="" style={{ fontSize: '13px', color: textSecondary, lineHeight: '20px' }}>{f}</span>
                   </div>
                 ))}
               </div>
               <Link
                 href="/sign-up"
                 data-cta-button=""
+                className="cta-primary"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1335,7 +1695,6 @@ export default async function LandingPage() {
                   fontSize: '13px',
                   fontWeight: 500,
                   textDecoration: 'none',
-                  boxShadow: '0 0 20px rgba(91,91,214,0.25)',
                   position: 'relative',
                 }}
               >
@@ -1345,21 +1704,21 @@ export default async function LandingPage() {
 
             {/* Pro */}
             <div
-              className="glass-card"
+              className="glass-card glass-glow"
               style={{
                 padding: '32px 28px',
                 display: 'flex',
                 flexDirection: 'column',
               }}
             >
-              <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px', color: textSecondary }}>
+              <div data-light-text-secondary="" style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px', color: textSecondary }}>
                 Pro
               </div>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '4px' }}>
-                <span style={{ fontSize: '36px', fontWeight: 600, letterSpacing: '-0.03em' }}>&pound;149</span>
-                <span style={{ fontSize: '14px', color: textTertiary }}>/mo</span>
+                <span data-light-text="" style={{ fontSize: '36px', fontWeight: 600, letterSpacing: '-0.03em' }}>&pound;149</span>
+                <span data-light-text-tertiary="" style={{ fontSize: '14px', color: textTertiary }}>/mo</span>
               </div>
-              <div style={{ fontSize: '13px', color: textTertiary, marginBottom: '28px' }}>
+              <div data-light-text-tertiary="" style={{ fontSize: '13px', color: textTertiary, marginBottom: '28px' }}>
                 For scaling revenue teams
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px', flex: 1 }}>
@@ -1373,13 +1732,16 @@ export default async function LandingPage() {
                 ].map((f) => (
                   <div key={f} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                     <span style={{ color: accent, fontSize: '14px', lineHeight: '20px', flexShrink: 0 }}>&#10003;</span>
-                    <span style={{ fontSize: '13px', color: textSecondary, lineHeight: '20px' }}>{f}</span>
+                    <span data-light-text-secondary="" style={{ fontSize: '13px', color: textSecondary, lineHeight: '20px' }}>{f}</span>
                   </div>
                 ))}
               </div>
               <Link
                 href="/sign-up"
                 data-cta-button=""
+                className="cta-secondary"
+                data-light-text=""
+                data-light-border=""
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1400,9 +1762,9 @@ export default async function LandingPage() {
         </section>
       </div>
 
-      {/* ══════════════════════════════════════════════════════════
+      {/* ======================================================
           SECTION 8 — CTA + FOOTER
-      ══════════════════════════════════════════════════════════ */}
+      ====================================================== */}
       <section
         data-section=""
         style={{
@@ -1412,6 +1774,9 @@ export default async function LandingPage() {
           position: 'relative',
         }}
       >
+        {/* Section divider */}
+        <div className="section-divider" style={{ marginBottom: '80px' }} />
+
         {/* Ambient glow */}
         <div
           className="glow-orb"
@@ -1438,6 +1803,7 @@ export default async function LandingPage() {
             Your pipeline has risks you&apos;re not seeing.
           </h2>
           <p
+            data-light-text-secondary=""
             style={{
               fontSize: '18px',
               color: textSecondary,
@@ -1449,6 +1815,7 @@ export default async function LandingPage() {
           <Link
             href="/sign-up"
             data-cta-button=""
+            className="cta-primary"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -1462,7 +1829,6 @@ export default async function LandingPage() {
               fontSize: '15px',
               fontWeight: 500,
               textDecoration: 'none',
-              boxShadow: '0 0 30px rgba(91,91,214,0.3), 0 0 60px rgba(91,91,214,0.1)',
             }}
           >
             Start free &rarr;
@@ -1489,6 +1855,7 @@ export default async function LandingPage() {
           }}
         />
         <p
+          data-light-text-secondary=""
           style={{
             fontSize: '15px',
             color: textSecondary,
@@ -1499,7 +1866,7 @@ export default async function LandingPage() {
         >
           Halvex &mdash; The intelligence layer for B2B sales.
         </p>
-        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)' }}>
+        <p data-light-text-tertiary="" style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)' }}>
           London, UK &middot; Halvex Ltd
         </p>
       </footer>

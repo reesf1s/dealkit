@@ -59,8 +59,8 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingBottom: '12px', borderBottom: '1px solid var(--border)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--glass-card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--glass-card-border)', borderRadius: '12px', padding: '20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingBottom: '12px', borderBottom: '1px solid var(--glass-card-border)' }}>
         <div style={{ color: 'var(--accent)' }}>{icon}</div>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -94,7 +94,7 @@ function FactorRow({ rank, label, value, direction, detail, importance }: {
   const lineColor = direction === 'positive' ? 'var(--success)' : direction === 'negative' ? 'var(--danger)' : 'var(--text-secondary)'
   const barColor = direction === 'positive' ? 'var(--success)' : direction === 'negative' ? 'var(--danger)' : 'var(--text-secondary)'
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', background: 'var(--surface)', border: 'none', borderRadius: '10px' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', background: 'var(--glass-card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid var(--glass-card-border)', borderRadius: '10px' }}>
       <div style={{ flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', background: `color-mix(in srgb, ${rankColor} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${rankColor} 25%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '600', color: rankColor }}>
         {rank}
       </div>
@@ -129,9 +129,11 @@ function LockedCard({ title, description, unlockText, iconColor, bgTint }: {
   return (
     <div style={{
       padding: '20px',
-      borderRadius: '8px',
-      border: 'none',
-      background: bgTint,
+      borderRadius: '12px',
+      border: '1px solid var(--glass-card-border)',
+      background: 'var(--glass-card-bg)',
+      backdropFilter: 'blur(16px)',
+      WebkitBackdropFilter: 'blur(16px)',
       display: 'flex',
       flexDirection: 'column',
       gap: '10px',
@@ -369,7 +371,7 @@ export default function PlaybookPage() {
           { label: 'Avg won value', value: wl?.avgWonValue ? formatCurrency(Math.round(wl.avgWonValue)) : '—', color: 'var(--accent)' },
           { label: 'Closed deals', value: String(totalDeals), color: 'var(--text-secondary)' },
         ].map(s => (
-          <div key={s.label} style={{ padding: '12px 16px', background: 'var(--card-bg)', border: 'none', borderRadius: '10px', minWidth: '110px' }}>
+          <div key={s.label} style={{ padding: '12px 16px', background: 'var(--glass-card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--glass-card-border)', borderRadius: '12px', minWidth: '110px' }}>
             <div style={{ fontSize: '20px', fontWeight: '600', color: s.color, lineHeight: 1 }} className="font-mono">{s.value}</div>
             <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{s.label}</div>
           </div>
@@ -458,7 +460,7 @@ export default function PlaybookPage() {
               const winConditions: string[] = p.winConditions ?? (p.topWinCondition ? [p.topWinCondition] : [])
               const lossConditions: string[] = p.lossConditions ?? (p.topLossRisk ? [p.topLossRisk] : [])
               return (
-                <div key={i} style={{ padding: '16px', background: 'var(--card-bg)', border: 'none', borderRadius: '8px' }}>
+                <div key={i} style={{ padding: '16px', background: 'var(--glass-card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--glass-card-border)', borderRadius: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                     <div style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)' }}>vs {p.competitor}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

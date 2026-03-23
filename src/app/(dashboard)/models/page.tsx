@@ -281,11 +281,18 @@ function ModelGrid({ trainingSize, brainData }: { trainingSize: number; brainDat
         return (
           <div key={i} style={{
             padding: '14px',
-            borderRadius: '8px',
-            background: status === 'active' ? 'var(--card-bg)' : 'var(--surface)',
-            border: `1px solid ${status === 'active' ? 'var(--card-border)' : 'var(--border)'}`,
+            borderRadius: '12px',
+            background: 'var(--glass-card-bg)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            border: `1px solid var(--glass-card-border)`,
             opacity: status === 'locked' ? 0.65 : 1,
             transition: 'opacity 0.1s ease',
+            boxShadow: status === 'active'
+              ? '0 0 16px var(--glass-glow-success, rgba(60,203,127,0.12))'
+              : status === 'warming'
+                ? '0 0 16px var(--glass-glow-warning, rgba(245,158,11,0.08))'
+                : 'var(--glow-grey, 0 0 8px rgba(255,255,255,0.02))',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -564,9 +571,11 @@ export default function ModelsPage() {
   const forecastData = forecastRes?.data
 
   const cardStyle: React.CSSProperties = {
-    background: 'var(--card-bg)',
-    border: 'none',
-    borderRadius: '8px',
+    background: 'var(--glass-card-bg)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    border: '1px solid var(--glass-card-border)',
+    borderRadius: '12px',
     padding: '24px',
     display: 'flex',
     flexDirection: 'column',

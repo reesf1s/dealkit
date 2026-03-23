@@ -47,11 +47,18 @@ export default function ToolCallCard({ invocation }: ToolCallCardProps) {
   return (
     <div style={{
       margin: '4px 0',
-      borderRadius: '8px',
-      background: 'rgba(15, 12, 30, 0.6)',
+      borderRadius: '10px',
+      background: 'var(--glass-tool-card, rgba(15, 12, 30, 0.6))',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
       border: `1px solid ${isDone ? (isToolError ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)') : 'rgba(99,102,241,0.2)'}`,
       overflow: 'hidden',
       transition: 'border-color 0.2s',
+      boxShadow: isDone && !isToolError
+        ? '0 0 8px rgba(16,185,129,0.06)'
+        : isToolError
+          ? '0 0 8px rgba(245,158,11,0.06)'
+          : undefined,
     }}>
       <button
         onClick={() => resultText && setExpanded(p => !p)}

@@ -36,11 +36,21 @@
   --ds-red: #E5484D;
   --ds-red-soft: rgba(229,72,77,0.14);
 
-  /* Radii — TIGHT like Linear */
+  /* Glass card mixins */
+  --ds-glass-bg: rgba(255,255,255,0.04);
+  --ds-glass-border: rgba(255,255,255,0.08);
+  --ds-glass-blur: blur(20px);
+  --ds-glass-hover: rgba(255,255,255,0.07);
+  --ds-glow-accent: rgba(91,91,214,0.15);
+  --ds-glow-green: rgba(60,203,127,0.12);
+  --ds-glow-amber: rgba(245,158,11,0.12);
+  --ds-glow-red: rgba(229,72,77,0.12);
+
+  /* Radii — softer glass-friendly corners */
   --ds-radius-sm: 4px;
   --ds-radius-md: 6px;
-  --ds-radius-lg: 8px;
-  --ds-radius-xl: 10px;
+  --ds-radius-lg: 12px;
+  --ds-radius-xl: 14px;
 
   /* Font */
   --ds-font: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -56,4 +66,62 @@ body {
   color: var(--ds-text-1) !important;
   font-size: 13px !important;
   -webkit-font-smoothing: antialiased !important;
+}
+
+/* ── Light mode (prefers-color-scheme) ────────────────────────────────────── */
+@media (prefers-color-scheme: light) {
+  :root {
+    --ds-bg-page: #F8F9FA;
+    --ds-bg-sidebar: rgba(255,255,255,0.8);
+    --ds-bg-card: rgba(255,255,255,0.7);
+    --ds-bg-hover: rgba(0,0,0,0.04);
+    --ds-bg-active: rgba(0,0,0,0.06);
+    --ds-text-1: rgba(0,0,0,0.87);
+    --ds-text-2: rgba(0,0,0,0.55);
+    --ds-text-3: rgba(0,0,0,0.32);
+    --ds-glass-bg: rgba(255,255,255,0.6);
+    --ds-glass-border: rgba(0,0,0,0.08);
+    --ds-glass-hover: rgba(0,0,0,0.04);
+    --ds-border: rgba(0,0,0,0.08);
+    --ds-glow-accent: rgba(91,91,214,0.08);
+    --ds-glow-green: rgba(60,203,127,0.06);
+    --ds-glow-amber: rgba(245,158,11,0.06);
+    --ds-glow-red: rgba(229,72,77,0.06);
+    --glass-card-bg: rgba(255,255,255,0.60);
+    --glass-card-border: rgba(0,0,0,0.08);
+    --glass-card-hover-bg: rgba(255,255,255,0.72);
+    --glass-card-hover-border: rgba(0,0,0,0.12);
+    --glass-glow-accent: rgba(91,91,214,0.04);
+    --glass-glow-success: rgba(60,203,127,0.06);
+    --glass-glow-danger: rgba(229,72,77,0.04);
+    --glass-glow-warning: rgba(245,158,11,0.03);
+  }
+}
+
+/* ── Light mode (class-based toggle) ──────────────────────────────────────── */
+.light {
+  --ds-bg-page: #F8F9FA;
+  --ds-bg-sidebar: rgba(255,255,255,0.8);
+  --ds-bg-card: rgba(255,255,255,0.7);
+  --ds-bg-hover: rgba(0,0,0,0.04);
+  --ds-bg-active: rgba(0,0,0,0.06);
+  --ds-text-1: rgba(0,0,0,0.87);
+  --ds-text-2: rgba(0,0,0,0.55);
+  --ds-text-3: rgba(0,0,0,0.32);
+  --ds-glass-bg: rgba(255,255,255,0.6);
+  --ds-glass-border: rgba(0,0,0,0.08);
+  --ds-glass-hover: rgba(0,0,0,0.04);
+  --ds-border: rgba(0,0,0,0.08);
+  --ds-glow-accent: rgba(91,91,214,0.08);
+  --ds-glow-green: rgba(60,203,127,0.06);
+  --ds-glow-amber: rgba(245,158,11,0.06);
+  --ds-glow-red: rgba(229,72,77,0.06);
+  --glass-card-bg: rgba(255,255,255,0.60);
+  --glass-card-border: rgba(0,0,0,0.08);
+  --glass-card-hover-bg: rgba(255,255,255,0.72);
+  --glass-card-hover-border: rgba(0,0,0,0.12);
+  --glass-glow-accent: rgba(91,91,214,0.04);
+  --glass-glow-success: rgba(60,203,127,0.06);
+  --glass-glow-danger: rgba(229,72,77,0.04);
+  --glass-glow-warning: rgba(245,158,11,0.03);
 }

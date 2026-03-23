@@ -53,6 +53,16 @@
   --color-ml: #5B5BD6;
   --color-locked: #3A3A3C;
   --color-info: #32ADE6;
+
+  /* Glass-morphism card tokens — light mode */
+  --glass-card-bg: rgba(255, 255, 255, 0.60);
+  --glass-card-border: rgba(0, 0, 0, 0.08);
+  --glass-card-hover-bg: rgba(255, 255, 255, 0.72);
+  --glass-card-hover-border: rgba(0, 0, 0, 0.12);
+  --glass-glow-accent: rgba(91, 91, 214, 0.04);
+  --glass-glow-success: rgba(60, 203, 127, 0.12);
+  --glass-glow-danger: rgba(229, 72, 77, 0.04);
+  --glass-glow-warning: rgba(245, 158, 11, 0.03);
 }
 
 /* ── Dark mode — Linear-style deep dark ──────────────────────────────────── */
@@ -101,6 +111,16 @@
   --color-ml: var(--ds-accent, #5B5BD6);
   --color-locked: #3A3A3C;
   --color-info: #32ADE6;
+
+  /* Glass-morphism card tokens — dark mode */
+  --glass-card-bg: rgba(255, 255, 255, 0.04);
+  --glass-card-border: rgba(255, 255, 255, 0.08);
+  --glass-card-hover-bg: rgba(255, 255, 255, 0.07);
+  --glass-card-hover-border: rgba(255, 255, 255, 0.12);
+  --glass-glow-accent: rgba(91, 91, 214, 0.08);
+  --glass-glow-success: rgba(60, 203, 127, 0.25);
+  --glass-glow-danger: rgba(229, 72, 77, 0.08);
+  --glass-glow-warning: rgba(245, 158, 11, 0.06);
 }
 
 /* ─── Reset ───────────────────────────────────────────────────────────────── */
@@ -321,6 +341,15 @@ body, * {
   border-radius: 12px !important;
 }
 
+/* RULE 4b: Glass card surface — dark mode */
+.dark .card, .dark [class*="card"] {
+  background: var(--ds-glass-bg) !important;
+  backdrop-filter: var(--ds-glass-blur) !important;
+  -webkit-backdrop-filter: var(--ds-glass-blur) !important;
+  border: 1px solid var(--ds-glass-border) !important;
+  border-radius: 12px !important;
+}
+
 /* RULE 5: Font-weight 500 everywhere, 600 for page titles only */
 .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
   font-weight: 500;
@@ -361,6 +390,50 @@ body, * {
 .dark *, .dark *::before, .dark *::after {
   transition-duration: 0.1s;
   transition-timing-function: ease;
+}
+
+/* ── Light mode body & cards ────────────────────────────────────────────── */
+.light body, body.light {
+  background: var(--ds-bg-page) !important;
+  color: var(--ds-text-1) !important;
+}
+.light .card, .light [class*="card"] {
+  background: var(--ds-glass-bg) !important;
+  backdrop-filter: var(--ds-glass-blur) !important;
+  -webkit-backdrop-filter: var(--ds-glass-blur) !important;
+  border: 1px solid var(--ds-glass-border) !important;
+  border-radius: 12px !important;
+}
+.light .card-standard,
+.light [class*="Card"],
+.light [class*="modal"],
+.light [class*="Modal"],
+.light [class*="dialog"],
+.light [class*="Dialog"],
+.light [class*="popover"],
+.light [class*="Popover"],
+.light [class*="dropdown"],
+.light [class*="Dropdown"] {
+  border-radius: 12px !important;
+}
+
+/* ── Colored glow accents ──────────────────────────────────────────────── */
+.score-high,
+[class*="score-high"],
+[class*="success-glow"] {
+  box-shadow: 0 0 12px var(--ds-glow-green);
+}
+.score-mid,
+[class*="score-mid"],
+[class*="warning-glow"],
+[class*="alert-glow"] {
+  box-shadow: 0 0 12px var(--ds-glow-amber);
+}
+.score-low,
+[class*="score-low"],
+[class*="error-glow"],
+[class*="danger-glow"] {
+  box-shadow: 0 0 12px var(--ds-glow-red);
 }
 
 /* ─── Import design system tokens LAST ───────────────────────────────────── */

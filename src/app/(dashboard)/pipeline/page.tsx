@@ -206,14 +206,16 @@ function DealCard({
       onDragEnd={() => { onDragEnd() }}
       onClick={() => { window.location.href = `/deals/${deal.id}` }}
       style={{
-        background: 'var(--card-bg)',
-        border: `1px solid ${isUrgent ? 'color-mix(in srgb, var(--danger) 30%, var(--card-border))' : 'var(--card-border)'}`,
-        borderRadius: '8px',
+        background: 'var(--glass-card-bg, rgba(255,255,255,0.04))',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: `1px solid ${isUrgent ? 'rgba(229,72,77,0.25)' : 'var(--glass-card-border, rgba(255,255,255,0.06))'}`,
+        borderRadius: '12px',
         padding: '12px 13px',
         cursor: 'pointer',
         opacity: isDragging ? 0.4 : 1,
-        transition: 'box-shadow 0.12s, border-color 0.12s',
-        boxShadow: 'var(--shadow-sm)',
+        transition: 'all 0.15s ease',
+        boxShadow: 'none',
         userSelect: 'none',
         display: 'flex',
         flexDirection: 'column',
@@ -221,10 +223,11 @@ function DealCard({
         position: 'relative',
       }}
       onMouseEnter={e => {
-        ;(e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow)'
+        ;(e.currentTarget as HTMLElement).style.background = 'var(--glass-card-hover-bg, rgba(255,255,255,0.07))'
+        ;(e.currentTarget as HTMLElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)'
         ;(e.currentTarget as HTMLElement).style.borderColor = isUrgent
-          ? 'color-mix(in srgb, var(--danger) 40%, transparent)'
-          : 'var(--border-strong)'
+          ? 'rgba(229,72,77,0.35)'
+          : 'var(--glass-card-hover-border, rgba(255,255,255,0.12))'
         // Start hover preview timer
         if (previewTimer.current) clearTimeout(previewTimer.current)
         previewTimer.current = setTimeout(() => {
@@ -237,10 +240,11 @@ function DealCard({
         }, 200)
       }}
       onMouseLeave={e => {
-        ;(e.currentTarget as HTMLElement).style.boxShadow = 'var(--shadow-sm)'
+        ;(e.currentTarget as HTMLElement).style.background = 'var(--glass-card-bg, rgba(255,255,255,0.04))'
+        ;(e.currentTarget as HTMLElement).style.boxShadow = 'none'
         ;(e.currentTarget as HTMLElement).style.borderColor = isUrgent
-          ? 'color-mix(in srgb, var(--danger) 30%, var(--card-border))'
-          : 'var(--card-border)'
+          ? 'rgba(229,72,77,0.25)'
+          : 'var(--glass-card-border, rgba(255,255,255,0.06))'
         if (previewTimer.current) clearTimeout(previewTimer.current)
         setPreviewVisible(false)
       }}
@@ -284,7 +288,7 @@ function DealCard({
                 <span style={{ fontSize: '11px', fontWeight: '700', color: scColor, lineHeight: 1 }}>{scoreDisplay.text}</span>
               </div>
             ) : (
-              <svg width="34" height="34" viewBox="0 0 34 34" style={{ cursor: 'default', flexShrink: 0 }}>
+              <svg width="34" height="34" viewBox="0 0 34 34" style={{ cursor: 'default', flexShrink: 0, filter: `drop-shadow(0 0 6px ${scColor}40)` }}>
                 {/* Background track */}
                 <circle cx="17" cy="17" r="14" fill={`color-mix(in srgb, ${scColor} 10%, transparent)`} stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
                 {/* Progress arc */}
@@ -793,10 +797,10 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
   })()
 
   const cardStyle: React.CSSProperties = {
-    background: 'var(--card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-    border: 'none', borderRadius: '8px', padding: '18px 20px',
+    background: 'var(--glass-card-bg, rgba(255,255,255,0.04))', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+    border: '1px solid var(--glass-card-border, rgba(255,255,255,0.08))', borderRadius: '12px', padding: '18px 20px',
     display: 'flex', flexDirection: 'column', gap: '12px',
-    transition: 'border-color 0.15s',
+    transition: 'border-color 0.15s, box-shadow 0.15s',
   }
   const labelStyle: React.CSSProperties = {
     fontSize: '10px', fontWeight: '700', color: 'var(--text-tertiary)',
@@ -1564,19 +1568,27 @@ export default function PipelinePage() {
   const tabBarStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     gap: '8px',
+    background: 'var(--glass-card-bg, rgba(255,255,255,0.03))',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    border: '1px solid var(--glass-card-border, rgba(255,255,255,0.06))',
+    borderRadius: '12px',
+    padding: '8px 12px',
   }
   const tabGroupStyle: React.CSSProperties = {
     display: 'flex', gap: '4px',
   }
   const tabBtn = (active: boolean): React.CSSProperties => ({
     display: 'flex', alignItems: 'center', gap: '6px',
-    padding: '7px 14px', borderRadius: '6px',
+    padding: '7px 14px', borderRadius: '8px',
     fontSize: '12px', fontWeight: '500',
     cursor: 'pointer', border: 'none', outline: 'none',
-    background: active ? 'var(--accent)' : 'var(--surface)',
+    background: active ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
     color: active ? '#fff' : 'var(--text-secondary)',
-    ...(active ? {} : { border: 'none' }),
-    transition: 'background 0.15s, color 0.15s',
+    backdropFilter: active ? 'none' : 'blur(8px)',
+    WebkitBackdropFilter: active ? 'none' : 'blur(8px)',
+    boxShadow: active ? '0 2px 12px rgba(91,91,214,0.25)' : 'none',
+    transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
   })
 
   return (
@@ -1785,14 +1797,17 @@ export default function PipelinePage() {
                     {/* Column header */}
                     <div style={{
                       padding: '10px 12px',
-                      background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.06)` : 'var(--card-bg)',
-                      border: isDropTarget ? `1px solid ${stage.color}33` : '1px solid var(--card-border)',
-                      borderRadius: '8px',
+                      background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.06)` : 'var(--glass-card-bg, rgba(255,255,255,0.04))',
+                      backdropFilter: 'blur(16px)',
+                      WebkitBackdropFilter: 'blur(16px)',
+                      border: isDropTarget ? `1px solid ${stage.color}33` : '1px solid var(--glass-card-border, rgba(255,255,255,0.08))',
+                      borderTop: `3px solid ${stage.color}66`,
+                      borderRadius: '12px',
                       transition: 'background 0.15s, border-color 0.15s',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>{stage.label}</span>
-                        <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)', background: 'var(--surface)', border: 'none', padding: '1px 6px', borderRadius: '100px' }}>{stageDeals.length}</span>
+                        <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.06)', border: 'none', padding: '1px 6px', borderRadius: '100px' }}>{stageDeals.length}</span>
                       </div>
                       {stageValue > 0 && (
                         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '3px' }}>
@@ -1898,14 +1913,17 @@ export default function PipelinePage() {
                     {/* Column header */}
                     <div style={{
                       padding: '10px 12px',
-                      background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.06)` : 'var(--card-bg)',
-                      border: isDropTarget ? `1px solid ${stage.color}33` : '1px solid var(--card-border)',
-                      borderRadius: '8px',
+                      background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.06)` : 'var(--glass-card-bg, rgba(255,255,255,0.04))',
+                      backdropFilter: 'blur(16px)',
+                      WebkitBackdropFilter: 'blur(16px)',
+                      border: isDropTarget ? `1px solid ${stage.color}33` : '1px solid var(--glass-card-border, rgba(255,255,255,0.08))',
+                      borderTop: `3px solid ${stage.color}66`,
+                      borderRadius: '12px',
                       transition: 'background 0.15s, border-color 0.15s',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>{stage.label}</span>
-                        <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)', background: 'var(--surface)', border: 'none', padding: '1px 6px', borderRadius: '100px' }}>{stageDeals.length}</span>
+                        <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.06)', border: 'none', padding: '1px 6px', borderRadius: '100px' }}>{stageDeals.length}</span>
                       </div>
                       {stageValue > 0 && (
                         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '3px' }}>

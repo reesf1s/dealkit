@@ -50,19 +50,19 @@ function CollateralCard({
   return (
     <div
       style={{
-        background: 'rgba(255,255,255,0.03)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255,255,255,0.07)',
-        borderRadius: '8px',
+        background: 'var(--glass-card-bg)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        border: '1px solid var(--glass-card-border)',
+        borderRadius: '12px',
         padding: '16px',
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
         transition: 'border-color 150ms ease, background 150ms ease',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.25)'; e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'; e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--glass-card-hover-border)'; e.currentTarget.style.background = 'var(--glass-card-hover-bg)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--glass-card-border)'; e.currentTarget.style.background = 'var(--glass-card-bg)' }}
     >
       {/* Top row: type badge + status */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
