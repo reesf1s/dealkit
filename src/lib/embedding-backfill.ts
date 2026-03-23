@@ -15,8 +15,8 @@ import { generateEmbedding, generateDealEmbedding } from './openai-embeddings'
 
 export async function backfillEmbeddings(workspaceId: string): Promise<number> {
   // Bail early if no API key configured
-  if (!process.env.VOYAGE_API_KEY) {
-    console.warn('[embeddings] Skipping backfill — VOYAGE_API_KEY not set')
+  if (!process.env.OPENAI_API_KEY) {
+    console.warn('[embeddings] Skipping backfill — OPENAI_API_KEY not set')
     return 0
   }
 

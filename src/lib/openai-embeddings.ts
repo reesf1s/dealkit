@@ -1,28 +1,19 @@
 /**
- * Voyage AI Embedding Engine — pgvector-backed semantic search.
+ * OpenAI Embedding Engine — pgvector-backed semantic search.
  *
- * Uses voyage-3-lite (1024 dims) — Anthropic's recommended embedding partner.
- * First 200M tokens free. $0.02 per 1M tokens after.
- *
- * Columns: deal_logs.note_embedding, deal_logs.deal_embedding (vector(1024))
- * Indexes: HNSW with cosine distance for fast ANN search.
- *
- * Requires VOYAGE_API_KEY in environment variables.
- * Get one at: https://dash.voyageai.com/
+ * Uses text-embedding-3-small (1536 dims). Standard choice.
+ * Set OPENAI_API_KEY in Vercel environment variables.
  */
 
-const EMBEDDING_MODEL = 'voyage-3-lite'
-const EMBEDDING_DIMENSIONS = 1024
+const EMBEDDING_MODEL = 'text-embedding-3-small'
 
 export async function generateEmbedding(text: string): Promise<number[]> {
-  const apiKey = process.env.VOYAGE_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    throw new Error('VOYAGE_API_KEY not set — embeddings disabled')
+    throw new Error('OPENAI_API_KEY not set — embeddings disabled')
   }
 
-  const truncated = text.slice(0, 100000) // voyage-3-lite supports 32K tokens
-
-  const response = await fetch('https://api.voyageai.com/v1/embeddings', {
+  const response = await fetch('https://api.openai.com/v1/embeddings', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
@@ -30,14 +21,13 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     },
     body: JSON.stringify({
       model: EMBEDDING_MODEL,
-      input: [truncated],
-      input_type: 'document',
+      input: text.slice(0, 30000),
     }),
   })
 
   if (!response.ok) {
     const err = await response.text()
-    console.error('[embeddings] Voyage AI error:', err)
+    console.error('[embeddings] OpenAI error:', err)
     throw new Error(`Embedding generation failed: ${response.status}`)
   }
 
@@ -45,34 +35,9 @@ export async function generateEmbedding(text: string): Promise<number[]> {
   return data.data[0].embedding
 }
 
-export async function generateQueryEmbedding(text: string): Promise<number[]> {
-  const apiKey = process.env.VOYAGE_API_KEY
-  if (!apiKey) {
-    throw new Error('VOYAGE_API_KEY not set — embeddings disabled')
-  }
-
-  const response = await fetch('https://api.voyageai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: EMBEDDING_MODEL,
-      input: [text.slice(0, 10000)],
-      input_type: 'query',
-    }),
-  })
-
-  if (!response.ok) {
-    const err = await response.text()
-    console.error('[embeddings] Voyage AI error:', err)
-    throw new Error(`Query embedding failed: ${response.status}`)
-  }
-
-  const data = await response.json()
-  return data.data[0].embedding
-}
+// Alias for query vs document — OpenAI doesn't distinguish, but keeping
+// the interface so we can swap providers later without changing callers.
+export const generateQueryEmbedding = generateEmbedding
 
 export async function generateDealEmbedding(deal: {
   name: string
