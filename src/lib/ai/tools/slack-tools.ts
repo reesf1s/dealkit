@@ -38,6 +38,8 @@ import {
   getTeamMembers,
 } from '@/lib/linear-cycle'
 import { generateScopedIssue } from '@/lib/scope-generator'
+import { extractDealSignalText } from '@/lib/linear-signal-match'
+import { findSimilarLinearIssues } from '@/lib/semantic-search'
 import type { ToolContext, ToolResult } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -952,6 +954,439 @@ export const halvex_mark_issue_deployed = {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// halvex_discover_issues
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Semantic discovery: find Linear issues that match a deal's objection signals,
+ * upsert them as suggested links, store a pending bulk-scope confirmation, and
+ * return the list with deal health context.
+ *
+ * This is step 2-4 of the core product flow:
+ *   User asks about deal → LLM calls this → bot presents issues → user says "yes" → bulk scope
+ */
+export const halvex_discover_issues = {
+  description: 'Discover Linear issues semantically related to a deal\'s objection signals and risk factors. Use when user asks about a deal and wants to know what product work could help convert it (e.g. "what\'s the latest on the Miro deal?", "what can we build to help close Coke?"). Returns deal health + matched issues and asks if they should be prioritised into the next cycle.',
+  parameters: z.object({
+    dealQuery: z.string().describe('Deal name or company name to look up'),
+  }),
+  execute: async (
+    { dealQuery }: { dealQuery: string },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    // 1. Find deal
+    const context = await getRelevantContext(ctx.workspaceId, dealQuery, 1)
+    const deal = context.relevantDeals[0]
+    if (!deal) return { result: `No deal found matching "${dealQuery}". Try the company or deal name.` }
+
+    // 2. Fetch full deal record for signal extraction
+    const [dealRow] = await db
+      .select({
+        id: dealLogs.id,
+        dealName: dealLogs.dealName,
+        prospectCompany: dealLogs.prospectCompany,
+        prospectName: dealLogs.prospectName,
+        notes: dealLogs.notes,
+        meetingNotes: dealLogs.meetingNotes,
+        dealRisks: dealLogs.dealRisks,
+        lostReason: dealLogs.lostReason,
+        description: dealLogs.description,
+        conversionScore: dealLogs.conversionScore,
+        stage: dealLogs.stage,
+        closeDate: dealLogs.closeDate,
+      })
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, deal.id), eq(dealLogs.workspaceId, ctx.workspaceId)))
+      .limit(1)
+
+    if (!dealRow) return { result: `Deal not found.` }
+
+    const risks = (dealRow.dealRisks as string[]) ?? []
+    const score = dealRow.conversionScore
+
+    // 3. Extract objection signal text and run semantic match
+    const signalText = extractDealSignalText(dealRow)
+
+    let discoveredIssues: { issueId: string; similarity: number }[] = []
+    if (signalText) {
+      discoveredIssues = await findSimilarLinearIssues(ctx.workspaceId, signalText, {
+        limit: 10,
+        minSimilarity: 0.25,
+      })
+    }
+
+    // 4. Hydrate with titles from cache
+    const issueIds = discoveredIssues.map(i => i.issueId)
+    const cachedIssues = issueIds.length > 0
+      ? await db
+          .select({
+            linearIssueId: linearIssuesCache.linearIssueId,
+            title: linearIssuesCache.title,
+            linearIssueUrl: linearIssuesCache.linearIssueUrl,
+          })
+          .from(linearIssuesCache)
+          .where(and(
+            eq(linearIssuesCache.workspaceId, ctx.workspaceId),
+          ))
+      : []
+
+    const cacheMap = new Map(cachedIssues.map(i => [i.linearIssueId, i]))
+
+    // Filter to issues that are actually in the cache (have titles)
+    const hydratedIssues = discoveredIssues
+      .filter(i => cacheMap.has(i.issueId))
+      .slice(0, 5)
+
+    // 5. Upsert discovered issues as suggested links
+    for (const issue of hydratedIssues) {
+      const cached = cacheMap.get(issue.issueId)
+      const scoreScaled = Math.round(issue.similarity * 100)
+
+      await db
+        .insert(dealLinearLinks)
+        .values({
+          workspaceId: ctx.workspaceId,
+          dealId: dealRow.id,
+          linearIssueId: issue.issueId,
+          linearTitle: cached?.title ?? issue.issueId,
+          linearIssueUrl: cached?.linearIssueUrl ?? null,
+          relevanceScore: scoreScaled,
+          linkType: 'feature_gap',
+          status: 'suggested',
+        })
+        .onConflictDoUpdate({
+          target: [dealLinearLinks.dealId, dealLinearLinks.linearIssueId],
+          set: {
+            relevanceScore: scoreScaled,
+            linearTitle: cached?.title ?? issue.issueId,
+            linearIssueUrl: cached?.linearIssueUrl ?? null,
+            updatedAt: new Date(),
+          },
+        })
+    }
+
+    // Also include already-confirmed/in-cycle links
+    const existingLinks = await db
+      .select()
+      .from(dealLinearLinks)
+      .where(and(
+        eq(dealLinearLinks.workspaceId, ctx.workspaceId),
+        eq(dealLinearLinks.dealId, dealRow.id),
+      ))
+
+    const actionableLinks = existingLinks.filter(l =>
+      l.status === 'confirmed' || l.status === 'suggested' || l.status === 'in_cycle'
+    )
+
+    // 6. Store pending bulk-scope confirmation if we found issues and have channel context
+    const newIssueIds = hydratedIssues.map(i => i.issueId)
+    const allCandidateIds = [
+      ...new Set([
+        ...newIssueIds,
+        ...existingLinks.filter(l => l.status === 'confirmed' || l.status === 'suggested').map(l => l.linearIssueId),
+      ]),
+    ]
+
+    if (allCandidateIds.length > 0 && ctx.userId && ctx.channelId) {
+      // Clear any existing pending confirmation for this user+channel
+      await db
+        .update(mcpActionLog)
+        .set({ status: 'error' })
+        .where(and(
+          eq(mcpActionLog.workspaceId, ctx.workspaceId),
+          eq(mcpActionLog.triggeredBy, 'slack'),
+          eq(mcpActionLog.status, 'awaiting_confirmation'),
+          eq(mcpActionLog.actionType, 'bulk_scope_confirmation'),
+        ))
+
+      const issueList = allCandidateIds.slice(0, 5).join(', ')
+      const promptMsg = `I found ${allCandidateIds.length} Linear issue${allCandidateIds.length > 1 ? 's' : ''} that would help convert ${dealRow.dealName} — ${issueList}. Want me to write user stories and prioritise them into the next cycle?`
+
+      await db.insert(mcpActionLog).values({
+        workspaceId: ctx.workspaceId,
+        actionType: 'bulk_scope_confirmation',
+        dealId: dealRow.id,
+        triggeredBy: 'slack',
+        status: 'awaiting_confirmation',
+        slackChannelId: ctx.channelId,
+        payload: {
+          slackUserId: ctx.userId,
+          channelId: ctx.channelId,
+          prompt: promptMsg,
+          action: `Call halvex_bulk_scope_to_cycle with dealQuery="${dealRow.dealName}" and issueIds=${JSON.stringify(allCandidateIds.slice(0, 5))}. Scope all issues into user stories and add to the next cycle.`,
+          params: {
+            dealId: dealRow.id,
+            dealName: dealRow.dealName,
+            issueIds: allCandidateIds.slice(0, 5),
+          },
+        },
+      })
+    }
+
+    // 7. Build response
+    const lines: string[] = []
+
+    // Deal health summary
+    const stageLabel = ctx.stageLabels?.[dealRow.stage] ?? dealRow.stage
+    const closeInfo = dealRow.closeDate
+      ? ` — closes ${new Date(dealRow.closeDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+      : ''
+    lines.push(`*${dealRow.dealName}* (${dealRow.prospectCompany}) — ${score ?? '?'}% | ${stageLabel}${closeInfo}`)
+
+    if (risks.length > 0) {
+      lines.push('')
+      lines.push('*Key risk factors:*')
+      for (const r of risks.slice(0, 3)) {
+        lines.push(`• ${r}`)
+      }
+    }
+
+    if (actionableLinks.length === 0 && hydratedIssues.length === 0) {
+      lines.push('')
+      lines.push(`No matching Linear issues found. Try syncing from Settings → Linear.`)
+      return { result: lines.join('\n') }
+    }
+
+    // Show discovered + existing links
+    lines.push('')
+    lines.push(`*Matching Linear issues (${allCandidateIds.length} found):*`)
+
+    for (const link of actionableLinks.sort((a, b) => b.relevanceScore - a.relevanceScore).slice(0, 5)) {
+      const statusEmoji = link.status === 'in_cycle' ? '🔄' : link.status === 'confirmed' ? '✅' : '💡'
+      const urlPart = link.linearIssueUrl ? ` <${link.linearIssueUrl}|↗>` : ''
+      lines.push(`${statusEmoji} *${link.linearIssueId}* — ${link.linearTitle ?? link.linearIssueId} (${link.relevanceScore}% match)${urlPart}`)
+    }
+
+    const candidatesNotInCycle = allCandidateIds.filter(id => {
+      const l = actionableLinks.find(al => al.linearIssueId === id)
+      return !l || l.status !== 'in_cycle'
+    })
+
+    if (candidatesNotInCycle.length > 0) {
+      lines.push('')
+      lines.push(`I found *${candidatesNotInCycle.length}* Linear issue${candidatesNotInCycle.length > 1 ? 's' : ''} that would help convert ${dealRow.prospectCompany} — want me to prioritise them into the next cycle?`)
+    }
+
+    return { result: lines.join('\n') }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// halvex_bulk_scope_to_cycle
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Scope multiple Linear issues to the next cycle for a deal in one shot.
+ * For each issue: generates a customer-centric user story + ACs, updates the
+ * Linear issue description, and adds it to the upcoming cycle.
+ *
+ * This is step 7 of the core product flow (triggered after user says "yes").
+ */
+export const halvex_bulk_scope_to_cycle = {
+  description: 'Scope multiple Linear issues into the next cycle for a deal at once — generates user story + ACs for each, updates Linear, and adds all to the upcoming cycle. Use when user confirms they want to prioritise issues (e.g. "yes", "do it", "go ahead") after halvex_discover_issues has identified matching issues. Also use when user explicitly asks to scope multiple issues.',
+  parameters: z.object({
+    dealQuery: z.string().describe('Deal name or company name'),
+    issueIds: z.array(z.string()).min(1).max(10).describe('Array of Linear issue identifiers to scope, e.g. ["ENG-36", "ENG-42", "ENG-51"]'),
+  }),
+  execute: async (
+    { dealQuery, issueIds }: { dealQuery: string; issueIds: string[] },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    // 1. Deal context
+    const context = await getRelevantContext(ctx.workspaceId, dealQuery, 1)
+    const deal = context.relevantDeals[0]
+    if (!deal) return { result: `No deal found matching "${dealQuery}"` }
+
+    const [dealRow] = await db
+      .select({
+        dealName: dealLogs.dealName,
+        prospectCompany: dealLogs.prospectCompany,
+        notes: dealLogs.notes,
+        dealRisks: dealLogs.dealRisks,
+      })
+      .from(dealLogs)
+      .where(eq(dealLogs.id, deal.id))
+      .limit(1)
+
+    if (!dealRow) return { result: `Deal not found.` }
+
+    // 2. Get Linear integration
+    const [integration] = await db
+      .select({ apiKeyEnc: linearIntegrations.apiKeyEnc, teamId: linearIntegrations.teamId, teamName: linearIntegrations.teamName })
+      .from(linearIntegrations)
+      .where(eq(linearIntegrations.workspaceId, ctx.workspaceId))
+      .limit(1)
+
+    if (!integration) {
+      return { result: 'Linear is not connected. Please connect Linear in Settings.' }
+    }
+
+    const apiKey = decrypt(integration.apiKeyEnc, getEncryptionKey())
+
+    // 3. Get upcoming cycle
+    const cycle = await getUpcomingCycle(integration.teamId, apiKey)
+    if (!cycle) {
+      return { result: `No upcoming cycle found for ${integration.teamName ?? 'your team'}. Create one in Linear first.` }
+    }
+
+    const cycleName = cycle.name ?? `Cycle #${cycle.number}`
+    const dealRisks = Array.isArray(dealRow.dealRisks) ? (dealRow.dealRisks as string[]) : []
+
+    // 4. Process each issue
+    const results: { issueId: string; title: string; userStory: string; success: boolean; error?: string }[] = []
+
+    for (const rawId of issueIds.slice(0, 10)) {
+      const issueId = rawId.toUpperCase()
+
+      try {
+        // Get issue from cache
+        const [cachedIssue] = await db
+          .select()
+          .from(linearIssuesCache)
+          .where(and(
+            eq(linearIssuesCache.workspaceId, ctx.workspaceId),
+            eq(linearIssuesCache.linearIssueId, issueId),
+          ))
+          .limit(1)
+
+        const issueTitle = cachedIssue?.title ?? issueId
+        const issueDescription = cachedIssue?.description ?? null
+
+        // Check for cached scoped content
+        const [existingLink] = await db
+          .select()
+          .from(dealLinearLinks)
+          .where(and(
+            eq(dealLinearLinks.workspaceId, ctx.workspaceId),
+            eq(dealLinearLinks.dealId, deal.id),
+            eq(dealLinearLinks.linearIssueId, issueId),
+          ))
+          .limit(1)
+
+        let userStory: string
+        let acceptanceCriteria: string[]
+        let scopedDescription: string
+
+        if (existingLink?.scopedUserStory) {
+          userStory = existingLink.scopedUserStory
+          acceptanceCriteria = existingLink.scopedAcceptanceCriteria
+            ? existingLink.scopedAcceptanceCriteria.split('\n').filter(Boolean)
+            : []
+          scopedDescription = existingLink.scopedDescription ?? ''
+        } else {
+          const scoped = await generateScopedIssue({
+            dealName: dealRow.dealName,
+            prospectCompany: dealRow.prospectCompany,
+            dealNotes: dealRow.notes ?? null,
+            dealRisks,
+            issueTitle,
+            issueDescription,
+          })
+          userStory = scoped.userStory
+          acceptanceCriteria = scoped.acceptanceCriteria
+          scopedDescription = scoped.description
+        }
+
+        // Update Linear issue description
+        const halvexContent = [
+          `**Deal:** ${dealRow.dealName} (${dealRow.prospectCompany})`,
+          '',
+          `**User Story:** ${userStory}`,
+          '',
+          '**Acceptance Criteria:**',
+          ...acceptanceCriteria.map(ac => `- [ ] ${ac}`),
+        ].join('\n')
+
+        try {
+          await updateIssueDescription(issueId, halvexContent, issueDescription, apiKey)
+        } catch { /* non-fatal — still add to cycle */ }
+
+        // Add to cycle
+        await scopeIssueToCycle(issueId, cycle.id, apiKey)
+
+        // Upsert link with scoped content + in_cycle status
+        await db
+          .insert(dealLinearLinks)
+          .values({
+            workspaceId: ctx.workspaceId,
+            dealId: deal.id,
+            linearIssueId: issueId,
+            linearTitle: issueTitle,
+            relevanceScore: existingLink?.relevanceScore ?? 80,
+            linkType: existingLink?.linkType ?? 'feature_gap',
+            status: 'in_cycle',
+            scopedAt: new Date(),
+            scopedDescription,
+            scopedUserStory: userStory,
+            scopedAcceptanceCriteria: acceptanceCriteria.join('\n'),
+            cycleId: cycle.id,
+          })
+          .onConflictDoUpdate({
+            target: [dealLinearLinks.dealId, dealLinearLinks.linearIssueId],
+            set: {
+              status: 'in_cycle',
+              scopedAt: new Date(),
+              updatedAt: new Date(),
+              scopedDescription,
+              scopedUserStory: userStory,
+              scopedAcceptanceCriteria: acceptanceCriteria.join('\n'),
+              cycleId: cycle.id,
+            },
+          })
+
+        await db.insert(mcpActionLog).values({
+          workspaceId: ctx.workspaceId,
+          actionType: 'issue_scoped_to_cycle',
+          dealId: deal.id,
+          linearIssueId: issueId,
+          triggeredBy: 'slack',
+          status: 'complete',
+          result: {
+            cycleName,
+            cycleId: cycle.id,
+            userStoryPreview: userStory.slice(0, 100),
+            bulkScoped: true,
+          },
+        })
+
+        results.push({ issueId, title: issueTitle, userStory, success: true })
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        results.push({ issueId, title: issueId, userStory: '', success: false, error: msg.slice(0, 100) })
+      }
+    }
+
+    // 5. Build response
+    const succeeded = results.filter(r => r.success)
+    const failed = results.filter(r => !r.success)
+
+    const cycleRange = cycle.startsAt && cycle.endsAt
+      ? ` (${new Date(cycle.startsAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}–${new Date(cycle.endsAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })})`
+      : ''
+
+    const lines: string[] = [
+      `✅ *Scoped ${succeeded.length} issue${succeeded.length !== 1 ? 's' : ''} into ${cycleName}${cycleRange} for the ${dealRow.dealName} deal*`,
+      '',
+    ]
+
+    for (const r of succeeded) {
+      lines.push(`• *${r.issueId}* — ${r.title}`)
+      lines.push(`  _${r.userStory}_`)
+    }
+
+    if (failed.length > 0) {
+      lines.push('')
+      lines.push(`⚠️ ${failed.length} issue${failed.length !== 1 ? 's' : ''} could not be scoped: ${failed.map(r => `${r.issueId} (${r.error})`).join(', ')}`)
+    }
+
+    lines.push('')
+    lines.push(`I'll notify you when ${succeeded.length > 1 ? 'these ship' : 'this ships'} so you can send a personalised release email to ${dealRow.prospectCompany} to help close the deal.`)
+
+    return { result: lines.join('\n') }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Combined export for the Slack agent
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -963,6 +1398,8 @@ export const slackTools = {
   halvex_mark_issue_released,
   halvex_mark_issue_deployed,
   halvex_scope_issue_to_cycle,
+  halvex_bulk_scope_to_cycle,
+  halvex_discover_issues,
   halvex_get_cycle_candidates,
   halvex_get_upcoming_cycle,
   halvex_search_linear_issues,

@@ -117,7 +117,7 @@ function buildSlackSystemPrompt(
 
 ═══ YOUR TOOLS ═══
 
-Core deal tools (same as web agent):
+Core deal tools:
 - get_deal — look up any deal by name or company
 - update_deal — update deal fields, add notes, set stage, value, close date
 - search_deals — find deals matching a query
@@ -125,7 +125,9 @@ Core deal tools (same as web agent):
 - answer_question — answer pipeline questions from brain data
 
 Slack/Linear tools:
-- halvex_get_linked_issues — list Linear issues linked to a deal
+- halvex_discover_issues — **PRIMARY TOOL for deal questions** — look up a deal, discover semantically matching Linear issues from objection signals, store them as links, and ask if you should prioritise them into the next cycle
+- halvex_bulk_scope_to_cycle — scope multiple Linear issues at once: generates user story + ACs for each, updates Linear, adds all to the next cycle. Use when user confirms after halvex_discover_issues.
+- halvex_get_linked_issues — list already-linked Linear issues for a deal
 - halvex_link_issue_to_deal — manually link an issue to a deal
 - halvex_confirm_link — confirm a suggested link
 - halvex_dismiss_link — dismiss a link
@@ -133,12 +135,34 @@ Slack/Linear tools:
 - halvex_mark_issue_deployed — mark issue as deployed + fire proactive Slack DM notification
 - halvex_get_cycle_candidates — list confirmed issues for a deal that could go into next cycle
 - halvex_get_upcoming_cycle — show upcoming cycle: name, dates, issues already in it
-- halvex_scope_issue_to_cycle — scope issue to cycle: generates user story + ACs, updates Linear, adds to cycle, optionally assigns dev
+- halvex_scope_issue_to_cycle — scope a single issue to cycle with user story + ACs
 - halvex_search_linear_issues — search issues by keyword
 - halvex_get_linear_issue — get details of a specific issue
 - halvex_find_at_risk_deals — show deals needing attention
 - halvex_get_win_loss_signals — workspace win/loss intelligence
 - halvex_generate_release_email — generate or retrieve cached release email for a deployed issue
+
+═══ CORE PRODUCT FLOW ═══
+
+When a user asks about a deal (e.g. "what's the latest on the Miro deal?", "how's Coke going?"):
+
+1. Call **halvex_discover_issues** with the deal name.
+   - This returns: deal health (score, stage, risk factors) + matching Linear issues
+   - It also stores a pending confirmation so "yes" will trigger bulk scope
+
+2. Present the result clearly:
+   - Deal score, stage, close date, key risk factors
+   - The matching Linear issues with relevance scores
+   - End with: "I found N issues that would help convert [Company] — want me to write user stories and prioritise them into the next cycle?"
+
+3. If user says "yes" / "go ahead" / "do it":
+   - Call **halvex_bulk_scope_to_cycle** with the deal name and the issue IDs
+   - This generates user stories + ACs for ALL issues, updates Linear, adds them to the cycle
+   - Reply: "Done — scoped all 3 issues into [Cycle Name]. I'll notify you when they ship."
+
+4. When issues ship (webhook fires automatically):
+   - You'll get a proactive DM with the email draft + call scheduling message
+   - The Slack DM shows: what shipped, which objection each issue addresses, draft email to prospect, and a suggested message to schedule a call
 
 ═══ SLACK FORMATTING RULES ═══
 
@@ -148,26 +172,16 @@ Slack/Linear tools:
 - For confirmations like "Done — linked ENG-42 to Coke" keep it to one line
 - For complex answers (deal health, issue lists), use structured sections
 
-═══ MULTI-TURN FLOWS ═══
+═══ MULTI-TURN CONFIRMATION ═══
 
-When the user needs to confirm an action before you execute it (e.g. "shall I scope all 3 issues?"), end your message with a clear question. The user can reply "yes" and you will execute.
+When halvex_discover_issues finds issues and you ask "shall I prioritise these?", the system has stored a pending confirmation. When the user says "yes"/"sure"/"go ahead", the system will re-invoke you with context to call halvex_bulk_scope_to_cycle.
 
-For the "scope to cycle" flow:
-1. User asks "what can I put in next cycle for Coke?"
-2. You call halvex_get_linked_issues for Coke, return the list with relevance scores
-3. Ask "Shall I scope these into user stories and add them to the cycle? Reply with the issue number(s) if you only want specific ones."
-4. User replies "only issue 36" → call halvex_scope_issue_to_cycle for ENG-36
-
-For the "release email" flow:
-1. An issue goes live (user says "ENG-36 is deployed for Coke" or webhook triggers automatically)
-2. Call halvex_mark_issue_deployed — this marks deployed AND fires a Slack DM with Block Kit buttons
-3. If user says "yes write the email" or "draft release email for Coke" → call halvex_generate_release_email
-4. Return the subject + body formatted for copy-paste — no auto-send in v1
+If the user specifies a subset (e.g. "only ENG-36 and ENG-42"), call halvex_bulk_scope_to_cycle with only those IDs.
 
 ═══ BEHAVIOR RULES ═══
 
 1. Act immediately — don't describe what you'll do, do it
-2. For deal updates, call get_deal first if you don't have the ID, then update_deal
+2. When user asks about ANY deal, use halvex_discover_issues first (not get_deal + halvex_get_linked_issues separately)
 3. Don't invent deal IDs — only use IDs returned by tool calls
 4. Currency: £ (British pounds) unless told otherwise
 5. If Linear is not connected, say so clearly and direct to Settings
@@ -189,6 +203,7 @@ interface SlackInternalToolContext {
   brain: WorkspaceBrain | null
   activeDealId: string | null
   stageLabels?: Record<string, string>
+  channelId?: string
 }
 
 function buildSdkTools(toolContext: SlackInternalToolContext) {
@@ -317,6 +332,7 @@ export async function handleSlackMessage(
     brain: brain ?? null,
     activeDealId: null,
     stageLabels: Object.keys(stageLabels).length > 0 ? stageLabels : undefined,
+    channelId,                 // pass channel so tools can store pending confirmations
   }
 
   const sdkTools = buildSdkTools(toolContext)

@@ -240,6 +240,64 @@ export function issueDeployedBlocks(info: {
 }
 
 /**
+ * Format an "all issues deployed" rich notification.
+ * Shown when every in_cycle Linear issue linked to a deal is completed.
+ * Includes what shipped, how it maps to objection signals, a draft email,
+ * and a suggested call scheduling message for the rep.
+ */
+export function allIssuesDeployedBlocks(info: {
+  dealName: string
+  company: string
+  dealId: string
+  contactName: string | null
+  shippedIssues: { issueId: string; title: string; addressesObjection: string }[]
+  emailSubject: string
+  emailBody: string
+  callSchedulingMessage: string
+}): SlackBlock[] {
+  const blocks: SlackBlock[] = []
+
+  // Header
+  blocks.push(sectionBlock(
+    `🚀 *Everything shipped for the ${info.dealName} deal!*\n` +
+    `${info.shippedIssues.length} issue${info.shippedIssues.length !== 1 ? 's' : ''} just completed that were linked to converting *${info.company}*.`
+  ))
+
+  blocks.push(dividerBlock())
+
+  // What shipped + how it maps to objections
+  if (info.shippedIssues.length > 0) {
+    const issueLines = info.shippedIssues.map(i =>
+      `• *${i.issueId}* — ${i.title}\n  _Addresses: ${i.addressesObjection}_`
+    ).join('\n')
+    blocks.push(sectionBlock(`*What shipped:*\n${issueLines}`))
+  }
+
+  blocks.push(dividerBlock())
+
+  // Draft email
+  blocks.push(sectionBlock(`*✉️ Draft release email to ${info.company}:*`))
+  blocks.push(sectionBlock(`*Subject:* ${info.emailSubject}`))
+  blocks.push(sectionBlock(info.emailBody.slice(0, 2500)))
+
+  blocks.push(dividerBlock())
+
+  // Call scheduling message
+  blocks.push(sectionBlock(
+    `*💬 Suggested message to schedule a call${info.contactName ? ` with ${info.contactName}` : ''}:*\n` +
+    `_${info.callSchedulingMessage}_`
+  ))
+
+  // Actions
+  blocks.push(actionsBlock([
+    { text: '📊 View deal', url: `${APP_URL}/deals/${info.dealId}` },
+    { text: 'Skip', actionId: `skip_release_email_${info.dealId}` },
+  ]))
+
+  return blocks
+}
+
+/**
  * Simple error/fallback block.
  */
 export function errorBlocks(message: string): SlackBlock[] {

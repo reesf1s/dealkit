@@ -70,16 +70,57 @@ async function handleDraftReleaseEmail(
       return
     }
 
-    const emailText = [
-      `✉️ *Release email ready*`,
+    // Fetch deal contact info for the CTA section
+    const [deal] = await db
+      .select({
+        prospectCompany: dealLogs.prospectCompany,
+        prospectName: dealLogs.prospectName,
+        contacts: dealLogs.contacts,
+      })
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId)))
+      .limit(1)
+
+    const contacts = (deal?.contacts as { name?: string; email?: string; title?: string }[]) ?? []
+    const primaryContact = deal?.prospectName ?? contacts[0]?.name
+    const primaryEmail = contacts[0]?.email
+
+    const emailParts = [
+      `✉️ *Release email ready for ${deal?.prospectCompany ?? 'your prospect'}*`,
       '',
       `*Subject:* ${email.subject}`,
       '',
       `*Body:*`,
       email.body,
       '',
-      `_Copy this and send from your email client._`,
-    ].join('\n')
+    ]
+
+    // Call scheduling message (if generated)
+    if (email.callSchedulingMessage) {
+      emailParts.push(
+        `---`,
+        ``,
+        `*💬 Suggested message to schedule a call${primaryContact ? ` with ${primaryContact}` : ''}:*`,
+        `_${email.callSchedulingMessage}_`,
+        ``,
+      )
+    }
+
+    // Contact info for convenience
+    if (primaryContact || primaryEmail) {
+      const contactLine = [
+        primaryContact ? `*${primaryContact}*` : null,
+        primaryEmail ? primaryEmail : null,
+      ].filter(Boolean).join(' — ')
+      emailParts.push(
+        `*Contact:* ${contactLine}`,
+        ``,
+      )
+    }
+
+    emailParts.push(`_Copy the email above and send from your email client._`)
+
+    const emailText = emailParts.join('\n')
 
     await slackPostMessage(
       token,

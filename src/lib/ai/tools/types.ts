@@ -8,6 +8,11 @@ export interface ToolContext {
   activeDealId: string | null
   /** Map of stage ID → display label from pipeline config (e.g. { negotiation: 'Verbal Commit' }) */
   stageLabels?: Record<string, string>
+  /**
+   * Slack channel ID for the current conversation — only set in the Slack agent context.
+   * Used by tools that need to store pending confirmations referencing the conversation.
+   */
+  channelId?: string
 }
 
 export interface ToolResult {

@@ -20,7 +20,7 @@ import { eq, and } from 'drizzle-orm'
 import { linearIntegrations, dealLinearLinks, dealLogs } from '@/lib/db/schema'
 import { syncLinearIssues } from '@/lib/linear-sync'
 import { matchAllOpenDeals } from '@/lib/linear-signal-match'
-import { notifyIssueDeployed } from '@/lib/slack-notify'
+import { notifyIssueDeployed, notifyAllIssuesDeployed } from '@/lib/slack-notify'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Webhook payload types (subset of Linear webhook schema)
@@ -105,13 +105,32 @@ async function handleIssueCompleted(
 
     if (!deal) continue
 
-    notifyIssueDeployed(workspaceId, {
-      dealId: link.dealId,
-      dealName: deal.dealName,
-      company: deal.prospectCompany,
-      linearIssueId,
-      linearTitle: link.linearTitle ?? issueTitle ?? linearIssueId,
-    }).catch(err => console.error('[webhook/linear] notifyIssueDeployed failed:', err))
+    // Check if ALL in_cycle issues for this deal are now deployed
+    // (the current issue was just marked deployed above, so check remaining in_cycle count)
+    const remainingInCycle = await db
+      .select({ id: dealLinearLinks.id })
+      .from(dealLinearLinks)
+      .where(and(
+        eq(dealLinearLinks.workspaceId, workspaceId),
+        eq(dealLinearLinks.dealId, link.dealId),
+        eq(dealLinearLinks.status, 'in_cycle'),
+      ))
+
+    if (remainingInCycle.length === 0) {
+      // All issues deployed — fire the rich "all shipped" notification with email draft
+      notifyAllIssuesDeployed(workspaceId, link.dealId).catch(
+        err => console.error('[webhook/linear] notifyAllIssuesDeployed failed:', err),
+      )
+    } else {
+      // Partial deployment — notify about this individual issue
+      notifyIssueDeployed(workspaceId, {
+        dealId: link.dealId,
+        dealName: deal.dealName,
+        company: deal.prospectCompany,
+        linearIssueId,
+        linearTitle: link.linearTitle ?? issueTitle ?? linearIssueId,
+      }).catch(err => console.error('[webhook/linear] notifyIssueDeployed failed:', err))
+    }
   }
 }
 

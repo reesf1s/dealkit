@@ -10,11 +10,12 @@
  */
 
 import { db } from '@/lib/db'
-import { slackConnections, slackUserMappings, mcpActionLog } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { slackConnections, slackUserMappings, mcpActionLog, dealLogs, dealLinearLinks, linearIssuesCache } from '@/lib/db/schema'
+import { eq, and } from 'drizzle-orm'
 import { decrypt, getEncryptionKey } from '@/lib/encrypt'
 import { slackPostMessage, slackOpenDm } from '@/lib/slack-client'
-import { healthDropBlocks, newIssueLinkBlocks, issueDeployedBlocks } from '@/lib/slack-blocks'
+import { healthDropBlocks, newIssueLinkBlocks, issueDeployedBlocks, allIssuesDeployedBlocks } from '@/lib/slack-blocks'
+import { generateBatchReleaseEmail } from '@/lib/release-email-generator'
 import type { WorkspaceBrain } from '@/lib/workspace-brain'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -165,6 +166,144 @@ export async function notifyIssueDeployed(
     }
   } catch (e) {
     console.error('[slack-notify] notifyIssueDeployed failed:', e)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// notifyAllIssuesDeployed
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Send a rich Slack DM when ALL in_cycle Linear issues linked to a deal are deployed.
+ * Includes: what shipped + how it maps to objections, a draft email to the prospect,
+ * and a suggested Slack message the rep can use to schedule a call.
+ *
+ * Called from the Linear webhook after detecting complete deployment of all deal issues.
+ */
+export async function notifyAllIssuesDeployed(
+  workspaceId: string,
+  dealId: string,
+): Promise<void> {
+  try {
+    const conn = await getConnection(workspaceId)
+    if (!conn) return
+
+    const users = await getMappedUsers(workspaceId, 'notifyIssueLinks')
+    if (users.length === 0) return
+
+    // Fetch deal context
+    const [deal] = await db
+      .select({
+        dealName: dealLogs.dealName,
+        prospectCompany: dealLogs.prospectCompany,
+        prospectName: dealLogs.prospectName,
+        contacts: dealLogs.contacts,
+        notes: dealLogs.notes,
+        successCriteria: dealLogs.successCriteria,
+        dealRisks: dealLogs.dealRisks,
+      })
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId)))
+      .limit(1)
+
+    if (!deal) return
+
+    // Fetch deployed links
+    const deployedLinks = await db
+      .select({
+        linearIssueId: dealLinearLinks.linearIssueId,
+        linearTitle: dealLinearLinks.linearTitle,
+        scopedUserStory: dealLinearLinks.scopedUserStory,
+      })
+      .from(dealLinearLinks)
+      .where(and(
+        eq(dealLinearLinks.workspaceId, workspaceId),
+        eq(dealLinearLinks.dealId, dealId),
+        eq(dealLinearLinks.status, 'deployed'),
+      ))
+
+    if (deployedLinks.length === 0) return
+
+    // Hydrate with issue descriptions from cache
+    const issueContexts = await Promise.all(
+      deployedLinks.map(async (link) => {
+        const [cached] = await db
+          .select({ description: linearIssuesCache.description })
+          .from(linearIssuesCache)
+          .where(and(
+            eq(linearIssuesCache.workspaceId, workspaceId),
+            eq(linearIssuesCache.linearIssueId, link.linearIssueId),
+          ))
+          .limit(1)
+
+        return {
+          linearIssueId: link.linearIssueId,
+          title: link.linearTitle ?? link.linearIssueId,
+          description: cached?.description ?? null,
+          scopedUserStory: link.scopedUserStory ?? null,
+        }
+      })
+    )
+
+    const dealContext = {
+      dealId,
+      dealName: deal.dealName,
+      prospectCompany: deal.prospectCompany,
+      contactName: deal.prospectName ?? null,
+      contacts: (deal.contacts as { name?: string; email?: string; title?: string }[]) ?? [],
+      notes: deal.notes ?? null,
+      successCriteria: deal.successCriteria ?? null,
+      dealRisks: (deal.dealRisks as string[]) ?? [],
+    }
+
+    // Generate batch release email
+    const batchEmail = await generateBatchReleaseEmail(workspaceId, dealContext, issueContexts)
+    if (!batchEmail) return
+
+    const blocks = allIssuesDeployedBlocks({
+      dealName: deal.dealName,
+      company: deal.prospectCompany,
+      dealId,
+      contactName: deal.prospectName ?? null,
+      shippedIssues: batchEmail.shippedSummary,
+      emailSubject: batchEmail.subject,
+      emailBody: batchEmail.body,
+      callSchedulingMessage: batchEmail.callSchedulingMessage,
+    })
+
+    const fallbackText = `🚀 All issues shipped for ${deal.dealName} (${deal.prospectCompany})! Here's a draft email to re-engage them.`
+
+    for (const slackUserId of users) {
+      try {
+        const dmChannel = await slackOpenDm(conn.botToken, slackUserId)
+        if (!dmChannel) continue
+
+        await slackPostMessage(conn.botToken, dmChannel, blocks, fallbackText)
+
+        // Log the notification
+        await db.insert(mcpActionLog).values({
+          workspaceId,
+          actionType: 'all_issues_deployed_notification',
+          dealId,
+          triggeredBy: 'webhook',
+          status: 'complete',
+          slackChannelId: dmChannel,
+          payload: {
+            slackUserId,
+            issueCount: deployedLinks.length,
+            company: deal.prospectCompany,
+          },
+          result: {
+            emailSubject: batchEmail.subject,
+            callSchedulingMessage: batchEmail.callSchedulingMessage,
+          },
+        })
+      } catch (e) {
+        console.error(`[slack-notify] notifyAllIssuesDeployed failed for user ${slackUserId}:`, e)
+      }
+    }
+  } catch (e) {
+    console.error('[slack-notify] notifyAllIssuesDeployed failed:', e)
   }
 }
 

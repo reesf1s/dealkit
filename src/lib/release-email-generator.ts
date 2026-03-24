@@ -21,6 +21,8 @@ import { eq, and } from 'drizzle-orm'
 export interface ReleaseEmail {
   subject: string
   body: string
+  /** Pre-drafted Slack message the rep can send to schedule a call with the prospect */
+  callSchedulingMessage?: string
 }
 
 interface DealContext {
@@ -31,6 +33,7 @@ interface DealContext {
   notes: string | null
   successCriteria: string | null
   dealRisks: string[]
+  contacts: { name?: string; email?: string; title?: string }[]
 }
 
 interface IssueContext {
@@ -66,7 +69,11 @@ export async function getCachedReleaseEmail(
 
   const r = row.result as Record<string, unknown>
   if (typeof r.subject === 'string' && typeof r.body === 'string') {
-    return { subject: r.subject, body: r.body }
+    return {
+      subject: r.subject,
+      body: r.body,
+      callSchedulingMessage: typeof r.callSchedulingMessage === 'string' ? r.callSchedulingMessage : undefined,
+    }
   }
   return null
 }
@@ -82,6 +89,7 @@ async function fetchDealContext(workspaceId: string, dealId: string): Promise<De
       dealName: dealLogs.dealName,
       prospectCompany: dealLogs.prospectCompany,
       prospectName: dealLogs.prospectName,
+      contacts: dealLogs.contacts,
       notes: dealLogs.notes,
       successCriteria: dealLogs.successCriteria,
       dealRisks: dealLogs.dealRisks,
@@ -100,6 +108,7 @@ async function fetchDealContext(workspaceId: string, dealId: string): Promise<De
     dealName: deal.dealName,
     prospectCompany: deal.prospectCompany,
     contactName: deal.prospectName ?? null,
+    contacts: (deal.contacts as { name?: string; email?: string; title?: string }[]) ?? [],
     notes: deal.notes ?? null,
     successCriteria: deal.successCriteria ?? null,
     dealRisks: (deal.dealRisks as string[]) ?? [],
@@ -149,23 +158,32 @@ async function fetchIssueContext(
 // Generator
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are a senior customer success manager writing release notification emails.
+const SYSTEM_PROMPT = `You are a senior customer success manager writing release notification emails and helping the sales rep schedule a follow-up call.
 
-Your goal: write a concise, warm email from the product/CS team to a prospect notifying them that a capability they expressed interest in is now live — framing it as a reason to reconvene and move the deal forward.
+Your goal: write a concise, warm email from the product/CS team to a prospect notifying them that capabilities they expressed interest in are now live — framing it as a reason to reconvene and move the deal forward.
 
-Rules:
+Also draft a short Slack message the rep can send internally (or directly to the prospect on Slack if they're connected) to suggest a call.
+
+Rules for the email:
 - Professional but conversational tone — not a cold email, not a marketing blast
 - Lead with what shipped and why it matters to them specifically
-- Connect the feature to the buyer's stated needs or success criteria
+- Explicitly connect each feature to their stated concerns or objection signals
 - Clear, soft CTA: "I'd love to show you this in action — are you free this week?"
-- Keep the body under 150 words
+- Keep the body under 200 words
 - No emojis, no bullet lists in the email body
-- Subject line: concise, specific (e.g. "The export feature you mentioned is live")
+- Subject line: concise, specific (e.g. "The export feature you asked about is live")
+
+Rules for the call scheduling message:
+- 1-2 sentences max — a casual Slack message the rep could send to the prospect
+- Reference the specific feature(s) that shipped
+- Suggest a specific short window e.g. "15 mins this week"
+- Warm and direct — not salesy
 
 Output valid JSON only:
 {
   "subject": "...",
-  "body": "..."
+  "body": "...",
+  "callSchedulingMessage": "..."
 }`
 
 export async function generateReleaseEmail(
@@ -178,40 +196,48 @@ export async function generateReleaseEmail(
 
   const anthropic = createAnthropic({ apiKey })
 
+  // Build primary contact info
+  const primaryContact = deal.contacts?.[0]
+  const contactName = deal.contactName ?? primaryContact?.name ?? null
+  const contactEmail = primaryContact?.email ?? null
+
   const userPrompt = [
     `Company: ${deal.prospectCompany}`,
-    deal.contactName ? `Contact name: ${deal.contactName}` : '',
+    contactName ? `Contact name: ${contactName}` : '',
+    contactEmail ? `Contact email: ${contactEmail}` : '',
     deal.notes ? `Deal notes (context): ${deal.notes.slice(0, 400)}` : '',
     deal.successCriteria ? `Their success criteria: ${deal.successCriteria.slice(0, 300)}` : '',
-    deal.dealRisks.length > 0 ? `Key deal risks: ${deal.dealRisks.slice(0, 2).join('; ')}` : '',
+    deal.dealRisks.length > 0 ? `Key objection signals / deal risks: ${deal.dealRisks.slice(0, 3).join('; ')}` : '',
     '',
     `Feature shipped: ${issue.title}`,
     issue.description ? `Feature description: ${issue.description.slice(0, 300)}` : '',
-    issue.scopedUserStory ? `Scoped user story: ${issue.scopedUserStory.slice(0, 300)}` : '',
+    issue.scopedUserStory ? `Scoped user story (maps to their needs): ${issue.scopedUserStory.slice(0, 300)}` : '',
   ].filter(Boolean).join('\n')
 
   const { text } = await generateText({
     model: anthropic('claude-haiku-4-5-20251001', {
-      cacheControl: true,  // enable prompt caching on qualifying messages
+      cacheControl: true,
     }),
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],
-    maxTokens: 512,
+    maxTokens: 700,
   })
 
   // Parse JSON response
   let email: ReleaseEmail
   try {
     const cleaned = text.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim()
-    email = JSON.parse(cleaned) as ReleaseEmail
-    if (!email.subject || !email.body) throw new Error('Missing subject or body')
+    const parsed = JSON.parse(cleaned) as ReleaseEmail
+    if (!parsed.subject || !parsed.body) throw new Error('Missing subject or body')
+    email = parsed
   } catch {
-    // Fallback: extract manually if JSON parse fails
     const subjectMatch = text.match(/"subject"\s*:\s*"([^"]+)"/)
     const bodyMatch = text.match(/"body"\s*:\s*"([\s\S]+?)"(?:\s*[},])/)
+    const callMatch = text.match(/"callSchedulingMessage"\s*:\s*"([^"]+)"/)
     email = {
       subject: subjectMatch?.[1] ?? `${issue.title} is now live`,
       body: bodyMatch?.[1]?.replace(/\\n/g, '\n') ?? text.slice(0, 600),
+      callSchedulingMessage: callMatch?.[1] ?? undefined,
     }
   }
 
@@ -223,10 +249,116 @@ export async function generateReleaseEmail(
     linearIssueId: issue.linearIssueId,
     triggeredBy: 'webhook',
     status: 'complete',
-    result: { subject: email.subject, body: email.body },
+    result: { subject: email.subject, body: email.body, callSchedulingMessage: email.callSchedulingMessage ?? null },
   })
 
   return email
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// generateBatchReleaseEmail — for when ALL linked issues for a deal ship
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BATCH_SYSTEM_PROMPT = `You are a senior customer success manager writing a release notification email when multiple features have shipped for a specific prospect.
+
+Your goal: write a compelling email showing the prospect that you've shipped everything they needed — this is the moment to re-engage and close the deal.
+
+Also draft a short Slack message the rep can send to the prospect to schedule a call.
+
+Rules for the email:
+- Lead with the business impact: "We've shipped everything on your wishlist"
+- Explicitly map each feature to the objection or concern it addresses
+- Make the prospect feel heard — you built this partly for them
+- Clear CTA: propose a specific call to do a live walkthrough
+- Keep under 250 words, no bullet lists, professional but warm
+- Subject line should feel personal and specific
+
+Rules for the call scheduling message:
+- 1-2 sentences, casual Slack message
+- "Hey [name], we just shipped [X and Y] — would love to show you in 15 mins, free this week?"
+- Use their actual name and feature names
+
+Output valid JSON only:
+{
+  "subject": "...",
+  "body": "...",
+  "callSchedulingMessage": "..."
+}`
+
+export interface BatchReleaseEmail {
+  subject: string
+  body: string
+  callSchedulingMessage: string
+  /** Summary of what shipped and which objection it addresses — for the Slack DM */
+  shippedSummary: { issueId: string; title: string; addressesObjection: string }[]
+}
+
+export async function generateBatchReleaseEmail(
+  workspaceId: string,
+  deal: DealContext,
+  issues: IssueContext[],
+): Promise<BatchReleaseEmail | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return null
+
+  const anthropic = createAnthropic({ apiKey })
+
+  const primaryContact = deal.contacts?.[0]
+  const contactName = deal.contactName ?? primaryContact?.name ?? null
+
+  const issuesList = issues.map((i, idx) =>
+    `${idx + 1}. "${i.title}"${i.description ? ` — ${i.description.slice(0, 200)}` : ''}${i.scopedUserStory ? ` (user story: ${i.scopedUserStory.slice(0, 150)})` : ''}`
+  ).join('\n')
+
+  const userPrompt = [
+    `Company: ${deal.prospectCompany}`,
+    contactName ? `Contact name: ${contactName}` : '',
+    deal.notes ? `Deal context: ${deal.notes.slice(0, 400)}` : '',
+    deal.successCriteria ? `Their success criteria: ${deal.successCriteria.slice(0, 300)}` : '',
+    deal.dealRisks.length > 0
+      ? `Key objection signals / concerns they raised:\n${deal.dealRisks.slice(0, 4).map(r => `- ${r}`).join('\n')}`
+      : '',
+    '',
+    `Features shipped (${issues.length} total):`,
+    issuesList,
+  ].filter(Boolean).join('\n')
+
+  const { text } = await generateText({
+    model: anthropic('claude-haiku-4-5-20251001', { cacheControl: true }),
+    system: BATCH_SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: userPrompt }],
+    maxTokens: 900,
+  })
+
+  let parsed: { subject: string; body: string; callSchedulingMessage: string }
+  try {
+    const cleaned = text.replace(/^```json\s*/i, '').replace(/```\s*$/, '').trim()
+    parsed = JSON.parse(cleaned)
+    if (!parsed.subject || !parsed.body) throw new Error('Missing fields')
+  } catch {
+    const subjectMatch = text.match(/"subject"\s*:\s*"([^"]+)"/)
+    const bodyMatch = text.match(/"body"\s*:\s*"([\s\S]+?)"(?:\s*[},])/)
+    const callMatch = text.match(/"callSchedulingMessage"\s*:\s*"([^"]+)"/)
+    parsed = {
+      subject: subjectMatch?.[1] ?? `Everything you asked for is live`,
+      body: bodyMatch?.[1]?.replace(/\\n/g, '\n') ?? text.slice(0, 800),
+      callSchedulingMessage: callMatch?.[1] ?? `Hey${contactName ? ` ${contactName}` : ''}, we just shipped the features you flagged — would love to show you in 15 mins, free this week?`,
+    }
+  }
+
+  // Build shipped summary (simple heuristic: pair each issue with a risk)
+  const shippedSummary = issues.slice(0, 5).map((issue, idx) => ({
+    issueId: issue.linearIssueId,
+    title: issue.title,
+    addressesObjection: deal.dealRisks[idx] ?? deal.dealRisks[0] ?? 'a key blocker the team raised',
+  }))
+
+  return {
+    subject: parsed.subject,
+    body: parsed.body,
+    callSchedulingMessage: parsed.callSchedulingMessage,
+    shippedSummary,
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
