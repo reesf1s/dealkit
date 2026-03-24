@@ -53,13 +53,14 @@ const PLAN_DETAILS: Record<Plan, { name: string; price: string; color: string; b
 function SectionCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <div style={{
-      background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-      border: '1px solid var(--card-border)', borderRadius: '8px', overflow: 'hidden',
-      boxShadow: 'var(--shadow)',
+      background: 'linear-gradient(135deg, rgba(99,102,241,0.07), rgba(59,130,246,0.03), transparent)',
+      backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+      border: '1px solid rgba(255,255,255,0.08)', borderRadius: '1rem', overflow: 'hidden',
+      boxShadow: '0 2px 20px rgba(0,0,0,0.30)',
     }}>
-      <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
-        <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: description ? '3px' : 0 }}>{title}</h2>
-        {description && <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: 0 }}>{description}</p>}
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
+        <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0', margin: 0, marginBottom: description ? '3px' : 0 }}>{title}</h2>
+        {description && <p style={{ fontSize: '11px', color: '#475569', margin: 0 }}>{description}</p>}
       </div>
       <div style={{ padding: '16px 18px' }}>{children}</div>
     </div>
@@ -452,14 +453,14 @@ export default function SettingsPage() {
   const isOwner = dbUser?.role === 'owner'
 
   return (
-    <div style={{ padding: '24px 24px 24px 24px', maxWidth: '700px', margin: '0 auto' }}>
+    <div style={{ padding: '24px', maxWidth: '700px', margin: '0 auto' }}>
       <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
-      <div style={{ marginBottom: '20px' }}>
-        <h1 className="font-brand" style={{
-          fontSize: '20px', fontWeight: 500, letterSpacing: '0.01em', margin: 0, marginBottom: '4px',
-          color: 'var(--text-primary)',
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{
+          fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', margin: 0, marginBottom: '4px',
+          color: '#e2e8f0',
         }}>Settings</h1>
-        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>Manage your workspace, team, and billing</p>
+        <p style={{ fontSize: '13px', color: '#475569', margin: 0 }}>Manage your workspace, team, and billing</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1545,6 +1546,9 @@ export default function SettingsPage() {
           </div>
         </SectionCard>
 
+        {/* Company Brain */}
+        <CompanyBrainSection />
+
         <SectionCard title="Your data" description="Export or delete all workspace data">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '10px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
@@ -1583,6 +1587,188 @@ export default function SettingsPage() {
 
       <ConfirmModal open={deleteOpen} onOpenChange={setDeleteOpen} title="Delete account" description="This will permanently delete your account, all workspace data, and cancel any active subscriptions. This cannot be undone." confirmLabel="Delete my account" destructive onConfirm={handleDeleteAccount} />
       <ConfirmModal open={leaveOpen} onOpenChange={setLeaveOpen} title="Leave workspace" description="You will lose access to all shared data. You can rejoin later with the join code." confirmLabel="Leave workspace" destructive onConfirm={handleLeaveWorkspace} />
+    </div>
+  )
+}
+
+function CompanyBrainSection() {
+  const { toast } = useToast()
+  const { data: companyRes, mutate: mutateCompany, isLoading } = useSWR('/api/company', fetcher)
+  const company = companyRes?.data
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({
+    companyName: '',
+    description: '',
+    valuePropositions: '',
+    differentiators: '',
+    targetMarket: '',
+    commonObjections: '',
+  })
+
+  useEffect(() => {
+    if (company && !editing) {
+      setForm({
+        companyName: company.companyName ?? '',
+        description: company.description ?? '',
+        valuePropositions: Array.isArray(company.valuePropositions) ? company.valuePropositions.join('\n') : (company.valuePropositions ?? ''),
+        differentiators: Array.isArray(company.differentiators) ? company.differentiators.join('\n') : (company.differentiators ?? ''),
+        targetMarket: company.targetMarket ?? '',
+        commonObjections: Array.isArray(company.commonObjections) ? company.commonObjections.join('\n') : (company.commonObjections ?? ''),
+      })
+    }
+  }, [company, editing])
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/company', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyName: form.companyName,
+          description: form.description,
+          valuePropositions: form.valuePropositions.split('\n').filter(Boolean),
+          differentiators: form.differentiators.split('\n').filter(Boolean),
+          targetMarket: form.targetMarket,
+          commonObjections: form.commonObjections.split('\n').filter(Boolean),
+        }),
+      })
+      if (!res.ok) { toast('Failed to save', 'error'); return }
+      await mutateCompany()
+      setEditing(false)
+      toast('Company brain updated', 'success')
+    } catch { toast('Failed to save', 'error') }
+    finally { setSaving(false) }
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '8px 12px', borderRadius: '8px',
+    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+    color: '#e2e8f0', fontSize: '13px', outline: 'none',
+    boxSizing: 'border-box',
+  }
+
+  const taStyle: React.CSSProperties = {
+    ...inputStyle, resize: 'vertical', minHeight: '64px',
+  }
+
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, rgba(99,102,241,0.07), rgba(59,130,246,0.03), transparent)',
+      backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+      border: '1px solid rgba(255,255,255,0.08)', borderRadius: '1rem', overflow: 'hidden',
+      boxShadow: '0 2px 20px rgba(0,0,0,0.30)',
+    }}>
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0', margin: 0, marginBottom: '3px' }}>Company Brain</h2>
+          <p style={{ fontSize: '11px', color: '#475569', margin: 0 }}>Your company&apos;s knowledge base — used to power AI briefings, battlecards, and deal intelligence</p>
+        </div>
+        {!editing && (
+          <button
+            onClick={() => setEditing(true)}
+            style={{
+              padding: '6px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
+              background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.22)',
+              color: '#818cf8', cursor: 'pointer',
+            }}
+          >
+            Edit
+          </button>
+        )}
+      </div>
+      <div style={{ padding: '16px 18px' }}>
+        {isLoading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {[1, 2, 3].map(i => (
+              <div key={i} style={{ height: '14px', borderRadius: '6px' }} className="skeleton" />
+            ))}
+          </div>
+        ) : editing ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {[
+              { key: 'companyName', label: 'Company name', type: 'input' },
+              { key: 'description', label: 'What you do', type: 'textarea' },
+              { key: 'valuePropositions', label: 'Value propositions (one per line)', type: 'textarea' },
+              { key: 'differentiators', label: 'Differentiators (one per line)', type: 'textarea' },
+              { key: 'targetMarket', label: 'Target market', type: 'input' },
+              { key: 'commonObjections', label: 'Common objections (one per line)', type: 'textarea' },
+            ].map(({ key, label, type }) => (
+              <div key={key}>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '5px' }}>
+                  {label}
+                </label>
+                {type === 'input' ? (
+                  <input
+                    value={form[key as keyof typeof form]}
+                    onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                    style={inputStyle}
+                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(99,102,241,0.40)')}
+                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                  />
+                ) : (
+                  <textarea
+                    value={form[key as keyof typeof form]}
+                    onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+                    style={taStyle}
+                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(99,102,241,0.40)')}
+                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                  />
+                )}
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                style={{
+                  padding: '8px 16px', borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                  border: '1px solid rgba(99,102,241,0.40)',
+                  color: '#fff', fontSize: '13px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer',
+                  opacity: saving ? 0.6 : 1,
+                }}
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                style={{
+                  padding: '8px 14px', borderRadius: '8px',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#64748b', fontSize: '13px', cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : company ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {company.companyName && (
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>{company.companyName}</div>
+            )}
+            {company.description && (
+              <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 1.6 }}>{company.description}</div>
+            )}
+            {company.targetMarket && (
+              <div style={{ fontSize: '12px', color: '#64748b' }}>
+                Target: <span style={{ color: '#94a3b8' }}>{company.targetMarket}</span>
+              </div>
+            )}
+            {!company.description && (
+              <p style={{ fontSize: '13px', color: '#475569', margin: 0 }}>
+                Add your company&apos;s context to improve AI deal intelligence.
+              </p>
+            )}
+          </div>
+        ) : (
+          <p style={{ fontSize: '13px', color: '#475569', margin: 0 }}>
+            Add your company&apos;s knowledge base to power AI briefings and battlecards.
+          </p>
+        )}
+      </div>
     </div>
   )
 }

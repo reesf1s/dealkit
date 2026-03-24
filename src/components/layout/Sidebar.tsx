@@ -6,23 +6,24 @@ import { usePathname } from 'next/navigation'
 import { useClerk, useUser } from '@clerk/nextjs'
 import useSWR from 'swr'
 import {
-  LayoutDashboard,
-  Settings, LogOut, Search,
+  LayoutDashboard, GitBranch, Brain, Zap,
+  Plug, Settings, LogOut, Search,
   ChevronLeft, ChevronRight,
-  X, Brain, MessageSquare, GitBranch,
-  Plug,
+  X, MessageSquare,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 import { identify } from '@/lib/analytics'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
-// Flat 4-item nav
+// 6-item flat nav
 const NAV_ITEMS = [
-  { href: '/dashboard',   icon: LayoutDashboard, label: 'Today',         matchPaths: ['/dashboard'] },
-  { href: '/deals',       icon: GitBranch,       label: 'Deals',         matchPaths: ['/deals', '/pipeline'] },
-  { href: '/competitors', icon: Brain,           label: 'Intelligence',  matchPaths: ['/competitors', '/case-studies', '/product-gaps', '/models', '/collateral', '/playbook'] },
-  { href: '/settings',    icon: Plug,            label: 'Workflows',     matchPaths: ['/settings', '/company', '/onboarding'] },
+  { href: '/dashboard',    icon: LayoutDashboard, label: 'Today',        matchPaths: ['/dashboard'] },
+  { href: '/deals',        icon: GitBranch,       label: 'Deals',        matchPaths: ['/deals', '/pipeline'] },
+  { href: '/intelligence', icon: Brain,           label: 'Intelligence', matchPaths: ['/intelligence', '/competitors', '/case-studies', '/product-gaps', '/models', '/collateral', '/playbook'] },
+  { href: '/workflows',    icon: Zap,             label: 'Workflows',    matchPaths: ['/workflows'] },
+  { href: '/connections',  icon: Plug,            label: 'Integrations', matchPaths: ['/connections'] },
+  { href: '/settings',     icon: Settings,        label: 'Settings',     matchPaths: ['/settings', '/company', '/onboarding'] },
 ]
 
 export default function Sidebar() {
@@ -80,45 +81,44 @@ export default function Sidebar() {
           display: 'flex',
           alignItems: 'center',
           gap: '9px',
-          padding: collapsed ? '0' : '0 10px',
+          padding: collapsed ? '0' : '0 12px',
           justifyContent: collapsed ? 'center' : 'flex-start',
-          height: '34px',
+          height: '44px',
           borderRadius: '10px',
           marginBottom: '2px',
           textDecoration: 'none',
           fontSize: '13px',
           fontWeight: active ? 600 : 400,
           letterSpacing: '-0.01em',
-          color: active ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.42)',
-          background: active ? 'rgba(255,255,255,0.06)' : 'transparent',
+          color: active ? '#a5b4fc' : '#64748b',
+          background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
           transition: 'all 0.15s ease',
           position: 'relative',
           flexShrink: 0,
-          width: collapsed ? '36px' : undefined,
+          width: collapsed ? '40px' : undefined,
           margin: collapsed ? '0 auto 2px' : undefined,
-          // Frost border via inline approach for active state
-          boxShadow: active ? 'inset 0 0 0 1px rgba(255,255,255,0.10)' : 'none',
+          boxShadow: active ? '0 0 12px rgba(99,102,241,0.30), inset 0 0 0 1px rgba(99,102,241,0.20)' : 'none',
         }}
         onMouseEnter={e => {
           if (!active) {
             const el = e.currentTarget as HTMLElement
             el.style.background = 'rgba(255,255,255,0.04)'
-            el.style.color = 'rgba(255,255,255,0.70)'
+            el.style.color = '#94a3b8'
           }
         }}
         onMouseLeave={e => {
           if (!active) {
             const el = e.currentTarget as HTMLElement
             el.style.background = 'transparent'
-            el.style.color = 'rgba(255,255,255,0.42)'
+            el.style.color = '#64748b'
           }
         }}
       >
         <div style={{ position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Icon
-            size={15}
+            size={20}
             style={{
-              color: active ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.35)',
+              color: active ? '#818cf8' : '#475569',
               display: 'block',
               transition: 'color 0.15s ease',
             }}
@@ -146,36 +146,19 @@ export default function Sidebar() {
     )
   }
 
-  function SectionLabel({ children }: { children: string }) {
-    if (collapsed) return <div style={{ height: '8px' }} />
-    return (
-      <div style={{
-        padding: '10px 10px 4px',
-        fontSize: '10px',
-        fontWeight: 600,
-        color: 'rgba(255,255,255,0.18)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.08em',
-      }}>
-        {children}
-      </div>
-    )
-  }
-
   function Divider() {
-    return <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '6px 0' }} />
+    return <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', margin: '6px 0' }} />
   }
 
   const SidebarContent = (
     <aside style={{
       position: 'fixed', left: 0, top: 0, bottom: 0, width: w,
-      background: 'rgba(23,23,23,0.88)',
-      backdropFilter: 'blur(24px) saturate(180%)',
-      WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-      borderRight: '1px solid rgba(255,255,255,0.06)',
+      background: '#080a10',
+      borderRight: '1px solid rgba(255,255,255,0.05)',
       display: 'flex', flexDirection: 'column', zIndex: 40,
       transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)',
       overflow: 'hidden',
+      boxShadow: '2px 0 32px rgba(0,0,0,0.50)',
     }}>
 
       {/* ── Logo row ── */}
@@ -190,19 +173,18 @@ export default function Sidebar() {
       }}>
         {!collapsed && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {/* Logo mark — frost-border style */}
             <div style={{
               width: '28px', height: '28px',
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.80) 0%, rgba(139,92,246,0.70) 100%)',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.90) 0%, rgba(139,92,246,0.80) 100%)',
               borderRadius: '9px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0,
-              boxShadow: '0 0 0 1px rgba(255,255,255,0.12), 0 4px 12px rgba(99,102,241,0.30)',
+              boxShadow: '0 0 16px rgba(99,102,241,0.40), 0 0 0 1px rgba(255,255,255,0.12)',
             }}>
-              <Brain size={14} color="rgba(255,255,255,0.90)" strokeWidth={2} />
+              <Brain size={14} color="rgba(255,255,255,0.95)" strokeWidth={2} />
             </div>
             <span style={{
-              color: 'rgba(255,255,255,0.85)',
+              color: '#e2e8f0',
               letterSpacing: '3px',
               fontSize: '11px',
               fontWeight: 600,
@@ -213,12 +195,12 @@ export default function Sidebar() {
         {collapsed && (
           <div style={{
             width: '28px', height: '28px',
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.80) 0%, rgba(139,92,246,0.70) 100%)',
+            background: 'linear-gradient(135deg, rgba(99,102,241,0.90) 0%, rgba(139,92,246,0.80) 100%)',
             borderRadius: '9px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 0 1px rgba(255,255,255,0.12), 0 4px 12px rgba(99,102,241,0.30)',
+            boxShadow: '0 0 16px rgba(99,102,241,0.40), 0 0 0 1px rgba(255,255,255,0.12)',
           }}>
-            <Brain size={14} color="rgba(255,255,255,0.90)" strokeWidth={2} />
+            <Brain size={14} color="rgba(255,255,255,0.95)" strokeWidth={2} />
           </div>
         )}
 
@@ -226,16 +208,16 @@ export default function Sidebar() {
           onClick={() => { mobileOpen ? closeMobile() : toggleCollapsed() }}
           style={{
             background: 'none', border: 'none',
-            color: 'rgba(255,255,255,0.20)', cursor: 'pointer',
+            color: '#334155', cursor: 'pointer',
             padding: '4px', borderRadius: '6px', display: 'flex',
             transition: 'color 0.12s, background 0.12s',
           }}
           onMouseEnter={e => {
-            ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.50)'
-            ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
+            ;(e.currentTarget as HTMLElement).style.color = '#64748b'
+            ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'
           }}
           onMouseLeave={e => {
-            ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.20)'
+            ;(e.currentTarget as HTMLElement).style.color = '#334155'
             ;(e.currentTarget as HTMLElement).style.background = 'transparent'
           }}
         >
@@ -250,8 +232,8 @@ export default function Sidebar() {
             onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
             style={{
               width: '100%', height: '32px', borderRadius: '10px',
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.07)',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.06)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', padding: '0 10px',
               transition: 'all 0.12s ease',
             }}
@@ -260,15 +242,15 @@ export default function Sidebar() {
               ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.10)'
             }}
             onMouseLeave={e => {
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.07)'
+              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'
             }}
           >
-            <Search size={11} style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: '12px', color: 'rgba(255,255,255,0.25)', textAlign: 'left' }}>Search</span>
+            <Search size={11} style={{ color: '#334155', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: '12px', color: '#334155', textAlign: 'left' }}>Search</span>
             <span style={{
-              fontSize: '10px', color: 'rgba(255,255,255,0.18)',
-              background: 'rgba(255,255,255,0.06)', padding: '1px 5px',
+              fontSize: '10px', color: '#1e293b',
+              background: 'rgba(255,255,255,0.04)', padding: '1px 5px',
               borderRadius: '4px', letterSpacing: '0.02em',
             }}>⌘P</span>
           </button>
@@ -278,13 +260,13 @@ export default function Sidebar() {
             title="Search (⌘P)"
             style={{
               width: '36px', height: '32px', borderRadius: '10px',
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.07)',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.06)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 0.12s ease',
             }}
           >
-            <Search size={11} style={{ color: 'rgba(255,255,255,0.25)' }} />
+            <Search size={11} style={{ color: '#334155' }} />
           </button>
         )}
       </div>
@@ -303,7 +285,7 @@ export default function Sidebar() {
             }}
             onMouseEnter={e => {
               ;(e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.18)'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.32)'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.35)'
             }}
             onMouseLeave={e => {
               ;(e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.10)'
@@ -339,7 +321,6 @@ export default function Sidebar() {
 
       {/* ── Navigation ── */}
       <nav style={{ flex: 1, padding: collapsed ? '0 4px' : '0 6px', overflowY: 'auto', overflowX: 'hidden' }}>
-
         {NAV_ITEMS.map(item => (
           <NavItem
             key={item.href}
@@ -353,19 +334,11 @@ export default function Sidebar() {
             }
           />
         ))}
-
-        <Divider />
-
-        <NavItem
-          href="/settings"
-          icon={Settings}
-          label="Settings"
-        />
       </nav>
 
       {/* ── Footer: brain status + user ── */}
       <div style={{
-        borderTop: '1px solid rgba(255,255,255,0.05)',
+        borderTop: '1px solid rgba(255,255,255,0.04)',
         padding: collapsed ? '8px 4px' : '8px',
         flexShrink: 0,
       }}>
@@ -375,8 +348,8 @@ export default function Sidebar() {
           <div style={{
             display: 'flex', alignItems: 'center', gap: '7px',
             padding: '6px 10px', marginBottom: '6px', borderRadius: '10px',
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.06)',
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px solid rgba(255,255,255,0.05)',
           }}>
             <div style={{
               width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
@@ -385,10 +358,10 @@ export default function Sidebar() {
               animation: brainAgeInfo.mins < 2 ? 'pulse-dot 2s ease-in-out infinite' : 'none',
             }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '11px', fontWeight: 500, color: 'rgba(255,255,255,0.55)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 500, color: '#475569' }}>
                 {urgentCount > 0 ? `${urgentCount} deals flagged` : 'Intelligence ready'}
               </div>
-              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', marginTop: '1px' }}>
+              <div style={{ fontSize: '10px', color: '#334155', marginTop: '1px' }}>
                 Updated {brainAgeInfo.label}
               </div>
             </div>
@@ -402,19 +375,19 @@ export default function Sidebar() {
             title="Sign out"
             style={{
               width: '36px', height: '32px', borderRadius: '10px',
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.07)',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.06)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: 'rgba(255,255,255,0.25)', margin: '0 auto',
+              cursor: 'pointer', color: '#334155', margin: '0 auto',
               transition: 'all 0.12s',
             }}
             onMouseEnter={e => {
-              ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.55)'
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'
+              ;(e.currentTarget as HTMLElement).style.color = '#64748b'
+              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
             }}
             onMouseLeave={e => {
-              ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.25)'
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'
+              ;(e.currentTarget as HTMLElement).style.color = '#334155'
+              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'
             }}
           >
             <LogOut size={12} />
@@ -423,8 +396,8 @@ export default function Sidebar() {
           <div style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             padding: '7px 10px', borderRadius: '10px',
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.06)',
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px solid rgba(255,255,255,0.05)',
           }}>
             <div style={{
               width: '24px', height: '24px', borderRadius: '50%',
@@ -438,13 +411,13 @@ export default function Sidebar() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
                 fontSize: '12px', fontWeight: 500, letterSpacing: '-0.01em',
-                color: 'rgba(255,255,255,0.75)',
+                color: '#94a3b8',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
                 {user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Account'}
               </div>
               <div style={{
-                fontSize: '10px', color: 'rgba(255,255,255,0.28)',
+                fontSize: '10px', color: '#334155',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px',
               }}>
                 {user?.emailAddresses?.[0]?.emailAddress ?? ''}
@@ -454,12 +427,12 @@ export default function Sidebar() {
               onClick={() => signOut({ redirectUrl: '/' })}
               style={{
                 background: 'none', border: 'none', padding: '3px',
-                color: 'rgba(255,255,255,0.20)', borderRadius: '4px',
+                color: '#334155', borderRadius: '4px',
                 display: 'flex', alignItems: 'center', cursor: 'pointer',
                 transition: 'color 0.12s',
               }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.55)'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.20)'}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#64748b'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#334155'}
               title="Sign out"
             >
               <LogOut size={11} />
@@ -474,8 +447,8 @@ export default function Sidebar() {
   const MOBILE_TABS = [
     { href: '/dashboard',   icon: LayoutDashboard, label: 'Today' },
     { href: '/deals',       icon: GitBranch,        label: 'Deals' },
-    { href: '/competitors', icon: Brain,            label: 'Intel' },
-    { href: '/settings',    icon: Plug,             label: 'Workflows' },
+    { href: '/intelligence', icon: Brain,           label: 'Intel' },
+    { href: '/workflows',   icon: Zap,             label: 'Flows' },
   ]
 
   return (
@@ -485,7 +458,7 @@ export default function Sidebar() {
       {/* Mobile backdrop */}
       {mobileOpen && (
         <div
-          style={{ position: 'fixed', inset: 0, zIndex: 39, background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(4px)' }}
+          style={{ position: 'fixed', inset: 0, zIndex: 39, background: 'rgba(0,0,0,0.70)', backdropFilter: 'blur(4px)' }}
           onClick={closeMobile}
         />
       )}
@@ -507,9 +480,7 @@ export default function Sidebar() {
       <nav className="mobile-bottom-nav" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
         height: '56px',
-        background: 'rgba(23,23,23,0.92)',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+        background: '#080a10',
         borderTop: '1px solid rgba(255,255,255,0.06)',
         display: 'none',
         alignItems: 'center', justifyContent: 'space-around',
@@ -527,10 +498,10 @@ export default function Sidebar() {
                 minWidth: '48px', minHeight: '44px',
               }}
             >
-              <tab.icon size={16} style={{ color: active ? '#818cf8' : 'rgba(255,255,255,0.30)' }} />
+              <tab.icon size={20} style={{ color: active ? '#818cf8' : '#475569' }} />
               <span style={{
                 fontSize: '10px', fontWeight: active ? 600 : 400,
-                color: active ? '#818cf8' : 'rgba(255,255,255,0.30)',
+                color: active ? '#818cf8' : '#475569',
                 lineHeight: 1,
               }}>{tab.label}</span>
             </Link>
@@ -545,7 +516,7 @@ export default function Sidebar() {
             minWidth: '48px', minHeight: '44px',
           }}
         >
-          <MessageSquare size={16} style={{ color: '#818cf8' }} />
+          <MessageSquare size={20} style={{ color: '#818cf8' }} />
           <span style={{ fontSize: '10px', fontWeight: 400, color: '#818cf8', lineHeight: 1 }}>Ask AI</span>
         </button>
       </nav>

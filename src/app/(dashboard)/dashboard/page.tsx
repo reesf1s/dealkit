@@ -6,8 +6,8 @@ import useSWR, { mutate } from 'swr'
 import Link from 'next/link'
 import {
   Sparkles, RefreshCw, AlertTriangle, ArrowUpRight,
-  TrendingDown, GitBranch, MessageSquare, CheckCircle2,
-  Plug, Clock, ChevronRight, Brain,
+  GitBranch, MessageSquare, CheckCircle2,
+  Plug, ChevronRight, Brain,
 } from 'lucide-react'
 import { useSidebar } from '@/components/layout/SidebarContext'
 import { formatCurrency } from '@/lib/format'
@@ -30,17 +30,26 @@ function SkeletonLine({ w = '100%', h = '14px' }: { w?: string; h?: string }) {
 
 const card: React.CSSProperties = {
   position: 'relative',
-  background: 'rgba(255,255,255,0.03)',
-  backdropFilter: 'blur(20px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-  borderRadius: '14px',
+  background: 'linear-gradient(135deg, rgba(99,102,241,0.10), rgba(59,130,246,0.05), transparent)',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  borderRadius: '1rem',
+  border: '1px solid rgba(255,255,255,0.08)',
   boxShadow: '0 2px 20px rgba(0,0,0,0.40), 0 1px 4px rgba(0,0,0,0.20)',
-  outline: '1px solid rgba(255,255,255,0.08)',
-  outlineOffset: '-1px',
+}
+
+const heroCard: React.CSSProperties = {
+  position: 'relative',
+  background: 'linear-gradient(135deg, rgba(99,102,241,0.40), rgba(59,130,246,0.25))',
+  backdropFilter: 'blur(24px)',
+  WebkitBackdropFilter: 'blur(24px)',
+  borderRadius: '1.25rem',
+  border: '1px solid rgba(99,102,241,0.20)',
+  boxShadow: '0 8px 40px rgba(99,102,241,0.20), 0 2px 8px rgba(0,0,0,0.40)',
 }
 
 const surface: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.04)',
+  background: 'rgba(255,255,255,0.03)',
   borderRadius: '10px',
   border: '1px solid rgba(255,255,255,0.06)',
 }
@@ -226,23 +235,50 @@ export default function DashboardPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '800px' }}>
 
-      {/* ══ HEADER ══ */}
-      <div>
+      {/* ══ HERO MORNING BRIEFING ══ */}
+      <div style={{ ...heroCard, padding: '28px 32px' }}>
         <h1 style={{
-          fontSize: isMobile ? '26px' : '34px',
-          fontWeight: 600,
-          color: 'rgba(255,255,255,0.92)',
+          fontSize: isMobile ? '24px' : '30px',
+          fontWeight: 700,
+          color: '#ffffff',
           letterSpacing: '-0.025em',
-          lineHeight: 1.1,
-          marginBottom: '6px',
+          lineHeight: 1.15,
+          marginBottom: '8px',
         }}>
-          {greeting}
+          {greeting}{' '}
+          {attentionCount > 0 ? (
+            <span style={{ color: '#fca5a5' }}>
+              {attentionCount} deal{attentionCount !== 1 ? 's' : ''} need{attentionCount === 1 ? 's' : ''} your attention today.
+            </span>
+          ) : (
+            <span style={{ color: 'rgba(255,255,255,0.65)' }}>Pipeline looks healthy.</span>
+          )}
         </h1>
-        <p style={{ fontSize: '15px', color: 'rgba(255,255,255,0.38)', letterSpacing: '-0.01em' }}>
+        <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.55)', letterSpacing: '-0.01em', margin: 0 }}>
           {new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
-          {' · '}
-          <span style={{ color: 'rgba(255,255,255,0.28)' }}>here&apos;s what matters today</span>
+          {isLoading ? null : overview?.summary ? (
+            <span style={{ display: 'block', marginTop: '8px', fontSize: '14px', color: 'rgba(255,255,255,0.70)', lineHeight: 1.65 }}>
+              {overview.summary}
+            </span>
+          ) : null}
         </p>
+        <button
+          onClick={regenerate}
+          disabled={regenerating}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '5px',
+            marginTop: '16px', padding: '6px 14px', borderRadius: '8px',
+            background: 'rgba(255,255,255,0.10)',
+            border: '1px solid rgba(255,255,255,0.20)',
+            color: 'rgba(255,255,255,0.75)', fontSize: '12px', fontWeight: 500,
+            cursor: regenerating ? 'not-allowed' : 'pointer',
+            opacity: regenerating ? 0.6 : 1,
+            transition: 'all 0.12s',
+          }}
+        >
+          <RefreshCw size={11} style={{ animation: regenerating ? 'spin 1s linear infinite' : 'none' }} />
+          {regenerating ? 'Refreshing…' : 'Refresh briefing'}
+        </button>
       </div>
 
       {/* ══ PRIORITY ACTIONS ══ */}
@@ -250,86 +286,28 @@ export default function DashboardPage() {
 
         {/* Card header */}
         <div style={{
-          padding: '18px 22px 14px',
+          padding: '16px 20px 12px',
           borderBottom: '1px solid rgba(255,255,255,0.05)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+          display: 'flex', alignItems: 'center', gap: '10px',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '30px', height: '30px', borderRadius: '9px', flexShrink: 0,
-              background: attentionCount > 0
-                ? 'rgba(248,113,113,0.12)'
-                : 'rgba(99,102,241,0.12)',
-              border: `1px solid ${attentionCount > 0 ? 'rgba(248,113,113,0.22)' : 'rgba(99,102,241,0.22)'}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              {attentionCount > 0
-                ? <AlertTriangle size={14} style={{ color: '#f87171' }} />
-                : <Sparkles size={14} style={{ color: '#818cf8' }} />}
-            </div>
-            <div>
-              {isLoading ? (
-                <SkeletonLine w="180px" h="16px" />
-              ) : topPriorities.length > 0 ? (
-                <div style={{ fontSize: '15px', fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '-0.01em' }}>
-                  {attentionCount > 0
-                    ? `${attentionCount} deal${attentionCount > 1 ? 's' : ''} need${attentionCount === 1 ? 's' : ''} your attention`
-                    : `${topPriorities.length} thing${topPriorities.length !== 1 ? 's' : ''} to act on today`}
-                </div>
-              ) : (
-                <div style={{ fontSize: '15px', fontWeight: 600, color: 'rgba(255,255,255,0.90)' }}>
-                  Pipeline looks healthy
-                </div>
-              )}
-            </div>
-          </div>
-          <button
-            onClick={regenerate}
-            disabled={regenerating}
-            title="Refresh AI briefing"
-            style={{
-              display: 'flex', alignItems: 'center', gap: '5px',
-              padding: '6px 12px', borderRadius: '8px',
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.07)',
-              color: 'rgba(255,255,255,0.35)', fontSize: '11px', fontWeight: 500,
-              cursor: regenerating ? 'not-allowed' : 'pointer',
-              opacity: regenerating ? 0.6 : 1,
-              transition: 'all 0.12s', flexShrink: 0,
-            }}
-            onMouseEnter={e => { if (!regenerating) { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.65)' }}}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.35)' }}
-          >
-            <RefreshCw size={11} style={{ animation: regenerating ? 'spin 1s linear infinite' : 'none' }} />
-            {regenerating ? 'Refreshing…' : 'Refresh'}
-          </button>
-        </div>
-
-        {/* AI Briefing — natural language overview */}
-        {(overview?.summary || isLoading) && (
           <div style={{
-            padding: '14px 22px',
-            borderBottom: '1px solid rgba(255,255,255,0.05)',
-            background: 'rgba(99,102,241,0.03)',
+            width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0,
+            background: attentionCount > 0 ? 'rgba(248,113,113,0.12)' : 'rgba(99,102,241,0.12)',
+            border: `1px solid ${attentionCount > 0 ? 'rgba(248,113,113,0.22)' : 'rgba(99,102,241,0.22)'}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            {isLoading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <SkeletonLine w="95%" h="13px" />
-                <SkeletonLine w="80%" h="13px" />
-              </div>
-            ) : (
-              <p style={{
-                fontSize: '13px',
-                color: 'rgba(255,255,255,0.58)',
-                lineHeight: 1.65,
-                margin: 0,
-                letterSpacing: '-0.005em',
-              }}>
-                {overview.summary}
-              </p>
-            )}
+            {attentionCount > 0
+              ? <AlertTriangle size={13} style={{ color: '#f87171' }} />
+              : <Sparkles size={13} style={{ color: '#818cf8' }} />}
           </div>
-        )}
+          {isLoading ? (
+            <SkeletonLine w="160px" h="15px" />
+          ) : (
+            <span style={{ fontSize: '14px', fontWeight: 600, color: '#e2e8f0', letterSpacing: '-0.01em' }}>
+              Priority actions
+            </span>
+          )}
+        </div>
 
         {/* Priority list */}
         <div style={{ padding: '8px 12px 12px' }}>
@@ -537,8 +515,8 @@ export default function DashboardPage() {
             <div style={{ padding: '14px 20px 10px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <GitBranch size={13} style={{ color: '#818cf8' }} />
-                <span style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.80)' }}>
-                  In-cycle issues linked to your deals
+                <span style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>
+                  Issues in your current sprint
                 </span>
               </div>
               <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.30)' }}>
@@ -647,15 +625,16 @@ export default function DashboardPage() {
       {/* ══ CONNECTED STATUS ══ */}
       <div style={{ ...card, padding: '14px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.30)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            Halvex is connected to
+          <Plug size={11} style={{ color: '#475569' }} />
+          <div style={{ fontSize: '11px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+            Connections
           </div>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {[
-            { label: 'Slack', icon: <MessageSquare size={12} />, connected: slackConnected, href: '/settings' },
-            { label: 'Linear', icon: <GitBranch size={12} />, connected: linearConnected, href: '/settings' },
-            { label: 'HubSpot', icon: <Brain size={12} />, connected: hubspotConnected, href: '/settings' },
+            { label: 'Slack', icon: <MessageSquare size={12} />, connected: slackConnected, href: '/connections' },
+            { label: 'Linear', icon: <GitBranch size={12} />, connected: linearConnected, href: '/connections' },
+            { label: 'HubSpot', icon: <Brain size={12} />, connected: hubspotConnected, href: '/connections' },
           ].map(({ label, icon, connected, href }) => (
             <Link
               key={label}

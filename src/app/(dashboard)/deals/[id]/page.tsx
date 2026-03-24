@@ -4999,72 +4999,115 @@ export default function DealDetailPage() {
           )
         })()}
 
-        {deal ? (
-          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-start', justifyContent: 'space-between', gap: isMobile ? '12px' : undefined, background: 'var(--glass-card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--glass-card-border)', borderRadius: '12px', padding: '16px 20px' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                <h1 className="font-brand" style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '500', letterSpacing: '0.01em', color: 'var(--text-primary)', margin: 0 }}>
-                  {deal.prospectCompany}
-                </h1>
-                <span style={{
-                  fontSize: '11px', padding: '3px 10px', borderRadius: '100px', fontWeight: '600',
-                  background: `${stageColor}18`, color: stageColor, border: `1px solid ${stageColor}35`,
-                }}>
-                  {deal.stage?.replace('_', ' ')}
-                </span>
-                {deal.conversionScore != null && (() => {
-                  const isClosed = deal.stage === 'closed_won' || deal.stage === 'closed_lost'
-                  const c = getScoreColor(deal.conversionScore, isClosed)
-                  return (
-                    <span style={{
-                      fontSize: '12px', padding: '3px 10px', borderRadius: '100px', fontWeight: '700',
-                      background: `color-mix(in srgb, ${c} 10%, transparent)`,
-                      color: c,
-                      border: `1px solid color-mix(in srgb, ${c} 25%, transparent)`,
-                      display: 'flex', alignItems: 'center', gap: '4px',
-                      boxShadow: `0 0 16px color-mix(in srgb, ${c} 20%, transparent), 0 0 4px color-mix(in srgb, ${c} 12%, transparent)`,
+        {deal ? (() => {
+          const isClosed = deal.stage === 'closed_won' || deal.stage === 'closed_lost'
+          const score = deal.conversionScore ?? null
+          const scoreColor = score != null ? getScoreColor(score, isClosed) : '#64748b'
+          const objectionSignals: string[] = (deal.objectionSignals as string[]) ?? []
+          return (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(59,130,246,0.15))',
+              backdropFilter: 'blur(24px)',
+              WebkitBackdropFilter: 'blur(24px)',
+              border: '1px solid rgba(99,102,241,0.20)',
+              borderRadius: '1.25rem',
+              padding: isMobile ? '20px' : '24px 28px',
+              boxShadow: '0 8px 40px rgba(99,102,241,0.15), 0 2px 8px rgba(0,0,0,0.40)',
+            }}>
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-start', gap: isMobile ? '16px' : '24px' }}>
+
+                {/* Health score circle */}
+                {score != null && (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                    <div style={{
+                      width: '72px', height: '72px', borderRadius: '50%',
+                      background: `conic-gradient(${scoreColor} ${score * 3.6}deg, rgba(255,255,255,0.08) 0deg)`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: `0 0 20px ${scoreColor}40`,
+                      position: 'relative',
                     }}>
-                      <Target size={10} /> {deal.conversionScore}% win probability
-                    </span>
-                  )
-                })()}
-                {deal.engagementType && (
-                  <span style={{
-                    fontSize: '11px', padding: '3px 10px', borderRadius: '100px', fontWeight: '600',
-                    background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
-                    border: '1px solid rgba(255,255,255,0.12)',
-                  }}>
-                    {deal.engagementType}
-                  </span>
+                      <div style={{
+                        width: '56px', height: '56px', borderRadius: '50%',
+                        background: 'rgba(13,15,26,0.90)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexDirection: 'column',
+                      }}>
+                        <span style={{ fontSize: '18px', fontWeight: 700, color: scoreColor, lineHeight: 1 }}>{score}</span>
+                        <span style={{ fontSize: '9px', color: '#64748b', marginTop: '1px' }}>score</span>
+                      </div>
+                    </div>
+                  </div>
                 )}
-              </div>
-              <div style={{ display: 'flex', gap: isMobile ? '10px' : '16px', fontSize: '12px', color: 'var(--text-tertiary)', flexWrap: 'wrap' }}>
-                {deal.prospectName && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><User size={11} />{deal.prospectName}</span>}
-                {deal.dealValue && <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--success)', fontWeight: '600' }}><Banknote size={11} />{currencySymbol}{Number(deal.dealValue).toLocaleString()}</span>}
-                {deal.closeDate && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} />Close {new Date(deal.closeDate).toLocaleDateString()}</span>}
+
+                {/* Deal info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
+                    <h1 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: 700, letterSpacing: '-0.02em', color: '#e2e8f0', margin: 0 }}>
+                      {deal.prospectCompany}
+                    </h1>
+                    <span style={{
+                      fontSize: '11px', padding: '3px 10px', borderRadius: '100px', fontWeight: '600',
+                      background: `${stageColor}18`, color: stageColor, border: `1px solid ${stageColor}35`,
+                    }}>
+                      {deal.stage?.replace('_', ' ')}
+                    </span>
+                    {deal.engagementType && (
+                      <span style={{
+                        fontSize: '11px', padding: '3px 10px', borderRadius: '100px', fontWeight: '600',
+                        background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                      }}>
+                        {deal.engagementType}
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: isMobile ? '10px' : '16px', fontSize: '12px', color: '#64748b', flexWrap: 'wrap', marginBottom: objectionSignals.length > 0 ? '10px' : '0' }}>
+                    {deal.prospectName && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><User size={11} />{deal.prospectName}</span>}
+                    {deal.dealValue && <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#34d399', fontWeight: '600' }}><Banknote size={11} />{currencySymbol}{Number(deal.dealValue).toLocaleString()}</span>}
+                    {deal.closeDate && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} />Close {new Date(deal.closeDate).toLocaleDateString()}</span>}
+                  </div>
+
+                  {/* Objection signal pills */}
+                  {objectionSignals.length > 0 && (
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                      {objectionSignals.slice(0, 5).map((sig: string, i: number) => (
+                        <span key={i} style={{
+                          fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '100px',
+                          background: 'rgba(248,113,113,0.12)', color: '#f87171',
+                          border: '1px solid rgba(248,113,113,0.25)',
+                        }}>{sig}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Action buttons */}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: isMobile ? 'wrap' : undefined, flexShrink: 0, alignSelf: 'flex-start' }}>
+                  <button onClick={() => setEditOpen(true)} style={{
+                    display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '10px 14px' : '8px 14px',
+                    background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)',
+                    borderRadius: '8px', color: '#e2e8f0', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                    minHeight: isMobile ? '44px' : undefined,
+                  }}>
+                    <Edit size={13} /> Edit
+                  </button>
+                  <Link href={`/collateral?dealId=${id}`} style={{
+                    display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '10px 14px' : '8px 14px',
+                    background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                    border: '1px solid rgba(99,102,241,0.40)',
+                    borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none',
+                    boxShadow: '0 0 16px rgba(99,102,241,0.30)',
+                    minHeight: isMobile ? '44px' : undefined,
+                  }}>
+                    <Sparkles size={13} /> Collateral
+                  </Link>
+                </div>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: isMobile ? 'wrap' : undefined }}>
-              <button onClick={() => setEditOpen(true)} style={{
-                display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '10px 14px' : '8px 14px',
-                background: 'var(--surface-hover)', border: '1px solid var(--border-strong)',
-                borderRadius: '6px', color: 'var(--text-primary)', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
-                minHeight: isMobile ? '44px' : undefined,
-              }}>
-                <Edit size={13} /> Edit
-              </button>
-              <Link href={`/collateral?dealId=${id}`} style={{
-                display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '10px 14px' : '8px 14px',
-                background: 'linear-gradient(135deg, #6366F1, #7C3AED)', boxShadow: 'var(--shadow)',
-                border: 'none', borderRadius: '6px', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none',
-                minHeight: isMobile ? '44px' : undefined,
-              }}>
-                <Sparkles size={13} /> Generate Collateral
-              </Link>
-            </div>
-          </div>
-        ) : (
-          <div style={{ height: '40px', background: 'var(--surface)', borderRadius: '8px', width: '300px', animation: 'pulse 1.5s infinite' }} />
+          )
+        })() : (
+          <div style={{ height: '100px', background: 'linear-gradient(135deg, rgba(99,102,241,0.10), rgba(59,130,246,0.05))', borderRadius: '1.25rem', border: '1px solid rgba(99,102,241,0.15)' }} className="skeleton" />
         )}
       </div>
 
