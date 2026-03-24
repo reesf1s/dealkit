@@ -6,34 +6,23 @@ import { usePathname } from 'next/navigation'
 import { useClerk, useUser } from '@clerk/nextjs'
 import useSWR from 'swr'
 import {
-  LayoutDashboard, Building2, Swords,
+  LayoutDashboard,
   Settings, LogOut, Search,
   ChevronLeft, ChevronRight,
-  X, Brain, Zap, MessageSquare, BookOpen, GitBranch,
-  Layers, Plug,
+  X, Brain, MessageSquare, GitBranch,
+  Plug,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 import { identify } from '@/lib/analytics'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
-// Primary nav — the core daily flows
-const CORE_ITEMS = [
-  { href: '/dashboard',  icon: LayoutDashboard, label: 'Today',       matchPaths: ['/dashboard'] },
-  { href: '/pipeline',   icon: GitBranch,       label: 'Pipeline',    matchPaths: ['/pipeline', '/deals'] },
-  { href: '/playbook',   icon: BookOpen,        label: 'Playbook',    matchPaths: ['/playbook'] },
-]
-
-// Intelligence — research and knowledge
-const INTEL_ITEMS = [
-  { href: '/competitors', icon: Swords,   label: 'Intelligence', matchPaths: ['/competitors', '/case-studies', '/product-gaps'] },
-  { href: '/models',      icon: Brain,    label: 'Models',       matchPaths: ['/models'] },
-  { href: '/collateral',  icon: Zap,      label: 'Collateral',   matchPaths: ['/collateral'] },
-]
-
-// Connect — MCP & integrations layer
-const CONNECT_ITEMS = [
-  { href: '/company', icon: Plug, label: 'Connections', matchPaths: ['/company', '/onboarding'] },
+// Flat 4-item nav
+const NAV_ITEMS = [
+  { href: '/dashboard',   icon: LayoutDashboard, label: 'Today',         matchPaths: ['/dashboard'] },
+  { href: '/pipeline',    icon: GitBranch,       label: 'Deals',         matchPaths: ['/pipeline', '/deals'] },
+  { href: '/competitors', icon: Brain,           label: 'Intelligence',  matchPaths: ['/competitors', '/case-studies', '/product-gaps', '/models', '/collateral', '/playbook'] },
+  { href: '/company',     icon: Plug,            label: 'Connect',       matchPaths: ['/company', '/onboarding'] },
 ]
 
 export default function Sidebar() {
@@ -351,24 +340,17 @@ export default function Sidebar() {
       {/* ── Navigation ── */}
       <nav style={{ flex: 1, padding: collapsed ? '0 4px' : '0 6px', overflowY: 'auto', overflowX: 'hidden' }}>
 
-        <SectionLabel>Core</SectionLabel>
-        {CORE_ITEMS.map(item => (
+        {NAV_ITEMS.map(item => (
           <NavItem
             key={item.href}
             {...item}
-            badge={item.href === '/pipeline' && urgentCount > 0 ? { count: urgentCount, color: '#f87171' } : undefined}
-          />
-        ))}
-
-        <SectionLabel>Intelligence</SectionLabel>
-        {INTEL_ITEMS.map(item => <NavItem key={item.href} {...item} />)}
-
-        <SectionLabel>Connect</SectionLabel>
-        {CONNECT_ITEMS.map(item => (
-          <NavItem
-            key={item.href}
-            {...item}
-            badge={item.href === '/company' && unmatchedEmailCount > 0 ? { count: unmatchedEmailCount, color: '#fbbf24' } : undefined}
+            badge={
+              item.href === '/pipeline' && urgentCount > 0
+                ? { count: urgentCount, color: '#f87171' }
+                : item.href === '/company' && unmatchedEmailCount > 0
+                ? { count: unmatchedEmailCount, color: '#fbbf24' }
+                : undefined
+            }
           />
         ))}
 
@@ -490,10 +472,10 @@ export default function Sidebar() {
 
   // Mobile bottom tab bar items
   const MOBILE_TABS = [
-    { href: '/dashboard', icon: LayoutDashboard, label: 'Today' },
-    { href: '/pipeline',  icon: GitBranch,       label: 'Pipeline' },
-    { href: '/playbook',  icon: BookOpen,         label: 'Playbook' },
-    { href: '/company',   icon: Layers,           label: 'Connect' },
+    { href: '/dashboard',   icon: LayoutDashboard, label: 'Today' },
+    { href: '/pipeline',    icon: GitBranch,        label: 'Deals' },
+    { href: '/competitors', icon: Brain,            label: 'Intel' },
+    { href: '/company',     icon: Plug,             label: 'Connect' },
   ]
 
   return (
