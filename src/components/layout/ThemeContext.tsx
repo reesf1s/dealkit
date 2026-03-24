@@ -15,17 +15,28 @@ const ThemeContext = createContext<ThemeCtx>({
 })
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // Always light — macOS Sonoma / Dimension aesthetic
-  const [theme] = useState<Theme>('light')
+  const [theme, setTheme] = useState<Theme>('dark')
 
   useEffect(() => {
-    document.documentElement.classList.add('light')
-    document.documentElement.classList.remove('dark')
-    localStorage.setItem('halvex-theme', 'light')
+    const stored = localStorage.getItem('halvex-theme') as Theme | null
+    if (stored === 'light' || stored === 'dark') {
+      setTheme(stored)
+      document.documentElement.classList.toggle('dark', stored === 'dark')
+    } else {
+      // Default to dark — Raycast aesthetic
+      setTheme('dark')
+      document.documentElement.classList.add('dark')
+    }
   }, [])
 
-  // No-op: theme is permanently light
-  const toggleTheme = () => {}
+  const toggleTheme = () => {
+    setTheme(prev => {
+      const next = prev === 'light' ? 'dark' : 'light'
+      localStorage.setItem('halvex-theme', next)
+      document.documentElement.classList.toggle('dark', next === 'dark')
+      return next
+    })
+  }
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
