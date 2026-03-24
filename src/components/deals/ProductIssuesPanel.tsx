@@ -172,6 +172,7 @@ export function ProductIssuesPanel({ dealId }: Props) {
         <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
           Product Issues
         </span>
+        <span className="ml-2 text-xs bg-purple-50 text-purple-600 border border-purple-200 rounded-full px-2 py-0.5 font-medium">MCP</span>
         <button
           onClick={() => setShowLinkInput(v => !v)}
           style={{
