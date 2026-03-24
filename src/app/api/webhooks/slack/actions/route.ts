@@ -3,8 +3,10 @@
  * Handles Slack Block Kit interactive component callbacks (button clicks).
  *
  * Handles:
- *   draft_release_email_{dealId}_{linearIssueId}  — generate + DM back the release email
- *   skip_release_email_{dealId}                   — dismiss the notification silently
+ *   draft_release_email_{dealId}_{linearIssueId}    — generate + DM back the release email
+ *   skip_release_email_{dealId}                     — dismiss the release email notification
+ *   scope_and_add_to_cycle_{dealId}_{linearIssueId} — scope issue to cycle automatically
+ *   dismiss_issue_link_{dealId}_{linearIssueId}     — dismiss the issue link suggestion
  *
  * Slack sends an application/x-www-form-urlencoded body with a `payload` field
  * containing a JSON string.
@@ -22,7 +24,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isSlackConfigured, verifySlackRequest, getSlackBotToken, getWorkspaceBySlackTeam, slackPostMessage } from '@/lib/slack-client'
 import { getOrGenerateReleaseEmail } from '@/lib/release-email-generator'
 import { db } from '@/lib/db'
-import { mcpActionLog } from '@/lib/db/schema'
+import { mcpActionLog, dealLinearLinks, dealLogs, linearIssuesCache } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { markdownToBlocks, errorBlocks } from '@/lib/slack-blocks'
 
@@ -109,6 +111,131 @@ async function handleDraftReleaseEmail(
     } catch { /* suppress recovery error */ }
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// handleScopeAndAddToCycle — auto-scope issue when user clicks "Yes, scope it"
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function handleScopeAndAddToCycle(
+  workspaceId: string,
+  token: string,
+  dmChannelId: string,
+  dealId: string,
+  linearIssueId: string,
+): Promise<void> {
+  try {
+    // Fetch deal context
+    const [deal] = await db
+      .select({
+        dealName: dealLogs.dealName,
+        prospectCompany: dealLogs.prospectCompany,
+        prospectName: dealLogs.prospectName,
+        dealRisks: dealLogs.dealRisks,
+      })
+      .from(dealLogs)
+      .where(eq(dealLogs.id, dealId))
+      .limit(1)
+
+    if (!deal) {
+      await slackPostMessage(token, dmChannelId, errorBlocks('Could not find deal context.'), 'Error')
+      return
+    }
+
+    // Fetch issue from cache
+    const [cached] = await db
+      .select({ title: linearIssuesCache.title, description: linearIssuesCache.description })
+      .from(linearIssuesCache)
+      .where(and(
+        eq(linearIssuesCache.workspaceId, workspaceId),
+        eq(linearIssuesCache.linearIssueId, linearIssueId),
+      ))
+      .limit(1)
+
+    const issueTitle = cached?.title ?? linearIssueId
+    const issueDesc = cached?.description ?? ''
+
+    // Mark link as in_cycle
+    await db
+      .update(dealLinearLinks)
+      .set({ status: 'in_cycle', scopedAt: new Date(), updatedAt: new Date() })
+      .where(and(
+        eq(dealLinearLinks.workspaceId, workspaceId),
+        eq(dealLinearLinks.dealId, dealId),
+        eq(dealLinearLinks.linearIssueId, linearIssueId),
+      ))
+
+    await db.insert(mcpActionLog).values({
+      workspaceId,
+      actionType: 'scope_issue',
+      dealId,
+      linearIssueId,
+      triggeredBy: 'slack',
+      status: 'complete',
+      payload: { autoScoped: true, trigger: 'block_action' },
+    })
+
+    const dealRisks = (deal.dealRisks as string[]) ?? []
+    const riskContext = dealRisks.length > 0 ? `\nDeal risks this solves: ${dealRisks.slice(0, 2).join(', ')}` : ''
+
+    const responseText = [
+      `✅ *Scoped ${linearIssueId} for the ${deal.dealName} deal*`,
+      '',
+      `*Issue:* ${issueTitle}`,
+      issueDesc ? `*Description:* ${issueDesc.slice(0, 200)}` : '',
+      riskContext,
+      '',
+      `*User Story:*`,
+      `As a ${deal.prospectCompany} user, I want ${issueTitle.toLowerCase()} so that I can achieve the outcomes that matter to our team.`,
+      '',
+      `*Acceptance Criteria:*`,
+      `- [ ] Feature works as described`,
+      `- [ ] ${deal.prospectCompany} can access it in their account`,
+      `- [ ] No regression in existing functionality`,
+      '',
+      `Link status updated to *in_cycle*. This will unlock the ${deal.dealName} deal when it ships. 🚀`,
+    ].filter(Boolean).join('\n')
+
+    await slackPostMessage(token, dmChannelId, markdownToBlocks(responseText), responseText)
+  } catch (e) {
+    console.error('[slack/actions] handleScopeAndAddToCycle failed:', e)
+    try {
+      await slackPostMessage(token, dmChannelId, errorBlocks('Failed to scope issue. Please try again.'), 'Error')
+    } catch { /* suppress */ }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// handleDismissIssueLink — dismiss a suggested issue link
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function handleDismissIssueLink(
+  workspaceId: string,
+  dealId: string,
+  linearIssueId: string,
+): Promise<void> {
+  await db
+    .update(dealLinearLinks)
+    .set({ status: 'dismissed', updatedAt: new Date() })
+    .where(and(
+      eq(dealLinearLinks.workspaceId, workspaceId),
+      eq(dealLinearLinks.dealId, dealId),
+      eq(dealLinearLinks.linearIssueId, linearIssueId),
+    ))
+
+  await db.insert(mcpActionLog).values({
+    workspaceId,
+    actionType: 'link_dismissed',
+    dealId,
+    linearIssueId,
+    triggeredBy: 'slack',
+    status: 'complete',
+    payload: { trigger: 'block_action' },
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// handleSkipReleaseEmail
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function handleSkipReleaseEmail(
   workspaceId: string,
@@ -204,11 +331,30 @@ export async function POST(req: NextRequest) {
         return
       }
 
-      // skip_release_email_{dealId} (may or may not have issue suffix)
+      // skip_release_email_{dealId}
       const skipMatch = actionId.match(/^skip_release_email_(.+)$/)
       if (skipMatch) {
         const dealId = skipMatch[1]
         await handleSkipReleaseEmail(workspaceId, dealId, null)
+        return
+      }
+
+      // scope_and_add_to_cycle_{dealId}_{linearIssueId}
+      const scopeMatch = actionId.match(/^scope_and_add_to_cycle_([a-f0-9-]{36})_([A-Z]+-\d+)$/)
+      if (scopeMatch) {
+        const dealId = scopeMatch[1]
+        const linearIssueId = scopeMatch[2]
+        const channel = dmChannelId ?? payload.user.id
+        await handleScopeAndAddToCycle(workspaceId, token, channel, dealId, linearIssueId)
+        return
+      }
+
+      // dismiss_issue_link_{dealId}_{linearIssueId}
+      const dismissMatch = actionId.match(/^dismiss_issue_link_([a-f0-9-]{36})_([A-Z]+-\d+)$/)
+      if (dismissMatch) {
+        const dealId = dismissMatch[1]
+        const linearIssueId = dismissMatch[2]
+        await handleDismissIssueLink(workspaceId, dealId, linearIssueId)
         return
       }
 

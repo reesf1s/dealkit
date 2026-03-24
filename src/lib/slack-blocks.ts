@@ -194,12 +194,24 @@ export function newIssueLinkBlocks(link: {
 }): SlackBlock[] {
   return [
     sectionBlock(
-      `🔗 New issue match for *${link.dealName}* (${link.company})\n` +
-      `*${link.linearIssueId}* — ${link.linearTitle} (relevance: ${link.relevanceScore}%)`
+      `🔗 *New link found for the ${link.dealName} deal*\n` +
+      `Issue *${link.linearIssueId}* "${link.linearTitle}" matches a success criterion in this deal (relevance: ${link.relevanceScore}%).\n` +
+      `Want me to scope it into a user story and add it to the current sprint to unlock this deal?`
     ),
     actionsBlock([
-      ...(link.linearIssueUrl ? [{ text: '🔧 View issue', url: link.linearIssueUrl }] : []),
-      { text: '📊 View deal', url: `${APP_URL}/deals/${link.dealId}` },
+      {
+        text: '✅ Yes, scope it',
+        actionId: `scope_and_add_to_cycle_${link.dealId}_${link.linearIssueId}`,
+        style: 'primary',
+      },
+      {
+        text: '👀 Review first',
+        url: `${APP_URL}/deals/${link.dealId}`,
+      },
+      {
+        text: '❌ Not relevant',
+        actionId: `dismiss_issue_link_${link.dealId}_${link.linearIssueId}`,
+      },
     ]),
   ]
 }
