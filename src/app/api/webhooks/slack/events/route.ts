@@ -64,7 +64,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Could not read body' }, { status: 400 })
   }
 
-  // Verify signature
+  // Handle Slack URL verification challenge BEFORE signature check —
+  // Slack sends the challenge without a valid signature during initial setup.
+  let payload: SlackEventPayload
+  try {
+    payload = JSON.parse(rawBody) as SlackEventPayload
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+
+  if (payload.type === 'url_verification') {
+    return NextResponse.json({ challenge: payload.challenge })
+  }
+
+  // Verify signature for all other events
   const timestamp = req.headers.get('x-slack-request-timestamp') ?? ''
   const signature = req.headers.get('x-slack-signature') ?? ''
 
@@ -76,19 +89,6 @@ export async function POST(req: NextRequest) {
     // verifySlackRequest throws if SLACK_SIGNING_SECRET is missing
     const msg = e instanceof Error ? e.message : 'Signature verification failed'
     return NextResponse.json({ error: msg }, { status: 503 })
-  }
-
-  // Parse payload
-  let payload: SlackEventPayload
-  try {
-    payload = JSON.parse(rawBody) as SlackEventPayload
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
-
-  // URL verification (initial Slack app setup)
-  if (payload.type === 'url_verification') {
-    return NextResponse.json({ challenge: payload.challenge })
   }
 
   // Only handle event_callback
