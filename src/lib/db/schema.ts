@@ -600,6 +600,7 @@ export const linearIssuesCache = pgTable('linear_issues_cache', {
   assigneeId:     text('assignee_id'),
   assigneeName:   text('assignee_name'),
   priority:       integer('priority').notNull().default(0), // 0=no priority,1=urgent,2=high,3=medium,4=low
+  embedding:      jsonb('embedding').$type<number[]>(),     // TF-IDF vector — populated by embedLinearIssues()
   cachedAt:       timestamp('cached_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   unique().on(t.workspaceId, t.linearIssueId),
