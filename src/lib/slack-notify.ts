@@ -14,7 +14,7 @@ import { slackConnections, slackUserMappings, mcpActionLog, dealLogs, dealLinear
 import { eq, and } from 'drizzle-orm'
 import { decrypt, getEncryptionKey } from '@/lib/encrypt'
 import { slackPostMessage, slackOpenDm } from '@/lib/slack-client'
-import { healthDropBlocks, newIssueLinkBlocks, issueDeployedBlocks, allIssuesDeployedBlocks } from '@/lib/slack-blocks'
+import { healthDropBlocks, newIssueLinkBlocks, issueDeployedBlocks, allIssuesDeployedBlocks, staleDealDigestBlocks, winLossDigestBlocks, gapLinearSuggestionBlocks } from '@/lib/slack-blocks'
 import { generateBatchReleaseEmail } from '@/lib/release-email-generator'
 import type { WorkspaceBrain } from '@/lib/workspace-brain'
 
@@ -33,12 +33,13 @@ async function getConnection(workspaceId: string): Promise<{ botToken: string } 
   return { botToken }
 }
 
-async function getMappedUsers(workspaceId: string, notifyPref: 'notifyHealthDrops' | 'notifyIssueLinks'): Promise<string[]> {
+async function getMappedUsers(workspaceId: string, notifyPref: 'notifyHealthDrops' | 'notifyIssueLinks' | 'notifyStaleDeals'): Promise<string[]> {
   const mappings = await db
     .select({
       slackUserId: slackUserMappings.slackUserId,
       notifyHealthDrops: slackUserMappings.notifyHealthDrops,
       notifyIssueLinks: slackUserMappings.notifyIssueLinks,
+      notifyStaleDeals: slackUserMappings.notifyStaleDeals,
     })
     .from(slackUserMappings)
     .where(eq(slackUserMappings.workspaceId, workspaceId))
@@ -313,6 +314,139 @@ export async function notifyAllIssuesDeployed(
 // ─────────────────────────────────────────────────────────────────────────────
 // notifyNewIssueLink
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// notifyStaleDeals
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Send a DM to each opted-in user listing their stale deals (14+ days no activity).
+ * Called from the /api/cron/stale-nudge cron daily at 9 AM UTC.
+ * No-ops if Slack is not connected or no stale deals exist.
+ */
+export async function notifyStaleDeals(
+  workspaceId: string,
+  staleDeals: {
+    dealName: string
+    company: string
+    dealId: string
+    stage: string
+    daysSinceUpdate: number
+    score: number | null
+  }[],
+): Promise<void> {
+  if (staleDeals.length === 0) return
+  try {
+    const conn = await getConnection(workspaceId)
+    if (!conn) return
+
+    const users = await getMappedUsers(workspaceId, 'notifyStaleDeals')
+    if (users.length === 0) return
+
+    const blocks = staleDealDigestBlocks(staleDeals)
+    const fallbackText = `🕰️ ${staleDeals.length} stale deal${staleDeals.length !== 1 ? 's' : ''} need your attention`
+
+    for (const slackUserId of users) {
+      try {
+        const dmChannel = await slackOpenDm(conn.botToken, slackUserId)
+        if (dmChannel) await slackPostMessage(conn.botToken, dmChannel, blocks, fallbackText)
+      } catch (e) {
+        console.error(`[slack-notify] notifyStaleDeals DM failed for ${slackUserId}:`, e)
+      }
+    }
+  } catch (e) {
+    console.error('[slack-notify] notifyStaleDeals failed:', e)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// notifyWinLossDigest
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Post a win/loss intelligence digest to the connected Slack channel.
+ * Called from /api/cron/win-loss-digest every Monday at 8 AM UTC.
+ * Posts to the general channel (slackConnections.defaultChannel) if set,
+ * otherwise no-ops (no default channel means team hasn't opted into digests).
+ */
+export async function notifyWinLossDigest(
+  workspaceId: string,
+  intel: {
+    winCount: number
+    lossCount: number
+    winRate: number
+    topLossReasons: string[]
+    competitorRecord: { name: string; wins: number; losses: number; winRate: number }[]
+    weightedForecast?: number
+    forecastDealCount?: number
+  },
+): Promise<void> {
+  try {
+    const conn = await getConnection(workspaceId)
+    if (!conn) return
+
+    const users = await getMappedUsers(workspaceId, 'notifyHealthDrops')
+    if (users.length === 0) return
+
+    const blocks = winLossDigestBlocks(intel)
+    const fallbackText = `📈 Weekly win/loss: ${intel.winRate}% win rate — ${intel.winCount}W / ${intel.lossCount}L`
+
+    for (const slackUserId of users) {
+      try {
+        const dmChannel = await slackOpenDm(conn.botToken, slackUserId)
+        if (dmChannel) await slackPostMessage(conn.botToken, dmChannel, blocks, fallbackText)
+      } catch (e) {
+        console.error(`[slack-notify] notifyWinLossDigest DM failed for ${slackUserId}:`, e)
+      }
+    }
+  } catch (e) {
+    console.error('[slack-notify] notifyWinLossDigest failed:', e)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// notifyGapLinearSuggestion
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Send a DM suggesting a product gap ↔ Linear issue link.
+ * Called from /api/cron/gap-linear-link when keyword matching finds a high-confidence match.
+ * No-ops if Slack is not connected or no opted-in users.
+ */
+export async function notifyGapLinearSuggestion(
+  workspaceId: string,
+  info: {
+    gapTitle: string
+    gapId: string
+    linearIssueId: string
+    linearTitle: string
+    linearIssueUrl: string | null
+    revenueAtRisk: number
+    dealsBlocked: number
+  },
+): Promise<void> {
+  try {
+    const conn = await getConnection(workspaceId)
+    if (!conn) return
+
+    const users = await getMappedUsers(workspaceId, 'notifyIssueLinks')
+    if (users.length === 0) return
+
+    const blocks = gapLinearSuggestionBlocks(info)
+    const fallbackText = `🔎 Product gap "${info.gapTitle}" matches Linear ${info.linearIssueId}`
+
+    for (const slackUserId of users) {
+      try {
+        const dmChannel = await slackOpenDm(conn.botToken, slackUserId)
+        if (dmChannel) await slackPostMessage(conn.botToken, dmChannel, blocks, fallbackText)
+      } catch (e) {
+        console.error(`[slack-notify] notifyGapLinearSuggestion DM failed for ${slackUserId}:`, e)
+      }
+    }
+  } catch (e) {
+    console.error('[slack-notify] notifyGapLinearSuggestion failed:', e)
+  }
+}
 
 export async function notifyNewIssueLink(
   workspaceId: string,

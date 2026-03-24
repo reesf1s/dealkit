@@ -313,6 +313,115 @@ export function allIssuesDeployedBlocks(info: {
 }
 
 /**
+ * Stale deal digest — list of deals with no activity in 14+ days.
+ * Sent as a daily Slack DM nudge.
+ */
+export function staleDealDigestBlocks(deals: {
+  dealName: string
+  company: string
+  dealId: string
+  stage: string
+  daysSinceUpdate: number
+  score: number | null
+}[]): SlackBlock[] {
+  const lines = deals
+    .slice(0, 8)
+    .map(d => {
+      const scoreStr = d.score != null ? ` · score ${d.score}` : ''
+      return `• *<${APP_URL}/deals/${d.dealId}|${d.dealName}>* (${d.company}) — ${d.stage}${scoreStr} · *${d.daysSinceUpdate}d* silent`
+    })
+    .join('\n')
+
+  return [
+    sectionBlock(
+      `🕰️ *${deals.length} deal${deals.length !== 1 ? 's' : ''} with no activity in 14+ days*\n` +
+      `These deals may be drifting. A quick touch today could save them.\n\n${lines}`
+    ),
+    actionsBlock([
+      { text: '📊 View pipeline', url: `${APP_URL}/pipeline` },
+    ]),
+  ]
+}
+
+/**
+ * Win/loss weekly intelligence digest — win rate, loss reasons, competitor record.
+ * Posted to the connected Slack channel (not DM) every Monday.
+ */
+export function winLossDigestBlocks(intel: {
+  winCount: number
+  lossCount: number
+  winRate: number
+  topLossReasons: string[]
+  competitorRecord: { name: string; wins: number; losses: number; winRate: number }[]
+  weightedForecast?: number
+  forecastDealCount?: number
+}): SlackBlock[] {
+  const blocks: SlackBlock[] = []
+  const total = intel.winCount + intel.lossCount
+
+  blocks.push(headerBlock('📈 Weekly Win/Loss Intelligence'))
+  blocks.push(sectionBlock(
+    `*Win rate:* ${intel.winRate}% (${intel.winCount}W / ${intel.lossCount}L of ${total} closed)\n` +
+    (intel.weightedForecast != null
+      ? `*Weighted forecast:* $${Math.round(intel.weightedForecast / 1000)}k across ${intel.forecastDealCount ?? 0} active deals`
+      : '')
+  ))
+
+  if (intel.topLossReasons.length > 0) {
+    blocks.push(dividerBlock())
+    blocks.push(sectionBlock(
+      `*Top loss reasons:*\n` +
+      intel.topLossReasons.slice(0, 4).map((r, i) => `${i + 1}. ${r}`).join('\n')
+    ))
+  }
+
+  if (intel.competitorRecord.length > 0) {
+    blocks.push(dividerBlock())
+    const compLines = intel.competitorRecord
+      .slice(0, 5)
+      .map(c => `• *${c.name}* — ${c.winRate}% win rate (${c.wins}W/${c.losses}L)`)
+      .join('\n')
+    blocks.push(sectionBlock(`*Competitive record:*\n${compLines}`))
+  }
+
+  blocks.push(dividerBlock())
+  blocks.push(actionsBlock([
+    { text: '📊 Intelligence', url: `${APP_URL}/intelligence` },
+    { text: '📉 Feature gaps', url: `${APP_URL}/product-gaps` },
+  ]))
+
+  return blocks
+}
+
+/**
+ * Product gap → Linear issue suggestion.
+ * Sent as a Slack DM when a high-priority gap matches a Linear issue.
+ */
+export function gapLinearSuggestionBlocks(info: {
+  gapTitle: string
+  gapId: string
+  linearIssueId: string
+  linearTitle: string
+  linearIssueUrl: string | null
+  revenueAtRisk: number
+  dealsBlocked: number
+}): SlackBlock[] {
+  const arrStr = info.revenueAtRisk > 0 ? ` · $${Math.round(info.revenueAtRisk / 1000)}k ARR at risk` : ''
+  return [
+    sectionBlock(
+      `🔎 *Product gap matched a Linear issue*\n` +
+      `Gap: *${info.gapTitle}*${arrStr} · blocking ${info.dealsBlocked} deal${info.dealsBlocked !== 1 ? 's' : ''}\n` +
+      `Linear: *${info.linearIssueId}* — "${info.linearTitle}"\n` +
+      `Linking this issue to the gap helps track delivery → conversion.`
+    ),
+    actionsBlock([
+      ...(info.linearIssueUrl ? [{ text: '📋 View issue', url: info.linearIssueUrl }] : []),
+      { text: '📊 View gaps', url: `${APP_URL}/product-gaps` },
+    ]),
+  ]
+}
+
+/**
  * Simple error/fallback block.
  */
 export function errorBlocks(message: string): SlackBlock[] {
