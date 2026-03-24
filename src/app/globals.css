@@ -205,3 +205,86 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+/* === BACKWARD-COMPAT ALIASES ===
+   Many pages reference old dark-mode CSS vars. Map them to light values
+   so we don't have to touch 20+ component files. */
+:root {
+  /* Old glass-card-* vars → light glass */
+  --glass-card-bg: rgba(255, 255, 255, 0.72);
+  --glass-card-border: rgba(0, 0, 0, 0.08);
+  --glass-card-shadow: 0 2px 20px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04);
+  --glass-glow-accent: rgba(99, 102, 241, 0.08);
+  --glass-glow-green: rgba(16, 185, 129, 0.10);
+  --glass-glow-amber: rgba(245, 158, 11, 0.10);
+  --glass-glow-red: rgba(239, 68, 68, 0.10);
+
+  /* Surface levels */
+  --bg: var(--bg-base);
+  --surface: rgba(0, 0, 0, 0.03);
+  --elevated: rgba(255, 255, 255, 0.90);
+  --overlay: rgba(255, 255, 255, 0.97);
+
+  /* Accent compat */
+  --accent-subtle: rgba(99, 102, 241, 0.10);
+  --accent-muted: rgba(99, 102, 241, 0.08);
+  --accent-hover: #818cf8;
+
+  /* Semantic status */
+  --success: #10b981;
+  --success-muted: rgba(16, 185, 129, 0.10);
+  --warning: #f59e0b;
+  --warning-muted: rgba(245, 158, 11, 0.10);
+  --danger: #ef4444;
+  --danger-muted: rgba(239, 68, 68, 0.10);
+
+  /* Skeleton shimmer */
+  --skeleton-from: rgba(0, 0, 0, 0.06);
+  --skeleton-to: rgba(0, 0, 0, 0.03);
+
+  /* ds-* namespace compat */
+  --ds-bg-page: var(--bg-base);
+  --ds-bg-sidebar: var(--sidebar-bg);
+  --ds-bg-card: var(--glass-bg);
+  --ds-bg-hover: var(--glass-bg-hover);
+  --ds-bg-active: var(--accent-bg);
+  --ds-bg-input: rgba(255, 255, 255, 0.80);
+  --ds-bg-elevated: rgba(255, 255, 255, 0.95);
+  --ds-glass-bg: var(--glass-bg);
+  --ds-glass-border: var(--glass-border);
+  --ds-glass-blur: var(--glass-blur);
+  --ds-glass-hover: var(--glass-bg-hover);
+  --ds-border: var(--glass-border);
+  --ds-border-hover: var(--glass-border-strong);
+  --ds-text-1: var(--text-primary);
+  --ds-text-2: var(--text-secondary);
+  --ds-text-3: var(--text-tertiary);
+  --ds-text-4: rgba(0, 0, 0, 0.20);
+  --ds-accent: var(--accent);
+  --ds-accent-hover: var(--accent-light);
+  --ds-accent-soft: var(--accent-bg);
+  --ds-green: var(--health-green);
+  --ds-green-soft: var(--health-green-bg);
+  --ds-amber: var(--health-amber);
+  --ds-amber-soft: var(--health-amber-bg);
+  --ds-red: var(--health-red);
+  --ds-red-soft: var(--health-red-bg);
+  --ds-glow-accent: rgba(99, 102, 241, 0.08);
+  --ds-radius-sm: var(--radius-sm);
+  --ds-radius-md: var(--radius-md);
+  --ds-radius-lg: var(--radius-lg);
+  --ds-radius-xl: var(--radius-xl);
+}
+
+/* Skeleton shimmer animation */
+@keyframes skeleton-shimmer {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
+/* Spin animation */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

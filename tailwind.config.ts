@@ -15,50 +15,50 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // ── Backgrounds (Linear design system) ─────────────────────────
-        background: '#09090B',
-        surface: '#141416',
-        elevated: '#1C1C20',
-        overlay: '#1F1F23',
+        // ── Backgrounds (light glass design system) ─────────────────
+        background: '#f5f5f7',
+        surface: 'rgba(255,255,255,0.72)',
+        elevated: 'rgba(255,255,255,0.90)',
+        overlay: 'rgba(255,255,255,0.97)',
 
-        // ── Text (rgba white at opacity) ─────────────────────────────
-        'text-primary': 'rgba(255,255,255,0.93)',
-        'text-secondary': 'rgba(255,255,255,0.56)',
-        'text-tertiary': 'rgba(255,255,255,0.32)',
-        'text-disabled': 'rgba(255,255,255,0.16)',
+        // ── Text (dark on light) ─────────────────────────────────────
+        'text-primary': '#1d1d1f',
+        'text-secondary': '#6e6e73',
+        'text-tertiary': '#aeaeb2',
+        'text-disabled': 'rgba(0,0,0,0.25)',
 
-        // ── Accent ───────────────────────────────────────────────────
+        // ── Accent (indigo) ──────────────────────────────────────────
         accent: {
-          DEFAULT: '#5B5BD6',
-          hover: '#6E6EE0',
-          muted: 'rgba(91,91,214,0.14)',
-          subtle: 'rgba(91,91,214,0.08)',
+          DEFAULT: '#6366f1',
+          hover: '#818cf8',
+          muted: 'rgba(99,102,241,0.10)',
+          subtle: 'rgba(99,102,241,0.06)',
         },
 
         // ── Semantic ─────────────────────────────────────────────────
         success: {
-          DEFAULT: '#3CCB7F',
-          muted: 'rgba(60,203,127,0.14)',
+          DEFAULT: '#10b981',
+          muted: 'rgba(16,185,129,0.10)',
         },
         warning: {
-          DEFAULT: '#FFB224',
-          muted: 'rgba(255,178,36,0.14)',
+          DEFAULT: '#f59e0b',
+          muted: 'rgba(245,158,11,0.10)',
         },
         danger: {
-          DEFAULT: '#E5484D',
-          muted: 'rgba(229,72,77,0.14)',
+          DEFAULT: '#ef4444',
+          muted: 'rgba(239,68,68,0.10)',
         },
         info: {
           DEFAULT: '#3B82F6',
-          muted: 'rgba(59,130,246,0.15)',
+          muted: 'rgba(59,130,246,0.10)',
         },
 
         // ── Borders ──────────────────────────────────────────────────
         border: {
-          DEFAULT: 'rgba(255,255,255,0.08)',
-          subtle: 'rgba(255,255,255,0.04)',
-          strong: 'rgba(255,255,255,0.13)',
-          accent: 'rgba(91,91,214,0.4)',
+          DEFAULT: 'rgba(0,0,0,0.08)',
+          subtle: 'rgba(0,0,0,0.04)',
+          strong: 'rgba(0,0,0,0.14)',
+          accent: 'rgba(99,102,241,0.25)',
         },
       },
       fontFamily: {
@@ -125,14 +125,14 @@ const config: Config = {
         96: '384px',
       },
       boxShadow: {
-        sm: '0 1px 2px rgba(0,0,0,0.4)',
-        DEFAULT: '0 2px 8px rgba(0,0,0,0.5)',
-        md: '0 4px 16px rgba(0,0,0,0.6)',
-        lg: '0 8px 32px rgba(0,0,0,0.7)',
-        xl: '0 16px 48px rgba(0,0,0,0.8)',
-        accent: '0 0 0 2px rgba(91,91,214,0.5)',
-        'inset-border': 'inset 0 0 0 1px rgba(255,255,255,0.06)',
-        glow: '0 0 20px rgba(91,91,214,0.3)',
+        sm: '0 1px 4px rgba(0,0,0,0.06)',
+        DEFAULT: '0 2px 12px rgba(0,0,0,0.08)',
+        md: '0 4px 20px rgba(0,0,0,0.10)',
+        lg: '0 8px 40px rgba(0,0,0,0.12)',
+        xl: '0 16px 60px rgba(0,0,0,0.14)',
+        accent: '0 0 0 2px rgba(99,102,241,0.35)',
+        'inset-border': 'inset 0 0 0 1px rgba(0,0,0,0.08)',
+        glow: '0 0 20px rgba(99,102,241,0.20)',
       },
       animation: {
         'skeleton-pulse': 'skeleton-pulse 1.5s ease-in-out infinite',
