@@ -62,6 +62,8 @@ export default function DashboardPage() {
   const { data: dealsRes } = useSWR('/api/deals', fetcher, { revalidateOnFocus: false })
   const { data: slackRes } = useSWR('/api/integrations/slack/status', fetcher, { revalidateOnFocus: false, dedupingInterval: 120000 })
   const { data: hubspotRes } = useSWR('/api/integrations/hubspot/status', fetcher, { revalidateOnFocus: false, dedupingInterval: 120000 })
+  // Integration status MUST always be scoped to workspace_id. Never expose cross-workspace data.
+  const { data: linearRes } = useSWR('/api/integrations/linear/status', fetcher, { revalidateOnFocus: false, dedupingInterval: 120000 })
   const [regenerating, setRegenerating] = useState(false)
 
   const overview = overviewRes?.data
@@ -69,9 +71,11 @@ export default function DashboardPage() {
   const deals: any[] = dealsRes?.data ?? []
   const activeDeals = deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
 
-  // Connection status
-  const slackConnected = slackRes?.data?.connected === true
-  const hubspotConnected = hubspotRes?.data?.connected === true
+  // Connection status — each flag is null (loading/unknown) until the API responds.
+  // Integration status MUST always be scoped to workspace_id. Never expose cross-workspace data.
+  const slackConnected = slackRes ? slackRes?.data?.connected === true : null
+  const linearConnected = linearRes ? linearRes?.data?.connected === true : null
+  const hubspotConnected = hubspotRes ? hubspotRes?.data?.connected === true : null
 
   // Build alert contexts
   const alertDeals = (deals || []).map((d: any) => {
@@ -504,7 +508,7 @@ export default function DashboardPage() {
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {[
             { label: 'Slack', icon: <MessageSquare size={12} />, connected: slackConnected, href: '/company' },
-            { label: 'Linear', icon: <GitBranch size={12} />, connected: null, href: '/company' },
+            { label: 'Linear', icon: <GitBranch size={12} />, connected: linearConnected, href: '/company' },
             { label: 'HubSpot', icon: <Brain size={12} />, connected: hubspotConnected, href: '/company' },
           ].map(({ label, icon, connected, href }) => (
             <Link
