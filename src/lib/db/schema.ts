@@ -792,3 +792,23 @@ export type NewSlackConnectionRow = typeof slackConnections.$inferInsert
 
 export type SlackUserMappingRow = typeof slackUserMappings.$inferSelect
 export type NewSlackUserMappingRow = typeof slackUserMappings.$inferInsert
+
+// ─────────────────────────────────────────────────────────────────────────────
+// workflows  (automated tasks configured per workspace)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const workflows = pgTable('workflows', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  name:        text('name').notNull(),
+  triggerType: text('trigger_type').notNull(),
+  actionType:  text('action_type').notNull(),
+  config:      jsonb('config').notNull().default({}),
+  enabled:     boolean('enabled').notNull().default(true),
+  lastRunAt:   timestamp('last_run_at', { withTimezone: true }),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export type WorkflowRow = typeof workflows.$inferSelect
+export type NewWorkflowRow = typeof workflows.$inferInsert

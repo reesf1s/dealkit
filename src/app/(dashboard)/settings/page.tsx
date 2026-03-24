@@ -487,6 +487,42 @@ export default function SettingsPage() {
           )}
         </SectionCard>
 
+        {/* Company Brain */}
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(99,102,241,0.14) 0%, rgba(59,130,246,0.07) 50%, rgba(139,92,246,0.10) 100%)',
+          backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+          border: '1px solid rgba(99,102,241,0.28)', borderRadius: '12px', overflow: 'hidden',
+        }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.07)', background: 'rgba(99,102,241,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ width: '20px', height: '20px', borderRadius: '6px', background: 'rgba(99,102,241,0.20)', border: '1px solid rgba(99,102,241,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Zap size={11} color="#818cf8" />
+              </div>
+              <h2 style={{ fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.88)', margin: 0 }}>Company Brain</h2>
+            </div>
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', margin: '4px 0 0 28px' }}>
+              Your AI uses this to understand your business — products, competitors, deal context
+            </p>
+          </div>
+          <div style={{ padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.50)', margin: 0, lineHeight: 1.6, flex: 1 }}>
+              The more you tell Halvex about your company, the more personalised your AI briefings, deal intelligence, and playbooks become. Set up your company profile, products, and competitors here.
+            </p>
+            <a
+              href="/company"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                padding: '8px 18px', borderRadius: '9px', flexShrink: 0,
+                background: 'rgba(99,102,241,0.20)', border: '1px solid rgba(99,102,241,0.35)',
+                color: '#818cf8', fontSize: '12px', fontWeight: 600, textDecoration: 'none',
+                transition: 'all 0.12s',
+              }}
+            >
+              Set up <ExternalLink size={11} />
+            </a>
+          </div>
+        </div>
+
         {/* Team */}
         <SectionCard title="Team" description="Your workspace and join code for teammates">
           {loadingUser || loadingMembers ? <SkeletonCard lines={4} showHeader={false} /> : (

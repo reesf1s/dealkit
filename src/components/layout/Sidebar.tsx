@@ -10,19 +10,20 @@ import {
   Settings, LogOut, Search,
   ChevronLeft, ChevronRight,
   X, Brain, MessageSquare, GitBranch,
-  Plug,
+  Plug, Zap,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 import { identify } from '@/lib/analytics'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
-// Flat 4-item nav
+// 5-item nav (Settings lives at bottom, separated by divider)
 const NAV_ITEMS = [
-  { href: '/dashboard',   icon: LayoutDashboard, label: 'Today',         matchPaths: ['/dashboard'] },
-  { href: '/pipeline',    icon: GitBranch,       label: 'Deals',         matchPaths: ['/pipeline', '/deals'] },
-  { href: '/competitors', icon: Brain,           label: 'Intelligence',  matchPaths: ['/competitors', '/case-studies', '/product-gaps', '/models', '/collateral', '/playbook'] },
-  { href: '/company',     icon: Plug,            label: 'Connect',       matchPaths: ['/company', '/onboarding'] },
+  { href: '/dashboard',     icon: LayoutDashboard, label: 'Today',        matchPaths: ['/dashboard'] },
+  { href: '/deals',         icon: GitBranch,       label: 'Deals',        matchPaths: ['/deals', '/pipeline'] },
+  { href: '/intelligence',  icon: Brain,           label: 'Intelligence', matchPaths: ['/intelligence', '/competitors', '/case-studies', '/product-gaps', '/models', '/collateral', '/playbook'] },
+  { href: '/workflows',     icon: Zap,             label: 'Workflows',    matchPaths: ['/workflows'] },
+  { href: '/connections',   icon: Plug,            label: 'Connections',  matchPaths: ['/connections', '/company', '/onboarding'] },
 ]
 
 export default function Sidebar() {
@@ -169,10 +170,10 @@ export default function Sidebar() {
   const SidebarContent = (
     <aside style={{
       position: 'fixed', left: 0, top: 0, bottom: 0, width: w,
-      background: 'rgba(23,23,23,0.88)',
+      background: 'rgba(8,10,16,0.95)',
       backdropFilter: 'blur(24px) saturate(180%)',
       WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-      borderRight: '1px solid rgba(255,255,255,0.06)',
+      borderRight: '1px solid rgba(255,255,255,0.05)',
       display: 'flex', flexDirection: 'column', zIndex: 40,
       transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)',
       overflow: 'hidden',
@@ -345,9 +346,9 @@ export default function Sidebar() {
             key={item.href}
             {...item}
             badge={
-              item.href === '/pipeline' && urgentCount > 0
+              item.href === '/deals' && urgentCount > 0
                 ? { count: urgentCount, color: '#f87171' }
-                : item.href === '/company' && unmatchedEmailCount > 0
+                : item.href === '/connections' && unmatchedEmailCount > 0
                 ? { count: unmatchedEmailCount, color: '#fbbf24' }
                 : undefined
             }
@@ -472,10 +473,11 @@ export default function Sidebar() {
 
   // Mobile bottom tab bar items
   const MOBILE_TABS = [
-    { href: '/dashboard',   icon: LayoutDashboard, label: 'Today' },
-    { href: '/pipeline',    icon: GitBranch,        label: 'Deals' },
-    { href: '/competitors', icon: Brain,            label: 'Intel' },
-    { href: '/company',     icon: Plug,             label: 'Connect' },
+    { href: '/dashboard',    icon: LayoutDashboard, label: 'Today' },
+    { href: '/deals',        icon: GitBranch,        label: 'Deals' },
+    { href: '/intelligence', icon: Brain,            label: 'Intel' },
+    { href: '/workflows',    icon: Zap,              label: 'Flows' },
+    { href: '/connections',  icon: Plug,             label: 'Connect' },
   ]
 
   return (
@@ -507,7 +509,7 @@ export default function Sidebar() {
       <nav className="mobile-bottom-nav" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
         height: '56px',
-        background: 'rgba(23,23,23,0.92)',
+        background: 'rgba(8,10,16,0.96)',
         backdropFilter: 'blur(20px) saturate(180%)',
         WebkitBackdropFilter: 'blur(20px) saturate(180%)',
         borderTop: '1px solid rgba(255,255,255,0.06)',

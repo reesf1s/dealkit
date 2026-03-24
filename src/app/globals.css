@@ -4,27 +4,27 @@
 
 :root {
   /* ══════════════════════════════════════════════════
-     HALVEX — DARK DESIGN SYSTEM
-     Identity: frost-border glass on #171717
-     Surfaces: translucent white/opacity layers only.
-     No opaque fills beyond the base.
+     HALVEX — LUMINOUS GLASS DESIGN SYSTEM
+     Identity: coloured-gradient glass on deep navy-black
+     Surfaces: indigo/blue gradient through frosted glass.
+     The glass panels feel luminous — coloured light behind frost.
   ══════════════════════════════════════════════════ */
 
-  /* Base */
-  --bg-base: #171717;
-  --bg-surface: #1c1c1c;
+  /* Base — deep navy-black, not flat grey */
+  --bg-base: #0d0f1a;
+  --bg-surface: #111827;
 
-  /* Glass surfaces — white opacity layers */
-  --glass-bg: rgba(255, 255, 255, 0.03);
-  --glass-bg-hover: rgba(255, 255, 255, 0.05);
-  --glass-bg-strong: rgba(255, 255, 255, 0.08);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-border-strong: rgba(255, 255, 255, 0.14);
-  --glass-blur: blur(20px) saturate(180%);
+  /* Glass surfaces — luminous coloured gradient through frosted glass */
+  --glass-bg: rgba(99, 102, 241, 0.06);
+  --glass-bg-hover: rgba(99, 102, 241, 0.10);
+  --glass-bg-strong: rgba(99, 102, 241, 0.14);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-border-strong: rgba(255, 255, 255, 0.18);
+  --glass-blur: blur(24px) saturate(200%);
 
-  /* Sidebar */
-  --sidebar-bg: rgba(255, 255, 255, 0.025);
-  --sidebar-border: rgba(255, 255, 255, 0.06);
+  /* Sidebar — near-black navy */
+  --sidebar-bg: rgba(8, 10, 16, 0.95);
+  --sidebar-border: rgba(255, 255, 255, 0.05);
   --sidebar-width: 220px;
 
   /* Frost border system — the core design identity.
@@ -124,9 +124,9 @@ html, body {
   min-height: 100%;
   background-color: var(--bg-base);
   background-image:
-    radial-gradient(ellipse at 15% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 55%),
-    radial-gradient(ellipse at 85% 85%, rgba(139, 92, 246, 0.06) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.02) 0%, transparent 40%);
+    radial-gradient(ellipse at 10% 10%, rgba(99, 102, 241, 0.14) 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 80%, rgba(139, 92, 246, 0.10) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.06) 0%, transparent 60%);
   background-attachment: fixed;
   color: var(--text-primary);
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Text', 'Segoe UI', sans-serif;
@@ -173,20 +173,21 @@ html, body {
   opacity: var(--frost-opacity-hover, 0.30);
 }
 
-/* Glass card — frost border + dark translucent surface */
+/* Glass card — luminous coloured gradient behind frosted glass */
 .glass {
-  background: var(--glass-bg);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(59, 130, 246, 0.04) 50%, transparent 100%);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow-card);
 }
 
 .glass-card {
-  background: var(--glass-bg);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(59, 130, 246, 0.04) 50%, rgba(139, 92, 246, 0.06) 100%);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
+  border: 1px solid rgba(255, 255, 255, 0.10);
 }
 
 .glass-card-hover {
@@ -194,7 +195,7 @@ html, body {
 }
 
 .glass-card-hover:hover {
-  background: var(--glass-bg-hover);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(59, 130, 246, 0.07) 50%, rgba(139, 92, 246, 0.09) 100%);
   box-shadow: var(--shadow-card-hover);
   transform: translateY(-1px);
 }
@@ -260,9 +261,9 @@ a {
    every single file.
 ══════════════════════════════════════════════════ */
 :root {
-  /* Old glass-card-* vars → dark glass */
-  --glass-card-bg: rgba(255, 255, 255, 0.03);
-  --glass-card-border: rgba(255, 255, 255, 0.08);
+  /* Old glass-card-* vars → luminous glass */
+  --glass-card-bg: rgba(99, 102, 241, 0.08);
+  --glass-card-border: rgba(255, 255, 255, 0.10);
   --glass-card-shadow: 0 2px 20px rgba(0, 0, 0, 0.40), 0 1px 4px rgba(0, 0, 0, 0.20);
   --glass-glow-accent: rgba(99, 102, 241, 0.12);
   --glass-glow-green: rgba(52, 211, 153, 0.12);
@@ -271,9 +272,9 @@ a {
 
   /* Surface levels */
   --bg: var(--bg-base);
-  --surface: rgba(255, 255, 255, 0.03);
-  --elevated: rgba(255, 255, 255, 0.06);
-  --overlay: rgba(255, 255, 255, 0.09);
+  --surface: rgba(99, 102, 241, 0.06);
+  --elevated: rgba(99, 102, 241, 0.10);
+  --overlay: rgba(99, 102, 241, 0.14);
 
   /* Accent compat */
   --accent-subtle: rgba(99, 102, 241, 0.12);

@@ -426,6 +426,24 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
     `,
   },
   {
+    version: 29,
+    name: 'create_workflows_table',
+    sql: `
+      CREATE TABLE IF NOT EXISTS workflows (
+        id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        workspace_id    UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        name            TEXT NOT NULL,
+        trigger_type    TEXT NOT NULL,
+        action_type     TEXT NOT NULL,
+        config          JSONB NOT NULL DEFAULT '{}',
+        enabled         BOOLEAN NOT NULL DEFAULT TRUE,
+        last_run_at     TIMESTAMP WITH TIME ZONE,
+        created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        updated_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+      )
+    `,
+  },
+  {
     version: 28,
     name: 'ensure_embeddings_1536',
     sql: `
