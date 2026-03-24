@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from '@sentry/nextjs'
 
 // Derive Supabase hostname from env so connect-src covers the project URL.
 // Falls back to a wildcard supabase.co pattern when the var is absent (e.g. CI).
@@ -53,4 +54,13 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default nextConfig;
+// Wrap with Sentry only when SENTRY_DSN is present; otherwise export plain config.
+// This means omitting the env var is safe and won't break builds.
+export default process.env.SENTRY_DSN
+  ? withSentryConfig(nextConfig, {
+      silent: true,          // suppress build output noise
+      disableLogger: true,
+      tunnelRoute: '/monitoring', // avoids ad-blocker interference
+      sourcemaps: { disable: true },
+    })
+  : nextConfig
