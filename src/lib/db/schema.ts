@@ -85,6 +85,7 @@ export const workspaces = pgTable('workspaces', {
   pipelineConfig: jsonb('pipeline_config'),                    // PipelineConfig JSON — custom stages, labels, industry preset
   embeddingCache: jsonb('embedding_cache'),                    // Semantic embedding vectors for deals, competitors, collateral
   inboundEmailToken: text('inbound_email_token'),              // 8-char hex token for email forwarding ingest
+  mcpApiKey: text('mcp_api_key').unique(),                     // Bearer token for external MCP server access
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
