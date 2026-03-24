@@ -5,7 +5,7 @@
  * calls matchDealToIssues() which scores all cached Linear issues against
  * the deal's signals and upserts deal_linear_links rows.
  *
- * Returns the refreshed list of links for the deal.
+ * Returns the refreshed list of links for the deal plus match counts.
  */
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -37,10 +37,9 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    // Run discovery
-    await matchDealToIssues(workspaceId, id)
+    // Run discovery and return match counts + refreshed links
+    const result = await matchDealToIssues(workspaceId, id, 'user')
 
-    // Return refreshed links
     const links = await db
       .select()
       .from(dealLinearLinks)
@@ -51,7 +50,14 @@ export async function POST(_req: NextRequest, { params }: Params) {
         ),
       )
 
-    return NextResponse.json({ data: links })
+    return NextResponse.json({
+      data: {
+        linked: result.linked,
+        suggested: result.suggested,
+        total: result.linked + result.suggested,
+        links,
+      },
+    })
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: msg }, { status: 500 })

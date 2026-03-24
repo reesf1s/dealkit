@@ -4,20 +4,23 @@
  * ProductIssuesPanel
  *
  * Shows Linear issues linked to a deal — confirmed (●) and suggested (○).
- * Reps can confirm or dismiss suggestions.
+ * Reps can confirm or dismiss suggestions, and trigger discovery to find
+ * matching issues from the Linear backlog.
+ *
  * Non-breaking: renders nothing if Linear isn't connected for the workspace.
  *
  * ┌─────────────────────────────────────────────────────┐
- * │ Product Issues                            [+ Link]  │
+ * │ Product Issues                [Discover] [+ Link]   │
  * ├─────────────────────────────────────────────────────┤
- * │ ● #36  Bulk CSV Export          High  · In Cycle ↗  │
- * │ ○ #279 API Rate Limit Increase  Med   · Backlog      │
+ * │ [ENG-36] Bulk CSV Export          · In Cycle  ↗    │
+ * │ [ENG-279] API Rate Limit Increase · Backlog         │
+ * │   → addresses "export performance"                  │
  * └─────────────────────────────────────────────────────┘
  */
 
 import { useState, useCallback } from 'react'
 import useSWR from 'swr'
-import { ExternalLink, Plus, Check, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
+import { ExternalLink, Plus, Check, X, Loader2, ChevronDown, ChevronUp, Search } from 'lucide-react'
 import { useToast } from '@/components/shared/Toast'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -52,13 +55,18 @@ const fetcher = (url: string) =>
   })
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Priority label helpers
+// Status badge helper
 // ─────────────────────────────────────────────────────────────────────────────
 
-function scoreLabel(score: number): { label: string; color: string } {
-  if (score >= 90) return { label: 'High', color: 'var(--red, #EF4444)' }
-  if (score >= 70) return { label: 'Med', color: 'var(--yellow, #F59E0B)' }
-  return { label: 'Low', color: 'var(--text-tertiary, #888)' }
+function statusBadge(status: DealLinearLink['status'], cycleId: string | null): {
+  label: string
+  bg: string
+  color: string
+} {
+  if (status === 'deployed') return { label: 'Deployed', bg: 'rgba(16,185,129,0.12)', color: '#10B981' }
+  if (status === 'in_cycle') return { label: 'In Cycle', bg: 'rgba(34,197,94,0.12)', color: '#16A34A' }
+  if (status === 'confirmed') return { label: 'Confirmed', bg: 'rgba(99,102,241,0.12)', color: '#6366F1' }
+  return { label: 'Suggested', bg: 'rgba(100,116,139,0.10)', color: '#64748B' }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,7 +81,7 @@ export function ProductIssuesPanel({ dealId }: Props) {
   const { toast } = useToast()
   const [linkInput, setLinkInput] = useState('')
   const [showLinkInput, setShowLinkInput] = useState(false)
-  const [actionLoading, setActionLoading] = useState<string | null>(null) // linkId being acted on
+  const [actionLoading, setActionLoading] = useState<string | null>(null) // linkId or 'new' or 'discover'
   const [expandedStory, setExpandedStory] = useState<string | null>(null) // linkId with expanded user story
 
   // Check if Linear is connected for this workspace
@@ -145,6 +153,26 @@ export function ProductIssuesPanel({ dealId }: Props) {
     }
   }, [dealId, linkInput, mutateLinks, toast])
 
+  const handleDiscover = useCallback(async () => {
+    setActionLoading('discover')
+    try {
+      const res = await fetch(`/api/deals/${dealId}/discover-issues`, { method: 'POST' })
+      if (!res.ok) throw new Error('Discovery failed')
+      const json = await res.json()
+      await mutateLinks()
+      const total = json?.data?.total ?? 0
+      if (total > 0) {
+        toast(`Found ${total} matching issue${total !== 1 ? 's' : ''}`, 'success')
+      } else {
+        toast('No new matches found — try syncing from Linear Settings', 'info')
+      }
+    } catch {
+      toast('Could not run discovery', 'error')
+    } finally {
+      setActionLoading(null)
+    }
+  }, [dealId, mutateLinks, toast])
+
   // Don't render if Linear isn't connected
   if (!statusData?.data?.connected) return null
 
@@ -153,10 +181,7 @@ export function ProductIssuesPanel({ dealId }: Props) {
   const confirmed = visibleLinks.filter(l => l.status === 'confirmed' || l.status === 'in_cycle' || l.status === 'deployed')
   const suggested = visibleLinks.filter(l => l.status === 'suggested')
 
-  if (visibleLinks.length === 0 && !showLinkInput) {
-    // Show empty state only if we've loaded
-    if (!linksData) return null
-  }
+  if (visibleLinks.length === 0 && !showLinkInput && !linksData) return null
 
   return (
     <div style={{
@@ -175,21 +200,52 @@ export function ProductIssuesPanel({ dealId }: Props) {
         borderBottom: visibleLinks.length > 0 || showLinkInput ? '1px solid var(--border)' : undefined,
         background: 'var(--surface)',
       }}>
-        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
-          Product Issues
-        </span>
-        <span className="ml-2 text-xs bg-purple-50 text-purple-600 border border-purple-200 rounded-full px-2 py-0.5 font-medium">MCP</span>
-        <button
-          onClick={() => setShowLinkInput(v => !v)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '4px',
-            fontSize: '11px', color: 'var(--accent)', background: 'none',
-            border: 'none', cursor: 'pointer', padding: '2px 4px',
-          }}
-        >
-          <Plus size={12} />
-          Link
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+            Product Issues
+          </span>
+          <span style={{
+            fontSize: '9px', fontWeight: 700, padding: '1px 5px',
+            borderRadius: '10px', background: 'rgba(139,92,246,0.12)',
+            color: '#8B5CF6', letterSpacing: '0.04em',
+          }}>
+            MCP
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Discover Issues button */}
+          <button
+            onClick={handleDiscover}
+            disabled={actionLoading === 'discover'}
+            title="Discover matching Linear issues from your backlog"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '3px',
+              fontSize: '11px', color: 'var(--accent)', background: 'none',
+              border: '1px solid var(--accent)', borderRadius: '4px',
+              cursor: actionLoading === 'discover' ? 'not-allowed' : 'pointer',
+              padding: '2px 7px', opacity: actionLoading === 'discover' ? 0.6 : 1,
+            }}
+          >
+            {actionLoading === 'discover'
+              ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} />
+              : <Search size={10} />
+            }
+            Discover
+          </button>
+          {/* Manual link button */}
+          <button
+            onClick={() => setShowLinkInput(v => !v)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '4px',
+              fontSize: '11px', color: 'var(--text-tertiary)', background: 'none',
+              border: 'none', cursor: 'pointer', padding: '2px 4px',
+            }}
+            title="Manually link an issue by ID"
+          >
+            <Plus size={12} />
+            Link
+          </button>
+        </div>
       </div>
 
       {/* Manual link input */}
@@ -222,175 +278,167 @@ export function ProductIssuesPanel({ dealId }: Props) {
       )}
 
       {/* Issue rows */}
-      {visibleLinks.length === 0 && !showLinkInput ? (
-        <div style={{ padding: '10px 14px', fontSize: '11px', color: 'var(--text-tertiary)' }}>
-          No linked issues yet
+      {visibleLinks.length === 0 ? (
+        <div style={{ padding: '12px 14px', fontSize: '11px', color: 'var(--text-tertiary)' }}>
+          No linked issues yet. Click <strong>Discover</strong> to find matching issues from your backlog.
         </div>
       ) : (
         <>
           {[...confirmed, ...suggested].map(link => {
-            const isConfirmed = link.status !== 'suggested'
-            const isInCycle = link.status === 'in_cycle'
-            const isDeployed = link.status === 'deployed'
-            const { label, color } = scoreLabel(link.relevanceScore)
             const isLoading = actionLoading === link.id
             const isExpanded = expandedStory === link.id
             const hasUserStory = Boolean(link.scopedUserStory)
+            const badge = statusBadge(link.status, link.cycleId)
+            const issueUrl = link.linearIssueUrl
 
             return (
               <div key={link.id} style={{ borderBottom: '1px solid var(--border)' }}>
                 <div
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '8px',
-                    padding: '8px 14px',
+                    display: 'flex', alignItems: 'flex-start', gap: '8px',
+                    padding: '9px 14px',
                     opacity: isLoading ? 0.6 : 1,
+                    cursor: issueUrl ? 'pointer' : 'default',
                   }}
+                  onClick={() => { if (issueUrl) window.open(issueUrl, '_blank', 'noopener,noreferrer') }}
                 >
-                  {/* Confirmed/Suggested indicator */}
+                  {/* Identifier badge (indigo) */}
                   <span style={{
-                    fontSize: '14px',
-                    color: isDeployed ? '#10B981' : isInCycle ? 'var(--accent)' : isConfirmed ? 'var(--accent)' : 'var(--text-tertiary)',
-                    flexShrink: 0,
-                    lineHeight: 1,
+                    fontSize: '10px', fontWeight: 700,
+                    padding: '2px 6px', borderRadius: '4px',
+                    background: 'rgba(99,102,241,0.12)', color: '#6366F1',
+                    flexShrink: 0, lineHeight: 1.5, letterSpacing: '0.02em',
+                    cursor: issueUrl ? 'pointer' : 'default',
+                    marginTop: '1px',
                   }}>
-                    {isDeployed ? '🚀' : isInCycle ? '🔄' : isConfirmed ? '●' : '○'}
+                    {link.linearIssueId}
                   </span>
 
-                  {/* Issue ID + title */}
+                  {/* Title + badges column */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', flexShrink: 0 }}>
-                        #{link.linearIssueId}
-                      </span>
+                    <div style={{
+                      fontSize: '12px', color: 'var(--text-primary)',
+                      lineHeight: 1.4, fontWeight: 500,
+                      overflow: 'hidden',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical' as const,
+                    }}>
+                      {link.linearTitle ?? link.linearIssueId}
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px', flexWrap: 'wrap' }}>
+                      {/* Status badge */}
                       <span style={{
-                        fontSize: '12px', color: 'var(--text-primary)',
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        fontSize: '9px', fontWeight: 600, padding: '1px 5px',
+                        borderRadius: '10px', background: badge.bg, color: badge.color,
+                        letterSpacing: '0.03em',
                       }}>
-                        {link.linearTitle ?? link.linearIssueId}
+                        {badge.label}
                       </span>
-                      {/* In-cycle badge */}
-                      {isInCycle && (
+
+                      {/* Release email sent */}
+                      {link.status === 'deployed' && link.hasReleaseEmail && (
                         <span style={{
-                          fontSize: '9px', fontWeight: 600,
-                          padding: '1px 5px', borderRadius: '10px',
-                          background: 'color-mix(in srgb, var(--accent) 15%, transparent)',
-                          color: 'var(--accent)',
-                          flexShrink: 0,
-                          letterSpacing: '0.02em',
+                          fontSize: '9px', fontWeight: 600, padding: '1px 5px',
+                          borderRadius: '10px', background: 'rgba(99,102,241,0.12)', color: '#818CF8',
+                          letterSpacing: '0.03em',
                         }}>
-                          IN CYCLE
+                          Email sent
                         </span>
                       )}
-                      {/* Deployed badge */}
-                      {isDeployed && (
-                        <span style={{
-                          fontSize: '9px', fontWeight: 600,
-                          padding: '1px 5px', borderRadius: '10px',
-                          background: 'color-mix(in srgb, #10B981 15%, transparent)',
-                          color: '#10B981',
-                          flexShrink: 0,
-                          letterSpacing: '0.02em',
-                        }}>
-                          DEPLOYED
-                        </span>
-                      )}
-                      {/* Release email sent badge */}
-                      {isDeployed && link.hasReleaseEmail && (
-                        <span style={{
-                          fontSize: '9px', fontWeight: 600,
-                          padding: '1px 5px', borderRadius: '10px',
-                          background: 'color-mix(in srgb, #6366F1 15%, transparent)',
-                          color: '#818CF8',
-                          flexShrink: 0,
-                          letterSpacing: '0.02em',
-                        }}>
-                          EMAIL SENT
-                        </span>
-                      )}
-                      {isInCycle && link.assigneeName && (
-                        <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', flexShrink: 0 }}>
+
+                      {/* Assignee */}
+                      {link.assigneeName && (
+                        <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>
                           → {link.assigneeName}
                         </span>
                       )}
                     </div>
+
+                    {/* Addresses risk — amber tag always visible when set */}
+                    {link.addressesRisk && (
+                      <div style={{
+                        marginTop: '4px', fontSize: '10px',
+                        color: '#92400E', background: 'rgba(251,191,36,0.12)',
+                        borderRadius: '4px', padding: '2px 6px',
+                        display: 'inline-flex', alignItems: 'center', gap: '3px',
+                        lineHeight: 1.4, maxWidth: '100%',
+                      }}>
+                        → addresses &ldquo;{link.addressesRisk.slice(0, 80)}{link.addressesRisk.length > 80 ? '…' : ''}&rdquo;
+                      </div>
+                    )}
                   </div>
 
-                  {/* Score label */}
-                  <span style={{ fontSize: '10px', color, flexShrink: 0 }}>{label}</span>
-
-                  {/* User story expand toggle */}
-                  {hasUserStory && (
-                    <button
-                      onClick={() => setExpandedStory(isExpanded ? null : link.id)}
-                      title={isExpanded ? 'Hide user story' : 'Show user story'}
-                      style={{
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        color: 'var(--text-tertiary)', flexShrink: 0, padding: '2px',
-                      }}
-                    >
-                      {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-                    </button>
-                  )}
-
-                  {/* External link */}
-                  {link.linearIssueUrl && (
-                    <a
-                      href={link.linearIssueUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}
-                    >
-                      <ExternalLink size={11} />
-                    </a>
-                  )}
-
-                  {/* Confirm/dismiss buttons for suggested links */}
-                  {link.status === 'suggested' && (
-                    <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                  {/* Right-side controls */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                    {/* User story expand toggle */}
+                    {hasUserStory && (
                       <button
-                        onClick={() => handleConfirm(link)}
-                        disabled={isLoading}
-                        title="Confirm link"
+                        onClick={() => setExpandedStory(isExpanded ? null : link.id)}
+                        title={isExpanded ? 'Hide user story' : 'Show user story'}
                         style={{
-                          background: 'none', border: '1px solid var(--border)',
-                          borderRadius: '3px', padding: '2px 4px',
-                          cursor: 'pointer', color: 'var(--accent)',
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: 'var(--text-tertiary)', padding: '2px',
                         }}
                       >
-                        <Check size={10} />
+                        {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
                       </button>
-                      <button
-                        onClick={() => handleDismiss(link)}
-                        disabled={isLoading}
-                        title="Dismiss suggestion"
-                        style={{
-                          background: 'none', border: '1px solid var(--border)',
-                          borderRadius: '3px', padding: '2px 4px',
-                          cursor: 'pointer', color: 'var(--text-tertiary)',
-                        }}
+                    )}
+
+                    {/* External link */}
+                    {issueUrl && (
+                      <a
+                        href={issueUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}
+                        title="Open in Linear"
                       >
-                        <X size={10} />
-                      </button>
-                    </div>
-                  )}
+                        <ExternalLink size={11} />
+                      </a>
+                    )}
+
+                    {/* Confirm/dismiss buttons for suggested links */}
+                    {link.status === 'suggested' && (
+                      <div style={{ display: 'flex', gap: '3px' }}>
+                        <button
+                          onClick={() => handleConfirm(link)}
+                          disabled={isLoading}
+                          title="Confirm link"
+                          style={{
+                            background: 'none', border: '1px solid var(--border)',
+                            borderRadius: '3px', padding: '2px 4px',
+                            cursor: 'pointer', color: 'var(--accent)',
+                          }}
+                        >
+                          <Check size={10} />
+                        </button>
+                        <button
+                          onClick={() => handleDismiss(link)}
+                          disabled={isLoading}
+                          title="Dismiss suggestion"
+                          style={{
+                            background: 'none', border: '1px solid var(--border)',
+                            borderRadius: '3px', padding: '2px 4px',
+                            cursor: 'pointer', color: 'var(--text-tertiary)',
+                          }}
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* User story + objection expand panel */}
+                {/* User story expand panel */}
                 {isExpanded && link.scopedUserStory && (
                   <div style={{
-                    padding: '8px 14px 10px 36px',
+                    padding: '8px 14px 10px 14px',
                     background: 'color-mix(in srgb, var(--accent) 4%, transparent)',
                     borderTop: '1px solid var(--border)',
                   }}>
-                    {link.addressesRisk && (
-                      <div style={{
-                        fontSize: '10px', color: 'var(--text-tertiary)',
-                        marginBottom: '4px', lineHeight: 1.4,
-                        fontStyle: 'italic',
-                      }}>
-                        → addresses &ldquo;{link.addressesRisk}&rdquo;
-                      </div>
-                    )}
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                       {link.scopedUserStory}
                     </div>

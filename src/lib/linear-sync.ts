@@ -8,6 +8,7 @@
  *  - POST /api/webhooks/linear (on issue create/update)
  */
 
+import { after } from 'next/server'
 import { db } from '@/lib/db'
 import { eq, sql } from 'drizzle-orm'
 import { linearIntegrations, linearIssuesCache } from '@/lib/db/schema'
@@ -15,6 +16,7 @@ import { decrypt, getEncryptionKey } from '@/lib/encrypt'
 import { fetchTeamIssues, type LinearIssue } from '@/lib/linear-client'
 import { embedLinearIssues } from '@/lib/semantic-search'
 import { embedNullLinearIssues } from '@/lib/deal-embeddings'
+import { matchAllOpenDeals } from '@/lib/linear-signal-match'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -155,6 +157,18 @@ export async function syncLinearIssues(workspaceId: string): Promise<SyncResult>
   console.log(
     `[linear-sync] workspace=${workspaceId.slice(0, 8)} synced=${synced} pages=${pagesFetched} embedded=${embedded} incremental=${!!since}`,
   )
+
+  // After every sync, re-run signal matching for all open deals in the background.
+  // This ensures all deals (not just the one in the current Slack conversation) get
+  // their links updated when new issues are pulled from Linear.
+  after(async () => {
+    try {
+      await matchAllOpenDeals(workspaceId, 'cron')
+    } catch (err) {
+      console.error('[linear-sync] matchAllOpenDeals failed:', err)
+    }
+  })
+
   return { synced, embedded, pagesFetched }
 }
 

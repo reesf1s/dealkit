@@ -84,6 +84,8 @@ async function logActionDeduped(values: {
 /**
  * Extract deal signal text for embedding.
  * Concatenates risk-oriented fields that represent objections/gaps.
+ * Includes successCriteria — this is critical because many deals capture
+ * product requirements in the success criteria field, not just in notes.
  */
 export function extractDealSignalText(deal: {
   notes: string | null
@@ -91,6 +93,7 @@ export function extractDealSignalText(deal: {
   dealRisks: unknown
   lostReason: string | null
   description: string | null
+  successCriteria?: string | null
 }): string {
   const risks = Array.isArray(deal.dealRisks)
     ? (deal.dealRisks as string[]).join(' ')
@@ -98,6 +101,7 @@ export function extractDealSignalText(deal: {
 
   return [
     risks,
+    deal.successCriteria ?? '',
     deal.notes ?? '',
     deal.meetingNotes ?? '',
     deal.lostReason ?? '',
@@ -128,7 +132,18 @@ export async function matchDealToIssues(
   triggeredBy: 'cron' | 'user' | 'webhook' = 'cron',
 ): Promise<MatchResult> {
   const [deal] = await db
-    .select()
+    .select({
+      id: dealLogs.id,
+      dealName: dealLogs.dealName,
+      prospectCompany: dealLogs.prospectCompany,
+      notes: dealLogs.notes,
+      meetingNotes: dealLogs.meetingNotes,
+      dealRisks: dealLogs.dealRisks,
+      lostReason: dealLogs.lostReason,
+      description: dealLogs.description,
+      successCriteria: dealLogs.successCriteria,
+      stage: dealLogs.stage,
+    })
     .from(dealLogs)
     .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId)))
     .limit(1)

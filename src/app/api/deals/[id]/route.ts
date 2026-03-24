@@ -80,7 +80,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const [updated] = await db.update(dealLogs).set(updateData).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).returning()
     await logEvent(workspaceId, userId, 'deal_log.updated', { dealLogId: id, dealName: updated.dealName })
     // Check if note-related fields changed — if so, re-run signal matching
-    const noteFieldsChanged = ['notes', 'meetingNotes', 'dealRisks'].some(f => f in body)
+    // successCriteria is included because deals often capture product requirements there
+    const noteFieldsChanged = ['notes', 'meetingNotes', 'dealRisks', 'successCriteria'].some(f => f in body)
     after(async () => {
       console.log(`[brain] Rebuild triggered by: deal_updated (deal: ${updated.dealName}) at ${new Date().toISOString()}`)
       await requestBrainRebuild(workspaceId, 'deal_updated')
