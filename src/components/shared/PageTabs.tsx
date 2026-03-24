@@ -25,8 +25,8 @@ export function PageTabs({ tabs }: { tabs: PageTab[] }) {
       gap: '2px',
       marginBottom: '24px',
       padding: '3px',
-      background: 'rgba(0,0,0,0.04)',
-      border: '1px solid rgba(0,0,0,0.07)',
+      background: 'rgba(255,255,255,0.04)',
+      border: '1px solid rgba(255,255,255,0.08)',
       borderRadius: '10px',
       width: 'fit-content',
       backdropFilter: 'blur(12px)',
@@ -47,22 +47,22 @@ export function PageTabs({ tabs }: { tabs: PageTab[] }) {
               borderRadius: '7px',
               fontSize: '12px',
               fontWeight: active ? '600' : '500',
-              color: active ? '#6366f1' : '#6e6e73',
-              background: active ? 'rgba(99,102,241,0.10)' : 'transparent',
+              color: active ? '#818cf8' : 'rgba(255,255,255,0.45)',
+              background: active ? 'rgba(99,102,241,0.14)' : 'transparent',
               textDecoration: 'none',
-              border: active ? '1px solid rgba(99,102,241,0.18)' : '1px solid transparent',
+              border: active ? '1px solid rgba(99,102,241,0.22)' : '1px solid transparent',
               transition: 'all 0.12s ease',
               whiteSpace: 'nowrap',
             }}
             onMouseEnter={e => {
               if (!active) {
-                (e.currentTarget as HTMLElement).style.color = '#1d1d1f'
-                ;(e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)'
+                (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.80)'
+                ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
               }
             }}
             onMouseLeave={e => {
               if (!active) {
-                (e.currentTarget as HTMLElement).style.color = '#6e6e73'
+                (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.45)'
                 ;(e.currentTarget as HTMLElement).style.background = 'transparent'
               }
             }}

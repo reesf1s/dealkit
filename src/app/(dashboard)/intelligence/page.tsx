@@ -1,9 +1,10 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
+import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
-import { Brain, TrendingUp, TrendingDown, Layers, BarChart2, ArrowUpRight, ChevronRight } from 'lucide-react'
+import { Brain, TrendingUp, TrendingDown, Layers, BarChart2, ArrowUpRight, ChevronRight, BookOpen, Save } from 'lucide-react'
 import { PageTabs } from '@/components/shared/PageTabs'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
@@ -21,6 +22,30 @@ const card: React.CSSProperties = {
 export default function IntelligencePage() {
   const { data: brainRes, isLoading } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
   const brain = brainRes?.data
+  const { data: kbRes, mutate: mutateKb } = useSWR('/api/workspace/knowledge-base', fetcher, { revalidateOnFocus: false })
+  const [kbText, setKbText] = useState('')
+  const [kbSaving, setKbSaving] = useState(false)
+  const [kbSaved, setKbSaved] = useState(false)
+
+  useEffect(() => {
+    if (kbRes?.data?.text != null && kbText === '') {
+      setKbText(kbRes.data.text)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kbRes])
+
+  async function saveKb() {
+    setKbSaving(true)
+    try {
+      await fetch('/api/workspace/knowledge-base', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: kbText }),
+      })
+      await mutateKb()
+      setKbSaved(true)
+      setTimeout(() => setKbSaved(false), 2000)
+    } finally { setKbSaving(false) }
+  }
 
   // Win signals — top 3 positive
   const winSignals: any[] = (brain?.winPatterns ?? brain?.objectionWinMap ?? []).slice(0, 3)
@@ -46,7 +71,7 @@ export default function IntelligencePage() {
   }
 
   return (
-    <div style={{ maxWidth: '900px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ maxWidth: '960px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
       {/* Tabs */}
       <PageTabs tabs={INTELLIGENCE_TABS} />
@@ -254,6 +279,58 @@ export default function IntelligencePage() {
         </div>
 
       </div>
+
+      {/* KNOWLEDGE BASE */}
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <BookOpen size={16} style={{ color: '#818cf8' }} />
+            <span style={{ fontSize: '14px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.01em' }}>
+              Company Knowledge Base
+            </span>
+          </div>
+          <button
+            onClick={saveKb}
+            disabled={kbSaving}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '5px',
+              padding: '5px 14px', borderRadius: '7px', fontSize: '12px', fontWeight: 600,
+              background: kbSaved ? 'rgba(52,211,153,0.12)' : 'rgba(99,102,241,0.12)',
+              border: `1px solid ${kbSaved ? 'rgba(52,211,153,0.25)' : 'rgba(99,102,241,0.25)'}`,
+              color: kbSaved ? '#34d399' : '#818cf8',
+              cursor: kbSaving ? 'not-allowed' : 'pointer',
+              opacity: kbSaving ? 0.6 : 1,
+              transition: 'all 0.15s',
+            }}
+          >
+            <Save size={11} />
+            {kbSaved ? 'Saved!' : kbSaving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+        <p style={{ fontSize: '12px', color: '#475569', margin: '0 0 12px', lineHeight: 1.6 }}>
+          Describe your company, product, ICP, and competitive positioning. This context is fed into every AI operation in your workspace.
+        </p>
+        <textarea
+          value={kbText}
+          onChange={e => setKbText(e.target.value)}
+          placeholder="e.g. We are Halvex, a B2B sales intelligence platform targeting mid-market SaaS companies. Our ICP is a VP of Sales at a 50-500 person company. We compete against Gong, Clari, and HubSpot Insights. Our key differentiators are..."
+          rows={8}
+          style={{
+            width: '100%', boxSizing: 'border-box', resize: 'vertical',
+            background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: '10px', padding: '12px 14px',
+            fontSize: '13px', lineHeight: 1.7, color: 'rgba(255,255,255,0.80)',
+            outline: 'none', caretColor: '#818cf8',
+            fontFamily: 'inherit',
+          }}
+          onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.35)')}
+          onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.08)')}
+        />
+        <div style={{ fontSize: '11px', color: '#334155', marginTop: '8px' }}>
+          {kbText.length} characters
+        </div>
+      </div>
+
     </div>
   )
 }

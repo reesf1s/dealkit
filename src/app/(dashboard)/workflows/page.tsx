@@ -63,7 +63,7 @@ const DEFAULT_TEMPLATES: Workflow[] = [
     title: 'Daily sprint briefing',
     trigger: 'Every day at 8am',
     action: 'Show in Today tab: @linear issues in @cyclecurrent linked to deals',
-    active: true,
+    active: false,
     isTemplate: true,
     tokens: [
       'Show in Today tab: ',
@@ -79,7 +79,7 @@ const DEFAULT_TEMPLATES: Workflow[] = [
     title: 'Deal score alert',
     trigger: 'When a deal score drops below 40',
     action: 'Send Slack DM with risk factors and suggested action',
-    active: true,
+    active: false,
     isTemplate: true,
     tokens: [
       'Send ',
@@ -388,7 +388,7 @@ export default function WorkflowsPage() {
       title: 'Custom workflow',
       trigger,
       action,
-      active: true,
+      active: false,
     }])
     setSelectedTrigger(''); setSelectedAction(''); setNewTrigger(''); setNewAction('')
     setShowNewForm(false)

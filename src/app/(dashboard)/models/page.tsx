@@ -346,10 +346,9 @@ const PLACEHOLDER_FEATURES = [
   { name: 'Competitor Present', pct: 11 },
 ]
 
-function FeatureImportanceChart({ features, isPlaceholder }: { features: { name: string; pct: number }[]; isPlaceholder: boolean }) {
+function FeatureImportanceChart({ features, isPlaceholder }: { features: { name: string; pct: number; direction?: string }[]; isPlaceholder: boolean }) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => { const t = setTimeout(() => setMounted(true), 100); return () => clearTimeout(t) }, [])
-  const maxPct = Math.max(...features.map(f => f.pct), 1)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -360,22 +359,26 @@ function FeatureImportanceChart({ features, isPlaceholder }: { features: { name:
       )}
       {features.map((f, i) => {
         const tooltip = FEATURE_TOOLTIPS[f.name] ?? f.name
-        const barWidth = mounted ? Math.min(100, (f.pct / maxPct) * 100) : 0
+        const barWidth = mounted ? Math.min(100, f.pct) : 0
+        const isPositive = f.direction !== 'negative'
+        const barColor = isPlaceholder
+          ? 'rgba(99,102,241,0.60)'
+          : isPositive ? '#34d399' : '#f87171'
         return (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '160px', fontSize: '12px', fontWeight: '500', color: isPlaceholder ? 'var(--text-secondary)' : 'var(--text-primary)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
               {f.name}
               <InfoButton text={tooltip} />
             </div>
-            <div style={{ flex: 1, height: '8px', borderRadius: '4px', background: 'var(--border)', overflow: 'hidden' }}>
+            <div style={{ flex: 1, height: '8px', borderRadius: '4px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
               <div style={{
                 height: '100%', width: `${barWidth}%`,
-                background: isPlaceholder ? 'color-mix(in srgb, #6366f1 60%, transparent)' : 'var(--accent)',
+                background: barColor,
                 borderRadius: '4px',
-                transition: 'width 0.1s ease',
+                transition: 'width 0.6s ease-out',
               }} />
             </div>
-            <div style={{ width: '40px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: isPlaceholder ? 'var(--text-secondary)' : 'var(--text-primary)', flexShrink: 0, fontFamily: 'var(--font-mono, monospace)' }}>
+            <div style={{ width: '40px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: isPlaceholder ? 'var(--text-secondary)' : barColor, flexShrink: 0, fontFamily: 'var(--font-mono, monospace)' }}>
               {f.pct}%
             </div>
           </div>
@@ -656,6 +659,7 @@ export default function ModelsPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', maxWidth: '960px' }}>
       <PageTabs tabs={[
+        { label: 'Overview',     href: '/intelligence', icon: Activity      },
         { label: 'Competitors',  href: '/competitors',  icon: Swords        },
         { label: 'Case Studies', href: '/case-studies', icon: BookOpen      },
         { label: 'Feature Gaps', href: '/product-gaps', icon: AlertTriangle },
