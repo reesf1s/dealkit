@@ -649,6 +649,43 @@ export const mcpActionLog = pgTable('mcp_action_log', {
   createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// MCP Phase 2 — Slack Gateway tables
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * slack_connections  (one per workspace — stores encrypted bot token)
+ * Created by OAuth install flow. Bot token is AES-256-GCM encrypted via encrypt.ts.
+ */
+export const slackConnections = pgTable('slack_connections', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  workspaceId:   uuid('workspace_id')
+    .notNull()
+    .references(() => workspaces.id, { onDelete: 'cascade' })
+    .unique(),                                               // one connection per workspace
+  slackTeamId:   text('slack_team_id').notNull().unique(),  // e.g. "T01234567"
+  slackTeamName: text('slack_team_name'),                   // e.g. "Acme Sales"
+  botTokenEnc:   text('bot_token_enc').notNull(),           // AES-256-GCM encrypted bot token
+  installedBy:   text('installed_by'),                      // Clerk user ID who installed
+  createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+/**
+ * slack_user_mappings  (Clerk user ↔ Slack user, with per-user notification prefs)
+ */
+export const slackUserMappings = pgTable('slack_user_mappings', {
+  id:                   uuid('id').primaryKey().defaultRandom(),
+  workspaceId:          uuid('workspace_id')
+    .notNull()
+    .references(() => workspaces.id, { onDelete: 'cascade' }),
+  clerkUserId:          text('clerk_user_id').notNull(),    // Clerk user ID
+  slackUserId:          text('slack_user_id').notNull(),    // Slack user ID e.g. "U01234567"
+  notifyHealthDrops:    boolean('notify_health_drops').notNull().default(true),
+  notifyIssueLinks:     boolean('notify_issue_links').notNull().default(true),
+  notifyStaleDeals:     boolean('notify_stale_deals').notNull().default(true),
+  createdAt:            timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.workspaceId, t.clerkUserId)])
+
 // Relations
 export const linearIntegrationsRelations = relations(linearIntegrations, ({ one }) => ({
   workspace: one(workspaces, { fields: [linearIntegrations.workspaceId], references: [workspaces.id] }),
@@ -666,6 +703,14 @@ export const dealLinearLinksRelations = relations(dealLinearLinks, ({ one }) => 
 export const mcpActionLogRelations = relations(mcpActionLog, ({ one }) => ({
   workspace: one(workspaces, { fields: [mcpActionLog.workspaceId], references: [workspaces.id] }),
   deal: one(dealLogs, { fields: [mcpActionLog.dealId], references: [dealLogs.id] }),
+}))
+
+export const slackConnectionsRelations = relations(slackConnections, ({ one }) => ({
+  workspace: one(workspaces, { fields: [slackConnections.workspaceId], references: [workspaces.id] }),
+}))
+
+export const slackUserMappingsRelations = relations(slackUserMappings, ({ one }) => ({
+  workspace: one(workspaces, { fields: [slackUserMappings.workspaceId], references: [workspaces.id] }),
 }))
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -731,3 +776,9 @@ export type GlobalBenchmarkCacheRow = typeof globalBenchmarkCache.$inferSelect
 
 export type SignalOutcomeRow = typeof signalOutcomes.$inferSelect
 export type NewSignalOutcomeRow = typeof signalOutcomes.$inferInsert
+
+export type SlackConnectionRow = typeof slackConnections.$inferSelect
+export type NewSlackConnectionRow = typeof slackConnections.$inferInsert
+
+export type SlackUserMappingRow = typeof slackUserMappings.$inferSelect
+export type NewSlackUserMappingRow = typeof slackUserMappings.$inferInsert

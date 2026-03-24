@@ -2482,6 +2482,18 @@ async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown')
     )
   )
 
+  // Slack proactive notifications — fire for each score alert (non-blocking)
+  // Only fires when Slack is connected and users have opted in to notifications.
+  if (brain.scoreAlerts && brain.scoreAlerts.length > 0) {
+    import('./slack-notify').then(({ notifyHealthDrop }) => {
+      for (const alert of brain.scoreAlerts) {
+        notifyHealthDrop(workspaceId, alert).catch(err =>
+          console.error('[brain] Slack health-drop notification failed:', err)
+        )
+      }
+    }).catch(() => { /* non-fatal */ })
+  }
+
   return brain
 }
 

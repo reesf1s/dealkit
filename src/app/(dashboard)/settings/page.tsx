@@ -110,6 +110,8 @@ export default function SettingsPage() {
   const [linearSyncing, setLinearSyncing] = useState(false)
   const [linearMatching, setLinearMatching] = useState(false)
   const [linearMatchResult, setLinearMatchResult] = useState<{ matched: number; confirmed: number; suggested: number; deals_checked: number } | null>(null)
+  // Slack state
+  const [slackDisconnecting, setSlackDisconnecting] = useState(false)
 
   const { data: userRes, isLoading: loadingUser } = useSWR<{ data: DbUser }>('/api/user', fetcher)
   const { data: membersRes, isLoading: loadingMembers, mutate: mutateMembers } = useSWR<{ data: Member[] }>('/api/workspaces/members', fetcher)
@@ -119,8 +121,10 @@ export default function SettingsPage() {
   const { data: inboundEmailRes, mutate: mutateInboundEmail } = useSWR<{ data: { email: string; token: string } }>('/api/workspace/inbound-email', fetcher, { revalidateOnFocus: false })
   const { data: apiKeyRes } = useSWR<{ data: { apiKey: string } }>('/api/workspace/api-key', fetcher, { revalidateOnFocus: false })
   const { data: linearRes, mutate: mutateLinear } = useSWR<{ data: { connected: boolean; teamName?: string | null; workspaceName?: string | null; lastSyncAt?: string | null; syncError?: string | null } }>('/api/integrations/linear/status', fetcher, { revalidateOnFocus: false })
+  const { data: slackRes, mutate: mutateSlack } = useSWR<{ data: { connected: boolean; configured: boolean; slackTeamName?: string | null; slackTeamId?: string | null; connectedAt?: string | null } }>('/api/integrations/slack/status', fetcher, { revalidateOnFocus: false })
   const hubspot = hubspotRes?.data
   const linear = linearRes?.data
+  const slack = slackRes?.data
   const dbUser = userRes?.data
 
   // Sync consent state from server
@@ -186,6 +190,17 @@ export default function SettingsPage() {
     } else if (hs === 'error') {
       const reason = params.get('reason') ?? 'Unknown error'
       toast(`HubSpot connection failed: ${reason}`, 'error')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+    // Handle Slack OAuth redirect
+    const sl = params.get('slack')
+    if (sl === 'connected') {
+      toast('Slack connected! Your bot is ready to use.', 'success')
+      mutateSlack()
+      window.history.replaceState({}, '', window.location.pathname)
+    } else if (sl === 'error') {
+      const reason = params.get('reason') ?? 'Unknown error'
+      toast(`Slack connection failed: ${reason}`, 'error')
       window.history.replaceState({}, '', window.location.pathname)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1077,6 +1092,73 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        </SectionCard>
+
+        {/* Slack Integration */}
+        <SectionCard title="Slack" description="Ask Halvex questions and get deal alerts in Slack">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {slack?.connected ? (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <CheckCircle size={14} style={{ color: 'var(--success, #22C55E)' }} />
+                    <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                      Connected — {slack.slackTeamName ?? 'Slack workspace'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      setSlackDisconnecting(true)
+                      try {
+                        await fetch('/api/integrations/slack/disconnect', { method: 'POST' })
+                        mutateSlack()
+                        toast('Slack disconnected', 'success')
+                      } catch { toast('Disconnect failed', 'error') }
+                      finally { setSlackDisconnecting(false) }
+                    }}
+                    disabled={slackDisconnecting}
+                    style={{ fontSize: '11px', padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '5px', cursor: 'pointer', color: 'var(--danger, #EF4444)', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  >
+                    <Unplug size={11} />
+                    Disconnect
+                  </button>
+                </div>
+                {slack.connectedAt && (
+                  <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: 0 }}>
+                    Connected: {new Date(slack.connectedAt).toLocaleString()}
+                  </p>
+                )}
+                <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '4px 0 0' }}>
+                  DM the bot or use <code style={{ background: 'var(--surface)', padding: '1px 4px', borderRadius: '3px' }}>/halvex [question]</code> in any channel.
+                </p>
+              </div>
+            ) : (
+              <div>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '0 0 12px', lineHeight: 1.6 }}>
+                  Connect Slack to query deal intelligence and receive proactive alerts when deals need attention.
+                  {slack && !slack.configured && (
+                    <span style={{ color: 'var(--danger, #EF4444)' }}> (Slack app not configured — add SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_SIGNING_SECRET to environment.)</span>
+                  )}
+                </p>
+                <a
+                  href="/api/integrations/slack/install"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    fontSize: '12px', padding: '7px 14px',
+                    background: slack?.configured !== false ? '#4A154B' : 'var(--border)',
+                    color: '#fff', border: 'none', borderRadius: '6px',
+                    cursor: slack?.configured !== false ? 'pointer' : 'not-allowed',
+                    textDecoration: 'none',
+                    opacity: slack?.configured !== false ? 1 : 0.5,
+                  }}
+                  onClick={e => { if (slack?.configured === false) e.preventDefault() }}
+                >
+                  <Plug size={13} />
+                  Connect Slack
+                </a>
               </div>
             )}
           </div>
