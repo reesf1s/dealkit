@@ -443,6 +443,269 @@ function DealCard({
     </div>
   )
 }
+// ── Intel List View ───────────────────────────────────────────────────────────
+function IntelListView({
+  deals, urgentMap, staleMap, mlMap, daysInStageMap, momentumMap,
+  configStages, currencySymbol, isLoading, brainData, onAsk,
+}: {
+  deals: any[]
+  urgentMap: Record<string, string>
+  staleMap: Record<string, number>
+  mlMap: Record<string, { churnRisk?: number; winProb?: number }>
+  daysInStageMap: Record<string, number>
+  momentumMap: Record<string, 'hot' | 'cooling' | null>
+  configStages: any[]
+  currencySymbol: string
+  isLoading: boolean
+  brainData: any
+  onAsk: (q: string) => void
+}) {
+  const activeDeals = deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+
+  // Sort by health score ascending (lowest = most at risk first)
+  const sorted = [...activeDeals].sort((a: any, b: any) => {
+    const scoreA = a.conversionScore ?? 0
+    const scoreB = b.conversionScore ?? 0
+    return scoreA - scoreB
+  })
+
+  const urgentCount = sorted.filter((d: any) => urgentMap[d.id]).length
+  const atRiskCount = sorted.filter((d: any) => (d.conversionScore ?? 0) < 40).length
+
+  const fmt = (v: number) =>
+    v >= 1_000_000 ? `${currencySymbol}${(v / 1_000_000).toFixed(1)}m`
+    : v >= 1_000 ? `${currencySymbol}${Math.round(v / 1_000)}k`
+    : `${currencySymbol}${Math.round(v)}`
+
+  const stageLabel = (id: string) => configStages.find((s: any) => s.id === id)?.label ?? id
+
+  // Risk signal for each deal — plain English summary
+  function riskSignal(deal: any): string | null {
+    if (urgentMap[deal.id]) return urgentMap[deal.id]
+    const stale = staleMap[deal.id]
+    if (stale && stale > 14) return `No activity for ${stale} days`
+    const churn = mlMap[deal.id]?.churnRisk
+    if (churn && churn >= 60) return `${churn}% churn risk detected`
+    const risks: any[] = Array.isArray(deal.dealRisks) ? deal.dealRisks : []
+    if (risks.length > 0) {
+      const r = risks[0]
+      return typeof r === 'string' ? r : (r?.text || r?.description || null)
+    }
+    return null
+  }
+
+  const cardStyle: React.CSSProperties = {
+    background: 'var(--glass-card-bg, rgba(255,255,255,0.04))',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    border: '1px solid var(--glass-card-border, rgba(255,255,255,0.08))',
+    borderRadius: '12px',
+    overflow: 'hidden',
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+      {/* Summary banner */}
+      <div style={{
+        padding: '16px 20px',
+        background: urgentCount > 0
+          ? 'linear-gradient(135deg, rgba(248,113,113,0.07) 0%, rgba(255,255,255,0.03) 100%)'
+          : 'linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(255,255,255,0.03) 100%)',
+        ...cardStyle,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: '18px', fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '-0.01em', marginBottom: '3px' }}>
+              {isLoading ? '—' : urgentCount > 0
+                ? `${urgentCount} deal${urgentCount !== 1 ? 's' : ''} need your attention`
+                : atRiskCount > 0
+                ? `${atRiskCount} deal${atRiskCount !== 1 ? 's' : ''} at risk — low health score`
+                : `${activeDeals.length} active deals — looking healthy`}
+            </div>
+            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)' }}>
+              Sorted by health score · lowest first
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              onClick={() => onAsk('What are the biggest risks in my pipeline right now?')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '7px 13px', borderRadius: '8px', cursor: 'pointer',
+                background: 'rgba(99,102,241,0.10)',
+                border: '1px solid rgba(99,102,241,0.20)',
+                color: '#818cf8', fontSize: '12px', fontWeight: 500,
+              }}
+            >
+              <Brain size={12} /> Ask AI about pipeline
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Deal list */}
+      <div style={cardStyle}>
+
+        {/* Header row */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 80px 90px 100px 1fr',
+          gap: '8px',
+          padding: '10px 18px',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.25)',
+          textTransform: 'uppercase', letterSpacing: '0.07em',
+        }}>
+          <span>Company</span>
+          <span style={{ textAlign: 'right' }}>Value</span>
+          <span style={{ textAlign: 'center' }}>Health</span>
+          <span>Stage</span>
+          <span>AI Signal</span>
+        </div>
+
+        {isLoading ? (
+          <div style={{ padding: '12px 0' }}>
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} style={{
+                display: 'grid', gridTemplateColumns: '1fr 80px 90px 100px 1fr',
+                gap: '8px', padding: '14px 18px',
+                borderBottom: '1px solid rgba(255,255,255,0.04)',
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <div style={{ height: '13px', width: '55%', borderRadius: '4px', background: 'rgba(255,255,255,0.06)' }} />
+                  <div style={{ height: '11px', width: '35%', borderRadius: '4px', background: 'rgba(255,255,255,0.04)' }} />
+                </div>
+                <div style={{ height: '13px', width: '60px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', justifySelf: 'end' }} />
+                <div style={{ height: '28px', width: '50px', borderRadius: '100px', background: 'rgba(255,255,255,0.05)', justifySelf: 'center' }} />
+                <div style={{ height: '13px', width: '70px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)' }} />
+                <div style={{ height: '13px', width: '80%', borderRadius: '4px', background: 'rgba(255,255,255,0.04)' }} />
+              </div>
+            ))}
+          </div>
+        ) : sorted.length === 0 ? (
+          <div style={{ padding: '48px 20px', textAlign: 'center' }}>
+            <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.45)', fontWeight: 500, marginBottom: '6px' }}>
+              No active deals yet
+            </div>
+            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.25)', marginBottom: '16px' }}>
+              Add your first deal to start tracking health scores and AI risk signals
+            </div>
+            <Link href="/deals" style={{
+              display: 'inline-flex', alignItems: 'center', gap: '5px',
+              padding: '8px 16px', borderRadius: '8px',
+              background: 'rgba(99,102,241,0.12)',
+              border: '1px solid rgba(99,102,241,0.22)',
+              color: '#818cf8', fontSize: '12px', fontWeight: 600, textDecoration: 'none',
+            }}>
+              <Plus size={12} /> Add first deal
+            </Link>
+          </div>
+        ) : (
+          sorted.map((deal: any, idx: number) => {
+            const score = deal.conversionScore ?? 0
+            const isClosed = false
+            const color = getScoreColor(score, isClosed)
+            const isUrgent = !!urgentMap[deal.id]
+            const signal = riskSignal(deal)
+            const days = daysInStageMap[deal.id]
+            const momentum = momentumMap[deal.id]
+            const value = deal.dealValue ?? 0
+
+            return (
+              <Link
+                key={deal.id}
+                href={`/deals/${deal.id}`}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 80px 90px 100px 1fr',
+                  gap: '8px',
+                  padding: '14px 18px',
+                  borderBottom: idx < sorted.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                  alignItems: 'center',
+                  textDecoration: 'none',
+                  background: isUrgent ? 'rgba(248,113,113,0.03)' : 'transparent',
+                  transition: 'background 0.12s',
+                }}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = isUrgent ? 'rgba(248,113,113,0.06)' : 'rgba(255,255,255,0.03)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = isUrgent ? 'rgba(248,113,113,0.03)' : 'transparent'}
+              >
+                {/* Company + deal name */}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.88)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {deal.prospectCompany}
+                    {momentum === 'hot' && <span title="Hot deal" style={{ marginLeft: '6px', color: '#059669', fontSize: '10px' }}>●</span>}
+                    {momentum === 'cooling' && <span title="Cooling" style={{ marginLeft: '6px', color: '#D97706', fontSize: '10px' }}>●</span>}
+                  </div>
+                  {deal.dealName && deal.dealName !== deal.prospectCompany && (
+                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {deal.dealName}
+                    </div>
+                  )}
+                </div>
+
+                {/* Value */}
+                <div style={{ textAlign: 'right', fontSize: '12px', fontWeight: 600, color: value > 0 ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.20)' }}>
+                  {value > 0 ? fmt(value) : '—'}
+                </div>
+
+                {/* Health score — large, prominent */}
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  {score > 0 ? (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: '52px', height: '28px',
+                      borderRadius: '8px',
+                      background: `color-mix(in srgb, ${color} 12%, transparent)`,
+                      border: `1.5px solid color-mix(in srgb, ${color} 30%, transparent)`,
+                    }}>
+                      <span style={{ fontSize: '14px', fontWeight: 800, color, lineHeight: 1, letterSpacing: '-0.01em' }}>
+                        {score}
+                      </span>
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.20)' }}>—</span>
+                  )}
+                </div>
+
+                {/* Stage + days */}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '11px', fontWeight: 500, color: 'rgba(255,255,255,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {stageLabel(deal.stage)}
+                  </div>
+                  {days > 0 && (
+                    <div style={{ fontSize: '10px', color: days > 14 ? '#fbbf24' : 'rgba(255,255,255,0.25)', marginTop: '2px' }}>
+                      {days}d in stage
+                    </div>
+                  )}
+                </div>
+
+                {/* AI Risk signal */}
+                <div style={{ minWidth: 0 }}>
+                  {signal ? (
+                    <div style={{
+                      fontSize: '11px',
+                      color: isUrgent ? '#f87171' : 'rgba(255,255,255,0.45)',
+                      lineHeight: 1.4,
+                      overflow: 'hidden', display: '-webkit-box',
+                      WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                    }}>
+                      {isUrgent && <AlertTriangle size={10} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-top' }} />}
+                      {signal}
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.18)' }}>—</span>
+                  )}
+                </div>
+              </Link>
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
+}
+
 function PipelineSettings({
   open, onClose, config, presets, onUpdate
 }: {
@@ -1457,7 +1720,7 @@ export default function PipelinePage() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
 
-  const [view, setView] = useState<'board' | 'insights'>('board')
+  const [view, setView] = useState<'intel' | 'board' | 'insights'>('intel')
   const [aiInput, setAiInput] = useState('')
   const aiInputRef = useRef<HTMLInputElement>(null)
 
@@ -1604,28 +1867,34 @@ export default function PipelinePage() {
       {/* Tab bar */}
       <div style={tabBarStyle}>
         <div style={tabGroupStyle}>
+          <button style={tabBtn(view === 'intel')} onClick={() => setView('intel')}>
+            <Target size={13} />
+            Intelligence
+          </button>
           <button style={tabBtn(view === 'board')} onClick={() => setView('board')}>
             <Kanban size={13} />
-            Board
+            Kanban
           </button>
           <button style={tabBtn(view === 'insights')} onClick={() => setView('insights')}>
             <Brain size={13} />
-            Insights
+            ML Insights
           </button>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            onClick={() => setSettingsOpen(true)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '8px 14px',
-              background: 'var(--surface)',
-              border: 'none',
-              borderRadius: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', cursor: 'pointer',
-            }}
-          >
-            <Settings size={14} /> Columns
-          </button>
+          {view === 'board' && (
+            <button
+              onClick={() => setSettingsOpen(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '8px 14px',
+                background: 'var(--surface)',
+                border: 'none',
+                borderRadius: '6px', color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '500', cursor: 'pointer',
+              }}
+            >
+              <Settings size={14} /> Columns
+            </button>
+          )}
           <Link href="/deals" style={{
             display: 'flex', alignItems: 'center', gap: '6px',
             padding: '8px 16px',
@@ -1637,6 +1906,23 @@ export default function PipelinePage() {
           </Link>
         </div>
       </div>
+
+      {/* ── INTEL VIEW (default) ────────────────────────────────────────────── */}
+      {view === 'intel' && (
+        <IntelListView
+          deals={deals}
+          urgentMap={urgentMap}
+          staleMap={staleMap}
+          mlMap={mlMap}
+          daysInStageMap={daysInStageMap}
+          momentumMap={momentumMap}
+          configStages={configStages}
+          currencySymbol={currencySymbol}
+          isLoading={isLoading}
+          brainData={brainData}
+          onAsk={dispatchAI}
+        />
+      )}
 
       {/* ── BOARD VIEW ──────────────────────────────────────────────────────── */}
       {view === 'board' && (
