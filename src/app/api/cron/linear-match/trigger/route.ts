@@ -61,6 +61,7 @@ export async function POST() {
         issues_checked: Number(issuesRow?.value ?? 0),
         synced: syncResult.synced,
         embedded: syncResult.embedded,
+        pages_fetched: syncResult.pagesFetched,
       },
     })
   } catch (e: unknown) {

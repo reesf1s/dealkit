@@ -9,7 +9,7 @@
  */
 
 import { db } from '@/lib/db'
-import { eq, and, sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { linearIntegrations, linearIssuesCache } from '@/lib/db/schema'
 import { decrypt, getEncryptionKey } from '@/lib/encrypt'
 import { fetchTeamIssues, type LinearIssue } from '@/lib/linear-client'
@@ -22,46 +22,53 @@ import { embedLinearIssues } from '@/lib/semantic-search'
 export interface SyncResult {
   synced: number
   embedded: number
+  pagesFetched: number
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+const UPSERT_BATCH_SIZE = 50
+
 /**
  * Upsert a batch of Linear issues into linear_issues_cache.
+ * Processes in batches of 50 to stay within Postgres parameter limits.
  */
 async function upsertIssues(workspaceId: string, issues: LinearIssue[]): Promise<void> {
   if (issues.length === 0) return
 
-  for (const issue of issues) {
+  for (let i = 0; i < issues.length; i += UPSERT_BATCH_SIZE) {
+    const batch = issues.slice(i, i + UPSERT_BATCH_SIZE)
     await db
       .insert(linearIssuesCache)
-      .values({
-        workspaceId,
-        linearIssueId: issue.identifier,
-        linearIssueUrl: issue.url,
-        title: issue.title,
-        description: issue.description,
-        status: issue.state.name,
-        cycleId: issue.cycle?.id ?? null,
-        assigneeId: issue.assignee?.id ?? null,
-        assigneeName: issue.assignee?.name ?? null,
-        priority: issue.priority,
-        cachedAt: new Date(),
-      })
+      .values(
+        batch.map(issue => ({
+          workspaceId,
+          linearIssueId:  issue.identifier,
+          linearIssueUrl: issue.url,
+          title:          issue.title,
+          description:    issue.description,
+          status:         issue.state.name,
+          cycleId:        issue.cycle?.id ?? null,
+          assigneeId:     issue.assignee?.id ?? null,
+          assigneeName:   issue.assignee?.name ?? null,
+          priority:       issue.priority,
+          cachedAt:       new Date(),
+        })),
+      )
       .onConflictDoUpdate({
         target: [linearIssuesCache.workspaceId, linearIssuesCache.linearIssueId],
         set: {
-          linearIssueUrl: issue.url,
-          title: issue.title,
-          description: issue.description,
-          status: issue.state.name,
-          cycleId: issue.cycle?.id ?? null,
-          assigneeId: issue.assignee?.id ?? null,
-          assigneeName: issue.assignee?.name ?? null,
-          priority: issue.priority,
-          cachedAt: new Date(),
+          linearIssueUrl: sql`excluded.linear_issue_url`,
+          title:          sql`excluded.title`,
+          description:    sql`excluded.description`,
+          status:         sql`excluded.status`,
+          cycleId:        sql`excluded.cycle_id`,
+          assigneeId:     sql`excluded.assignee_id`,
+          assigneeName:   sql`excluded.assignee_name`,
+          priority:       sql`excluded.priority`,
+          cachedAt:       sql`excluded.cached_at`,
         },
       })
   }
@@ -83,7 +90,7 @@ export async function syncLinearIssues(workspaceId: string): Promise<SyncResult>
     .limit(1)
 
   if (!integration) {
-    return { synced: 0, embedded: 0 }
+    return { synced: 0, embedded: 0, pagesFetched: 0 }
   }
 
   let apiKey: string
@@ -95,11 +102,15 @@ export async function syncLinearIssues(workspaceId: string): Promise<SyncResult>
       .set({ syncError: 'Failed to decrypt API key', updatedAt: new Date() })
       .where(eq(linearIntegrations.workspaceId, workspaceId))
     console.error('[linear-sync] Decrypt error for workspace', workspaceId.slice(0, 8), err)
-    return { synced: 0, embedded: 0 }
+    return { synced: 0, embedded: 0, pagesFetched: 0 }
   }
+
+  // Incremental sync: only fetch issues updated since the last successful sync
+  const since = integration.lastSyncAt?.toISOString()
 
   let cursor: string | null = null
   let synced = 0
+  let pagesFetched = 0
 
   try {
     do {
@@ -107,10 +118,12 @@ export async function syncLinearIssues(workspaceId: string): Promise<SyncResult>
         apiKey,
         integration.teamId,
         cursor ?? undefined,
+        since,
       )
 
       await upsertIssues(workspaceId, issues)
       synced += issues.length
+      pagesFetched += 1
       cursor = nextCursor
     } while (cursor !== null)
 
@@ -126,16 +139,16 @@ export async function syncLinearIssues(workspaceId: string): Promise<SyncResult>
       .set({ syncError: msg, updatedAt: new Date() })
       .where(eq(linearIntegrations.workspaceId, workspaceId))
     console.error('[linear-sync] Sync error for workspace', workspaceId.slice(0, 8), err)
-    return { synced, embedded: 0 }
+    return { synced, embedded: 0, pagesFetched }
   }
 
   // Re-embed all issues now that the cache is up to date
   const { embedded } = await embedLinearIssues(workspaceId)
 
   console.log(
-    `[linear-sync] workspace=${workspaceId.slice(0, 8)} synced=${synced} embedded=${embedded}`,
+    `[linear-sync] workspace=${workspaceId.slice(0, 8)} synced=${synced} pages=${pagesFetched} embedded=${embedded} incremental=${!!since}`,
   )
-  return { synced, embedded }
+  return { synced, embedded, pagesFetched }
 }
 
 /**

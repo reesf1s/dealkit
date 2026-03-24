@@ -120,14 +120,18 @@ export async function validateApiKey(apiKey: string): Promise<LinearWorkspaceInf
 }
 
 /**
- * Fetch all non-completed issues for a team, paginated.
- * Returns up to 250 issues per page; caller may paginate via cursor.
+ * Fetch non-completed issues for a team, paginated (100/page — Linear's safe max).
+ * Pass `since` (ISO string) to fetch only issues updated after that timestamp.
  */
 export async function fetchTeamIssues(
   apiKey: string,
   teamId: string,
   cursor?: string,
+  since?: string,
 ): Promise<{ issues: LinearIssue[]; nextCursor: string | null }> {
+  const sinceVar    = since ? ', $since: DateTime' : ''
+  const sinceFilter = since ? '\n          updatedAt: { gt: $since }' : ''
+
   const data = await gql<{
     team: {
       issues: {
@@ -137,12 +141,12 @@ export async function fetchTeamIssues(
     }
   }>(
     apiKey,
-    `query FetchIssues($teamId: String!, $after: String) {
+    `query FetchIssues($teamId: String!, $after: String${sinceVar}) {
       team(id: $teamId) {
         issues(
-          first: 250
+          first: 100
           after: $after
-          filter: { state: { type: { nin: ["completed", "cancelled"] } } }
+          filter: { state: { type: { nin: ["completed", "cancelled"] } }${sinceFilter} }
           orderBy: updatedAt
         ) {
           nodes {
@@ -161,7 +165,7 @@ export async function fetchTeamIssues(
         }
       }
     }`,
-    { teamId, after: cursor ?? null },
+    { teamId, after: cursor ?? null, ...(since ? { since } : {}) },
   )
 
   return {
