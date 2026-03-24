@@ -2,508 +2,429 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparkles, ArrowRight, CheckCircle, Building2, Users, Loader2, ClipboardPaste, Zap, Target, FileText, ClipboardList, LogIn } from 'lucide-react'
-import { PageTabs } from '@/components/shared/PageTabs'
+import { ArrowRight, CheckCircle, Building2, Loader2, MessageSquare, Database, Zap } from 'lucide-react'
+
+type Step = 'workspace' | 'crm' | 'slack'
+type CrmTab = 'hubspot' | 'manual'
+
+async function seedDemoDeals() {
+  try {
+    await fetch('/api/deals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dealName: 'Acme Corp — Platform evaluation',
+        prospectCompany: 'Acme Corp',
+        prospectName: 'Sarah Chen',
+        prospectTitle: 'VP of Engineering',
+        dealValue: 48000,
+        stage: 'demo',
+        description:
+          'Evaluating Halvex for their 12-person product-engineering team. Budget approved Q2. Decision by end of month.',
+        notes:
+          'Champion is Sarah Chen. CTO attended the demo. Competing with Notion and Linear native integrations.',
+      }),
+    })
+  } catch {
+    /* best effort */
+  }
+}
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const [step, setStep] = useState<'paste' | 'review' | 'saving' | 'generating' | 'done' | 'join'>('paste')
-  const [joinCode, setJoinCode] = useState('')
-  const [joinLoading, setJoinLoading] = useState(false)
-  const [joinError, setJoinError] = useState('')
+  const [step, setStep] = useState<Step>('workspace')
+  const [workspaceName, setWorkspaceName] = useState('')
+  const [crmTab, setCrmTab] = useState<CrmTab>('hubspot')
+  const [hubspotToken, setHubspotToken] = useState('')
+  const [crmLoading, setCrmLoading] = useState(false)
+  const [crmError, setCrmError] = useState('')
+  const [crmConnected, setCrmConnected] = useState(false)
+  const [demoSeeded, setDemoSeeded] = useState(false)
 
-  async function handleJoin() {
-    if (!joinCode.trim()) return
-    setJoinLoading(true)
-    setJoinError('')
-    try {
-      const res = await fetch('/api/workspaces/join', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: joinCode.trim() }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Failed to join workspace')
-      router.push('/pipeline')
-    } catch (e: unknown) {
-      setJoinError(e instanceof Error ? e.message : 'Failed to join. Try again.')
-    } finally {
-      setJoinLoading(false)
-    }
-  }
-  const [text, setText] = useState('')
-  const [parsed, setParsed] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [generatingProgress, setGeneratingProgress] = useState<{ name: string; done: boolean }[]>([])
+  const stepIndex = step === 'workspace' ? 1 : step === 'crm' ? 2 : 3
 
-  const handleParse = async () => {
-    if (!text.trim()) return
-    setLoading(true)
-    setError('')
-    try {
-      const res = await fetch('/api/onboarding/parse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      })
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      setParsed(data)
-      setStep('review')
-    } catch (e: any) {
-      setError(e.message ?? 'Failed to parse. Try again.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  /** Map AI-extracted industry text to a known pipeline preset key */
-  function inferPreset(industry: string | null | undefined): string | null {
-    if (!industry) return null
-    const s = industry.toLowerCase()
-    if (s.includes('saas') || s.includes('software') || s.includes('tech') || s.includes('app')) return 'saas'
-    if (s.includes('agency') || s.includes('creative') || s.includes('marketing') || s.includes('design')) return 'agency'
-    if (s.includes('consult')) return 'consulting'
-    if (s.includes('ecommerce') || s.includes('e-commerce') || s.includes('retail') || s.includes('wholesale') || s.includes('clothing') || s.includes('fashion')) return 'ecommerce'
-    if (s.includes('real estate') || s.includes('property') || s.includes('realty')) return 'real_estate'
-    if (s.includes('manufactur') || s.includes('industrial') || s.includes('factory') || s.includes('engineering')) return 'manufacturing'
-    return null
-  }
-
-  const handleSave = async () => {
-    setStep('saving')
-    try {
-      // Save company profile
-      await fetch('/api/company', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parsed.company),
-      })
-
-      // Auto-apply industry pipeline preset based on extracted company industry
-      const preset = inferPreset(parsed.company?.industry)
-      if (preset) {
-        await fetch('/api/pipeline-config', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ applyPreset: preset }),
-        }).catch(() => { /* best effort */ })
-      }
-
-      // Save competitors + collect their IDs
-      const createdCompetitors: { id: string; name: string }[] = []
-      for (const comp of (parsed.competitors ?? [])) {
-        const res = await fetch('/api/competitors', {
+  async function handleWorkspaceContinue() {
+    if (workspaceName.trim()) {
+      try {
+        await fetch('/api/company', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(comp),
+          body: JSON.stringify({ companyName: workspaceName.trim() }),
         })
-        const data = await res.json()
-        if (data.data?.id) {
-          createdCompetitors.push({ id: data.data.id, name: comp.name })
-        }
+      } catch {
+        /* best effort */
       }
+    }
+    setStep('crm')
+  }
 
-      // If we have competitors, generate battlecards for each
-      if (createdCompetitors.length > 0) {
-        setStep('generating')
-        setGeneratingProgress(createdCompetitors.map(c => ({ name: c.name, done: false })))
-
-        await Promise.all(createdCompetitors.map(async (comp, idx) => {
-          try {
-            await fetch('/api/collateral/generate', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: 'battlecard', competitorId: comp.id }),
-            })
-          } catch { /* best effort */ }
-          setGeneratingProgress(prev =>
-            prev.map((p, i) => i === idx ? { ...p, done: true } : p)
-          )
-        }))
-
-        setStep('done')
-      } else {
-        router.push('/pipeline?onboarded=1')
-      }
-    } catch {
-      setStep('review')
-      setError('Failed to save. Please try again.')
+  async function handleHubSpotConnect() {
+    if (!hubspotToken.trim()) return
+    setCrmLoading(true)
+    setCrmError('')
+    try {
+      const res = await fetch('/api/integrations/hubspot/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: hubspotToken.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Failed to connect')
+      // Kick off sync in background
+      fetch('/api/integrations/hubspot/sync', { method: 'POST' }).catch(() => {})
+      setCrmConnected(true)
+      setStep('slack')
+    } catch (e: unknown) {
+      setCrmError(e instanceof Error ? e.message : 'Connection failed. Check your token and try again.')
+    } finally {
+      setCrmLoading(false)
     }
   }
 
+  async function handleSkipCrm() {
+    if (!demoSeeded) {
+      await seedDemoDeals()
+      setDemoSeeded(true)
+    }
+    setStep('slack')
+  }
+
+  async function handleFinish() {
+    if (!crmConnected && !demoSeeded) {
+      await seedDemoDeals()
+    }
+    router.push('/dashboard?onboarded=1')
+  }
+
+  const steps = ['Workspace', 'Connect data', 'Slack']
+
   return (
-    <div style={{ maxWidth: '680px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+    <div style={{ maxWidth: '520px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '32px', paddingTop: '8px' }}>
 
-      {/* Company / AI Import tabs */}
-      <PageTabs tabs={[
-        { label: 'Company Profile', href: '/company',    icon: Building2 },
-        { label: 'Brain Setup',     href: '/onboarding', icon: Sparkles  },
-      ]} />
-
-      {/* Header */}
-      <div style={{ textAlign: 'center' }}>
-        <div style={{
-          width: '56px', height: '56px', borderRadius: '8px',
-          background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2))',
-          border: '1px solid rgba(99,102,241,0.3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
-          boxShadow: '0 0 32px rgba(99,102,241,0.2)',
-        }}>
-          <Sparkles size={24} color="var(--accent)" />
-        </div>
-        <h1 style={{ fontSize: '24px', fontWeight: '600', letterSpacing: '-0.04em', color: 'var(--text-primary)', marginBottom: '8px' }}>
-          Train the brain in 30 seconds
-        </h1>
-        <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', lineHeight: '1.6' }}>
-          Paste anything — a pitch deck, company page, or notes — and the brain will learn your business, then autonomously generate your first battlecards
-        </p>
+      {/* Progress bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0', justifyContent: 'center' }}>
+        {steps.map((label, i) => {
+          const num = i + 1
+          const active = num === stepIndex
+          const done = num < stepIndex
+          return (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{
+                  width: '24px', height: '24px', borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '10px', fontWeight: '700',
+                  background: done
+                    ? 'rgba(52,211,153,0.15)'
+                    : active ? 'rgba(99,102,241,0.2)' : 'var(--surface)',
+                  border: done
+                    ? '1px solid rgba(52,211,153,0.35)'
+                    : active ? '1px solid rgba(99,102,241,0.5)' : '1px solid var(--border)',
+                  color: done ? 'var(--success)' : active ? 'var(--accent)' : 'var(--text-tertiary)',
+                  flexShrink: 0,
+                }}>
+                  {done ? '✓' : num}
+                </div>
+                <span style={{
+                  fontSize: '12px', fontWeight: active ? '500' : '400',
+                  color: active ? 'var(--text-primary)' : done ? 'var(--text-secondary)' : 'var(--text-tertiary)',
+                }}>
+                  {label}
+                </span>
+              </div>
+              {i < 2 && (
+                <div style={{ width: '32px', height: '1px', background: 'var(--border)', margin: '0 8px' }} />
+              )}
+            </div>
+          )
+        })}
       </div>
 
-      {step === 'paste' && (
-        <>
-          <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <ClipboardPaste size={15} color="var(--accent)" />
-              <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Paste your content</span>
+      {/* ── Step 1: Workspace name ─────────────────────────── */}
+      {step === 'workspace' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              width: '52px', height: '52px', borderRadius: '12px',
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2))',
+              border: '1px solid rgba(99,102,241,0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 16px',
+              boxShadow: '0 0 24px rgba(99,102,241,0.15)',
+            }}>
+              <Building2 size={22} color="var(--accent)" />
             </div>
-            <textarea
-              value={text}
-              onChange={e => setText(e.target.value)}
-              placeholder="Paste your pitch deck text, company website copy, LinkedIn about section, sales deck, or any text describing your company and competitors..."
-              rows={10}
-              style={{
-                width: '100%', resize: 'vertical', background: 'var(--surface)',
-                border: '1px solid var(--border)', borderRadius: '10px',
-                color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6', padding: '14px',
-                outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
-              }}
-              onFocus={e => (e.target as HTMLElement).style.borderColor = 'rgba(99,102,241,0.4)'}
-              onBlur={e => (e.target as HTMLElement).style.borderColor = 'var(--border)'}
-            />
-            {error && <div style={{ fontSize: '12px', color: 'var(--danger)' }}>{error}</div>}
-            <button
-              onClick={handleParse}
-              disabled={!text.trim() || loading}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                padding: '12px', borderRadius: '10px', border: 'none', cursor: loading || !text.trim() ? 'not-allowed' : 'pointer',
-                background: loading || !text.trim() ? 'rgba(99,102,241,0.2)' : 'linear-gradient(135deg, var(--accent), #7C3AED)',
-                color: '#fff', fontSize: '14px', fontWeight: '600',
-                boxShadow: loading || !text.trim() ? 'none' : '0 0 24px rgba(99,102,241,0.4)',
-                transition: 'all 0.1s ease',
-              }}
-            >
-              {loading ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Analyzing with AI...</> : <><Sparkles size={15} /> Auto-fill my profile</>}
-            </button>
-          </div>
-
-          {/* What AI creates */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', paddingLeft: '4px' }}>What AI creates automatically</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              {[
-                { icon: Building2, label: 'Company profile', desc: 'Name, industry, description, products', color: '#818CF8' },
-                { icon: Users, label: 'Competitors', desc: 'Any competitors mentioned in text', color: '#A78BFA' },
-                { icon: Sparkles, label: 'Value props & differentiators', desc: 'Key advantages and objections', color: '#6366F1' },
-                { icon: FileText, label: 'Battlecards (auto-generated)', desc: 'Full AI battlecard per competitor found', color: '#22C55E' },
-              ].map(({ icon: Icon, label, desc, color }) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px', background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '10px' }}>
-                  <div style={{ width: '28px', height: '28px', background: `${color}14`, border: `1px solid ${color}22`, borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Icon size={13} color={color} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' }}>{label}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* AI workflows preview */}
-          <div style={{ background: 'var(--accent-subtle)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', padding: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
-              <Zap size={13} color="var(--accent)" />
-              <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--accent)' }}>After setup, you&apos;ll be able to:</span>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {[
-                '📋 Paste call notes → AI extracts todos, blockers & opportunities',
-                '🎯 Get AI conversion score (0-100) + specific next steps per deal',
-                '⚔️ Ask AI to create battlecards: "Create battlecard for Salesforce"',
-                '🔍 AI auto-identifies product gaps from lost deals',
-              ].map(item => (
-                <div key={item} style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <button
-              onClick={() => setStep('join')}
-              style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: '12px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}
-            >
-              <LogIn size={12} />
-              Joining a team? Enter your invite code instead
-            </button>
-            <button onClick={() => router.push('/pipeline')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}>
-              Skip — set up manually
-            </button>
-          </div>
-        </>
-      )}
-
-      {step === 'join' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <LogIn size={15} color="var(--accent)" />
-              <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Join your team&apos;s workspace</span>
-            </div>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.6' }}>
-              Ask your team admin for the workspace invite code (visible in their Settings → Team section). It looks like <code style={{ color: 'var(--accent)', background: 'var(--accent-subtle)', padding: '1px 6px', borderRadius: '4px', fontSize: '12px' }}>crane-47</code>.
+            <h1 style={{ fontSize: '22px', fontWeight: '600', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '8px' }}>
+              Name your workspace
+            </h1>
+            <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', lineHeight: '1.6' }}>
+              Usually your company or team name. You can change this later.
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <input
-                type="text"
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
-                placeholder="e.g. crane-47"
-                style={{
-                  width: '100%',
-                  height: '42px',
-                  padding: '0 14px',
-                  background: 'var(--surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '10px',
-                  color: 'var(--text-primary)',
-                  fontSize: '14px',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                  boxSizing: 'border-box',
-                  letterSpacing: '0.05em',
-                }}
-                onFocus={(e) => (e.target.style.borderColor = 'rgba(99,102,241,0.4)')}
-                onBlur={(e) => (e.target.style.borderColor = 'var(--border)')}
-              />
-              {joinError && <div style={{ fontSize: '12px', color: 'var(--danger)' }}>{joinError}</div>}
-            </div>
+          </div>
+
+          <div style={{
+            background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+            borderRadius: '10px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px',
+          }}>
+            <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Workspace name
+            </label>
+            <input
+              type="text"
+              value={workspaceName}
+              onChange={e => setWorkspaceName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleWorkspaceContinue()}
+              placeholder="e.g. Acme Sales Team"
+              autoFocus
+              style={{
+                width: '100%', height: '44px', padding: '0 14px',
+                background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px',
+                color: 'var(--text-primary)', fontSize: '14px', outline: 'none',
+                fontFamily: 'inherit', boxSizing: 'border-box',
+              }}
+              onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.4)')}
+              onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+            />
             <button
-              onClick={handleJoin}
-              disabled={!joinCode.trim() || joinLoading}
+              onClick={handleWorkspaceContinue}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                padding: '12px', borderRadius: '10px', border: 'none',
-                cursor: joinLoading || !joinCode.trim() ? 'not-allowed' : 'pointer',
-                background: joinLoading || !joinCode.trim() ? 'rgba(99,102,241,0.2)' : 'linear-gradient(135deg, var(--accent), #7C3AED)',
+                padding: '12px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                background: 'linear-gradient(135deg, var(--accent), #7C3AED)',
                 color: '#fff', fontSize: '14px', fontWeight: '600',
-                boxShadow: joinLoading || !joinCode.trim() ? 'none' : '0 0 24px rgba(99,102,241,0.4)',
-                transition: 'all 0.1s ease',
+                boxShadow: '0 0 20px rgba(99,102,241,0.3)',
+                transition: 'opacity 0.1s',
               }}
             >
-              {joinLoading ? <><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> Joining...</> : <>Join workspace <ArrowRight size={14} /></>}
+              Continue <ArrowRight size={14} />
             </button>
           </div>
 
           <div style={{ textAlign: 'center' }}>
-            <button onClick={() => setStep('paste')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: '12px', cursor: 'pointer' }}>
-              ← Back to create a new workspace instead
+            <button
+              onClick={() => setStep('crm')}
+              style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: '12px', cursor: 'pointer' }}
+            >
+              Skip for now
             </button>
           </div>
         </div>
       )}
 
-      {step === 'review' && parsed && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ background: 'rgba(34,197,94,0.06)', border: 'none', borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <CheckCircle size={14} color="var(--success)" />
-            <span style={{ fontSize: '13px', color: 'var(--success)', fontWeight: '500' }}>AI extracted your company info — review before saving</span>
+      {/* ── Step 2: Connect CRM ────────────────────────────── */}
+      {step === 'crm' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              width: '52px', height: '52px', borderRadius: '12px',
+              background: 'linear-gradient(135deg, rgba(255,122,89,0.2), rgba(245,158,11,0.15))',
+              border: '1px solid rgba(255,122,89,0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 16px',
+              boxShadow: '0 0 24px rgba(255,122,89,0.12)',
+            }}>
+              <Database size={22} color="#ff7a59" />
+            </div>
+            <h1 style={{ fontSize: '22px', fontWeight: '600', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '8px' }}>
+              Connect your pipeline data
+            </h1>
+            <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', lineHeight: '1.6' }}>
+              Import deals from HubSpot, or start with sample data and add your own later.
+            </p>
           </div>
 
-          {/* Company preview */}
-          <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', padding: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-              <Building2 size={14} color="var(--accent)" />
-              <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Company Profile</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              {[
-                { label: 'Company', value: parsed.company?.companyName },
-                { label: 'Industry', value: parsed.company?.industry },
-                { label: 'Website', value: parsed.company?.website },
-                { label: 'Target Market', value: parsed.company?.targetMarket },
-              ].map(({ label, value }) => value ? (
-                <div key={label}>
-                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '2px' }}>{label}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '500' }}>{value}</div>
+          {/* Tabs */}
+          <div style={{
+            display: 'flex', background: 'var(--surface)',
+            borderRadius: '8px', padding: '4px', gap: '2px',
+          }}>
+            {(['hubspot', 'manual'] as CrmTab[]).map(tab => (
+              <button
+                key={tab}
+                onClick={() => setCrmTab(tab)}
+                style={{
+                  flex: 1, padding: '8px 12px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+                  background: crmTab === tab ? 'rgba(99,102,241,0.15)' : 'transparent',
+                  color: crmTab === tab ? 'var(--accent)' : 'var(--text-tertiary)',
+                  fontSize: '13px', fontWeight: '500',
+                  transition: 'all 0.1s',
+                }}
+              >
+                {tab === 'hubspot' ? '🟠  HubSpot' : '✏️  Manual'}
+              </button>
+            ))}
+          </div>
+
+          {crmTab === 'hubspot' && (
+            <div style={{
+              background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+              borderRadius: '10px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px',
+            }}>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', margin: 0 }}>
+                In HubSpot, go to <strong style={{ color: 'var(--text-primary)' }}>Settings → Integrations → Private Apps</strong>,
+                create an app with <code style={{
+                  color: 'var(--accent)', background: 'var(--accent-subtle)',
+                  padding: '1px 6px', borderRadius: '4px', fontSize: '11px',
+                }}>crm.objects.deals.read</code> scope, then paste the token below.
+              </p>
+              <input
+                type="password"
+                value={hubspotToken}
+                onChange={e => setHubspotToken(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleHubSpotConnect()}
+                placeholder="pat-na1-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                style={{
+                  width: '100%', height: '42px', padding: '0 14px',
+                  background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px',
+                  color: 'var(--text-primary)', fontSize: '12px', outline: 'none',
+                  fontFamily: 'monospace', boxSizing: 'border-box', letterSpacing: '0.03em',
+                }}
+                onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.4)')}
+                onBlur={e => (e.target.style.borderColor = 'var(--border)')}
+              />
+              {crmError && <div style={{ fontSize: '12px', color: 'var(--danger)' }}>{crmError}</div>}
+              <button
+                onClick={handleHubSpotConnect}
+                disabled={!hubspotToken.trim() || crmLoading}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  padding: '12px', borderRadius: '8px', border: 'none',
+                  cursor: crmLoading || !hubspotToken.trim() ? 'not-allowed' : 'pointer',
+                  background: crmLoading || !hubspotToken.trim()
+                    ? 'rgba(99,102,241,0.2)'
+                    : 'linear-gradient(135deg, var(--accent), #7C3AED)',
+                  color: '#fff', fontSize: '13px', fontWeight: '600',
+                  boxShadow: crmLoading || !hubspotToken.trim() ? 'none' : '0 0 20px rgba(99,102,241,0.3)',
+                  transition: 'all 0.1s',
+                }}
+              >
+                {crmLoading
+                  ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Connecting...</>
+                  : <>Connect HubSpot <ArrowRight size={14} /></>}
+              </button>
+
+              {crmConnected && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--success)' }}>
+                  <CheckCircle size={13} />
+                  Connected — deals syncing in the background
                 </div>
-              ) : null)}
-            </div>
-            {parsed.company?.description && (
-              <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Description</div>
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>{parsed.company.description}</div>
-              </div>
-            )}
-          </div>
-
-          {/* Competitors preview */}
-          {parsed.competitors?.length > 0 && (
-            <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', padding: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <Users size={14} color="var(--accent)" />
-                <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{parsed.competitors.length} Competitors Found</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px', padding: '8px 10px', background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.12)', borderRadius: '8px' }}>
-                <Sparkles size={11} color="var(--success)" />
-                <span style={{ fontSize: '11px', color: 'var(--success)' }}>AI will automatically generate a battlecard for each competitor after saving</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {parsed.competitors.map((c: any, i: number) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px' }}>
-                    <div style={{ width: '28px', height: '28px', background: 'var(--accent-subtle)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '11px', fontWeight: '600', color: 'var(--accent)' }}>
-                      {c.name?.[0]?.toUpperCase() ?? '?'}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)' }}>{c.name}</div>
-                      {c.description && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '1px' }}>{c.description.slice(0, 80)}{c.description.length > 80 ? '...' : ''}</div>}
-                    </div>
-                    <div style={{ fontSize: '10px', color: 'var(--accent)', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.2)', padding: '2px 7px', borderRadius: '100px', fontWeight: '600', flexShrink: 0 }}>
-                      + Battlecard
-                    </div>
-                  </div>
-                ))}
-              </div>
+              )}
             </div>
           )}
 
-          {error && <div style={{ fontSize: '12px', color: 'var(--danger)' }}>{error}</div>}
-
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={() => setStep('paste')} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}>
-              ← Edit paste
-            </button>
-            <button onClick={handleSave} style={{
-              flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-              padding: '12px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-              background: 'linear-gradient(135deg, var(--accent), #7C3AED)',
-              color: '#fff', fontSize: '13px', fontWeight: '600',
-              boxShadow: '0 0 24px rgba(99,102,241,0.3)',
+          {crmTab === 'manual' && (
+            <div style={{
+              background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+              borderRadius: '10px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px',
             }}>
-              Save & generate battlecards <ArrowRight size={14} />
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', margin: 0 }}>
+                We&apos;ll load a sample deal so the dashboard isn&apos;t empty. You can add your real deals
+                from the <strong style={{ color: 'var(--text-primary)' }}>Deals</strong> page any time.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '12px', background: 'var(--surface)', borderRadius: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sample deal</div>
+                <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '500' }}>Acme Corp — Platform evaluation</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>£48,000 · Demo stage · Sarah Chen, VP Engineering</div>
+              </div>
+              <button
+                onClick={handleSkipCrm}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  padding: '12px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                  background: 'linear-gradient(135deg, var(--accent), #7C3AED)',
+                  color: '#fff', fontSize: '13px', fontWeight: '600',
+                  boxShadow: '0 0 20px rgba(99,102,241,0.3)',
+                }}
+              >
+                Start with sample data <ArrowRight size={14} />
+              </button>
+            </div>
+          )}
+
+          <div style={{ textAlign: 'center' }}>
+            <button
+              onClick={handleSkipCrm}
+              style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: '12px', cursor: 'pointer' }}
+            >
+              Skip for now — I&apos;ll connect later
             </button>
           </div>
         </div>
       )}
 
-      {step === 'saving' && (
-        <div style={{ textAlign: 'center', padding: '48px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', color: 'var(--accent)', marginBottom: '12px' }}>
-            <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
-            <span style={{ fontSize: '16px', fontWeight: '500' }}>Saving your profile...</span>
-          </div>
-          <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>Setting up your workspace</p>
-        </div>
-      )}
-
-      {step === 'generating' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* ── Step 3: Slack ──────────────────────────────────── */}
+      {step === 'slack' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '8px' }}>
-              <Sparkles size={18} color="var(--accent)" style={{ animation: 'pulse 1.5s ease-in-out infinite' }} />
-              <span style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)' }}>Generating your battlecards...</span>
+            <div style={{
+              width: '52px', height: '52px', borderRadius: '12px',
+              background: 'linear-gradient(135deg, rgba(52,211,153,0.2), rgba(99,102,241,0.1))',
+              border: '1px solid rgba(52,211,153,0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 16px',
+              boxShadow: '0 0 24px rgba(52,211,153,0.15)',
+            }}>
+              <MessageSquare size={22} color="var(--success)" />
             </div>
-            <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>AI is building competitive intelligence for each competitor</p>
-          </div>
-
-          <div style={{ background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {generatingProgress.map((item, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', background: 'var(--surface)', borderRadius: '8px' }}>
-                <div style={{ width: '28px', height: '28px', background: item.done ? 'rgba(34,197,94,0.1)' : 'var(--accent-subtle)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {item.done
-                    ? <CheckCircle size={14} color="var(--success)" />
-                    : <Loader2 size={14} color="var(--accent)" style={{ animation: 'spin 1s linear infinite' }} />
-                  }
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)' }}>{item.name}</div>
-                  <div style={{ fontSize: '11px', color: item.done ? 'var(--success)' : 'var(--text-tertiary)', marginTop: '1px' }}>
-                    {item.done ? 'Battlecard generated ✓' : 'Generating battlecard...'}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {step === 'done' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ width: '56px', height: '56px', background: 'rgba(34,197,94,0.1)', border: 'none', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 0 24px rgba(34,197,94,0.15)' }}>
-              <CheckCircle size={24} color="var(--success)" />
-            </div>
-            <h2 style={{ fontSize: '20px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '8px', letterSpacing: '-0.03em' }}>You&apos;re all set!</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', lineHeight: '1.6' }}>
-              Your company profile, competitors, and battlecards are ready.<br />Here&apos;s what to do next:
+            <h1 style={{ fontSize: '22px', fontWeight: '600', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '8px' }}>
+              Add the Slack bot
+            </h1>
+            <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', lineHeight: '1.6' }}>
+              Ask about deals, scope issues, and get notified when features ship — right in Slack.
             </p>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {[
-              { icon: ClipboardList, label: 'Log your first deal', desc: 'Track a prospect and get AI deal scoring', href: '/deals', color: '#F59E0B' },
-              { icon: FileText, label: 'View your battlecards', desc: 'AI-generated competitive intel is ready', href: '/collateral?type=battlecard', color: '#6366F1' },
-              { icon: Target, label: 'Open your dashboard', desc: 'See your AI briefing and pipeline intelligence', href: '/pipeline', color: '#A78BFA' },
-            ].map(({ icon: Icon, label, desc, href, color }) => (
-              <a key={href} href={href} style={{
-                display: 'flex', alignItems: 'center', gap: '12px',
-                padding: '14px', background: 'var(--card-bg)',
-                backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-                border: 'none',
-                borderRadius: '10px', textDecoration: 'none',
-                transition: 'border-color 0.1s, background 0.1s',
-              }}
-              onMouseEnter={e => {
-                ;(e.currentTarget as HTMLElement).style.borderColor = `${color}33`
-                ;(e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'
-              }}
-              onMouseLeave={e => {
-                ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--card-border)'
-                ;(e.currentTarget as HTMLElement).style.background = 'var(--card-bg)'
-              }}
-              >
-                <div style={{ width: '32px', height: '32px', background: `${color}14`, border: `1px solid ${color}22`, borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Icon size={15} color={color} />
+          <div style={{
+            background: 'var(--card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+            borderRadius: '10px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px',
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>
+                What you can ask
+              </div>
+              {[
+                '@halvex what\'s the status of Acme Corp?',
+                '@halvex which deals need attention today?',
+                '@halvex scope a Linear issue for the SSO request',
+              ].map(ex => (
+                <div key={ex} style={{
+                  padding: '10px 12px', background: 'var(--surface)', borderRadius: '6px',
+                  fontSize: '12px', fontFamily: 'monospace', color: 'var(--text-secondary)',
+                  borderLeft: '2px solid rgba(99,102,241,0.3)',
+                }}>
+                  {ex}
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>{label}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{desc}</div>
-                </div>
-                <ArrowRight size={14} color="var(--text-tertiary)" />
-              </a>
-            ))}
+              ))}
+            </div>
+
+            <a
+              href="/api/integrations/slack/install"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                padding: '12px', borderRadius: '8px', cursor: 'pointer',
+                background: 'linear-gradient(135deg, var(--accent), #7C3AED)',
+                color: '#fff', fontSize: '13px', fontWeight: '600',
+                textDecoration: 'none',
+                boxShadow: '0 0 20px rgba(99,102,241,0.3)',
+              }}
+            >
+              <Zap size={14} /> Add to Slack
+            </a>
           </div>
 
-          <button onClick={() => router.push('/pipeline?onboarded=1')} style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-            padding: '14px', borderRadius: '10px', border: 'none', cursor: 'pointer',
-            background: 'linear-gradient(135deg, var(--accent), #7C3AED)',
-            color: '#fff', fontSize: '14px', fontWeight: '600',
-            boxShadow: '0 0 24px rgba(99,102,241,0.4)',
-          }}>
-            Go to Dashboard <ArrowRight size={15} />
-          </button>
+          <div style={{ textAlign: 'center' }}>
+            <button
+              onClick={handleFinish}
+              style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: '12px', cursor: 'pointer' }}
+            >
+              Skip for now — go to dashboard →
+            </button>
+          </div>
         </div>
       )}
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
-        @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.5 } }
       `}</style>
     </div>
   )

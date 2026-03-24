@@ -4,27 +4,27 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Halvex — The intelligence layer for B2B sales',
+  title: 'Halvex — Your sales pipeline, finally connected to your roadmap',
   description:
-    'Private ML trained on your closed deals scores every opportunity, surfaces risk, and tells you exactly what to do. Start free.',
+    'Halvex links your deals to your engineering backlog — so PMs know what to build to unlock revenue, and sales reps know what\'s shipping that could save a deal.',
   openGraph: {
-    title: 'Halvex — Every deal scored. Every risk surfaced.',
+    title: 'Halvex — Pipeline meets roadmap',
     description:
-      'Private ML trained on your closed deals — not industry averages. Halvex tells you exactly what to do, who to call, and which deals are dying.',
+      'Halvex links your deals to your engineering backlog — so PMs know what to build to unlock revenue, and sales reps know what\'s shipping that could save a deal.',
     type: 'website',
     url: 'https://halvex.com',
     siteName: 'Halvex',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Halvex — Every deal scored. Every risk surfaced.',
+    title: 'Halvex — Pipeline meets roadmap',
     description:
-      'Private ML trained on your closed deals — not industry averages. Halvex tells you exactly what to do, who to call, and which deals are dying.',
+      'Halvex links your deals to your engineering backlog — so PMs know what to build to unlock revenue, and sales reps know what\'s shipping that could save a deal.',
   },
 }
 
 /* ── Design tokens ─────────────────────────────────────────── */
-const bg = '#09090B'
+const bg = '#0d0f1a'
 const textPrimary = 'rgba(255,255,255,0.93)'
 const textSecondary = 'rgba(255,255,255,0.55)'
 const textTertiary = 'rgba(255,255,255,0.32)'
@@ -533,11 +533,11 @@ export default async function LandingPage() {
               textShadow: '0 0 80px rgba(91,91,214,0.3)',
             }}
           >
-            Every deal scored.
+            Your sales pipeline,
             <br />
-            Every risk surfaced.
+            finally connected
             <br />
-            Every morning.
+            to your roadmap.
           </h1>
 
           <p
@@ -552,8 +552,8 @@ export default async function LandingPage() {
               zIndex: 1,
             }}
           >
-            Private ML trained on your closed deals &mdash; not industry averages. Halvex tells you
-            exactly what to do, who to call, and which deals are dying.
+            Halvex links your deals to your engineering backlog &mdash; so PMs know what to build
+            to unlock revenue, and sales reps know what&apos;s shipping that could save a deal.
           </p>
 
           <div
@@ -613,7 +613,7 @@ export default async function LandingPage() {
           </div>
 
           <p data-light-text-tertiary="" style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)', position: 'relative', zIndex: 1 }}>
-            Trusted by teams managing &pound;1M+ pipelines
+            Built for B2B SaaS teams
           </p>
 
           {/* Hero bottom gradient divider */}
@@ -633,218 +633,119 @@ export default async function LandingPage() {
         <div className="section-divider" />
 
         {/* ======================================================
-            SECTION 2 — THE PROBLEM
+            SECTION 2 — VALUE PILLARS
         ====================================================== */}
-        <section data-section="" style={{ paddingTop: '80px', paddingBottom: '120px', position: 'relative' }}>
-          <h2
-            className="gradient-text"
-            style={{
-              fontSize: '32px',
-              fontWeight: 600,
-              letterSpacing: '-0.03em',
-              marginBottom: '48px',
-              lineHeight: 1.2,
-            }}
-          >
-            Your CRM knows what happened.
-            <br />
-            It has no idea what&apos;s about to.
-          </h2>
-
-          <div style={{ position: 'relative' }}>
-            {/* Background glow behind compare card */}
-            <div
-              className="glow-orb"
+        <section data-section="" style={{ paddingTop: '80px', paddingBottom: '100px', position: 'relative' }}>
+          <div style={{ textAlign: 'center', marginBottom: '56px' }}>
+            <div style={{
+              display: 'inline-block', padding: '4px 14px',
+              background: 'rgba(91,91,214,0.12)', border: '1px solid rgba(91,91,214,0.25)',
+              borderRadius: '100px', fontSize: '11px', fontWeight: 600, color: accent,
+              letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '20px',
+            }}>
+              Built for B2B SaaS teams
+            </div>
+            <h2
+              className="gradient-text"
               style={{
-                width: '400px',
-                height: '400px',
-                background: 'radial-gradient(circle, rgba(239,68,68,0.12) 0%, transparent 70%)',
-                top: '-50px',
-                right: '-100px',
-              }}
-            />
-
-            <div
-              data-compare-card=""
-              className="glass-card"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1px 1fr',
-                position: 'relative',
-                zIndex: 1,
+                fontSize: '32px',
+                fontWeight: 600,
+                letterSpacing: '-0.03em',
+                marginBottom: '16px',
+                lineHeight: 1.2,
               }}
             >
-              {/* CRM side — dimmed */}
-              <div style={{
-                padding: '32px',
-                opacity: 0.7,
-                position: 'relative',
-              }}>
-                {/* Subtle dark overlay for dimming */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'linear-gradient(135deg, rgba(127,29,29,0.06) 0%, transparent 60%)',
-                    pointerEvents: 'none',
-                    borderRadius: '16px 0 0 16px',
-                  }}
-                />
-                <div
-                  data-light-text-tertiary=""
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    letterSpacing: '1px',
-                    color: textTertiary,
-                    textTransform: 'uppercase',
-                    marginBottom: '20px',
-                    position: 'relative',
-                  }}
-                >
-                  Your CRM says
-                </div>
-                <div style={{ position: 'relative', display: 'inline-block' }}>
-                  {/* Green glow behind 82 */}
-                  <div
-                    className="score-glow"
-                    style={{
-                      position: 'absolute',
-                      width: '100px',
-                      height: '100px',
-                      background: 'radial-gradient(circle, rgba(34,197,94,0.30) 0%, transparent 70%)',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      filter: 'blur(20px)',
-                      pointerEvents: 'none',
-                    }}
-                  />
-                  <div
-                    style={{
-                      fontSize: '48px',
-                      fontWeight: 700,
-                      color: '#22c55e',
-                      marginBottom: '12px',
-                      position: 'relative',
-                      fontFamily: 'var(--font-mono, monospace)',
-                      letterSpacing: '-0.03em',
-                    }}
-                  >
-                    82
-                  </div>
-                </div>
-                <div data-light-text-secondary="" style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7, position: 'relative' }}>
-                  &ldquo;Deal is on track. Close date next month. Rep says champion is engaged.&rdquo;
-                </div>
-              </div>
-
-              {/* Gradient divider */}
-              <div
-                data-compare-divider=""
-                style={{
-                  background: 'linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)',
-                }}
-              />
-              <div
-                data-compare-mobile-divider=""
-                style={{
-                  display: 'none',
-                  height: '1px',
-                  background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)',
-                  gridColumn: '1 / -1',
-                }}
-              />
-
-              {/* Halvex side — indigo glow border */}
-              <div style={{
-                padding: '32px',
-                position: 'relative',
-                borderLeft: '2px solid rgba(91,91,214,0.4)',
-                boxShadow: 'inset 4px 0 20px rgba(91,91,214,0.08)',
-              }}>
-                {/* Subtle indigo tint */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'linear-gradient(135deg, rgba(91,91,214,0.04) 0%, transparent 60%)',
-                    pointerEvents: 'none',
-                    borderRadius: '0 16px 16px 0',
-                  }}
-                />
-                <div
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    letterSpacing: '1px',
-                    color: accent,
-                    textTransform: 'uppercase',
-                    marginBottom: '20px',
-                    position: 'relative',
-                  }}
-                >
-                  Halvex says
-                </div>
-                <div style={{ position: 'relative', display: 'inline-block' }}>
-                  {/* Red glow behind 38 */}
-                  <div
-                    className="score-glow"
-                    style={{
-                      position: 'absolute',
-                      width: '100px',
-                      height: '100px',
-                      background: 'radial-gradient(circle, rgba(239,68,68,0.35) 0%, transparent 70%)',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      filter: 'blur(20px)',
-                      pointerEvents: 'none',
-                    }}
-                  />
-                  <div
-                    style={{
-                      fontSize: '48px',
-                      fontWeight: 700,
-                      color: '#ef4444',
-                      marginBottom: '12px',
-                      position: 'relative',
-                      fontFamily: 'var(--font-mono, monospace)',
-                      letterSpacing: '-0.03em',
-                    }}
-                  >
-                    38
-                  </div>
-                </div>
-                <div data-light-text-secondary="" style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7, position: 'relative' }}>
-                  &ldquo;Champion went silent 18 days ago. No technical validation. Budget
-                  conversation stalled. Deals like this close 12% of the time.&rdquo;
-                </div>
-              </div>
-            </div>
+              One platform. Two teams. Zero silos.
+            </h2>
           </div>
 
-          <p
-            data-light-text-secondary=""
-            style={{
-              fontSize: '15px',
-              color: textSecondary,
-              lineHeight: 1.7,
-              marginTop: '24px',
-              maxWidth: '720px',
-            }}
-          >
-            CRM scores use metadata &mdash; stage, close date, deal size. Halvex reads what actually
-            happened in every conversation, matches it against your closed-won and closed-lost
-            history, and gives you a score grounded in reality.
+          <p data-light-text-secondary="" style={{ fontSize: '16px', color: textSecondary, maxWidth: '560px', margin: '0 auto 48px', lineHeight: 1.7, textAlign: 'center' }}>
+            Halvex connects your sales pipeline to your product roadmap — so everyone knows what to build and what to save.
           </p>
+
+          <div data-three-col="" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', position: 'relative', zIndex: 1 }}>
+            {([
+              {
+                badge: 'For Sales',
+                badgeColor: green,
+                badgeBg: 'rgba(60,203,127,0.10)',
+                icon: '🎯',
+                title: 'Know which deals are at risk',
+                desc: 'Know which deals are at risk before they go cold — and what your product team is building that could save them.',
+                glowColor: 'rgba(60,203,127,0.12)',
+                glowClass: 'glass-glow-green',
+              },
+              {
+                badge: 'For Product',
+                badgeColor: accent,
+                badgeBg: 'rgba(91,91,214,0.10)',
+                icon: '📊',
+                title: 'Prioritise with data, not gut feel',
+                desc: 'See which features in your backlog are blocking the most revenue — prioritise with data, not gut feel.',
+                glowColor: 'rgba(91,91,214,0.12)',
+                glowClass: 'glass-glow-indigo',
+              },
+              {
+                badge: 'For Both',
+                badgeColor: '#8B5CF6',
+                badgeBg: 'rgba(139,92,246,0.10)',
+                icon: '⚡',
+                title: 'One Slack bot to connect it all',
+                desc: 'Ask about a deal, scope issues, get notified when they ship — all from Slack.',
+                glowColor: 'rgba(139,92,246,0.12)',
+                glowClass: 'glass-glow-purple',
+              },
+            ] as const).map(({ badge, badgeColor, badgeBg, icon, title, desc, glowColor, glowClass }) => (
+              <div key={title} style={{ position: 'relative' }}>
+                <div className="glow-orb" style={{ width: '200px', height: '200px', background: `radial-gradient(circle, ${glowColor} 0%, transparent 70%)`, top: '20%', left: '50%', transform: 'translateX(-50%)' }} />
+                <div className={`glass-card glass-glow ${glowClass}`} style={{ padding: '28px', position: 'relative', zIndex: 1, height: '100%', boxSizing: 'border-box' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: '100px', background: badgeBg, border: `1px solid ${badgeColor}33`, fontSize: '11px', fontWeight: 600, color: badgeColor, marginBottom: '16px', letterSpacing: '0.04em' }}>
+                    {badge}
+                  </div>
+                  <div style={{ fontSize: '20px', marginBottom: '10px' }}>{icon}</div>
+                  <div data-light-text="" style={{ fontSize: '15px', fontWeight: 600, color: textPrimary, marginBottom: '10px', lineHeight: 1.4 }}>{title}</div>
+                  <div data-light-text-secondary="" style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>{desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
         </section>
 
         {/* Section divider */}
         <div className="section-divider" />
 
         {/* ======================================================
-            SECTION 3 — HOW IT WORKS
+            SECTION 3 — INTEGRATIONS
+        ====================================================== */}
+        <section data-section="" style={{ paddingTop: '40px', paddingBottom: '80px', textAlign: 'center', position: 'relative' }}>
+          <p data-light-text-tertiary="" style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '1.5px', color: textTertiary, textTransform: 'uppercase', marginBottom: '28px' }}>
+            Connected to the tools you already use
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            {[
+              { name: 'HubSpot', dot: '#FF7A59', bg: 'rgba(255,122,89,0.06)', border: 'rgba(255,122,89,0.18)' },
+              { name: 'Linear',  dot: '#5E6AD2', bg: 'rgba(94,106,210,0.06)',  border: 'rgba(94,106,210,0.18)' },
+              { name: 'Slack',   dot: '#E01E5A', bg: 'rgba(224,30,90,0.06)',   border: 'rgba(224,30,90,0.18)' },
+            ].map(({ name, dot, bg, border }) => (
+              <div key={name} style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '10px 22px', borderRadius: '10px',
+                background: bg, border: `1px solid ${border}`,
+                backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+              }}>
+                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: dot, boxShadow: `0 0 8px ${dot}88` }} />
+                <span data-light-text="" style={{ fontSize: '14px', fontWeight: 600, color: textPrimary }}>{name}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Section divider */}
+        <div className="section-divider" />
+
+        {/* ======================================================
+            SECTION 4 — HOW IT WORKS (MCP FLOW)
         ====================================================== */}
         <section
           id="how-it-works"
@@ -857,335 +758,81 @@ export default async function LandingPage() {
               fontSize: '32px',
               fontWeight: 600,
               letterSpacing: '-0.03em',
-              marginBottom: '48px',
+              marginBottom: '16px',
             }}
           >
-            From raw pipeline to scored intelligence in seconds.
+            From a Slack question to a shipped feature.
           </h2>
+          <p data-light-text-secondary="" style={{ fontSize: '16px', color: textSecondary, lineHeight: 1.7, marginBottom: '56px', maxWidth: '560px' }}>
+            Halvex uses an MCP agent to bridge your deals and your backlog — autonomously.
+          </p>
 
-          <div
-            data-three-col=""
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '20px',
-              position: 'relative',
-            }}
-          >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', maxWidth: '720px', position: 'relative', zIndex: 1 }}>
             {[
               {
-                num: '1',
-                title: 'CONNECT',
-                desc: 'Add your deals and conversations. Halvex extracts signals automatically — champion status, budget, risks, competitive mentions, product gaps.',
-                glowColor: 'rgba(91,91,214,0.18)',
-                accentColor: accent,
-                badgeBg: 'rgba(91,141,239,0.15)',
-                badgeColor: '#5B8DEF',
-                glowClass: 'glass-glow-indigo',
+                step: 'Ask',
+                label: '01',
+                desc: 'A sales rep DMs @halvex in Slack: "Acme Corp keeps asking about SSO — are we building it?"',
+                dotColor: '#5B8DEF',
+                lineColor: 'rgba(91,141,239,0.4)',
+                glowColor: 'rgba(91,141,239,0.15)',
               },
               {
-                num: '2',
-                title: 'SCORE',
-                desc: 'Private ML trained on your closed deals calculates win probability. Every score is pure math from your own history — never hallucinated.',
-                glowColor: 'rgba(139,92,246,0.18)',
-                accentColor: '#8B5CF6',
-                badgeBg: 'rgba(139,92,246,0.15)',
-                badgeColor: '#8B5CF6',
-                glowClass: 'glass-glow-purple',
+                step: 'Discover',
+                label: '02',
+                desc: 'Halvex searches your deals. Finds 6 open opportunities (£340k combined) where SSO was flagged as a blocker or competitor advantage.',
+                dotColor: accent,
+                lineColor: 'rgba(91,91,214,0.4)',
+                glowColor: 'rgba(91,91,214,0.15)',
               },
               {
-                num: '3',
-                title: 'ACT',
-                desc: 'Morning briefings with specific actions for each deal. Which deals need attention, what changed, and exactly what to do next.',
-                glowColor: 'rgba(60,203,127,0.18)',
-                accentColor: green,
-                badgeBg: 'rgba(60,203,127,0.15)',
-                badgeColor: green,
-                glowClass: 'glass-glow-green',
+                step: 'Scope',
+                label: '03',
+                desc: 'Halvex opens a Linear issue — pre-filled with context: which deals need it, what competitors offer, and a suggested priority.',
+                dotColor: '#8B5CF6',
+                lineColor: 'rgba(139,92,246,0.4)',
+                glowColor: 'rgba(139,92,246,0.15)',
               },
-            ].map(({ num, title, desc, glowColor, accentColor, badgeBg, badgeColor, glowClass }, i) => (
-              <div key={num} style={{ position: 'relative', display: 'flex', alignItems: 'stretch' }}>
-                {/* Glow behind card */}
-                <div
-                  className="glow-orb"
-                  style={{
-                    width: '200px',
-                    height: '200px',
-                    background: `radial-gradient(circle, ${glowColor} 0%, transparent 70%)`,
-                    top: '20%',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                  }}
-                />
-
-                <div
-                  className={`glass-card glass-glow ${glowClass}`}
-                  style={{
-                    padding: '28px',
-                    position: 'relative',
-                    zIndex: 1,
-                    flex: 1,
-                  }}
-                >
-                  {/* Watermark number */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '12px',
-                      right: '16px',
-                      fontSize: '60px',
-                      fontWeight: 700,
-                      color: 'rgba(255,255,255,0.04)',
-                      lineHeight: 1,
-                      pointerEvents: 'none',
-                    }}
-                  >
-                    {num}
+              {
+                step: 'Ship',
+                label: '04',
+                desc: 'Your engineers pick it up in the next sprint. Linear tracks progress. Halvex watches for the status change.',
+                dotColor: amber,
+                lineColor: 'rgba(245,158,11,0.4)',
+                glowColor: 'rgba(245,158,11,0.15)',
+              },
+              {
+                step: 'Notify',
+                label: '05',
+                desc: 'When the feature ships, Halvex pings the reps on those 6 deals in Slack — with a message they can forward to their champions.',
+                dotColor: green,
+                lineColor: 'rgba(60,203,127,0.4)',
+                glowColor: 'rgba(60,203,127,0.15)',
+              },
+            ].map(({ step, label, desc, dotColor, lineColor, glowColor }, i) => (
+              <div key={step} data-arch-row="" style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', position: 'relative' }}>
+                {/* Flow dot + line */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: '40px', paddingTop: '28px' }}>
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ position: 'absolute', width: '24px', height: '24px', borderRadius: '50%', background: `radial-gradient(circle, ${glowColor} 0%, transparent 70%)`, top: '50%', left: '50%', transform: 'translate(-50%, -50%)', filter: 'blur(6px)' }} />
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: dotColor, position: 'relative', boxShadow: `0 0 12px ${lineColor}` }} />
                   </div>
-
-                  {/* Colored number badge */}
-                  <div
-                    style={{
-                      width: '36px',
-                      height: '36px',
-                      borderRadius: '10px',
-                      background: badgeBg,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '15px',
-                      fontWeight: 700,
-                      color: badgeColor,
-                      marginBottom: '16px',
-                      boxShadow: `0 0 16px ${glowColor}`,
-                    }}
-                  >
-                    {num}
-                  </div>
-                  <div
-                    data-light-text=""
-                    style={{
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      letterSpacing: '1.5px',
-                      color: textPrimary,
-                      marginBottom: '8px',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    {title}
-                  </div>
-                  <div data-light-text-secondary="" style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>
-                    {desc}
-                  </div>
+                  {i < 4 && (
+                    <div className="arch-line-pulse" style={{ width: '1px', height: '60px', background: `linear-gradient(180deg, ${lineColor} 0%, transparent 100%)`, marginTop: '4px' }} />
+                  )}
                 </div>
 
-                {/* Arrow connector */}
-                {i < 2 && (
-                  <div
-                    data-step-arrow=""
-                    style={{
-                      position: 'absolute',
-                      right: '-14px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      zIndex: 2,
-                      color: 'rgba(255,255,255,0.15)',
-                      fontSize: '18px',
-                      fontWeight: 300,
-                    }}
-                  >
-                    &rarr;
+                {/* Card */}
+                <div className="glass-card" style={{ padding: '22px 26px', flex: 1, position: 'relative', borderLeft: `3px solid ${dotColor}`, marginBottom: '2px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 700, color: dotColor, letterSpacing: '1px', opacity: 0.7 }}>{label}</span>
+                    <span data-light-text="" style={{ fontSize: '15px', fontWeight: 600, color: textPrimary, letterSpacing: '-0.01em' }}>{step}</span>
                   </div>
-                )}
+                  <div data-light-text-secondary="" style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>{desc}</div>
+                </div>
               </div>
             ))}
           </div>
-        </section>
-
-        {/* Section divider */}
-        <div className="section-divider" />
-
-        {/* ======================================================
-            SECTION 4 — WHY NOT HUBSPOT?
-        ====================================================== */}
-        <section data-section="" style={{ paddingTop: '80px', paddingBottom: '120px', position: 'relative' }}>
-          <h2
-            className="gradient-text"
-            style={{
-              fontSize: '32px',
-              fontWeight: 600,
-              letterSpacing: '-0.03em',
-              marginBottom: '48px',
-              lineHeight: 1.2,
-            }}
-          >
-            &ldquo;We already have HubSpot forecasting.
-            <br />
-            Why would we need this?&rdquo;
-          </h2>
-
-          <div style={{ position: 'relative' }}>
-            {/* Purple glow behind Halvex side */}
-            <div
-              className="glow-orb"
-              style={{
-                width: '350px',
-                height: '350px',
-                background: 'radial-gradient(circle, rgba(91,91,214,0.12) 0%, transparent 70%)',
-                top: '-50px',
-                right: '0px',
-              }}
-            />
-
-            <div
-              data-two-col=""
-              className="glass-card"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                position: 'relative',
-                zIndex: 1,
-                border: 'none',
-              }}
-            >
-              {/* HubSpot side — dimmed with red/grey tint */}
-              <div
-                style={{
-                  padding: '32px',
-                  borderRadius: '16px 0 0 16px',
-                  background: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(255,255,255,0.04)',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  opacity: 0.75,
-                }}
-              >
-                {/* Subtle red/grey background tint */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'linear-gradient(135deg, rgba(127,29,29,0.06) 0%, transparent 60%)',
-                    pointerEvents: 'none',
-                  }}
-                />
-                <div
-                  data-light-text-tertiary=""
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    letterSpacing: '1px',
-                    color: textTertiary,
-                    textTransform: 'uppercase',
-                    marginBottom: '20px',
-                    position: 'relative',
-                  }}
-                >
-                  HubSpot
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
-                    fontSize: '14px',
-                    color: 'rgba(255,255,255,0.38)',
-                    lineHeight: 1.7,
-                    position: 'relative',
-                  }}
-                >
-                  <div>Scores on metadata: stage, amount, close date</div>
-                  <div>Generic model trained on industry averages</div>
-                  <div>No signal extraction from conversations</div>
-                  <div>Forecast based on rep self-reporting</div>
-                  <div>No specific daily actions</div>
-                </div>
-              </div>
-
-              {/* Halvex side — bright, indigo glow border */}
-              <div
-                style={{
-                  padding: '32px',
-                  borderRadius: '0 16px 16px 0',
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(91,91,214,0.25)',
-                  borderLeft: 'none',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  boxShadow: 'inset 0 0 30px rgba(91,91,214,0.06)',
-                }}
-              >
-                {/* Gradient left border */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: '2px',
-                    background: `linear-gradient(180deg, ${accent} 0%, rgba(139,92,246,0.5) 50%, transparent 100%)`,
-                  }}
-                />
-                {/* Subtle indigo background glow */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    background: 'linear-gradient(135deg, rgba(91,91,214,0.04) 0%, transparent 60%)',
-                    pointerEvents: 'none',
-                  }}
-                />
-                <div
-                  style={{
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    letterSpacing: '1px',
-                    color: accent,
-                    textTransform: 'uppercase',
-                    marginBottom: '20px',
-                    position: 'relative',
-                  }}
-                >
-                  Halvex
-                </div>
-                <div
-                  data-light-text-secondary=""
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '12px',
-                    fontSize: '14px',
-                    color: textSecondary,
-                    lineHeight: 1.7,
-                    position: 'relative',
-                  }}
-                >
-                  <div>Scores on what actually happened in every interaction</div>
-                  <div>Private ML trained on your own win/loss data</div>
-                  <div>Extracts signals, risks, and gaps from conversations</div>
-                  <div>Forecast based on behavioural evidence</div>
-                  <div>Daily briefing with specific next actions</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <p
-            data-light-text-secondary=""
-            style={{
-              fontSize: '15px',
-              color: textSecondary,
-              lineHeight: 1.7,
-              marginTop: '24px',
-              maxWidth: '720px',
-            }}
-          >
-            HubSpot sees that a deal moved from &ldquo;Discovery&rdquo; to &ldquo;Proposal.&rdquo;
-            Halvex reads every conversation and knows the champion hasn&apos;t mentioned budget in
-            three interactions, the technical evaluation stalled, and a competitor was named twice
-            last week.
-          </p>
         </section>
 
         {/* Section divider */}
@@ -1314,205 +961,6 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        {/* Section divider */}
-        <div className="section-divider" />
-
-        {/* ======================================================
-            SECTION 6 — THE ARCHITECTURE
-        ====================================================== */}
-        <section data-section="" style={{ paddingTop: '80px', paddingBottom: '120px', position: 'relative' }}>
-          <h2
-            className="gradient-text"
-            style={{
-              fontSize: '32px',
-              fontWeight: 600,
-              letterSpacing: '-0.03em',
-              marginBottom: '48px',
-            }}
-          >
-            Three layers. No shortcuts.
-          </h2>
-
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '2px',
-              maxWidth: '720px',
-              position: 'relative',
-            }}
-          >
-            {[
-              {
-                label: 'Layer 1',
-                title: 'Signal Extraction',
-                desc: 'AI reads every conversation and extracts structured signals — champion status, budget indicators, risk markers, competitive mentions, and product gaps.',
-                dotColor: '#5B8DEF',
-                glowColor: 'rgba(91,141,239,0.15)',
-                lineColor: 'rgba(91,141,239,0.4)',
-                borderColor: '#5B8DEF',
-              },
-              {
-                label: 'Layer 2',
-                title: 'Private ML Engine',
-                desc: 'A model trained exclusively on your closed deals. Win probability calculated from real patterns in your data. No industry averages. No hallucinated scores.',
-                dotColor: '#8B5CF6',
-                glowColor: 'rgba(139,92,246,0.15)',
-                lineColor: 'rgba(139,92,246,0.4)',
-                borderColor: '#8B5CF6',
-              },
-              {
-                label: 'Layer 3',
-                title: 'AI Narration',
-                desc: 'AI explains every score in plain language. Why is this deal at risk? What changed? What should you do next? Specific, actionable, grounded in evidence.',
-                dotColor: green,
-                glowColor: 'rgba(60,203,127,0.15)',
-                lineColor: 'rgba(60,203,127,0.4)',
-                borderColor: green,
-              },
-            ].map(({ label, title, desc, dotColor, glowColor, lineColor, borderColor }, i) => (
-              <div
-                key={title}
-                data-arch-row=""
-                style={{
-                  display: 'flex',
-                  gap: '24px',
-                  alignItems: 'flex-start',
-                  position: 'relative',
-                }}
-              >
-                {/* Left: flow indicator */}
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    flexShrink: 0,
-                    width: '40px',
-                    paddingTop: '28px',
-                  }}
-                >
-                  {/* Glowing dot */}
-                  <div style={{ position: 'relative' }}>
-                    <div
-                      style={{
-                        position: 'absolute',
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        background: `radial-gradient(circle, ${glowColor} 0%, transparent 70%)`,
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        filter: 'blur(6px)',
-                      }}
-                    />
-                    <div
-                      style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: dotColor,
-                        position: 'relative',
-                        boxShadow: `0 0 12px ${lineColor}`,
-                      }}
-                    />
-                  </div>
-                  {i < 2 && (
-                    <div
-                      className="arch-line-pulse"
-                      style={{
-                        width: '1px',
-                        height: '60px',
-                        background: `linear-gradient(180deg, ${lineColor} 0%, transparent 100%)`,
-                        marginTop: '4px',
-                      }}
-                    />
-                  )}
-                </div>
-
-                {/* Right: glass card with colored left border */}
-                <div
-                  className="glass-card"
-                  style={{
-                    padding: '24px 28px',
-                    flex: 1,
-                    position: 'relative',
-                    borderLeft: `3px solid ${borderColor}`,
-                    boxShadow: `inset 4px 0 16px rgba(${borderColor === '#5B8DEF' ? '91,141,239' : borderColor === '#8B5CF6' ? '139,92,246' : '60,203,127'},0.06)`,
-                  }}
-                >
-                  {/* Subtle glow inside card */}
-                  <div
-                    className="glow-orb"
-                    style={{
-                      width: '150px',
-                      height: '150px',
-                      background: `radial-gradient(circle, ${glowColor} 0%, transparent 70%)`,
-                      top: '-30px',
-                      left: '-30px',
-                      filter: 'blur(60px)',
-                    }}
-                  />
-                  <div
-                    data-light-text-tertiary=""
-                    style={{
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      letterSpacing: '1.5px',
-                      color: textTertiary,
-                      textTransform: 'uppercase',
-                      marginBottom: '4px',
-                      position: 'relative',
-                    }}
-                  >
-                    {label}
-                  </div>
-                  <div
-                    data-light-text=""
-                    style={{
-                      fontSize: '15px',
-                      fontWeight: 600,
-                      color: textPrimary,
-                      marginBottom: '6px',
-                      position: 'relative',
-                    }}
-                  >
-                    {title}
-                  </div>
-                  <div data-light-text-secondary="" style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7, position: 'relative' }}>
-                    {desc}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <p
-            style={{
-              fontSize: '15px',
-              lineHeight: 1.7,
-              marginTop: '32px',
-              maxWidth: '720px',
-            }}
-          >
-            <span
-              style={{
-                background: `linear-gradient(135deg, ${accent}, ${green}, ${amber})`,
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-                fontWeight: 600,
-              }}
-            >
-              AI extracts. ML predicts. AI explains.
-            </span>
-            <span data-light-text-secondary="" style={{ color: textSecondary }}> No score is ever hallucinated.</span>
-          </p>
-        </section>
-
-        {/* Section divider */}
-        <div className="section-divider" />
 
         {/* ======================================================
             SECTION 7 — PRICING
@@ -1801,7 +1249,7 @@ export default async function LandingPage() {
               marginBottom: '12px',
             }}
           >
-            Your pipeline has risks you&apos;re not seeing.
+            Connect your pipeline to your roadmap.
           </h2>
           <p
             data-light-text-secondary=""
@@ -1811,7 +1259,7 @@ export default async function LandingPage() {
               marginBottom: '32px',
             }}
           >
-            Add your first deal. See what Halvex finds.
+            Free to start. Your first deal scored in minutes.
           </p>
           <Link
             href="/sign-up"
@@ -1865,7 +1313,7 @@ export default async function LandingPage() {
             margin: '0 auto 16px',
           }}
         >
-          Halvex &mdash; The intelligence layer for B2B sales.
+          Halvex &mdash; Pipeline meets roadmap. Built for B2B SaaS teams.
         </p>
         <p data-light-text-tertiary="" style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)' }}>
           London, UK &middot; Halvex Ltd
