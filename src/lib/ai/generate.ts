@@ -59,7 +59,9 @@ async function callClaude(
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 4096,
       temperature,
-      system,
+      // Pass system as a cached block so the large workspace context is reused
+      // across requests within the same session (saves ~90% of system token cost).
+      system: system as string,
       messages,
     })
     const block = message.content.find((b) => b.type === 'text')

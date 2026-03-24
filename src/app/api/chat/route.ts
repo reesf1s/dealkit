@@ -8,7 +8,7 @@ import { db } from '@/lib/db'
 import {
   companyProfiles, competitors, caseStudies, dealLogs, productGaps, collateral, events, workspaces,
 } from '@/lib/db/schema'
-import Anthropic from '@anthropic-ai/sdk'
+import { anthropic } from '@/lib/ai/client'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { generateCollateral, generateFreeformCollateral } from '@/lib/ai/generate'
 import { PLAN_LIMITS, isWithinLimit } from '@/lib/stripe/plans'
@@ -20,7 +20,6 @@ import type { WorkspaceBrain } from '@/lib/workspace-brain'
 import { ensureLinksColumn } from '@/lib/api-helpers'
 import { upsertCollateral } from '@/lib/collateral-helpers'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 // ── Scoring grounding rules — included in every system prompt referencing deal scores ──
 export const SCORING_GROUNDING = `SCORING RULES (never contradict these):
