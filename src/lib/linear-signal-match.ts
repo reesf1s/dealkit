@@ -158,6 +158,21 @@ export async function matchDealToIssues(
         linkType: 'feature_gap',
         status: newStatus,
       })
+
+      // Proactive Slack notification for NEW high-relevance links (≥ 80)
+      if (scoreInt >= AUTO_CONFIRM_THRESHOLD) {
+        import('./slack-notify').then(({ notifyNewIssueLink }) => {
+          notifyNewIssueLink(workspaceId, {
+            dealId,
+            dealName: deal.dealName,
+            company: deal.prospectCompany,
+            linearIssueId: match.issueId,
+            linearTitle: issue.title ?? match.issueId,
+            linearIssueUrl: issue.linearIssueUrl,
+            relevanceScore: scoreInt,
+          }).catch(err => console.error('[linear-signal-match] Slack notify failed:', err))
+        }).catch(() => { /* non-fatal */ })
+      }
     }
 
     if (newStatus === 'confirmed') linked++
