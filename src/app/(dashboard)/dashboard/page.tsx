@@ -170,6 +170,28 @@ export default function DashboardPage() {
           </p>
         )}
 
+        {/* What to Focus On — ML-computed action bullets */}
+        {(overview?.focusBullets?.length ?? 0) > 0 && (
+          <div style={{ marginBottom: '20px', position: 'relative' }}>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.10em', marginBottom: '9px' }}>
+              What to focus on
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {overview.focusBullets.map((bullet: string, i: number) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: '8px',
+                  padding: '9px 12px', borderRadius: '10px',
+                  background: 'rgba(255,255,255,0.07)',
+                  border: '1px solid rgba(255,255,255,0.10)',
+                }}>
+                  <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#818cf8', flexShrink: 0, marginTop: '6px' }} />
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.82)', lineHeight: 1.5 }}>{bullet}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Refresh briefing */}
         <button
           onClick={regenerate}
