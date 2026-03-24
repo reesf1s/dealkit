@@ -30,8 +30,13 @@ export async function GET(req: NextRequest) {
     else if (outcome === 'open') conditions.push(sql`${dealLogs.stage} NOT IN ('closed_won', 'closed_lost')`)
     if (fromDate) conditions.push(gte(dealLogs.createdAt, new Date(fromDate)))
     if (toDate) conditions.push(lte(dealLogs.createdAt, new Date(toDate)))
-    let rows = await db.select().from(dealLogs).where(and(...conditions)).orderBy(dealLogs.createdAt)
-    if (competitor) rows = rows.filter(d => (d.competitors as string[]).some(c => c.toLowerCase().includes(competitor.toLowerCase())))
+    if (competitor) conditions.push(
+      sql`EXISTS (
+        SELECT 1 FROM jsonb_array_elements_text(${dealLogs.competitors}::jsonb) AS elem
+        WHERE lower(elem) LIKE lower(${`%${competitor}%`})
+      )`
+    )
+    const rows = await db.select().from(dealLogs).where(and(...conditions)).orderBy(dealLogs.createdAt)
     return NextResponse.json({ data: rows })
   } catch (err) { return dbErrResponse(err) }
 }
