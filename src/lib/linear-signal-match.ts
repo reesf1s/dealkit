@@ -26,10 +26,11 @@ import { decrypt, getEncryptionKey } from '@/lib/encrypt'
 const AUTO_CONFIRM_THRESHOLD = 80
 
 /** Score ≥ this → suggest for rep review.
- * Lowered to 40 (from 60) because TF-IDF cosine similarity scores are typically
- * lower than dense neural embeddings — 0.40 is a genuine topic match at this scale.
+ * Set to 15 because TF-IDF cosine similarity scores are typically
+ * lower than dense neural embeddings — 0.15 is a genuine keyword overlap at this scale.
+ * This ensures successCriteria keyword matches (e.g. Atlassian) are not filtered out.
  */
-const SUGGEST_THRESHOLD = 40
+const SUGGEST_THRESHOLD = 15
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Deduplication helper
@@ -303,6 +304,20 @@ export async function matchAllOpenDeals(
         ]),
       ),
     )
+
+  // Clear stale suggested (unconfirmed) links before re-running so old
+  // suggestions don't persist after issues are updated or deals change.
+  // Only clears status='suggested' — never touches 'confirmed', 'in_cycle', or 'deployed'.
+  if (openDeals.length > 0) {
+    const dealIds = openDeals.map(d => d.id)
+    await db.delete(dealLinearLinks).where(
+      and(
+        eq(dealLinearLinks.workspaceId, workspaceId),
+        inArray(dealLinearLinks.dealId, dealIds),
+        eq(dealLinearLinks.status, 'suggested'),
+      )
+    )
+  }
 
   let totalLinked = 0
   let totalSuggested = 0

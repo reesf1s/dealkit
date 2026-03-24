@@ -257,6 +257,7 @@ export default function ProductGapsPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '960px' }}>
       <PageTabs tabs={[
+        { label: 'Overview',     href: '/intelligence', icon: Brain         },
         { label: 'Competitors',  href: '/competitors',  icon: Swords        },
         { label: 'Case Studies', href: '/case-studies', icon: BookOpen      },
         { label: 'Feature Gaps', href: '/product-gaps', icon: AlertTriangle },

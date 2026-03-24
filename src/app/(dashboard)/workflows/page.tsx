@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useState, useRef, useEffect } from 'react'
 import useSWR from 'swr'
 import {
-  Zap, Plus, Clock, ArrowRight, GitBranch, ChevronDown, Play,
+  Zap, Plus, Clock, ArrowRight, GitBranch, ChevronDown, Play, Loader2,
 } from 'lucide-react'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
@@ -290,14 +290,14 @@ function SelectField({
 
 // ─── Workflow card ────────────────────────────────────────────────────────────
 
-function WorkflowCard({
-  workflow, onToggle, onRun, running,
-}: {
-  workflow: Workflow
-  onToggle: (id: string, active: boolean) => void
-  onRun?: (id: string) => void
-  running?: boolean
-}) {
+function WorkflowCard({ workflow, onToggle, onRun }: { workflow: Workflow; onToggle: (id: string, active: boolean) => void; onRun?: (id: string) => Promise<void> }) {
+  const [running, setRunning] = useState(false)
+
+  const handleRun = async () => {
+    if (!onRun || running) return
+    setRunning(true)
+    try { await onRun(workflow.id) } finally { setRunning(false) }
+  }
   const renderTokens = (tokens?: WorkflowToken[], fallback?: string) => {
     if (!tokens) return <span style={{ fontSize: '12px', color: '#64748b' }}>{fallback}</span>
     return (
@@ -350,37 +350,35 @@ function WorkflowCard({
           </div>
           {/* Last run info */}
           {workflow.lastRunAt && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
-              <span style={{ fontSize: '10px', color: '#334155' }}>Last run: {timeAgoStr(workflow.lastRunAt)}</span>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginTop: '6px' }}>
+              <span style={{ fontSize: '10px', color: '#334155', flexShrink: 0 }}>Last run: {timeAgoStr(workflow.lastRunAt)}</span>
               {workflow.lastOutput && (
                 <span style={{ fontSize: '10px', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>· {workflow.lastOutput}</span>
               )}
             </div>
           )}
+          {/* Run now button — only for saved (non-template) workflows */}
+          {onRun && (
+            <div style={{ marginTop: '8px' }}>
+              <button
+                onClick={handleRun}
+                disabled={running}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '4px',
+                  padding: '4px 10px', borderRadius: '6px',
+                  background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.20)',
+                  color: '#818cf8', fontSize: '11px', fontWeight: 600,
+                  cursor: running ? 'not-allowed' : 'pointer',
+                  opacity: running ? 0.6 : 1,
+                }}
+              >
+                {running ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={10} />}
+                {running ? 'Running…' : 'Run now'}
+              </button>
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-          {/* Run now */}
-          {onRun && (
-            <button
-              onClick={() => onRun(workflow.id)}
-              disabled={running}
-              title="Run now"
-              style={{
-                display: 'flex', alignItems: 'center', gap: '4px',
-                padding: '4px 10px', borderRadius: '7px', border: 'none',
-                background: running ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.12)',
-                color: running ? '#475569' : '#818cf8',
-                fontSize: '11px', fontWeight: 600,
-                cursor: running ? 'not-allowed' : 'pointer',
-                transition: 'all 0.12s',
-              }}
-              onMouseEnter={e => { if (!running) (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.20)' }}
-              onMouseLeave={e => { if (!running) (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.12)' }}
-            >
-              <Play size={9} style={{ animation: running ? 'spin 1s linear infinite' : 'none' }} />
-              {running ? 'Running…' : 'Run'}
-            </button>
-          )}
           {/* Toggle */}
           <button
             onClick={() => onToggle(workflow.id, !workflow.active)}
@@ -446,21 +444,13 @@ export default function WorkflowsPage() {
   const [selectedAction, setSelectedAction] = useState('')
   const [newTrigger, setNewTrigger] = useState('')
   const [newAction, setNewAction] = useState('')
-  const [runningIds, setRunningIds] = useState<Set<string>>(new Set())
-
-  const handleRun = async (id: string) => {
-    if (runningIds.has(id)) return
-    setRunningIds(prev => new Set(prev).add(id))
-    try {
-      await fetch('/api/workflows/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      })
-      mutateSaved()
-    } catch { /* non-fatal */ } finally {
-      setRunningIds(prev => { const s = new Set(prev); s.delete(id); return s })
-    }
+  const handleRun = async (id: string): Promise<void> => {
+    await fetch('/api/workflows/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    mutateSaved()
   }
 
   const handleToggle = async (id: string, active: boolean) => {
@@ -673,8 +663,7 @@ export default function WorkflowsPage() {
               key={w.id}
               workflow={w}
               onToggle={handleToggle}
-              onRun={!w.isTemplate ? handleRun : undefined}
-              running={runningIds.has(w.id)}
+              onRun={savedIds.has(w.id) ? handleRun : undefined}
             />
           ))}
         </div>

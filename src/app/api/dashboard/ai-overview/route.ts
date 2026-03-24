@@ -38,6 +38,7 @@ async function loadStageLabels(workspaceId: string): Promise<Record<string, stri
 export type AIOverview = {
   summary: string
   keyActions: string[]
+  focusBullets: string[]
   pipelineHealth: string
   momentum: string | null
   topRisk: string | null
@@ -338,6 +339,38 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
   })
   const briefingHealth: 'green' | 'amber' | 'red' = hasRed ? 'red' : hasAmber ? 'amber' : 'green'
 
+  // ── focusBullets: ML-computed inputs → Haiku formatting only (max 150 tokens) ──
+  // Pre-computed TypeScript inputs are passed; Haiku only reformats into short bullets.
+  let focusBullets: string[] = []
+  try {
+    if (topAttentionDeals.length > 0) {
+      const dealLines = topAttentionDeals
+        .map(d => `- ${d.dealName} (${d.company}) [${d.urgency}]: ${d.reason}`)
+        .join('\n')
+
+      const focusMsg = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 150,
+        system: 'Convert these pre-analysed deal alerts into ≤4 action bullets. Each bullet: ≤12 words, starts with an action verb, is specific. Respond with a plain list (one bullet per line, no numbers, no dash prefix). No preamble.',
+        messages: [{ role: 'user', content: dealLines }],
+      })
+
+      const raw = (focusMsg.content[0] as { type: string; text: string }).text.trim()
+      focusBullets = raw
+        .split('\n')
+        .map(l => l.replace(/^[-•*]\s*/, '').trim())
+        .filter(l => l.length > 0)
+        .slice(0, 4)
+    } else if (openDeals.length > 0) {
+      focusBullets = ['Pipeline looks healthy — review any pending todos.']
+    }
+  } catch {
+    // non-fatal: fallback to topAttentionDeals reason strings
+    focusBullets = topAttentionDeals.slice(0, 4).map(d =>
+      `Review ${d.dealName} — ${d.reason.slice(0, 60)}`.replace(/\s+/g, ' ').trim()
+    )
+  }
+
   // ── Try AI generation — gracefully degrade if Claude API fails or returns non-JSON ──
   let aiParsed: Record<string, unknown> | null = null
   try {
@@ -535,6 +568,7 @@ GOOD: "Prepare QA test scenarios for the BOE Monday call — ensure the floor pl
   return {
     summary: String(parsed.summary ?? ''),
     keyActions: dedupedActions,
+    focusBullets,
     pipelineHealth: String(parsed.pipelineHealth ?? ''),
     momentum: parsed.momentum ? String(parsed.momentum) : null,
     topRisk: parsed.topRisk ? String(parsed.topRisk) : null,
@@ -612,6 +646,7 @@ export async function POST() {
         overview = {
           summary: `${open.length} open deal${open.length !== 1 ? 's' : ''} worth ${fmtFb(totalValue)} in pipeline. Win rate: ${winRate}%. AI briefing temporarily unavailable — refresh to retry.`,
           keyActions: [],
+          focusBullets: [],
           pipelineHealth: open.length > 0 ? `${open.length} active deal${open.length !== 1 ? 's' : ''}` : 'No active deals',
           momentum: null,
           topRisk: null,
@@ -627,6 +662,7 @@ export async function POST() {
         overview = {
           summary: 'AI briefing temporarily unavailable. Refresh to retry.',
           keyActions: [],
+          focusBullets: [],
           pipelineHealth: 'Unknown',
           momentum: null,
           topRisk: null,

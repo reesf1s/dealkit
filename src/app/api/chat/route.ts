@@ -8,7 +8,7 @@ import { db } from '@/lib/db'
 import {
   companyProfiles, competitors, caseStudies, dealLogs, productGaps, collateral, events, workspaces,
 } from '@/lib/db/schema'
-import Anthropic from '@anthropic-ai/sdk'
+import { anthropic } from '@/lib/ai/client'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { generateCollateral, generateFreeformCollateral } from '@/lib/ai/generate'
 import { PLAN_LIMITS, isWithinLimit } from '@/lib/stripe/plans'
@@ -20,7 +20,6 @@ import type { WorkspaceBrain } from '@/lib/workspace-brain'
 import { ensureLinksColumn } from '@/lib/api-helpers'
 import { upsertCollateral } from '@/lib/collateral-helpers'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 // ── Scoring grounding rules — included in every system prompt referencing deal scores ──
 export const SCORING_GROUNDING = `SCORING RULES (never contradict these):
@@ -85,13 +84,30 @@ function looksLikeMeetingTranscript(text: string): boolean {
   return keywordMatches >= 2 || (lineCount >= 8 && keywordMatches >= 1)
 }
 
+// High-confidence patterns that short-circuit the LLM classifier.
+// These are unambiguous regardless of extra context (e.g. "create a deal named X, not the Y deal").
+const HIGH_CONFIDENCE_PATTERNS: Array<[RegExp, Intent]> = [
+  [/\b(create|add|log|track|start|open|record)\s+(a\s+)?(new\s+)?deal\b/i, 'deal_create'],
+  [/\bnew\s+(deal|prospect|opportunity)\b/i, 'deal_create'],
+  [/\bdeal\s+(called|named)\s+\S/i, 'deal_create'],
+  [/\bdelete\s+(the\s+)?deal\b/i, 'deal_delete'],
+  [/\bremove\s+(the\s+)?deal\b/i, 'deal_delete'],
+]
+
+function detectHighConfidenceIntent(text: string): Intent | null {
+  for (const [pattern, intent] of HIGH_CONFIDENCE_PATTERNS) {
+    if (pattern.test(text)) return intent
+  }
+  return null
+}
+
 // Fallback regex-based classifier (used when Haiku call fails)
 function detectIntentFallback(text: string): Intent {
   const lower = text.toLowerCase()
   if (/list.*deal|show.*deal|all.*deal|what deals.*have|my deals|what deals do i/i.test(text)) return 'deal_list'
   if (/why.*win|win pattern|what.*win|how.*win|winning factor|what.*help.*win/i.test(text)) return 'win_analysis'
   if (/at.?risk|need.*attention|stale.*deal|urgent.*deal|behind.*target|behind.*quota/i.test(text)) return 'at_risk'
-  if (/\b(new deal|new prospect|add.*deal|create.*deal|log.*deal)\b/i.test(text)) return 'deal_create'
+  if (/\b(new deal|new prospect|add.*deal|create.*deal|log.*deal|deal named|deal called)\b/i.test(text)) return 'deal_create'
   if (looksLikeMeetingTranscript(text)) return 'meeting_notes'
   if (/battlecard|add competitor|create competitor|new competitor|track.*competitor/i.test(text)) return 'competitor_battlecard'
   if (/product\s+gap|feature\s+gap|feature\s+request|missing\s+feature/i.test(text)) return 'product_gap'
@@ -109,6 +125,10 @@ function detectIntentFallback(text: string): Intent {
 }
 
 async function classifyIntent(text: string): Promise<Intent> {
+  // Short-circuit for high-confidence patterns — avoids LLM misclassification on ambiguous phrasing
+  const highConf = detectHighConfidenceIntent(text)
+  if (highConf) return highConf
+
   try {
     const msg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',

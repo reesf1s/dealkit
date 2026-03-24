@@ -51,6 +51,7 @@ export default function CaseStudiesPage() {
     <div style={{ padding: '32px', maxWidth: '1100px', margin: '0 auto' }}>
       {/* Intelligence tabs */}
       <PageTabs tabs={[
+        { label: 'Overview',     href: '/intelligence', icon: Brain         },
         { label: 'Competitors',  href: '/competitors',  icon: Swords        },
         { label: 'Case Studies', href: '/case-studies', icon: BookOpen      },
         { label: 'Feature Gaps', href: '/product-gaps', icon: AlertTriangle },

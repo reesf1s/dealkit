@@ -81,46 +81,46 @@ export default function Sidebar() {
           display: 'flex',
           alignItems: 'center',
           gap: '9px',
-          padding: collapsed ? '0' : '0 12px',
+          padding: collapsed ? '0' : '0 12px 0 14px',
           justifyContent: collapsed ? 'center' : 'flex-start',
-          height: '44px',
-          borderRadius: '10px',
-          marginBottom: '2px',
+          height: '32px',
+          borderRadius: '7px',
+          marginBottom: '1px',
           textDecoration: 'none',
           fontSize: '13px',
-          fontWeight: active ? 600 : 400,
+          fontWeight: active ? 500 : 400,
           letterSpacing: '-0.01em',
-          color: active ? '#a5b4fc' : '#64748b',
-          background: active ? 'rgba(99,102,241,0.15)' : 'transparent',
-          transition: 'all 0.15s ease',
+          color: active ? 'rgba(255,255,255,0.88)' : '#475569',
+          background: active ? 'rgba(255,255,255,0.07)' : 'transparent',
+          transition: 'all 0.12s ease',
           position: 'relative',
           flexShrink: 0,
           width: collapsed ? '40px' : undefined,
-          margin: collapsed ? '0 auto 2px' : undefined,
-          boxShadow: active ? '0 0 12px rgba(99,102,241,0.30), inset 0 0 0 1px rgba(99,102,241,0.20)' : 'none',
+          margin: collapsed ? '0 auto 1px' : undefined,
+          boxShadow: 'none',
         }}
         onMouseEnter={e => {
           if (!active) {
             const el = e.currentTarget as HTMLElement
             el.style.background = 'rgba(255,255,255,0.04)'
-            el.style.color = '#94a3b8'
+            el.style.color = 'rgba(255,255,255,0.60)'
           }
         }}
         onMouseLeave={e => {
           if (!active) {
             const el = e.currentTarget as HTMLElement
             el.style.background = 'transparent'
-            el.style.color = '#64748b'
+            el.style.color = '#475569'
           }
         }}
       >
         <div style={{ position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Icon
-            size={20}
+            size={16}
             style={{
-              color: active ? '#818cf8' : '#475569',
+              color: active ? 'rgba(255,255,255,0.80)' : '#475569',
               display: 'block',
-              transition: 'color 0.15s ease',
+              transition: 'color 0.12s ease',
             }}
           />
           {badge && badge.count > 0 && (

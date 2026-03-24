@@ -4,8 +4,9 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
-import { Brain, TrendingUp, TrendingDown, Layers, BarChart2, ArrowUpRight, ChevronRight, BookOpen, Save, Lock } from 'lucide-react'
+import { Brain, TrendingUp, TrendingDown, Layers, BarChart2, ArrowUpRight, ChevronRight, BookOpen, Save, Lock, Swords, AlertTriangle } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
+import { PageTabs } from '@/components/shared/PageTabs'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -202,7 +203,6 @@ export default function IntelligencePage() {
   const [kbText, setKbText] = useState('')
   const [kbSaving, setKbSaving] = useState(false)
   const [kbSaved, setKbSaved] = useState(false)
-  const [activeTab, setActiveTab] = useState<'overview' | 'playbook'>('overview')
 
   useEffect(() => {
     if (kbRes?.data?.text != null && kbText === '') {
@@ -224,26 +224,31 @@ export default function IntelligencePage() {
     } finally { setKbSaving(false) }
   }
 
-  // Win signals — top 3 positive
-  const winSignals: any[] = (brain?.winPatterns ?? brain?.objectionWinMap ?? []).slice(0, 3)
-  // Risk signals — top 3
-  const riskSignals: any[] = (brain?.dealRiskPatterns ?? brain?.riskPatterns ?? []).slice(0, 3)
-  // Feature gaps blocking revenue
-  const productGaps: any[] = (brain?.productGapSignals ?? []).slice(0, 4)
-  // ML accuracy
-  const mlAccuracy = brain?.mlAccuracy ?? brain?.modelAccuracy ?? null
-  const mlDealCount = brain?.mlTrainingCount ?? brain?.dealCount ?? null
+  // Win signals — ML feature importance (helps direction), fallback to win playbook objection wins
+  const mlWinFactors: any[] = (brain?.mlModel?.featureImportance ?? [])
+    .filter((f: any) => f.direction === 'helps')
+    .slice(0, 3)
+    .map((f: any) => ({ pattern: f.label ?? f.name, importance: f.importance, _type: 'ml' }))
+  const playbookWins: any[] = (brain?.winPlaybook?.topObjectionWinPatterns ?? [])
+    .slice(0, 3)
+    .map((p: any) => ({ pattern: p.theme, winRateWithTheme: p.winRateWithTheme, howBeaten: p.howBeaten, _type: 'playbook' }))
+  const winSignals: any[] = mlWinFactors.length > 0 ? mlWinFactors : playbookWins
 
-  const tabStyle = (active: boolean): React.CSSProperties => ({
-    display: 'flex', alignItems: 'center', gap: '6px',
-    padding: '6px 16px', borderRadius: '7px',
-    fontSize: '12px', fontWeight: active ? 600 : 500,
-    color: active ? '#818cf8' : 'rgba(255,255,255,0.45)',
-    background: active ? 'rgba(99,102,241,0.14)' : 'transparent',
-    border: active ? '1px solid rgba(99,102,241,0.22)' : '1px solid transparent',
-    textDecoration: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
-    transition: 'all 0.12s ease',
-  })
+  // Risk signals — ML feature importance (hurts direction), fallback to topLossReasons strings
+  const mlLossFactors: any[] = (brain?.mlModel?.featureImportance ?? [])
+    .filter((f: any) => f.direction === 'hurts')
+    .slice(0, 3)
+    .map((f: any) => ({ pattern: f.label ?? f.name, importance: f.importance, _type: 'ml' }))
+  const lossReasons: any[] = (brain?.winLossIntel?.topLossReasons ?? [])
+    .slice(0, 3)
+    .map((r: string) => ({ pattern: r, _type: 'reason' }))
+  const riskSignals: any[] = mlLossFactors.length > 0 ? mlLossFactors : lossReasons
+
+  // Feature gaps blocking revenue — productGapPriority has dealsBlocked + revenueAtRisk
+  const productGaps: any[] = (brain?.productGapPriority ?? []).slice(0, 4)
+  // ML accuracy
+  const mlAccuracy = brain?.mlModel?.looAccuracy ?? null
+  const mlDealCount = brain?.mlModel?.trainingSize ?? null
 
   function SkeletonLine({ w = '100%', h = '14px' }: { w?: string; h?: string }) {
     return <div style={{ width: w, height: h, borderRadius: '6px' }} className="skeleton" />
@@ -252,27 +257,14 @@ export default function IntelligencePage() {
   return (
     <div style={{ maxWidth: '960px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
-      {/* Tabs — Overview + Playbook inline; others navigate to their routes */}
-      <div style={{
-        display: 'flex', gap: '2px', padding: '3px',
-        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: '10px', width: 'fit-content',
-        backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-      }}>
-        <button onClick={() => setActiveTab('overview')} style={tabStyle(activeTab === 'overview')}>Overview</button>
-        <button onClick={() => setActiveTab('playbook')} style={tabStyle(activeTab === 'playbook')}>Playbook</button>
-        {([
-          { label: 'Competitors', href: '/competitors' },
-          { label: 'Case Studies', href: '/case-studies' },
-          { label: 'Feature Gaps', href: '/product-gaps' },
-          { label: 'Models', href: '/models' },
-        ] as { label: string; href: string }[]).map(tab => (
-          <Link key={tab.href} href={tab.href} style={tabStyle(false)}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.80)'; (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.45)'; (e.currentTarget as HTMLElement).style.background = 'transparent' }}
-          >{tab.label}</Link>
-        ))}
-      </div>
+      <PageTabs tabs={[
+        { label: 'Overview',     href: '/intelligence', icon: Brain         },
+        { label: 'Competitors',  href: '/competitors',  icon: Swords        },
+        { label: 'Case Studies', href: '/case-studies', icon: BookOpen      },
+        { label: 'Feature Gaps', href: '/product-gaps', icon: AlertTriangle },
+        { label: 'Playbook',     href: '/playbook',     icon: TrendingUp    },
+        { label: 'Models',       href: '/models',       icon: Brain         },
+      ]} />
 
       {/* Page header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -287,21 +279,15 @@ export default function IntelligencePage() {
         </div>
         <div>
           <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.02em', margin: 0 }}>
-            {activeTab === 'playbook' ? 'Win Playbook' : 'Intelligence'}
+            Intelligence
           </h1>
           <p style={{ fontSize: '13px', color: '#475569', margin: 0 }}>
-            {activeTab === 'playbook' ? 'Auto-generated from your closed deal history' : 'Patterns and signals extracted from your deals'}
+            Patterns and signals extracted from your deals
           </p>
         </div>
       </div>
 
-      {/* Playbook tab content */}
-      {activeTab === 'playbook' && (
-        <PlaybookPanel brain={brain} isLoading={isLoading} />
-      )}
-
-      {/* Overview tab content */}
-      {activeTab === 'overview' && <>
+      {/* Overview content */}
 
       {/* 4-section grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '20px' }}>
@@ -327,10 +313,14 @@ export default function IntelligencePage() {
                   border: '1px solid rgba(52,211,153,0.15)',
                 }}>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: '#34d399', marginBottom: '2px' }}>
-                    {sig.objection ?? sig.pattern ?? sig.signal ?? `Win signal ${i + 1}`}
+                    {sig.pattern ?? sig.signal ?? `Win signal ${i + 1}`}
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748b' }}>
-                    {sig.winRate != null ? `${Math.round(sig.winRate * 100)}% win rate when present` : sig.description ?? sig.insight ?? ''}
+                    {sig._type === 'ml' && sig.importance != null
+                      ? `${(sig.importance * 100).toFixed(1)}% feature importance`
+                      : sig.winRateWithTheme != null
+                        ? `${sig.winRateWithTheme}% win rate when present${sig.howBeaten ? ` — ${sig.howBeaten}` : ''}`
+                        : ''}
                   </div>
                 </div>
               ))}
@@ -371,7 +361,9 @@ export default function IntelligencePage() {
                     {sig.pattern ?? sig.signal ?? sig.riskFactor ?? `Risk signal ${i + 1}`}
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748b' }}>
-                    {sig.dealCount != null ? `Seen in ${sig.dealCount} deal${sig.dealCount !== 1 ? 's' : ''}` : sig.description ?? sig.insight ?? ''}
+                    {sig._type === 'ml' && sig.importance != null
+                      ? `${(sig.importance * 100).toFixed(1)}% feature importance`
+                      : ''}
                   </div>
                 </div>
               ))}
@@ -409,7 +401,7 @@ export default function IntelligencePage() {
                     background: 'rgba(251,191,36,0.12)', padding: '2px 8px', borderRadius: '100px',
                     flexShrink: 0,
                   }}>
-                    {gap.dealCount ?? gap.count ?? '?'}× blocked
+                    {gap.dealsBlocked ?? gap.dealCount ?? gap.count ?? '?'}× blocked
                   </span>
                   <span style={{ fontSize: '13px', color: '#94a3b8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {gap.feature ?? gap.title ?? gap.pattern ?? 'Feature gap'}
@@ -536,8 +528,6 @@ export default function IntelligencePage() {
           {kbText.length} characters
         </div>
       </div>
-
-      </> /* end Overview tab */}
 
     </div>
   )

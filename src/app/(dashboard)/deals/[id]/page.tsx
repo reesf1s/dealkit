@@ -2833,7 +2833,7 @@ function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; o
                       title="Double-click to rename"
                     >
                       <a
-                        href={link.url}
+                        href={/^https?:\/\//i.test(link.url) ? link.url : `https://${link.url}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
@@ -3158,21 +3158,22 @@ function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
 
 // ─── Score Ring ───────────────────────────────────────────────────────────────
 
-function ScoreRing({ score }: { score: number }) {
-  const pct = Math.min(100, Math.max(0, score))
-  const color = pct >= 70 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#ef4444'
+function ScoreRing({ score, size = 64 }: { score: number | null; size?: number }) {
+  const pct = score == null ? 0 : Math.min(100, Math.max(0, score))
+  const color = score == null ? '#475569' : pct >= 70 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#ef4444'
+  const circumference = 2 * Math.PI * 34
   return (
-    <div style={{ position: 'relative', width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', transform: 'rotate(-90deg)' }} viewBox="0 0 80 80">
+    <div style={{ position: 'relative', width: `${size}px`, height: `${size}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <svg className="absolute inset-0 w-full h-full" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', transform: 'rotate(-90deg)' }} viewBox="0 0 80 80">
         <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="6" />
         <circle
           cx="40" cy="40" r="34" fill="none"
           stroke={color} strokeWidth="6"
-          strokeDasharray={`${(pct / 100) * 213.6} 213.6`}
+          strokeDasharray={`${(pct / 100) * circumference} ${circumference}`}
           strokeLinecap="round"
         />
       </svg>
-      <span style={{ fontSize: '20px', fontWeight: 700, color, lineHeight: 1 }}>{score}</span>
+      <span style={{ fontSize: size >= 76 ? '22px' : '20px', fontWeight: 700, color, lineHeight: 1 }}>{score ?? 0}</span>
     </div>
   )
 }
@@ -3498,7 +3499,7 @@ function DealLinksSection({ deal, patchDeal }: { deal: any; patchDeal: (payload:
             <div key={link.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {linkIcon(link.type)}
               <a
-                href={link.url}
+                href={/^https?:\/\//i.test(link.url) ? link.url : `https://${link.url}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ flex: 1, fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
@@ -4593,7 +4594,7 @@ export default function DealDetailPage() {
   )
   const parentDeal = parentDealRes?.data ?? parentDealRes
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'activity' | 'team'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'manage' | 'notes' | 'activity' | 'team'>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [winStoryOpen, setWinStoryOpen] = useState(false)
   const [wonDeal, setWonDeal] = useState<any>(null)
@@ -4740,23 +4741,9 @@ export default function DealDetailPage() {
             </div>
 
             {/* CENTER: Health score ring */}
-            {score != null && !isMobile && (
+            {!isMobile && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                <div style={{
-                  width: '80px', height: '80px', borderRadius: '50%',
-                  background: `conic-gradient(${scoreColor} ${score * 3.6}deg, rgba(255,255,255,0.08) 0deg)`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: `0 0 24px ${scoreColor}38`,
-                }}>
-                  <div style={{
-                    width: '62px', height: '62px', borderRadius: '50%',
-                    background: 'rgba(13,15,26,0.92)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <span style={{ fontSize: '22px', fontWeight: 700, color: scoreColor!, lineHeight: 1 }}>{score}</span>
-                    <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)', marginTop: '2px' }}>/100</span>
-                  </div>
-                </div>
+                <ScoreRing score={score} size={80} />
                 <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.40)', fontWeight: 500 }}>Win probability</span>
               </div>
             )}
@@ -4845,16 +4832,17 @@ export default function DealDetailPage() {
       }}>
         {[
           { id: 'overview', label: 'Overview' },
-          { id: 'plans', label: (() => {
+          { id: 'manage', label: (() => {
             const openTodos = deal?.todos?.filter((t: any) => !t.done) ?? []
             const openTasks = (deal?.projectPlan as any)?.phases?.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete') ?? []
             const openCriteria = (deal?.successCriteriaTodos as any[])?.filter((c: any) => !c.achieved) ?? []
             const total = openTodos.length + openTasks.length + openCriteria.length
-            if (total === 0) return 'Plans'
-            return `Plans (${total})`
+            if (total === 0) return 'Manage'
+            return `Manage (${total})`
           })() },
+          { id: 'notes', label: 'Notes' },
           { id: 'activity', label: 'Activity' },
-          { id: 'collateral', label: 'Collateral' },
+          { id: 'team', label: 'Team' },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{
             padding: isMobile ? '12px 16px' : '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '500',
@@ -4967,17 +4955,18 @@ export default function DealDetailPage() {
               objectionWinMap={objectionWinMap} objectionConditionalWins={objectionConditionalWins}
             />
           )}
+          {activeTab === 'manage' && (
+            <ActionsTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
+          )}
           {activeTab === 'notes' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <ActivityTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
-              <ActionsTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
-              <CollateralTab dealId={id} deal={deal} />
+              <ActivityLog dealId={id} deal={deal} onUpdate={() => mutate()} />
             </div>
           )}
           {activeTab === 'activity' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <AiActivitySection dealId={id} />
-              <ActivityLog dealId={id} deal={deal} onUpdate={() => mutate()} />
             </div>
           )}
           {activeTab === 'team' && (

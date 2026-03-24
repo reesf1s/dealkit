@@ -397,6 +397,11 @@ export default function ConnectionsPage() {
                 Workspace: <span style={{ color: '#94a3b8', fontWeight: 600 }}>{linearData.workspaceName}</span>
               </div>
             )}
+            {linearData?.lastSyncAt && (
+              <div style={{ fontSize: '12px', color: '#475569' }}>
+                Last sync: <span style={{ color: '#94a3b8' }}>{new Date(linearData.lastSyncAt).toLocaleString()}</span>
+              </div>
+            )}
             <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
               <button
                 onClick={handleLinearSync}
@@ -617,9 +622,62 @@ export default function ConnectionsPage() {
               {mcpApiKey ? 'Regenerate' : 'Generate key'}
             </button>
           </div>
-          <p style={{ fontSize: '12px', color: '#475569', margin: 0 }}>
+          <p style={{ fontSize: '12px', color: '#475569', margin: '0 0 16px' }}>
             Add this key to your Claude MCP configuration to enable AI-native deal workflows.
           </p>
+
+          {/* Endpoint URL */}
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Endpoint URL</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                flex: 1, padding: '7px 12px',
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '8px', fontFamily: 'monospace', fontSize: '12px', color: '#94a3b8',
+              }}>
+                https://halvex.ai/api/mcp
+              </div>
+              <button
+                onClick={() => copyToClipboard('https://halvex.ai/api/mcp')}
+                style={{
+                  width: '34px', height: '34px', borderRadius: '8px',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#64748b', cursor: 'pointer',
+                }}
+              >
+                <Copy size={13} />
+              </button>
+            </div>
+          </div>
+
+          {/* Available tools */}
+          <div>
+            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Available tools (6)</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {[
+                { name: 'halvex_get_deal_health', desc: 'Health score, risks & recommendations for any deal' },
+                { name: 'halvex_find_at_risk_deals', desc: 'All deals needing immediate attention this week' },
+                { name: 'halvex_get_linked_issues', desc: 'Linear issues blocking or linked to a deal' },
+                { name: 'halvex_get_win_loss_signals', desc: 'Workspace-level win rate, patterns & loss reasons' },
+                { name: 'halvex_scope_issue', desc: 'Generate user story + ACs and push to Linear cycle' },
+                { name: 'halvex_draft_release_email', desc: 'Draft a release notification for a prospect' },
+              ].map(t => (
+                <div key={t.name} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: '10px',
+                  padding: '8px 10px',
+                  background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.10)',
+                  borderRadius: '8px',
+                }}>
+                  <span style={{
+                    fontFamily: 'monospace', fontSize: '11px', fontWeight: 600,
+                    color: '#818cf8', whiteSpace: 'nowrap', flexShrink: 0,
+                  }}>{t.name}</span>
+                  <span style={{ fontSize: '11px', color: '#64748b' }}>{t.desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 

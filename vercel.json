@@ -17,6 +17,22 @@
       "schedule": "0 4 * * *"
     },
     {
+      "path": "/api/cron/workflows",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/stale-nudge",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/win-loss-digest",
+      "schedule": "0 8 * * 1"
+    },
+    {
+      "path": "/api/cron/gap-linear-link",
+      "schedule": "0 5 * * *"
+    },
+    {
       "path": "/api/cron/email-digest",
       "schedule": "0 7 * * *"
     }
