@@ -2833,7 +2833,7 @@ function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; o
                       title="Double-click to rename"
                     >
                       <a
-                        href={link.url}
+                        href={/^https?:\/\//i.test(link.url) ? link.url : `https://${link.url}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{
@@ -3499,7 +3499,7 @@ function DealLinksSection({ deal, patchDeal }: { deal: any; patchDeal: (payload:
             <div key={link.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {linkIcon(link.type)}
               <a
-                href={link.url}
+                href={/^https?:\/\//i.test(link.url) ? link.url : `https://${link.url}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ flex: 1, fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
