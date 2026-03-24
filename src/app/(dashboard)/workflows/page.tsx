@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useState, useRef, useEffect } from 'react'
 import useSWR from 'swr'
 import {
-  Zap, Plus, Clock, ArrowRight, GitBranch, ChevronDown,
+  Zap, Plus, Clock, ArrowRight, GitBranch, ChevronDown, Play,
 } from 'lucide-react'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
@@ -290,7 +290,14 @@ function SelectField({
 
 // ─── Workflow card ────────────────────────────────────────────────────────────
 
-function WorkflowCard({ workflow, onToggle }: { workflow: Workflow; onToggle: (id: string, active: boolean) => void }) {
+function WorkflowCard({
+  workflow, onToggle, onRun, running,
+}: {
+  workflow: Workflow
+  onToggle: (id: string, active: boolean) => void
+  onRun?: (id: string) => void
+  running?: boolean
+}) {
   const renderTokens = (tokens?: WorkflowToken[], fallback?: string) => {
     if (!tokens) return <span style={{ fontSize: '12px', color: '#64748b' }}>{fallback}</span>
     return (
@@ -351,24 +358,48 @@ function WorkflowCard({ workflow, onToggle }: { workflow: Workflow; onToggle: (i
             </div>
           )}
         </div>
-        {/* Toggle */}
-        <button
-          onClick={() => onToggle(workflow.id, !workflow.active)}
-          style={{
-            width: '36px', height: '20px', borderRadius: '10px', border: 'none',
-            background: workflow.active ? '#6366f1' : 'rgba(255,255,255,0.10)',
-            cursor: 'pointer', position: 'relative', flexShrink: 0,
-            transition: 'background 0.2s',
-          }}
-        >
-          <div style={{
-            width: '14px', height: '14px', borderRadius: '50%', background: '#fff',
-            position: 'absolute', top: '3px',
-            left: workflow.active ? '19px' : '3px',
-            transition: 'left 0.2s',
-            boxShadow: workflow.active ? '0 0 6px rgba(99,102,241,0.50)' : 'none',
-          }} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+          {/* Run now */}
+          {onRun && (
+            <button
+              onClick={() => onRun(workflow.id)}
+              disabled={running}
+              title="Run now"
+              style={{
+                display: 'flex', alignItems: 'center', gap: '4px',
+                padding: '4px 10px', borderRadius: '7px', border: 'none',
+                background: running ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.12)',
+                color: running ? '#475569' : '#818cf8',
+                fontSize: '11px', fontWeight: 600,
+                cursor: running ? 'not-allowed' : 'pointer',
+                transition: 'all 0.12s',
+              }}
+              onMouseEnter={e => { if (!running) (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.20)' }}
+              onMouseLeave={e => { if (!running) (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.12)' }}
+            >
+              <Play size={9} style={{ animation: running ? 'spin 1s linear infinite' : 'none' }} />
+              {running ? 'Running…' : 'Run'}
+            </button>
+          )}
+          {/* Toggle */}
+          <button
+            onClick={() => onToggle(workflow.id, !workflow.active)}
+            style={{
+              width: '36px', height: '20px', borderRadius: '10px', border: 'none',
+              background: workflow.active ? '#6366f1' : 'rgba(255,255,255,0.10)',
+              cursor: 'pointer', position: 'relative',
+              transition: 'background 0.2s',
+            }}
+          >
+            <div style={{
+              width: '14px', height: '14px', borderRadius: '50%', background: '#fff',
+              position: 'absolute', top: '3px',
+              left: workflow.active ? '19px' : '3px',
+              transition: 'left 0.2s',
+              boxShadow: workflow.active ? '0 0 6px rgba(99,102,241,0.50)' : 'none',
+            }} />
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -415,6 +446,22 @@ export default function WorkflowsPage() {
   const [selectedAction, setSelectedAction] = useState('')
   const [newTrigger, setNewTrigger] = useState('')
   const [newAction, setNewAction] = useState('')
+  const [runningIds, setRunningIds] = useState<Set<string>>(new Set())
+
+  const handleRun = async (id: string) => {
+    if (runningIds.has(id)) return
+    setRunningIds(prev => new Set(prev).add(id))
+    try {
+      await fetch('/api/workflows/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      })
+      mutateSaved()
+    } catch { /* non-fatal */ } finally {
+      setRunningIds(prev => { const s = new Set(prev); s.delete(id); return s })
+    }
+  }
 
   const handleToggle = async (id: string, active: boolean) => {
     // Optimistic update for saved workflows
@@ -622,7 +669,13 @@ export default function WorkflowsPage() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {workflowList.map(w => (
-            <WorkflowCard key={w.id} workflow={w} onToggle={handleToggle} />
+            <WorkflowCard
+              key={w.id}
+              workflow={w}
+              onToggle={handleToggle}
+              onRun={!w.isTemplate ? handleRun : undefined}
+              running={runningIds.has(w.id)}
+            />
           ))}
         </div>
       </div>
@@ -658,6 +711,8 @@ export default function WorkflowsPage() {
           })}
         </div>
       )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
