@@ -449,9 +449,16 @@ export async function embedLinearIssues(workspaceId: string): Promise<{ embedded
 
   await saveCache(workspaceId, updatedCache)
 
-  // Also persist vectors to linear_issues_cache.embedding for per-row durability.
-  // This runs after the JSONB cache write so the JSONB path is always populated first.
+  // Persist vectors to linear_issues_cache.embedding — incremental:
+  // only write rows that still have a NULL embedding in the DB so that
+  // subsequent runs skip the 222 sequential UPDATEs entirely (fast path).
+  // Build a set of issue IDs that need a DB write from the in-memory data.
+  const nullEmbeddingIds = new Set(
+    issues.filter(i => i.embedding === null).map(i => i.linearIssueId),
+  )
+
   for (const { id, vector } of newLinearEmbeddings) {
+    if (!nullEmbeddingIds.has(id)) continue // already stored, skip
     await db
       .update(linearIssuesCache)
       .set({ embedding: vector })

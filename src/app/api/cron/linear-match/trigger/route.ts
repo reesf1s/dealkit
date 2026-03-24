@@ -6,7 +6,7 @@
  * Used by the "Run match now" button in Settings → Linear.
  */
 export const dynamic = 'force-dynamic'
-export const maxDuration = 120 // 2 min — covers sync + match for a single workspace
+export const maxDuration = 300 // 5 min max (Vercel Pro limit) — covers cold sync+embed+match
 
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
