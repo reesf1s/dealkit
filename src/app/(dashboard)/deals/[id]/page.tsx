@@ -4088,6 +4088,14 @@ function LinearColumn({ dealId }: { dealId: string }) {
                       ↳ {link.addressesRisk.length > 42 ? link.addressesRisk.slice(0, 42) + '…' : link.addressesRisk}
                     </span>
                   )}
+                  {link.hasReleaseEmail && (
+                    <span style={{ fontSize: '10px', fontWeight: 600, color: '#34d399' }}>✉ Follow-up sent</span>
+                  )}
+                  {isDeployed && link.deployedAt && (
+                    <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)' }}>
+                      {timeAgoShort(link.deployedAt)}
+                    </span>
+                  )}
                 </div>
               </div>
             )
@@ -4407,6 +4415,13 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   link_dismissed: 'Dismissed link',
   risk_alert: 'Risk alert fired',
   deal_scored: 'Deal scored',
+  // Loop-specific action types
+  discover_issues: 'Issues discovered',
+  issue_scoped_to_cycle: 'Scoped to cycle',
+  bulk_scope_confirmation: 'Scope confirmation sent',
+  all_issues_deployed_notification: 'Loop complete — email drafted',
+  release_email_generated: 'Release email drafted',
+  issue_deployed_notification: 'Issue shipped',
 }
 
 const ACTION_TYPE_ICONS: Record<string, string> = {
@@ -4418,6 +4433,13 @@ const ACTION_TYPE_ICONS: Record<string, string> = {
   link_dismissed: '✖️',
   risk_alert: '⚠️',
   deal_scored: '🎯',
+  // Loop-specific
+  discover_issues: '🔍',
+  issue_scoped_to_cycle: '⚙️',
+  bulk_scope_confirmation: '🔗',
+  all_issues_deployed_notification: '🎉',
+  release_email_generated: '✉️',
+  issue_deployed_notification: '✅',
 }
 
 function timeAgoShort(isoStr: string): string {

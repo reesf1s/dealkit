@@ -6,7 +6,7 @@ import useSWR from 'swr'
 import Link from 'next/link'
 import {
   AlertTriangle, ArrowUpRight, Brain, Send,
-  RefreshCw, Zap, CheckCircle2, TrendingDown,
+  RefreshCw, Zap, CheckCircle2,
   GitBranch, Layers,
 } from 'lucide-react'
 
@@ -37,19 +37,20 @@ const STAGE_LABELS: Record<string, string> = {
   negotiation: 'Negotiation',
 }
 
-const RISK_COLORS: Record<string, string> = {
-  high: 'var(--accent-danger)',
-  medium: 'var(--accent-warning)',
-  low: 'var(--accent-success)',
+const STATUS_CHIP: Record<string, { background: string; color: string; label: string }> = {
+  in_cycle:  { background: 'rgba(99,102,241,0.12)', color: '#818cf8', label: 'In cycle' },
+  confirmed: { background: 'rgba(99,102,241,0.08)', color: '#818cf8', label: 'Confirmed' },
+  suggested: { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.50)', label: 'Proposed' },
+  deployed:  { background: 'rgba(52,211,153,0.10)', color: '#34d399', label: 'Deployed' },
 }
 
-// ─── Left Column: Revenue at Risk ────────────────────────────────────────────
-function RevenueAtRiskColumn() {
-  const { data, isLoading } = useSWR('/api/dashboard/summary', fetcher, {
+// ─── Left Column: Loop Activity ───────────────────────────────────────────────
+function LoopStatusColumn() {
+  const { data, isLoading } = useSWR('/api/dashboard/loops', fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 120000,
   })
-  const summary = data?.data
+  const loops = data?.data
 
   return (
     <div style={{
@@ -66,118 +67,201 @@ function RevenueAtRiskColumn() {
         borderBottom: '1px solid var(--border-subtle)',
         flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <TrendingDown size={14} color="var(--accent-danger)" />
-          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Revenue at Risk</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <GitBranch size={14} color="var(--accent-primary)" />
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Loop Activity</span>
         </div>
-        {isLoading ? (
-          <div style={{ height: '18px', width: '120px', borderRadius: '4px' }} className="skeleton" />
-        ) : summary ? (
-          <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--accent-danger)', letterSpacing: '-0.03em', lineHeight: 1 }}>
-            {formatCurrency(summary.revenueAtRisk)}
-            <span style={{ fontSize: '12px', fontWeight: 400, color: 'var(--text-tertiary)', marginLeft: '6px' }}>
-              across {summary.dealsAtRisk} deal{summary.dealsAtRisk !== 1 ? 's' : ''}
-            </span>
-          </div>
-        ) : (
-          <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>No open deals</div>
-        )}
+        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Deal-driven product work</div>
       </div>
 
-      {/* Deal list */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
-        {isLoading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px' }}>
-            {[1, 2, 3].map(i => (
-              <div key={i} style={{ height: '72px', borderRadius: '8px' }} className="skeleton" />
-            ))}
-          </div>
-        ) : summary?.topDeals?.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {summary.topDeals.map((deal: any) => (
-              <Link key={deal.id} href={`/deals/${deal.id}`} style={{ textDecoration: 'none' }}>
-                <div
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: 'var(--radius-md)',
-                    background: 'var(--bg-glass)',
-                    border: `1px solid var(--border-subtle)`,
-                    borderLeft: `3px solid ${RISK_COLORS[deal.riskLevel]}`,
-                    transition: 'background var(--transition-fast)',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-glass-hover)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-glass)'}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {deal.company ?? deal.name}
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                        {STAGE_LABELS[deal.stage] ?? deal.stage}
-                        {deal.daysStale > 0 && ` · ${deal.daysStale}d stale`}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
-                      {formatCurrency(deal.value)}
-                    </div>
-                  </div>
-                  {deal.primaryBlocker && (
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      Missing: {deal.primaryBlocker}
-                    </div>
-                  )}
-                  <div style={{
-                    marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px',
-                    padding: '2px 8px', borderRadius: '100px',
-                    background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.20)',
-                    fontSize: '11px', fontWeight: 500, color: '#818cf8',
-                  }}>
-                    {deal.topAction}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div style={{ textAlign: 'center', padding: '40px 16px' }}>
-            <CheckCircle2 size={24} style={{ color: 'var(--accent-success)', marginBottom: '10px' }} />
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Pipeline looks healthy</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px' }}>No at-risk deals detected</div>
-            <Link href="/deals" style={{
-              display: 'inline-flex', alignItems: 'center', gap: '4px',
-              marginTop: '12px', padding: '6px 14px', borderRadius: 'var(--radius-sm)',
-              background: 'var(--bg-glass)', border: '1px solid var(--border-default)',
-              fontSize: '12px', color: 'var(--text-secondary)',
-            }}>
-              View deals <ArrowUpRight size={10} />
-            </Link>
-          </div>
-        )}
-      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-      {/* Focus bullets */}
-      {!isLoading && summary?.focusBullets?.length > 0 && (
-        <div style={{
-          borderTop: '1px solid var(--border-subtle)',
-          padding: '12px 16px',
-          flexShrink: 0,
-          background: 'var(--bg-hero)',
-        }}>
+        {/* Active Loops */}
+        <div>
           <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
-            What to focus on
+            Active Loops
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            {summary.focusBullets.map((bullet: string, i: number) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '7px', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                <span style={{ color: 'var(--accent-primary)', flexShrink: 0, marginTop: '1px' }}>•</span>
-                {bullet}
-              </div>
-            ))}
-          </div>
+          {isLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {[1, 2].map(i => (
+                <div key={i} style={{ height: '68px', borderRadius: '8px' }} className="skeleton" />
+              ))}
+            </div>
+          ) : loops?.activeLoops?.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {loops.activeLoops.map((loop: any) => (
+                <Link key={loop.dealId} href={`/deals/${loop.dealId}`} style={{ textDecoration: 'none' }}>
+                  <div
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      background: 'var(--bg-glass)',
+                      border: '1px solid var(--border-subtle)',
+                      transition: 'background var(--transition-fast)',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-glass-hover)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-glass)'}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {loop.dealCompany || loop.dealName}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                          {loop.summary}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                        {STATUS_CHIP[loop.highestStatus] && (
+                          <span style={{
+                            padding: '2px 7px', borderRadius: '100px',
+                            background: STATUS_CHIP[loop.highestStatus].background,
+                            color: STATUS_CHIP[loop.highestStatus].color,
+                            fontSize: '10px', fontWeight: 500,
+                          }}>
+                            {STATUS_CHIP[loop.highestStatus].label}
+                          </span>
+                        )}
+                        <ArrowUpRight size={12} color="var(--text-tertiary)" />
+                      </div>
+                    </div>
+                    {loop.issues?.length > 0 && (
+                      <div style={{ marginTop: '6px', display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                        {loop.issues.map((issue: any) => (
+                          <span key={issue.id} style={{
+                            fontSize: '10px', color: 'var(--text-tertiary)',
+                            background: 'var(--bg-glass)', border: '1px solid var(--border-subtle)',
+                            padding: '1px 6px', borderRadius: '4px',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px',
+                          }}>
+                            {issue.id}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div style={{ padding: '16px 0', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>No active loops</div>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Loops Completed This Week */}
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+            Completed This Week
+          </div>
+          {isLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {[1, 2].map(i => (
+                <div key={i} style={{ height: '52px', borderRadius: '8px' }} className="skeleton" />
+              ))}
+            </div>
+          ) : loops?.completedLoops?.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              {loops.completedLoops.map((loop: any) => (
+                <Link key={loop.dealId} href={`/deals/${loop.dealId}`} style={{ textDecoration: 'none' }}>
+                  <div
+                    style={{
+                      padding: '9px 12px',
+                      borderRadius: 'var(--radius-sm)',
+                      background: 'var(--bg-glass)',
+                      border: '1px solid var(--border-subtle)',
+                      transition: 'background var(--transition-fast)',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-glass-hover)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-glass)'}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {loop.dealCompany || loop.dealName}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '1px' }}>
+                          {loop.issueCount} issue{loop.issueCount !== 1 ? 's' : ''} shipped
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                        {loop.emailSent && (
+                          <span style={{
+                            padding: '2px 7px', borderRadius: '100px',
+                            background: STATUS_CHIP.deployed.background,
+                            color: STATUS_CHIP.deployed.color,
+                            fontSize: '10px', fontWeight: 500,
+                          }}>
+                            Follow-up sent
+                          </span>
+                        )}
+                        <CheckCircle2 size={12} color="var(--accent-success)" />
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div style={{ padding: '16px 0', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>No loops completed this week</div>
+            </div>
+          )}
+        </div>
+
+        {/* Deals Ready for Loop */}
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+            Ready for Loop
+          </div>
+          {isLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {[1, 2, 3].map(i => (
+                <div key={i} style={{ height: '44px', borderRadius: '8px' }} className="skeleton" />
+              ))}
+            </div>
+          ) : loops?.readyForLoop?.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              {loops.readyForLoop.map((deal: any) => (
+                <Link key={deal.dealId} href={`/deals/${deal.dealId}`} style={{ textDecoration: 'none' }}>
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-sm)',
+                      background: 'var(--bg-glass)',
+                      border: '1px solid var(--border-subtle)',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px',
+                      transition: 'background var(--transition-fast)',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-glass-hover)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-glass)'}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {deal.dealCompany || deal.dealName}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '1px' }}>
+                        {STAGE_LABELS[deal.stage] ?? deal.stage}
+                        {deal.dealValue > 0 && ` · ${formatCurrency(deal.dealValue)}`}
+                      </div>
+                    </div>
+                    <ArrowUpRight size={12} color="var(--text-tertiary)" style={{ flexShrink: 0 }} />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div style={{ padding: '16px 0', textAlign: 'center' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>All open deals have active loops</div>
+            </div>
+          )}
+        </div>
+
+      </div>
     </div>
   )
 }
@@ -324,7 +408,6 @@ function AskHalvexColumn() {
                 color: msg.role === 'user' ? '#fff' : 'var(--text-secondary)',
                 lineHeight: 1.65,
                 whiteSpace: 'pre-wrap',
-                backdropFilter: msg.role === 'assistant' ? 'blur(16px)' : undefined,
               }}>
                 {msg.content}
               </div>
@@ -598,7 +681,7 @@ export default function DashboardPage() {
       overflow: 'hidden',
       margin: '-22px -24px',
     }}>
-      <RevenueAtRiskColumn />
+      <LoopStatusColumn />
       <AskHalvexColumn />
       <ProductSignalColumn />
 
