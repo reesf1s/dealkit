@@ -243,7 +243,7 @@ export async function handleSlackMessage(
 ): Promise<SlackAgentResult> {
   const text = userText.trim()
   if (!text) {
-    return textResult("Hi! Ask me anything about your pipeline. Try: "how is the Coke deal?" or "what deals need attention?"")
+    return textResult('Hi! Ask me anything about your pipeline. Try: "how is the Coke deal?" or "what deals need attention?"')
   }
 
   // ── Check for pending confirmation ────────────────────────────────────────
