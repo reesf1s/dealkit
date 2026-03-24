@@ -18,6 +18,7 @@ import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { requestBrainRebuild } from '@/lib/brain-rebuild'
+import { extractAndLinkFeatures } from '@/lib/meeting-intelligence'
 import Anthropic from '@anthropic-ai/sdk'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
@@ -93,9 +94,12 @@ export async function POST(
       .set(patch)
       .where(eq(dealLogs.id, dealId))
 
-    // ── Trigger brain rebuild in background ───────────────────────────────────
+    // ── Trigger brain rebuild + meeting intelligence in background ────────────
     after(async () => {
-      try { await requestBrainRebuild(workspaceId, 'meeting_notes_logged') } catch { /* non-fatal */ }
+      await Promise.allSettled([
+        requestBrainRebuild(workspaceId, 'meeting_notes_logged'),
+        extractAndLinkFeatures(dealId, notes, workspaceId, userId),
+      ])
     })
 
     return NextResponse.json({
