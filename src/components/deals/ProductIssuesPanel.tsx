@@ -86,14 +86,6 @@ export function ProductIssuesPanel({ dealId }: Props) {
     fetcher,
   )
 
-  // Don't render if Linear isn't connected
-  if (!statusData?.data?.connected) return null
-
-  const allLinks = linksData?.data ?? []
-  const visibleLinks = allLinks.filter(l => l.status !== 'dismissed')
-  const confirmed = visibleLinks.filter(l => l.status === 'confirmed' || l.status === 'in_cycle' || l.status === 'deployed')
-  const suggested = visibleLinks.filter(l => l.status === 'suggested')
-
   const handleConfirm = useCallback(async (link: DealLinearLink) => {
     setActionLoading(link.id)
     try {
@@ -146,6 +138,14 @@ export function ProductIssuesPanel({ dealId }: Props) {
       setActionLoading(null)
     }
   }, [dealId, linkInput, mutateLinks, toast])
+
+  // Don't render if Linear isn't connected
+  if (!statusData?.data?.connected) return null
+
+  const allLinks = linksData?.data ?? []
+  const visibleLinks = allLinks.filter(l => l.status !== 'dismissed')
+  const confirmed = visibleLinks.filter(l => l.status === 'confirmed' || l.status === 'in_cycle' || l.status === 'deployed')
+  const suggested = visibleLinks.filter(l => l.status === 'suggested')
 
   if (visibleLinks.length === 0 && !showLinkInput) {
     // Show empty state only if we've loaded
