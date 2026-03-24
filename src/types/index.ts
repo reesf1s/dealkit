@@ -145,6 +145,7 @@ export interface DealLog {
   parentDealId?: string | null
   expansionType?: ExpansionType | null
   projectPlan?: ProjectPlan | null
+  conversionScore?: number | null
   createdAt: Date
   updatedAt: Date
 }
