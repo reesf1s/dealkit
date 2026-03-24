@@ -34,8 +34,12 @@ const amber = '#F59E0B'
 const maxW = '960px'
 
 export default async function LandingPage() {
-  const { userId } = await auth()
-  if (userId) redirect('/dashboard')
+  try {
+    const { userId } = await auth()
+    if (userId) redirect('/dashboard')
+  } catch {
+    // Clerk not configured in this environment — show landing page
+  }
 
   return (
     <div
