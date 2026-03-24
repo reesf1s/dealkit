@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Halvex
 
-## Getting Started
+AI-powered deal intelligence platform. Halvex is an MCP layer connecting sales and product via Linear, Slack, and HubSpot. It scores live deals, surfaces objection patterns, and closes the loop between what prospects say and what gets built.
 
-First, run the development server:
+## What it does
 
+- **Deal scores** — composite win-probability (text signals + local ML + global Bayesian prior) on every open deal
+- **Objection engine** — extracts objections from notes, maps them to case studies and battle cards
+- **Product gap loop** — links deal friction to Linear issues and notifies sales on deployment via Slack
+- **Knowledge base** — company profile, competitors, case studies, and collateral kept fresh automatically
+
+## Local setup
+
+**1. Install**
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**2. Environment variables** — copy `.env.example` to `.env.local`:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Required | Description |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | ✓ | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✓ | Supabase service role key |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | ✓ | Clerk key (`pk_test_…` dev / `pk_live_…` prod) |
+| `CLERK_SECRET_KEY` | ✓ | Clerk secret key |
+| `ANTHROPIC_API_KEY` | ✓ | Anthropic API key |
+| `STRIPE_SECRET_KEY` | ✓ | Stripe secret key |
+| `STRIPE_WEBHOOK_SECRET` | ✓ | Stripe webhook signing secret |
+| `SENTRY_DSN` | — | Sentry DSN — omit to disable error tracking |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**3. Run migrations** (Supabase is source of truth for schema):
+```bash
+npx supabase db push        # against remote
+# or: npx supabase db reset  # local dev
+```
 
-## Learn More
+**4. Start dev server**
+```bash
+npm run dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Architecture
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/app/           Next.js App Router pages + API routes
+src/components/    React UI (deals, pipeline, dashboard)
+src/lib/
+  db/              Drizzle schema + typed DB client
+  ml/              Composite score, text-signal extraction
+  deal-ml.ts       Per-workspace logistic regression
+  global-model.ts  Cross-workspace Bayesian prior (nightly cron)
+  workspace-brain.ts  RAG knowledge compression
+  slack-agent.ts   Slack MCP event handlers
+supabase/migrations/  SQL migrations — schema source of truth
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Score model
 
-## Deploy on Vercel
+Win-probability blends three components: text signals (always on), local ML logistic regression (activates at 10 closed deals), and a global cross-workspace Bayesian prior (blends down as local data grows, requires 50 pool deals to train). See `src/lib/ml/composite-score.ts` and `src/lib/global-model.ts`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Migration workflow
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`supabase/migrations/` is the schema source of truth. The Drizzle schema in `src/lib/db/schema.ts` is kept in sync manually for TypeScript type generation only — do not run `drizzle-kit push` against production. See `CONTRIBUTING.md`.
+
+## Integrations
+
+Clerk (auth), Supabase + pgvector (DB + embeddings), Anthropic Claude (AI), Linear MCP (product gaps), Slack MCP (closed-loop delivery), HubSpot (CRM sync), Stripe (billing).
