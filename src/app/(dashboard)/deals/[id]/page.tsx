@@ -4594,7 +4594,7 @@ export default function DealDetailPage() {
   )
   const parentDeal = parentDealRes?.data ?? parentDealRes
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'activity' | 'team'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'manage' | 'notes' | 'activity' | 'team'>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [winStoryOpen, setWinStoryOpen] = useState(false)
   const [wonDeal, setWonDeal] = useState<any>(null)
@@ -4816,16 +4816,17 @@ export default function DealDetailPage() {
       }}>
         {[
           { id: 'overview', label: 'Overview' },
-          { id: 'plans', label: (() => {
+          { id: 'manage', label: (() => {
             const openTodos = deal?.todos?.filter((t: any) => !t.done) ?? []
             const openTasks = (deal?.projectPlan as any)?.phases?.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete') ?? []
             const openCriteria = (deal?.successCriteriaTodos as any[])?.filter((c: any) => !c.achieved) ?? []
             const total = openTodos.length + openTasks.length + openCriteria.length
-            if (total === 0) return 'Plans'
-            return `Plans (${total})`
+            if (total === 0) return 'Manage'
+            return `Manage (${total})`
           })() },
+          { id: 'notes', label: 'Notes' },
           { id: 'activity', label: 'Activity' },
-          { id: 'collateral', label: 'Collateral' },
+          { id: 'team', label: 'Team' },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{
             padding: isMobile ? '12px 16px' : '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '500',
@@ -4860,17 +4861,18 @@ export default function DealDetailPage() {
               objectionWinMap={objectionWinMap} objectionConditionalWins={objectionConditionalWins}
             />
           )}
+          {activeTab === 'manage' && (
+            <ActionsTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
+          )}
           {activeTab === 'notes' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <ActivityTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
-              <ActionsTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
-              <CollateralTab dealId={id} deal={deal} />
+              <ActivityLog dealId={id} deal={deal} onUpdate={() => mutate()} />
             </div>
           )}
           {activeTab === 'activity' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <AiActivitySection dealId={id} />
-              <ActivityLog dealId={id} deal={deal} onUpdate={() => mutate()} />
             </div>
           )}
           {activeTab === 'team' && (
