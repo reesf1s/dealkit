@@ -792,3 +792,29 @@ export type NewSlackConnectionRow = typeof slackConnections.$inferInsert
 
 export type SlackUserMappingRow = typeof slackUserMappings.$inferSelect
 export type NewSlackUserMappingRow = typeof slackUserMappings.$inferInsert
+
+// ─────────────────────────────────────────────────────────────────────────────
+// workspace_ml_models  (persisted LR weights to skip retraining on brain rebuild)
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { numeric } from 'drizzle-orm/pg-core'
+
+/**
+ * Caches trained logistic-regression weights per workspace.
+ * Before each brain rebuild we hash the sorted closed-deal IDs; if the hash
+ * matches the cached row we load the weights instead of retraining.
+ */
+export const workspaceMlModels = pgTable('workspace_ml_models', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  workspaceId:      text('workspace_id').notNull(),
+  modelType:        text('model_type').notNull().default('win_probability'),
+  weights:          jsonb('weights').notNull(),   // { coefficients: number[], bias: number, featureNames: string[] }
+  trainingSize:     integer('training_size').notNull(),
+  accuracy:         numeric('accuracy', { precision: 5, scale: 4 }),
+  lastTrainedAt:    timestamp('last_trained_at', { withTimezone: true }).notNull().defaultNow(),
+  closedDealsHash:  text('closed_deals_hash'),   // sorted closed-deal ID join; null = always retrain
+  createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.workspaceId, t.modelType)])
+
+export type WorkspaceMlModelRow = typeof workspaceMlModels.$inferSelect
+export type NewWorkspaceMlModelRow = typeof workspaceMlModels.$inferInsert
