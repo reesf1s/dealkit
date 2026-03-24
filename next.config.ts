@@ -14,18 +14,18 @@ try {
 
 const csp = [
   "default-src 'self'",
-  // Scripts: self + Clerk (uses eval for its own UI) + Vercel Speed Insights
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.accounts.dev https://*.clerk.accounts.dev",
-  // Styles: self + inline (needed for CSS-in-JS / Tailwind)
-  "style-src 'self' 'unsafe-inline'",
+  // Scripts: self + Clerk (uses eval for its own UI) + Mixpanel analytics + Stripe + Vercel insights
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://clerk.halvex.ai https://clerk.accounts.dev https://*.clerk.accounts.dev https://cdn.mxpnl.com https://js.stripe.com https://*.vercel-insights.com",
+  // Styles: self + inline (needed for CSS-in-JS / Tailwind) + Google Fonts
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   // Images: self + data URIs + any HTTPS (avatars, logos)
   "img-src 'self' data: blob: https:",
-  // Fonts: self + data URIs
-  "font-src 'self' data:",
-  // Connections: self + Supabase + Clerk + Vercel analytics
-  `connect-src 'self' ${supabaseHosts} https://clerk.accounts.dev https://*.clerk.accounts.dev https://vitals.vercel-insights.com https://*.vercel-insights.com`,
+  // Fonts: self + data URIs + Google Fonts CDN
+  "font-src 'self' data: https://fonts.gstatic.com",
+  // Connections: self + Supabase + Clerk (custom domain + accounts) + Stripe + Vercel analytics
+  `connect-src 'self' ${supabaseHosts} https://*.supabase.co wss://*.supabase.co https://clerk.halvex.ai https://clerk.accounts.dev https://*.clerk.accounts.dev wss://ws.clerk.accounts.dev https://api.stripe.com https://vitals.vercel-insights.com https://*.vercel-insights.com`,
   // Frames: Clerk hosted pages only
-  "frame-src https://accounts.clerk.dev https://*.clerk.accounts.dev",
+  "frame-src https://accounts.clerk.dev https://*.clerk.accounts.dev https://clerk.halvex.ai https://js.stripe.com",
   // Workers: self
   "worker-src 'self' blob:",
 ].join('; ')

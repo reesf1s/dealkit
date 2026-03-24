@@ -75,6 +75,7 @@ export async function GET() {
     return NextResponse.json({ data: enriched })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error'
-    return NextResponse.json({ error: msg }, { status: 500 })
+    console.error('[in-cycle] DB error, returning empty:', msg)
+    return NextResponse.json({ data: [] })
   }
 }
