@@ -13,8 +13,10 @@
  *   halvex_scope_issue_to_cycle  — generate user story / AC for an issue (Phase 2; actual cycle add is Phase 3)
  *   halvex_search_linear_issues  — search cached Linear issues by keyword
  *   halvex_get_linear_issue      — get full details of a specific Linear issue
- *   halvex_find_at_risk_deals    — pipeline: deals needing attention now
- *   halvex_get_win_loss_signals  — workspace-level win/loss intelligence
+ *   halvex_find_at_risk_deals        — pipeline: deals needing attention now
+ *   halvex_get_win_loss_signals      — workspace-level win/loss intelligence
+ *   halvex_generate_release_email    — generate/retrieve a release email for a deployed issue
+ *   halvex_mark_issue_deployed       — manual override: mark issue deployed + fire notification
  */
 
 import { z } from 'zod'
@@ -25,6 +27,8 @@ import { getWorkspaceBrain } from '@/lib/workspace-brain'
 import { getRelevantContext } from '@/lib/agent-context'
 import { decrypt, getEncryptionKey } from '@/lib/encrypt'
 import { getIssue } from '@/lib/linear-client'
+import { getOrGenerateReleaseEmail } from '@/lib/release-email-generator'
+import { notifyIssueDeployed } from '@/lib/slack-notify'
 import type { ToolContext, ToolResult } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -553,6 +557,144 @@ export const halvex_get_win_loss_signals = {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// halvex_generate_release_email
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const halvex_generate_release_email = {
+  description: 'Generate (or retrieve cached) a release email for a deal + deployed Linear issue. Use when user says "write a release email for Coke" or "draft an email for ENG-36". Returns subject + body the user can copy and send.',
+  parameters: z.object({
+    dealQuery: z.string().describe('Deal name or company name'),
+    linearIssueId: z.string().describe('Linear issue identifier e.g. "ENG-42"'),
+  }),
+  execute: async (
+    { dealQuery, linearIssueId }: { dealQuery: string; linearIssueId: string },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const context = await getRelevantContext(ctx.workspaceId, dealQuery, 1)
+    const deal = context.relevantDeals[0]
+    if (!deal) return { result: `No deal found matching "${dealQuery}"` }
+
+    const issueId = linearIssueId.toUpperCase()
+
+    // Verify the issue is deployed for this deal
+    const [link] = await db
+      .select({ status: dealLinearLinks.status, linearTitle: dealLinearLinks.linearTitle })
+      .from(dealLinearLinks)
+      .where(and(
+        eq(dealLinearLinks.workspaceId, ctx.workspaceId),
+        eq(dealLinearLinks.dealId, deal.id),
+        eq(dealLinearLinks.linearIssueId, issueId),
+      ))
+      .limit(1)
+
+    if (!link) {
+      return { result: `${issueId} is not linked to ${deal.dealName}. Link it first with halvex_link_issue_to_deal.` }
+    }
+
+    if (link.status !== 'deployed') {
+      return {
+        result: `${issueId} is currently "${link.status}" for ${deal.dealName} — it needs to be deployed before generating a release email. Use halvex_mark_issue_deployed to mark it live.`,
+      }
+    }
+
+    try {
+      const email = await getOrGenerateReleaseEmail(ctx.workspaceId, deal.id, issueId)
+      if (!email) return { result: `Could not generate release email — missing deal or issue context.` }
+
+      return {
+        result: [
+          `✉️ *Release email for ${deal.prospectCompany}*`,
+          '',
+          `*Subject:* ${email.subject}`,
+          '',
+          `*Body:*`,
+          email.body,
+          '',
+          `_Copy this and send from your email client. No auto-send in v1._`,
+        ].join('\n'),
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return { result: `Failed to generate release email: ${msg.slice(0, 200)}` }
+    }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// halvex_mark_issue_deployed
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const halvex_mark_issue_deployed = {
+  description: 'Manual override: mark a Linear issue as deployed for a deal and fire the proactive deployment notification. Use when the webhook did not fire or the user says "mark ENG-42 as live for Coke". This updates the link status and sends a Slack DM prompt to write a release email.',
+  parameters: z.object({
+    dealQuery: z.string().describe('Deal name or company name'),
+    linearIssueId: z.string().describe('Linear issue identifier e.g. "ENG-42"'),
+  }),
+  execute: async (
+    { dealQuery, linearIssueId }: { dealQuery: string; linearIssueId: string },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const context = await getRelevantContext(ctx.workspaceId, dealQuery, 1)
+    const deal = context.relevantDeals[0]
+    if (!deal) return { result: `No deal found matching "${dealQuery}"` }
+
+    const issueId = linearIssueId.toUpperCase()
+
+    // Fetch link + issue title
+    const [link] = await db
+      .select({ linearTitle: dealLinearLinks.linearTitle, status: dealLinearLinks.status })
+      .from(dealLinearLinks)
+      .where(and(
+        eq(dealLinearLinks.workspaceId, ctx.workspaceId),
+        eq(dealLinearLinks.dealId, deal.id),
+        eq(dealLinearLinks.linearIssueId, issueId),
+      ))
+      .limit(1)
+
+    if (!link) {
+      return { result: `${issueId} is not linked to ${deal.dealName}. Use halvex_link_issue_to_deal first.` }
+    }
+
+    if (link.status === 'deployed') {
+      return { result: `${issueId} is already marked as deployed for ${deal.dealName}.` }
+    }
+
+    // Mark deployed
+    await db
+      .update(dealLinearLinks)
+      .set({ status: 'deployed', deployedAt: new Date(), updatedAt: new Date() })
+      .where(and(
+        eq(dealLinearLinks.workspaceId, ctx.workspaceId),
+        eq(dealLinearLinks.dealId, deal.id),
+        eq(dealLinearLinks.linearIssueId, issueId),
+      ))
+
+    await db.insert(mcpActionLog).values({
+      workspaceId: ctx.workspaceId,
+      actionType: 'issue_deployed_manual',
+      dealId: deal.id,
+      linearIssueId: issueId,
+      triggeredBy: 'slack',
+      status: 'complete',
+      payload: { manualOverride: true },
+    })
+
+    // Fire proactive notification (fire-and-forget)
+    notifyIssueDeployed(ctx.workspaceId, {
+      dealId: deal.id,
+      dealName: deal.dealName,
+      company: deal.prospectCompany,
+      linearIssueId: issueId,
+      linearTitle: link.linearTitle ?? issueId,
+    }).catch(err => console.error('[halvex_mark_issue_deployed] notify failed:', err))
+
+    return {
+      result: `🚀 *${issueId}* marked as deployed for *${deal.dealName}* (${deal.prospectCompany}).\n\nI've sent you a DM with options to write a release email. Or reply here: "write release email for ${deal.prospectCompany}"`,
+    }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Combined export for the Slack agent
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -562,9 +704,11 @@ export const slackTools = {
   halvex_confirm_link,
   halvex_dismiss_link,
   halvex_mark_issue_released,
+  halvex_mark_issue_deployed,
   halvex_scope_issue_to_cycle,
   halvex_search_linear_issues,
   halvex_get_linear_issue,
   halvex_find_at_risk_deals,
   halvex_get_win_loss_signals,
+  halvex_generate_release_email,
 } as const

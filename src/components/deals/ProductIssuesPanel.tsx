@@ -32,6 +32,7 @@ interface DealLinearLink {
   relevanceScore: number
   linkType: string
   status: 'suggested' | 'confirmed' | 'dismissed' | 'in_cycle' | 'deployed'
+  hasReleaseEmail?: boolean
   createdAt: string
 }
 
@@ -263,6 +264,22 @@ export function ProductIssuesPanel({ dealId }: Props) {
 
                 {/* Score label */}
                 <span style={{ fontSize: '10px', color, flexShrink: 0 }}>{label}</span>
+
+                {/* Deployed + email drafted badge */}
+                {link.status === 'deployed' && (
+                  <span style={{
+                    fontSize: '9px',
+                    padding: '1px 5px',
+                    borderRadius: '3px',
+                    flexShrink: 0,
+                    background: link.hasReleaseEmail ? 'rgba(16,185,129,0.12)' : 'rgba(99,102,241,0.12)',
+                    color: link.hasReleaseEmail ? '#10B981' : '#6366F1',
+                    fontWeight: 600,
+                    letterSpacing: '0.02em',
+                  }}>
+                    {link.hasReleaseEmail ? '✉ Email drafted' : '🚀 Deployed'}
+                  </span>
+                )}
 
                 {/* External link */}
                 {link.linearIssueUrl && (

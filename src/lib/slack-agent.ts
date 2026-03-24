@@ -129,12 +129,14 @@ Slack/Linear tools:
 - halvex_link_issue_to_deal — manually link an issue to a deal
 - halvex_confirm_link — confirm a suggested link
 - halvex_dismiss_link — dismiss a link
-- halvex_mark_issue_released — mark issue as deployed, trigger release email flow
+- halvex_mark_issue_released — mark issue as deployed (basic, no notification)
+- halvex_mark_issue_deployed — mark issue as deployed + fire proactive Slack DM notification
 - halvex_scope_issue_to_cycle — generate user story + AC for an issue
 - halvex_search_linear_issues — search issues by keyword
 - halvex_get_linear_issue — get details of a specific issue
 - halvex_find_at_risk_deals — show deals needing attention
 - halvex_get_win_loss_signals — workspace win/loss intelligence
+- halvex_generate_release_email — generate or retrieve cached release email for a deployed issue
 
 ═══ SLACK FORMATTING RULES ═══
 
@@ -155,10 +157,10 @@ For the "scope to cycle" flow:
 4. User replies "only issue 36" → call halvex_scope_issue_to_cycle for ENG-36
 
 For the "release email" flow:
-1. An issue goes live (user says "ENG-36 is deployed" or webhook triggers)
-2. Call halvex_mark_issue_released to update the link status
-3. Ask "Shall I write Coke a release email to try to convert them?"
-4. User says "yes" → call generate_content with type=email, include the feature in context
+1. An issue goes live (user says "ENG-36 is deployed for Coke" or webhook triggers automatically)
+2. Call halvex_mark_issue_deployed — this marks deployed AND fires a Slack DM with Block Kit buttons
+3. If user says "yes write the email" or "draft release email for Coke" → call halvex_generate_release_email
+4. Return the subject + body formatted for copy-paste — no auto-send in v1
 
 ═══ BEHAVIOR RULES ═══
 
