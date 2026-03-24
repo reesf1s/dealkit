@@ -15,49 +15,49 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // ── Backgrounds (light glass design system) ─────────────────
-        background: '#f5f5f7',
-        surface: 'rgba(255,255,255,0.72)',
-        elevated: 'rgba(255,255,255,0.90)',
-        overlay: 'rgba(255,255,255,0.97)',
+        // ── Backgrounds (dark design system — #171717 base) ──────────
+        background: '#171717',
+        surface: 'rgba(255,255,255,0.03)',
+        elevated: 'rgba(255,255,255,0.06)',
+        overlay: 'rgba(255,255,255,0.09)',
 
-        // ── Text (dark on light) ─────────────────────────────────────
-        'text-primary': '#1d1d1f',
-        'text-secondary': '#6e6e73',
-        'text-tertiary': '#aeaeb2',
-        'text-disabled': 'rgba(0,0,0,0.25)',
+        // ── Text (white opacity on dark) ─────────────────────────────
+        'text-primary': 'rgba(255,255,255,0.92)',
+        'text-secondary': 'rgba(255,255,255,0.50)',
+        'text-tertiary': 'rgba(255,255,255,0.28)',
+        'text-disabled': 'rgba(255,255,255,0.18)',
 
         // ── Accent (indigo) ──────────────────────────────────────────
         accent: {
           DEFAULT: '#6366f1',
           hover: '#818cf8',
-          muted: 'rgba(99,102,241,0.10)',
+          muted: 'rgba(99,102,241,0.12)',
           subtle: 'rgba(99,102,241,0.06)',
         },
 
-        // ── Semantic ─────────────────────────────────────────────────
+        // ── Semantic (brighter on dark) ───────────────────────────────
         success: {
-          DEFAULT: '#10b981',
-          muted: 'rgba(16,185,129,0.10)',
+          DEFAULT: '#34d399',
+          muted: 'rgba(52,211,153,0.12)',
         },
         warning: {
-          DEFAULT: '#f59e0b',
-          muted: 'rgba(245,158,11,0.10)',
+          DEFAULT: '#fbbf24',
+          muted: 'rgba(251,191,36,0.12)',
         },
         danger: {
-          DEFAULT: '#ef4444',
-          muted: 'rgba(239,68,68,0.10)',
+          DEFAULT: '#f87171',
+          muted: 'rgba(248,113,113,0.12)',
         },
         info: {
-          DEFAULT: '#3B82F6',
-          muted: 'rgba(59,130,246,0.10)',
+          DEFAULT: '#60a5fa',
+          muted: 'rgba(96,165,250,0.12)',
         },
 
-        // ── Borders ──────────────────────────────────────────────────
+        // ── Borders (white opacity on dark) ──────────────────────────
         border: {
-          DEFAULT: 'rgba(0,0,0,0.08)',
-          subtle: 'rgba(0,0,0,0.04)',
-          strong: 'rgba(0,0,0,0.14)',
+          DEFAULT: 'rgba(255,255,255,0.08)',
+          subtle: 'rgba(255,255,255,0.04)',
+          strong: 'rgba(255,255,255,0.14)',
           accent: 'rgba(99,102,241,0.25)',
         },
       },
@@ -125,14 +125,14 @@ const config: Config = {
         96: '384px',
       },
       boxShadow: {
-        sm: '0 1px 4px rgba(0,0,0,0.06)',
-        DEFAULT: '0 2px 12px rgba(0,0,0,0.08)',
-        md: '0 4px 20px rgba(0,0,0,0.10)',
-        lg: '0 8px 40px rgba(0,0,0,0.12)',
-        xl: '0 16px 60px rgba(0,0,0,0.14)',
-        accent: '0 0 0 2px rgba(99,102,241,0.35)',
-        'inset-border': 'inset 0 0 0 1px rgba(0,0,0,0.08)',
-        glow: '0 0 20px rgba(99,102,241,0.20)',
+        sm: '0 1px 4px rgba(0,0,0,0.30)',
+        DEFAULT: '0 2px 12px rgba(0,0,0,0.40)',
+        md: '0 4px 20px rgba(0,0,0,0.50)',
+        lg: '0 8px 40px rgba(0,0,0,0.60)',
+        xl: '0 16px 60px rgba(0,0,0,0.70)',
+        accent: '0 0 0 2px rgba(99,102,241,0.40)',
+        'inset-border': 'inset 0 0 0 1px rgba(255,255,255,0.08)',
+        glow: '0 0 20px rgba(99,102,241,0.30)',
       },
       animation: {
         'skeleton-pulse': 'skeleton-pulse 1.5s ease-in-out infinite',

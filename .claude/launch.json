@@ -3,9 +3,10 @@
   "configurations": [
     {
       "name": "dealkit-dev",
-      "runtimeExecutable": "/bin/zsh",
-      "runtimeArgs": ["-c", "source ~/.zshrc 2>/dev/null; source ~/.zprofile 2>/dev/null; source ~/.nvm/nvm.sh 2>/dev/null; cd /Users/rees/Desktop/DealKit && npm run dev"],
-      "port": 3000
+      "runtimeExecutable": "/opt/homebrew/bin/npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3001,
+      "autoPort": true
     }
   ]
 }
