@@ -15,7 +15,7 @@ import {
   ExternalLink, ChevronDown, ChevronRight, PenTool,
   TrendingUp, ArrowUpRight, RefreshCw,
   FileCheck, BarChart2, File,
-  ArrowUp, ArrowDown
+  ArrowUp, ArrowDown, MessageSquare
 } from 'lucide-react'
 import type { DealContact, DealLink as DealLinkType, DealLinkType as LinkTypeEnum } from '@/types'
 import { useSidebar } from '@/components/layout/SidebarContext'
@@ -4598,6 +4598,10 @@ export default function DealDetailPage() {
   const [winStoryOpen, setWinStoryOpen] = useState(false)
   const [wonDeal, setWonDeal] = useState<any>(null)
   const [discoveringIssues, setDiscoveringIssues] = useState(false)
+  const [logMeetingOpen, setLogMeetingOpen] = useState(false)
+  const [meetingNotesDraft, setMeetingNotesDraft] = useState('')
+  const [meetingLogging, setMeetingLogging] = useState(false)
+  const [meetingToast, setMeetingToast] = useState<string | null>(null)
 
   const [isMobile, setIsMobile] = useState(false)
   useEffect(() => {
@@ -4789,6 +4793,18 @@ export default function DealDetailPage() {
                   <Edit size={13} /> Edit
                 </button>
                 <button
+                  onClick={() => setLogMeetingOpen(true)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
+                    background: 'rgba(52,211,153,0.10)', border: '1px solid rgba(52,211,153,0.22)',
+                    borderRadius: '8px', color: '#34d399', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.18)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.10)' }}
+                >
+                  <MessageSquare size={13} /> Log meeting
+                </button>
+                <button
                   onClick={async () => {
                     setDiscoveringIssues(true)
                     try { await fetch(`/api/deals/${id}/discover-issues`, { method: 'POST' }) }
@@ -4859,6 +4875,84 @@ export default function DealDetailPage() {
         onWon={(data) => { setWonDeal(data); setWinStoryOpen(true) }}
       />
       <WinStoryPromptModal wonDeal={wonDeal} open={winStoryOpen} onOpenChange={setWinStoryOpen} currencySymbol={currencySymbol} />
+
+      {/* ── Log Meeting modal ─────────────────────────────────────────── */}
+      {logMeetingOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', zIndex: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: '#0d0f1a', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '16px', width: '100%', maxWidth: '560px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#e2e8f0', margin: 0, letterSpacing: '-0.02em' }}>Log meeting</h3>
+                <p style={{ fontSize: '12px', color: '#475569', margin: '4px 0 0' }}>Paste your notes — Halvex will extract objections, competitors, and product gaps automatically.</p>
+              </div>
+              <button onClick={() => setLogMeetingOpen(false)} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', padding: '4px' }}>
+                <X size={16} />
+              </button>
+            </div>
+            <textarea
+              value={meetingNotesDraft}
+              onChange={e => setMeetingNotesDraft(e.target.value)}
+              placeholder="Paste or type your meeting notes here…"
+              rows={10}
+              style={{
+                width: '100%', resize: 'vertical', padding: '12px 14px',
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)',
+                borderRadius: '10px', fontSize: '13px', lineHeight: 1.6,
+                color: 'rgba(255,255,255,0.82)', outline: 'none', caretColor: '#818cf8',
+                fontFamily: 'inherit',
+              }}
+              onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.40)')}
+              onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.10)')}
+            />
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => { setLogMeetingOpen(false); setMeetingNotesDraft('') }}
+                style={{ padding: '9px 16px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#64748b', fontSize: '13px', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={meetingLogging || !meetingNotesDraft.trim()}
+                onClick={async () => {
+                  if (!meetingNotesDraft.trim()) return
+                  setMeetingLogging(true)
+                  try {
+                    const res = await fetch(`/api/deals/${id}/meeting-notes`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ notes: meetingNotesDraft }),
+                    })
+                    const json = await res.json()
+                    setLogMeetingOpen(false)
+                    setMeetingNotesDraft('')
+                    setMeetingToast(json.message ?? 'Meeting notes logged.')
+                    setTimeout(() => setMeetingToast(null), 5000)
+                    mutate()
+                  } finally {
+                    setMeetingLogging(false)
+                  }
+                }}
+                style={{
+                  padding: '9px 20px', borderRadius: '8px',
+                  background: meetingLogging || !meetingNotesDraft.trim() ? 'rgba(99,102,241,0.40)' : 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                  border: '1px solid rgba(99,102,241,0.40)',
+                  color: '#fff', fontSize: '13px', fontWeight: 600,
+                  cursor: meetingLogging || !meetingNotesDraft.trim() ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {meetingLogging ? 'Extracting…' : 'Log & extract'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Meeting toast ───────────────────────────────────────────────── */}
+      {meetingToast && (
+        <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 800, background: '#0d0f1a', border: '1px solid rgba(52,211,153,0.30)', borderRadius: '12px', padding: '14px 18px', color: '#34d399', fontSize: '13px', fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,0.50)', maxWidth: '360px' }}>
+          ✓ {meetingToast}
+        </div>
+      )}
 
       {/* ── Tab content ────────────────────────────────────────────────── */}
       {!deal ? (
