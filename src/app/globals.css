@@ -271,6 +271,10 @@ a {
    every single file.
 ══════════════════════════════════════════════════ */
 :root {
+  /* Copilot panel glass background */
+  --glass-copilot-bg: rgba(13, 15, 26, 0.72);
+  --copilot-bg: rgba(13, 15, 26, 0.72);
+
   /* Old glass-card-* vars → dark glass */
   --glass-card-bg: rgba(255, 255, 255, 0.03);
   --glass-card-border: rgba(255, 255, 255, 0.12);

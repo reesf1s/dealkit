@@ -129,13 +129,15 @@ export default function DashboardPage() {
           LEFT COLUMN — Pipeline Overview (gradient)
       ═══════════════════════════════════════════════════════════ */}
       <div style={{
-        background: 'linear-gradient(160deg, #1e1b4b 0%, #312e81 25%, #4c1d95 55%, #5b21b6 85%, #6d28d9 100%)',
+        background: 'linear-gradient(160deg, rgba(30,27,75,0.85) 0%, rgba(49,46,129,0.80) 25%, rgba(76,29,149,0.75) 55%, rgba(91,33,182,0.70) 85%, rgba(109,40,217,0.65) 100%)',
+        backdropFilter: 'blur(24px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(24px) saturate(180%)',
         padding: '32px 26px',
         display: 'flex',
         flexDirection: 'column',
         gap: '0',
         overflowY: 'auto',
-        borderRight: '1px solid rgba(255,255,255,0.06)',
+        borderRight: '1px solid rgba(255,255,255,0.08)',
         position: 'relative',
       }}>
         {/* Subtle radial overlay */}
@@ -262,7 +264,9 @@ export default function DashboardPage() {
           MIDDLE COLUMN — Ask Halvex Chat
       ═══════════════════════════════════════════════════════════ */}
       <div style={{
-        background: '#0d0f1a',
+        background: 'rgba(13,15,26,0.75)',
+        backdropFilter: 'blur(20px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(160%)',
         display: 'flex',
         flexDirection: 'column',
         borderRight: '1px solid rgba(255,255,255,0.06)',
@@ -427,7 +431,9 @@ export default function DashboardPage() {
           RIGHT COLUMN — Today / Morning Update
       ═══════════════════════════════════════════════════════════ */}
       <div style={{
-        background: '#0d0f1a',
+        background: 'rgba(13,15,26,0.75)',
+        backdropFilter: 'blur(20px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(160%)',
         display: 'flex',
         flexDirection: 'column',
         height: '100%',

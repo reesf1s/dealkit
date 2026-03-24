@@ -17,7 +17,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
     <div style={{
       display: 'flex',
       minHeight: '100vh',
-      background: 'var(--bg)',
+      background: 'transparent',
       position: 'relative',
     }}>
 
