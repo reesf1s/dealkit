@@ -86,14 +86,15 @@ export default function DashboardPage() {
     e?.preventDefault()
     const q = inputText.trim()
     if (!q || chatLoading) return
-    setMessages(prev => [...prev, { role: 'user', content: q }])
+    const newMessages: ChatMessage[] = [...messages, { role: 'user', content: q }]
+    setMessages(newMessages)
     setInputText('')
     setChatLoading(true)
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: q }),
+        body: JSON.stringify({ messages: newMessages }),
       })
       const json = await res.json()
       const reply = json.reply ?? json.message ?? json.data?.reply ?? 'No response'
