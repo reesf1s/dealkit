@@ -171,8 +171,9 @@ export async function POST(req: NextRequest) {
   }
 
   if (!matchedWorkspaceId) {
-    // If no webhook secret is configured, fall back to processing all workspaces
-    // (acceptable for initial setup; tighten once webhook secret is stored)
+    // No workspace matched the signature — reject unverified webhooks.
+    // This happens when the webhook secret hasn't been stored in the DB yet.
+    // Set up the secret in Settings → Linear to enable the deployment flow.
     console.warn('[webhook/linear] No matching workspace found for webhook — signature unverified')
     return NextResponse.json({ data: { received: true, verified: false } })
   }

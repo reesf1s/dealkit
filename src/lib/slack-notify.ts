@@ -97,14 +97,6 @@ export async function notifyHealthDrop(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// notifyNewIssueLink
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Send a DM when a new high-relevance Linear issue link is created (score ≥ 80).
- * Called from linear-signal-match.ts after a new link is inserted.
- */
-// ─────────────────────────────────────────────────────────────────────────────
 // notifyIssueDeployed
 // ─────────────────────────────────────────────────────────────────────────────
 
