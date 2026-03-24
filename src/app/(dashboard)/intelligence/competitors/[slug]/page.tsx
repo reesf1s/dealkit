@@ -219,11 +219,11 @@ export default function CompetitorBattlecardPage() {
                 </ul>
               </div>
             )}
-            {compProfile.ourDifferentiators?.length > 0 && (
+            {compProfile.differentiators?.length > 0 && (
               <div>
                 <p style={{ fontSize: '11px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>Our differentiators</p>
                 <ul style={{ margin: 0, padding: '0 0 0 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {compProfile.ourDifferentiators.slice(0, 4).map((s: string, i: number) => (
+                  {compProfile.differentiators.slice(0, 4).map((s: string, i: number) => (
                     <li key={i} style={{ fontSize: '12px', color: '#6ee7b7', lineHeight: 1.5 }}>{s}</li>
                   ))}
                 </ul>
