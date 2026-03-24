@@ -22,7 +22,7 @@
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { dealLinearLinks, linearIssuesCache, linearIntegrations, dealLogs, mcpActionLog } from '@/lib/db/schema'
-import { eq, and, like, or } from 'drizzle-orm'
+import { eq, and, like, or, inArray } from 'drizzle-orm'
 import { getWorkspaceBrain } from '@/lib/workspace-brain'
 import { getRelevantContext } from '@/lib/agent-context'
 import { decrypt, getEncryptionKey } from '@/lib/encrypt'
@@ -1054,6 +1054,7 @@ export const halvex_discover_issues = {
           .from(linearIssuesCache)
           .where(and(
             eq(linearIssuesCache.workspaceId, ctx.workspaceId),
+            inArray(linearIssuesCache.linearIssueId, issueIds),
           ))
       : []
 
