@@ -254,6 +254,7 @@ export function allIssuesDeployedBlocks(info: {
   emailSubject: string
   emailBody: string
   callSchedulingMessage: string
+  hubspotConnected?: boolean
 }): SlackBlock[] {
   const blocks: SlackBlock[] = []
 
@@ -288,10 +289,24 @@ export function allIssuesDeployedBlocks(info: {
     `_${info.callSchedulingMessage}_`
   ))
 
-  // Actions
+  // Actions — HubSpot send button if connected, otherwise a reminder to copy
   blocks.push(actionsBlock([
     { text: '📊 View deal', url: `${APP_URL}/deals/${info.dealId}` },
+    ...(info.hubspotConnected
+      ? [{ text: '📤 Send via HubSpot', actionId: `send_via_hubspot_${info.dealId}`, style: 'primary' as const }]
+      : [{ text: '📋 Copy email', actionId: `copy_release_email_${info.dealId}` }]
+    ),
     { text: 'Skip', actionId: `skip_release_email_${info.dealId}` },
+  ]))
+
+  // Follow-up nudge block
+  blocks.push(dividerBlock())
+  blocks.push(sectionBlock(
+    `⏰ *Follow-up reminder* — want me to nudge you if ${info.contactName ? info.contactName : info.company} hasn't responded in 3 days?`
+  ))
+  blocks.push(actionsBlock([
+    { text: '✅ Yes, remind me', actionId: `schedule_followup_${info.dealId}`, style: 'primary' },
+    { text: 'No thanks', actionId: `skip_followup_${info.dealId}` },
   ]))
 
   return blocks

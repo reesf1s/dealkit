@@ -64,6 +64,8 @@ export default function DashboardPage() {
   const { data: hubspotRes } = useSWR('/api/integrations/hubspot/status', fetcher, { revalidateOnFocus: false, dedupingInterval: 120000 })
   // Integration status MUST always be scoped to workspace_id. Never expose cross-workspace data.
   const { data: linearRes } = useSWR('/api/integrations/linear/status', fetcher, { revalidateOnFocus: false, dedupingInterval: 120000 })
+  const { data: mcpActionsRes } = useSWR('/api/mcp-actions/recent?limit=5', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
+  const { data: inCycleRes } = useSWR('/api/deals/in-cycle', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
   const [regenerating, setRegenerating] = useState(false)
 
   const overview = overviewRes?.data
@@ -518,6 +520,129 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* ══ IN-CYCLE LINEAR ISSUES ══ */}
+      {(() => {
+        const inCycleItems: any[] = inCycleRes?.data ?? []
+        if (inCycleItems.length === 0) return null
+        const dealGroups = inCycleItems.reduce((acc: Record<string, any[]>, item: any) => {
+          const key = item.dealId ?? 'unknown'
+          if (!acc[key]) acc[key] = []
+          acc[key].push(item)
+          return acc
+        }, {})
+        const dealCount = Object.keys(dealGroups).length
+        return (
+          <div style={{ ...card, padding: '0', overflow: 'hidden' }}>
+            <div style={{ padding: '14px 20px 10px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <GitBranch size={13} style={{ color: '#818cf8' }} />
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.80)' }}>
+                  In-cycle issues linked to your deals
+                </span>
+              </div>
+              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.30)' }}>
+                {inCycleItems.length} issue{inCycleItems.length !== 1 ? 's' : ''} across {dealCount} deal{dealCount !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <div style={{ padding: '8px 12px 12px' }}>
+              {inCycleItems.slice(0, 6).map((item: any) => (
+                <div key={item.id} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: '10px',
+                  padding: '8px 10px', borderRadius: '8px',
+                  background: 'rgba(255,255,255,0.02)', marginBottom: '4px',
+                  border: '1px solid rgba(255,255,255,0.04)',
+                }}>
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#818cf8', marginTop: '5px', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.75)' }}>
+                        {item.linearTitle ?? item.linearIssueId}
+                      </span>
+                      <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.30)' }}>{item.linearIssueId}</span>
+                      {item.daysInCycle !== null && (
+                        <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)' }}>· {item.daysInCycle}d in sprint</span>
+                      )}
+                    </div>
+                    {item.dealName && (
+                      <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', marginTop: '1px' }}>
+                        {item.dealName} {item.prospectCompany ? `(${item.prospectCompany})` : ''}
+                      </div>
+                    )}
+                    {item.addressesRisk && (
+                      <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', marginTop: '1px', fontStyle: 'italic' }}>
+                        → &ldquo;{item.addressesRisk.slice(0, 80)}&rdquo;
+                      </div>
+                    )}
+                  </div>
+                  {item.linearIssueUrl && (
+                    <a href={item.linearIssueUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0, marginTop: '2px' }}>
+                      <ArrowUpRight size={11} />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ══ RECENT AI ACTIONS ══ */}
+      {(() => {
+        const recentActions: any[] = mcpActionsRes?.data ?? []
+        if (recentActions.length === 0) return null
+        const actionEmoji: Record<string, string> = {
+          issue_scoped_to_cycle: '🔄',
+          release_email_generated: '✉️',
+          all_issues_deployed_notification: '🚀',
+          hubspot_email_logged: '📤',
+          follow_up_reminder: '⏰',
+          link_dismissed: '✕',
+        }
+        return (
+          <div style={{ ...card, padding: '0', overflow: 'hidden' }}>
+            <div style={{ padding: '14px 20px 10px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Sparkles size={13} style={{ color: '#a78bfa' }} />
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.80)' }}>
+                  Recent AI actions
+                </span>
+              </div>
+            </div>
+            <div style={{ padding: '8px 12px 12px' }}>
+              {recentActions.map((action: any) => {
+                const emoji = actionEmoji[action.actionType] ?? '🤖'
+                const timeAgo = action.createdAt ? (() => {
+                  const diff = Date.now() - new Date(action.createdAt).getTime()
+                  const mins = Math.floor(diff / 60000)
+                  if (mins < 60) return `${mins}m ago`
+                  const hrs = Math.floor(mins / 60)
+                  if (hrs < 24) return `${hrs}h ago`
+                  return `${Math.floor(hrs / 24)}d ago`
+                })() : ''
+                return (
+                  <div key={action.id} style={{
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    padding: '7px 10px', borderRadius: '8px',
+                    marginBottom: '3px',
+                  }}>
+                    <span style={{ fontSize: '13px', flexShrink: 0 }}>{emoji}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.65)' }}>{action.label}</span>
+                      {action.dealName && (
+                        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.30)', marginLeft: '6px' }}>
+                          · {action.dealName}
+                        </span>
+                      )}
+                    </div>
+                    <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.20)', flexShrink: 0 }}>{timeAgo}</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ══ CONNECTED STATUS ══ */}
       <div style={{ ...card, padding: '14px 20px' }}>

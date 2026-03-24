@@ -24,7 +24,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isSlackConfigured, verifySlackRequest, getSlackBotToken, getWorkspaceBySlackTeam, slackPostMessage } from '@/lib/slack-client'
 import { getOrGenerateReleaseEmail } from '@/lib/release-email-generator'
 import { db } from '@/lib/db'
-import { mcpActionLog, dealLinearLinks, dealLogs, linearIssuesCache } from '@/lib/db/schema'
+import { mcpActionLog, dealLinearLinks, dealLogs, linearIssuesCache, hubspotIntegrations } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { markdownToBlocks, errorBlocks } from '@/lib/slack-blocks'
 
@@ -302,6 +302,158 @@ async function handleSkipReleaseEmail(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// handleSendViaHubspot — log the release email as a sent email in HubSpot CRM
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function handleSendViaHubspot(
+  workspaceId: string,
+  token: string,
+  dmChannelId: string,
+  dealId: string,
+): Promise<void> {
+  try {
+    // Get deal + contact info
+    const [deal] = await db
+      .select({
+        dealName: dealLogs.dealName,
+        prospectCompany: dealLogs.prospectCompany,
+        prospectName: dealLogs.prospectName,
+        contacts: dealLogs.contacts,
+      })
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId)))
+      .limit(1)
+
+    if (!deal) {
+      await slackPostMessage(token, dmChannelId, errorBlocks('Could not find deal to send email for.'), 'Error')
+      return
+    }
+
+    // Get HubSpot integration
+    const [hsIntegration] = await db
+      .select({ accessToken: hubspotIntegrations.accessToken })
+      .from(hubspotIntegrations)
+      .where(eq(hubspotIntegrations.workspaceId, workspaceId))
+      .limit(1)
+
+    if (!hsIntegration) {
+      await slackPostMessage(token, dmChannelId, errorBlocks('HubSpot is not connected. Connect it in Settings → Integrations.'), 'HubSpot not connected')
+      return
+    }
+
+    // Get the most recent release email from action log
+    const [emailLog] = await db
+      .select({ result: mcpActionLog.result })
+      .from(mcpActionLog)
+      .where(and(
+        eq(mcpActionLog.workspaceId, workspaceId),
+        eq(mcpActionLog.dealId, dealId),
+        eq(mcpActionLog.actionType, 'release_email_generated'),
+        eq(mcpActionLog.status, 'complete'),
+      ))
+      .orderBy(mcpActionLog.createdAt)
+      .limit(1)
+
+    const emailResult = emailLog?.result as { subject?: string; body?: string } | null
+    const contacts = (deal.contacts as { name?: string; email?: string }[]) ?? []
+    const primaryContact = deal.prospectName ?? contacts[0]?.name ?? 'Contact'
+    const primaryEmail = contacts[0]?.email
+
+    if (!emailResult?.subject || !emailResult?.body) {
+      await slackPostMessage(token, dmChannelId, errorBlocks('No release email found to send. Draft one first.'), 'No email')
+      return
+    }
+
+    // Log as an email engagement in HubSpot via Engagements API v1
+    const hsBody = {
+      engagement: { active: true, type: 'EMAIL' },
+      associations: {},
+      metadata: {
+        from: { email: 'noreply@halvex.io', firstName: 'Halvex', lastName: 'AI' },
+        to: primaryEmail ? [{ email: primaryEmail }] : [],
+        subject: emailResult.subject,
+        text: emailResult.body,
+        html: `<p>${emailResult.body.replace(/\n/g, '<br>')}</p>`,
+        sentVia: 'halvex',
+      },
+    }
+
+    const hsRes = await fetch('https://api.hubapi.com/engagements/v1/engagements', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${hsIntegration.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(hsBody),
+    })
+
+    if (!hsRes.ok) {
+      const errText = await hsRes.text().catch(() => '')
+      console.error('[slack/actions] HubSpot engagement create failed:', hsRes.status, errText)
+      await slackPostMessage(token, dmChannelId, errorBlocks('Could not log email in HubSpot. Check your integration in Settings → Integrations.'), 'HubSpot error')
+      return
+    }
+
+    await db.insert(mcpActionLog).values({
+      workspaceId,
+      actionType: 'hubspot_email_logged',
+      dealId,
+      triggeredBy: 'slack',
+      status: 'complete',
+      payload: { trigger: 'block_action', subject: emailResult.subject },
+    })
+
+    const confirmText = `✅ *Email sent to ${primaryContact} via HubSpot*\nLogged under the ${deal.dealName} deal.`
+    await slackPostMessage(token, dmChannelId, markdownToBlocks(confirmText), confirmText)
+  } catch (e) {
+    console.error('[slack/actions] handleSendViaHubspot failed:', e)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// handleScheduleFollowup — log a follow-up reminder intent to mcp_action_log
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function handleScheduleFollowup(
+  workspaceId: string,
+  token: string,
+  dmChannelId: string,
+  dealId: string,
+  slackUserId: string,
+): Promise<void> {
+  try {
+    const [deal] = await db
+      .select({ dealName: dealLogs.dealName, prospectName: dealLogs.prospectName, prospectCompany: dealLogs.prospectCompany })
+      .from(dealLogs)
+      .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId)))
+      .limit(1)
+
+    const scheduledFor = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) // now + 3 days
+    const contactName = deal?.prospectName ?? deal?.prospectCompany ?? 'the prospect'
+
+    await db.insert(mcpActionLog).values({
+      workspaceId,
+      actionType: 'follow_up_reminder',
+      dealId,
+      triggeredBy: 'slack',
+      status: 'pending',
+      payload: {
+        slackUserId,
+        scheduledFor: scheduledFor.toISOString(),
+        note: `Follow up on release email — check if ${contactName} has responded`,
+        dealName: deal?.dealName,
+        company: deal?.prospectCompany,
+      },
+    })
+
+    const msg = `✅ *Reminder set for ${scheduledFor.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}* — I'll nudge you if ${contactName} hasn't responded to the release email.`
+    await slackPostMessage(token, dmChannelId, markdownToBlocks(msg), msg)
+  } catch (e) {
+    console.error('[slack/actions] handleScheduleFollowup failed:', e)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Handler
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -396,6 +548,34 @@ export async function POST(req: NextRequest) {
         const dealId = dismissMatch[1]
         const linearIssueId = dismissMatch[2]
         await handleDismissIssueLink(workspaceId, dealId, linearIssueId)
+        return
+      }
+
+      // send_via_hubspot_{dealId}
+      const hubspotMatch = actionId.match(/^send_via_hubspot_([a-f0-9-]{36})$/)
+      if (hubspotMatch) {
+        const dealId = hubspotMatch[1]
+        const channel = dmChannelId ?? payload.user.id
+        await handleSendViaHubspot(workspaceId, token, channel, dealId)
+        return
+      }
+
+      // schedule_followup_{dealId}
+      const followupMatch = actionId.match(/^schedule_followup_([a-f0-9-]{36})$/)
+      if (followupMatch) {
+        const dealId = followupMatch[1]
+        const channel = dmChannelId ?? payload.user.id
+        await handleScheduleFollowup(workspaceId, token, channel, dealId, payload.user.id)
+        return
+      }
+
+      // skip_followup_{dealId} — just a no-op dismiss
+      if (actionId.startsWith('skip_followup_')) {
+        return
+      }
+
+      // copy_release_email_{dealId} — no-op (clipboard copy happens client-side)
+      if (actionId.startsWith('copy_release_email_')) {
         return
       }
 

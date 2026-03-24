@@ -46,6 +46,33 @@ import type { ToolContext, ToolResult } from './types'
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Find which dealRisk best matches an issue by simple word overlap.
+ * Returns the best matching risk text (verbatim), or the first risk as fallback.
+ */
+function findBestMatchingRisk(
+  issueTitle: string,
+  issueDescription: string | null,
+  dealRisks: string[],
+): string | null {
+  if (dealRisks.length === 0) return null
+  const issueText = `${issueTitle} ${issueDescription ?? ''}`.toLowerCase()
+
+  let bestRisk: string | null = null
+  let bestScore = 0
+
+  for (const risk of dealRisks) {
+    const riskWords = risk.toLowerCase().split(/\W+/).filter(w => w.length > 3)
+    const score = riskWords.filter(w => issueText.includes(w)).length
+    if (score > bestScore) {
+      bestScore = score
+      bestRisk = risk
+    }
+  }
+
+  return bestRisk ?? dealRisks[0] ?? null
+}
+
 async function getLinearApiKey(workspaceId: string): Promise<string | null> {
   const [row] = await db
     .select({ apiKeyEnc: linearIntegrations.apiKeyEnc })
@@ -1037,10 +1064,15 @@ export const halvex_discover_issues = {
       .filter(i => cacheMap.has(i.issueId))
       .slice(0, 5)
 
-    // 5. Upsert discovered issues as suggested links
+    // 5. Upsert discovered issues as suggested links, computing addresses_risk per issue
     for (const issue of hydratedIssues) {
       const cached = cacheMap.get(issue.issueId)
       const scoreScaled = Math.round(issue.similarity * 100)
+      const addressesRisk = findBestMatchingRisk(
+        cached?.title ?? issue.issueId,
+        null,
+        risks,
+      )
 
       await db
         .insert(dealLinearLinks)
@@ -1053,6 +1085,7 @@ export const halvex_discover_issues = {
           relevanceScore: scoreScaled,
           linkType: 'feature_gap',
           status: 'suggested',
+          addressesRisk,
         })
         .onConflictDoUpdate({
           target: [dealLinearLinks.dealId, dealLinearLinks.linearIssueId],
@@ -1060,6 +1093,7 @@ export const halvex_discover_issues = {
             relevanceScore: scoreScaled,
             linearTitle: cached?.title ?? issue.issueId,
             linearIssueUrl: cached?.linearIssueUrl ?? null,
+            addressesRisk,
             updatedAt: new Date(),
           },
         })
@@ -1155,6 +1189,9 @@ export const halvex_discover_issues = {
       const statusEmoji = link.status === 'in_cycle' ? '🔄' : link.status === 'confirmed' ? '✅' : '💡'
       const urlPart = link.linearIssueUrl ? ` <${link.linearIssueUrl}|↗>` : ''
       lines.push(`${statusEmoji} *${link.linearIssueId}* — ${link.linearTitle ?? link.linearIssueId} (${link.relevanceScore}% match)${urlPart}`)
+      if (link.addressesRisk) {
+        lines.push(`  _→ addresses "${link.addressesRisk.slice(0, 100)}"_`)
+      }
     }
 
     const candidatesNotInCycle = allCandidateIds.filter(id => {
@@ -1233,7 +1270,16 @@ export const halvex_bulk_scope_to_cycle = {
     const dealRisks = Array.isArray(dealRow.dealRisks) ? (dealRow.dealRisks as string[]) : []
 
     // 4. Process each issue
-    const results: { issueId: string; title: string; userStory: string; success: boolean; error?: string }[] = []
+    const results: {
+      issueId: string
+      title: string
+      userStory: string
+      acceptanceCriteria: string[]
+      linearUrl: string | null
+      addressesRisk: string | null
+      success: boolean
+      error?: string
+    }[] = []
 
     for (const rawId of issueIds.slice(0, 10)) {
       const issueId = rawId.toUpperCase()
@@ -1304,7 +1350,13 @@ export const halvex_bulk_scope_to_cycle = {
         // Add to cycle
         await scopeIssueToCycle(issueId, cycle.id, apiKey)
 
-        // Upsert link with scoped content + in_cycle status
+        // Compute which objection this issue addresses
+        const addressesRisk = existingLink?.addressesRisk
+          ?? findBestMatchingRisk(issueTitle, issueDescription, dealRisks)
+
+        const linearUrl = cachedIssue?.linearIssueUrl ?? existingLink?.linearIssueUrl ?? null
+
+        // Upsert link with scoped content + in_cycle status + addresses_risk
         await db
           .insert(dealLinearLinks)
           .values({
@@ -1312,6 +1364,7 @@ export const halvex_bulk_scope_to_cycle = {
             dealId: deal.id,
             linearIssueId: issueId,
             linearTitle: issueTitle,
+            linearIssueUrl: linearUrl,
             relevanceScore: existingLink?.relevanceScore ?? 80,
             linkType: existingLink?.linkType ?? 'feature_gap',
             status: 'in_cycle',
@@ -1320,6 +1373,7 @@ export const halvex_bulk_scope_to_cycle = {
             scopedUserStory: userStory,
             scopedAcceptanceCriteria: acceptanceCriteria.join('\n'),
             cycleId: cycle.id,
+            addressesRisk,
           })
           .onConflictDoUpdate({
             target: [dealLinearLinks.dealId, dealLinearLinks.linearIssueId],
@@ -1331,6 +1385,7 @@ export const halvex_bulk_scope_to_cycle = {
               scopedUserStory: userStory,
               scopedAcceptanceCriteria: acceptanceCriteria.join('\n'),
               cycleId: cycle.id,
+              addressesRisk,
             },
           })
 
@@ -1349,10 +1404,10 @@ export const halvex_bulk_scope_to_cycle = {
           },
         })
 
-        results.push({ issueId, title: issueTitle, userStory, success: true })
+        results.push({ issueId, title: issueTitle, userStory, acceptanceCriteria, linearUrl, addressesRisk, success: true })
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
-        results.push({ issueId, title: issueId, userStory: '', success: false, error: msg.slice(0, 100) })
+        results.push({ issueId, title: issueId, userStory: '', acceptanceCriteria: [], linearUrl: null, addressesRisk: null, success: false, error: msg.slice(0, 100) })
       }
     }
 
@@ -1372,6 +1427,16 @@ export const halvex_bulk_scope_to_cycle = {
     for (const r of succeeded) {
       lines.push(`• *${r.issueId}* — ${r.title}`)
       lines.push(`  _${r.userStory}_`)
+      if (r.addressesRisk) {
+        lines.push(`  → addresses _"${r.addressesRisk.slice(0, 100)}"_`)
+      }
+      // Top 2 acceptance criteria
+      for (const ac of r.acceptanceCriteria.slice(0, 2)) {
+        lines.push(`  ✓ ${ac}`)
+      }
+      if (r.linearUrl) {
+        lines.push(`  <${r.linearUrl}|View in Linear ↗>`)
+      }
     }
 
     if (failed.length > 0) {
