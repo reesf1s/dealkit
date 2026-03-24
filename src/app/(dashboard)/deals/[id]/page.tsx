@@ -4827,7 +4827,7 @@ export default function DealDetailPage() {
         borderRadius: '10px', padding: '4px',
         overflowX: isMobile ? 'auto' : undefined, scrollbarWidth: 'none',
       }}>
-        {([
+        {[
           { id: 'overview', label: 'Overview' },
           { id: 'plans', label: (() => {
             const openTodos = deal?.todos?.filter((t: any) => !t.done) ?? []
