@@ -28,6 +28,9 @@ import { kMeans as kMeansLib, type ClusterResult } from './ml/kmeans'
 import { fitOLS } from './ml/ols'
 import { extractTextSignals } from '@/lib/text-signals'
 import type { GlobalPriorInput } from '@/lib/global-pool'
+import { db } from '@/lib/db'
+import { workspaceMlModels } from '@/lib/db/schema'
+import { and, eq } from 'drizzle-orm'
 
 export const ML_FEATURE_NAMES = ML_FEATURE_NAMES_IMPORT
 
@@ -339,6 +342,77 @@ function computeLOO(examples: { features: number[]; label: number }[]): number {
     if ((prob >= 0.5 ? 1 : 0) === y[i]) correct++
   }
   return correct / X.length
+}
+
+/**
+ * k-fold cross-validation — O(k × n) vs LOO's O(n²).
+ * Used when n > 25; gives nearly identical accuracy estimates at ~1/30th the cost
+ * for n=150.
+ *
+ * Shuffle is seeded by a simple deterministic permutation so results are
+ * reproducible across rebuilds for the same dataset.
+ */
+function kFoldCrossValidate(
+  examples: { features: number[]; label: number }[],
+  k: number,
+  seed: number,
+): number {
+  if (examples.length < k) return 0
+  const cvOpts = { learningRate: 0.1, iterations: 300, l2Lambda: 0.01 }
+
+  // Seeded Fisher-Yates shuffle (LCG — good enough for fold assignment)
+  let rng = seed >>> 0
+  const next = () => { rng = (Math.imul(1664525, rng) + 1013904223) >>> 0; return rng / 0x100000000 }
+  const indices = examples.map((_, i) => i)
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(next() * (i + 1));
+    [indices[i], indices[j]] = [indices[j]!, indices[i]!]
+  }
+  const shuffled = indices.map(i => examples[i]!)
+
+  let totalCorrect = 0
+  let totalEvaluated = 0
+
+  for (let fold = 0; fold < k; fold++) {
+    const foldSize  = Math.floor(shuffled.length / k)
+    const start     = fold * foldSize
+    const end       = fold === k - 1 ? shuffled.length : start + foldSize
+
+    const holdout = shuffled.slice(start, end)
+    const trainSet = [...shuffled.slice(0, start), ...shuffled.slice(end)]
+
+    const trainX = trainSet.map(e => e.features)
+    const trainY = trainSet.map(e => e.label)
+    if (!trainY.includes(0) || !trainY.includes(1)) continue
+
+    const model = trainLogisticRegression(trainX, trainY, cvOpts)
+    for (const ex of holdout) {
+      const prob = predictProbability(model, ex.features)
+      if ((prob >= 0.5 ? 1 : 0) === ex.label) totalCorrect++
+      totalEvaluated++
+    }
+  }
+
+  return totalEvaluated > 0 ? totalCorrect / totalEvaluated : 0
+}
+
+/**
+ * Selects and runs cross-validation: k-fold (k=5) for n > 25, LOO otherwise.
+ * LOO is O(n²); k-fold is O(k×n) — ~30× faster at n=150.
+ */
+function computeCVAccuracy(
+  examples: { features: number[]; label: number }[],
+  workspaceIdSeed: string,
+): number {
+  if (examples.length > 25) {
+    // Hash workspace ID to a numeric seed for the shuffle
+    let seed = 0
+    for (let i = 0; i < workspaceIdSeed.length; i++) {
+      seed = (Math.imul(31, seed) + workspaceIdSeed.charCodeAt(i)) >>> 0
+    }
+    return kFoldCrossValidate(examples, 5, seed)
+  }
+  return computeLOO(examples)
 }
 
 // ─── Archetype helpers ────────────────────────────────────────────────────────
@@ -698,6 +772,8 @@ export function runMLEngine(
   allDeals: DealMLInput[],
   now = new Date(),
   globalPrior?: GlobalPriorInput | null,
+  cachedWeightsOverride?: CachedMLWeights | null,
+  workspaceId?: string,
 ): MLEngineResult {
   const closedWon  = allDeals.filter(d => d.stage === 'closed_won')
   const closedLost = allDeals.filter(d => d.stage === 'closed_lost')
@@ -778,20 +854,38 @@ export function runMLEngine(
     [...compStats.entries()].map(([k, s]) => [k, s.total > 0 ? s.wins / s.total : 0.5])
   )
 
-  // ── Rep win rates (feature 10: rep behaviour as ML dimension) ─────────────
-  const repStats = new Map<string, { wins: number; total: number }>()
+  // ── Rep win rates with recency decay (feature 10: rep behaviour) ────────────
+  // Exponential decay with 180-day half-life so a rep's old track record fades
+  // as more recent deals accumulate. Raw counts are replaced by weighted sums.
+  const HALF_LIFE_DAYS = 180
+  function repDecayWeight(deal: DealMLInput): number {
+    const closeTs = deal.stage === 'closed_won'
+      ? (deal.wonDate  ? new Date(deal.wonDate).getTime()  : null)
+      : (deal.lostDate ? new Date(deal.lostDate).getTime() : null)
+    if (!closeTs) return 1  // no close date — treat as fully weighted
+    const daysSince = (now.getTime() - closeTs) / (1000 * 60 * 60 * 24)
+    return Math.pow(0.5, daysSince / HALF_LIFE_DAYS)
+  }
+
+  const repDecayStats = new Map<string, { weightedWins: number; weightedTotal: number }>()
   for (const d of closed) {
     if (!d.repId) continue
-    const s = repStats.get(d.repId) ?? { wins: 0, total: 0 }
-    s.total++
-    if (d.stage === 'closed_won') s.wins++
-    repStats.set(d.repId, s)
+    const w = repDecayWeight(d)
+    const s = repDecayStats.get(d.repId) ?? { weightedWins: 0, weightedTotal: 0 }
+    s.weightedTotal += w
+    if (d.stage === 'closed_won') s.weightedWins += w
+    repDecayStats.set(d.repId, s)
   }
-  // Only use rep win rate if we have ≥ 3 closed deals for that rep; otherwise neutral 0.5
+  // Only use rep win rate if we have enough effective weight (≥ 3 unweighted deals equivalent)
+  const repCounts = new Map<string, number>()
+  for (const d of closed) {
+    if (!d.repId) continue
+    repCounts.set(d.repId, (repCounts.get(d.repId) ?? 0) + 1)
+  }
   const repWinRates = new Map<string, number>(
-    [...repStats.entries()]
-      .filter(([, s]) => s.total >= 3)
-      .map(([k, s]) => [k, s.wins / s.total])
+    [...repDecayStats.entries()]
+      .filter(([repId]) => (repCounts.get(repId) ?? 0) >= 3)
+      .map(([k, s]) => [k, s.weightedTotal > 0 ? s.weightedWins / s.weightedTotal : 0.5])
   )
 
   // ── Feature extraction for all deals ─────────────────────────────────────
@@ -809,32 +903,39 @@ export function runMLEngine(
     label:    d.stage === 'closed_won' ? 1 : 0,
   }))
 
-  const { weights: rawWeights, bias: rawBias } = trainLR(training.map(e => ({ features: e.features, label: e.label })))
-
-  // ── Bayesian blend with global prior (if available) ───────────────────────
-  // α_global = 1 / (1 + localClosedDeals / 10) — fades to zero as local data grows
-  // Global prior may have 10 features (before rep_win_rate was added); pad with 0 if needed.
-  let weights = rawWeights
-  let bias    = rawBias
+  // ── Train or restore cached weights ──────────────────────────────────────
+  let weights: number[]
+  let bias: number
   let globalAlpha = 0
-  if (globalPrior && globalPrior.weights.length >= ML_FEATURE_NAMES.length - 1) {
-    const paddedGlobalWeights = [...globalPrior.weights]
-    while (paddedGlobalWeights.length < ML_FEATURE_NAMES.length) paddedGlobalWeights.push(0)
-    globalAlpha  = 1 / (1 + closed.length / 10)
-    const localAlpha = 1 - globalAlpha
-    weights = paddedGlobalWeights.map((gw, i) => globalAlpha * gw + localAlpha * (rawWeights[i] ?? 0))
-    bias    = globalAlpha * globalPrior.bias + localAlpha * rawBias
-  }
-
-  // ── LOO accuracy ──────────────────────────────────────────────────────────
   let loo: number
-  if (closed.length <= 50) {
-    loo = computeLOO(training.map(e => ({ features: e.features, label: e.label })))
+
+  if (cachedWeightsOverride) {
+    // Cache hit: skip training, Bayesian blend, and CV entirely
+    weights = cachedWeightsOverride.weights
+    bias    = cachedWeightsOverride.bias
+    loo     = cachedWeightsOverride.looAccuracy
   } else {
-    const correct = training.filter(
-      e => (sigmoid(dot(weights, e.features) + bias) >= 0.5 ? 1 : 0) === e.label
-    ).length
-    loo = correct / training.length
+    const { weights: rawWeights, bias: rawBias } = trainLR(training.map(e => ({ features: e.features, label: e.label })))
+
+    // ── Bayesian blend with global prior (if available) ─────────────────────
+    // α_global = 1 / (1 + localClosedDeals / 10) — fades to zero as local data grows
+    // Global prior may have 10 features (before rep_win_rate was added); pad with 0 if needed.
+    weights = rawWeights
+    bias    = rawBias
+    if (globalPrior && globalPrior.weights.length >= ML_FEATURE_NAMES.length - 1) {
+      const paddedGlobalWeights = [...globalPrior.weights]
+      while (paddedGlobalWeights.length < ML_FEATURE_NAMES.length) paddedGlobalWeights.push(0)
+      globalAlpha  = 1 / (1 + closed.length / 10)
+      const localAlpha = 1 - globalAlpha
+      weights = paddedGlobalWeights.map((gw, i) => globalAlpha * gw + localAlpha * (rawWeights[i] ?? 0))
+      bias    = globalAlpha * globalPrior.bias + localAlpha * rawBias
+    }
+
+    // ── CV accuracy: k-fold (n>25) or LOO (n≤25) ─────────────────────────────
+    loo = computeCVAccuracy(
+      training.map(e => ({ features: e.features, label: e.label })),
+      workspaceId ?? 'default',
+    )
   }
 
   const featureImportance = ML_FEATURE_NAMES.map((name, i) => ({
@@ -1146,4 +1247,92 @@ export interface ScoreBreakdown {
   ml_active: boolean
   training_deals: number
   model_version: string
+}
+
+// ─── ML model cache — persists trained weights to workspace_ml_models ─────────
+
+export interface CachedMLWeights {
+  weights: number[]
+  bias: number
+  looAccuracy: number
+}
+
+/**
+ * Computes a cheap staleness key from sorted closed-deal IDs.
+ * If the key matches the DB row's closed_deals_hash, retraining is skipped.
+ */
+export function computeClosedDealHash(closedDealIds: string[]): string {
+  return [...closedDealIds].sort().join(',')
+}
+
+/**
+ * Loads the cached model weights for a workspace/modelType pair.
+ * Returns null if no cache exists or the hash doesn't match.
+ */
+export async function loadCachedModel(
+  workspaceId: string,
+  modelType: string,
+  closedDealsHash: string,
+): Promise<CachedMLWeights | null> {
+  try {
+    const [row] = await db
+      .select()
+      .from(workspaceMlModels)
+      .where(and(
+        eq(workspaceMlModels.workspaceId, workspaceId),
+        eq(workspaceMlModels.modelType, modelType),
+      ))
+      .limit(1)
+
+    if (!row || row.closedDealsHash !== closedDealsHash) return null
+
+    const stored = row.weights as { coefficients?: number[]; weights?: number[]; bias: number }
+    const weights = stored.coefficients ?? stored.weights ?? []
+    if (!Array.isArray(weights) || weights.length === 0) return null
+
+    return {
+      weights,
+      bias: stored.bias ?? 0,
+      looAccuracy: row.accuracy ? Number(row.accuracy) : 0,
+    }
+  } catch {
+    // Cache miss — non-fatal, will retrain
+    return null
+  }
+}
+
+/**
+ * Upserts trained model weights for a workspace into the cache table.
+ */
+export async function saveCachedModel(
+  workspaceId: string,
+  modelType: string,
+  model: TrainedMLModel,
+  closedDealsHash: string,
+): Promise<void> {
+  try {
+    await db
+      .insert(workspaceMlModels)
+      .values({
+        workspaceId,
+        modelType,
+        weights: { coefficients: model.weights, bias: model.bias, featureNames: [...model.featureNames] },
+        trainingSize: model.trainingSize,
+        accuracy: String(Math.round(model.looAccuracy * 10000) / 10000),
+        lastTrainedAt: new Date(),
+        closedDealsHash,
+      })
+      .onConflictDoUpdate({
+        target: [workspaceMlModels.workspaceId, workspaceMlModels.modelType],
+        set: {
+          weights: { coefficients: model.weights, bias: model.bias, featureNames: [...model.featureNames] },
+          trainingSize: model.trainingSize,
+          accuracy: String(Math.round(model.looAccuracy * 10000) / 10000),
+          lastTrainedAt: new Date(),
+          closedDealsHash,
+        },
+      })
+  } catch (err) {
+    console.error('[ml-cache] saveCachedModel failed (non-fatal):', err)
+  }
 }

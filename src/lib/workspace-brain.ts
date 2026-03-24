@@ -12,10 +12,11 @@
  * - staleDeals:  open deals with no update in 14+ days
  * - keyPatterns: recurring risk/objection themes across the pipeline
  */
+import { after } from 'next/server'
 import { db } from '@/lib/db'
 import { dealLogs, competitors as competitorRecords, productGaps as productGapsTable, collateral as collateralTable, workspaces as workspacesTable } from '@/lib/db/schema'
 import { eq, and, sql } from 'drizzle-orm'
-import { runMLEngine, computeCompositeScore, type TrainedMLModel, type DealMLPrediction, type MLTrends, type DealArchetype, type StageVelocityIntel, type CompetitivePattern, type ScoreCalibrationPoint, type CloseDateModel, type ScoreBreakdown, ML_MIN_TRAINING_DEALS } from '@/lib/deal-ml'
+import { runMLEngine, computeCompositeScore, computeClosedDealHash, loadCachedModel, saveCachedModel, type TrainedMLModel, type DealMLPrediction, type MLTrends, type DealArchetype, type StageVelocityIntel, type CompetitivePattern, type ScoreCalibrationPoint, type CloseDateModel, type ScoreBreakdown, ML_MIN_TRAINING_DEALS } from '@/lib/deal-ml'
 import { extractTextSignals, analyzeDeterioration, parseMeetingEntries, heuristicScore, type TextSignals } from '@/lib/text-signals'
 import { BRAIN_VERSION } from '@/lib/brain-constants'
 export { BRAIN_VERSION } from '@/lib/brain-constants'
@@ -380,19 +381,20 @@ const _pendingRebuilds = new Map<string, { timer: NodeJS.Timeout; reason: string
  *             This shim is kept for callers that haven't been migrated yet.
  */
 export function queueBrainRebuild(workspaceId: string, reason: string): void {
+  // Cancel any pending debounce entry (kept for bookkeeping; timer is no-op on serverless)
   const existing = _pendingRebuilds.get(workspaceId)
   if (existing) clearTimeout(existing.timer)
+  _pendingRebuilds.delete(workspaceId)
 
-  const timer = setTimeout(async () => {
-    _pendingRebuilds.delete(workspaceId)
+  // Use next/after so the rebuild runs after the response is sent on Vercel serverless,
+  // where setTimeout callbacks are silently dropped once the response is flushed.
+  after(async () => {
     try {
       await rebuildWorkspaceBrain(workspaceId, reason)
     } catch (e) {
       console.error(`[brain] queueBrainRebuild(${reason}) failed for ${workspaceId}:`, e)
     }
-  }, 5000)
-
-  _pendingRebuilds.set(workspaceId, { timer, reason })
+  })
 }
 
 /**
@@ -1869,7 +1871,19 @@ async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown')
   })
 
   if ((wonDeals.length + lostDeals.length) >= ML_MIN_TRAINING_DEALS || globalPrior) {
-    const mlResult = runMLEngine(mlInputs, now, globalPrior)
+    // ── ML model cache: skip retraining if closed-deal set is unchanged ────
+    const closedDeals = mlInputs.filter(d => d.stage === 'closed_won' || d.stage === 'closed_lost')
+    const closedHash  = computeClosedDealHash(closedDeals.map(d => d.id))
+    const cached      = await loadCachedModel(workspaceId, 'win_probability', closedHash)
+
+    const mlResult = runMLEngine(mlInputs, now, globalPrior, cached, workspaceId)
+
+    // If we trained a fresh model (cache miss), persist weights for next rebuild
+    if (!cached && mlResult.model) {
+      saveCachedModel(workspaceId, 'win_probability', mlResult.model, closedHash).catch(err =>
+        console.error('[brain] saveCachedModel failed (non-fatal):', err)
+      )
+    }
     if (mlResult.model) {
       mlModel              = mlResult.model
       mlTrends             = mlResult.trends ?? undefined

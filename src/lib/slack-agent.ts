@@ -105,15 +105,9 @@ function isCancellation(text: string): boolean {
 // System prompt
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildSlackSystemPrompt(
-  brainContext: string,
-  stageLabels: Record<string, string>,
-): string {
-  const stageLabelNote = Object.keys(stageLabels).length > 0
-    ? `\nStage labels: ${Object.entries(stageLabels).map(([id, label]) => `${id} → "${label}"`).join(', ')}`
-    : ''
-
-  return `You are Halvex — a sales intelligence bot in Slack. You have full access to the user's CRM pipeline, Linear issues, and deal intelligence.
+// Static block: tool descriptions + formatting rules + behavior rules
+// This never changes per-request, so it qualifies for Anthropic prompt caching.
+const SLACK_STATIC_SYSTEM_BLOCK = `You are Halvex — a sales intelligence bot in Slack. You have full access to the user's CRM pipeline, Linear issues, and deal intelligence.
 
 ═══ YOUR TOOLS ═══
 
@@ -185,9 +179,18 @@ If the user specifies a subset (e.g. "only ENG-36 and ENG-42"), call halvex_bulk
 3. Don't invent deal IDs — only use IDs returned by tool calls
 4. Currency: £ (British pounds) unless told otherwise
 5. If Linear is not connected, say so clearly and direct to Settings
-6. Never 500 — catch errors gracefully
+6. Never 500 — catch errors gracefully`
 
-═══ WORKSPACE INTELLIGENCE ═══
+// Dynamic block: workspace brain + stage labels — changes per-request, must NOT be cached.
+function buildSlackDynamicBlock(
+  brainContext: string,
+  stageLabels: Record<string, string>,
+): string {
+  const stageLabelNote = Object.keys(stageLabels).length > 0
+    ? `\nStage labels: ${Object.entries(stageLabels).map(([id, label]) => `${id} → "${label}"`).join(', ')}`
+    : ''
+
+  return `═══ WORKSPACE INTELLIGENCE ═══
 
 ${brainContext}${stageLabelNote}`
 }
@@ -322,7 +325,7 @@ export async function handleSlackMessage(
     brainContext = brain ? 'No deals yet. Encourage the user to add deals via the web app.' : 'No workspace data loaded.'
   }
 
-  const systemPrompt = buildSlackSystemPrompt(brainContext, stageLabels)
+  const dynamicBlock = buildSlackDynamicBlock(brainContext, stageLabels)
 
   // ── Build tool context (matches ToolContext interface) ───────────────────
   const toolContext: SlackInternalToolContext = {
@@ -337,13 +340,32 @@ export async function handleSlackMessage(
 
   const sdkTools = buildSdkTools(toolContext)
 
-  // ── Call Claude ──────────────────────────────────────────────────────────
+  // ── Call Claude with prompt caching ─────────────────────────────────────
+  // Static block (tool descriptions + rules) is cached with Anthropic ephemeral
+  // cache_control — reduces billed input tokens by ~80-90% for the cached portion.
+  // Dynamic block (brain summary + stage labels) changes per-request, so no cache.
   let responseText: string
   try {
     const result = await generateText({
       model: getAnthropicClient()('claude-sonnet-4-6'),
-      system: systemPrompt,
-      messages: [{ role: 'user', content: text }],
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: SLACK_STATIC_SYSTEM_BLOCK,
+              experimental_providerMetadata: {
+                anthropic: { cacheControl: { type: 'ephemeral' } },
+              },
+            },
+            {
+              type: 'text',
+              text: `${dynamicBlock}\n\nUser message: ${text}`,
+            },
+          ],
+        },
+      ],
       tools: sdkTools as Parameters<typeof generateText>[0]['tools'],
       maxSteps: 5,
       maxTokens: 2048,
