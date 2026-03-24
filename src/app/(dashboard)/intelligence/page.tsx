@@ -224,15 +224,31 @@ export default function IntelligencePage() {
     } finally { setKbSaving(false) }
   }
 
-  // Win signals — top 3 positive
-  const winSignals: any[] = (brain?.winPatterns ?? brain?.objectionWinMap ?? []).slice(0, 3)
-  // Risk signals — top 3
-  const riskSignals: any[] = (brain?.dealRiskPatterns ?? brain?.riskPatterns ?? []).slice(0, 3)
-  // Feature gaps blocking revenue
-  const productGaps: any[] = (brain?.productGapSignals ?? []).slice(0, 4)
+  // Win signals — ML feature importance (helps direction), fallback to win playbook objection wins
+  const mlWinFactors: any[] = (brain?.mlModel?.featureImportance ?? [])
+    .filter((f: any) => f.direction === 'helps')
+    .slice(0, 3)
+    .map((f: any) => ({ pattern: f.label ?? f.name, importance: f.importance, _type: 'ml' }))
+  const playbookWins: any[] = (brain?.winPlaybook?.topObjectionWinPatterns ?? [])
+    .slice(0, 3)
+    .map((p: any) => ({ pattern: p.theme, winRateWithTheme: p.winRateWithTheme, howBeaten: p.howBeaten, _type: 'playbook' }))
+  const winSignals: any[] = mlWinFactors.length > 0 ? mlWinFactors : playbookWins
+
+  // Risk signals — ML feature importance (hurts direction), fallback to topLossReasons strings
+  const mlLossFactors: any[] = (brain?.mlModel?.featureImportance ?? [])
+    .filter((f: any) => f.direction === 'hurts')
+    .slice(0, 3)
+    .map((f: any) => ({ pattern: f.label ?? f.name, importance: f.importance, _type: 'ml' }))
+  const lossReasons: any[] = (brain?.winLossIntel?.topLossReasons ?? [])
+    .slice(0, 3)
+    .map((r: string) => ({ pattern: r, _type: 'reason' }))
+  const riskSignals: any[] = mlLossFactors.length > 0 ? mlLossFactors : lossReasons
+
+  // Feature gaps blocking revenue — productGapPriority has dealsBlocked + revenueAtRisk
+  const productGaps: any[] = (brain?.productGapPriority ?? []).slice(0, 4)
   // ML accuracy
-  const mlAccuracy = brain?.mlAccuracy ?? brain?.modelAccuracy ?? null
-  const mlDealCount = brain?.mlTrainingCount ?? brain?.dealCount ?? null
+  const mlAccuracy = brain?.mlModel?.looAccuracy ?? null
+  const mlDealCount = brain?.mlModel?.trainingSize ?? null
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
     display: 'flex', alignItems: 'center', gap: '6px',
@@ -327,10 +343,14 @@ export default function IntelligencePage() {
                   border: '1px solid rgba(52,211,153,0.15)',
                 }}>
                   <div style={{ fontSize: '13px', fontWeight: 600, color: '#34d399', marginBottom: '2px' }}>
-                    {sig.objection ?? sig.pattern ?? sig.signal ?? `Win signal ${i + 1}`}
+                    {sig.pattern ?? sig.signal ?? `Win signal ${i + 1}`}
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748b' }}>
-                    {sig.winRate != null ? `${Math.round(sig.winRate * 100)}% win rate when present` : sig.description ?? sig.insight ?? ''}
+                    {sig._type === 'ml' && sig.importance != null
+                      ? `${(sig.importance * 100).toFixed(1)}% feature importance`
+                      : sig.winRateWithTheme != null
+                        ? `${sig.winRateWithTheme}% win rate when present${sig.howBeaten ? ` — ${sig.howBeaten}` : ''}`
+                        : ''}
                   </div>
                 </div>
               ))}
@@ -371,7 +391,9 @@ export default function IntelligencePage() {
                     {sig.pattern ?? sig.signal ?? sig.riskFactor ?? `Risk signal ${i + 1}`}
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748b' }}>
-                    {sig.dealCount != null ? `Seen in ${sig.dealCount} deal${sig.dealCount !== 1 ? 's' : ''}` : sig.description ?? sig.insight ?? ''}
+                    {sig._type === 'ml' && sig.importance != null
+                      ? `${(sig.importance * 100).toFixed(1)}% feature importance`
+                      : ''}
                   </div>
                 </div>
               ))}
@@ -409,7 +431,7 @@ export default function IntelligencePage() {
                     background: 'rgba(251,191,36,0.12)', padding: '2px 8px', borderRadius: '100px',
                     flexShrink: 0,
                   }}>
-                    {gap.dealCount ?? gap.count ?? '?'}× blocked
+                    {gap.dealsBlocked ?? gap.dealCount ?? gap.count ?? '?'}× blocked
                   </span>
                   <span style={{ fontSize: '13px', color: '#94a3b8', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {gap.feature ?? gap.title ?? gap.pattern ?? 'Feature gap'}
