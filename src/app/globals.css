@@ -11,19 +11,19 @@
   ══════════════════════════════════════════════════ */
 
   /* Base */
-  --bg-base: #171717;
-  --bg-surface: #1c1c1c;
+  --bg-base: #0d0f1a;
+  --bg-surface: #111320;
 
-  /* Glass surfaces — white opacity layers */
-  --glass-bg: rgba(255, 255, 255, 0.03);
-  --glass-bg-hover: rgba(255, 255, 255, 0.05);
-  --glass-bg-strong: rgba(255, 255, 255, 0.08);
+  /* Glass surfaces — indigo-tinted dark glass */
+  --glass-bg: rgba(99, 102, 241, 0.05);
+  --glass-bg-hover: rgba(99, 102, 241, 0.08);
+  --glass-bg-strong: rgba(99, 102, 241, 0.12);
   --glass-border: rgba(255, 255, 255, 0.08);
   --glass-border-strong: rgba(255, 255, 255, 0.14);
   --glass-blur: blur(20px) saturate(180%);
 
   /* Sidebar */
-  --sidebar-bg: rgba(255, 255, 255, 0.025);
+  --sidebar-bg: #080a10;
   --sidebar-border: rgba(255, 255, 255, 0.06);
   --sidebar-width: 220px;
 
@@ -84,10 +84,10 @@
   --transition-base: 200ms ease;
   --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* shadcn/Tailwind compat — dark theme */
-  --background: 0 0% 9%;
-  --foreground: 0 0% 93%;
-  --card: 0 0% 10%;
+  /* shadcn/Tailwind compat — dark navy theme */
+  --background: 234 40% 8%;
+  --foreground: 0 0% 100%;
+  --card: 234 40% 9%;
   --card-foreground: 0 0% 93%;
   --popover: 0 0% 10%;
   --popover-foreground: 0 0% 93%;
@@ -122,11 +122,11 @@ html.dark,
 html, body {
   height: 100%;
   min-height: 100%;
-  background-color: var(--bg-base);
+  background-color: #0d0f1a !important;
   background-image:
-    radial-gradient(ellipse at 15% 15%, rgba(99, 102, 241, 0.08) 0%, transparent 55%),
-    radial-gradient(ellipse at 85% 85%, rgba(139, 92, 246, 0.06) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.02) 0%, transparent 40%);
+    radial-gradient(ellipse at 15% 15%, rgba(99, 102, 241, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 85%, rgba(139, 92, 246, 0.08) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 0%, rgba(59, 130, 246, 0.04) 0%, transparent 40%);
   background-attachment: fixed;
   color: var(--text-primary);
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Text', 'Segoe UI', sans-serif;
@@ -173,7 +173,7 @@ html, body {
   opacity: var(--frost-opacity-hover, 0.30);
 }
 
-/* Glass card — frost border + dark translucent surface */
+/* Glass card — indigo-tinted dark glass surface */
 .glass {
   background: var(--glass-bg);
   backdrop-filter: var(--glass-blur);
@@ -182,11 +182,21 @@ html, body {
 }
 
 .glass-card {
-  background: var(--glass-bg);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.10), rgba(59, 130, 246, 0.05), transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
   box-shadow: var(--shadow-card);
+}
+
+.glass-hero {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.40), rgba(59, 130, 246, 0.25));
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(99, 102, 241, 0.20);
+  border-radius: 1.25rem;
+  box-shadow: 0 8px 40px rgba(99, 102, 241, 0.20), 0 2px 8px rgba(0, 0, 0, 0.40);
 }
 
 .glass-card-hover {
@@ -194,17 +204,15 @@ html, body {
 }
 
 .glass-card-hover:hover {
-  background: var(--glass-bg-hover);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(59, 130, 246, 0.08), transparent);
   box-shadow: var(--shadow-card-hover);
   transform: translateY(-1px);
 }
 
 .glass-sidebar {
-  background: var(--sidebar-bg);
-  border-right: 1px solid var(--sidebar-border);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-  box-shadow: var(--shadow-sidebar);
+  background: #080a10;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 2px 0 32px rgba(0, 0, 0, 0.50);
 }
 
 /* Dividers */
@@ -331,14 +339,14 @@ a {
 ══════════════════════════════════════════════════ */
 
 .skeleton {
-  background: var(--skeleton-from);
+  background: linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.05) 100%);
+  background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
 }
 
 @keyframes skeleton-shimmer {
-  0%   { opacity: 1; }
-  50%  { opacity: 0.4; }
-  100% { opacity: 1; }
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 @keyframes spin {

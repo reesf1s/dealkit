@@ -71,20 +71,20 @@ export default function DealsPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
             <div style={{
               width: '32px', height: '32px',
-              background: 'rgba(124, 58, 237, 0.18)',
-              border: '1px solid rgba(124, 58, 237, 0.30)',
+              background: 'rgba(99,102,241,0.15)',
+              border: '1px solid rgba(99,102,241,0.25)',
               borderRadius: '10px',
               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              boxShadow: '0 0 12px rgba(124,58,237,0.15)',
+              boxShadow: '0 0 14px rgba(99,102,241,0.20)',
             }}>
-              <ClipboardList size={15} color="#a78bfa" />
+              <ClipboardList size={15} color="#818cf8" />
             </div>
-            <h1 className="font-brand" style={{ fontSize: '20px', fontWeight: 600, color: 'rgba(255,255,255,0.95)', letterSpacing: '-0.01em', margin: 0 }}>
-              Deal Log
+            <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.02em', margin: 0 }}>
+              Deals
             </h1>
           </div>
-          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.40)', margin: 0, paddingLeft: '42px' }}>
-            <span style={{ color: '#a78bfa', fontWeight: 600 }}>{deals.length}</span>
+          <p style={{ fontSize: '13px', color: '#475569', margin: 0, paddingLeft: '42px' }}>
+            <span style={{ color: '#818cf8', fontWeight: 600 }}>{deals.length}</span>
             {' '}deals · Track wins and losses to improve closing
           </p>
         </div>
@@ -96,19 +96,19 @@ export default function DealsPage() {
             height: '36px', padding: '0 18px',
             borderRadius: '9px', fontSize: '13px', fontWeight: 600,
             color: '#fff',
-            background: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
-            border: '1px solid rgba(124, 58, 237, 0.50)',
+            background: 'linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)',
+            border: '1px solid rgba(99,102,241,0.50)',
             cursor: 'pointer',
-            boxShadow: '0 0 20px rgba(124,58,237,0.30), 0 4px 12px rgba(0,0,0,0.25)',
+            boxShadow: '0 0 20px rgba(99,102,241,0.30), 0 4px 12px rgba(0,0,0,0.30)',
             transition: 'all 0.15s ease',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'translateY(-1px)'
-            e.currentTarget.style.boxShadow = '0 0 30px rgba(124,58,237,0.45), 0 6px 20px rgba(0,0,0,0.30)'
+            e.currentTarget.style.boxShadow = '0 0 28px rgba(99,102,241,0.45), 0 6px 20px rgba(0,0,0,0.35)'
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = '0 0 20px rgba(124,58,237,0.30), 0 4px 12px rgba(0,0,0,0.25)'
+            e.currentTarget.style.boxShadow = '0 0 20px rgba(99,102,241,0.30), 0 4px 12px rgba(0,0,0,0.30)'
           }}
         >
           <Plus size={14} strokeWidth={2.5} />
@@ -152,12 +152,12 @@ export default function DealsPage() {
             transform: 'translate(-50%, -50%)',
             zIndex: 501, width: '100%', maxWidth: '520px',
             maxHeight: '90vh', overflowY: 'auto',
-            background: 'rgba(12, 16, 32, 0.96)',
+            background: 'linear-gradient(135deg, rgba(13,15,26,0.98), rgba(8,10,16,0.98))',
             backdropFilter: 'blur(40px)',
             WebkitBackdropFilter: 'blur(40px)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            borderRadius: '16px', padding: '28px',
-            boxShadow: '0 24px 80px rgba(0,0,0,0.60), inset 0 1px 0 rgba(255,255,255,0.08)',
+            border: '1px solid rgba(99,102,241,0.20)',
+            borderRadius: '20px', padding: '28px',
+            boxShadow: '0 24px 80px rgba(0,0,0,0.70), 0 0 0 1px rgba(99,102,241,0.10)',
             outline: 'none',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
