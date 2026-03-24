@@ -3158,21 +3158,22 @@ function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
 
 // ─── Score Ring ───────────────────────────────────────────────────────────────
 
-function ScoreRing({ score }: { score: number }) {
-  const pct = Math.min(100, Math.max(0, score))
-  const color = pct >= 70 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#ef4444'
+function ScoreRing({ score, size = 64 }: { score: number | null; size?: number }) {
+  const pct = score == null ? 0 : Math.min(100, Math.max(0, score))
+  const color = score == null ? '#475569' : pct >= 70 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#ef4444'
+  const circumference = 2 * Math.PI * 34
   return (
-    <div style={{ position: 'relative', width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', transform: 'rotate(-90deg)' }} viewBox="0 0 80 80">
+    <div style={{ position: 'relative', width: `${size}px`, height: `${size}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <svg className="absolute inset-0 w-full h-full" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', transform: 'rotate(-90deg)' }} viewBox="0 0 80 80">
         <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="6" />
         <circle
           cx="40" cy="40" r="34" fill="none"
           stroke={color} strokeWidth="6"
-          strokeDasharray={`${(pct / 100) * 213.6} 213.6`}
+          strokeDasharray={`${(pct / 100) * circumference} ${circumference}`}
           strokeLinecap="round"
         />
       </svg>
-      <span style={{ fontSize: '20px', fontWeight: 700, color, lineHeight: 1 }}>{score}</span>
+      <span style={{ fontSize: size >= 76 ? '22px' : '20px', fontWeight: 700, color, lineHeight: 1 }}>{score ?? 0}</span>
     </div>
   )
 }
@@ -4736,23 +4737,9 @@ export default function DealDetailPage() {
             </div>
 
             {/* CENTER: Health score ring */}
-            {score != null && !isMobile && (
+            {!isMobile && (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                <div style={{
-                  width: '80px', height: '80px', borderRadius: '50%',
-                  background: `conic-gradient(${scoreColor} ${score * 3.6}deg, rgba(255,255,255,0.08) 0deg)`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: `0 0 24px ${scoreColor}38`,
-                }}>
-                  <div style={{
-                    width: '62px', height: '62px', borderRadius: '50%',
-                    background: 'rgba(13,15,26,0.92)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <span style={{ fontSize: '22px', fontWeight: 700, color: scoreColor!, lineHeight: 1 }}>{score}</span>
-                    <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)', marginTop: '2px' }}>/100</span>
-                  </div>
-                </div>
+                <ScoreRing score={score} size={80} />
                 <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.40)', fontWeight: 500 }}>Win probability</span>
               </div>
             )}
