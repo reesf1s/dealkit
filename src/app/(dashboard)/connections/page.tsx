@@ -99,6 +99,8 @@ export default function ConnectionsPage() {
   const [linearApiKey, setLinearApiKey] = useState('')
   const [linearConnecting, setLinearConnecting] = useState(false)
   const [linearDisconnecting, setLinearDisconnecting] = useState(false)
+  const [linearSyncing, setLinearSyncing] = useState(false)
+  const [linearRematching, setLinearRematching] = useState(false)
 
   // Slack state
   const [slackDisconnecting, setSlackDisconnecting] = useState(false)
@@ -178,6 +180,30 @@ export default function ConnectionsPage() {
       mutateLinear()
     } catch { toast('Failed to disconnect', 'error') }
     finally { setLinearDisconnecting(false) }
+  }
+
+  async function handleLinearSync() {
+    setLinearSyncing(true)
+    try {
+      const res = await fetch('/api/integrations/linear/sync', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Sync failed')
+      toast(`Synced ${json.data?.issuesSynced ?? json.data?.count ?? 0} issues from Linear`, 'success')
+      mutateLinear()
+    } catch (e: unknown) { toast(e instanceof Error ? e.message : 'Sync failed', 'error') }
+    finally { setLinearSyncing(false) }
+  }
+
+  async function handleLinearRematch() {
+    setLinearRematching(true)
+    try {
+      const res = await fetch('/api/integrations/linear/rematch', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Rematch failed')
+      const { matched = 0, deals = 0 } = json.data ?? {}
+      toast(`Rematched ${matched} issues across ${deals} open deals`, 'success')
+    } catch (e: unknown) { toast(e instanceof Error ? e.message : 'Rematch failed', 'error') }
+    finally { setLinearRematching(false) }
   }
 
   async function handleSlackDisconnect() {
@@ -371,7 +397,37 @@ export default function ConnectionsPage() {
                 Workspace: <span style={{ color: '#94a3b8', fontWeight: 600 }}>{linearData.workspaceName}</span>
               </div>
             )}
-            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+              <button
+                onClick={handleLinearSync}
+                disabled={linearSyncing}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  padding: '6px 14px', borderRadius: '8px',
+                  background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.22)',
+                  color: '#818cf8', fontSize: '12px', fontWeight: 600,
+                  cursor: linearSyncing ? 'not-allowed' : 'pointer',
+                  opacity: linearSyncing ? 0.6 : 1,
+                }}
+              >
+                <RefreshCw size={11} style={{ animation: linearSyncing ? 'spin 1s linear infinite' : 'none' }} />
+                {linearSyncing ? 'Syncing…' : 'Sync issues'}
+              </button>
+              <button
+                onClick={handleLinearRematch}
+                disabled={linearRematching}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  padding: '6px 14px', borderRadius: '8px',
+                  background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.20)',
+                  color: '#a5b4fc', fontSize: '12px', fontWeight: 600,
+                  cursor: linearRematching ? 'not-allowed' : 'pointer',
+                  opacity: linearRematching ? 0.6 : 1,
+                }}
+              >
+                {linearRematching ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : null}
+                {linearRematching ? 'Rematching…' : 'Rematch to deals'}
+              </button>
               <button
                 onClick={handleLinearDisconnect}
                 disabled={linearDisconnecting}

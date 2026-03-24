@@ -53,6 +53,9 @@ interface Workflow {
   active: boolean
   isTemplate?: boolean
   tokens?: WorkflowToken[]
+  // DB fields (present on saved workflows)
+  lastRunAt?: string | null
+  lastOutput?: string | null
 }
 
 // ─── Pre-built templates ──────────────────────────────────────────────────────
@@ -338,6 +341,15 @@ function WorkflowCard({ workflow, onToggle }: { workflow: Workflow; onToggle: (i
             <ArrowRight size={10} style={{ color: '#334155', flexShrink: 0, marginTop: '3px' }} />
             <div>{renderTokens(workflow.tokens, workflow.action)}</div>
           </div>
+          {/* Last run info */}
+          {workflow.lastRunAt && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+              <span style={{ fontSize: '10px', color: '#334155' }}>Last run: {timeAgoStr(workflow.lastRunAt)}</span>
+              {workflow.lastOutput && (
+                <span style={{ fontSize: '10px', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>· {workflow.lastOutput}</span>
+              )}
+            </div>
+          )}
         </div>
         {/* Toggle */}
         <button
@@ -362,39 +374,95 @@ function WorkflowCard({ workflow, onToggle }: { workflow: Workflow; onToggle: (i
   )
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function timeAgoStr(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function WorkflowsPage() {
   const { data: mcpActionsRes } = useSWR('/api/mcp-actions/recent?limit=5', fetcher, { revalidateOnFocus: false })
   const recentActions: any[] = mcpActionsRes?.data ?? []
 
-  const [workflows, setWorkflows] = useState<Workflow[]>(DEFAULT_TEMPLATES)
+  // DB-persisted workflows
+  const { data: savedRes, mutate: mutateSaved } = useSWR('/api/workflows', fetcher, { revalidateOnFocus: false })
+  const savedWorkflows: Workflow[] = (savedRes?.data ?? []).map((w: any) => ({
+    id: w.id,
+    title: w.name,
+    trigger: w.triggerType === 'schedule' ? (w.triggerConfig?.label ?? 'Every day at 8am') : w.triggerType,
+    action: w.actions?.[0]?.label ?? w.description ?? '',
+    active: w.isEnabled ?? false,
+    lastRunAt: w.lastRunAt,
+    lastOutput: w.lastOutput,
+  }))
+
+  // Merge: show saved DB workflows first, then templates not yet saved
+  const savedIds = new Set(savedWorkflows.map(w => w.id))
+  const [localTemplates, setLocalTemplates] = useState<Workflow[]>(DEFAULT_TEMPLATES)
+  const unsavedTemplates = localTemplates.filter(t => t.isTemplate && !savedIds.has(t.id))
+  const workflowList: Workflow[] = [...savedWorkflows, ...unsavedTemplates]
+
   const [showNewForm, setShowNewForm] = useState(false)
   const [selectedTrigger, setSelectedTrigger] = useState('')
   const [selectedAction, setSelectedAction] = useState('')
   const [newTrigger, setNewTrigger] = useState('')
   const [newAction, setNewAction] = useState('')
 
-  const handleToggle = (id: string, active: boolean) => {
-    setWorkflows(prev => prev.map(w => w.id === id ? { ...w, active } : w))
+  const handleToggle = async (id: string, active: boolean) => {
+    // Optimistic update for saved workflows
+    if (savedIds.has(id)) {
+      mutateSaved(
+        { data: (savedRes?.data ?? []).map((w: any) => w.id === id ? { ...w, isEnabled: active } : w) },
+        false,
+      )
+      try {
+        await fetch('/api/workflows', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, isEnabled: active }),
+        })
+        mutateSaved()
+      } catch { mutateSaved() }
+    } else {
+      // Local template — just update local state
+      setLocalTemplates(prev => prev.map(w => w.id === id ? { ...w, active } : w))
+    }
   }
 
-  const handleAddWorkflow = () => {
+  const handleAddWorkflow = async () => {
     const trigger = selectedTrigger || newTrigger.trim()
     const action = selectedAction || newAction.trim()
     if (!trigger || !action) return
-    setWorkflows(prev => [...prev, {
-      id: `custom-${Date.now()}`,
-      title: 'Custom workflow',
-      trigger,
-      action,
-      active: false,
-    }])
+
+    try {
+      await fetch('/api/workflows', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Custom workflow',
+          triggerType: 'manual',
+          triggerConfig: { label: trigger },
+          actions: [{ type: 'notify', label: action }],
+          outputTarget: action.toLowerCase().includes('today') ? 'today_tab' : 'slack',
+        }),
+      })
+      mutateSaved()
+    } catch {
+      // fallback: local state only
+    }
     setSelectedTrigger(''); setSelectedAction(''); setNewTrigger(''); setNewAction('')
     setShowNewForm(false)
   }
 
-  const activeCount = workflows.filter(w => w.active).length
+  const activeCount = workflowList.filter(w => w.active).length
 
   const card: React.CSSProperties = {
     background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.04), transparent)',
@@ -553,7 +621,7 @@ export default function WorkflowsPage() {
           Workflows
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {workflows.map(w => (
+          {workflowList.map(w => (
             <WorkflowCard key={w.id} workflow={w} onToggle={handleToggle} />
           ))}
         </div>

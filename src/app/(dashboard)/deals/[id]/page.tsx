@@ -3156,6 +3156,27 @@ function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
   )
 }
 
+// ─── Score Ring ───────────────────────────────────────────────────────────────
+
+function ScoreRing({ score }: { score: number }) {
+  const pct = Math.min(100, Math.max(0, score))
+  const color = pct >= 70 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#ef4444'
+  return (
+    <div style={{ position: 'relative', width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', transform: 'rotate(-90deg)' }} viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="6" />
+        <circle
+          cx="40" cy="40" r="34" fill="none"
+          stroke={color} strokeWidth="6"
+          strokeDasharray={`${(pct / 100) * 213.6} 213.6`}
+          strokeLinecap="round"
+        />
+      </svg>
+      <span style={{ fontSize: '20px', fontWeight: 700, color, lineHeight: 1 }}>{score}</span>
+    </div>
+  )
+}
+
 // ─── Score Breakdown Visual ──────────────────────────────────────────────────
 
 function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPrediction: any; brainData: any }) {
@@ -3239,10 +3260,7 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
 
       {/* Main score + bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div style={{ flexShrink: 0, width: '64px', height: '64px', borderRadius: '8px', background: scoreBg, border: `1px solid ${scoreBorder}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: '24px', fontWeight: '700', color: scoreColor, lineHeight: 1 }}>{score}</div>
-          <div style={{ fontSize: '9px', color: scoreColor, marginTop: '1px' }}>/100</div>
-        </div>
+        <ScoreRing score={score} />
         <div style={{ flex: 1 }}>
           {/* Stacked contribution bar — clickable to expand breakdown */}
           <div
@@ -4811,25 +4829,24 @@ export default function DealDetailPage() {
       }}>
         {([
           { id: 'overview', label: 'Overview' },
-          { id: 'notes', label: openCount > 0 ? `Notes & Plans (${openCount})` : 'Notes & Plans' },
+          { id: 'plans', label: (() => {
+            const openTodos = deal?.todos?.filter((t: any) => !t.done) ?? []
+            const openTasks = (deal?.projectPlan as any)?.phases?.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete') ?? []
+            const openCriteria = (deal?.successCriteriaTodos as any[])?.filter((c: any) => !c.achieved) ?? []
+            const total = openTodos.length + openTasks.length + openCriteria.length
+            if (total === 0) return 'Plans'
+            return `Plans (${total})`
+          })() },
           { id: 'activity', label: 'Activity' },
-          { id: 'team', label: 'Team' },
-        ] as const).map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={{
-              padding: '8px 18px',
-              background: activeTab === tab.id ? 'rgba(99,102,241,0.22)' : 'transparent',
-              border: activeTab === tab.id ? '1px solid rgba(99,102,241,0.32)' : '1px solid transparent',
-              borderRadius: '7px', cursor: 'pointer',
-              fontSize: '13px', fontWeight: activeTab === tab.id ? 600 : 500,
-              color: activeTab === tab.id ? '#e2e8f0' : 'rgba(255,255,255,0.45)',
-              transition: 'all 0.15s', flexShrink: 0, whiteSpace: 'nowrap',
-            }}
-            onMouseEnter={e => { if (activeTab !== tab.id) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.72)' }}
-            onMouseLeave={e => { if (activeTab !== tab.id) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.45)' }}
-          >
+          { id: 'collateral', label: 'Collateral' },
+        ].map(tab => (
+          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{
+            padding: isMobile ? '12px 16px' : '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '500',
+            color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-tertiary)',
+            borderBottom: activeTab === tab.id ? '2px solid #6366F1' : '2px solid transparent',
+            marginBottom: '-1px', transition: 'color 0.1s',
+            minHeight: isMobile ? '44px' : undefined, flexShrink: 0,
+          }}>
             {tab.label}
           </button>
         ))}

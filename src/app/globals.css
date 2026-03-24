@@ -18,8 +18,8 @@
   --glass-bg: rgba(99, 102, 241, 0.05);
   --glass-bg-hover: rgba(99, 102, 241, 0.08);
   --glass-bg-strong: rgba(99, 102, 241, 0.12);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-border-strong: rgba(255, 255, 255, 0.14);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border-strong: rgba(255, 255, 255, 0.18);
   --glass-blur: blur(20px) saturate(180%);
 
   /* Sidebar */
@@ -34,10 +34,10 @@
   --frost-opacity: 0.15;
   --frost-opacity-hover: 0.30;
 
-  /* Typography — white opacity only */
-  --text-primary: rgba(255, 255, 255, 0.92);
-  --text-secondary: rgba(255, 255, 255, 0.50);
-  --text-tertiary: rgba(255, 255, 255, 0.28);
+  /* Typography — high-contrast enterprise dark theme */
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.70);
+  --text-tertiary: rgba(255, 255, 255, 0.45);
   --text-accent: #818cf8;
 
   /* Accent (indigo) */
@@ -124,9 +124,12 @@ html, body {
   min-height: 100%;
   background-color: #0d0f1a !important;
   background-image:
-    radial-gradient(ellipse at 15% 15%, rgba(99, 102, 241, 0.10) 0%, transparent 55%),
-    radial-gradient(ellipse at 85% 85%, rgba(139, 92, 246, 0.08) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 0%, rgba(59, 130, 246, 0.04) 0%, transparent 40%);
+    radial-gradient(ellipse at 15% 15%, rgba(124, 58, 237, 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 85%, rgba(139, 92, 246, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 0%, rgba(99, 102, 241, 0.06) 0%, transparent 40%),
+    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: auto, auto, auto, 48px 48px, 48px 48px;
   background-attachment: fixed;
   color: var(--text-primary);
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Text', 'Segoe UI', sans-serif;
@@ -270,7 +273,7 @@ a {
 :root {
   /* Old glass-card-* vars → dark glass */
   --glass-card-bg: rgba(255, 255, 255, 0.03);
-  --glass-card-border: rgba(255, 255, 255, 0.08);
+  --glass-card-border: rgba(255, 255, 255, 0.12);
   --glass-card-shadow: 0 2px 20px rgba(0, 0, 0, 0.40), 0 1px 4px rgba(0, 0, 0, 0.20);
   --glass-glow-accent: rgba(99, 102, 241, 0.12);
   --glass-glow-green: rgba(52, 211, 153, 0.12);

@@ -15,7 +15,7 @@ import { requestBrainRebuild } from '@/lib/brain-rebuild'
 import { computeCompositeScore, type ScoreBreakdown } from '@/lib/deal-ml'
 import { ensureLinksColumn } from '@/lib/api-helpers'
 import { extractTextSignals, heuristicScore } from '@/lib/text-signals'
-import { buildDealBriefing, scoreNarrationPrompt } from '@/lib/brain-narrator'
+import { buildDealBriefing, scoreNarrationPrompt, type ActionItemContext } from '@/lib/brain-narrator'
 import { NoteExtractionSchema, buildCorrectionPrompt, type NoteExtraction } from '@/lib/extraction-schema'
 
 const anthropic = new Anthropic()
@@ -76,6 +76,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       meetingNotes: dealLogs.meetingNotes,
       competitors: dealLogs.competitors,
       createdAt: dealLogs.createdAt,
+      updatedAt: dealLogs.updatedAt,
       conversionScorePinned: dealLogs.conversionScorePinned,
       scheduledEvents: dealLogs.scheduledEvents,
     }).from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
@@ -408,9 +409,23 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
         conversionScore: finalScore,
       }
       const briefing = buildDealBriefing(brain, id, dealForBriefing, signals)
+
+      // Build action item context from extracted facts for specific, grounded narration
+      const daysSinceUpdate = deal.updatedAt
+        ? Math.floor((Date.now() - new Date(deal.updatedAt).getTime()) / 86_400_000)
+        : null
+      const extra: ActionItemContext = {
+        contacts: noteExtraction?.stakeholders_mentioned?.map(s => ({ name: s.name, role: s.role })) ?? [],
+        daysSinceUpdate,
+        scheduledEvents: noteExtraction?.scheduled_events?.map(e => ({ description: e.description, date: e.date })) ?? [],
+        pendingTodos: mergedTodos.filter((t: any) => !t.done).map((t: any) => t.text),
+        nextMeetingBooked: parsed.intentSignals?.nextMeetingBooked ?? undefined,
+        decisionTimeline: parsed.intentSignals?.decisionTimeline ?? null,
+      }
+
       const narrationMsg = await anthropic.messages.create({
         model: 'claude-sonnet-4-6', max_tokens: 400,
-        messages: [{ role: 'user', content: scoreNarrationPrompt(briefing) }],
+        messages: [{ role: 'user', content: scoreNarrationPrompt(briefing, extra) }],
       })
       const narration = (narrationMsg.content[0] as any)?.text?.trim() ?? ''
       // Parse bullet points from narration into insight strings
