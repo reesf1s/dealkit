@@ -21,6 +21,7 @@ import { extractTextSignals, analyzeDeterioration, parseMeetingEntries, heuristi
 import { BRAIN_VERSION } from '@/lib/brain-constants'
 export { BRAIN_VERSION } from '@/lib/brain-constants'
 import { getActiveGlobalModel, getGlobalConsent, extractContributions, contributeToGlobalPool } from '@/lib/global-pool'
+import { computeUrgencyScore } from '@/lib/ml/urgency'
 
 export interface DealSignalSummary {
   momentum:         number    // 0–1 sentiment momentum (>0.5 = building)
@@ -76,6 +77,8 @@ export interface WorkspaceBrain {
     dealName: string
     company: string
     reason: string              // e.g. "Close date in 3 days" or "High-stage with low score"
+    urgencyScore?: number       // 0-100 composite urgency (from computeUrgencyScore)
+    topAction?: string          // single most important next action
   }[]
   staleDeals: {                 // open deals with no activity for 14+ days
     dealId: string
@@ -940,6 +943,34 @@ async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown')
       })
     }
   }
+
+  // ── Enrich urgentDeals with urgencyScore + topAction, add high-score misses ──
+  const urgentDealIds = new Set(urgentDeals.map(u => u.dealId))
+  for (const snap of snapshots) {
+    if (snap.stage === 'closed_won' || snap.stage === 'closed_lost') continue
+    const urgency = computeUrgencyScore(snap)
+    // Enrich existing entries
+    const existing = urgentDeals.find(u => u.dealId === snap.id)
+    if (existing) {
+      existing.urgencyScore = urgency.score
+      existing.topAction = urgency.topAction
+      continue
+    }
+    // Add deals missed by heuristics but scoring >60 urgency
+    if (urgency.score >= 60 && urgency.reasons.length > 0) {
+      urgentDealIds.add(snap.id)
+      urgentDeals.push({
+        dealId: snap.id,
+        dealName: snap.name,
+        company: snap.company,
+        reason: urgency.reasons[0],
+        urgencyScore: urgency.score,
+        topAction: urgency.topAction,
+      })
+    }
+  }
+  // Sort urgentDeals by urgencyScore descending
+  urgentDeals.sort((a, b) => (b.urgencyScore ?? 0) - (a.urgencyScore ?? 0))
 
   // ── Proactive: stale deals (no update in 14+ days) ─────────────────────────
   const staleDeals: WorkspaceBrain['staleDeals'] = activeDeals
