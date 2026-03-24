@@ -14,6 +14,7 @@ import { linearIntegrations, linearIssuesCache } from '@/lib/db/schema'
 import { decrypt, getEncryptionKey } from '@/lib/encrypt'
 import { fetchTeamIssues, type LinearIssue } from '@/lib/linear-client'
 import { embedLinearIssues } from '@/lib/semantic-search'
+import { embedNullLinearIssues } from '@/lib/deal-embeddings'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -145,6 +146,12 @@ export async function syncLinearIssues(workspaceId: string): Promise<SyncResult>
   // Re-embed all issues now that the cache is up to date
   const { embedded } = await embedLinearIssues(workspaceId)
 
+  // Generate pgvector embeddings for any issues that don't have them yet
+  // (fire-and-forget — don't block the sync response)
+  embedNullLinearIssues(workspaceId).catch(err =>
+    console.warn('[linear-sync] pgvector embed failed:', err)
+  )
+
   console.log(
     `[linear-sync] workspace=${workspaceId.slice(0, 8)} synced=${synced} pages=${pagesFetched} embedded=${embedded} incremental=${!!since}`,
   )
@@ -161,4 +168,8 @@ export async function syncSingleIssue(
 ): Promise<void> {
   await upsertIssues(workspaceId, [issue])
   await embedLinearIssues(workspaceId)
+  // Generate pgvector embedding for the single new/updated issue
+  embedNullLinearIssues(workspaceId).catch(err =>
+    console.warn('[linear-sync] pgvector embed failed:', err)
+  )
 }

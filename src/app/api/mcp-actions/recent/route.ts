@@ -13,6 +13,8 @@ import { mcpActionLog, dealLogs } from '@/lib/db/schema'
 import { eq, and, desc } from 'drizzle-orm'
 
 const ACTION_LABELS: Record<string, string> = {
+  link_created: 'Linked issue',
+  link_confirmed: 'Confirmed issue link',
   issue_scoped_to_cycle: 'Scoped issue to sprint',
   bulk_scope_confirmation: 'Bulk scope confirmation',
   release_email_generated: 'Release email generated',
@@ -20,6 +22,7 @@ const ACTION_LABELS: Record<string, string> = {
   issue_deployed_notification: 'Issue deployed',
   link_dismissed: 'Dismissed issue link',
   scope_issue: 'Scoped issue',
+  issue_scoped: 'Issue scoped',
   hubspot_email_logged: 'Sent email via HubSpot',
   follow_up_reminder: 'Follow-up reminder set',
 }
@@ -69,17 +72,37 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const enriched = actions.map(a => ({
-      id: a.id,
-      actionType: a.actionType,
-      label: ACTION_LABELS[a.actionType] ?? a.actionType,
-      dealId: a.dealId,
-      dealName: a.dealId ? dealNames[a.dealId]?.dealName : null,
-      company: a.dealId ? dealNames[a.dealId]?.prospectCompany : null,
-      linearIssueId: a.linearIssueId,
-      triggeredBy: a.triggeredBy,
-      createdAt: a.createdAt,
-    }))
+    const enriched = actions.map(a => {
+      const result = a.result as Record<string, unknown> | null
+      // Prefer identifier from result payload (populated by new logging), fall back to linearIssueId
+      const issueIdentifier = (result?.linear_issue_identifier as string | undefined)
+        ?? (result?.linear_issue_id as string | undefined)
+        ?? a.linearIssueId
+        ?? null
+      const issueTitle = (result?.linear_issue_title as string | undefined)
+        ?? (result?.issueTitle as string | undefined)
+        ?? null
+
+      // Build a human-friendly label
+      let label = ACTION_LABELS[a.actionType] ?? a.actionType
+      if ((a.actionType === 'link_created' || a.actionType === 'link_confirmed') && issueIdentifier) {
+        label = `Linked ${issueIdentifier}`
+      }
+
+      return {
+        id: a.id,
+        actionType: a.actionType,
+        label,
+        dealId: a.dealId,
+        dealName: a.dealId ? dealNames[a.dealId]?.dealName : null,
+        company: a.dealId ? dealNames[a.dealId]?.prospectCompany : null,
+        linearIssueId: a.linearIssueId,
+        linearIssueIdentifier: issueIdentifier,
+        linearIssueTitle: issueTitle,
+        triggeredBy: a.triggeredBy,
+        createdAt: a.createdAt,
+      }
+    })
 
     return NextResponse.json({ data: enriched })
   } catch (e: unknown) {

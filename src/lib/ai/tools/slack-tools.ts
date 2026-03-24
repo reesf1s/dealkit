@@ -39,7 +39,7 @@ import {
 } from '@/lib/linear-cycle'
 import { generateScopedIssue } from '@/lib/scope-generator'
 import { extractDealSignalText } from '@/lib/linear-signal-match'
-import { findSimilarLinearIssues } from '@/lib/semantic-search'
+import { findMatchingIssues } from '@/lib/deal-linear-matcher'
 import type { ToolContext, ToolResult } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1031,12 +1031,11 @@ export const halvex_discover_issues = {
     const risks = (dealRow.dealRisks as string[]) ?? []
     const score = dealRow.conversionScore
 
-    // 3. Extract objection signal text and run semantic match
-    const signalText = extractDealSignalText(dealRow)
-
+    // 3. Run deal-to-issue matching (pgvector primary, TF-IDF fallback)
     let discoveredIssues: { issueId: string; similarity: number }[] = []
-    if (signalText) {
-      discoveredIssues = await findSimilarLinearIssues(ctx.workspaceId, signalText, {
+    const signalText = extractDealSignalText(dealRow)
+    if (signalText || dealRow.dealName) {
+      discoveredIssues = await findMatchingIssues(dealRow.id, ctx.workspaceId, dealRow, {
         limit: 10,
         minSimilarity: 0.25,
       })

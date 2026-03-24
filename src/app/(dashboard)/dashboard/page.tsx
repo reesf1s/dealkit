@@ -206,6 +206,7 @@ export default function DashboardPage() {
   }
 
   const actionEmoji: Record<string, string> = {
+    link_created: '🔗', link_confirmed: '✅',
     issue_scoped_to_cycle: '🔄', release_email_generated: '✉️',
     all_issues_deployed_notification: '🚀', hubspot_email_logged: '📤',
     follow_up_reminder: '⏰', link_dismissed: '✕',
@@ -494,6 +495,7 @@ export default function DashboardPage() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.60)' }}>{action.label}</span>
                         {action.dealName && <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.28)', marginLeft: '5px' }}>· {action.dealName}</span>}
+                        {action.linearIssueTitle && <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.20)', marginLeft: '4px', fontStyle: 'italic' }}>&quot;{action.linearIssueTitle}&quot;</span>}
                       </div>
                       <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.20)' }}>{ago}</span>

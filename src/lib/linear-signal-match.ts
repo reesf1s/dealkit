@@ -12,9 +12,9 @@
  */
 
 import { db } from '@/lib/db'
-import { eq, and, inArray } from 'drizzle-orm'
+import { eq, and, inArray, sql } from 'drizzle-orm'
 import { dealLogs, dealLinearLinks, linearIssuesCache, linearIntegrations, mcpActionLog } from '@/lib/db/schema'
-import { findSimilarLinearIssues } from '@/lib/semantic-search'
+import { findMatchingIssues } from '@/lib/deal-linear-matcher'
 import { updateIssueDescription, getIssue } from '@/lib/linear-client'
 import { decrypt, getEncryptionKey } from '@/lib/encrypt'
 
@@ -30,6 +30,52 @@ const AUTO_CONFIRM_THRESHOLD = 80
  * lower than dense neural embeddings — 0.40 is a genuine topic match at this scale.
  */
 const SUGGEST_THRESHOLD = 40
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Deduplication helper
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Insert an mcp_action_log row only if an identical entry (same workspace,
+ * action_type, deal_id, linear_issue_id) has NOT been logged in the past 60 s.
+ * This prevents duplicate audit rows when the cron or webhook fires multiple
+ * times for the same event within a short window.
+ */
+async function logActionDeduped(values: {
+  workspaceId: string
+  actionType: string
+  dealId?: string | null
+  linearIssueId?: string | null
+  triggeredBy?: string | null
+  payload?: Record<string, unknown> | null
+  result?: Record<string, unknown> | null
+  status?: string
+}): Promise<void> {
+  // Check for a duplicate in the last 60 seconds
+  const recent = await db.execute<{ count: string }>(
+    sql`SELECT COUNT(*) AS count
+        FROM mcp_action_log
+        WHERE workspace_id = ${values.workspaceId}::uuid
+          AND action_type = ${values.actionType}
+          AND deal_id = ${values.dealId ?? null}::uuid
+          AND (linear_issue_id = ${values.linearIssueId ?? null} OR (linear_issue_id IS NULL AND ${values.linearIssueId ?? null} IS NULL))
+          AND created_at > NOW() - INTERVAL '60 seconds'
+        LIMIT 1`
+  )
+
+  if (parseInt(recent[0]?.count ?? '0', 10) > 0) return
+
+  await db.insert(mcpActionLog).values({
+    workspaceId: values.workspaceId,
+    actionType: values.actionType,
+    dealId: values.dealId ?? undefined,
+    linearIssueId: values.linearIssueId ?? undefined,
+    triggeredBy: values.triggeredBy ?? undefined,
+    payload: values.payload ?? undefined,
+    result: values.result ?? undefined,
+    status: values.status ?? 'complete',
+  })
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal helpers
@@ -92,8 +138,8 @@ export async function matchDealToIssues(
   const signalText = extractDealSignalText(deal)
   if (!signalText) return { linked: 0, suggested: 0 }
 
-  // Find similar issues by TF-IDF cosine similarity
-  const similar = await findSimilarLinearIssues(workspaceId, signalText, {
+  // Find similar issues — pgvector primary, TF-IDF fallback
+  const similar = await findMatchingIssues(dealId, workspaceId, deal, {
     limit: 25,
     minSimilarity: SUGGEST_THRESHOLD / 100,
   })
@@ -180,15 +226,25 @@ export async function matchDealToIssues(
       }
     }
 
-    // Audit log — one entry per link created or updated
-    await db.insert(mcpActionLog).values({
+    // Audit log — deduplicated to prevent repeat entries within 60 s
+    await logActionDeduped({
       workspaceId,
       actionType: 'link_created',
       dealId,
       linearIssueId: match.issueId,
       triggeredBy,
-      payload: { score: scoreInt, signalText: signalText.slice(0, 200) },
-      result: { status: newStatus, issueTitle: issue.title },
+      payload: {
+        score: scoreInt,
+        signalText: signalText.slice(0, 200),
+        matchSource: match.source,
+        linear_issue_identifier: match.issueId,
+      },
+      result: {
+        status: newStatus,
+        issueTitle: issue.title,
+        linear_issue_identifier: match.issueId,
+        linear_issue_title: issue.title,
+      },
       status: 'complete',
     })
 
