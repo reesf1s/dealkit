@@ -23,6 +23,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { isSlackConfigured, verifySlackRequest, getSlackBotToken, getWorkspaceBySlackTeam, slackPostMessage } from '@/lib/slack-client'
 import { getOrGenerateReleaseEmail } from '@/lib/release-email-generator'
+import { executePmApproval, declinePmApproval } from '@/lib/pm-approval'
 import { db } from '@/lib/db'
 import { mcpActionLog, dealLinearLinks, dealLogs, linearIssuesCache, hubspotIntegrations } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
@@ -576,6 +577,41 @@ export async function POST(req: NextRequest) {
 
       // copy_release_email_{dealId} — no-op (clipboard copy happens client-side)
       if (actionId.startsWith('copy_release_email_')) {
+        return
+      }
+
+      // pm_approve_{pendingActionId} — PM approved the prioritisation request
+      const pmApproveMatch = actionId.match(/^pm_approve_([a-f0-9-]{36})$/)
+      if (pmApproveMatch) {
+        const pendingActionId = pmApproveMatch[1]
+        const channel = dmChannelId ?? payload.user.id
+        try {
+          const result = await executePmApproval(pendingActionId, workspaceId)
+          const msg = result.succeeded.length > 0
+            ? [
+              `✅ *Approved — ${result.succeeded.length} issue${result.succeeded.length !== 1 ? 's' : ''} moved to ${result.cycleName} with specs written*`,
+              '',
+              ...result.succeeded.map(r => `• *${r.issueId}* — ${r.title}`),
+              '',
+              `The sales rep has been notified.`,
+            ].join('\n')
+            : `⚠️ No issues could be scoped — ${result.failed.map(f => f.error).join(', ')}`
+          await slackPostMessage(token, channel, markdownToBlocks(msg), msg)
+        } catch (e) {
+          const err = e instanceof Error ? e.message : 'Unknown error'
+          await slackPostMessage(token, channel, errorBlocks(`Could not complete approval: ${err.slice(0, 120)}`), 'Error')
+        }
+        return
+      }
+
+      // pm_decline_{pendingActionId} — PM declined the prioritisation request
+      const pmDeclineMatch = actionId.match(/^pm_decline_([a-f0-9-]{36})$/)
+      if (pmDeclineMatch) {
+        const pendingActionId = pmDeclineMatch[1]
+        const channel = dmChannelId ?? payload.user.id
+        await declinePmApproval(pendingActionId, workspaceId)
+        const msg = `✗ Declined — the sales rep has been notified.`
+        await slackPostMessage(token, channel, markdownToBlocks(msg), msg)
         return
       }
 
