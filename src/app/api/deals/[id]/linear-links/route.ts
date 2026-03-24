@@ -8,8 +8,8 @@ import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { db } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
-import { dealLinearLinks, dealLogs, linearIssuesCache } from '@/lib/db/schema'
+import { eq, and, inArray } from 'drizzle-orm'
+import { dealLinearLinks, dealLogs, linearIssuesCache, mcpActionLog } from '@/lib/db/schema'
 import { matchDealToIssues } from '@/lib/linear-signal-match'
 
 type Params = { params: Promise<{ id: string }> }
@@ -41,7 +41,36 @@ export async function GET(_req: NextRequest, { params }: Params) {
         ),
       )
 
-    return NextResponse.json({ data: links })
+    // Enrich deployed links with hasReleaseEmail flag
+    const deployedIssueIds = links
+      .filter(l => l.status === 'deployed')
+      .map(l => l.linearIssueId)
+
+    const emailedIssueIds = new Set<string>()
+    if (deployedIssueIds.length > 0) {
+      const emailLogs = await db
+        .select({ linearIssueId: mcpActionLog.linearIssueId })
+        .from(mcpActionLog)
+        .where(
+          and(
+            eq(mcpActionLog.workspaceId, workspaceId),
+            eq(mcpActionLog.dealId, id),
+            eq(mcpActionLog.actionType, 'release_email_generated'),
+            eq(mcpActionLog.status, 'complete'),
+            inArray(mcpActionLog.linearIssueId, deployedIssueIds),
+          ),
+        )
+      for (const row of emailLogs) {
+        if (row.linearIssueId) emailedIssueIds.add(row.linearIssueId)
+      }
+    }
+
+    const enriched = links.map(l => ({
+      ...l,
+      hasReleaseEmail: emailedIssueIds.has(l.linearIssueId),
+    }))
+
+    return NextResponse.json({ data: enriched })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error'
     return NextResponse.json({ error: msg }, { status: 500 })

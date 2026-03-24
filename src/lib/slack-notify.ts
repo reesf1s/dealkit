@@ -10,11 +10,11 @@
  */
 
 import { db } from '@/lib/db'
-import { slackConnections, slackUserMappings } from '@/lib/db/schema'
+import { slackConnections, slackUserMappings, mcpActionLog } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import { decrypt, getEncryptionKey } from '@/lib/encrypt'
 import { slackPostMessage, slackOpenDm } from '@/lib/slack-client'
-import { healthDropBlocks, newIssueLinkBlocks } from '@/lib/slack-blocks'
+import { healthDropBlocks, newIssueLinkBlocks, issueDeployedBlocks } from '@/lib/slack-blocks'
 import type { WorkspaceBrain } from '@/lib/workspace-brain'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -103,6 +103,75 @@ export async function notifyHealthDrop(
  * Send a DM when a new high-relevance Linear issue link is created (score ≥ 80).
  * Called from linear-signal-match.ts after a new link is inserted.
  */
+// ─────────────────────────────────────────────────────────────────────────────
+// notifyIssueDeployed
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Send a proactive DM when a Linear issue linked to a deal is deployed.
+ * Includes Block Kit buttons: "✉️ Write release email" / "Skip".
+ * Records a pending action in mcp_action_log so the button click can resolve it.
+ *
+ * Guards: no-ops if Slack is not connected, or no users have opted in.
+ */
+export async function notifyIssueDeployed(
+  workspaceId: string,
+  info: {
+    dealId: string
+    dealName: string
+    company: string
+    linearIssueId: string
+    linearTitle: string
+  },
+): Promise<void> {
+  try {
+    const conn = await getConnection(workspaceId)
+    if (!conn) return  // Slack not connected
+
+    const users = await getMappedUsers(workspaceId, 'notifyIssueLinks')
+    if (users.length === 0) return
+
+    const blocks = issueDeployedBlocks(info)
+    const fallbackText = `🚀 ${info.linearIssueId} is live — linked to ${info.dealName} (${info.company}). Shall I write a release email?`
+
+    for (const slackUserId of users) {
+      try {
+        const dmChannel = await slackOpenDm(conn.botToken, slackUserId)
+        if (!dmChannel) continue
+
+        const msgResult = await slackPostMessage(conn.botToken, dmChannel, blocks, fallbackText)
+
+        // Store pending action so button clicks and text replies can resolve it
+        await db.insert(mcpActionLog).values({
+          workspaceId,
+          actionType: 'issue_deployed_notification',
+          dealId: info.dealId,
+          linearIssueId: info.linearIssueId,
+          triggeredBy: 'webhook',
+          status: 'awaiting_confirmation',
+          slackChannelId: dmChannel,
+          slackMessageTs: (msgResult as { ts?: string })?.ts ?? null,
+          payload: {
+            slackUserId,
+            channelId: dmChannel,
+            prompt: `Issue ${info.linearIssueId} (${info.linearTitle}) deployed for ${info.dealName}`,
+            action: 'generate_release_email',
+            params: { dealId: info.dealId, linearIssueId: info.linearIssueId },
+          },
+        })
+      } catch (e) {
+        console.error(`[slack-notify] Failed to DM user ${slackUserId}:`, e)
+      }
+    }
+  } catch (e) {
+    console.error('[slack-notify] notifyIssueDeployed failed:', e)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// notifyNewIssueLink
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function notifyNewIssueLink(
   workspaceId: string,
   link: {

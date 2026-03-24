@@ -645,7 +645,9 @@ export const mcpActionLog = pgTable('mcp_action_log', {
   triggeredBy:    text('triggered_by'),                      // 'slack'|'claude'|'cron'|'webhook'|'user'
   payload:        jsonb('payload'),
   result:         jsonb('result'),
-  status:         text('status').notNull().default('pending'), // 'pending'|'complete'|'error'
+  status:         text('status').notNull().default('pending'), // 'pending'|'complete'|'error'|'awaiting_confirmation'
+  slackMessageTs: text('slack_message_ts'),                  // Slack message ts — for editing the notification in-place
+  slackChannelId: text('slack_channel_id'),                  // Slack channel ID for the notification message
   createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
