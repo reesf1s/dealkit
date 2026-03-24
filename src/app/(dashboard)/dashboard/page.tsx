@@ -5,8 +5,8 @@ import { useState, useEffect, useRef } from 'react'
 import useSWR, { mutate } from 'swr'
 import Link from 'next/link'
 import {
-  Sparkles, RefreshCw, AlertTriangle, ArrowUpRight,
-  GitBranch, Send, Brain, TrendingUp, Zap, CheckCircle2,
+  RefreshCw, ArrowUpRight,
+  GitBranch, Send, Brain, Layers,
 } from 'lucide-react'
 import { getScoreColor } from '@/lib/deal-context'
 import { generateAlerts } from '@/lib/alerts'
@@ -32,7 +32,6 @@ export default function DashboardPage() {
   const { data: overviewRes, isLoading: overviewLoading } = useSWR('/api/dashboard/ai-overview', fetcher, { revalidateOnFocus: false })
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
   const { data: dealsRes } = useSWR('/api/deals', fetcher, { revalidateOnFocus: false })
-  const { data: mcpActionsRes } = useSWR('/api/mcp-actions/recent?limit=3', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
   const { data: inCycleRes } = useSWR('/api/deals/in-cycle', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
   const [regenerating, setRegenerating] = useState(false)
 
@@ -47,19 +46,18 @@ export default function DashboardPage() {
   const brain = brainRes?.data
   const deals: any[] = dealsRes?.data ?? []
   const activeDeals = deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
-  const closedDeals = deals.filter((d: any) => d.stage === 'closed_won' || d.stage === 'closed_lost')
-  const wonDeals = deals.filter((d: any) => d.stage === 'closed_won')
-  const winRate = closedDeals.length > 0 ? Math.round((wonDeals.length / closedDeals.length) * 100) : null
   const inCycleItems: any[] = inCycleRes?.data ?? []
-  const recentActions: any[] = mcpActionsRes?.data ?? []
 
-  const dealsAtRisk = brain?.urgentDeals?.length ?? 0
-  const inCycleCount = inCycleItems.length
+  // ML pipeline rows — sort active deals by score asc (most at risk first)
+  const mlPipelineRows = [...activeDeals]
+    .filter((d: any) => (d.conversionScore ?? 0) > 0)
+    .sort((a: any, b: any) => (a.conversionScore ?? 50) - (b.conversionScore ?? 50))
+    .slice(0, 7)
 
-  // Urgent deals (score < 40, active)
-  const urgentDeals = deals
-    .filter((d: any) => !['closed_won', 'closed_lost'].includes(d.stage) && (d.conversionScore ?? 0) > 0 && (d.conversionScore ?? 0) < 40)
-    .slice(0, 3)
+  // Product gaps — sorted by revenue at risk desc
+  const productGapsList: any[] = [...(brain?.productGapPriority ?? [])]
+    .sort((a: any, b: any) => (b.revenueAtRisk ?? 0) - (a.revenueAtRisk ?? 0))
+    .slice(0, 6)
 
   const greeting = (() => {
     const h = new Date().getHours()
@@ -104,13 +102,6 @@ export default function DashboardPage() {
     } finally {
       setChatLoading(false)
     }
-  }
-
-  const actionEmoji: Record<string, string> = {
-    link_created: '🔗', link_confirmed: '✅',
-    issue_scoped_to_cycle: '🔄', release_email_generated: '✉️',
-    all_issues_deployed_notification: '🚀', hubspot_email_logged: '📤',
-    follow_up_reminder: '⏰', link_dismissed: '✕',
   }
 
   const colHeight = 'calc(100vh - 96px)'
@@ -212,34 +203,55 @@ export default function DashboardPage() {
           {regenerating ? 'Refreshing…' : 'Refresh briefing'}
         </button>
 
-        {/* Stat chips */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', position: 'relative' }}>
-          {[
-            { icon: <AlertTriangle size={14} />, label: 'Deals at risk', value: String(dealsAtRisk || 0), color: dealsAtRisk > 0 ? '#f87171' : '#34d399', href: '/deals' },
-            { icon: <GitBranch size={14} />, label: 'Issues in cycle', value: String(inCycleCount), color: '#a78bfa', href: '/deals' },
-            { icon: <TrendingUp size={14} />, label: 'Win rate', value: winRate != null ? `${winRate}%` : '—', color: '#34d399', href: '/intelligence' },
-          ].map((chip, i) => (
-            <Link key={i} href={chip.href} style={{ textDecoration: 'none' }}>
-              <div
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '12px',
-                  padding: '13px 16px', borderRadius: '14px',
-                  background: 'rgba(255,255,255,0.08)',
-                  border: '1px solid rgba(255,255,255,0.13)',
-                  transition: 'all 0.12s',
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.13)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)' }}
-              >
-                <span style={{ color: chip.color }}>{chip.icon}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: '22px', fontWeight: 800, color: '#fff', lineHeight: 1, letterSpacing: '-0.03em' }}>{chip.value}</div>
-                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.48)', marginTop: '2px' }}>{chip.label}</div>
-                </div>
-                <ArrowUpRight size={13} style={{ color: 'rgba(255,255,255,0.28)' }} />
-              </div>
-            </Link>
-          ))}
+        {/* ML Pipeline Rows — ranked by risk score */}
+        <div style={{ display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          <div style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.10em', marginBottom: '10px' }}>
+            Pipeline · by risk
+          </div>
+          {mlPipelineRows.length === 0 ? (
+            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.30)', fontStyle: 'italic', margin: 0 }}>
+              No scored deals yet
+            </p>
+          ) : (
+            mlPipelineRows.map((deal: any) => {
+              const score = deal.conversionScore ?? 0
+              const rgb = score >= 70 ? '52,211,153' : score >= 40 ? '251,191,36' : '248,113,113'
+              const textColor = score >= 70 ? '#34d399' : score >= 40 ? '#fbbf24' : '#f87171'
+              return (
+                <Link key={deal.id} href={`/deals/${deal.id}`} style={{ textDecoration: 'none' }}>
+                  <div
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '10px',
+                      padding: '9px 12px', borderRadius: '9px', marginBottom: '5px',
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.09)',
+                      transition: 'all 0.12s',
+                    }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.11)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)' }}
+                  >
+                    <div style={{
+                      width: '34px', height: '34px', borderRadius: '8px', flexShrink: 0,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: `rgba(${rgb},0.12)`, border: `1px solid rgba(${rgb},0.22)`,
+                    }}>
+                      <span style={{ fontSize: '11px', fontWeight: 800, color: textColor, letterSpacing: '-0.03em' }}>{score}</span>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {deal.prospectCompany ?? deal.dealName ?? 'Deal'}
+                      </div>
+                      <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.38)', marginTop: '2px' }}>
+                        {(deal.stage ?? '').replace(/_/g, ' ')}
+                        {deal.dealValue ? ` · $${(deal.dealValue / 1000).toFixed(0)}k` : ''}
+                      </div>
+                    </div>
+                    <ArrowUpRight size={11} style={{ color: 'rgba(255,255,255,0.22)', flexShrink: 0 }} />
+                  </div>
+                </Link>
+              )
+            })
+          )}
         </div>
 
         {/* View pipeline link */}
@@ -452,137 +464,84 @@ export default function DashboardPage() {
           <h2 style={{ fontSize: '17px', fontWeight: 700, color: '#e2e8f0', margin: 0, letterSpacing: '-0.02em' }}>Today</h2>
         </div>
 
-        {/* Scrollable content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Product Signals — Feature gaps by ARR blocked */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-          {/* Morning Briefing — workflow outputs / in-cycle items */}
-          <div style={{ borderRadius: '12px', background: 'rgba(139,92,246,0.05)', border: '1px solid rgba(139,92,246,0.14)', overflow: 'hidden' }}>
-            <div style={{ padding: '11px 14px 9px', borderBottom: '1px solid rgba(139,92,246,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Zap size={11} color="#a78bfa" />
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Morning Briefing</span>
-              </div>
-              <Link href="/workflows" style={{ fontSize: '10px', color: 'rgba(255,255,255,0.30)', textDecoration: 'none' }}>Manage →</Link>
+          {/* Section header */}
+          <div style={{ paddingBottom: '10px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+              <Layers size={11} color="#a78bfa" />
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Product Signals</span>
+              <Link href="/product-gaps" style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', textDecoration: 'none', marginLeft: 'auto' }}>View all →</Link>
             </div>
-            <div style={{ padding: '10px 14px 12px' }}>
-              {inCycleItems.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  {inCycleItems.slice(0, 5).map((item: any) => (
-                    <div key={item.id} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.62)', padding: '6px 8px', borderRadius: '7px', background: 'rgba(255,255,255,0.025)', lineHeight: 1.4 }}>
-                      {item.linearIssueId && <span style={{ color: '#a78bfa', fontWeight: 600, marginRight: '5px' }}>{item.linearIssueId}</span>}
-                      {item.linearTitle ?? item.dealName ?? 'In-cycle issue'}
-                      {item.dealName && item.linearTitle && (
-                        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.28)', marginTop: '1px' }}>→ {item.dealName}</div>
-                      )}
-                    </div>
-                  ))}
-                  {inCycleItems.length > 5 && (
-                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.28)', textAlign: 'center', padding: '2px 0' }}>+{inCycleItems.length - 5} more</div>
-                  )}
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '14px 0' }}>
-                  <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.28)', lineHeight: 1.6 }}>
-                    Your morning briefing will appear here once workflows run
-                  </div>
-                  <Link href="/workflows" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '10px', padding: '6px 12px', borderRadius: '7px', background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.20)', color: '#a78bfa', fontSize: '11px', fontWeight: 600, textDecoration: 'none' }}>
-                    <Zap size={10} /> Go to Workflows
-                  </Link>
-                </div>
-              )}
-            </div>
+            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.30)', margin: 0, lineHeight: 1.4 }}>
+              Feature gaps ranked by revenue at risk
+            </p>
           </div>
 
-          {/* Urgent deals */}
-          {urgentDeals.length > 0 && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '9px' }}>
-                <AlertTriangle size={10} style={{ color: '#f87171' }} />
-                <span style={{ fontSize: '10px', fontWeight: 700, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Urgent</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {urgentDeals.map((deal: any) => (
-                  <Link key={deal.id} href={`/deals/${deal.id}`} style={{ textDecoration: 'none' }}>
-                    <div
-                      style={{
-                        padding: '10px 12px', borderRadius: '10px',
-                        background: 'rgba(248,113,113,0.05)', border: '1px solid rgba(248,113,113,0.14)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-                        transition: 'all 0.12s',
-                      }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(248,113,113,0.09)' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(248,113,113,0.05)' }}
-                    >
-                      <div>
-                        <div style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>
-                          {deal.prospectCompany ?? deal.dealName ?? 'Deal'}
-                        </div>
-                        <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.38)', marginTop: '1px' }}>
-                          Score: {deal.conversionScore ?? '—'} · {deal.stage?.replace('_', ' ')}
-                        </div>
-                      </div>
-                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', background: 'rgba(248,113,113,0.15)', color: '#f87171', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                        Review
+          {/* Gap rows */}
+          {productGapsList.length > 0 ? (
+            productGapsList.map((gap: any, i: number) => (
+              <Link key={gap.gapId ?? i} href="/product-gaps" style={{ textDecoration: 'none' }}>
+                <div
+                  style={{
+                    padding: '10px 12px', borderRadius: '10px',
+                    background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.12)',
+                    transition: 'all 0.12s',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.09)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(139,92,246,0.04)' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: gap.dealsBlocked > 0 ? '4px' : '0' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.82)', lineHeight: 1.3, flex: 1 }}>
+                      {gap.gapTitle ?? gap.title ?? 'Feature gap'}
+                    </span>
+                    {gap.revenueAtRisk > 0 && (
+                      <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '6px', background: 'rgba(248,113,113,0.12)', color: '#f87171', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        ${(gap.revenueAtRisk / 1000).toFixed(0)}k ARR
                       </span>
-                    </div>
-                  </Link>
-                ))}
+                    )}
+                  </div>
+                  {gap.dealsBlocked > 0 && (
+                    <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)' }}>
+                      blocking {gap.dealsBlocked} deal{gap.dealsBlocked !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            ))
+          ) : (
+            <div style={{ textAlign: 'center', padding: '28px 16px', margin: 'auto' }}>
+              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.28)', lineHeight: 1.7 }}>
+                No feature gaps logged yet
               </div>
+              <Link href="/product-gaps" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '10px', padding: '6px 12px', borderRadius: '7px', background: 'rgba(139,92,246,0.10)', border: '1px solid rgba(139,92,246,0.20)', color: '#a78bfa', fontSize: '11px', fontWeight: 600, textDecoration: 'none' }}>
+                Log a gap
+              </Link>
             </div>
           )}
 
-          {/* Recent MCP Activity */}
-          {recentActions.length > 0 && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '9px' }}>
-                <Sparkles size={10} style={{ color: 'rgba(255,255,255,0.35)' }} />
-                <span style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.09em' }}>Recent MCP Activity</span>
+          {/* In-cycle issues (PM view) */}
+          {inCycleItems.length > 0 && (
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '12px', marginTop: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '8px' }}>
+                <GitBranch size={10} color="#818cf8" />
+                <span style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.09em' }}>In-cycle issues</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {recentActions.map((action: any) => {
-                  const emoji = actionEmoji[action.actionType] ?? '🤖'
-                  const ago = action.createdAt ? timeAgo(action.createdAt) : ''
-                  return (
-                    <div
-                      key={action.id}
-                      style={{
-                        display: 'flex', alignItems: 'flex-start', gap: '8px',
-                        padding: '7px 10px', borderRadius: '8px',
-                        background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)',
-                        cursor: action.dealId ? 'pointer' : 'default',
-                        transition: 'background 0.12s',
-                      }}
-                      onClick={() => { if (action.dealId) window.location.href = `/deals/${action.dealId}` }}
-                      onMouseEnter={e => { if (action.dealId) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)' }}
-                    >
-                      <span style={{ fontSize: '11px', flexShrink: 0, marginTop: '1px' }}>{emoji}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.60)' }}>{action.label}</span>
-                        {action.dealName && <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.28)', marginLeft: '5px' }}>· {action.dealName}</span>}
-                        {action.linearIssueTitle && <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.20)', marginLeft: '4px', fontStyle: 'italic' }}>&quot;{action.linearIssueTitle}&quot;</span>}
-                      </div>
-                      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.20)' }}>{ago}</span>
-                        {action.dealId && <ArrowUpRight size={9} style={{ color: 'rgba(255,255,255,0.20)' }} />}
-                      </div>
-                    </div>
-                  )
-                })}
+                {inCycleItems.slice(0, 4).map((item: any) => (
+                  <div key={item.id} style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)', padding: '5px 8px', borderRadius: '6px', background: 'rgba(255,255,255,0.025)', lineHeight: 1.4 }}>
+                    {item.linearIssueId && <span style={{ color: '#818cf8', fontWeight: 600, marginRight: '4px' }}>{item.linearIssueId}</span>}
+                    {item.linearTitle ?? item.dealName ?? 'Issue'}
+                  </div>
+                ))}
+                {inCycleItems.length > 4 && (
+                  <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', textAlign: 'center' }}>+{inCycleItems.length - 4} more</div>
+                )}
               </div>
             </div>
           )}
 
-          {/* All clear empty state */}
-          {urgentDeals.length === 0 && recentActions.length === 0 && inCycleItems.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '36px 16px', margin: 'auto' }}>
-              <CheckCircle2 size={26} style={{ color: '#34d399', marginBottom: '12px' }} />
-              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.48)', fontWeight: 600 }}>Pipeline looks healthy</div>
-              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.26)', marginTop: '5px', lineHeight: 1.6 }}>
-                No urgent items. Run a workflow to see your morning briefing here.
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
