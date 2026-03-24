@@ -17,7 +17,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
     <div style={{
       display: 'flex',
       minHeight: '100vh',
-      background: 'transparent',
+      background: 'var(--bg-base)',
       position: 'relative',
     }}>
 
@@ -34,6 +34,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
         position: 'relative',
         zIndex: 1,
         paddingTop: '52px',
+        background: 'var(--bg-surface)',
         transition: 'margin-left 0.18s cubic-bezier(0.4,0,0.2,1)',
       }}>
         <div style={{ flex: 1, padding: '22px 24px', width: '100%', boxSizing: 'border-box' }}>

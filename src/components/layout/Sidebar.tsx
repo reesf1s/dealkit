@@ -9,7 +9,7 @@ import {
   LayoutDashboard, GitBranch, Brain, Zap,
   Plug, Settings, LogOut, Search,
   ChevronLeft, ChevronRight,
-  X, MessageSquare,
+  X, MessageSquare, CreditCard,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 import { identify } from '@/lib/analytics'
@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { href: '/intelligence', icon: Brain,           label: 'Intelligence', matchPaths: ['/intelligence', '/competitors', '/case-studies', '/product-gaps', '/models', '/collateral', '/playbook'] },
   { href: '/workflows',    icon: Zap,             label: 'Workflows',    matchPaths: ['/workflows'] },
   { href: '/connections',  icon: Plug,            label: 'Integrations', matchPaths: ['/connections'] },
+  { href: '/billing',      icon: CreditCard,      label: 'Billing',      matchPaths: ['/billing'] },
   { href: '/settings',     icon: Settings,        label: 'Settings',     matchPaths: ['/settings', '/company', '/onboarding'] },
 ]
 
@@ -81,36 +82,36 @@ export default function Sidebar() {
           display: 'flex',
           alignItems: 'center',
           gap: '9px',
-          padding: collapsed ? '0' : '0 12px 0 14px',
+          padding: collapsed ? '0' : '0 10px 0 12px',
           justifyContent: collapsed ? 'center' : 'flex-start',
           height: '32px',
-          borderRadius: '7px',
-          marginBottom: '1px',
+          borderRadius: '8px',
+          marginBottom: '2px',
           textDecoration: 'none',
           fontSize: '13px',
-          fontWeight: active ? 500 : 400,
+          fontWeight: active ? 600 : 400,
           letterSpacing: '-0.01em',
-          color: active ? 'rgba(255,255,255,0.88)' : '#475569',
-          background: active ? 'rgba(255,255,255,0.07)' : 'transparent',
-          transition: 'all 0.12s ease',
+          color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+          background: active ? 'rgba(99,102,241,0.08)' : 'transparent',
+          borderLeft: active && !collapsed ? '2px solid var(--accent-primary)' : '2px solid transparent',
+          transition: 'all 0.15s ease',
           position: 'relative',
           flexShrink: 0,
           width: collapsed ? '40px' : undefined,
-          margin: collapsed ? '0 auto 1px' : undefined,
-          boxShadow: 'none',
+          margin: collapsed ? '0 auto 2px' : undefined,
         }}
         onMouseEnter={e => {
           if (!active) {
             const el = e.currentTarget as HTMLElement
             el.style.background = 'rgba(255,255,255,0.04)'
-            el.style.color = 'rgba(255,255,255,0.60)'
+            el.style.color = 'var(--text-primary)'
           }
         }}
         onMouseLeave={e => {
           if (!active) {
             const el = e.currentTarget as HTMLElement
             el.style.background = 'transparent'
-            el.style.color = '#475569'
+            el.style.color = 'var(--text-secondary)'
           }
         }}
       >
@@ -118,9 +119,9 @@ export default function Sidebar() {
           <Icon
             size={16}
             style={{
-              color: active ? 'rgba(255,255,255,0.80)' : '#475569',
+              color: active ? 'var(--accent-primary)' : 'var(--text-tertiary)',
               display: 'block',
-              transition: 'color 0.12s ease',
+              transition: 'color 0.15s ease',
             }}
           />
           {badge && badge.count > 0 && (
@@ -153,12 +154,12 @@ export default function Sidebar() {
   const SidebarContent = (
     <aside style={{
       position: 'fixed', left: 0, top: 0, bottom: 0, width: w,
-      background: '#080a10',
-      borderRight: '1px solid rgba(255,255,255,0.05)',
+      background: 'var(--bg-base)',
+      borderRight: '1px solid var(--border-subtle)',
       display: 'flex', flexDirection: 'column', zIndex: 40,
       transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)',
       overflow: 'hidden',
-      boxShadow: '2px 0 32px rgba(0,0,0,0.50)',
+      boxShadow: 'var(--shadow-sidebar)',
     }}>
 
       {/* ── Logo row ── */}

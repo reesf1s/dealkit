@@ -319,15 +319,32 @@ export interface DeteriorationAlert {
 /** No-op: all DDL migrations now live in lib/db/migrations.ts and run via runMigrations(). */
 async function ensureBrainColumn() {}
 
+// ── In-memory read cache ──────────────────────────────────────────────────────
+// Avoids a DB round-trip on every request. TTL of 30 minutes; invalidated
+// automatically whenever rebuildWorkspaceBrain writes a fresh brain.
+const _brainReadCache = new Map<string, { brain: WorkspaceBrain; cachedAt: number }>()
+const BRAIN_READ_CACHE_TTL = 30 * 60 * 1000 // 30 minutes
+
+function _invalidateBrainCache(workspaceId: string) {
+  _brainReadCache.delete(workspaceId)
+}
+
 /** Read the brain. Returns null if not yet built.
  *  Never runs DDL here — DDL only runs inside _doRebuildWorkspaceBrain (via after()).
  *  Catching column-not-found errors so a fresh DB returns null gracefully. */
 export async function getWorkspaceBrain(workspaceId: string): Promise<WorkspaceBrain | null> {
+  // Serve from in-memory cache if fresh
+  const cached = _brainReadCache.get(workspaceId)
+  if (cached && Date.now() - cached.cachedAt < BRAIN_READ_CACHE_TTL) {
+    return cached.brain
+  }
   try {
     const rows = await db.execute<{ workspace_brain: WorkspaceBrain | null }>(
       sql`SELECT workspace_brain FROM workspaces WHERE id = ${workspaceId} LIMIT 1`
     )
-    return rows[0]?.workspace_brain ?? null
+    const brain = rows[0]?.workspace_brain ?? null
+    if (brain) _brainReadCache.set(workspaceId, { brain, cachedAt: Date.now() })
+    return brain
   } catch {
     // Column doesn't exist yet on a fresh DB — brain will be created on next rebuild
     return null
@@ -2365,6 +2382,8 @@ async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown')
     SET workspace_brain = ${JSON.stringify(brain)}::jsonb
     WHERE id = ${workspaceId}
   `)
+  // Invalidate read cache so next getWorkspaceBrain call returns fresh data
+  _invalidateBrainCache(workspaceId)
 
   // ── Rebuild log — record every rebuild for ML auditability ───────────────────
   try {

@@ -4,61 +4,69 @@
 
 :root {
   /* ══════════════════════════════════════════════════
-     HALVEX — DARK DESIGN SYSTEM
-     Identity: frost-border glass on #171717
-     Surfaces: translucent white/opacity layers only.
-     No opaque fills beyond the base.
+     HALVEX — DIMENSIONS-STYLE DESIGN SYSTEM
+     Inspired by dimensions.dev: sidebar #080a12,
+     content area #111827 — the contrast is the brand.
   ══════════════════════════════════════════════════ */
 
-  /* Base */
-  --bg-base: #0d0f1a;
-  --bg-surface: #111320;
+  /* Base backgrounds — the Dimensions contrast system */
+  --bg-base: #080a12;           /* sidebar, darkest */
+  --bg-surface: #111827;         /* main content area */
+  --bg-elevated: #1a2035;        /* cards on surface */
+  --bg-glass: rgba(255,255,255,0.05);
+  --bg-glass-hover: rgba(255,255,255,0.08);
+  --bg-hero: rgba(99,102,241,0.1);
 
-  /* Glass surfaces — indigo-tinted dark glass */
-  --glass-bg: rgba(99, 102, 241, 0.05);
-  --glass-bg-hover: rgba(99, 102, 241, 0.08);
-  --glass-bg-strong: rgba(99, 102, 241, 0.12);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-border-strong: rgba(255, 255, 255, 0.18);
-  --glass-blur: blur(20px) saturate(180%);
+  /* Borders — hairline only */
+  --border-subtle: rgba(255,255,255,0.07);
+  --border-default: rgba(255,255,255,0.10);
+  --border-strong: rgba(255,255,255,0.18);
 
-  /* Sidebar */
-  --sidebar-bg: #080a10;
-  --sidebar-border: rgba(255, 255, 255, 0.06);
-  --sidebar-width: 220px;
+  /* Typography */
+  --text-primary: #f1f5f9;
+  --text-secondary: rgba(241,245,249,0.6);
+  --text-tertiary: rgba(241,245,249,0.35);
+  --text-inverse: #0a0b0f;
 
-  /* Frost border system — the core design identity.
-     A pseudo-element with a diagonal white gradient at 15% opacity.
-     Hover lifts to 30%. The gradient runs 1→0.35→0.35→1 diagonally. */
-  --frost-border-width: 1px;
-  --frost-opacity: 0.15;
-  --frost-opacity-hover: 0.30;
+  /* Accent palette */
+  --accent-primary: #6366f1;     /* indigo */
+  --accent-success: #10b981;     /* emerald */
+  --accent-warning: #f59e0b;     /* amber */
+  --accent-danger: #ef4444;      /* red */
+  --accent-info: #3b82f6;        /* blue */
 
-  /* Typography — high-contrast enterprise dark theme */
-  --text-primary: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.70);
-  --text-tertiary: rgba(255, 255, 255, 0.45);
-  --text-accent: #818cf8;
-
-  /* Accent (indigo) */
+  /* Legacy accent aliases */
   --accent: #6366f1;
   --accent-light: #818cf8;
   --accent-bg: rgba(99, 102, 241, 0.12);
   --accent-bg-hover: rgba(99, 102, 241, 0.20);
 
-  /* Status */
-  --health-green: #34d399;
-  --health-green-bg: rgba(52, 211, 153, 0.12);
-  --health-amber: #fbbf24;
-  --health-amber-bg: rgba(251, 191, 36, 0.12);
-  --health-red: #f87171;
-  --health-red-bg: rgba(248, 113, 113, 0.12);
-  --health-grey: rgba(255, 255, 255, 0.28);
-  --health-grey-bg: rgba(255, 255, 255, 0.06);
+  /* Sidebar */
+  --sidebar-bg: #080a12;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-width: 220px;
 
-  /* Shadows — deep on dark */
-  --shadow-card: 0 2px 20px rgba(0, 0, 0, 0.40), 0 1px 4px rgba(0, 0, 0, 0.20);
-  --shadow-card-hover: 0 8px 40px rgba(0, 0, 0, 0.60), 0 2px 8px rgba(0, 0, 0, 0.30);
+  /* Glass surfaces */
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-bg-hover: rgba(255, 255, 255, 0.08);
+  --glass-bg-strong: rgba(99, 102, 241, 0.12);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-border-strong: rgba(255, 255, 255, 0.18);
+  --glass-blur: blur(16px);
+
+  /* Status colors */
+  --health-green: #10b981;
+  --health-green-bg: rgba(16, 185, 129, 0.10);
+  --health-amber: #f59e0b;
+  --health-amber-bg: rgba(245, 158, 11, 0.10);
+  --health-red: #ef4444;
+  --health-red-bg: rgba(239, 68, 68, 0.10);
+  --health-grey: rgba(241, 245, 249, 0.35);
+  --health-grey-bg: rgba(241, 245, 249, 0.06);
+
+  /* Shadows */
+  --shadow-card: 0 1px 12px rgba(0, 0, 0, 0.30), 0 1px 3px rgba(0, 0, 0, 0.15);
+  --shadow-card-hover: 0 4px 24px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.20);
   --shadow-sidebar: 2px 0 24px rgba(0, 0, 0, 0.30);
 
   /* Spacing */
@@ -72,44 +80,43 @@
   --space-10: 40px;
   --space-12: 48px;
 
-  /* Radius */
-  --radius-sm: 8px;
+  /* Radius — tighter than before */
+  --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
-  --radius-xl: 20px;
+  --radius-xl: 18px;
   --radius-full: 9999px;
 
   /* Transitions */
   --transition-fast: 120ms ease;
-  --transition-base: 200ms ease;
-  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 180ms ease;
+  --transition-slow: 320ms cubic-bezier(0.4, 0, 0.2, 1);
 
   /* shadcn/Tailwind compat — dark navy theme */
-  --background: 234 40% 8%;
-  --foreground: 0 0% 100%;
-  --card: 234 40% 9%;
-  --card-foreground: 0 0% 93%;
-  --popover: 0 0% 10%;
-  --popover-foreground: 0 0% 93%;
+  --background: 222 47% 8%;
+  --foreground: 213 31% 95%;
+  --card: 222 47% 9%;
+  --card-foreground: 213 31% 92%;
+  --popover: 222 47% 10%;
+  --popover-foreground: 213 31% 92%;
   --primary: 239 84% 67%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 14%;
-  --secondary-foreground: 0 0% 93%;
-  --muted: 0 0% 14%;
-  --muted-foreground: 0 0% 50%;
+  --secondary: 222 47% 13%;
+  --secondary-foreground: 213 31% 92%;
+  --muted: 222 47% 13%;
+  --muted-foreground: 215 16% 47%;
   --accent: 239 84% 67%;
   --accent-foreground: 0 0% 100%;
-  --destructive: 0 72% 51%;
+  --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  --border: 0 0% 18%;
-  --input: 0 0% 18%;
+  --border: 222 47% 16%;
+  --input: 222 47% 16%;
   --ring: 239 84% 67%;
   --radius: 10px;
 }
 
 /* No dark override — this IS the dark theme */
-html.dark,
-.dark {
+html.dark, .dark {
   /* Already dark — keep all vars as-is */
 }
 
@@ -122,31 +129,65 @@ html.dark,
 html, body {
   height: 100%;
   min-height: 100%;
-  background-color: #0d0f1a !important;
-  background-image:
-    radial-gradient(ellipse at 15% 15%, rgba(124, 58, 237, 0.12) 0%, transparent 55%),
-    radial-gradient(ellipse at 85% 85%, rgba(139, 92, 246, 0.10) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 0%, rgba(99, 102, 241, 0.06) 0%, transparent 40%),
-    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
-  background-size: auto, auto, auto, 48px 48px, 48px 48px;
-  background-attachment: fixed;
+  /* Flat surface — no gradient noise. Contrast is in the layout. */
+  background-color: var(--bg-base) !important;
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Text', 'Segoe UI', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  font-feature-settings: "cv11", "ss01";
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: 'cv02' 1, 'cv03' 1, 'cv04' 1, 'ss01' 1;
-  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 /* ══════════════════════════════════════════════════
-   FROST-BORDER GLASS SYSTEM
-   The core design identity. A pseudo-element with a
-   diagonal white gradient border. Opacity-controlled.
-   Applied to cards, CTAs, icon containers — everything.
+   GLASS CARD SYSTEM — Dimensions aesthetic
+   rgba(255,255,255,0.05) + backdrop-filter + hairline border
 ══════════════════════════════════════════════════ */
 
-/* Frost border: adds the gradient border via ::before pseudo-element */
+.glass-card {
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.glass-hero {
+  background: var(--bg-hero);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: var(--radius-lg);
+}
+
+.glass-card:hover {
+  background: var(--bg-glass-hover);
+  border-color: var(--border-default);
+}
+
+.glass-card-hover {
+  transition: background var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.glass-card-hover:hover {
+  background: var(--bg-glass-hover);
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.glass-sidebar {
+  background: var(--bg-base);
+  border-right: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sidebar);
+}
+
+/* ══════════════════════════════════════════════════
+   FROST BORDER — retained for legacy components
+══════════════════════════════════════════════════ */
+
 .frost-border {
   position: relative;
 }
@@ -156,7 +197,7 @@ html, body {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  padding: var(--frost-border-width, 1px);
+  padding: 1px;
   background: linear-gradient(
     135deg,
     rgba(255, 255, 255, 1.00) 0%,
@@ -169,88 +210,53 @@ html, body {
     linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  opacity: var(--frost-opacity, 0.15);
+  opacity: 0.12;
   transition: opacity var(--transition-base);
   pointer-events: none;
 }
 
 .frost-border:hover::before {
-  opacity: var(--frost-opacity-hover, 0.30);
+  opacity: 0.22;
 }
 
-/* Glass card — indigo-tinted dark glass surface */
 .glass {
-  background: var(--glass-bg);
+  background: var(--bg-glass);
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow-card);
 }
 
-.glass-card {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.10), rgba(59, 130, 246, 0.05), transparent);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 1rem;
-  box-shadow: var(--shadow-card);
-}
-
-.glass-hero {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.40), rgba(59, 130, 246, 0.25));
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(99, 102, 241, 0.20);
-  border-radius: 1.25rem;
-  box-shadow: 0 8px 40px rgba(99, 102, 241, 0.20), 0 2px 8px rgba(0, 0, 0, 0.40);
-}
-
-.glass-card-hover {
-  transition: box-shadow var(--transition-base), transform var(--transition-base), background var(--transition-base);
-}
-
-.glass-card-hover:hover {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(59, 130, 246, 0.08), transparent);
-  box-shadow: var(--shadow-card-hover);
-  transform: translateY(-1px);
-}
-
-.glass-sidebar {
-  background: #080a10;
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 2px 0 32px rgba(0, 0, 0, 0.50);
-}
-
 /* Dividers */
 .divider {
   border: none;
-  border-top: 1px solid var(--glass-border);
+  border-top: 1px solid var(--border-subtle);
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.10);
-  border-radius: 3px;
+  background: rgba(241, 245, 249, 0.10);
+  border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(241, 245, 249, 0.18);
 }
 
 /* Selection */
 ::selection {
-  background: rgba(99, 102, 241, 0.30);
-  color: rgba(255, 255, 255, 0.92);
+  background: rgba(99, 102, 241, 0.28);
+  color: rgba(241, 245, 249, 0.95);
 }
 
 /* Focus ring */
 :focus-visible {
-  outline: 2px solid rgba(99, 102, 241, 0.60);
+  outline: 2px solid rgba(99, 102, 241, 0.55);
   outline-offset: 2px;
 }
 
@@ -268,66 +274,64 @@ a {
 
 /* ══════════════════════════════════════════════════
    BACKWARD-COMPAT ALIASES
-   Map all legacy vars to the new dark system so
-   existing components render correctly without touching
-   every single file.
+   Map old vars so existing components render correctly.
 ══════════════════════════════════════════════════ */
 :root {
-  /* Copilot panel glass background */
-  --glass-copilot-bg: rgba(13, 15, 26, 0.72);
-  --copilot-bg: rgba(13, 15, 26, 0.72);
-
-  /* Old glass-card-* vars → dark glass */
-  --glass-card-bg: rgba(255, 255, 255, 0.03);
-  --glass-card-border: rgba(255, 255, 255, 0.12);
-  --glass-card-shadow: 0 2px 20px rgba(0, 0, 0, 0.40), 0 1px 4px rgba(0, 0, 0, 0.20);
-  --glass-glow-accent: rgba(99, 102, 241, 0.12);
-  --glass-glow-green: rgba(52, 211, 153, 0.12);
-  --glass-glow-amber: rgba(251, 191, 36, 0.12);
-  --glass-glow-red: rgba(248, 113, 113, 0.12);
-
-  /* Surface levels */
+  /* Old surface vars */
   --bg: var(--bg-base);
+  --bg-surface-legacy: var(--bg-surface);
   --surface: rgba(255, 255, 255, 0.03);
   --elevated: rgba(255, 255, 255, 0.06);
   --overlay: rgba(255, 255, 255, 0.09);
 
-  /* Accent compat */
-  --accent-subtle: rgba(99, 102, 241, 0.12);
-  --accent-muted: rgba(99, 102, 241, 0.08);
-  --accent-hover: #818cf8;
+  /* Old text vars */
+  --text-accent: #818cf8;
 
-  /* Semantic status */
-  --success: #34d399;
-  --success-muted: rgba(52, 211, 153, 0.12);
-  --warning: #fbbf24;
-  --warning-muted: rgba(251, 191, 36, 0.12);
-  --danger: #f87171;
-  --danger-muted: rgba(248, 113, 113, 0.12);
+  /* Old glass card vars */
+  --glass-card-bg: rgba(255, 255, 255, 0.05);
+  --glass-card-border: rgba(255, 255, 255, 0.10);
+  --glass-card-shadow: var(--shadow-card);
+  --glass-glow-accent: rgba(99, 102, 241, 0.10);
+  --glass-glow-green: rgba(16, 185, 129, 0.10);
+  --glass-glow-amber: rgba(245, 158, 11, 0.10);
+  --glass-glow-red: rgba(239, 68, 68, 0.10);
 
-  /* Skeleton shimmer — dark version */
-  --skeleton-from: rgba(255, 255, 255, 0.06);
-  --skeleton-to: rgba(255, 255, 255, 0.03);
+  /* Frost compat */
+  --frost-border-width: 1px;
+  --frost-opacity: 0.12;
+  --frost-opacity-hover: 0.22;
+
+  /* Semantic status compat */
+  --success: var(--accent-success);
+  --success-muted: var(--health-green-bg);
+  --warning: var(--accent-warning);
+  --warning-muted: var(--health-amber-bg);
+  --danger: var(--accent-danger);
+  --danger-muted: var(--health-red-bg);
+
+  /* Skeleton shimmer */
+  --skeleton-from: rgba(241, 245, 249, 0.05);
+  --skeleton-to: rgba(241, 245, 249, 0.03);
 
   /* ds-* namespace compat */
   --ds-bg-page: var(--bg-base);
-  --ds-bg-sidebar: var(--sidebar-bg);
-  --ds-bg-card: var(--glass-bg);
-  --ds-bg-hover: var(--glass-bg-hover);
+  --ds-bg-sidebar: var(--bg-base);
+  --ds-bg-card: var(--bg-glass);
+  --ds-bg-hover: var(--bg-glass-hover);
   --ds-bg-active: var(--accent-bg);
   --ds-bg-input: rgba(255, 255, 255, 0.05);
-  --ds-bg-elevated: rgba(255, 255, 255, 0.06);
-  --ds-glass-bg: var(--glass-bg);
-  --ds-glass-border: var(--glass-border);
+  --ds-bg-elevated: var(--bg-elevated);
+  --ds-glass-bg: var(--bg-glass);
+  --ds-glass-border: var(--border-subtle);
   --ds-glass-blur: var(--glass-blur);
-  --ds-glass-hover: var(--glass-bg-hover);
-  --ds-border: var(--glass-border);
-  --ds-border-hover: var(--glass-border-strong);
+  --ds-glass-hover: var(--bg-glass-hover);
+  --ds-border: var(--border-subtle);
+  --ds-border-hover: var(--border-default);
   --ds-text-1: var(--text-primary);
   --ds-text-2: var(--text-secondary);
   --ds-text-3: var(--text-tertiary);
-  --ds-text-4: rgba(255, 255, 255, 0.14);
-  --ds-accent: var(--accent);
+  --ds-text-4: rgba(241, 245, 249, 0.15);
+  --ds-accent: var(--accent-primary);
   --ds-accent-hover: var(--accent-light);
   --ds-accent-soft: var(--accent-bg);
   --ds-green: var(--health-green);
@@ -344,11 +348,33 @@ a {
 }
 
 /* ══════════════════════════════════════════════════
+   TYPOGRAPHY SCALE
+══════════════════════════════════════════════════ */
+
+h1 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ══════════════════════════════════════════════════
    ANIMATIONS
 ══════════════════════════════════════════════════ */
 
 .skeleton {
-  background: linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.10) 50%, rgba(255,255,255,0.05) 100%);
+  background: linear-gradient(90deg,
+    rgba(241,245,249,0.04) 0%,
+    rgba(241,245,249,0.08) 50%,
+    rgba(241,245,249,0.04) 100%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
 }
@@ -376,4 +402,9 @@ a {
 @keyframes slide-up {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes bounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30%            { transform: translateY(-5px); }
 }

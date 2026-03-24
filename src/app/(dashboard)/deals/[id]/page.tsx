@@ -4312,6 +4312,37 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
           </div>
         )}
 
+        {/* Win Conditions — workspace patterns from brain */}
+        {objectionWinMap && objectionWinMap.length > 0 && deal.stage !== 'closed_won' && deal.stage !== 'closed_lost' && (
+          <div className="glass-card" style={{ padding: '16px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.40)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>
+              Win Conditions
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {objectionWinMap.slice(0, 3).map((item: any, i: number) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '9px 12px', borderRadius: '8px',
+                  background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.12)',
+                }}>
+                  <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.70)', lineHeight: 1.4, flex: 1 }}>
+                    {item.theme}
+                  </div>
+                  {item.winRateWithTheme != null && (
+                    <div style={{
+                      fontSize: '11px', fontWeight: 700, color: '#34d399',
+                      background: 'rgba(52,211,153,0.12)', padding: '2px 8px',
+                      borderRadius: '100px', flexShrink: 0, marginLeft: '8px',
+                    }}>
+                      {item.winRateWithTheme}% win
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Grow This Account — closed_won */}
         {deal.stage === 'closed_won' && (
           <div className="glass-card" style={{ padding: '16px' }}>
@@ -4710,13 +4741,13 @@ export default function DealDetailPage() {
       {/* ── Hero card ─────────────────────────────────────────────────── */}
       {deal ? (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(49,46,129,0.72) 0%, rgba(30,27,75,0.60) 50%, rgba(15,23,42,0.82) 100%)',
+          background: 'var(--bg-hero)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
-          border: '1px solid rgba(99,102,241,0.22)',
+          border: '1px solid rgba(99,102,241,0.20)',
           borderRadius: '1.25rem',
           padding: isMobile ? '20px' : '24px 28px',
-          boxShadow: '0 8px 40px rgba(20,10,60,0.55), 0 2px 8px rgba(0,0,0,0.50)',
+          boxShadow: '0 4px 24px rgba(99,102,241,0.12)',
         }}>
           <div style={{
             display: 'flex',
