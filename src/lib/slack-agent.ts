@@ -206,9 +206,9 @@ function buildSdkTools(toolContext: SlackInternalToolContext) {
             return jsonSchema({ type: 'object', properties: {}, additionalProperties: true })
           }
         })() as ReturnType<typeof jsonSchema>,
-        execute: async (params: Record<string, unknown>) => {
+        execute: async (params: unknown) => {
           try {
-            const normalised = normaliseParams(params)
+            const normalised = normaliseParams(params as Record<string, unknown>)
             const validated = t.parameters.parse(normalised) as Record<string, unknown>
             const result = await (t.execute as (p: Record<string, unknown>, ctx: typeof toolContext) => Promise<{ result: string }>)(validated, toolContext)
             return result.result
