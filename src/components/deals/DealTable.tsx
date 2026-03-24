@@ -26,15 +26,25 @@ function stageBadge(stage: string) {
   if (stage === 'closed_won') return <StatusBadge status="won" />
   if (stage === 'closed_lost') return <StatusBadge status="lost" />
   return (
-    <span style={{ fontSize: '11px', color: '#888', backgroundColor: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: '9999px', textTransform: 'capitalize' }}>
+    <span style={{
+      fontSize: '11px',
+      color: 'rgba(167,139,250,0.85)',
+      backgroundColor: 'rgba(124,58,237,0.12)',
+      border: '1px solid rgba(124,58,237,0.22)',
+      padding: '2px 8px',
+      borderRadius: '9999px',
+      textTransform: 'capitalize',
+    }}>
       {stage.replace('_', ' ')}
     </span>
   )
 }
 
 function SortIcon({ field, active, direction }: { field: string; active: boolean; direction: 'asc' | 'desc' }) {
-  if (!active) return <ChevronUp size={12} style={{ color: '#333' }} />
-  return direction === 'asc' ? <ChevronUp size={12} style={{ color: '#6366F1' }} /> : <ChevronDown size={12} style={{ color: '#6366F1' }} />
+  if (!active) return <ChevronUp size={12} style={{ color: 'rgba(255,255,255,0.20)' }} />
+  return direction === 'asc'
+    ? <ChevronUp size={12} style={{ color: '#a78bfa' }} />
+    : <ChevronDown size={12} style={{ color: '#a78bfa' }} />
 }
 
 export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: DealTableProps) {
@@ -99,35 +109,57 @@ export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: Dea
   return (
     <div>
       {/* Filter tabs */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '12px' }}>
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '14px', alignItems: 'center' }}>
         {FILTER_TABS.map((tab) => (
           <button
             key={tab.key}
             onClick={() => setFilter(tab.key)}
             style={{
-              height: '28px',
-              padding: '0 12px',
-              borderRadius: '6px',
+              height: '30px',
+              padding: '0 14px',
+              borderRadius: '8px',
               fontSize: '12px',
-              fontWeight: 500,
-              color: filter === tab.key ? '#EBEBEB' : '#888',
-              backgroundColor: filter === tab.key ? 'rgba(255,255,255,0.08)' : 'transparent',
-              border: filter === tab.key ? '1px solid rgba(255,255,255,0.12)' : '1px solid transparent',
+              fontWeight: filter === tab.key ? 600 : 500,
+              color: filter === tab.key ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.45)',
+              backgroundColor: filter === tab.key ? 'rgba(124,58,237,0.22)' : 'transparent',
+              border: filter === tab.key ? '1px solid rgba(124,58,237,0.35)' : '1px solid transparent',
               cursor: 'pointer',
               transition: 'all 150ms ease',
+              boxShadow: filter === tab.key ? '0 0 12px rgba(124,58,237,0.15)' : 'none',
+            }}
+            onMouseEnter={e => {
+              if (filter !== tab.key) {
+                (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.75)'
+                ;(e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.06)'
+              }
+            }}
+            onMouseLeave={e => {
+              if (filter !== tab.key) {
+                (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.45)'
+                ;(e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
+              }
             }}
           >
             {tab.label}
           </button>
         ))}
-        <span style={{ fontSize: '12px', color: '#555', lineHeight: '28px', marginLeft: '8px' }}>
+        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.30)', lineHeight: '30px', marginLeft: '8px' }}>
           {sorted.length} deal{sorted.length !== 1 ? 's' : ''}
         </span>
       </div>
 
-      <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', overflow: 'hidden' }}>
+      {/* Table */}
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.05)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255,255,255,0.10)',
+        borderRadius: '14px',
+        overflow: 'hidden',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.06)',
+      }}>
         {/* Header row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 110px 110px 120px 32px', padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 110px 110px 120px 32px', padding: '12px 18px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
           {[
             { label: 'Deal / Prospect', field: 'dealName' as SortField },
             { label: 'Company', field: 'prospectCompany' as SortField },
@@ -141,7 +173,17 @@ export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: Dea
             <button
               key={label}
               onClick={() => field && toggleSort(field)}
-              style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, color: '#555', letterSpacing: '0.05em', textTransform: 'uppercase', background: 'none', border: 'none', cursor: field ? 'pointer' : 'default', padding: 0, textAlign: 'left' }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '4px',
+                fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.30)',
+                letterSpacing: '0.07em', textTransform: 'uppercase',
+                background: 'none', border: 'none',
+                cursor: field ? 'pointer' : 'default',
+                padding: 0, textAlign: 'left',
+                transition: 'color 0.12s',
+              }}
+              onMouseEnter={e => { if (field) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.65)' }}
+              onMouseLeave={e => { if (field) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.30)' }}
             >
               {label}
               {field && <SortIcon field={field} active={sortField === field} direction={sortDir} />}
@@ -151,50 +193,72 @@ export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: Dea
         </div>
 
         {/* Data rows */}
-        {sorted.map((deal) => (
+        {sorted.map((deal, i) => (
           <div
             key={deal.id}
             onClick={() => router.push(`/deals/${deal.id}`)}
-            style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 110px 110px 120px 32px', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center', transition: 'background-color 100ms ease', cursor: 'pointer' }}
-            onMouseEnter={(e) => { setHoveredId(deal.id); e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)' }}
-            onMouseLeave={(e) => { setHoveredId(null); setConfirmId(null); e.currentTarget.style.backgroundColor = 'transparent' }}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 110px 110px 120px 32px',
+              padding: '13px 18px',
+              borderBottom: i < sorted.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+              alignItems: 'center',
+              transition: 'background 0.12s ease',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              setHoveredId(deal.id)
+              e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'
+            }}
+            onMouseLeave={(e) => {
+              setHoveredId(null)
+              setConfirmId(null)
+              e.currentTarget.style.backgroundColor = 'transparent'
+            }}
           >
             {/* Deal name */}
             <div>
-              <p style={{ fontSize: '13px', fontWeight: 500, color: hoveredId === deal.id ? '#A5B4FC' : '#EBEBEB', margin: 0, marginBottom: '1px', transition: 'color 100ms ease' }}>{deal.dealName}</p>
+              <p style={{
+                fontSize: '13px', fontWeight: 600,
+                color: hoveredId === deal.id ? '#c4b5fd' : 'rgba(255,255,255,0.90)',
+                margin: 0, marginBottom: '1px',
+                transition: 'color 0.12s ease',
+              }}>{deal.dealName}</p>
               {deal.prospectName && (
-                <p style={{ fontSize: '11px', color: '#555', margin: 0 }}>{deal.prospectName}{deal.prospectTitle ? `, ${deal.prospectTitle}` : ''}</p>
+                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', margin: 0 }}>
+                  {deal.prospectName}{deal.prospectTitle ? `, ${deal.prospectTitle}` : ''}
+                </p>
               )}
             </div>
 
             {/* Company */}
-            <span style={{ fontSize: '13px', color: '#888' }}>{deal.prospectCompany}</span>
+            <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)' }}>{deal.prospectCompany}</span>
 
             {/* Outcome */}
             <div>{stageBadge(deal.stage)}</div>
 
             {/* Competitor */}
-            <span style={{ fontSize: '12px', color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.40)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {deal.competitors.length > 0 ? deal.competitors.join(', ') : '—'}
             </span>
 
             {/* Value */}
-            <span style={{ fontSize: '13px', color: '#888', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.65)', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
               {deal.dealValue != null ? `${currencySymbol}${deal.dealValue.toLocaleString()}` : '—'}
             </span>
 
             {/* Contract Start */}
-            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums' }}>
               {formatDate((deal as any).contractStartDate)}
             </span>
 
             {/* Contract End */}
-            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums' }}>
               {formatDate((deal as any).contractEndDate)}
             </span>
 
             {/* Date */}
-            <span style={{ fontSize: '12px', color: '#555', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', fontVariantNumeric: 'tabular-nums' }}>
               {formatDate(deal.createdAt)}
             </span>
 
@@ -204,16 +268,27 @@ export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: Dea
                 confirmId === deal.id ? (
                   <button
                     onClick={() => { onDelete(deal.id); setConfirmId(null) }}
-                    style={{ fontSize: '10px', fontWeight: 600, color: '#fff', backgroundColor: '#ef4444', border: 'none', borderRadius: '4px', padding: '2px 6px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    style={{
+                      fontSize: '10px', fontWeight: 600, color: '#fff',
+                      backgroundColor: '#ef4444',
+                      border: '1px solid rgba(239,68,68,0.40)',
+                      borderRadius: '5px', padding: '2px 7px',
+                      cursor: 'pointer', whiteSpace: 'nowrap',
+                    }}
                   >
                     Confirm
                   </button>
                 ) : (
                   <button
                     onClick={() => setConfirmId(deal.id)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', padding: '2px', display: 'flex', alignItems: 'center', borderRadius: '4px', transition: 'color 100ms' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444' }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = '#555' }}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'rgba(255,255,255,0.28)', padding: '3px',
+                      display: 'flex', alignItems: 'center', borderRadius: '5px',
+                      transition: 'color 0.12s',
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#ef4444' }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.28)' }}
                   >
                     <Trash2 size={13} />
                   </button>

@@ -10,33 +10,22 @@ interface ThemeCtx {
 }
 
 const ThemeContext = createContext<ThemeCtx>({
-  theme: 'light',
+  theme: 'dark',
   toggleTheme: () => {},
 })
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark')
+  // Always dark — Dimension aesthetic
+  const [theme] = useState<Theme>('dark')
 
   useEffect(() => {
-    const stored = localStorage.getItem('halvex-theme') as Theme | null
-    if (stored === 'light' || stored === 'dark') {
-      setTheme(stored)
-      document.documentElement.classList.toggle('dark', stored === 'dark')
-    } else {
-      // Default to dark — Raycast aesthetic
-      setTheme('dark')
-      document.documentElement.classList.add('dark')
-    }
+    document.documentElement.classList.add('dark')
+    document.documentElement.classList.remove('light')
+    localStorage.setItem('halvex-theme', 'dark')
   }, [])
 
-  const toggleTheme = () => {
-    setTheme(prev => {
-      const next = prev === 'light' ? 'dark' : 'light'
-      localStorage.setItem('halvex-theme', next)
-      document.documentElement.classList.toggle('dark', next === 'dark')
-      return next
-    })
-  }
+  // No-op: theme is permanently dark
+  const toggleTheme = () => {}
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>

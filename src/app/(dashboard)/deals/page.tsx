@@ -69,15 +69,22 @@ export default function DealsPage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-            <div style={{ width: '32px', height: '32px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <ClipboardList size={15} color="var(--accent)" />
+            <div style={{
+              width: '32px', height: '32px',
+              background: 'rgba(124, 58, 237, 0.18)',
+              border: '1px solid rgba(124, 58, 237, 0.30)',
+              borderRadius: '10px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              boxShadow: '0 0 12px rgba(124,58,237,0.15)',
+            }}>
+              <ClipboardList size={15} color="#a78bfa" />
             </div>
-            <h1 className="font-brand" style={{ fontSize: '20px', fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '0.01em', margin: 0 }}>
+            <h1 className="font-brand" style={{ fontSize: '20px', fontWeight: 600, color: 'rgba(255,255,255,0.95)', letterSpacing: '-0.01em', margin: 0 }}>
               Deal Log
             </h1>
           </div>
-          <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', margin: 0, paddingLeft: '42px' }}>
-            <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{deals.length}</span>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.40)', margin: 0, paddingLeft: '42px' }}>
+            <span style={{ color: '#a78bfa', fontWeight: 600 }}>{deals.length}</span>
             {' '}deals · Track wins and losses to improve closing
           </p>
         </div>
@@ -86,22 +93,22 @@ export default function DealsPage() {
           onClick={() => setAddOpen(true)}
           style={{
             display: 'flex', alignItems: 'center', gap: '7px',
-            height: '36px', padding: '0 16px',
-            borderRadius: '8px', fontSize: '13px', fontWeight: 600,
+            height: '36px', padding: '0 18px',
+            borderRadius: '9px', fontSize: '13px', fontWeight: 600,
             color: '#fff',
-            background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
-            border: '1px solid rgba(99,102,241,0.4)',
+            background: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
+            border: '1px solid rgba(124, 58, 237, 0.50)',
             cursor: 'pointer',
-            boxShadow: 'var(--shadow)',
-            transition: 'opacity 0.1s ease',
+            boxShadow: '0 0 20px rgba(124,58,237,0.30), 0 4px 12px rgba(0,0,0,0.25)',
+            transition: 'all 0.15s ease',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.opacity = '0.9'
-            e.currentTarget.style.boxShadow = 'var(--shadow-lg)'
+            e.currentTarget.style.transform = 'translateY(-1px)'
+            e.currentTarget.style.boxShadow = '0 0 30px rgba(124,58,237,0.45), 0 6px 20px rgba(0,0,0,0.30)'
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.opacity = '1'
-            e.currentTarget.style.boxShadow = 'var(--shadow)'
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = '0 0 20px rgba(124,58,237,0.30), 0 4px 12px rgba(0,0,0,0.25)'
           }}
         >
           <Plus size={14} strokeWidth={2.5} />
@@ -145,12 +152,12 @@ export default function DealsPage() {
             transform: 'translate(-50%, -50%)',
             zIndex: 501, width: '100%', maxWidth: '520px',
             maxHeight: '90vh', overflowY: 'auto',
-            background: 'var(--elevated)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            border: '1px solid var(--border-strong)',
-            borderRadius: '8px', padding: '24px',
-            boxShadow: 'var(--shadow-lg)',
+            background: 'rgba(12, 16, 32, 0.96)',
+            backdropFilter: 'blur(40px)',
+            WebkitBackdropFilter: 'blur(40px)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: '16px', padding: '28px',
+            boxShadow: '0 24px 80px rgba(0,0,0,0.60), inset 0 1px 0 rgba(255,255,255,0.08)',
             outline: 'none',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
@@ -161,14 +168,20 @@ export default function DealsPage() {
                 <button style={{
                   width: '28px', height: '28px',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  borderRadius: '6px',
-                  backgroundColor: 'var(--surface-hover)',
-                  border: '1px solid var(--border)',
-                  cursor: 'pointer', color: 'var(--text-tertiary)',
-                  transition: 'background 0.15s',
+                  borderRadius: '7px',
+                  backgroundColor: 'rgba(255,255,255,0.07)',
+                  border: '1px solid rgba(255,255,255,0.10)',
+                  cursor: 'pointer', color: 'rgba(255,255,255,0.45)',
+                  transition: 'all 0.12s',
                 }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--border-strong)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'var(--surface-hover)' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.12)'
+                    e.currentTarget.style.color = 'rgba(255,255,255,0.80)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.07)'
+                    e.currentTarget.style.color = 'rgba(255,255,255,0.45)'
+                  }}
                 >
                   <X size={14} strokeWidth={2} />
                 </button>

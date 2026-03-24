@@ -17,7 +17,8 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
     <div style={{
       display: 'flex',
       minHeight: '100vh',
-      background: 'var(--bg)',
+      background: 'linear-gradient(135deg, #0a0f1e 0%, #1a0a2e 100%)',
+      backgroundAttachment: 'fixed',
       position: 'relative',
     }}>
 

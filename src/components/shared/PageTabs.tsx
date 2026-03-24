@@ -25,10 +25,12 @@ export function PageTabs({ tabs }: { tabs: PageTab[] }) {
       gap: '2px',
       marginBottom: '24px',
       padding: '3px',
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.06)',
-      borderRadius: '9px',
+      background: 'rgba(255,255,255,0.05)',
+      border: '1px solid rgba(255,255,255,0.09)',
+      borderRadius: '10px',
       width: 'fit-content',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
     }}>
       {tabs.map(tab => {
         const active = isTabActive(tab)
@@ -41,26 +43,27 @@ export function PageTabs({ tabs }: { tabs: PageTab[] }) {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '5px 14px',
-              borderRadius: '6px',
+              padding: '6px 16px',
+              borderRadius: '7px',
               fontSize: '12px',
-              fontWeight: active ? '600' : '400',
-              color: active ? '#E5E7EB' : '#4B5563',
-              background: active ? 'rgba(255,255,255,0.09)' : 'transparent',
+              fontWeight: active ? '600' : '500',
+              color: active ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.42)',
+              background: active ? 'rgba(124,58,237,0.22)' : 'transparent',
               textDecoration: 'none',
-              border: active ? '1px solid rgba(255,255,255,0.09)' : '1px solid transparent',
+              border: active ? '1px solid rgba(124,58,237,0.35)' : '1px solid transparent',
               transition: 'all 0.12s ease',
               whiteSpace: 'nowrap',
+              boxShadow: active ? '0 0 12px rgba(124,58,237,0.15)' : 'none',
             }}
             onMouseEnter={e => {
               if (!active) {
-                (e.currentTarget as HTMLElement).style.color = '#9CA3AF'
-                ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'
+                (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.75)'
+                ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'
               }
             }}
             onMouseLeave={e => {
               if (!active) {
-                (e.currentTarget as HTMLElement).style.color = '#4B5563'
+                (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.42)'
                 ;(e.currentTarget as HTMLElement).style.background = 'transparent'
               }
             }}

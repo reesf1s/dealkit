@@ -22,15 +22,39 @@ function makeFmt(sym: string) {
   }
 }
 
+const CARD_STYLE: React.CSSProperties = {
+  background: 'rgba(255, 255, 255, 0.05)',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  border: '1px solid rgba(255, 255, 255, 0.10)',
+  borderRadius: '14px',
+  overflow: 'hidden',
+  boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.06)',
+}
+
+const CARD_HEADER_STYLE: React.CSSProperties = {
+  padding: '14px 18px',
+  borderBottom: '1px solid rgba(255,255,255,0.07)',
+}
+
+const CARD_TITLE_STYLE: React.CSSProperties = {
+  fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.85)', letterSpacing: '-0.01em',
+}
+
+const DIVIDER_STYLE: React.CSSProperties = {
+  borderTop: '1px solid rgba(255,255,255,0.07)',
+}
+
 function WinRateGauge({ rate }: { rate: number }) {
-  const color = rate >= 60 ? 'var(--ds-green, #3CCB7F)' : rate >= 40 ? 'var(--ds-amber, #F59E0B)' : 'var(--ds-red, #E5484D)'
+  const color = rate >= 60 ? '#10b981' : rate >= 40 ? '#f59e0b' : '#ef4444'
+  const glowColor = rate >= 60 ? 'rgba(16,185,129,0.35)' : rate >= 40 ? 'rgba(245,158,11,0.35)' : 'rgba(239,68,68,0.35)'
   const circumference = 2 * Math.PI * 40
   const offset = circumference - (rate / 100) * circumference
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', padding: '16px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', padding: '20px 16px' }}>
       <div style={{ position: 'relative', width: '100px', height: '100px' }}>
-        <svg width="100" height="100" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
+        <svg width="100" height="100" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)', filter: `drop-shadow(0 0 8px ${glowColor})` }}>
           <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
           <circle
             cx="50"
@@ -46,12 +70,12 @@ function WinRateGauge({ rate }: { rate: number }) {
           />
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontSize: '22px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontSize: '22px', fontWeight: 700, color: 'rgba(255,255,255,0.95)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
             {Math.round(rate)}%
           </span>
         </div>
       </div>
-      <span style={{ fontSize: '12px', color: '#888' }}>Overall win rate</span>
+      <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.40)' }}>Overall win rate</span>
     </div>
   )
 }
@@ -63,12 +87,10 @@ export function DealInsights({ deals, currencySymbol = '£' }: DealInsightsProps
   const lostDeals = deals.filter((d) => d.stage === 'closed_lost')
   const winRate = closedDeals.length > 0 ? (wonDeals.length / closedDeals.length) * 100 : 0
 
-  // MRR / ARR from recurring won deals
   const recurringWon = wonDeals.filter((d) => d.dealType === 'recurring')
   const mrr = recurringWon.reduce((sum, d) => sum + toMRR(d), 0)
   const arr = mrr * 12
 
-  // Top loss reasons
   const lossReasonCounts: Record<string, number> = {}
   lostDeals.forEach((d) => {
     if (d.lostReason) {
@@ -79,7 +101,6 @@ export function DealInsights({ deals, currencySymbol = '£' }: DealInsightsProps
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5)
 
-  // Win rate by competitor
   const competitorStats: Record<string, { won: number; lost: number }> = {}
   closedDeals.forEach((d) => {
     d.competitors.forEach((c) => {
@@ -90,9 +111,7 @@ export function DealInsights({ deals, currencySymbol = '£' }: DealInsightsProps
   })
   const competitorRows = Object.entries(competitorStats)
     .map(([name, { won, lost }]) => ({
-      name,
-      won,
-      lost,
+      name, won, lost,
       total: won + lost,
       rate: won + lost > 0 ? Math.round((won / (won + lost)) * 100) : 0,
     }))
@@ -100,49 +119,49 @@ export function DealInsights({ deals, currencySymbol = '£' }: DealInsightsProps
     .slice(0, 5)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
       {/* MRR / ARR projection */}
       {recurringWon.length > 0 && (
-        <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', overflow: 'hidden' }}>
-          <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB' }}>Revenue projection</span>
+        <div style={CARD_STYLE}>
+          <div style={CARD_HEADER_STYLE}>
+            <span style={CARD_TITLE_STYLE}>Revenue projection</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ padding: '14px 16px', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>MRR</div>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#6366F1', fontVariantNumeric: 'tabular-nums' }}>{fmt(mrr)}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ padding: '16px 18px', borderRight: '1px solid rgba(255,255,255,0.07)' }}>
+              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '5px' }}>MRR</div>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#a78bfa', fontVariantNumeric: 'tabular-nums' }}>{fmt(mrr)}</div>
             </div>
-            <div style={{ padding: '14px 16px' }}>
-              <div style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>ARR</div>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#8B5CF6', fontVariantNumeric: 'tabular-nums' }}>{fmt(arr)}</div>
+            <div style={{ padding: '16px 18px' }}>
+              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '5px' }}>ARR</div>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#c4b5fd', fontVariantNumeric: 'tabular-nums' }}>{fmt(arr)}</div>
             </div>
           </div>
-          <div style={{ padding: '8px 16px' }}>
-            <span style={{ fontSize: '11px', color: '#444' }}>From {recurringWon.length} recurring deal{recurringWon.length !== 1 ? 's' : ''}</span>
+          <div style={{ padding: '10px 18px' }}>
+            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.30)' }}>From {recurringWon.length} recurring deal{recurringWon.length !== 1 ? 's' : ''}</span>
           </div>
         </div>
       )}
 
       {/* Win rate gauge */}
-      <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', overflow: 'hidden' }}>
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB' }}>Win rate</span>
+      <div style={CARD_STYLE}>
+        <div style={CARD_HEADER_STYLE}>
+          <span style={CARD_TITLE_STYLE}>Win rate</span>
         </div>
         {closedDeals.length === 0 ? (
-          <p style={{ fontSize: '13px', color: '#555', padding: '16px', margin: 0, textAlign: 'center' }}>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)', padding: '20px', margin: 0, textAlign: 'center' }}>
             Log your first closed deal to see win rate.
           </p>
         ) : (
           <>
             <WinRateGauge rate={winRate} />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ padding: '12px 16px', textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: '20px', fontWeight: 700, color: '#22C55E', fontVariantNumeric: 'tabular-nums' }}>{wonDeals.length}</div>
-                <div style={{ fontSize: '11px', color: '#555' }}>Won</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', ...DIVIDER_STYLE }}>
+              <div style={{ padding: '14px 18px', textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.07)' }}>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: '#10b981', fontVariantNumeric: 'tabular-nums' }}>{wonDeals.length}</div>
+                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.40)', marginTop: '2px' }}>Won</div>
               </div>
-              <div style={{ padding: '12px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: '20px', fontWeight: 700, color: '#EF4444', fontVariantNumeric: 'tabular-nums' }}>{lostDeals.length}</div>
-                <div style={{ fontSize: '11px', color: '#555' }}>Lost</div>
+              <div style={{ padding: '14px 18px', textAlign: 'center' }}>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: '#ef4444', fontVariantNumeric: 'tabular-nums' }}>{lostDeals.length}</div>
+                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.40)', marginTop: '2px' }}>Lost</div>
               </div>
             </div>
           </>
@@ -150,21 +169,22 @@ export function DealInsights({ deals, currencySymbol = '£' }: DealInsightsProps
       </div>
 
       {/* Top loss reasons */}
-      <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', overflow: 'hidden' }}>
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB' }}>Top loss reasons</span>
+      <div style={CARD_STYLE}>
+        <div style={CARD_HEADER_STYLE}>
+          <span style={CARD_TITLE_STYLE}>Top loss reasons</span>
         </div>
-        <div style={{ padding: '12px' }}>
+        <div style={{ padding: '14px 18px' }}>
           {topLossReasons.length === 0 ? (
-            <p style={{ fontSize: '13px', color: '#555', margin: 0, textAlign: 'center', padding: '8px' }}>No data yet.</p>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)', margin: 0, textAlign: 'center', padding: '6px 0' }}>No data yet.</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {topLossReasons.map(([reason, count]) => (
                 <div key={reason} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ flex: 1, fontSize: '12px', color: '#EBEBEB', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'rgba(239,68,68,0.70)', flexShrink: 0 }} />
+                  <span style={{ flex: 1, fontSize: '12px', color: 'rgba(255,255,255,0.70)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {reason}
                   </span>
-                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#EF4444', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#f87171', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
                     ×{count}
                   </span>
                 </div>
@@ -175,31 +195,31 @@ export function DealInsights({ deals, currencySymbol = '£' }: DealInsightsProps
       </div>
 
       {/* Win rate by competitor */}
-      <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: 'none', borderRadius: '8px', overflow: 'hidden' }}>
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB' }}>Win rate vs competitors</span>
+      <div style={CARD_STYLE}>
+        <div style={CARD_HEADER_STYLE}>
+          <span style={CARD_TITLE_STYLE}>Win rate vs competitors</span>
         </div>
         {competitorRows.length === 0 ? (
-          <p style={{ fontSize: '13px', color: '#555', margin: 0, textAlign: 'center', padding: '16px' }}>No competitor data yet.</p>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)', margin: 0, textAlign: 'center', padding: '20px' }}>No competitor data yet.</p>
         ) : (
-          <div style={{ overflow: 'hidden' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 50px 70px', padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 50px 50px 70px', padding: '8px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               {['Competitor', 'W', 'L', 'Rate'].map((h) => (
-                <span key={h} style={{ fontSize: '10px', fontWeight: 600, color: '#444', letterSpacing: '0.05em', textTransform: 'uppercase', textAlign: h === 'Competitor' ? 'left' : 'right' }}>
+                <span key={h} style={{ fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.28)', letterSpacing: '0.07em', textTransform: 'uppercase', textAlign: h === 'Competitor' ? 'left' : 'right' }}>
                   {h}
                 </span>
               ))}
             </div>
-            {competitorRows.map((row) => (
-              <div key={row.name} style={{ display: 'grid', gridTemplateColumns: '1fr 50px 50px 70px', padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', alignItems: 'center' }}>
-                <span style={{ fontSize: '12px', color: '#EBEBEB', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</span>
-                <span style={{ fontSize: '12px', color: '#22C55E', fontWeight: 600, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.won}</span>
-                <span style={{ fontSize: '12px', color: '#EF4444', fontWeight: 600, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.lost}</span>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
-                  <div style={{ width: '32px', height: '4px', borderRadius: '9999px', backgroundColor: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${row.rate}%`, backgroundColor: row.rate >= 50 ? '#22C55E' : '#EF4444', borderRadius: '9999px' }} />
+            {competitorRows.map((row, i) => (
+              <div key={row.name} style={{ display: 'grid', gridTemplateColumns: '1fr 50px 50px 70px', padding: '10px 18px', borderBottom: i < competitorRows.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.75)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.name}</span>
+                <span style={{ fontSize: '12px', color: '#10b981', fontWeight: 600, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.won}</span>
+                <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: 600, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.lost}</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '5px' }}>
+                  <div style={{ width: '32px', height: '4px', borderRadius: '9999px', backgroundColor: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${row.rate}%`, backgroundColor: row.rate >= 50 ? '#10b981' : '#ef4444', borderRadius: '9999px' }} />
                   </div>
-                  <span style={{ fontSize: '12px', color: '#888', fontVariantNumeric: 'tabular-nums', minWidth: '30px', textAlign: 'right' }}>{row.rate}%</span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.50)', fontVariantNumeric: 'tabular-nums', minWidth: '30px', textAlign: 'right' }}>{row.rate}%</span>
                 </div>
               </div>
             ))}

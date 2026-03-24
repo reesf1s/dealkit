@@ -26,26 +26,27 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
       {/* Icon container */}
       <div
         style={{
-          width: '48px',
-          height: '48px',
-          borderRadius: '8px',
-          backgroundColor: 'rgba(255, 255, 255, 0.04)',
-          border: '1px solid rgba(255, 255, 255, 0.06)',
+          width: '52px',
+          height: '52px',
+          borderRadius: '12px',
+          background: 'rgba(124, 58, 237, 0.12)',
+          border: '1px solid rgba(124, 58, 237, 0.22)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          boxShadow: '0 0 20px rgba(124,58,237,0.12)',
         }}
       >
-        <Icon size={20} strokeWidth={1.5} style={{ color: '#555555' }} />
+        <Icon size={20} strokeWidth={1.5} style={{ color: '#a78bfa' }} />
       </div>
 
       {/* Text */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxWidth: '320px' }}>
         <h3
           style={{
-            fontSize: '14px',
+            fontSize: '15px',
             fontWeight: 600,
-            color: '#EBEBEB',
+            color: 'rgba(255,255,255,0.88)',
             letterSpacing: '-0.01em',
             margin: 0,
           }}
@@ -55,8 +56,8 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
         <p
           style={{
             fontSize: '13px',
-            color: '#888888',
-            lineHeight: 1.5,
+            color: 'rgba(255,255,255,0.42)',
+            lineHeight: 1.6,
             margin: 0,
           }}
         >
@@ -69,22 +70,25 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
         <button
           onClick={action.onClick}
           style={{
-            height: '32px',
-            padding: '0 16px',
-            borderRadius: '6px',
+            height: '34px',
+            padding: '0 20px',
+            borderRadius: '8px',
             fontSize: '13px',
-            fontWeight: 500,
+            fontWeight: 600,
             color: '#fff',
-            backgroundColor: '#6366F1',
-            border: 'none',
+            background: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
+            border: '1px solid rgba(124,58,237,0.50)',
             cursor: 'pointer',
-            transition: 'background-color 150ms ease',
+            transition: 'all 150ms ease',
+            boxShadow: '0 0 16px rgba(124,58,237,0.25)',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#4F46E5'
+            e.currentTarget.style.transform = 'translateY(-1px)'
+            e.currentTarget.style.boxShadow = '0 0 24px rgba(124,58,237,0.40)'
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#6366F1'
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = '0 0 16px rgba(124,58,237,0.25)'
           }}
         >
           {action.label}

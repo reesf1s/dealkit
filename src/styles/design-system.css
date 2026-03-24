@@ -1,56 +1,57 @@
 /* ============================================================
-   LINEAR-STYLE DESIGN SYSTEM
+   DIMENSION-STYLE DARK GLASS DESIGN SYSTEM
+   Deep navy-purple, frosted glass, OS-level premium feel.
    Imported LAST in globals.css to override all base styles.
    ============================================================ */
 
 :root {
-  /* Surfaces — glassmorphism */
-  --ds-bg-page: #09090B;
-  --ds-bg-sidebar: rgba(15,15,17,0.85);
-  --ds-bg-card: rgba(255,255,255,0.03);
-  --ds-bg-hover: rgba(255,255,255,0.06);
-  --ds-bg-active: rgba(255,255,255,0.08);
-  --ds-bg-input: #141416;
-  --ds-bg-elevated: rgba(255,255,255,0.05);
+  /* Surfaces — deep navy-purple glass */
+  --ds-bg-page: #0a0f1e;
+  --ds-bg-sidebar: rgba(10, 15, 30, 0.80);
+  --ds-bg-card: rgba(255, 255, 255, 0.05);
+  --ds-bg-hover: rgba(255, 255, 255, 0.07);
+  --ds-bg-active: rgba(255, 255, 255, 0.10);
+  --ds-bg-input: rgba(255, 255, 255, 0.06);
+  --ds-bg-elevated: rgba(20, 15, 45, 0.95);
 
-  /* Text — rgba white, NOT hex greys */
-  --ds-text-1: rgba(255,255,255,0.93);
-  --ds-text-2: rgba(255,255,255,0.56);
-  --ds-text-3: rgba(255,255,255,0.32);
-  --ds-text-4: rgba(255,255,255,0.16);
+  /* Text — rgba white */
+  --ds-text-1: rgba(255, 255, 255, 0.95);
+  --ds-text-2: rgba(255, 255, 255, 0.55);
+  --ds-text-3: rgba(255, 255, 255, 0.35);
+  --ds-text-4: rgba(255, 255, 255, 0.18);
 
-  /* Borders — glassmorphism */
-  --ds-border: rgba(255,255,255,0.06);
-  --ds-border-hover: rgba(255,255,255,0.10);
+  /* Borders */
+  --ds-border: rgba(255, 255, 255, 0.10);
+  --ds-border-hover: rgba(255, 255, 255, 0.18);
 
-  /* Accent */
-  --ds-accent: #5B5BD6;
-  --ds-accent-hover: #6E6EE0;
-  --ds-accent-soft: rgba(91,91,214,0.14);
+  /* Accent — purple (Dimension) */
+  --ds-accent: #7c3aed;
+  --ds-accent-hover: #8b5cf6;
+  --ds-accent-soft: rgba(124, 58, 237, 0.18);
 
   /* Semantic */
-  --ds-green: #3CCB7F;
-  --ds-green-soft: rgba(60,203,127,0.14);
-  --ds-amber: #F59E0B;
-  --ds-amber-soft: rgba(245,158,11,0.14);
-  --ds-red: #E5484D;
-  --ds-red-soft: rgba(229,72,77,0.14);
+  --ds-green: #10b981;
+  --ds-green-soft: rgba(16, 185, 129, 0.15);
+  --ds-amber: #f59e0b;
+  --ds-amber-soft: rgba(245, 158, 11, 0.15);
+  --ds-red: #ef4444;
+  --ds-red-soft: rgba(239, 68, 68, 0.15);
 
-  /* Glass card mixins */
-  --ds-glass-bg: rgba(255,255,255,0.04);
-  --ds-glass-border: rgba(255,255,255,0.08);
+  /* Glass card */
+  --ds-glass-bg: rgba(255, 255, 255, 0.05);
+  --ds-glass-border: rgba(255, 255, 255, 0.10);
   --ds-glass-blur: blur(20px);
-  --ds-glass-hover: rgba(255,255,255,0.07);
-  --ds-glow-accent: rgba(91,91,214,0.15);
-  --ds-glow-green: rgba(60,203,127,0.12);
-  --ds-glow-amber: rgba(245,158,11,0.12);
-  --ds-glow-red: rgba(229,72,77,0.12);
+  --ds-glass-hover: rgba(255, 255, 255, 0.08);
+  --ds-glow-accent: rgba(124, 58, 237, 0.18);
+  --ds-glow-green: rgba(16, 185, 129, 0.15);
+  --ds-glow-amber: rgba(245, 158, 11, 0.15);
+  --ds-glow-red: rgba(239, 68, 68, 0.15);
 
-  /* Radii — softer glass-friendly corners */
-  --ds-radius-sm: 4px;
-  --ds-radius-md: 6px;
-  --ds-radius-lg: 12px;
-  --ds-radius-xl: 14px;
+  /* Radii */
+  --ds-radius-sm: 6px;
+  --ds-radius-md: 10px;
+  --ds-radius-lg: 14px;
+  --ds-radius-xl: 20px;
 
   /* Font */
   --ds-font: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -60,7 +61,8 @@
 }
 
 body {
-  background: var(--ds-bg-page) !important;
+  background: linear-gradient(135deg, #0a0f1e 0%, #1a0a2e 100%) !important;
+  background-attachment: fixed !important;
   font-family: var(--ds-font) !important;
   font-weight: 500 !important;
   color: var(--ds-text-1) !important;
@@ -68,60 +70,9 @@ body {
   -webkit-font-smoothing: antialiased !important;
 }
 
-/* ── Light mode (prefers-color-scheme) ────────────────────────────────────── */
-@media (prefers-color-scheme: light) {
-  :root {
-    --ds-bg-page: #F8F9FA;
-    --ds-bg-sidebar: rgba(255,255,255,0.8);
-    --ds-bg-card: rgba(255,255,255,0.7);
-    --ds-bg-hover: rgba(0,0,0,0.04);
-    --ds-bg-active: rgba(0,0,0,0.06);
-    --ds-text-1: rgba(0,0,0,0.87);
-    --ds-text-2: rgba(0,0,0,0.55);
-    --ds-text-3: rgba(0,0,0,0.32);
-    --ds-glass-bg: rgba(255,255,255,0.6);
-    --ds-glass-border: rgba(0,0,0,0.08);
-    --ds-glass-hover: rgba(0,0,0,0.04);
-    --ds-border: rgba(0,0,0,0.08);
-    --ds-glow-accent: rgba(91,91,214,0.08);
-    --ds-glow-green: rgba(60,203,127,0.06);
-    --ds-glow-amber: rgba(245,158,11,0.06);
-    --ds-glow-red: rgba(229,72,77,0.06);
-    --glass-card-bg: rgba(255,255,255,0.60);
-    --glass-card-border: rgba(0,0,0,0.08);
-    --glass-card-hover-bg: rgba(255,255,255,0.72);
-    --glass-card-hover-border: rgba(0,0,0,0.12);
-    --glass-glow-accent: rgba(91,91,214,0.04);
-    --glass-glow-success: rgba(60,203,127,0.06);
-    --glass-glow-danger: rgba(229,72,77,0.04);
-    --glass-glow-warning: rgba(245,158,11,0.03);
-  }
+/* Force background on html too for scroll overscroll */
+html {
+  background: #0a0f1e !important;
 }
 
-/* ── Light mode (class-based toggle) ──────────────────────────────────────── */
-.light {
-  --ds-bg-page: #F8F9FA;
-  --ds-bg-sidebar: rgba(255,255,255,0.8);
-  --ds-bg-card: rgba(255,255,255,0.7);
-  --ds-bg-hover: rgba(0,0,0,0.04);
-  --ds-bg-active: rgba(0,0,0,0.06);
-  --ds-text-1: rgba(0,0,0,0.87);
-  --ds-text-2: rgba(0,0,0,0.55);
-  --ds-text-3: rgba(0,0,0,0.32);
-  --ds-glass-bg: rgba(255,255,255,0.6);
-  --ds-glass-border: rgba(0,0,0,0.08);
-  --ds-glass-hover: rgba(0,0,0,0.04);
-  --ds-border: rgba(0,0,0,0.08);
-  --ds-glow-accent: rgba(91,91,214,0.08);
-  --ds-glow-green: rgba(60,203,127,0.06);
-  --ds-glow-amber: rgba(245,158,11,0.06);
-  --ds-glow-red: rgba(229,72,77,0.06);
-  --glass-card-bg: rgba(255,255,255,0.60);
-  --glass-card-border: rgba(0,0,0,0.08);
-  --glass-card-hover-bg: rgba(255,255,255,0.72);
-  --glass-card-hover-border: rgba(0,0,0,0.12);
-  --glass-glow-accent: rgba(91,91,214,0.04);
-  --glass-glow-success: rgba(60,203,127,0.06);
-  --glass-glow-danger: rgba(229,72,77,0.04);
-  --glass-glow-warning: rgba(245,158,11,0.03);
-}
+/* ── No light mode overrides. Dark only. ──────────────────────────────────── */
