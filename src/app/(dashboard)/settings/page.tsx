@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useUser } from '@clerk/nextjs'
 import useSWR from 'swr'
 import { useState, useEffect } from 'react'
-import { Check, X, CheckCircle, AlertTriangle, ExternalLink, Download, Trash2, Copy, LogOut, RefreshCw, Plug, Unplug, Mail, Key, Inbox, Loader2, Zap } from 'lucide-react'
+import { Check, X, CheckCircle, AlertTriangle, ExternalLink, Download, Trash2, Copy, LogOut, RefreshCw, Plug, Unplug, Mail, Key, Inbox, Loader2, Zap, Eye, EyeOff } from 'lucide-react'
 import { SkeletonCard } from '@/components/shared/SkeletonCard'
 import { ConfirmModal } from '@/components/shared/ConfirmModal'
 import { useToast } from '@/components/shared/Toast'
@@ -112,6 +112,10 @@ export default function SettingsPage() {
   const [linearMatchResult, setLinearMatchResult] = useState<{ matched: number; confirmed: number; suggested: number; deals_checked: number } | null>(null)
   // Slack state
   const [slackDisconnecting, setSlackDisconnecting] = useState(false)
+  // MCP state
+  const [mcpKeyRevealed, setMcpKeyRevealed] = useState(false)
+  const [mcpKeyCopied, setMcpKeyCopied] = useState(false)
+  const [mcpKeyRegenerating, setMcpKeyRegenerating] = useState(false)
 
   const { data: userRes, isLoading: loadingUser } = useSWR<{ data: DbUser }>('/api/user', fetcher)
   const { data: membersRes, isLoading: loadingMembers, mutate: mutateMembers } = useSWR<{ data: Member[] }>('/api/workspaces/members', fetcher)
@@ -122,6 +126,7 @@ export default function SettingsPage() {
   const { data: apiKeyRes } = useSWR<{ data: { apiKey: string } }>('/api/workspace/api-key', fetcher, { revalidateOnFocus: false })
   const { data: linearRes, mutate: mutateLinear } = useSWR<{ data: { connected: boolean; teamName?: string | null; workspaceName?: string | null; lastSyncAt?: string | null; syncError?: string | null } }>('/api/integrations/linear/status', fetcher, { revalidateOnFocus: false })
   const { data: slackRes, mutate: mutateSlack } = useSWR<{ data: { connected: boolean; configured: boolean; slackTeamName?: string | null; slackTeamId?: string | null; connectedAt?: string | null } }>('/api/integrations/slack/status', fetcher, { revalidateOnFocus: false })
+  const { data: mcpKeyRes, mutate: mutateMcpKey } = useSWR<{ data: { mcpApiKey: string } }>('/api/workspace/mcp-api-key', fetcher, { revalidateOnFocus: false })
   const hubspot = hubspotRes?.data
   const linear = linearRes?.data
   const slack = slackRes?.data
@@ -413,6 +418,32 @@ export default function SettingsPage() {
       toast(e instanceof Error ? e.message : 'Failed to regenerate', 'error')
     } finally {
       setRegeneratingInbound(false)
+    }
+  }
+
+  function handleCopyMcpKey() {
+    const key = mcpKeyRes?.data?.mcpApiKey
+    if (!key) return
+    navigator.clipboard.writeText(key)
+    setMcpKeyCopied(true)
+    toast('MCP API key copied!', 'success')
+    setTimeout(() => setMcpKeyCopied(false), 2000)
+  }
+
+  async function handleRegenerateMcpKey() {
+    if (!confirm('Regenerate your MCP API key? The old key will stop working immediately.')) return
+    setMcpKeyRegenerating(true)
+    try {
+      const res = await fetch('/api/workspace/mcp-api-key', { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Failed to regenerate')
+      await mutateMcpKey()
+      setMcpKeyRevealed(true)
+      toast('New MCP API key generated', 'success')
+    } catch (e: unknown) {
+      toast(e instanceof Error ? e.message : 'Failed to regenerate', 'error')
+    } finally {
+      setMcpKeyRegenerating(false)
     }
   }
 
@@ -1161,6 +1192,147 @@ export default function SettingsPage() {
                 </a>
               </div>
             )}
+          </div>
+        </SectionCard>
+
+        {/* Claude MCP */}
+        <SectionCard title="Claude MCP" description="Connect Claude Desktop or external agents to your Halvex pipeline">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+            {/* Explainer */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 14px', borderRadius: '10px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.14)' }}>
+              <Key size={14} strokeWidth={2} style={{ color: 'var(--accent)', flexShrink: 0, marginTop: '1px' }} />
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.7 }}>
+                Use the Halvex MCP server to query deal intelligence from Claude Desktop, Claude.ai, or any agent that supports the Model Context Protocol. Add the config below to your <code style={{ fontFamily: 'monospace', fontSize: '11px', background: 'var(--surface)', padding: '1px 5px', borderRadius: '4px', border: '1px solid var(--border)' }}>claude_desktop_config.json</code>.
+              </p>
+            </div>
+
+            {/* MCP server URL */}
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>MCP Server URL</p>
+              <input
+                readOnly
+                value="https://www.halvex.ai/api/mcp"
+                style={{
+                  width: '100%', height: '32px', padding: '0 10px', borderRadius: '7px', fontSize: '12px',
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  color: 'var(--text-primary)', fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            {/* API key */}
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>MCP API key</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <input
+                  data-mp-block
+                  readOnly
+                  type={mcpKeyRevealed ? 'text' : 'password'}
+                  value={mcpKeyRes?.data?.mcpApiKey ?? 'Loading…'}
+                  style={{
+                    flex: 1, height: '32px', padding: '0 10px', borderRadius: '7px', fontSize: '12px',
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    color: 'var(--text-primary)', fontFamily: 'monospace', outline: 'none',
+                  }}
+                />
+                <button
+                  onClick={() => setMcpKeyRevealed(r => !r)}
+                  title={mcpKeyRevealed ? 'Hide key' : 'Reveal key'}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '32px', height: '32px', borderRadius: '7px', flexShrink: 0,
+                    background: 'var(--surface)', border: '1px solid var(--border-strong)',
+                    cursor: 'pointer', color: 'var(--text-secondary)',
+                  }}
+                >
+                  {mcpKeyRevealed ? <EyeOff size={13} /> : <Eye size={13} />}
+                </button>
+                <button
+                  onClick={handleCopyMcpKey}
+                  disabled={!mcpKeyRes?.data?.mcpApiKey}
+                  title="Copy MCP API key"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    height: '32px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
+                    color: mcpKeyCopied ? 'var(--success)' : 'var(--text-primary)',
+                    background: mcpKeyCopied ? 'rgba(34,197,94,0.1)' : 'var(--surface-hover)',
+                    border: mcpKeyCopied ? '1px solid rgba(34,197,94,0.3)' : '1px solid var(--border-strong)',
+                    cursor: !mcpKeyRes?.data?.mcpApiKey ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.15s', whiteSpace: 'nowrap',
+                  }}
+                >
+                  <Copy size={11} />
+                  {mcpKeyCopied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+            </div>
+
+            {/* Claude Desktop config snippet */}
+            <div>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px' }}>Claude Desktop config</p>
+              <pre style={{
+                margin: 0, padding: '12px', borderRadius: '8px', fontSize: '11px', lineHeight: 1.6,
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                color: 'var(--text-secondary)', fontFamily: 'monospace', overflowX: 'auto',
+                whiteSpace: 'pre',
+              }}>{`{
+  "mcpServers": {
+    "halvex": {
+      "type": "http",
+      "url": "https://www.halvex.ai/api/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-mcp-api-key>"
+      }
+    }
+  }
+}`}</pre>
+            </div>
+
+            {/* Available tools */}
+            <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+              <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 8px' }}>Available tools</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {[
+                  ['halvex_get_deal_health', 'Health score, risks, and recommendations for any deal'],
+                  ['halvex_find_at_risk_deals', 'Deals with score drops, stale activity, or urgent close dates'],
+                  ['halvex_get_linked_issues', 'Linear issues linked to a deal'],
+                  ['halvex_get_win_loss_signals', 'Win rate, top patterns, and competitor records'],
+                  ['halvex_scope_issue', 'Generate user story + ACs, update Linear, add to cycle'],
+                  ['halvex_draft_release_email', 'Draft release notification email to a prospect'],
+                ].map(([name, desc]) => (
+                  <div key={name} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <code style={{ fontSize: '10px', color: 'var(--accent)', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '4px', padding: '1px 6px', fontFamily: 'monospace', flexShrink: 0, marginTop: '1px' }}>{name}</code>
+                    <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', lineHeight: 1.5 }}>{desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Regenerate */}
+            {(isOwner || dbUser?.role === 'admin') && (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '10px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                <div>
+                  <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>Regenerate key</p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '2px 0 0' }}>Creates a new key — the old one will stop working immediately</p>
+                </div>
+                <button
+                  onClick={handleRegenerateMcpKey}
+                  disabled={mcpKeyRegenerating}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
+                    color: 'var(--text-secondary)', background: 'var(--surface)', border: '1px solid var(--border-strong)',
+                    cursor: mcpKeyRegenerating ? 'not-allowed' : 'pointer', opacity: mcpKeyRegenerating ? 0.6 : 1,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <RefreshCw size={11} style={{ animation: mcpKeyRegenerating ? 'spin 1s linear infinite' : 'none' }} />
+                  {mcpKeyRegenerating ? 'Regenerating…' : 'Regenerate'}
+                </button>
+              </div>
+            )}
+
           </div>
         </SectionCard>
 

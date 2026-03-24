@@ -418,6 +418,14 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
     `,
   },
   {
+    version: 29,
+    name: 'workspace_mcp_api_key',
+    sql: `
+      ALTER TABLE workspaces
+        ADD COLUMN IF NOT EXISTS mcp_api_key TEXT UNIQUE
+    `,
+  },
+  {
     version: 28,
     name: 'ensure_embeddings_1536',
     sql: `
