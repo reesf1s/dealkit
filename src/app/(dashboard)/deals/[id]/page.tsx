@@ -3957,97 +3957,351 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
   )
 }
 
-function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', mlPrediction = null, globalPrior = null, brainData = null, objectionWinMap = [], objectionConditionalWins = [] }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void; currencySymbol?: string; mlPrediction?: any; globalPrior?: any; brainData?: any; objectionWinMap?: any[]; objectionConditionalWins?: any[] }) {
-  const router = useRouter()
-  const [expandingType, setExpandingType] = useState<string | null>(null)
-  const { data: allDealsRes } = useSWR('/api/deals', fetcher)
-  const expansionDeals = (allDealsRes?.data ?? []).filter((d: any) => d.parentDealId === deal.id)
-  const [editingSummary, setEditingSummary] = useState(false)
-  const [summaryDraft, setSummaryDraft] = useState('')
-  const [resetAIConfirm, setResetAIConfirm] = useState(false)
-  const [savingAI, setSavingAI] = useState(false)
+// ─── Linear Intelligence Column ──────────────────────────────────────────────
 
-  const patchDeal = async (payload: Record<string, unknown>) => {
-    setSavingAI(true)
+function LinearColumn({ dealId }: { dealId: string }) {
+  const [discovering, setDiscovering] = useState(false)
+  const [discoverStatus, setDiscoverStatus] = useState<'done' | 'error' | null>(null)
+
+  const { data: statusData } = useSWR<{ data: { connected: boolean; teamName?: string | null } }>(
+    '/api/integrations/linear/status', fetcher, { revalidateOnFocus: false }
+  )
+  const { data: linksData, mutate: mutateLinks } = useSWR<{ data: any[] }>(
+    statusData?.data?.connected ? `/api/deals/${dealId}/linear-links` : null,
+    fetcher,
+  )
+
+  const handleDiscover = async () => {
+    setDiscovering(true)
+    setDiscoverStatus(null)
     try {
-      await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      onUpdate()
+      await fetch(`/api/deals/${dealId}/discover-issues`, { method: 'POST' })
+      await mutateLinks()
+      setDiscoverStatus('done')
+    } catch {
+      setDiscoverStatus('error')
     } finally {
-      setSavingAI(false)
+      setDiscovering(false)
     }
   }
 
-  const deleteRisk = (index: number) => {
-    const current: string[] = deal?.dealRisks ?? []
-    patchDeal({ dealRisks: current.filter((_: string, i: number) => i !== index) })
+  if (!statusData?.data?.connected) {
+    return (
+      <div className="glass-card" style={{ padding: '16px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.40)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>Linked Issues</div>
+        <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.30)', textAlign: 'center', padding: '20px 0', lineHeight: 1.5 }}>
+          Connect Linear in Settings to see linked issues
+        </div>
+      </div>
+    )
   }
 
-  const deleteInsight = (index: number) => {
-    const current: string[] = deal?.conversionInsights ?? []
-    patchDeal({ conversionInsights: current.filter((_: string, i: number) => i !== index) })
-  }
+  const allLinks = linksData?.data ?? []
+  const visibleLinks = allLinks.filter((l: any) => l.status !== 'dismissed')
 
-  const saveSummary = () => {
-    patchDeal({ aiSummary: summaryDraft.trim() || null })
-    setEditingSummary(false)
-  }
+  return (
+    <div className="glass-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.40)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          Linked Issues
+        </span>
+        <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '100px', background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.25)', fontWeight: 700, letterSpacing: '0.04em' }}>
+          MCP
+        </span>
+      </div>
 
-  const resetAllAI = async () => {
-    // conversionScorePinned: false — ensure pin is cleared so AI can re-score after reset
-    await patchDeal({ aiSummary: null, conversionScore: null, conversionScorePinned: false, conversionInsights: [], dealRisks: [] })
-    setResetAIConfirm(false)
+      {/* Issue list or skeleton */}
+      {!linksData ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} style={{ height: '56px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)' }} />
+          ))}
+        </div>
+      ) : visibleLinks.length === 0 ? (
+        <div style={{ padding: '20px 0', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+          <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)' }}>No issues linked yet</div>
+          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.20)' }}>Run Discover Issues to find matches</div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {visibleLinks.map((link: any) => {
+            const isInCycle = link.status === 'in_cycle'
+            const isDeployed = link.status === 'deployed'
+            const isConfirmed = link.status === 'confirmed' || isInCycle || isDeployed
+            const statusColor = isDeployed ? '#34d399' : isInCycle ? '#818cf8' : isConfirmed ? '#818cf8' : 'rgba(255,255,255,0.35)'
+            const statusLabel = isDeployed ? 'Deployed' : isInCycle ? 'In Cycle' : isConfirmed ? 'Confirmed' : 'Suggested'
+            return (
+              <div
+                key={link.id}
+                onClick={() => { if (link.linearIssueUrl) window.open(link.linearIssueUrl, '_blank') }}
+                style={{
+                  padding: '10px 12px', borderRadius: '8px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  cursor: link.linearIssueUrl ? 'pointer' : 'default',
+                  transition: 'border-color 0.15s',
+                }}
+                onMouseEnter={e => { if (link.linearIssueUrl) (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.28)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.40)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0, fontFamily: 'monospace', letterSpacing: '0.04em' }}>
+                    {link.linearIssueId}
+                  </span>
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.80)', fontWeight: 500, lineHeight: 1.4, flex: 1, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                    {link.linearTitle ?? link.linearIssueId}
+                  </span>
+                  {link.linearIssueUrl && (
+                    <ExternalLink size={10} color="rgba(255,255,255,0.25)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  )}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <span style={{
+                    fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '100px',
+                    background: `color-mix(in srgb, ${statusColor} 12%, transparent)`,
+                    color: statusColor,
+                    border: `1px solid color-mix(in srgb, ${statusColor} 25%, transparent)`,
+                  }}>
+                    {statusLabel}
+                  </span>
+                  {link.addressesRisk && (
+                    <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', fontStyle: 'italic' }}>
+                      ↳ {link.addressesRisk.length > 42 ? link.addressesRisk.slice(0, 42) + '…' : link.addressesRisk}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Discover button */}
+      <button
+        onClick={handleDiscover}
+        disabled={discovering}
+        style={{
+          width: '100%', padding: '10px', borderRadius: '8px',
+          background: discovering ? 'rgba(99,102,241,0.08)' : 'linear-gradient(135deg, rgba(99,102,241,0.22), rgba(139,92,246,0.16))',
+          border: '1px solid rgba(99,102,241,0.28)',
+          color: '#818cf8', fontSize: '12px', fontWeight: 600,
+          cursor: discovering ? 'not-allowed' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
+          transition: 'all 0.15s',
+        }}
+        onMouseEnter={e => { if (!discovering) { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(99,102,241,0.30), rgba(139,92,246,0.22))'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.42)' } }}
+        onMouseLeave={e => { if (!discovering) { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(99,102,241,0.22), rgba(139,92,246,0.16))'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.28)' } }}
+      >
+        {discovering
+          ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Discovering…</>
+          : <><Zap size={12} /> Discover Issues</>
+        }
+      </button>
+
+      {discoverStatus === 'done' && (
+        <div style={{ fontSize: '11px', color: '#34d399', textAlign: 'center' }}>Issues discovered — list refreshed</div>
+      )}
+      {discoverStatus === 'error' && (
+        <div style={{ fontSize: '11px', color: '#f87171', textAlign: 'center' }}>Discovery failed — check Linear connection</div>
+      )}
+    </div>
+  )
+}
+
+// ─── AI Briefing Card ─────────────────────────────────────────────────────────
+
+function DealBriefingCard({ dealId }: { dealId: string }) {
+  const { data, isLoading } = useSWR<{ data: { brief: string | null; generatedAt: string | null } }>(
+    `/api/deals/${dealId}/brief`,
+    fetcher,
+    { revalidateOnFocus: false },
+  )
+
+  const brief = data?.data?.brief
+  const generatedAt = data?.data?.generatedAt
+
+  return (
+    <div className="glass-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.40)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          AI Briefing
+        </span>
+        <Sparkles size={13} color="#818cf8" />
+      </div>
+
+      {isLoading || !data ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ height: '14px', borderRadius: '4px', background: 'rgba(255,255,255,0.06)', width: '100%' }} />
+          <div style={{ height: '14px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', width: '100%' }} />
+          <div style={{ height: '14px', borderRadius: '4px', background: 'rgba(255,255,255,0.04)', width: '65%' }} />
+          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.30)', fontStyle: 'italic', marginTop: '2px' }}>Generating…</div>
+        </div>
+      ) : brief ? (
+        <>
+          <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.78)', lineHeight: 1.7, margin: 0 }}>{brief}</p>
+          {generatedAt && (
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.30)' }}>
+              Updated {timeAgoShort(generatedAt)}
+            </div>
+          )}
+        </>
+      ) : (
+        <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.35)', lineHeight: 1.6 }}>
+          Add meeting notes and run AI analysis to generate a briefing for this deal.
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Overview Tab (3-column layout) ──────────────────────────────────────────
+
+function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', mlPrediction = null, globalPrior = null, brainData = null, objectionWinMap = [], objectionConditionalWins = [] }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void; currencySymbol?: string; mlPrediction?: any; globalPrior?: any; brainData?: any; objectionWinMap?: any[]; objectionConditionalWins?: any[] }) {
+  const router = useRouter()
+  const [expandingType, setExpandingType] = useState<string | null>(null)
+
+  const contacts: any[] = Array.isArray(deal.contacts) && deal.contacts.length > 0
+    ? deal.contacts
+    : deal.prospectName ? [{ name: deal.prospectName, title: deal.prospectTitle }] : []
+  const primaryContact = contacts[0]
+
+  const dealRisks: string[] = deal.dealRisks ?? []
+  const insights: string[] = deal.conversionInsights ?? []
+
+  const nextActions = [
+    ...dealRisks.slice(0, 3).map((r: string) => ({ priority: 'red' as const, text: r })),
+    ...insights.slice(0, 2).map((i: string) => ({ priority: 'green' as const, text: i })),
+  ].slice(0, 5)
+
+  const patchDeal = async (payload: Record<string, unknown>) => {
+    await fetch(`/api/deals/${dealId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    onUpdate()
   }
 
   const handleExpand = async (expansionType: string) => {
     setExpandingType(expansionType)
     try {
       const res = await fetch(`/api/deals/${dealId}/expand`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ expansionType }),
       })
       const result = await res.json()
-      if (result?.data?.id) {
-        router.push(`/deals/${result.data.id}`)
-      }
+      if (result?.data?.id) router.push(`/deals/${result.data.id}`)
     } finally {
       setExpandingType(null)
     }
   }
 
-  const expansionTypeColors: Record<string, string> = {
-    upsell: 'var(--accent)',
-    cross_sell: '#A78BFA',
-    renewal: 'var(--success)',
-    expansion: 'var(--warning)',
-  }
+  const contextFields: { label: string; value: string }[] = [
+    primaryContact?.name ? { label: 'Primary Contact', value: `${primaryContact.name}${primaryContact.title ? ` · ${primaryContact.title}` : ''}` } : null,
+    primaryContact?.email ? { label: 'Email', value: primaryContact.email } : null,
+    deal.engagementType ? { label: 'Engagement', value: deal.engagementType } : null,
+    deal.dealType ? { label: 'Type', value: deal.dealType === 'recurring' ? `Recurring${deal.recurringInterval ? ` (${deal.recurringInterval})` : ''}` : 'One-off' } : null,
+    deal.dealValue ? { label: 'Value', value: `${currencySymbol}${Number(deal.dealValue).toLocaleString()}` } : null,
+    deal.closeDate ? { label: 'Close Date', value: new Date(deal.closeDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) } : null,
+    deal.contractStartDate ? { label: 'Contract Start', value: new Date(deal.contractStartDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) } : null,
+    deal.contractEndDate ? { label: 'Contract End', value: new Date(deal.contractEndDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) } : null,
+    (deal.competitors as string[])?.join(', ') ? { label: 'Competitors', value: (deal.competitors as string[]).join(', ') } : null,
+  ].filter(Boolean) as { label: string; value: string }[]
 
-  const expansionTypeLabels: Record<string, string> = {
-    upsell: 'Upsell',
-    cross_sell: 'Cross-sell',
-    renewal: 'Renewal',
-    expansion: 'Expansion',
+  const expansionColors: Record<string, string> = {
+    upsell: '#818cf8', cross_sell: '#a78bfa', renewal: '#34d399', expansion: '#fbbf24',
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '22% 1fr 28%', gap: '24px', alignItems: 'start' }}>
 
-      {/* Grow This Account — shown for closed_won deals */}
-      {deal.stage === 'closed_won' && (
-        <div style={{
-          background: 'var(--glass-card-bg)', border: '1px solid var(--glass-card-border)',
-          borderRadius: '12px', overflow: 'hidden', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid var(--glass-card-border)' }}>
-            <TrendingUp size={14} color="var(--success)" />
-            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--success)' }}>Grow This Account</span>
+      {/* ── LEFT: Deal Context ──────────────────────────────────── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="glass-card" style={{ padding: '16px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.40)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>
+            Deal Context
           </div>
-          <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
-              Create an expansion opportunity to grow this customer relationship
+          {contextFields.length === 0 ? (
+            <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)', fontStyle: 'italic' }}>No deal context yet — edit the deal to add details.</div>
+          ) : contextFields.map(({ label, value }, i) => (
+            <div key={label} style={{
+              padding: '10px 0',
+              borderBottom: i < contextFields.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+            }}>
+              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.40)', fontWeight: 500, marginBottom: '3px' }}>{label}</div>
+              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.85)', fontWeight: 500, lineHeight: 1.4, wordBreak: 'break-word' }}>{value}</div>
+            </div>
+          ))}
+
+          {/* Product Gaps */}
+          {dealGaps.length > 0 && (
+            <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <span style={{ fontSize: '11px', color: '#f87171', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Product Gaps ({dealGaps.length})
+                </span>
+                <Link href="/product-gaps" style={{ fontSize: '11px', color: '#f87171', textDecoration: 'none', opacity: 0.65 }}>View →</Link>
+              </div>
+              {dealGaps.slice(0, 4).map((g: any) => (
+                <div key={g.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0, marginTop: '5px', background: g.priority === 'critical' ? '#f87171' : g.priority === 'high' ? '#fbbf24' : '#818cf8' }} />
+                  <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.70)', lineHeight: 1.4 }}>{g.title}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Document Links */}
+          <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <DealLinksSection deal={deal} patchDeal={patchDeal} />
+          </div>
+        </div>
+      </div>
+
+      {/* ── CENTER: Intelligence ────────────────────────────────── */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+        {/* AI Briefing */}
+        <DealBriefingCard dealId={dealId} />
+
+        {/* Score Breakdown — active deals only */}
+        {deal.conversionScore != null && deal.stage !== 'closed_lost' && deal.stage !== 'closed_won' && (
+          <ScoreBreakdown deal={deal} mlPrediction={mlPrediction} brainData={brainData} />
+        )}
+
+        {/* What to Focus On */}
+        {nextActions.length > 0 && (
+          <div className="glass-card" style={{ padding: '16px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.40)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>
+              What to Focus On
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {nextActions.map((action, i) => (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: '10px',
+                  padding: '10px 12px', borderRadius: '8px',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
+                }}>
+                  <div style={{
+                    width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, marginTop: '5px',
+                    background: action.priority === 'red' ? '#f87171' : '#34d399',
+                  }} />
+                  <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.75)', lineHeight: 1.55, flex: 1 }}>{action.text}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Grow This Account — closed_won */}
+        {deal.stage === 'closed_won' && (
+          <div className="glass-card" style={{ padding: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <TrendingUp size={14} color="#34d399" />
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#34d399' }}>Grow This Account</span>
+            </div>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)', margin: '0 0 12px 0', lineHeight: 1.5 }}>
+              Create an expansion opportunity to grow this customer relationship.
             </p>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {([
@@ -4056,7 +4310,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                 { type: 'renewal', label: 'Renewal', icon: <RefreshCw size={12} /> },
                 { type: 'expansion', label: 'Expansion', icon: <Plus size={12} /> },
               ] as const).map(({ type, label, icon }) => {
-                const color = expansionTypeColors[type]
+                const color = expansionColors[type]
                 const isLoading = expandingType === type
                 return (
                   <button
@@ -4066,804 +4320,32 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                     style={{
                       display: 'flex', alignItems: 'center', gap: '6px',
                       padding: '6px 14px', borderRadius: '100px',
-                      background: `${color}14`, border: `1px solid ${color}30`,
-                      color, fontSize: '12px', fontWeight: 600, cursor: expandingType ? 'not-allowed' : 'pointer',
+                      background: `color-mix(in srgb, ${color} 12%, transparent)`,
+                      border: `1px solid color-mix(in srgb, ${color} 25%, transparent)`,
+                      color, fontSize: '12px', fontWeight: 600,
+                      cursor: expandingType ? 'not-allowed' : 'pointer',
                       opacity: expandingType && !isLoading ? 0.5 : 1,
-                      transition: 'all 0.15s ease',
                     }}
-                    onMouseEnter={e => { if (!expandingType) { e.currentTarget.style.background = `${color}25`; e.currentTarget.style.borderColor = `${color}50` } }}
-                    onMouseLeave={e => { e.currentTarget.style.background = `${color}14`; e.currentTarget.style.borderColor = `${color}30` }}
                   >
                     {isLoading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : icon}
-                    {isLoading ? 'Creating...' : label}
+                    {isLoading ? 'Creating…' : label}
                   </button>
                 )
               })}
             </div>
-
-            {/* Existing expansion deals */}
-            {expansionDeals.length > 0 && (
-              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
-                  Expansion Deals ({expansionDeals.length})
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {expansionDeals.map((ed: any) => {
-                    const eColor = expansionTypeColors[ed.expansionType] ?? 'var(--text-tertiary)'
-                    const eLabel = expansionTypeLabels[ed.expansionType] ?? ed.expansionType
-                    const stColor = (STAGE_COLORS as any)[ed.stage] ?? 'var(--text-tertiary)'
-                    return (
-                      <Link
-                        key={ed.id}
-                        href={`/deals/${ed.id}`}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '10px',
-                          padding: '8px 12px', background: 'var(--surface)', border: 'none',
-                          borderRadius: '8px', textDecoration: 'none', transition: 'border-color 0.1s ease',
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)' }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
-                      >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {ed.dealName}
-                          </div>
-                        </div>
-                        <span style={{
-                          fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '100px',
-                          background: `${stColor}18`, color: stColor, border: `1px solid ${stColor}35`,
-                        }}>
-                          {ed.stage?.replace(/_/g, ' ')}
-                        </span>
-                        {ed.dealValue && (
-                          <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--success)' }}>
-                            {currencySymbol}{Number(ed.dealValue).toLocaleString()}
-                          </span>
-                        )}
-                        <span style={{
-                          fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '100px',
-                          background: `${eColor}14`, color: eColor, border: `1px solid ${eColor}30`,
-                        }}>
-                          {eLabel}
-                        </span>
-                      </Link>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Score Breakdown Visual — shown when a conversion score exists (active deals only) */}
-      {deal.conversionScore != null && deal.stage !== 'closed_lost' && deal.stage !== 'closed_won' && (
-        <ScoreBreakdown deal={deal} mlPrediction={mlPrediction} brainData={brainData} />
-      )}
-
-      {/* AI Analysis card — shown first if any AI data exists */}
-      {(deal.aiSummary || deal.conversionScore != null || (deal.conversionInsights as string[])?.length > 0 || (deal.dealRisks as string[])?.length > 0) && (
-        <div style={{ background: 'var(--glass-card-bg)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid var(--glass-card-border)', borderRadius: '12px', overflow: 'hidden' }}>
-          {/* Header row with score */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', borderBottom: '1px solid var(--glass-card-border)' }}>
-            <Sparkles size={14} color="var(--accent)" />
-            <span className="font-brand-section" style={{ fontSize: '15px', fontWeight: '500', color: 'var(--accent)' }}>Deal Intelligence</span>
-            {(() => {
-              const isClosed = deal.stage === 'closed_won' || deal.stage === 'closed_lost'
-              const scoreDisplay = getScoreDisplay({
-                compositeScore: deal.conversionScore ?? 0,
-                isClosed,
-                outcome: deal.stage === 'closed_won' ? 'won' : deal.stage === 'closed_lost' ? 'lost' : null,
-              })
-              if (isClosed) return (
-                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{
-                    fontSize: '12px', fontWeight: '600', padding: '4px 10px', borderRadius: '6px',
-                    background: `color-mix(in srgb, ${scoreDisplay.color} 15%, transparent)`,
-                    color: scoreDisplay.color,
-                  }}>
-                    {scoreDisplay.text}
-                    {deal.lostDate || deal.wonDate ? ` · ${new Date(deal.lostDate || deal.wonDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
-                  </span>
-                </div>
-              )
-              if (deal.conversionScore != null) return (
-                <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '11px', color: scoreDisplay.color }}>
-                    {deal.conversionScore >= 70 ? 'High likelihood' : deal.conversionScore >= 40 ? 'Needs attention' : 'At risk'}
-                  </span>
-                  <span style={{ fontSize: '22px', fontWeight: '700', letterSpacing: '-0.04em', color: scoreDisplay.color }}>
-                    {scoreDisplay.text}
-                  </span>
-                  <button onClick={() => patchDeal({ conversionScore: null })} title="Clear score" style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}>✕</button>
-                </div>
-              )
-              return null
-            })()}
-          </div>
-
-          <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {/* Summary */}
-            {editingSummary ? (
-              <div>
-                <textarea
-                  value={summaryDraft}
-                  onChange={e => setSummaryDraft(e.target.value)}
-                  rows={4}
-                  style={{ width: '100%', background: 'var(--surface)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6', padding: '10px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
-                  autoFocus
-                />
-                <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                  <button onClick={saveSummary} disabled={savingAI} style={{ fontSize: '11px', padding: '4px 10px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '5px', color: 'var(--accent)', cursor: 'pointer' }}>
-                    {savingAI ? 'Saving…' : 'Save'}
-                  </button>
-                  <button onClick={() => setEditingSummary(false)} style={{ fontSize: '11px', padding: '4px 10px', background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer' }}>Cancel</button>
-                </div>
-              </div>
-            ) : deal.aiSummary ? (
-              <div style={{ position: 'relative' }}
-                onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.edit-summary-ov') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
-                onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.edit-summary-ov') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
-              >
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.7', margin: 0, paddingRight: '32px' }}>{deal.aiSummary}</p>
-                <button className="edit-summary-ov" onClick={() => { setSummaryDraft(deal.aiSummary); setEditingSummary(true) }}
-                  style={{ opacity: 0, position: 'absolute', top: 0, right: 0, fontSize: '10px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', transition: 'opacity 0.15s', padding: '2px 4px' }}>✎ edit</button>
-              </div>
-            ) : (
-              <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: 0, fontStyle: 'italic' }}>No summary yet — add updates via the AI assistant to generate insights.</p>
-            )}
-
-            {/* Insights — show analytical observations only (exclude last item which is the action line shown in "What to Focus On") */}
-            {(() => {
-              const filtered = ((deal.conversionInsights as string[]) ?? []).filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins))
-              // Show all except last (action line) to avoid duplicating "What to Focus On" content
-              const analyticalOnly = filtered.length > 1 ? filtered.slice(0, -1) : filtered
-              if (analyticalOnly.length === 0) return null
-              return (
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Insights</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {analyticalOnly.map((insight: string, i: number) => (
-                      <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: 'var(--text-secondary)' }}
-                        onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-insight-ov') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
-                        onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-insight-ov') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
-                      >
-                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, marginTop: '5px' }} />
-                        <span style={{ flex: 1 }}>{insight}</span>
-                        <button className="del-insight-ov" onClick={() => deleteInsight(i)} style={{ opacity: 0, fontSize: '10px', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s', padding: '0 2px' }}>✕</button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })()}
-
-            {/* Risks */}
-            {(deal.dealRisks as string[])?.length > 0 && (
-              <div style={{ padding: '12px 14px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '8px' }}>
-                <div style={{ fontSize: '11px', color: 'var(--warning)', fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>⚠ Deal Risks</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  {(deal.dealRisks as string[]).map((risk: string, i: number) => (
-                    <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: 'var(--warning)' }}
-                      onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-risk-ov') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
-                      onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-risk-ov') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
-                    >
-                      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--warning)', flexShrink: 0, marginTop: '5px' }} />
-                      <span style={{ flex: 1 }}>{risk}</span>
-                      <button className="del-risk-ov" onClick={() => deleteRisk(i)} style={{ opacity: 0, fontSize: '10px', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s', padding: '0 2px' }}>✕</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ML Score Drivers — what's pushing this deal's win probability up or down */}
-            {mlPrediction?.scoreDrivers?.length > 0 && (
-              <div style={{ padding: '10px 14px', background: 'rgba(129,140,248,0.04)', border: '1px solid rgba(129,140,248,0.12)', borderRadius: '8px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
-                  Score Drivers
-                  <span style={{ fontSize: '9px', fontWeight: 400, color: 'var(--text-tertiary)', textTransform: 'none', marginLeft: '6px' }}>factors behind the {deal.conversionScore ?? '?'}% score</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  {mlPrediction.scoreDrivers.map((d: any, i: number) => {
-                    const barWidth = Math.min(100, Math.round(Math.abs(d.contribution) * 60))
-                    const isPos = d.direction === 'positive'
-                    return (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '10px', color: isPos ? 'var(--success)' : 'var(--danger)', width: '10px', textAlign: 'center', flexShrink: 0 }}>{isPos ? '↑' : '↓'}</span>
-                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)', flex: 1, minWidth: 0 }}>{d.label}</span>
-                        <div style={{ width: '60px', height: '4px', background: 'var(--surface-hover)', borderRadius: '2px', flexShrink: 0 }}>
-                          <div style={{ width: `${barWidth}%`, height: '100%', borderRadius: '2px', background: isPos ? 'var(--success)' : 'var(--danger)' }} />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Industry context — "teams like yours" global benchmark */}
-            {globalPrior && globalPrior.usingPrior && globalPrior.trainingSize > 0 && (() => {
-              const gwr = globalPrior.globalWinRate as number
-              const p50 = globalPrior.stageVelocityP50 as number
-              const p75 = globalPrior.stageVelocityP75 as number
-              const dealDays = deal.createdAt
-                ? Math.round((Date.now() - new Date(deal.createdAt).getTime()) / 86400000)
-                : null
-              const isOpen = deal.stage !== 'closed_won' && deal.stage !== 'closed_lost'
-              const velocityStatus = isOpen && dealDays != null && p50 > 0
-                ? dealDays > p75 ? 'slow' : dealDays > p50 ? 'moderate' : 'fast'
-                : null
-              const velocityColor = velocityStatus === 'slow' ? 'var(--danger)' : velocityStatus === 'moderate' ? 'var(--warning)' : 'var(--success)'
-              return (
-                <div style={{ padding: '10px 14px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.12)', borderRadius: '8px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
-                    Industry Context
-                    <span style={{ fontSize: '9px', fontWeight: 400, color: 'var(--text-tertiary)', textTransform: 'none', letterSpacing: 0, marginLeft: '6px' }}>
-                      {globalPrior.trainingSize.toLocaleString()} similar deals
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Industry win rate</span>
-                      <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>{gwr}%</span>
-                    </div>
-                    {velocityStatus && dealDays != null && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Deal age vs industry</span>
-                        <span style={{ fontSize: '11px', fontWeight: 600, color: velocityColor }}>
-                          {dealDays}d — {velocityStatus === 'slow' ? `over p75 (${p75}d)` : velocityStatus === 'moderate' ? `p50–p75 (${p50}–${p75}d)` : `under median (${p50}d)`}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })()}
-
-            {/* Churn survival model — P(deal goes silent) for open deals */}
-            {mlPrediction && typeof mlPrediction.churnRisk === 'number' && deal.stage !== 'closed_won' && deal.stage !== 'closed_lost' && mlPrediction.churnRisk >= 40 && (() => {
-              const risk = mlPrediction.churnRisk as number
-              const daysOverdue = mlPrediction.churnDaysOverdue as number ?? 0
-              const color = risk >= 75 ? 'var(--danger)' : risk >= 55 ? '#F97316' : 'var(--warning)'
-              const label = risk >= 75 ? 'High risk of silence' : risk >= 55 ? 'Moderate silence risk' : 'Approaching threshold'
-              return (
-                <div style={{ padding: '10px 14px', background: `${color}08`, border: `1px solid ${color}28`, borderRadius: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                      Churn Risk
-                    </div>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color }}>{risk}%</div>
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                    {label}
-                    {daysOverdue > 0
-                      ? ` — ${daysOverdue}d past the safe follow-up window for ${deal.stage} stage`
-                      : ` — approaching the silence threshold for ${deal.stage} stage`}
-                    {(deal.dealRisks ?? []).length >= 3 ? '. Multiple active risks increase the probability.' : ''}
-                  </div>
-                  <div style={{ marginTop: '6px', height: '3px', background: 'var(--surface-hover)', borderRadius: '2px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${risk}%`, background: color, borderRadius: '2px' }} />
-                  </div>
-                </div>
-              )
-            })()}
-
-            {/* What To Do Next — first 5 open actions */}
-            {(() => {
-              const openTodos = (deal?.todos ?? []).filter((t: any) => !t.done)
-              const companyName = deal?.prospectCompany?.toLowerCase() ?? ''
-              const stripCompanyParens = (text: string) => {
-                if (!companyName) return text
-                return text.replace(new RegExp(`\\s*\\(${companyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`, 'gi'), '')
-              }
-              // Clean raw todo text: strip JSON artifacts, pipe-delimited project plan data, and truncate
-              const cleanTodoText = (raw: string): string => {
-                if (!raw) return ''
-                let text = raw
-                // Strip anything that looks like raw JSON
-                try { JSON.parse(text); return 'Action item' } catch {}
-
-                // Pipe-delimited project plan data (e.g. "Rees | QA call with gospace | 23 - 25 March | 30 mins | ...")
-                // Take the second segment (topic/title) and optionally the date range
-                if (text.includes('|')) {
-                  const parts = text.split('|').map(p => p.trim())
-                  if (parts.length >= 2) {
-                    const topic = parts[1] || parts[0]
-                    // Look for a date-like segment (3rd part often has date range)
-                    const datePart = parts.length >= 3 && /\d/.test(parts[2]) && parts[2].length < 30 ? ` (${parts[2].replace(/\s+/g, ' ').trim()})` : ''
-                    text = topic + datePart
-                  }
-                }
-
-                // Strip date/time availability matrices (lines with "Available", "Not Available", "Potentially")
-                const firstLine = text.split('\n')[0]
-                if (/\b(Available|Not Available|Potentially)\b/i.test(text) && text.includes('\n')) {
-                  text = firstLine
-                }
-
-                // Remove JSON-like artifacts: {, }, [, ], "key":
-                text = text.replace(/\{[^}]{0,20}\}/g, '').replace(/\[[^\]]{0,20}\]/g, '')
-                text = text.replace(/"?\w+"\s*:\s*/g, '')
-                // Remove leftover braces/brackets
-                text = text.replace(/[{}\[\]]/g, '')
-                // Strip markdown headers
-                text = text.replace(/^#+\s*/gm, '')
-                // Collapse whitespace
-                text = text.replace(/\s+/g, ' ').trim()
-                // Strip company name parenthetical
-                text = stripCompanyParens(text)
-                // Truncate to 120 chars with ellipsis
-                if (text.length > 120) text = text.slice(0, 117).trimEnd() + '...'
-                return text || 'Action item'
-              }
-              if (openTodos.length === 0) return null
-              return (
-                <div>
-                  <div className="font-brand-section" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '6px' }}>What To Do Next</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {openTodos.slice(0, 5).map((todo: any, i: number) => (
-                      <div key={todo.id ?? i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', padding: '7px 10px', background: 'var(--surface)', border: 'none', borderRadius: '7px' }}>
-                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, marginTop: '5px' }} />
-                        <span style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.5, flex: 1 }}>{cleanTodoText(todo.text)}</span>
-                      </div>
-                    ))}
-                    {openTodos.length > 5 && (
-                      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', paddingLeft: '13px', marginTop: '2px' }}>
-                        +{openTodos.length - 5} more in Activity tab
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })()}
-
-            {/* Intent Signals — extracted by AI from deal updates */}
-            {deal.intentSignals && (() => {
-              const is = deal.intentSignals as { championStatus?: string; budgetStatus?: string; decisionTimeline?: string | null; nextMeetingBooked?: boolean }
-              const champColor = is.championStatus === 'confirmed' ? 'var(--success)' : is.championStatus === 'suspected' ? 'var(--warning)' : 'var(--text-tertiary)'
-              const champLabel = is.championStatus === 'confirmed' ? '✓ Confirmed' : is.championStatus === 'suspected' ? '~ Suspected' : '— None'
-              const budgetColor = is.budgetStatus === 'approved' ? 'var(--success)' : is.budgetStatus === 'awaiting' ? 'var(--warning)' : is.budgetStatus === 'blocked' ? 'var(--danger)' : 'var(--text-tertiary)'
-              const budgetLabel = is.budgetStatus === 'approved' ? '✓ Approved' : is.budgetStatus === 'awaiting' ? '⏳ Awaiting' : is.budgetStatus === 'blocked' ? '✕ Blocked' : '— Not discussed'
-              return (
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Intent Signals</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' }}>
-                    <div style={{ padding: '8px 10px', background: 'var(--surface)', border: 'none', borderRadius: '8px' }}>
-                      <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '3px' }}>Champion</div>
-                      <div style={{ fontSize: '12px', fontWeight: 600, color: champColor }}>{champLabel}</div>
-                    </div>
-                    <div style={{ padding: '8px 10px', background: 'var(--surface)', border: 'none', borderRadius: '8px' }}>
-                      <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '3px' }}>Budget</div>
-                      <div style={{ fontSize: '12px', fontWeight: 600, color: budgetColor }}>{budgetLabel}</div>
-                    </div>
-                    <div style={{ padding: '8px 10px', background: 'var(--surface)', border: 'none', borderRadius: '8px' }}>
-                      <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '3px' }}>Decision Timeline</div>
-                      <div style={{ fontSize: '12px', color: is.decisionTimeline ? 'var(--text-primary)' : 'var(--text-tertiary)', fontWeight: is.decisionTimeline ? 500 : 400 }}>{is.decisionTimeline ?? '— Not mentioned'}</div>
-                    </div>
-                    <div style={{ padding: '8px 10px', background: 'var(--surface)', border: 'none', borderRadius: '8px' }}>
-                      <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '3px' }}>Next Meeting</div>
-                      <div style={{ fontSize: '12px', fontWeight: 600, color: is.nextMeetingBooked ? 'var(--success)' : 'var(--text-tertiary)' }}>{is.nextMeetingBooked ? '✓ Booked' : '— Not set'}</div>
-                    </div>
-                  </div>
-                </div>
-              )
-            })()}
-
-            {/* Score Simulator — moved from Intelligence tab */}
-            {deal.conversionScore != null && (
-              <ScoreSimulator deal={deal} mlPrediction={mlPrediction} brainData={brainData} />
-            )}
-
-            {/* What to focus on — specific to this deal's data */}
-            {deal.stage && deal.stage !== 'closed_won' && deal.stage !== 'closed_lost' && (
-              <div style={{ padding: '10px 14px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.1)', borderRadius: '8px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>What to focus on</div>
-                {deal.conversionScore == null ? (
-                  <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.6 }}>
-                    Add deal updates and run AI analysis to get a health score and specific recommendations for this deal.
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                    {/* Next step from deal data */}
-                    {deal.nextSteps && (
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--accent)', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '4px', padding: '1px 6px', flexShrink: 0, marginTop: '1px', letterSpacing: '0.04em' }}>NEXT</span>
-                        <span style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.5 }}>{deal.nextSteps}</span>
-                      </div>
-                    )}
-                    {/* Top risk */}
-                    {((deal.dealRisks as string[]) ?? []).length > 0 && (
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--warning)', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '4px', padding: '1px 6px', flexShrink: 0, marginTop: '1px', letterSpacing: '0.04em' }}>RISK</span>
-                        <span style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.5 }}>{(deal.dealRisks as string[])[0]}</span>
-                      </div>
-                    )}
-                    {/* Last insight (action line) if no risks — filter out score summaries */}
-                    {((deal.dealRisks as string[]) ?? []).length === 0 && (() => {
-                      const filtered = ((deal.conversionInsights as string[]) ?? []).filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins))
-                      if (filtered.length === 0) return null
-                      // Use the last insight (action/recommendation line) to avoid duplicating analytical insights shown above
-                      const actionLine = filtered[filtered.length - 1]
-                      return (
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                          <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--accent)', background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '4px', padding: '1px 6px', flexShrink: 0, marginTop: '1px', letterSpacing: '0.04em' }}>KEY</span>
-                          <span style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.5 }}>{actionLine}</span>
-                        </div>
-                      )
-                    })()}
-                    {/* Fallback when no specific data */}
-                    {!deal.nextSteps && ((deal.dealRisks as string[]) ?? []).length === 0 && ((deal.conversionInsights as string[]) ?? []).filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins)).length === 0 && (
-                      <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.6 }}>
-                        {deal.conversionScore < 40
-                          ? 'Score critically low — add next steps and update meeting notes to identify specific blockers.'
-                          : deal.conversionScore < 70
-                          ? 'Add next steps to the deal and log latest meeting notes to surface specific actions here.'
-                          : 'Strong position. Add next steps to keep this deal on track to close.'}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Similar Deals — semantic embedding similarity */}
-            {(() => {
-              // eslint-disable-next-line react-hooks/rules-of-hooks
-              const { data: similarData } = useSWR(deal?.id ? `/api/deals/${deal.id}/similar` : null, (url: string) => fetch(url).then(r => r.json()), { revalidateOnFocus: false })
-              const similarDeals = similarData?.data ?? []
-              // eslint-disable-next-line react-hooks/rules-of-hooks
-              const [expandedSimilar, setExpandedSimilar] = useState<string | null>(null)
-              if (similarDeals.length === 0) return null
-
-              const formatDate = (iso: string | null) => {
-                if (!iso) return null
-                const d = new Date(iso)
-                return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-              }
-
-              const outcomeLabel = (sd: any) => {
-                const isClosed = sd.stage === 'closed_won' || sd.stage === 'closed_lost'
-                const o = sd.outcome ?? (sd.stage === 'closed_won' ? 'won' : sd.stage === 'closed_lost' ? 'lost' : null)
-                if (o === 'won' || o === 'lost') {
-                  const display = getScoreDisplay({ compositeScore: sd.conversionScore ?? 0, isClosed: true, outcome: o })
-                  return { text: display.text, color: display.color, date: formatDate(o === 'won' ? sd.wonDate : sd.lostDate) }
-                }
-                return { text: sd.stage?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()), color: getScoreColor(sd.conversionScore ?? 0, isClosed), date: null }
-              }
-
-              return (
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Similar Deals</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {similarDeals.slice(0, 5).map((sd: any) => {
-                      const isExpanded = expandedSimilar === sd.id
-                      const oc = outcomeLabel(sd)
-                      return (
-                        <div key={sd.id} style={{ background: 'var(--surface)', border: `1px solid ${isExpanded ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '8px', transition: 'border-color 0.1s ease', overflow: 'hidden' }}>
-                          {/* Clickable header row */}
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => setExpandedSimilar(isExpanded ? null : sd.id)}
-                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedSimilar(isExpanded ? null : sd.id) } }}
-                            style={{
-                              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
-                              padding: '8px 10px', cursor: 'pointer', userSelect: 'none',
-                            }}
-                            onMouseEnter={e => { if (!isExpanded) e.currentTarget.parentElement!.style.borderColor = 'var(--accent)' }}
-                            onMouseLeave={e => { if (!isExpanded) e.currentTarget.parentElement!.style.borderColor = 'var(--border)' }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
-                              <ChevronRight size={12} style={{ color: 'var(--text-tertiary)', flexShrink: 0, transition: 'transform 0.1s ease', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }} />
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {sd.prospectCompany}
-                                  </span>
-                                  <span style={{ fontSize: '10px', color: oc.color, fontWeight: 600, flexShrink: 0 }}>
-                                    {oc.text}{oc.date ? ` ${oc.date}` : ''}
-                                  </span>
-                                </div>
-                                {!isExpanded && sd.reason && (
-                                  <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {sd.reason}
-                                  </div>
-                                )}
-                                {!isExpanded && sd.matchReasons?.length > 0 && (
-                                  <div style={{ fontSize: '10px', color: 'var(--ds-text-3, var(--text-tertiary))', marginTop: '1px' }}>
-                                    {sd.matchReasons.join(' \u00B7 ')}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <span style={{
-                              fontSize: '10px', fontWeight: 600,
-                              color: sd.similarity >= 80 ? 'var(--success)' : sd.similarity >= 60 ? '#A78BFA' : 'var(--text-tertiary)',
-                              background: sd.similarity >= 80 ? 'rgba(34,197,94,0.1)' : sd.similarity >= 60 ? 'rgba(167,139,250,0.1)' : 'var(--surface)',
-                              border: `1px solid ${sd.similarity >= 80 ? 'rgba(34,197,94,0.2)' : sd.similarity >= 60 ? 'rgba(167,139,250,0.2)' : 'var(--border)'}`,
-                              borderRadius: '4px', padding: '1px 5px', flexShrink: 0,
-                            }}>
-                              {sd.similarity}% match
-                            </span>
-                          </div>
-
-                          {/* Expanded detail panel */}
-                          {isExpanded && (
-                            <div style={{ padding: '0 10px 10px 28px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--border)' }}>
-                              <div style={{ height: '8px' }} />
-                              {/* Why similar */}
-                              {sd.reason && (
-                                <div>
-                                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>Why similar</div>
-                                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{sd.reason}</div>
-                                </div>
-                              )}
-
-                              {/* Match reasons (hybrid matching signals) */}
-                              {sd.matchReasons?.length > 0 && (
-                                <div style={{ fontSize: '11px', color: 'var(--ds-text-3, var(--text-tertiary))' }}>
-                                  {sd.matchReasons.join(' \u00B7 ')}
-                                </div>
-                              )}
-
-                              {/* Loss reason (only for lost deals) */}
-                              {(sd.outcome === 'lost' || sd.stage === 'closed_lost') && (
-                                <div>
-                                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>Why it was lost</div>
-                                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                                    {sd.lostReason || 'No loss reason recorded'}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Overlapping risks */}
-                              {sd.overlappingRisks?.length > 0 && (
-                                <div>
-                                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--warning)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>Overlapping risks</div>
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                    {sd.overlappingRisks.map((r: string, i: number) => (
-                                      <div key={i} style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
-                                        <span style={{ color: 'var(--warning)', flexShrink: 0 }}>!</span> {r}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* What to do differently */}
-                              {sd.advice && (
-                                <div style={{ padding: '6px 10px', background: 'color-mix(in srgb, var(--accent) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--accent) 15%, transparent)', borderRadius: '6px' }}>
-                                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '2px' }}>What to do differently</div>
-                                  <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>{sd.advice}</div>
-                                </div>
-                              )}
-
-                              {/* Link to deal */}
-                              <Link
-                                href={`/deals/${sd.id}`}
-                                style={{ fontSize: '11px', color: 'var(--accent)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}
-                                onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
-                                onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
-                              >
-                                View deal <ArrowUpRight size={10} />
-                              </Link>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })()}
-
-            {/* Likely Objections — moved from Intelligence tab */}
-            {(() => {
-              const dealRisks: string[] = deal?.dealRisks ?? []
-              const profileObjRes = typeof window !== 'undefined' ? null : null // profile from SWR in parent scope
-              // Use objectionWinMap + risk text to generate suggested responses
-              const getResponseApproach = (text: string): string => {
-                const lower = text.toLowerCase()
-                if (/declined|no response|ghosted|gone quiet|not responding/.test(lower)) return 'Suggested: Try a different channel or reframe the value proposition with a new stakeholder.'
-                if (/competitor|alternative|going with another|chosen/.test(lower)) return 'Suggested: Differentiate on unique strengths — focus on what competitors cannot offer.'
-                if (/no champion|no sponsor|no advocate|no internal/.test(lower)) return 'Suggested: Identify an internal advocate — find someone who benefits most from the solution.'
-                if (/budget|cost|expensive|price|roi/.test(lower)) return 'Suggested: Reframe around ROI and business impact — quantify the cost of inaction.'
-                if (/delay|postpone|on hold|not a priority/.test(lower)) return 'Suggested: Create urgency by tying the solution to an upcoming deadline or business event.'
-                return 'Suggested: Address directly in next meeting — prepare specific evidence to counter this concern.'
-              }
-              if (dealRisks.length === 0) return null
-              return (
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--danger)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Likely Objections</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    {dealRisks.map((risk, i) => (
-                      <div key={`obj-${i}`} style={{ padding: '8px 10px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: '7px' }}>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
-                          <span style={{ fontSize: '11px' }}>&#9888;</span>
-                          <span style={{ fontSize: '12px', color: 'var(--warning)', lineHeight: 1.5 }}>{risk}</span>
-                        </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px', paddingLeft: '19px', lineHeight: 1.5, fontStyle: 'italic' }}>
-                          {getResponseApproach(risk)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })()}
-
-            {/* Win Stories — moved from Intelligence tab */}
-            {(() => {
-              // eslint-disable-next-line react-hooks/rules-of-hooks
-              const { data: csRes } = useSWR('/api/case-studies', fetcher)
-              const allCaseStudies: any[] = csRes?.data ?? []
-              // eslint-disable-next-line react-hooks/rules-of-hooks
-              const { data: similarDataWin } = useSWR(deal?.id ? `/api/deals/${deal.id}/similar` : null, (url: string) => fetch(url).then(r => r.json()), { revalidateOnFocus: false })
-              const similarDealsForMatch = similarDataWin?.data ?? []
-              if (allCaseStudies.length === 0) return null
-              return (
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '6px' }}>Win Stories</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {allCaseStudies.slice(0, 3).map((cs: any) => {
-                      // Try to find a match reason from similar deals
-                      const matchDeal = similarDealsForMatch.find((sd: any) =>
-                        sd.prospectCompany?.toLowerCase() === cs.customerName?.toLowerCase() ||
-                        (sd.outcome === 'won' || sd.stage === 'closed_won')
-                      )
-                      const matchReason = matchDeal?.reason ?? null
-                      return (
-                        <div key={cs.id} style={{ padding: '10px 12px', background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.12)', borderRadius: '8px' }}>
-                          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '3px' }}>{cs.customerName}</div>
-                          {cs.customerIndustry && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>{cs.customerIndustry}{cs.customerSize ? ` \u00B7 ${cs.customerSize}` : ''}</div>}
-                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{cs.results || cs.description || 'No details available'}</div>
-                          {matchReason && (
-                            <div style={{ fontSize: '11px', color: 'var(--accent)', marginTop: '6px', fontStyle: 'italic' }}>
-                              Why relevant: {matchReason}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )
-            })()}
-
-            {/* Reset all AI */}
-            <div style={{ paddingTop: '4px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
-              {resetAIConfirm ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--danger)' }}>Reset all AI memory?</span>
-                  <button onClick={resetAllAI} disabled={savingAI} style={{ fontSize: '11px', color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '2px 8px', borderRadius: '5px', cursor: 'pointer' }}>
-                    {savingAI ? 'Resetting…' : 'Yes, reset'}
-                  </button>
-                  <button onClick={() => setResetAIConfirm(false)} style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
-                </div>
-              ) : (
-                <button onClick={() => setResetAIConfirm(true)} style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-                  Reset all AI inferences
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Product gaps banner */}
-      {dealGaps.length > 0 && (
-        <div style={{ padding: '14px 16px', background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '10px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-            <div style={{ fontSize: '11px', color: 'var(--danger)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Product Gaps ({dealGaps.length})
-            </div>
-            <Link href="/product-gaps" style={{ fontSize: '11px', color: 'var(--danger)', textDecoration: 'none', opacity: 0.7 }}>View all →</Link>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {dealGaps.map((g: any) => (
-              <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
-                <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: g.priority === 'critical' ? 'var(--danger)' : g.priority === 'high' ? 'var(--warning)' : 'var(--accent)', flexShrink: 0 }} />
-                <span style={{ color: 'var(--text-primary)', flex: 1 }}>{g.title}</span>
-                {g.roadmap && <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--surface)', borderRadius: '4px', padding: '1px 5px' }}>{g.roadmap}</span>}
-                <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{g.priority}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Product Issues panel — Linear bidirectional link */}
-      <ProductIssuesPanel dealId={dealId} />
-
-      {/* Deal info grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-        {[
-          { label: 'Stage', value: deal.stage?.replace(/_/g, ' '), preWrap: false },
-          { label: 'Deal Value', value: deal.dealValue ? `${currencySymbol}${Number(deal.dealValue).toLocaleString()}` : null, preWrap: false },
-          { label: 'Close Date', value: deal.closeDate ? new Date(deal.closeDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : null, preWrap: false },
-          { label: 'Deal Type', value: deal.dealType === 'recurring' ? `Recurring (${deal.recurringInterval ?? ''})`.trim() : deal.dealType === 'one_off' ? 'One-off' : null, preWrap: false },
-          { label: 'Engagement', value: deal.engagementType ?? null, preWrap: false },
-          { label: 'Competitors', value: (deal.competitors as string[])?.join(', ') || null, preWrap: false },
-          { label: 'Description', value: deal.description, preWrap: true },
-          { label: 'Notes', value: deal.notes, preWrap: true },
-          { label: 'Next Steps', value: deal.nextSteps, preWrap: true },
-        ].filter(f => f.value).map(({ label, value, preWrap }) => (
-          <div key={label} style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '12px 14px' }}>
-            <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>{label}</div>
-            <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: '500', lineHeight: 1.5, whiteSpace: preWrap ? 'pre-wrap' : undefined }}>{value}</div>
-          </div>
-        ))}
+        {/* AI Activity */}
+        <AiActivitySection dealId={dealId} />
       </div>
 
-      {/* Contract dates */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '12px 14px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 auto', minWidth: '200px' }}>
-          <label style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, whiteSpace: 'nowrap' }}>Contract Start</label>
-          <input
-            type="date"
-            value={deal.contractStartDate ? new Date(deal.contractStartDate).toISOString().split('T')[0] : ''}
-            onChange={async (e) => {
-              const val = e.target.value
-              await patchDeal({ contractStartDate: val || null })
-            }}
-            style={{
-              flex: 1, height: '30px', padding: '0 8px', borderRadius: '6px',
-              background: 'var(--input-bg)', border: 'none',
-              color: 'var(--text-primary)', fontSize: '12px', outline: 'none',
-              boxSizing: 'border-box' as const, fontFamily: 'inherit',
-            }}
-            onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
-            onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-          />
-        </div>
-        <span style={{ color: 'var(--text-tertiary)', fontSize: '12px', flexShrink: 0 }}>&mdash;</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 auto', minWidth: '200px' }}>
-          <label style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, whiteSpace: 'nowrap' }}>Contract End</label>
-          <input
-            type="date"
-            value={deal.contractEndDate ? new Date(deal.contractEndDate).toISOString().split('T')[0] : ''}
-            onChange={async (e) => {
-              const val = e.target.value
-              await patchDeal({ contractEndDate: val || null })
-            }}
-            style={{
-              flex: 1, height: '30px', padding: '0 8px', borderRadius: '6px',
-              background: 'var(--input-bg)', border: 'none',
-              color: 'var(--text-primary)', fontSize: '12px', outline: 'none',
-              boxSizing: 'border-box' as const, fontFamily: 'inherit',
-            }}
-            onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
-            onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-          />
-        </div>
-      </div>
-
-      {/* Contacts */}
-      {Array.isArray(deal.contacts) && deal.contacts.length > 0 && (
-        <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '12px 14px' }}>
-          <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>Contacts</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {(deal.contacts as any[]).map((c: any, i: number) => (
-              <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '12px' }}>
-                <User size={12} color="var(--text-tertiary)" style={{ flexShrink: 0 }} />
-                <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{c.name}</span>
-                {c.title && <span style={{ color: 'var(--text-tertiary)' }}>· {c.title}</span>}
-                {c.email && <a href={`mailto:${c.email}`} style={{ color: 'var(--accent)', marginLeft: 'auto', fontSize: '11px', textDecoration: 'none' }}>{c.email}</a>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Document Links */}
-      <DealLinksSection deal={deal} patchDeal={patchDeal} />
-
-      {/* Activity log */}
-      <ActivityLog dealId={dealId} deal={deal} onUpdate={onUpdate} />
+      {/* ── RIGHT: Linear Intelligence ──────────────────────────── */}
+      <LinearColumn dealId={dealId} />
     </div>
   )
 }
+
 
 // ─── AI Activity Section ─────────────────────────────────────────────────────
 
@@ -4980,6 +4462,84 @@ function AiActivitySection({ dealId }: { dealId: string }) {
   )
 }
 
+// ─── Team Tab ─────────────────────────────────────────────────────────────────
+
+function TeamTab({ deal, currencySymbol = '£' }: { deal: any; currencySymbol?: string }) {
+  const contacts: any[] = Array.isArray(deal.contacts) && deal.contacts.length > 0
+    ? deal.contacts
+    : deal.prospectName ? [{ name: deal.prospectName, title: deal.prospectTitle }] : []
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start' }}>
+      {/* Contacts */}
+      <div className="glass-card" style={{ padding: '20px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.40)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '16px' }}>
+          Contacts
+        </div>
+        {contacts.length === 0 ? (
+          <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)', fontStyle: 'italic', padding: '16px 0', textAlign: 'center' }}>No contacts added yet</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {contacts.map((c: any, i: number) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                <div style={{
+                  width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
+                  background: 'linear-gradient(135deg, rgba(99,102,241,0.28), rgba(139,92,246,0.18))',
+                  border: '1px solid rgba(99,102,241,0.25)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '14px', fontWeight: 700, color: '#818cf8',
+                }}>
+                  {c.name?.[0]?.toUpperCase() ?? '?'}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '14px', fontWeight: 600, color: 'rgba(255,255,255,0.90)', marginBottom: '2px' }}>{c.name}</div>
+                  {c.title && <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.50)', marginBottom: '2px' }}>{c.title}</div>}
+                  {c.email && (
+                    <a href={`mailto:${c.email}`} style={{ fontSize: '12px', color: '#818cf8', textDecoration: 'none' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.textDecoration = 'underline' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.textDecoration = 'none' }}
+                    >
+                      {c.email}
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Deal metadata */}
+      <div className="glass-card" style={{ padding: '20px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.40)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '16px' }}>
+          Deal Info
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {([
+            { label: 'Deal Name', value: deal.dealName },
+            { label: 'Company', value: deal.prospectCompany },
+            { label: 'Stage', value: deal.stage?.replace(/_/g, ' ') },
+            { label: 'Description', value: deal.description },
+            { label: 'Next Steps', value: deal.nextSteps },
+            deal.stage === 'closed_lost' ? { label: 'Lost Reason', value: deal.lostReason } : null,
+          ].filter(Boolean) as { label: string; value: string | null | undefined }[])
+            .filter(f => f.value)
+            .map(({ label, value }, i, arr) => (
+              <div key={label} style={{
+                padding: '10px 0',
+                borderBottom: i < arr.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+              }}>
+                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.40)', fontWeight: 500, marginBottom: '3px' }}>{label}</div>
+                <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.80)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{value}</div>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function DealDetailPage() {
   const { id } = useParams() as { id: string }
   const { data, mutate } = useSWR(id ? `/api/deals/${id}` : null, fetcher)
@@ -5001,9 +4561,7 @@ export default function DealDetailPage() {
   useEffect(() => {
     const aiParam = searchParams.get('ai')
     if (aiParam) {
-      // Slight delay to let copilot panel mount
       const t = setTimeout(() => sidebarSendToCopilot(aiParam), 300)
-      // Clean up the URL
       window.history.replaceState({}, '', `/deals/${id}`)
       return () => clearTimeout(t)
     }
@@ -5017,35 +4575,22 @@ export default function DealDetailPage() {
   )
   const parentDeal = parentDealRes?.data ?? parentDealRes
 
-  const expansionTypeLabels: Record<string, string> = {
-    upsell: 'Upsell',
-    cross_sell: 'Cross-sell',
-    renewal: 'Renewal',
-    expansion: 'Expansion',
-  }
-
-  const expansionTypeColors: Record<string, string> = {
-    upsell: 'var(--accent)',
-    cross_sell: '#A78BFA',
-    renewal: 'var(--success)',
-    expansion: 'var(--warning)',
-  }
-
-  const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'plans' | 'collateral'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'activity' | 'team'>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [winStoryOpen, setWinStoryOpen] = useState(false)
   const [wonDeal, setWonDeal] = useState<any>(null)
+  const [discoveringIssues, setDiscoveringIssues] = useState(false)
 
   const [isMobile, setIsMobile] = useState(false)
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 768px)')
+    const mq = window.matchMedia('(max-width: 900px)')
     setIsMobile(mq.matches)
     const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
 
-  // Register this deal as active context for the AI chat sidebar
+  // Register active deal for AI chat sidebar
   useEffect(() => {
     if (deal) {
       setActiveDeal({ id: deal.id, name: deal.dealName, company: deal.prospectCompany, stage: deal.stage })
@@ -5054,236 +4599,284 @@ export default function DealDetailPage() {
     return () => setActiveDeal(null)
   }, [deal?.id, deal?.dealName, deal?.prospectCompany, deal?.stage])
 
-  // Auto-switch to Notes tab only if deal has no AI data at all AND no notes
-  useEffect(() => {
-    if (deal && !deal.meetingNotes && !deal.aiSummary && !deal.conversionScore) {
-      setActiveTab('activity')
-    }
-  }, [deal?.id])
-
   if (!deal && data !== undefined) {
     return (
-      <div style={{ textAlign: 'center', padding: '80px', color: 'var(--text-tertiary)' }}>
-        Deal not found. <Link href="/deals" style={{ color: 'var(--accent)' }}>Back to deals</Link>
+      <div style={{ textAlign: 'center', padding: '80px', color: 'rgba(255,255,255,0.30)' }}>
+        Deal not found. <Link href="/deals" style={{ color: '#818cf8' }}>Back to deals</Link>
       </div>
     )
   }
 
-  const stageColor = STAGE_COLORS[deal?.stage] ?? 'var(--text-tertiary)'
+  const score = deal?.conversionScore ?? null
+  const scoreColor = score != null
+    ? (score > 70 ? '#34d399' : score >= 40 ? '#fbbf24' : '#f87171')
+    : null
+
+  const STAGE_BADGE: Record<string, { bg: string; color: string }> = {
+    prospecting:  { bg: 'rgba(100,116,139,0.18)', color: '#94a3b8' },
+    qualification:{ bg: 'rgba(100,116,139,0.18)', color: '#94a3b8' },
+    discovery:    { bg: 'rgba(59,130,246,0.18)',  color: '#60a5fa' },
+    proposal:     { bg: 'rgba(251,191,36,0.18)',  color: '#fbbf24' },
+    negotiation:  { bg: 'rgba(139,92,246,0.18)',  color: '#a78bfa' },
+    closed_won:   { bg: 'rgba(52,211,153,0.18)',  color: '#34d399' },
+    closed_lost:  { bg: 'rgba(248,113,113,0.18)', color: '#f87171' },
+  }
+  const stageBadge = STAGE_BADGE[deal?.stage ?? ''] ?? { bg: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.50)' }
+
+  const expansionTypeColors: Record<string, string> = {
+    upsell: '#818cf8', cross_sell: '#a78bfa', renewal: '#34d399', expansion: '#fbbf24',
+  }
+  const expansionTypeLabels: Record<string, string> = {
+    upsell: 'Upsell', cross_sell: 'Cross-sell', renewal: 'Renewal', expansion: 'Expansion',
+  }
+
+  const openTodos = deal?.todos?.filter((t: any) => !t.done) ?? []
+  const openTasks = (deal?.projectPlan as any)?.phases?.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete') ?? []
+  const openCount = openTodos.length + openTasks.length
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-      {/* Back + header */}
-      <div>
-        <Link href="/deals" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--text-tertiary)', fontSize: '13px', textDecoration: 'none', marginBottom: '14px' }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
-        >
-          <ArrowLeft size={13} /> Back to deals
-        </Link>
+      {/* Back link */}
+      <Link
+        href="/deals"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'rgba(255,255,255,0.40)', fontSize: '13px', textDecoration: 'none', width: 'fit-content' }}
+        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.75)'}
+        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.40)'}
+      >
+        <ArrowLeft size={13} /> Back to deals
+      </Link>
 
-        {/* Parent deal breadcrumb for expansion deals */}
-        {deal?.parentDealId && parentDeal && (() => {
-          const eType = deal.expansionType as string | undefined
-          const eColor = eType ? (expansionTypeColors[eType] ?? 'var(--text-tertiary)') : 'var(--text-tertiary)'
-          const eLabel = eType ? (expansionTypeLabels[eType] ?? eType) : 'Expansion'
-          return (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px',
-              fontSize: '12px', color: 'var(--text-tertiary)',
+      {/* Expansion breadcrumb */}
+      {deal?.parentDealId && parentDeal && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.40)' }}>
+          <span>Expansion from:</span>
+          <Link
+            href={`/deals/${deal.parentDealId}`}
+            style={{ color: '#818cf8', textDecoration: 'none', fontWeight: 600 }}
+            onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
+            onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
+          >
+            {parentDeal.prospectCompany ?? parentDeal.dealName ?? 'Parent Deal'}
+          </Link>
+          {deal.expansionType && (
+            <span style={{
+              fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '100px',
+              background: `color-mix(in srgb, ${expansionTypeColors[deal.expansionType] ?? '#818cf8'} 14%, transparent)`,
+              color: expansionTypeColors[deal.expansionType] ?? '#818cf8',
+              border: `1px solid color-mix(in srgb, ${expansionTypeColors[deal.expansionType] ?? '#818cf8'} 28%, transparent)`,
             }}>
-              <span>Expansion from:</span>
-              <Link
-                href={`/deals/${deal.parentDealId}`}
-                style={{
-                  color: 'var(--accent)', textDecoration: 'none', fontWeight: 600,
-                }}
-                onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
-                onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
-              >
-                {parentDeal.prospectCompany ?? parentDeal.dealName ?? 'Parent Deal'}
-              </Link>
-              <span style={{
-                fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '100px',
-                background: `${eColor}14`, color: eColor, border: `1px solid ${eColor}30`,
-              }}>
-                {eLabel}
-              </span>
-            </div>
-          )
-        })()}
+              {expansionTypeLabels[deal.expansionType] ?? deal.expansionType}
+            </span>
+          )}
+        </div>
+      )}
 
-        {deal ? (() => {
-          const isClosed = deal.stage === 'closed_won' || deal.stage === 'closed_lost'
-          const score = deal.conversionScore ?? null
-          const scoreColor = score != null ? getScoreColor(score, isClosed) : '#64748b'
-          const objectionSignals: string[] = (deal.objectionSignals as string[]) ?? []
-          return (
-            <div style={{
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.25), rgba(59,130,246,0.15))',
-              backdropFilter: 'blur(24px)',
-              WebkitBackdropFilter: 'blur(24px)',
-              border: '1px solid rgba(99,102,241,0.20)',
-              borderRadius: '1.25rem',
-              padding: isMobile ? '20px' : '24px 28px',
-              boxShadow: '0 8px 40px rgba(99,102,241,0.15), 0 2px 8px rgba(0,0,0,0.40)',
-            }}>
-              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'flex-start', gap: isMobile ? '16px' : '24px' }}>
+      {/* ── Hero card ─────────────────────────────────────────────────── */}
+      {deal ? (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(49,46,129,0.72) 0%, rgba(30,27,75,0.60) 50%, rgba(15,23,42,0.82) 100%)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          border: '1px solid rgba(99,102,241,0.22)',
+          borderRadius: '1.25rem',
+          padding: isMobile ? '20px' : '24px 28px',
+          boxShadow: '0 8px 40px rgba(20,10,60,0.55), 0 2px 8px rgba(0,0,0,0.50)',
+        }}>
+          <div style={{
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            gap: isMobile ? '20px' : '28px',
+            alignItems: isMobile ? 'stretch' : 'center',
+          }}>
 
-                {/* Health score circle */}
-                {score != null && (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                    <div style={{
-                      width: '72px', height: '72px', borderRadius: '50%',
-                      background: `conic-gradient(${scoreColor} ${score * 3.6}deg, rgba(255,255,255,0.08) 0deg)`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      boxShadow: `0 0 20px ${scoreColor}40`,
-                      position: 'relative',
-                    }}>
-                      <div style={{
-                        width: '56px', height: '56px', borderRadius: '50%',
-                        background: 'rgba(13,15,26,0.90)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        flexDirection: 'column',
-                      }}>
-                        <span style={{ fontSize: '18px', fontWeight: 700, color: scoreColor, lineHeight: 1 }}>{score}</span>
-                        <span style={{ fontSize: '9px', color: '#64748b', marginTop: '1px' }}>score</span>
-                      </div>
-                    </div>
-                  </div>
+            {/* LEFT: Company + deal name + stage */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h1 style={{ fontSize: isMobile ? '22px' : '28px', fontWeight: 700, color: '#fff', letterSpacing: '-0.02em', margin: '0 0 6px 0', lineHeight: 1.2 }}>
+                {deal.prospectCompany ?? deal.dealName ?? 'Unnamed Deal'}
+              </h1>
+              {deal.dealName && deal.prospectCompany && (
+                <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.52)', marginBottom: '12px', letterSpacing: '-0.01em' }}>
+                  {deal.dealName}
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{
+                  fontSize: '12px', padding: '4px 12px', borderRadius: '100px', fontWeight: 600,
+                  background: stageBadge.bg, color: stageBadge.color,
+                  border: `1px solid color-mix(in srgb, ${stageBadge.color} 28%, transparent)`,
+                  letterSpacing: '0.02em',
+                }}>
+                  {deal.stage?.replace(/_/g, ' ') ?? ''}
+                </span>
+                {deal.engagementType && (
+                  <span style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '100px', fontWeight: 500, background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.50)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                    {deal.engagementType}
+                  </span>
                 )}
-
-                {/* Deal info */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
-                    <h1 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: 700, letterSpacing: '-0.02em', color: '#e2e8f0', margin: 0 }}>
-                      {deal.prospectCompany}
-                    </h1>
-                    <span style={{
-                      fontSize: '11px', padding: '3px 10px', borderRadius: '100px', fontWeight: '600',
-                      background: `${stageColor}18`, color: stageColor, border: `1px solid ${stageColor}35`,
-                    }}>
-                      {deal.stage?.replace('_', ' ')}
-                    </span>
-                    {deal.engagementType && (
-                      <span style={{
-                        fontSize: '11px', padding: '3px 10px', borderRadius: '100px', fontWeight: '600',
-                        background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)',
-                        border: '1px solid rgba(255,255,255,0.12)',
-                      }}>
-                        {deal.engagementType}
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', gap: isMobile ? '10px' : '16px', fontSize: '12px', color: '#64748b', flexWrap: 'wrap', marginBottom: objectionSignals.length > 0 ? '10px' : '0' }}>
-                    {deal.prospectName && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><User size={11} />{deal.prospectName}</span>}
-                    {deal.dealValue && <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#34d399', fontWeight: '600' }}><Banknote size={11} />{currencySymbol}{Number(deal.dealValue).toLocaleString()}</span>}
-                    {deal.closeDate && <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Calendar size={11} />Close {new Date(deal.closeDate).toLocaleDateString()}</span>}
-                  </div>
-
-                  {/* Objection signal pills */}
-                  {objectionSignals.length > 0 && (
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                      {objectionSignals.slice(0, 5).map((sig: string, i: number) => (
-                        <span key={i} style={{
-                          fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '100px',
-                          background: 'rgba(248,113,113,0.12)', color: '#f87171',
-                          border: '1px solid rgba(248,113,113,0.25)',
-                        }}>{sig}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Action buttons */}
-                <div style={{ display: 'flex', gap: '8px', flexWrap: isMobile ? 'wrap' : undefined, flexShrink: 0, alignSelf: 'flex-start' }}>
-                  <button onClick={() => setEditOpen(true)} style={{
-                    display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '10px 14px' : '8px 14px',
-                    background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)',
-                    borderRadius: '8px', color: '#e2e8f0', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
-                    minHeight: isMobile ? '44px' : undefined,
-                  }}>
-                    <Edit size={13} /> Edit
-                  </button>
-                  <Link href={`/collateral?dealId=${id}`} style={{
-                    display: 'flex', alignItems: 'center', gap: '6px', padding: isMobile ? '10px 14px' : '8px 14px',
-                    background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
-                    border: '1px solid rgba(99,102,241,0.40)',
-                    borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none',
-                    boxShadow: '0 0 16px rgba(99,102,241,0.30)',
-                    minHeight: isMobile ? '44px' : undefined,
-                  }}>
-                    <Sparkles size={13} /> Collateral
-                  </Link>
-                </div>
               </div>
             </div>
-          )
-        })() : (
-          <div style={{ height: '100px', background: 'linear-gradient(135deg, rgba(99,102,241,0.10), rgba(59,130,246,0.05))', borderRadius: '1.25rem', border: '1px solid rgba(99,102,241,0.15)' }} className="skeleton" />
-        )}
-      </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--glass-card-border)', paddingBottom: '0', overflowX: isMobile ? 'auto' : undefined, whiteSpace: isMobile ? 'nowrap' : undefined, WebkitOverflowScrolling: 'touch' as any, msOverflowStyle: 'none', scrollbarWidth: 'none', background: 'var(--glass-card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderRadius: '12px 12px 0 0', padding: '0 8px' }}>
-        {[
+            {/* CENTER: Health score ring */}
+            {score != null && !isMobile && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                <div style={{
+                  width: '80px', height: '80px', borderRadius: '50%',
+                  background: `conic-gradient(${scoreColor} ${score * 3.6}deg, rgba(255,255,255,0.08) 0deg)`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: `0 0 24px ${scoreColor}38`,
+                }}>
+                  <div style={{
+                    width: '62px', height: '62px', borderRadius: '50%',
+                    background: 'rgba(13,15,26,0.92)',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <span style={{ fontSize: '22px', fontWeight: 700, color: scoreColor!, lineHeight: 1 }}>{score}</span>
+                    <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)', marginTop: '2px' }}>/100</span>
+                  </div>
+                </div>
+                <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.40)', fontWeight: 500 }}>Win probability</span>
+              </div>
+            )}
+
+            {/* RIGHT: Value, date, action buttons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: isMobile ? 'flex-start' : 'flex-end', flexShrink: 0 }}>
+              {deal.dealValue && (
+                <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
+                  <div style={{ fontSize: '26px', fontWeight: 700, color: '#34d399', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                    {currencySymbol}{Number(deal.dealValue).toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.40)', marginTop: '3px' }}>
+                    {deal.dealType === 'recurring' ? `ARR${deal.recurringInterval ? ` (${deal.recurringInterval})` : ''}` : 'Total value'}
+                  </div>
+                </div>
+              )}
+              {deal.contractEndDate && (
+                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.50)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Calendar size={12} />
+                  Contract ends {new Date(deal.contractEndDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setEditOpen(true)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
+                    background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)',
+                    borderRadius: '8px', color: '#e2e8f0', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.13)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)' }}
+                >
+                  <Edit size={13} /> Edit
+                </button>
+                <button
+                  onClick={async () => {
+                    setDiscoveringIssues(true)
+                    try { await fetch(`/api/deals/${id}/discover-issues`, { method: 'POST' }) }
+                    finally { setDiscoveringIssues(false) }
+                  }}
+                  disabled={discoveringIssues}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
+                    background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                    border: '1px solid rgba(99,102,241,0.40)',
+                    borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: 600,
+                    cursor: discoveringIssues ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 0 18px rgba(99,102,241,0.28)',
+                    opacity: discoveringIssues ? 0.75 : 1,
+                  }}
+                >
+                  {discoveringIssues
+                    ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Discovering…</>
+                    : <><Zap size={13} /> Discover Issues</>
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div style={{ height: '148px', background: 'rgba(99,102,241,0.08)', borderRadius: '1.25rem', border: '1px solid rgba(99,102,241,0.15)' }} />
+      )}
+
+      {/* ── Tab pills ──────────────────────────────────────────────────── */}
+      <div style={{
+        display: 'flex', gap: '4px',
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.10), rgba(59,130,246,0.05), transparent)',
+        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: '10px', padding: '4px',
+        overflowX: isMobile ? 'auto' : undefined, scrollbarWidth: 'none',
+      }}>
+        {([
           { id: 'overview', label: 'Overview' },
+          { id: 'notes', label: openCount > 0 ? `Notes & Plans (${openCount})` : 'Notes & Plans' },
           { id: 'activity', label: 'Activity' },
-          { id: 'plans', label: (() => {
-            const openTodos = deal?.todos?.filter((t: any) => !t.done) ?? []
-            const openTasks = (deal?.projectPlan as any)?.phases?.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete') ?? []
-            const openCriteria = (deal?.successCriteriaTodos as any[])?.filter((c: any) => !c.achieved) ?? []
-            const total = openTodos.length + openTasks.length + openCriteria.length
-            if (total === 0) return 'Plans'
-            return `Plans (${total})`
-          })() },
-          { id: 'collateral', label: 'Collateral' },
-        ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{
-            padding: isMobile ? '12px 16px' : '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '500',
-            color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-tertiary)',
-            borderBottom: activeTab === tab.id ? '2px solid #6366F1' : '2px solid transparent',
-            marginBottom: '-1px', transition: 'color 0.1s',
-            minHeight: isMobile ? '44px' : undefined, flexShrink: 0,
-          }}>
+          { id: 'team', label: 'Team' },
+        ] as const).map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: '8px 18px',
+              background: activeTab === tab.id ? 'rgba(99,102,241,0.22)' : 'transparent',
+              border: activeTab === tab.id ? '1px solid rgba(99,102,241,0.32)' : '1px solid transparent',
+              borderRadius: '7px', cursor: 'pointer',
+              fontSize: '13px', fontWeight: activeTab === tab.id ? 600 : 500,
+              color: activeTab === tab.id ? '#e2e8f0' : 'rgba(255,255,255,0.45)',
+              transition: 'all 0.15s', flexShrink: 0, whiteSpace: 'nowrap',
+            }}
+            onMouseEnter={e => { if (activeTab !== tab.id) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.72)' }}
+            onMouseLeave={e => { if (activeTab !== tab.id) (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.45)' }}
+          >
             {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Edit deal modal */}
+      {/* Modals */}
       <EditDealModal
         deal={deal} dealId={id} open={editOpen} onOpenChange={setEditOpen}
         onSaved={() => mutate()}
         onWon={(data) => { setWonDeal(data); setWinStoryOpen(true) }}
       />
-      {/* Win story capture */}
       <WinStoryPromptModal wonDeal={wonDeal} open={winStoryOpen} onOpenChange={setWinStoryOpen} currencySymbol={currencySymbol} />
 
-      {/* Tab content */}
+      {/* ── Tab content ────────────────────────────────────────────────── */}
       {!deal ? (
-        <div style={{ height: '200px', background: 'var(--surface)', borderRadius: '8px' }} />
+        <div style={{ height: '200px', borderRadius: '1rem', background: 'rgba(255,255,255,0.04)' }} />
       ) : (
         <div>
           {activeTab === 'overview' && (
-            <OverviewTab dealId={id} deal={deal} dealGaps={dealGaps} onUpdate={() => mutate()} currencySymbol={currencySymbol} mlPrediction={mlPrediction} globalPrior={globalPrior} brainData={brainRes?.data} objectionWinMap={objectionWinMap} objectionConditionalWins={objectionConditionalWins} />
+            <OverviewTab
+              dealId={id} deal={deal} dealGaps={dealGaps} onUpdate={() => mutate()}
+              currencySymbol={currencySymbol} mlPrediction={mlPrediction}
+              globalPrior={globalPrior} brainData={brainRes?.data}
+              objectionWinMap={objectionWinMap} objectionConditionalWins={objectionConditionalWins}
+            />
+          )}
+          {activeTab === 'notes' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <ActivityTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
+              <ActionsTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
+              <CollateralTab dealId={id} deal={deal} />
+            </div>
           )}
           {activeTab === 'activity' && (
-            <ActivityTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <AiActivitySection dealId={id} />
+              <ActivityLog dealId={id} deal={deal} onUpdate={() => mutate()} />
+            </div>
           )}
-          {activeTab === 'plans' && (
-            <ActionsTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
-          )}
-          {activeTab === 'collateral' && (
-            <CollateralTab dealId={id} deal={deal} />
+          {activeTab === 'team' && (
+            <TeamTab deal={deal} currencySymbol={currencySymbol} />
           )}
         </div>
       )}
 
-      {/* AI Activity */}
-      {deal && <AiActivitySection dealId={id} />}
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 }
+
