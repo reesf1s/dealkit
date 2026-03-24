@@ -4,22 +4,22 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Halvex — Your sales pipeline, finally connected to your roadmap',
+  title: 'Halvex — Stop losing deals to missing features',
   description:
-    'Halvex links your deals to your engineering backlog — so PMs know what to build to unlock revenue, and sales reps know what\'s shipping that could save a deal.',
+    'Halvex connects your sales pipeline to your engineering roadmap. Reps know which product gaps are costing them deals. PMs know which backlog items unlock revenue.',
   openGraph: {
-    title: 'Halvex — Pipeline meets roadmap',
+    title: 'Halvex — Where deals meet the roadmap',
     description:
-      'Halvex links your deals to your engineering backlog — so PMs know what to build to unlock revenue, and sales reps know what\'s shipping that could save a deal.',
+      'Halvex connects your sales pipeline to your engineering roadmap. Reps know which product gaps are costing them deals. PMs know which backlog items unlock revenue.',
     type: 'website',
     url: 'https://halvex.com',
     siteName: 'Halvex',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Halvex — Pipeline meets roadmap',
+    title: 'Halvex — Where deals meet the roadmap',
     description:
-      'Halvex links your deals to your engineering backlog — so PMs know what to build to unlock revenue, and sales reps know what\'s shipping that could save a deal.',
+      'Halvex connects your sales pipeline to your engineering roadmap. Reps know which product gaps are costing them deals. PMs know which backlog items unlock revenue.',
   },
 }
 
@@ -537,11 +537,9 @@ export default async function LandingPage() {
               textShadow: '0 0 80px rgba(91,91,214,0.3)',
             }}
           >
-            Your sales pipeline,
+            Stop losing deals
             <br />
-            finally connected
-            <br />
-            to your roadmap.
+            to missing features.
           </h1>
 
           <p
@@ -556,8 +554,9 @@ export default async function LandingPage() {
               zIndex: 1,
             }}
           >
-            Halvex links your deals to your engineering backlog &mdash; so PMs know what to build
-            to unlock revenue, and sales reps know what&apos;s shipping that could save a deal.
+            Halvex connects your sales pipeline to your engineering roadmap.
+            Reps know which product gaps are costing them deals.
+            PMs know which backlog items will actually close revenue.
           </p>
 
           <div
@@ -659,12 +658,12 @@ export default async function LandingPage() {
                 lineHeight: 1.2,
               }}
             >
-              One platform. Two teams. Zero silos.
+              One platform. Two teams. One source of truth.
             </h2>
           </div>
 
           <p data-light-text-secondary="" style={{ fontSize: '16px', color: textSecondary, maxWidth: '560px', margin: '0 auto 48px', lineHeight: 1.7, textAlign: 'center' }}>
-            Halvex connects your sales pipeline to your product roadmap — so everyone knows what to build and what to save.
+            Sales and product finally speaking the same language — deal health scores, linked backlog items, and AI that closes the loop automatically.
           </p>
 
           <div data-three-col="" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', position: 'relative', zIndex: 1 }}>
@@ -674,8 +673,8 @@ export default async function LandingPage() {
                 badgeColor: green,
                 badgeBg: 'rgba(60,203,127,0.10)',
                 icon: '🎯',
-                title: 'Know which deals are at risk',
-                desc: 'Know which deals are at risk before they go cold — and what your product team is building that could save them.',
+                title: 'Know your deal health before it\'s too late',
+                desc: 'AI-scored deal health, churn risk alerts, and daily action briefings — so you always know which deals need attention and exactly what to do next.',
                 glowColor: 'rgba(60,203,127,0.12)',
                 glowClass: 'glass-glow-green',
               },
@@ -684,8 +683,8 @@ export default async function LandingPage() {
                 badgeColor: accent,
                 badgeBg: 'rgba(91,91,214,0.10)',
                 icon: '📊',
-                title: 'Prioritise with data, not gut feel',
-                desc: 'See which features in your backlog are blocking the most revenue — prioritise with data, not gut feel.',
+                title: 'Build what unblocks revenue',
+                desc: 'See exactly which features are blocking the most pipeline value. Prioritise your backlog by ARR impact — not gut feel or loudest voice in the room.',
                 glowColor: 'rgba(91,91,214,0.12)',
                 glowClass: 'glass-glow-indigo',
               },
@@ -694,8 +693,8 @@ export default async function LandingPage() {
                 badgeColor: '#8B5CF6',
                 badgeBg: 'rgba(139,92,246,0.10)',
                 icon: '⚡',
-                title: 'One Slack bot to connect it all',
-                desc: 'Ask about a deal, scope issues, get notified when they ship — all from Slack.',
+                title: 'The whole loop, automated',
+                desc: 'Ask about any deal from Slack. Halvex scopes the issue, links it to your backlog, and pings your reps the moment it ships — no manual handoffs.',
                 glowColor: 'rgba(139,92,246,0.12)',
                 glowClass: 'glass-glow-purple',
               },
@@ -765,50 +764,50 @@ export default async function LandingPage() {
               marginBottom: '16px',
             }}
           >
-            From a Slack question to a shipped feature.
+            From product gap to closed deal — automatically.
           </h2>
           <p data-light-text-secondary="" style={{ fontSize: '16px', color: textSecondary, lineHeight: 1.7, marginBottom: '56px', maxWidth: '560px' }}>
-            Halvex uses an MCP agent to bridge your deals and your backlog — autonomously.
+            Halvex uses AI to connect the dots between your deals and your backlog — so nothing falls through the cracks.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', maxWidth: '720px', position: 'relative', zIndex: 1 }}>
             {[
               {
-                step: 'Ask',
+                step: 'Connect',
                 label: '01',
-                desc: 'A sales rep DMs @halvex in Slack: "Acme Corp keeps asking about SSO — are we building it?"',
+                desc: 'Link HubSpot and Linear in minutes. Halvex imports your deals and issues, then uses AI to match objections and blockers to backlog items — automatically.',
                 dotColor: '#5B8DEF',
                 lineColor: 'rgba(91,141,239,0.4)',
                 glowColor: 'rgba(91,141,239,0.15)',
               },
               {
-                step: 'Discover',
+                step: 'Score',
                 label: '02',
-                desc: 'Halvex searches your deals. Finds 6 open opportunities (£340k combined) where SSO was flagged as a blocker or competitor advantage.',
+                desc: 'Every deal gets an AI health score — updated daily from notes, signals, and meeting context. Deals trending toward churn surface before it\'s too late.',
                 dotColor: accent,
                 lineColor: 'rgba(91,91,214,0.4)',
                 glowColor: 'rgba(91,91,214,0.15)',
               },
               {
-                step: 'Scope',
+                step: 'Match',
                 label: '03',
-                desc: 'Halvex opens a Linear issue — pre-filled with context: which deals need it, what competitors offer, and a suggested priority.',
+                desc: 'Halvex links deal objections to Linear issues. Your PM sees that SSO is blocking £340k in pipeline — with deal names, stages, and a one-click scope to cycle.',
                 dotColor: '#8B5CF6',
                 lineColor: 'rgba(139,92,246,0.4)',
                 glowColor: 'rgba(139,92,246,0.15)',
               },
               {
-                step: 'Ship',
+                step: 'Brief',
                 label: '04',
-                desc: 'Your engineers pick it up in the next sprint. Linear tracks progress. Halvex watches for the status change.',
+                desc: 'Every morning, reps get a prioritised action list: which deals need a call, which objections your product team just answered, and what\'s closing this week.',
                 dotColor: amber,
                 lineColor: 'rgba(245,158,11,0.4)',
                 glowColor: 'rgba(245,158,11,0.15)',
               },
               {
-                step: 'Notify',
+                step: 'Close',
                 label: '05',
-                desc: 'When the feature ships, Halvex pings the reps on those 6 deals in Slack — with a message they can forward to their champions.',
+                desc: 'When an issue ships, Halvex pings every rep whose deal was blocked by it — with a draft release email they can forward to their champion in one click.',
                 dotColor: green,
                 lineColor: 'rgba(60,203,127,0.4)',
                 glowColor: 'rgba(60,203,127,0.15)',
