@@ -69,6 +69,7 @@ type Intent =
   | 'collateral' | 'project_plan' | 'deal_create' | 'case_study_create'
   | 'deal_action' | 'product_gap' | 'pipeline_query' | 'qa'
   | 'competitor_update' | 'gap_manage' | 'deal_delete'
+  | 'deal_list' | 'win_analysis' | 'at_risk'
 
 const MEETING_KEYWORDS = [
   'action item', 'follow up', 'next step', 'discussed', 'agenda',
@@ -87,6 +88,9 @@ function looksLikeMeetingTranscript(text: string): boolean {
 // Fallback regex-based classifier (used when Haiku call fails)
 function detectIntentFallback(text: string): Intent {
   const lower = text.toLowerCase()
+  if (/list.*deal|show.*deal|all.*deal|what deals.*have|my deals|what deals do i/i.test(text)) return 'deal_list'
+  if (/why.*win|win pattern|what.*win|how.*win|winning factor|what.*help.*win/i.test(text)) return 'win_analysis'
+  if (/at.?risk|need.*attention|stale.*deal|urgent.*deal|behind.*target|behind.*quota/i.test(text)) return 'at_risk'
   if (/\b(new deal|new prospect|add.*deal|create.*deal|log.*deal)\b/i.test(text)) return 'deal_create'
   if (looksLikeMeetingTranscript(text)) return 'meeting_notes'
   if (/battlecard|add competitor|create competitor|new competitor|track.*competitor/i.test(text)) return 'competitor_battlecard'
@@ -127,6 +131,9 @@ pipeline_query - asking about pipeline health, overview, what to focus on, forec
 competitor_update - editing, updating, or enriching a competitor profile (strengths, weaknesses, description, notes) or regenerating their battlecard
 gap_manage - resolving, closing, updating priority of, or archiving a product gap
 deal_delete - permanently deleting or archiving a deal
+deal_list - listing all current deals or asking what deals exist (show me my deals, what deals do I have)
+win_analysis - asking why we win deals, win patterns, winning factors, what helps us close
+at_risk - asking which deals need attention, are at risk, are stale, or need focus this week
 qa - any question, content draft request, or anything else
 
 Message: "${text.slice(0, 600)}"`,
@@ -138,6 +145,7 @@ Message: "${text.slice(0, 600)}"`,
       'project_plan', 'deal_create', 'case_study_create', 'deal_action',
       'product_gap', 'pipeline_query', 'qa',
       'competitor_update', 'gap_manage', 'deal_delete',
+      'deal_list', 'win_analysis', 'at_risk',
     ]
     return valid.includes(raw as Intent) ? (raw as Intent) : 'qa'
   } catch {
@@ -1624,6 +1632,119 @@ async function handleDealDelete(
   }
 }
 
+// ── Handler: deal list — quick formatted list of open deals ──────────────────
+async function handleDealList(
+  workspaceId: string,
+): Promise<{ reply: string; actions: ActionCard[] }> {
+  const brain = await getWorkspaceBrain(workspaceId)
+  const activeDeals = (brain?.deals ?? []).filter(d => !['closed_won', 'closed_lost'].includes(d.stage))
+
+  if (activeDeals.length === 0) {
+    return { reply: "You have no open deals yet. Try: _\"Create a deal for Acme Corp worth £50k\"_", actions: [] }
+  }
+
+  const totalValue = activeDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
+  const lines = activeDeals.slice(0, 20).map(d => {
+    const score = d.conversionScore != null ? ` · ${d.conversionScore}%` : ''
+    const val = d.dealValue ? ` · £${d.dealValue.toLocaleString('en-GB')}` : ''
+    return `• **${d.company}** "${d.name}" — ${d.stage}${score}${val}`
+  })
+
+  const header = `**${activeDeals.length} open deal${activeDeals.length !== 1 ? 's' : ''}** · £${totalValue.toLocaleString('en-GB')} total pipeline\n\n`
+  return { reply: header + lines.join('\n'), actions: [] }
+}
+
+// ── Handler: win analysis — why we win, from brain intelligence ────────────────
+async function handleWinAnalysis(
+  workspaceId: string,
+): Promise<{ reply: string; actions: ActionCard[] }> {
+  const brain = await getWorkspaceBrain(workspaceId)
+  const winLoss = brain?.winLossIntel
+  const playbook = brain?.winPlaybook
+  const objections = brain?.objectionWinMap ?? []
+
+  if (!winLoss || winLoss.winCount + winLoss.lossCount < 2) {
+    return {
+      reply: "Not enough closed deals to detect win patterns yet. Log your first wins and losses and I'll spot the patterns automatically.",
+      actions: [],
+    }
+  }
+
+  const parts: string[] = [
+    `**Win rate: ${winLoss.winRate}%** (${winLoss.winCount} won, ${winLoss.lossCount} lost)`,
+  ]
+
+  if (winLoss.avgWonValue > 0) {
+    parts.push(`Average won deal value: £${winLoss.avgWonValue.toLocaleString('en-GB')}`)
+  }
+
+  if (playbook?.topObjectionWinPatterns?.length) {
+    const topWins = playbook.topObjectionWinPatterns.slice(0, 3)
+      .map(p => `• **${p.theme}** — won ${p.winsWithTheme}× (${p.winRateWithTheme}% win rate)`)
+    parts.push('\n**Top objections we overcome:**\n' + topWins.join('\n'))
+  }
+
+  if (playbook?.fastestClosePattern?.commonSignals?.length) {
+    const signals = playbook.fastestClosePattern.commonSignals.slice(0, 3).join(', ')
+    parts.push(`\n**Fast-close signals** (avg ${playbook.fastestClosePattern.avgDaysToClose}d): ${signals}`)
+  }
+
+  if (playbook?.championPattern?.winRateWithChampion != null) {
+    const lift = playbook.championPattern.championLift ?? 0
+    parts.push(`\n**Champion impact**: +${lift.toFixed(0)}pts win rate when a champion is present`)
+  }
+
+  const winningObjThemes = objections.filter(o => o.winRateWithTheme >= 60).slice(0, 3)
+  if (winningObjThemes.length) {
+    parts.push('\n**Themes where we close despite resistance:**\n' +
+      winningObjThemes.map(o => `• ${o.theme}: ${o.winRateWithTheme}% win rate`).join('\n'))
+  }
+
+  return { reply: parts.join('\n'), actions: [] }
+}
+
+// ── Handler: at risk — urgent deals sorted by urgency ─────────────────────────
+async function handleAtRisk(
+  workspaceId: string,
+): Promise<{ reply: string; actions: ActionCard[] }> {
+  const brain = await getWorkspaceBrain(workspaceId)
+  const urgentDeals = brain?.urgentDeals ?? []
+  const staleDeals = brain?.staleDeals ?? []
+  const followUpAlerts = brain?.followUpIntel?.followUpAlerts ?? []
+
+  if (urgentDeals.length === 0 && staleDeals.length === 0 && followUpAlerts.length === 0) {
+    return { reply: "No deals appear to be at risk right now — pipeline looks healthy!", actions: [] }
+  }
+
+  const parts: string[] = []
+
+  if (urgentDeals.length > 0) {
+    parts.push(`**${urgentDeals.length} deal${urgentDeals.length !== 1 ? 's' : ''} needing attention:**`)
+    for (const d of urgentDeals.slice(0, 5)) {
+      parts.push(`• **${d.company}** "${d.dealName}" — ${d.reason}`)
+    }
+  }
+
+  if (staleDeals.length > 0) {
+    parts.push(`\n**${staleDeals.length} stale deal${staleDeals.length !== 1 ? 's' : ''} (no activity):**`)
+    for (const d of staleDeals.slice(0, 4)) {
+      parts.push(`• **${d.company}** "${d.dealName}" — ${d.daysSinceUpdate}d since last update · ${d.stage}`)
+    }
+  }
+
+  if (followUpAlerts.length > 0) {
+    const critical = followUpAlerts.filter(a => a.urgency === 'critical').slice(0, 3)
+    if (critical.length > 0) {
+      parts.push(`\n**Overdue follow-ups:**`)
+      for (const a of critical) {
+        parts.push(`• **${a.company}** "${a.dealName}" — ${a.daysOverdue}d overdue · ${a.stage}`)
+      }
+    }
+  }
+
+  return { reply: parts.join('\n'), actions: [] }
+}
+
 // ── Handler: pipeline query — structured overview using brain data ────────────
 async function handlePipelineQuery(
   workspaceId: string, text: string,
@@ -1819,6 +1940,21 @@ export async function POST(req: NextRequest) {
 
     if (intent === 'deal_delete') {
       const result = await handleDealDelete(workspaceId, userId, lastText, activeDealId ?? null)
+      return NextResponse.json(result)
+    }
+
+    if (intent === 'deal_list') {
+      const result = await handleDealList(workspaceId)
+      return NextResponse.json(result)
+    }
+
+    if (intent === 'win_analysis') {
+      const result = await handleWinAnalysis(workspaceId)
+      return NextResponse.json(result)
+    }
+
+    if (intent === 'at_risk') {
+      const result = await handleAtRisk(workspaceId)
       return NextResponse.json(result)
     }
 
