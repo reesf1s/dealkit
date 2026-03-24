@@ -1,13 +1,16 @@
 /**
  * POST /api/integrations/linear/sync
  * Manually trigger a Linear issue sync for the workspace.
+ * After sync, re-matches all open deals against the updated issue cache.
  */
 export const dynamic = 'force-dynamic'
 
 import { auth } from '@clerk/nextjs/server'
+import { after } from 'next/server'
 import { NextResponse } from 'next/server'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { syncLinearIssues } from '@/lib/linear-sync'
+import { matchAllOpenDeals } from '@/lib/linear-signal-match'
 
 export async function POST() {
   try {
@@ -17,6 +20,11 @@ export async function POST() {
     const { workspaceId } = await getWorkspaceContext(userId)
 
     const result = await syncLinearIssues(workspaceId)
+
+    // After sync, re-match all open deals in background
+    after(async () => {
+      await matchAllOpenDeals(workspaceId, 'user')
+    })
 
     return NextResponse.json({ data: result })
   } catch (e: unknown) {

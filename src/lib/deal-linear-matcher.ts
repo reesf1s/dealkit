@@ -132,11 +132,12 @@ export async function findMatchingIssues(
     dealRisks?: unknown
     lostReason?: string | null
     description?: string | null
+    successCriteria?: string | null
   },
   opts: { limit?: number; minSimilarity?: number } = {},
 ): Promise<LinearIssueMatch[]> {
   const limit = opts.limit ?? 25
-  const minSimilarity = opts.minSimilarity ?? 0.4
+  const minSimilarity = opts.minSimilarity ?? 0.15
 
   // Try pgvector first
   if (isEmbeddingAvailable()) {
@@ -158,6 +159,7 @@ export async function findMatchingIssues(
     dealRisks: dealData.dealRisks,
     lostReason: dealData.lostReason ?? null,
     description: dealData.description ?? null,
+    successCriteria: dealData.successCriteria ?? null,
   })
   if (!signalText) return []
 

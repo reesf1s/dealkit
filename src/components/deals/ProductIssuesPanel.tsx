@@ -75,6 +75,7 @@ export function ProductIssuesPanel({ dealId }: Props) {
   const [showLinkInput, setShowLinkInput] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null) // linkId being acted on
   const [expandedStory, setExpandedStory] = useState<string | null>(null) // linkId with expanded user story
+  const [discovering, setDiscovering] = useState(false)
 
   // Check if Linear is connected for this workspace
   const { data: statusData } = useSWR<{ data: LinearStatus }>(
@@ -145,6 +146,20 @@ export function ProductIssuesPanel({ dealId }: Props) {
     }
   }, [dealId, linkInput, mutateLinks, toast])
 
+  const handleDiscover = useCallback(async () => {
+    setDiscovering(true)
+    try {
+      const res = await fetch(`/api/deals/${dealId}/discover-issues`, { method: 'POST' })
+      if (!res.ok) throw new Error('Discover failed')
+      await mutateLinks()
+      toast('Issues re-matched to this deal', 'success')
+    } catch {
+      toast('Could not discover issues', 'error')
+    } finally {
+      setDiscovering(false)
+    }
+  }, [dealId, mutateLinks, toast])
+
   // Don't render if Linear isn't connected
   if (!statusData?.data?.connected) return null
 
@@ -178,18 +193,33 @@ export function ProductIssuesPanel({ dealId }: Props) {
         <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
           Product Issues
         </span>
-        <span className="ml-2 text-xs bg-purple-50 text-purple-600 border border-purple-200 rounded-full px-2 py-0.5 font-medium">MCP</span>
-        <button
-          onClick={() => setShowLinkInput(v => !v)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '4px',
-            fontSize: '11px', color: 'var(--accent)', background: 'none',
-            border: 'none', cursor: 'pointer', padding: '2px 4px',
-          }}
-        >
-          <Plus size={12} />
-          Link
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+          <button
+            onClick={handleDiscover}
+            disabled={discovering}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '4px',
+              fontSize: '11px', color: '#818cf8', background: 'rgba(99,102,241,0.10)',
+              border: '1px solid rgba(99,102,241,0.20)', borderRadius: '4px',
+              cursor: discovering ? 'not-allowed' : 'pointer', padding: '3px 8px',
+              opacity: discovering ? 0.6 : 1,
+            }}
+          >
+            {discovering ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : null}
+            Discover
+          </button>
+          <button
+            onClick={() => setShowLinkInput(v => !v)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '4px',
+              fontSize: '11px', color: 'var(--accent)', background: 'none',
+              border: 'none', cursor: 'pointer', padding: '2px 4px',
+            }}
+          >
+            <Plus size={12} />
+            Link
+          </button>
+        </div>
       </div>
 
       {/* Manual link input */}
@@ -259,18 +289,45 @@ export function ProductIssuesPanel({ dealId }: Props) {
                   {/* Issue ID + title */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      {/* Indigo pill identifier */}
                       {link.linearIssueUrl ? (
                         <a
                           href={link.linearIssueUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ fontSize: '11px', color: 'var(--text-tertiary)', flexShrink: 0, textDecoration: 'none' }}
+                          style={{
+                            fontSize: '10px', fontWeight: 700, color: '#818cf8',
+                            background: 'rgba(99,102,241,0.12)',
+                            border: '1px solid rgba(99,102,241,0.22)',
+                            borderRadius: '4px', padding: '1px 6px',
+                            flexShrink: 0, textDecoration: 'none',
+                            letterSpacing: '0.02em',
+                          }}
                         >
-                          #{link.linearIssueId}
+                          {link.linearIssueId}
                         </a>
                       ) : (
-                        <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', flexShrink: 0 }}>
-                          #{link.linearIssueId}
+                        <span style={{
+                          fontSize: '10px', fontWeight: 700, color: '#818cf8',
+                          background: 'rgba(99,102,241,0.12)',
+                          border: '1px solid rgba(99,102,241,0.22)',
+                          borderRadius: '4px', padding: '1px 6px',
+                          flexShrink: 0, letterSpacing: '0.02em',
+                        }}>
+                          {link.linearIssueId}
+                        </span>
+                      )}
+                      {/* addressesRisk amber tag */}
+                      {link.addressesRisk && (
+                        <span style={{
+                          fontSize: '9px', fontWeight: 600, color: '#f59e0b',
+                          background: 'rgba(245,158,11,0.10)',
+                          border: '1px solid rgba(245,158,11,0.20)',
+                          borderRadius: '4px', padding: '1px 5px',
+                          flexShrink: 0, maxWidth: '120px',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }} title={link.addressesRisk}>
+                          risk: {link.addressesRisk}
                         </span>
                       )}
                       <span style={{
@@ -279,6 +336,19 @@ export function ProductIssuesPanel({ dealId }: Props) {
                       }}>
                         {link.linearTitle ?? link.linearIssueId}
                       </span>
+                      {/* Matched badge (confirmed but not in_cycle/deployed) */}
+                      {isConfirmed && !isInCycle && !isDeployed && (
+                        <span style={{
+                          fontSize: '9px', fontWeight: 600,
+                          padding: '1px 5px', borderRadius: '10px',
+                          background: 'rgba(52,211,153,0.12)',
+                          color: '#34d399',
+                          flexShrink: 0,
+                          letterSpacing: '0.02em',
+                        }}>
+                          MATCHED
+                        </span>
+                      )}
                       {/* In-cycle badge */}
                       {isInCycle && (
                         <span style={{
