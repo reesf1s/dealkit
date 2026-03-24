@@ -728,6 +728,29 @@ export const slackUserMappingsRelations = relations(slackUserMappings, ({ one })
 }))
 
 // ─────────────────────────────────────────────────────────────────────────────
+// workflows  (saved automation rules — UI configuration, persisted to DB)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const workflows = pgTable('workflows', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  workspaceId:   uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  name:          text('name').notNull(),
+  description:   text('description'),
+  triggerType:   text('trigger_type').notNull().default('manual'),
+  triggerConfig: jsonb('trigger_config').default({}),
+  actions:       jsonb('actions').default([]),
+  outputTarget:  text('output_target').default('today_tab'),
+  isEnabled:     boolean('is_enabled').default(false),
+  lastRunAt:     timestamp('last_run_at', { withTimezone: true }),
+  lastOutput:    text('last_output'),
+  createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const workflowsRelations = relations(workflows, ({ one }) => ({
+  workspace: one(workspaces, { fields: [workflows.workspaceId], references: [workspaces.id] }),
+}))
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Inferred row types
 // ─────────────────────────────────────────────────────────────────────────────
 

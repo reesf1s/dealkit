@@ -259,9 +259,20 @@ export function ProductIssuesPanel({ dealId }: Props) {
                   {/* Issue ID + title */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', flexShrink: 0 }}>
-                        #{link.linearIssueId}
-                      </span>
+                      {link.linearIssueUrl ? (
+                        <a
+                          href={link.linearIssueUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ fontSize: '11px', color: 'var(--text-tertiary)', flexShrink: 0, textDecoration: 'none' }}
+                        >
+                          #{link.linearIssueId}
+                        </a>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', flexShrink: 0 }}>
+                          #{link.linearIssueId}
+                        </span>
+                      )}
                       <span style={{
                         fontSize: '12px', color: 'var(--text-primary)',
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',

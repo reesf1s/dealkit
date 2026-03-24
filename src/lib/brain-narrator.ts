@@ -299,25 +299,36 @@ export function buildMeetingPrepBriefing(
 // These produce minimal, tightly scoped LLM prompts.
 // Claude receives pre-determined facts — it writes sentences, not analysis.
 
-export function scoreNarrationPrompt(briefing: DealBriefing): string {
+export interface ActionItemContext {
+  /** Specific contacts extracted from latest notes (name + role pairs) */
+  contacts?: { name: string; role?: string }[]
+  /** Days since the deal record was last updated */
+  daysSinceUpdate?: number | null
+  /** Upcoming scheduled events from the latest note */
+  scheduledEvents?: { description: string; date: string | null }[]
+  /** Open action items not yet done */
+  pendingTodos?: string[]
+  /** Whether the next meeting is booked */
+  nextMeetingBooked?: boolean
+  /** Decision timeline stated by prospect */
+  decisionTimeline?: string | null
+}
+
+export function scoreNarrationPrompt(briefing: DealBriefing, extra?: ActionItemContext): string {
   const mlLine = briefing.mlWinProbability != null && briefing.mlTrainingDeals >= 6
     ? `Statistical model (trained on ${briefing.mlTrainingDeals} closed deals in this workspace): ${briefing.mlWinProbability}% win probability.`
     : `No statistical model yet (need 6+ closed deals).`
 
-  const positivesLine = briefing.topPositives.length
-    ? `Positive signals detected: ${briefing.topPositives.join('; ')}.`
-    : ''
-
   const risksLine = briefing.topRisks.length
-    ? `Risk signals: ${briefing.topRisks.join('; ')}.`
+    ? `Active deal risks: ${briefing.topRisks.join('; ')}.`
     : ''
 
   const stalledLine = briefing.stalledDays
-    ? `Deal is stalled — ${briefing.stalledDays} days past expected stage duration.`
+    ? `Deal STALLED — ${briefing.stalledDays} days past expected stage duration. Immediate re-engagement needed.`
     : ''
 
-  const similarLine = briefing.similarWin
-    ? `Most similar past win: ${briefing.similarWin}.`
+  const positivesLine = briefing.topPositives.length
+    ? `Positive signals: ${briefing.topPositives.join('; ')}.`
     : ''
 
   const competitorLine = briefing.competitorInsight
@@ -325,51 +336,61 @@ export function scoreNarrationPrompt(briefing: DealBriefing): string {
     : ''
 
   const momentumLine = briefing.isDeteriorating
-    ? `⚠ Deal signals deteriorating — recent notes more negative than early notes.`
+    ? `Warning: deal momentum declining — recent notes are more negative than earlier ones.`
     : briefing.momentumDirection === 'building'
-      ? `Deal momentum building — recent notes more positive than earlier.`
+      ? `Deal momentum building — recent notes more positive.`
       : ''
-
-  const closeDateLine = briefing.predictedCloseDays != null
-    ? `Predicted close: ~${briefing.predictedCloseDays} days from now (based on similar historical deals).`
-    : ''
 
   const stakeholderLine = briefing.stakeholderDepth != null && briefing.stakeholderDepth < 0.34
-    ? `Limited stakeholder coverage detected — only one functional area engaged so far.`
-    : briefing.stakeholderDepth != null && briefing.stakeholderDepth > 0.5
-      ? `Multi-function stakeholder engagement confirmed.`
-      : ''
+    ? `Only one functional area engaged — no multi-stakeholder coverage yet.`
+    : ''
 
-  return `You are a sales intelligence narrator. The scoring engine has determined the following facts about "${briefing.dealName}" (${briefing.company}):
+  // Extra context from the specific deal data
+  const contactsLine = extra?.contacts?.length
+    ? `Named contacts in latest notes: ${extra.contacts.map(c => c.role ? `${c.name} (${c.role})` : c.name).join(', ')}.`
+    : ''
+  const staleDaysLine = extra?.daysSinceUpdate != null && extra.daysSinceUpdate > 7
+    ? `${extra.daysSinceUpdate} days since last deal update — rep engagement gap.`
+    : ''
+  const scheduledLine = extra?.scheduledEvents?.length
+    ? `Upcoming: ${extra.scheduledEvents.map(e => e.date ? `${e.description} on ${e.date}` : e.description).join('; ')}.`
+    : ''
+  const todosLine = extra?.pendingTodos?.length
+    ? `Open action items: ${extra.pendingTodos.slice(0, 3).join('; ')}.`
+    : ''
+  const nextMeetingLine = extra?.nextMeetingBooked === false
+    ? `No next meeting booked.`
+    : ''
+  const timelineLine = extra?.decisionTimeline
+    ? `Prospect decision timeline: ${extra.decisionTimeline}.`
+    : ''
 
-Score: ${briefing.score}/100 (${briefing.scoreBasis === 'ml_composite' ? 'ML composite' : 'signal heuristic'}).
-${mlLine}
-${positivesLine}
-${risksLine}
-${stalledLine}
-${similarLine}
-${competitorLine}
-${momentumLine}
-${closeDateLine}
-${stakeholderLine}
-Primary recommendation: ${briefing.recommendation}
+  return `You are a sales action advisor. The system has computed the following VERIFIED FACTS about deal "${briefing.dealName}" at ${briefing.company}:
 
-GROUNDING RULES — read carefully before writing:
-1. Cite ONLY the signals listed above. Do not invent claims, infer motives, or reference information not explicitly provided.
-2. Lead with the single highest-impact signal in this priority order: ML win probability > stall warning > top risk > top positive signal.
-3. Every sentence must be traceable to a specific listed signal or fact. If a signal is absent, do not mention its category.
-4. Never say "AI", "model", "algorithm", or "scoring engine". Use "your pipeline" or "this deal".
-5. NEVER mention the numeric score (e.g. "82/100" or "rates at 82"). The score is shown separately in the UI — mentioning it in prose creates confusing duplicate displays. Focus on the qualitative signals instead.
+DEAL SIGNALS:
+${[mlLine, positivesLine, risksLine, stalledLine, competitorLine, momentumLine, stakeholderLine].filter(Boolean).join('\n')}
 
-OUTPUT FORMAT — return exactly 3 bullet lines (each starting with "- "):
-- Line 1: analytical observation about the deal's current state (pattern, risk, or signal — what the data shows)
-- Line 2: a second analytical observation (different angle — momentum, competitive position, stakeholder coverage, or timeline)
-- Line 3: ONE specific, concrete next action for this week (what to do — grounded in the recommendation above)
+SPECIFIC DEAL FACTS:
+${[contactsLine, staleDaysLine, scheduledLine, todosLine, nextMeetingLine, timelineLine, `Primary recommendation: ${briefing.recommendation}`].filter(Boolean).join('\n')}
 
-CRITICAL: Lines 1-2 (insights) and Line 3 (action) MUST contain different text.
-- Lines 1-2: analytical observations about the deal's state (patterns, risks, signals)
-- Line 3: ONE sentence describing the single most important action this week
-If you find yourself writing similar text for both, make lines 1-2 more analytical and line 3 more actionable.`
+INSTRUCTIONS — write exactly 3 bullet action items. Each item MUST:
+1. Start with an ACTION VERB (Call, Send, Book, Address, Confirm, Follow up, Schedule, Share, Request)
+2. Name a SPECIFIC person, document, objection, or date from the facts above — no vague references
+3. Be one sentence max
+
+EXAMPLES OF GOOD output:
+- "Call [Name] — no contact in X days and decision is needed before [date]"
+- "Send the pricing breakdown to [Name] — they requested it on the last call"
+- "Address the '[objection]' objection before next meeting"
+- "Book a technical call with [Name] — they are the IT decision-maker and haven't been engaged"
+
+EXAMPLES OF BAD output (NEVER write these):
+- "The deal shows strong forward momentum" (observation, not action)
+- "Continue to nurture the relationship" (vague, no specifics)
+- "Ensure stakeholder alignment" (generic fluff)
+
+If specific names/dates are not available for an item, ground it in the most specific available risk or open todo.
+Return exactly 3 lines, each starting with "- ".`
 }
 
 export function overviewNarrationPrompt(briefing: OverviewBriefing, dateStr: string): string {

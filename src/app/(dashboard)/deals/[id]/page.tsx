@@ -3156,6 +3156,27 @@ function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
   )
 }
 
+// ─── Score Ring ───────────────────────────────────────────────────────────────
+
+function ScoreRing({ score }: { score: number }) {
+  const pct = Math.min(100, Math.max(0, score))
+  const color = pct >= 70 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#ef4444'
+  return (
+    <div style={{ position: 'relative', width: '64px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', transform: 'rotate(-90deg)' }} viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="6" />
+        <circle
+          cx="40" cy="40" r="34" fill="none"
+          stroke={color} strokeWidth="6"
+          strokeDasharray={`${(pct / 100) * 213.6} 213.6`}
+          strokeLinecap="round"
+        />
+      </svg>
+      <span style={{ fontSize: '20px', fontWeight: 700, color, lineHeight: 1 }}>{score}</span>
+    </div>
+  )
+}
+
 // ─── Score Breakdown Visual ──────────────────────────────────────────────────
 
 function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPrediction: any; brainData: any }) {
@@ -3239,10 +3260,7 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
 
       {/* Main score + bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div style={{ flexShrink: 0, width: '64px', height: '64px', borderRadius: '8px', background: scoreBg, border: `1px solid ${scoreBorder}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontSize: '24px', fontWeight: '700', color: scoreColor, lineHeight: 1 }}>{score}</div>
-          <div style={{ fontSize: '9px', color: scoreColor, marginTop: '1px' }}>/100</div>
-        </div>
+        <ScoreRing score={score} />
         <div style={{ flex: 1 }}>
           {/* Stacked contribution bar — clickable to expand breakdown */}
           <div
@@ -5230,7 +5248,6 @@ export default function DealDetailPage() {
       <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--glass-card-border)', paddingBottom: '0', overflowX: isMobile ? 'auto' : undefined, whiteSpace: isMobile ? 'nowrap' : undefined, WebkitOverflowScrolling: 'touch' as any, msOverflowStyle: 'none', scrollbarWidth: 'none', background: 'var(--glass-card-bg)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderRadius: '12px 12px 0 0', padding: '0 8px' }}>
         {[
           { id: 'overview', label: 'Overview' },
-          { id: 'activity', label: 'Activity' },
           { id: 'plans', label: (() => {
             const openTodos = deal?.todos?.filter((t: any) => !t.done) ?? []
             const openTasks = (deal?.projectPlan as any)?.phases?.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete') ?? []
@@ -5239,6 +5256,7 @@ export default function DealDetailPage() {
             if (total === 0) return 'Plans'
             return `Plans (${total})`
           })() },
+          { id: 'activity', label: 'Activity' },
           { id: 'collateral', label: 'Collateral' },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{
