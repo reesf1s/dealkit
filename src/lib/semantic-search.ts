@@ -449,6 +449,20 @@ export async function embedLinearIssues(workspaceId: string): Promise<{ embedded
 
   await saveCache(workspaceId, updatedCache)
 
+  // Also persist vectors to linear_issues_cache.embedding for per-row durability.
+  // This runs after the JSONB cache write so the JSONB path is always populated first.
+  for (const { id, vector } of newLinearEmbeddings) {
+    await db
+      .update(linearIssuesCache)
+      .set({ embedding: vector })
+      .where(
+        and(
+          eq(linearIssuesCache.workspaceId, workspaceId),
+          eq(linearIssuesCache.linearIssueId, id),
+        ),
+      )
+  }
+
   if (embedded > 0) {
     console.log(`[semantic] Embedded ${embedded} Linear issues for workspace ${workspaceId.slice(0, 8)}`)
   }

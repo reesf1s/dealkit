@@ -13,7 +13,7 @@
 
 import { db } from '@/lib/db'
 import { eq, and, inArray } from 'drizzle-orm'
-import { dealLogs, dealLinearLinks, linearIssuesCache, linearIntegrations } from '@/lib/db/schema'
+import { dealLogs, dealLinearLinks, linearIssuesCache, linearIntegrations, mcpActionLog } from '@/lib/db/schema'
 import { findSimilarLinearIssues } from '@/lib/semantic-search'
 import { updateIssueDescription, getIssue } from '@/lib/linear-client'
 import { decrypt, getEncryptionKey } from '@/lib/encrypt'
@@ -25,8 +25,11 @@ import { decrypt, getEncryptionKey } from '@/lib/encrypt'
 /** Score ≥ this → auto-confirm (scaled 0-100) */
 const AUTO_CONFIRM_THRESHOLD = 80
 
-/** Score ≥ this → suggest for rep review */
-const SUGGEST_THRESHOLD = 60
+/** Score ≥ this → suggest for rep review.
+ * Lowered to 40 (from 60) because TF-IDF cosine similarity scores are typically
+ * lower than dense neural embeddings — 0.40 is a genuine topic match at this scale.
+ */
+const SUGGEST_THRESHOLD = 40
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal helpers
@@ -71,10 +74,12 @@ export interface MatchResult {
 /**
  * Run signal matching for a single deal against all workspace Linear issues.
  * Upserts deal_linear_links. Does not overwrite manually-set links or dismissed links.
+ * Writes audit entries to mcp_action_log for every link created or updated.
  */
 export async function matchDealToIssues(
   workspaceId: string,
   dealId: string,
+  triggeredBy: 'cron' | 'user' | 'webhook' = 'cron',
 ): Promise<MatchResult> {
   const [deal] = await db
     .select()
@@ -160,6 +165,18 @@ export async function matchDealToIssues(
       })
     }
 
+    // Audit log — one entry per link created or updated
+    await db.insert(mcpActionLog).values({
+      workspaceId,
+      actionType: 'link_created',
+      dealId,
+      linearIssueId: match.issueId,
+      triggeredBy,
+      payload: { score: scoreInt, signalText: signalText.slice(0, 200) },
+      result: { status: newStatus, issueTitle: issue.title },
+      status: 'complete',
+    })
+
     if (newStatus === 'confirmed') linked++
     else suggested++
   }
@@ -169,9 +186,12 @@ export async function matchDealToIssues(
 
 /**
  * Run signal matching for all open (non-closed) deals in a workspace.
- * Used by the nightly cron.
+ * Used by the nightly cron and the manual trigger endpoint.
  */
-export async function matchAllOpenDeals(workspaceId: string): Promise<MatchResult> {
+export async function matchAllOpenDeals(
+  workspaceId: string,
+  triggeredBy: 'cron' | 'user' = 'cron',
+): Promise<MatchResult> {
   // Require a linear integration to exist
   const [integration] = await db
     .select({ id: linearIntegrations.id })
@@ -202,7 +222,7 @@ export async function matchAllOpenDeals(workspaceId: string): Promise<MatchResul
   let totalSuggested = 0
 
   for (const deal of openDeals) {
-    const result = await matchDealToIssues(workspaceId, deal.id)
+    const result = await matchDealToIssues(workspaceId, deal.id, triggeredBy)
     totalLinked += result.linked
     totalSuggested += result.suggested
   }

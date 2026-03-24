@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useUser } from '@clerk/nextjs'
 import useSWR from 'swr'
 import { useState, useEffect } from 'react'
-import { Check, X, CheckCircle, AlertTriangle, ExternalLink, Download, Trash2, Copy, LogOut, RefreshCw, Plug, Unplug, Mail, Key, Inbox, Loader2 } from 'lucide-react'
+import { Check, X, CheckCircle, AlertTriangle, ExternalLink, Download, Trash2, Copy, LogOut, RefreshCw, Plug, Unplug, Mail, Key, Inbox, Loader2, Zap } from 'lucide-react'
 import { SkeletonCard } from '@/components/shared/SkeletonCard'
 import { ConfirmModal } from '@/components/shared/ConfirmModal'
 import { useToast } from '@/components/shared/Toast'
@@ -108,6 +108,8 @@ export default function SettingsPage() {
   const [linearConnecting, setLinearConnecting] = useState(false)
   const [linearDisconnecting, setLinearDisconnecting] = useState(false)
   const [linearSyncing, setLinearSyncing] = useState(false)
+  const [linearMatching, setLinearMatching] = useState(false)
+  const [linearMatchResult, setLinearMatchResult] = useState<{ matched: number; confirmed: number; suggested: number; deals_checked: number } | null>(null)
 
   const { data: userRes, isLoading: loadingUser } = useSWR<{ data: DbUser }>('/api/user', fetcher)
   const { data: membersRes, isLoading: loadingMembers, mutate: mutateMembers } = useSWR<{ data: Member[] }>('/api/workspaces/members', fetcher)
@@ -946,7 +948,7 @@ export default function SettingsPage() {
                         } catch { toast('Sync failed', 'error') }
                         finally { setLinearSyncing(false); mutateLinear() }
                       }}
-                      disabled={linearSyncing}
+                      disabled={linearSyncing || linearMatching}
                       style={{ fontSize: '11px', padding: '4px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-secondary)' }}
                     >
                       <RefreshCw size={11} style={linearSyncing ? { animation: 'spin 1s linear infinite' } : {}} />
@@ -954,10 +956,34 @@ export default function SettingsPage() {
                     </button>
                     <button
                       onClick={async () => {
+                        setLinearMatching(true)
+                        setLinearMatchResult(null)
+                        try {
+                          const res = await fetch('/api/cron/linear-match/trigger', { method: 'POST' })
+                          const j = await res.json()
+                          if (res.ok) {
+                            const d = j.data
+                            setLinearMatchResult({ matched: d.matched, confirmed: d.confirmed, suggested: d.suggested, deals_checked: d.deals_checked })
+                            toast(`Match complete — ${d.matched} link${d.matched !== 1 ? 's' : ''} found across ${d.deals_checked} deal${d.deals_checked !== 1 ? 's' : ''}`, 'success')
+                          } else {
+                            toast(j.error ?? 'Match failed', 'error')
+                          }
+                        } catch { toast('Match failed', 'error') }
+                        finally { setLinearMatching(false) }
+                      }}
+                      disabled={linearMatching || linearSyncing}
+                      style={{ fontSize: '11px', padding: '4px 10px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.25)', borderRadius: '5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--accent)' }}
+                    >
+                      {linearMatching ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Zap size={11} />}
+                      {linearMatching ? 'Matching…' : 'Run match now'}
+                    </button>
+                    <button
+                      onClick={async () => {
                         setLinearDisconnecting(true)
                         try {
                           await fetch('/api/integrations/linear/disconnect', { method: 'POST' })
                           mutateLinear()
+                          setLinearMatchResult(null)
                           toast('Linear disconnected', 'success')
                         } catch { toast('Disconnect failed', 'error') }
                         finally { setLinearDisconnecting(false) }
@@ -973,6 +999,11 @@ export default function SettingsPage() {
                 {linear.lastSyncAt && (
                   <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: 0 }}>
                     Last synced: {new Date(linear.lastSyncAt).toLocaleString()}
+                  </p>
+                )}
+                {linearMatchResult && (
+                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '4px 0 0' }}>
+                    Last match: <strong>{linearMatchResult.confirmed}</strong> confirmed, <strong>{linearMatchResult.suggested}</strong> suggested across {linearMatchResult.deals_checked} open deal{linearMatchResult.deals_checked !== 1 ? 's' : ''}
                   </p>
                 )}
                 {linear.syncError && (
