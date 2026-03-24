@@ -97,6 +97,7 @@ export default function CompetitorsPage() {
   }
 
   const INTEL_TABS = [
+    { label: 'Overview',      href: '/intelligence',  icon: Brain         },
     { label: 'Competitors',   href: '/competitors',   icon: Swords        },
     { label: 'Case Studies',  href: '/case-studies',  icon: BookOpen      },
     { label: 'Feature Gaps',  href: '/product-gaps',  icon: AlertTriangle },
