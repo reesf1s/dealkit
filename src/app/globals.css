@@ -135,6 +135,8 @@ html, body {
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Text', 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02' 1, 'cv03' 1, 'cv04' 1, 'ss01' 1;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ══════════════════════════════════════════════════
