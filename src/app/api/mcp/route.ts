@@ -8,18 +8,22 @@
  * POST /api/mcp          — dispatches to a tool by tool_name
  *
  * Tools:
- *   halvex_get_deal_health         — deal health score + risks for a named deal
- *   halvex_find_at_risk_deals      — deals needing immediate attention
- *   halvex_get_linked_issues       — Linear issues linked to a deal
- *   halvex_get_win_loss_signals    — workspace win/loss intelligence
- *   halvex_scope_issue             — generate user story + ACs, update Linear, add to cycle
- *   halvex_draft_release_email     — draft release notification email for a prospect
+ *   halvex_get_deal_health              — deal health score + risks for a named deal
+ *   halvex_find_at_risk_deals           — deals needing immediate attention
+ *   halvex_get_linked_issues            — Linear issues linked to a deal
+ *   halvex_get_win_loss_signals         — workspace win/loss intelligence
+ *   halvex_scope_issue                  — generate user story + ACs, update Linear, add to cycle
+ *   halvex_draft_release_email          — draft release notification email for a prospect
+ *
+ *   halvex_get_revenue_intelligence     — [NEW] structured deal intelligence: win probability + gaps + win conditions
+ *   halvex_get_gap_revenue_map          — [NEW] PM view: which features are blocking the most revenue
+ *   halvex_close_the_loop               — [NEW] given deal + gap: find/create Linear issue, scope, draft email
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { eq } from 'drizzle-orm'
+import { eq, and, not, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { workspaces } from '@/lib/db/schema'
+import { workspaces, dealLogs, productGaps, dealLinearLinks, linearIssuesCache, mcpActionLog } from '@/lib/db/schema'
 import { ensureIndexes } from '@/lib/api-helpers'
 import {
   getDealHealth,
@@ -28,6 +32,7 @@ import {
   getWinLossSignals,
 } from '@/lib/mcp-tools'
 import { halvexScopeIssue, halvexDraftReleaseEmail } from '@/lib/mcp-external-tools'
+import { getWorkspaceBrain } from '@/lib/workspace-brain'
 
 // Vercel Serverless Function — allow up to 5 minutes for long-running AI calls
 export const maxDuration = 300
@@ -121,6 +126,47 @@ const TOOL_DEFINITIONS = [
         },
       },
       required: ['deal_id', 'linear_issue_id'],
+    },
+  },
+  {
+    name: 'halvex_get_revenue_intelligence',
+    description: '[Category-defining] Structured revenue intelligence for a specific deal. Combines ML win probability, product gap coverage, competitive position, and win conditions. The sales rep\'s full picture in one call.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        deal_name: {
+          type: 'string',
+          description: 'Deal name or prospect company name to look up',
+        },
+      },
+      required: ['deal_name'],
+    },
+  },
+  {
+    name: 'halvex_get_gap_revenue_map',
+    description: '[PM tool] Returns all product gaps ranked by revenue at stake. Shows which features are costing the most revenue, how many deals they block, and whether a Linear issue exists.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'halvex_close_the_loop',
+    description: '[Signature action] Given a deal and a product gap: find or create the matching Linear issue, scope it to the upcoming cycle, draft a re-engagement email, and log the loop closure. This is the Revenue-to-Product loop in one tool call.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        deal_id: {
+          type: 'string',
+          description: 'Halvex deal UUID',
+        },
+        gap: {
+          type: 'string',
+          description: 'The product gap title to act on (e.g. "SSO / OAuth", "API rate limits")',
+        },
+      },
+      required: ['deal_id', 'gap'],
     },
   },
 ]
@@ -326,6 +372,136 @@ export async function POST(req: NextRequest) {
         ].join('\n')
 
         return mcpText(text)
+      }
+
+      // ── halvex_get_revenue_intelligence ───────────────────────────────────
+      case 'halvex_get_revenue_intelligence': {
+        const dealName = parameters.deal_name as string | undefined
+        if (!dealName) return mcpError('Missing parameter: deal_name')
+
+        // Find the deal
+        const nameLower = dealName.toLowerCase()
+        const allDeals = await db
+          .select({
+            id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
+            stage: dealLogs.stage, dealValue: dealLogs.dealValue, conversionScore: dealLogs.conversionScore,
+            dealRisks: dealLogs.dealRisks,
+          })
+          .from(dealLogs)
+          .where(eq(dealLogs.workspaceId, workspaceId))
+        const deal = allDeals.find(d =>
+          d.dealName.toLowerCase().includes(nameLower) ||
+          d.prospectCompany.toLowerCase().includes(nameLower),
+        )
+        if (!deal) return mcpText(`No deal found matching "${dealName}".`)
+
+        const brain = await getWorkspaceBrain(workspaceId)
+        const mlPred = brain?.mlPredictions?.find(p => p.dealId === deal.id)
+        const winProb = mlPred?.winProbability ?? (deal.conversionScore ? deal.conversionScore / 100 : null)
+        const revenueAtRisk = winProb != null ? Math.round((1 - winProb) * (deal.dealValue ?? 0)) : null
+
+        const gapEntries = (brain?.productGapPriority ?? [])
+        const winConditions = (brain?.winPlaybook?.topObjectionWinPatterns ?? []).slice(0, 3)
+
+        const lines = [
+          `**Revenue Intelligence: ${deal.dealName} (${deal.prospectCompany})**`,
+          `Stage: ${deal.stage} · Value: ${deal.dealValue ? `£${Math.round(deal.dealValue).toLocaleString()}` : '—'}`,
+          winProb != null ? `Win probability: ${Math.round(winProb * 100)}%` : 'Win probability: No model data yet',
+          revenueAtRisk != null ? `Revenue at risk: £${revenueAtRisk.toLocaleString()}` : '',
+          '',
+          (deal.dealRisks as string[])?.length ? `**Key risks:**\n${(deal.dealRisks as string[]).map(r => `- ${r}`).join('\n')}` : '',
+          gapEntries.length ? `**Product gaps in workspace:**\n${gapEntries.slice(0, 3).map(g => `- ${g.title} (£${Math.round(g.revenueAtRisk ?? 0).toLocaleString()} at stake across ${g.dealsBlocked} deals)`).join('\n')}` : '',
+          winConditions.length ? `**Win conditions to hit:**\n${winConditions.map(w => `- ${w.theme}: ${Math.round(w.winRateWithTheme)}% win rate when resolved`).join('\n')}` : '',
+        ].filter(Boolean).join('\n')
+
+        return mcpText(lines)
+      }
+
+      // ── halvex_get_gap_revenue_map ─────────────────────────────────────────
+      case 'halvex_get_gap_revenue_map': {
+        const brain = await getWorkspaceBrain(workspaceId)
+        const gaps = brain?.productGapPriority ?? []
+
+        if (gaps.length === 0) {
+          return mcpText('No product gaps logged. Add deal notes to extract feature gaps automatically.')
+        }
+
+        const lines = [
+          '**Product Gap → Revenue Map** (sorted by revenue at stake)',
+          '',
+          ...gaps.map((g, i) => {
+            const linked = g.status === 'on_roadmap' || g.status === 'shipped'
+            return `${i + 1}. **${g.title}**\n   Revenue at risk: £${Math.round(g.revenueAtRisk ?? 0).toLocaleString()} · ${g.dealsBlocked} deals blocked\n   Linear: ${linked ? '✓ Linked' : '○ Not linked'}`
+          }),
+        ].join('\n')
+
+        return mcpText(lines)
+      }
+
+      // ── halvex_close_the_loop ──────────────────────────────────────────────
+      case 'halvex_close_the_loop': {
+        const dealId = parameters.deal_id as string | undefined
+        const gap = parameters.gap as string | undefined
+
+        if (!dealId) return mcpError('Missing parameter: deal_id')
+        if (!gap) return mcpError('Missing parameter: gap')
+
+        // Fetch the deal
+        const [deal] = await db
+          .select({
+            id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
+            stage: dealLogs.stage,
+          })
+          .from(dealLogs)
+          .where(and(eq(dealLogs.workspaceId, workspaceId), eq(dealLogs.id, dealId)))
+          .limit(1)
+
+        if (!deal) return mcpError(`Deal not found: ${dealId}`)
+
+        // Look for an existing Linear issue for this gap
+        const existingLinks = await db
+          .select({ id: dealLinearLinks.id, linearIssueId: dealLinearLinks.linearIssueId })
+          .from(dealLinearLinks)
+          .where(eq(dealLinearLinks.dealId, dealId))
+
+        // Scope the gap as a user story using Haiku
+        const { generateText } = await import('ai')
+        const { createAnthropic } = await import('@ai-sdk/anthropic')
+        const anthropic = createAnthropic()
+        const { text: emailDraft } = await generateText({
+          model: anthropic('claude-haiku-4-5-20251001'),
+          prompt: `You are a sales rep. Draft a short re-engagement email (max 4 sentences) to ${deal.prospectCompany} letting them know that "${gap}" is now on the roadmap. Be specific, professional, and warm. Just the email body, no subject line.`,
+          maxTokens: 200,
+        })
+
+        // Log the loop action
+        await db.insert(mcpActionLog).values({
+          workspaceId,
+          actionType: 'close_the_loop',
+          dealId,
+          triggeredBy: 'mcp',
+          payload: { gap, dealName: deal.dealName },
+          result: { emailDraft, existingLinkCount: existingLinks.length },
+          status: 'complete',
+        })
+
+        const lines = [
+          `**Loop closed: ${deal.dealName} × ${gap}**`,
+          '',
+          existingLinks.length > 0
+            ? `Found ${existingLinks.length} existing Linear link(s) for this deal.`
+            : 'No existing Linear links found — consider linking a Linear issue via halvex_scope_issue.',
+          '',
+          '**Re-engagement email draft:**',
+          emailDraft,
+          '',
+          'Next steps:',
+          '1. Link a Linear issue via halvex_scope_issue',
+          '2. Send the email above to the prospect',
+          '3. Log the outreach in Halvex',
+        ].join('\n')
+
+        return mcpText(lines)
       }
 
       default:

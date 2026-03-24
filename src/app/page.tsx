@@ -4,1324 +4,469 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Halvex — Your sales pipeline, finally connected to your roadmap',
-  description:
-    'Halvex links your deals to your engineering backlog — so PMs know what to build to unlock revenue, and sales reps know what\'s shipping that could save a deal.',
+  title: 'Halvex — Revenue-to-Product Intelligence',
+  description: 'Halvex connects your sales outcomes to your product roadmap — automatically. See which features are blocking revenue, link them to your backlog, and close the loop when they ship.',
   openGraph: {
-    title: 'Halvex — Pipeline meets roadmap',
-    description:
-      'Halvex links your deals to your engineering backlog — so PMs know what to build to unlock revenue, and sales reps know what\'s shipping that could save a deal.',
+    title: 'Halvex — Revenue-to-Product Intelligence',
+    description: 'Stop losing deals to features you haven\'t built yet. Halvex closes the loop between sales outcomes and product decisions, automatically.',
     type: 'website',
     url: 'https://halvex.com',
     siteName: 'Halvex',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Halvex — Pipeline meets roadmap',
-    description:
-      'Halvex links your deals to your engineering backlog — so PMs know what to build to unlock revenue, and sales reps know what\'s shipping that could save a deal.',
+    title: 'Halvex — Revenue-to-Product Intelligence',
+    description: 'Stop losing deals to features you haven\'t built yet.',
   },
 }
-
-/* ── Design tokens ─────────────────────────────────────────── */
-const bg = '#0d0f1a'
-const textPrimary = 'rgba(255,255,255,0.93)'
-const textSecondary = 'rgba(255,255,255,0.55)'
-const textTertiary = 'rgba(255,255,255,0.32)'
-const accent = '#5B5BD6'
-const green = '#3CCB7F'
-const amber = '#F59E0B'
-const maxW = '960px'
 
 export default async function LandingPage() {
   try {
     const { userId } = await auth()
     if (userId) redirect('/dashboard')
   } catch {
-    // Clerk not configured in this environment — show landing page
+    // Clerk not configured — show landing page
   }
 
   return (
-    <div
-      className="landing-root"
-      style={{
-        background: bg,
-        color: textPrimary,
-        fontFamily: 'var(--ds-font)',
-        minHeight: '100vh',
-        overflowX: 'hidden',
-        position: 'relative',
-      }}
-    >
-      {/* ── Global styles + responsive + animations ──────────── */}
+    <div style={{
+      background: '#080a12',
+      color: '#f1f5f9',
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      fontSize: '14px',
+      lineHeight: '1.6',
+      minHeight: '100vh',
+      overflowX: 'hidden',
+      WebkitFontSmoothing: 'antialiased',
+    }}>
+
       <style>{`
-        /* ── Floating background orbs ────────────────────────── */
-        @keyframes orb-float {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(30px, -30px) scale(1.05); }
-          66% { transform: translate(-20px, 20px) scale(0.95); }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        a { color: inherit; text-decoration: none; }
+        @keyframes pulse-slow { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes flow-right {
+          0% { stroke-dashoffset: 100; opacity: 0; }
+          20% { opacity: 1; }
+          100% { stroke-dashoffset: 0; opacity: 0.6; }
         }
-        @keyframes orb-float-reverse {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(-25px, 25px) scale(0.95); }
-          66% { transform: translate(20px, -15px) scale(1.05); }
-        }
-        @keyframes orb-drift {
-          0%, 100% { transform: translate(0, 0); }
-          50% { transform: translate(40px, -20px); }
-        }
-        .bg-orb-1 {
-          position: fixed; top: 8%; left: 18%;
-          width: 650px; height: 650px;
-          background: radial-gradient(circle, rgba(91,91,214,0.14) 0%, transparent 70%);
-          border-radius: 50%; filter: blur(80px);
-          animation: orb-float 20s ease-in-out infinite;
-          pointer-events: none; z-index: 0;
-        }
-        .bg-orb-2 {
-          position: fixed; top: 55%; right: 8%;
-          width: 550px; height: 550px;
-          background: radial-gradient(circle, rgba(139,92,246,0.11) 0%, transparent 70%);
-          border-radius: 50%; filter: blur(80px);
-          animation: orb-float-reverse 25s ease-in-out infinite;
-          pointer-events: none; z-index: 0;
-        }
-        .bg-orb-3 {
-          position: fixed; bottom: 10%; left: 40%;
-          width: 480px; height: 480px;
-          background: radial-gradient(circle, rgba(60,203,127,0.08) 0%, transparent 70%);
-          border-radius: 50%; filter: blur(80px);
-          animation: orb-drift 30s ease-in-out infinite;
-          pointer-events: none; z-index: 0;
-        }
-
-        /* ── Glass card ──────────────────────────────────────── */
-        @supports (backdrop-filter: blur(1px)) {
-          .glass-card {
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-          }
-          .glass-card-hero {
-            backdrop-filter: blur(40px);
-            -webkit-backdrop-filter: blur(40px);
-          }
-          .glass-nav {
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-          }
-        }
-        @supports not (backdrop-filter: blur(1px)) {
-          .glass-card {
-            background: rgba(20,20,22,0.95) !important;
-          }
-          .glass-card-hero {
-            background: rgba(20,20,22,0.95) !important;
-          }
-          .glass-nav {
-            background: rgba(9,9,11,0.95) !important;
-          }
-        }
-
-        .glass-card {
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 16px;
-          position: relative;
-          overflow: hidden;
-          transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
-        }
-        .glass-card:hover {
-          border-color: rgba(255,255,255,0.14);
-          box-shadow: 0 0 40px rgba(91,91,214,0.10), 0 8px 32px rgba(0,0,0,0.2);
-          background: rgba(255,255,255,0.06);
-        }
-
-        /* ── Glass card with colored glow pseudo-element ───── */
-        .glass-glow {
-          position: relative;
-        }
-        .glass-glow::before {
-          content: '';
-          position: absolute;
-          top: -40%; left: -20%; right: -20%; bottom: -40%;
-          border-radius: 50%;
-          filter: blur(60px);
-          opacity: 0.5;
-          pointer-events: none;
-          z-index: -1;
-          transition: opacity 0.3s ease;
-        }
-        .glass-glow:hover::before {
-          opacity: 0.7;
-        }
-        .glass-glow-indigo::before {
-          background: radial-gradient(circle, rgba(91,91,214,0.12) 0%, transparent 70%);
-        }
-        .glass-glow-purple::before {
-          background: radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%);
-        }
-        .glass-glow-green::before {
-          background: radial-gradient(circle, rgba(60,203,127,0.10) 0%, transparent 70%);
-        }
-        .glass-glow-amber::before {
-          background: radial-gradient(circle, rgba(245,158,11,0.10) 0%, transparent 70%);
-        }
-
-        .glow-orb {
-          position: absolute;
-          border-radius: 50%;
-          filter: blur(120px);
-          pointer-events: none;
-          z-index: 0;
-        }
-
-        .gradient-text {
-          background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.6));
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-
-        /* ── CTA button glow + shimmer ───────────────────────── */
-        .cta-primary {
-          position: relative;
-          overflow: hidden;
-          box-shadow: 0 0 20px rgba(91,91,214,0.3), 0 0 60px rgba(91,91,214,0.1);
-          transition: box-shadow 0.3s ease, transform 0.2s ease;
-        }
-        .cta-primary:hover {
-          box-shadow: 0 0 30px rgba(91,91,214,0.5), 0 0 80px rgba(91,91,214,0.2);
-          transform: translateY(-1px);
-        }
-        .cta-primary::after {
-          content: '';
-          position: absolute;
-          top: -50%; left: -50%;
-          width: 200%; height: 200%;
-          background: linear-gradient(
-            115deg,
-            transparent 40%,
-            rgba(255,255,255,0.15) 50%,
-            transparent 60%
-          );
-          animation: cta-shimmer 3s ease-in-out infinite;
-          pointer-events: none;
-        }
-        @keyframes cta-shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-
-        /* ── Secondary button glow on hover ────────────────── */
-        .cta-secondary {
-          transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
-        }
-        .cta-secondary:hover {
-          border-color: rgba(255,255,255,0.18) !important;
-          box-shadow: 0 0 20px rgba(91,91,214,0.12);
-          background: rgba(255,255,255,0.06) !important;
-        }
-
-        /* ── Animations ───────────────────────────────────────── */
-        @keyframes pulse-line {
-          0%, 100% { opacity: 0.15; }
-          50% { opacity: 0.4; }
-        }
-        .arch-line-pulse {
-          animation: pulse-line 3s ease-in-out infinite;
-        }
-
-        @keyframes float-orb {
-          0%, 100% { transform: translate(0, 0); }
-          50% { transform: translate(15px, -10px); }
-        }
-        .float-orb-slow {
-          animation: float-orb 12s ease-in-out infinite;
-        }
-        .float-orb-med {
-          animation: float-orb 8s ease-in-out infinite reverse;
-        }
-
-        /* ── Section divider ────────────────────────────────── */
-        .section-divider {
-          width: 100%;
-          height: 1px;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
-          margin: 0 auto;
-        }
-
-        /* ── Badge shimmer (Most popular) ────────────────────── */
-        .badge-shimmer {
-          position: relative;
-          overflow: hidden;
-        }
-        .badge-shimmer::after {
-          content: '';
-          position: absolute;
-          top: 0; left: -100%; right: 0; bottom: 0;
-          width: 200%;
-          background: linear-gradient(
-            90deg,
-            transparent 40%,
-            rgba(255,255,255,0.25) 50%,
-            transparent 60%
-          );
-          animation: badge-shine 4s ease-in-out infinite;
-          pointer-events: none;
-        }
-        @keyframes badge-shine {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-
-        /* ── Score glow animation ─────────────────────────────── */
-        @keyframes score-pulse {
-          0%, 100% { opacity: 0.7; filter: blur(20px); }
-          50% { opacity: 1; filter: blur(25px); }
-        }
-        .score-glow {
-          animation: score-pulse 3s ease-in-out infinite;
-        }
-
-        /* ── Hero radial glow ─────────────────────────────────── */
-        .hero-glow {
-          position: absolute;
-          top: -200px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 900px;
-          height: 600px;
-          background: radial-gradient(ellipse at center, rgba(91,91,214,0.15) 0%, transparent 70%);
-          pointer-events: none;
-          z-index: 0;
-        }
-
-        /* ── Light mode ───────────────────────────────────────── */
-        @media (prefers-color-scheme: light) {
-          .landing-root {
-            background: #F5F5F7 !important;
-            color: #1A1A1A !important;
-          }
-          .glass-card {
-            background: rgba(255,255,255,0.7) !important;
-            backdrop-filter: blur(20px) !important;
-            -webkit-backdrop-filter: blur(20px) !important;
-            border: 1px solid rgba(0,0,0,0.08) !important;
-          }
-          .glass-card:hover {
-            background: rgba(255,255,255,0.85) !important;
-            border-color: rgba(0,0,0,0.12) !important;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.08) !important;
-          }
-          .glass-nav {
-            background: rgba(245,245,247,0.85) !important;
-            border-bottom-color: rgba(0,0,0,0.06) !important;
-          }
-          .bg-orb-1 {
-            background: radial-gradient(circle, rgba(91,91,214,0.08) 0%, transparent 70%) !important;
-          }
-          .bg-orb-2 {
-            background: radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%) !important;
-          }
-          .bg-orb-3 {
-            background: radial-gradient(circle, rgba(60,203,127,0.05) 0%, transparent 70%) !important;
-          }
-          .gradient-text {
-            background: linear-gradient(135deg, #1A1A1A, #444) !important;
-            -webkit-background-clip: text !important;
-            -webkit-text-fill-color: transparent !important;
-            background-clip: text !important;
-          }
-          .section-divider {
-            background: linear-gradient(90deg, transparent, rgba(0,0,0,0.06), transparent) !important;
-          }
-          .hero-glow {
-            background: radial-gradient(ellipse at center, rgba(91,91,214,0.08) 0%, transparent 70%) !important;
-          }
-          [data-light-text] { color: #1A1A1A !important; }
-          [data-light-text-secondary] { color: rgba(0,0,0,0.55) !important; }
-          [data-light-text-tertiary] { color: rgba(0,0,0,0.35) !important; }
-          [data-light-nav-wordmark] { color: rgba(0,0,0,0.35) !important; }
-          [data-light-border] { border-color: rgba(0,0,0,0.08) !important; }
-          .cta-primary {
-            box-shadow: 0 0 20px rgba(91,91,214,0.2), 0 4px 12px rgba(0,0,0,0.1) !important;
-          }
-          .cta-primary:hover {
-            box-shadow: 0 0 30px rgba(91,91,214,0.35), 0 8px 24px rgba(0,0,0,0.15) !important;
-          }
-          .cta-secondary {
-            background: rgba(255,255,255,0.8) !important;
-            border-color: rgba(0,0,0,0.1) !important;
-          }
-          .cta-secondary:hover {
-            background: rgba(255,255,255,0.95) !important;
-            border-color: rgba(0,0,0,0.15) !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
-          }
-          .glow-orb { opacity: 0.5 !important; }
-          .glass-glow-indigo::before { background: radial-gradient(circle, rgba(91,91,214,0.06) 0%, transparent 70%) !important; }
-          .glass-glow-purple::before { background: radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 70%) !important; }
-          .glass-glow-green::before { background: radial-gradient(circle, rgba(60,203,127,0.06) 0%, transparent 70%) !important; }
-          .glass-glow-amber::before { background: radial-gradient(circle, rgba(245,158,11,0.06) 0%, transparent 70%) !important; }
-        }
-
-        /* ── Responsive ───────────────────────────────────────── */
+        .nav-link:hover { color: #f1f5f9 !important; }
+        .cta-primary:hover { background: #4f46e5 !important; }
+        .cta-secondary:hover { background: rgba(255,255,255,0.06) !important; border-color: rgba(255,255,255,0.16) !important; }
+        .loop-card:hover { background: rgba(255,255,255,0.07) !important; border-color: rgba(255,255,255,0.14) !important; }
+        .pricing-card:hover { border-color: rgba(255,255,255,0.14) !important; }
         @media (max-width: 768px) {
-          [data-hero-headline] { font-size: 32px !important; }
-          [data-section] { padding-top: 64px !important; padding-bottom: 64px !important; }
-          [data-hero-section] { padding-top: 120px !important; padding-bottom: 64px !important; }
-          [data-two-col] { grid-template-columns: 1fr !important; }
-          [data-three-col] { grid-template-columns: 1fr !important; }
-          [data-pricing-grid] { grid-template-columns: 1fr !important; }
-          [data-hero-buttons] { flex-direction: column !important; width: 100% !important; }
-          [data-hero-buttons] a { width: 100% !important; min-height: 48px !important; justify-content: center !important; }
-          [data-cta-button] { width: 100% !important; min-height: 48px !important; justify-content: center !important; }
-          [data-content-wrap] { padding: 0 20px !important; }
-          [data-compare-card] { grid-template-columns: 1fr !important; }
-          [data-compare-divider] { display: none !important; }
-          [data-compare-mobile-divider] { display: block !important; }
-          [data-arch-row] { flex-direction: column !important; }
-          [data-step-arrow] { display: none !important; }
-          .glow-orb { filter: blur(80px) !important; opacity: 0.7 !important; }
-          [data-stagger-grid] { grid-template-columns: 1fr !important; }
-          [data-starter-elevate] { transform: none !important; }
-          .bg-orb-1, .bg-orb-2, .bg-orb-3 {
-            filter: blur(60px) !important;
-            opacity: 0.5 !important;
-          }
-          .bg-orb-1 { width: 350px !important; height: 350px !important; }
-          .bg-orb-2 { width: 300px !important; height: 300px !important; }
-          .bg-orb-3 { width: 280px !important; height: 280px !important; }
-          .hero-glow { width: 500px !important; height: 350px !important; }
+          .hero-h1 { font-size: 32px !important; }
+          .loop-grid { grid-template-columns: 1fr !important; }
+          .for-grid { grid-template-columns: 1fr !important; }
+          .pricing-grid { grid-template-columns: 1fr !important; }
+          .nav-links { display: none !important; }
+          .int-grid { grid-template-columns: repeat(2,1fr) !important; }
         }
       `}</style>
 
-      {/* ── Floating background orbs ────────────────────────── */}
-      <div className="bg-orb-1" />
-      <div className="bg-orb-2" />
-      <div className="bg-orb-3" />
-
-      {/* ── Nav ──────────────────────────────────────────────────── */}
-      <nav
-        className="glass-nav"
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 50,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0 24px',
-          height: '56px',
-          background: 'rgba(9,9,11,0.7)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-        }}
-      >
-        <span
-          className="font-brand-wordmark"
-          data-light-nav-wordmark=""
-          style={{
-            color: 'rgba(255,255,255,0.35)',
-          }}
-        >
-          HALVEX
-        </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Link
-            href="/sign-in"
-            data-light-text-secondary=""
-            style={{
-              padding: '8px 16px',
-              borderRadius: '6px',
-              color: textSecondary,
-              fontSize: '13px',
-              fontWeight: 500,
-              textDecoration: 'none',
-            }}
-          >
+      {/* ── Nav ───────────────────────────────────────────────────────────────── */}
+      <nav style={{
+        position: 'sticky', top: 0, zIndex: 100,
+        background: 'rgba(8,10,18,0.92)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        borderBottom: '1px solid rgba(255,255,255,0.07)',
+        padding: '0 24px',
+        height: '56px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{
+              width: '26px', height: '26px', borderRadius: '8px',
+              background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '13px', fontWeight: 800, color: '#fff',
+            }}>H</div>
+            <span style={{ fontSize: '14px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#f1f5f9' }}>HALVEX</span>
+          </Link>
+          <div className="nav-links" style={{ display: 'flex', gap: '24px' }}>
+            {['Product', 'Integrations', 'Pricing', 'Docs'].map(item => (
+              <a key={item} href={`#${item.toLowerCase()}`} className="nav-link"
+                style={{ fontSize: '13px', color: 'rgba(241,245,249,0.55)', transition: 'color 0.15s' }}>
+                {item}
+              </a>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Link href="/sign-in" style={{ fontSize: '13px', color: 'rgba(241,245,249,0.55)', padding: '6px 14px' }}
+            className="nav-link">
             Sign in
           </Link>
-          <Link
-            href="/sign-up"
+          <Link href="/sign-up"
             className="cta-primary"
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '0 18px',
-              height: '36px',
-              background: accent,
-              borderRadius: '6px',
-              color: '#fff',
-              fontSize: '13px',
-              fontWeight: 500,
-              textDecoration: 'none',
-            }}
-          >
-            Start free &rarr;
+              fontSize: '13px', fontWeight: 600, color: '#fff',
+              background: '#6366f1', padding: '7px 16px', borderRadius: '8px',
+              transition: 'background 0.15s',
+            }}>
+            Get started →
           </Link>
         </div>
       </nav>
 
-      <div data-content-wrap="" style={{ maxWidth: maxW, margin: '0 auto', padding: '0 24px', position: 'relative', zIndex: 1 }}>
-        {/* ======================================================
-            SECTION 1 — HERO
-        ====================================================== */}
-        <section
-          data-hero-section=""
-          data-section=""
-          style={{
-            paddingTop: '160px',
-            paddingBottom: '120px',
-            textAlign: 'center',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            position: 'relative',
-          }}
-        >
-          {/* Large radial gradient glow behind hero */}
-          <div className="hero-glow" />
+      {/* ── Hero ──────────────────────────────────────────────────────────────── */}
+      <section style={{ padding: '96px 24px 80px', textAlign: 'center', maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: '6px',
+          padding: '4px 14px', borderRadius: '100px',
+          background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.25)',
+          fontSize: '11px', fontWeight: 600, color: '#818cf8', letterSpacing: '0.06em',
+          textTransform: 'uppercase', marginBottom: '28px',
+        }}>
+          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#818cf8', animation: 'pulse-slow 2s infinite' }} />
+          Revenue-to-Product Intelligence
+        </div>
 
-          {/* Hero gradient orbs */}
-          <div
-            className="glow-orb float-orb-slow"
-            style={{
-              width: '600px',
-              height: '600px',
-              background: 'radial-gradient(circle, rgba(91,91,214,0.20) 0%, transparent 70%)',
-              top: '-100px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-            }}
-          />
-          <div
-            className="glow-orb float-orb-med"
-            style={{
-              width: '500px',
-              height: '500px',
-              background: 'radial-gradient(circle, rgba(245,158,11,0.15) 0%, transparent 70%)',
-              top: '0px',
-              right: '-200px',
-            }}
-          />
+        <h1 className="hero-h1" style={{
+          fontSize: '52px', fontWeight: 800, lineHeight: 1.08,
+          letterSpacing: '-0.03em', color: '#f1f5f9',
+          marginBottom: '20px',
+        }}>
+          Stop losing deals to features{' '}
+          <span style={{
+            background: 'linear-gradient(135deg, #6366f1, #818cf8)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}>you haven&apos;t built yet</span>
+        </h1>
 
-          <div
-            className="font-brand-wordmark"
-            data-light-text-tertiary=""
-            style={{
-              color: 'rgba(255,255,255,0.35)',
-              marginBottom: '32px',
-              position: 'relative',
-              zIndex: 1,
-            }}
-          >
-            HALVEX
-          </div>
+        <p style={{
+          fontSize: '17px', lineHeight: 1.7,
+          color: 'rgba(241,245,249,0.60)', maxWidth: '580px', margin: '0 auto 36px',
+        }}>
+          Halvex connects your sales outcomes to your product roadmap — automatically. See which features are blocking revenue, link them to your backlog, and close the loop when they ship.
+        </p>
 
-          <h1
-            data-hero-headline=""
-            className="gradient-text"
-            style={{
-              fontFamily: 'var(--ds-font-brand)',
-              fontSize: '52px',
-              fontWeight: 400,
-              lineHeight: 1.15,
-              letterSpacing: '-0.01em',
-              marginBottom: '24px',
-              maxWidth: '720px',
-              position: 'relative',
-              zIndex: 1,
-              textShadow: '0 0 80px rgba(91,91,214,0.3)',
-            }}
-          >
-            Your sales pipeline,
-            <br />
-            finally connected
-            <br />
-            to your roadmap.
-          </h1>
-
-          <p
-            data-light-text-secondary=""
-            style={{
-              fontSize: '18px',
-              color: 'rgba(255,255,255,0.60)',
-              lineHeight: 1.7,
-              marginBottom: '40px',
-              maxWidth: '640px',
-              position: 'relative',
-              zIndex: 1,
-            }}
-          >
-            Halvex links your deals to your engineering backlog &mdash; so PMs know what to build
-            to unlock revenue, and sales reps know what&apos;s shipping that could save a deal.
-          </p>
-
-          <div
-            data-hero-buttons=""
-            style={{
-              display: 'flex',
-              gap: '12px',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '40px',
-              position: 'relative',
-              zIndex: 1,
-            }}
-          >
-            <Link
-              href="/sign-up"
-              data-cta-button=""
-              className="cta-primary"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                padding: '0 28px',
-                height: '44px',
-                background: accent,
-                borderRadius: '8px',
-                color: '#fff',
-                fontSize: '14px',
-                fontWeight: 500,
-                textDecoration: 'none',
-              }}
-            >
-              Start free &rarr;
-            </Link>
-            <a
-              href="#how-it-works"
-              className="cta-secondary"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                padding: '0 28px',
-                height: '44px',
-                background: 'rgba(255,255,255,0.03)',
-                borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.10)',
-                color: textPrimary,
-                fontSize: '14px',
-                fontWeight: 500,
-                textDecoration: 'none',
-              }}
-            >
-              See how it works &darr;
-            </a>
-          </div>
-
-          <p data-light-text-tertiary="" style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)', position: 'relative', zIndex: 1 }}>
-            Built for B2B SaaS teams
-          </p>
-
-          {/* Hero bottom gradient divider */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: '-50vw',
-              right: '-50vw',
-              height: '1px',
-              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.10) 50%, transparent 100%)',
-            }}
-          />
-        </section>
-
-        {/* Section divider */}
-        <div className="section-divider" />
-
-        {/* ======================================================
-            SECTION 2 — VALUE PILLARS
-        ====================================================== */}
-        <section data-section="" style={{ paddingTop: '80px', paddingBottom: '100px', position: 'relative' }}>
-          <div style={{ textAlign: 'center', marginBottom: '56px' }}>
-            <div style={{
-              display: 'inline-block', padding: '4px 14px',
-              background: 'rgba(91,91,214,0.12)', border: '1px solid rgba(91,91,214,0.25)',
-              borderRadius: '100px', fontSize: '11px', fontWeight: 600, color: accent,
-              letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '20px',
-            }}>
-              Built for B2B SaaS teams
-            </div>
-            <h2
-              className="gradient-text"
-              style={{
-                fontSize: '32px',
-                fontWeight: 600,
-                letterSpacing: '-0.03em',
-                marginBottom: '16px',
-                lineHeight: 1.2,
-              }}
-            >
-              One platform. Two teams. Zero silos.
-            </h2>
-          </div>
-
-          <p data-light-text-secondary="" style={{ fontSize: '16px', color: textSecondary, maxWidth: '560px', margin: '0 auto 48px', lineHeight: 1.7, textAlign: 'center' }}>
-            Halvex connects your sales pipeline to your product roadmap — so everyone knows what to build and what to save.
-          </p>
-
-          <div data-three-col="" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', position: 'relative', zIndex: 1 }}>
-            {([
-              {
-                badge: 'For Sales',
-                badgeColor: green,
-                badgeBg: 'rgba(60,203,127,0.10)',
-                icon: '🎯',
-                title: 'Know which deals are at risk',
-                desc: 'Know which deals are at risk before they go cold — and what your product team is building that could save them.',
-                glowColor: 'rgba(60,203,127,0.12)',
-                glowClass: 'glass-glow-green',
-              },
-              {
-                badge: 'For Product',
-                badgeColor: accent,
-                badgeBg: 'rgba(91,91,214,0.10)',
-                icon: '📊',
-                title: 'Prioritise with data, not gut feel',
-                desc: 'See which features in your backlog are blocking the most revenue — prioritise with data, not gut feel.',
-                glowColor: 'rgba(91,91,214,0.12)',
-                glowClass: 'glass-glow-indigo',
-              },
-              {
-                badge: 'For Both',
-                badgeColor: '#8B5CF6',
-                badgeBg: 'rgba(139,92,246,0.10)',
-                icon: '⚡',
-                title: 'One Slack bot to connect it all',
-                desc: 'Ask about a deal, scope issues, get notified when they ship — all from Slack.',
-                glowColor: 'rgba(139,92,246,0.12)',
-                glowClass: 'glass-glow-purple',
-              },
-            ] as const).map(({ badge, badgeColor, badgeBg, icon, title, desc, glowColor, glowClass }) => (
-              <div key={title} style={{ position: 'relative' }}>
-                <div className="glow-orb" style={{ width: '200px', height: '200px', background: `radial-gradient(circle, ${glowColor} 0%, transparent 70%)`, top: '20%', left: '50%', transform: 'translateX(-50%)' }} />
-                <div className={`glass-card glass-glow ${glowClass}`} style={{ padding: '28px', position: 'relative', zIndex: 1, height: '100%', boxSizing: 'border-box' }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 10px', borderRadius: '100px', background: badgeBg, border: `1px solid ${badgeColor}33`, fontSize: '11px', fontWeight: 600, color: badgeColor, marginBottom: '16px', letterSpacing: '0.04em' }}>
-                    {badge}
-                  </div>
-                  <div style={{ fontSize: '20px', marginBottom: '10px' }}>{icon}</div>
-                  <div data-light-text="" style={{ fontSize: '15px', fontWeight: 600, color: textPrimary, marginBottom: '10px', lineHeight: 1.4 }}>{title}</div>
-                  <div data-light-text-secondary="" style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>{desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-        </section>
-
-        {/* Section divider */}
-        <div className="section-divider" />
-
-        {/* ======================================================
-            SECTION 3 — INTEGRATIONS
-        ====================================================== */}
-        <section data-section="" style={{ paddingTop: '40px', paddingBottom: '80px', textAlign: 'center', position: 'relative' }}>
-          <p data-light-text-tertiary="" style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '1.5px', color: textTertiary, textTransform: 'uppercase', marginBottom: '28px' }}>
-            Connected to the tools you already use
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px', flexWrap: 'wrap' }}>
-            {[
-              { name: 'HubSpot', dot: '#FF7A59', bg: 'rgba(255,122,89,0.06)', border: 'rgba(255,122,89,0.18)' },
-              { name: 'Linear',  dot: '#5E6AD2', bg: 'rgba(94,106,210,0.06)',  border: 'rgba(94,106,210,0.18)' },
-              { name: 'Slack',   dot: '#E01E5A', bg: 'rgba(224,30,90,0.06)',   border: 'rgba(224,30,90,0.18)' },
-            ].map(({ name, dot, bg, border }) => (
-              <div key={name} style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                padding: '10px 22px', borderRadius: '10px',
-                background: bg, border: `1px solid ${border}`,
-                backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-              }}>
-                <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: dot, boxShadow: `0 0 8px ${dot}88` }} />
-                <span data-light-text="" style={{ fontSize: '14px', fontWeight: 600, color: textPrimary }}>{name}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Section divider */}
-        <div className="section-divider" />
-
-        {/* ======================================================
-            SECTION 4 — HOW IT WORKS (MCP FLOW)
-        ====================================================== */}
-        <section
-          id="how-it-works"
-          data-section=""
-          style={{ paddingTop: '80px', paddingBottom: '120px', position: 'relative' }}
-        >
-          <h2
-            className="gradient-text"
-            style={{
-              fontSize: '32px',
-              fontWeight: 600,
-              letterSpacing: '-0.03em',
-              marginBottom: '16px',
-            }}
-          >
-            From a Slack question to a shipped feature.
-          </h2>
-          <p data-light-text-secondary="" style={{ fontSize: '16px', color: textSecondary, lineHeight: 1.7, marginBottom: '56px', maxWidth: '560px' }}>
-            Halvex uses an MCP agent to bridge your deals and your backlog — autonomously.
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', maxWidth: '720px', position: 'relative', zIndex: 1 }}>
-            {[
-              {
-                step: 'Ask',
-                label: '01',
-                desc: 'A sales rep DMs @halvex in Slack: "Acme Corp keeps asking about SSO — are we building it?"',
-                dotColor: '#5B8DEF',
-                lineColor: 'rgba(91,141,239,0.4)',
-                glowColor: 'rgba(91,141,239,0.15)',
-              },
-              {
-                step: 'Discover',
-                label: '02',
-                desc: 'Halvex searches your deals. Finds 6 open opportunities (£340k combined) where SSO was flagged as a blocker or competitor advantage.',
-                dotColor: accent,
-                lineColor: 'rgba(91,91,214,0.4)',
-                glowColor: 'rgba(91,91,214,0.15)',
-              },
-              {
-                step: 'Scope',
-                label: '03',
-                desc: 'Halvex opens a Linear issue — pre-filled with context: which deals need it, what competitors offer, and a suggested priority.',
-                dotColor: '#8B5CF6',
-                lineColor: 'rgba(139,92,246,0.4)',
-                glowColor: 'rgba(139,92,246,0.15)',
-              },
-              {
-                step: 'Ship',
-                label: '04',
-                desc: 'Your engineers pick it up in the next sprint. Linear tracks progress. Halvex watches for the status change.',
-                dotColor: amber,
-                lineColor: 'rgba(245,158,11,0.4)',
-                glowColor: 'rgba(245,158,11,0.15)',
-              },
-              {
-                step: 'Notify',
-                label: '05',
-                desc: 'When the feature ships, Halvex pings the reps on those 6 deals in Slack — with a message they can forward to their champions.',
-                dotColor: green,
-                lineColor: 'rgba(60,203,127,0.4)',
-                glowColor: 'rgba(60,203,127,0.15)',
-              },
-            ].map(({ step, label, desc, dotColor, lineColor, glowColor }, i) => (
-              <div key={step} data-arch-row="" style={{ display: 'flex', gap: '24px', alignItems: 'flex-start', position: 'relative' }}>
-                {/* Flow dot + line */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: '40px', paddingTop: '28px' }}>
-                  <div style={{ position: 'relative' }}>
-                    <div style={{ position: 'absolute', width: '24px', height: '24px', borderRadius: '50%', background: `radial-gradient(circle, ${glowColor} 0%, transparent 70%)`, top: '50%', left: '50%', transform: 'translate(-50%, -50%)', filter: 'blur(6px)' }} />
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: dotColor, position: 'relative', boxShadow: `0 0 12px ${lineColor}` }} />
-                  </div>
-                  {i < 4 && (
-                    <div className="arch-line-pulse" style={{ width: '1px', height: '60px', background: `linear-gradient(180deg, ${lineColor} 0%, transparent 100%)`, marginTop: '4px' }} />
-                  )}
-                </div>
-
-                {/* Card */}
-                <div className="glass-card" style={{ padding: '22px 26px', flex: 1, position: 'relative', borderLeft: `3px solid ${dotColor}`, marginBottom: '2px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 700, color: dotColor, letterSpacing: '1px', opacity: 0.7 }}>{label}</span>
-                    <span data-light-text="" style={{ fontSize: '15px', fontWeight: 600, color: textPrimary, letterSpacing: '-0.01em' }}>{step}</span>
-                  </div>
-                  <div data-light-text-secondary="" style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>{desc}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Section divider */}
-        <div className="section-divider" />
-
-        {/* ======================================================
-            SECTION 5 — WHAT YOU GET
-        ====================================================== */}
-        <section data-section="" style={{ paddingTop: '80px', paddingBottom: '120px', position: 'relative' }}>
-          <h2
-            className="gradient-text"
-            style={{
-              fontSize: '32px',
-              fontWeight: 600,
-              letterSpacing: '-0.03em',
-              marginBottom: '48px',
-            }}
-          >
-            Intelligence that compounds.
-          </h2>
-
-          {/* Ambient glow */}
-          <div
-            className="glow-orb float-orb-slow"
-            style={{
-              width: '400px',
-              height: '400px',
-              background: 'radial-gradient(circle, rgba(91,91,214,0.10) 0%, transparent 70%)',
-              top: '100px',
-              left: '-100px',
-            }}
-          />
-
-          <div
-            data-stagger-grid=""
-            style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '16px',
-              maxWidth: '720px',
-              position: 'relative',
-              zIndex: 1,
-            }}
-          >
-            {[
-              {
-                icon: '\u2600',
-                title: 'Morning Briefing',
-                desc: 'Every deal that needs attention, what changed, and exactly what to do about it. Delivered before your first call.',
-                accentGrad: `linear-gradient(90deg, ${amber}, ${amber}88)`,
-                glowClass: 'glass-glow-amber',
-                span: false,
-              },
-              {
-                icon: '\u{1F3AF}',
-                title: 'Deal Intelligence',
-                desc: 'Win probability, risk signals, competitive threats, and champion health — for every deal, updated with every interaction.',
-                accentGrad: `linear-gradient(90deg, ${accent}, ${accent}88)`,
-                glowClass: 'glass-glow-indigo',
-                span: false,
-              },
-              {
-                icon: '\u{1F9E0}',
-                title: 'Private ML',
-                desc: 'A model trained only on your data. What winning looks like for your team, your market, your deal shape. No generic benchmarks.',
-                accentGrad: `linear-gradient(90deg, ${green}, ${green}88)`,
-                glowClass: 'glass-glow-green',
-                span: true,
-              },
-              {
-                icon: '\u{1F50D}',
-                title: 'Product Gap Detection',
-                desc: 'Automatically surfaces feature requests and missing capabilities mentioned across your pipeline. Ranked by revenue impact.',
-                accentGrad: `linear-gradient(90deg, #ef4444, #ef444488)`,
-                glowClass: 'glass-glow-purple',
-                span: false,
-              },
-              {
-                icon: '\u2694',
-                title: 'Collateral Engine',
-                desc: 'Generates deal-specific battlecards, objection handlers, and case study recommendations based on live competitive intelligence.',
-                accentGrad: `linear-gradient(90deg, ${accent}, ${amber})`,
-                glowClass: 'glass-glow-indigo',
-                span: false,
-              },
-            ].map(({ icon, title, desc, accentGrad, glowClass, span }) => (
-              <div
-                key={title}
-                className={`glass-card glass-glow ${glowClass}`}
-                style={{
-                  padding: '24px 28px',
-                  gridColumn: span ? '1 / -1' : undefined,
-                }}
-              >
-                {/* Colored accent line on top */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: '24px',
-                    right: '24px',
-                    height: '2px',
-                    background: accentGrad,
-                    borderRadius: '0 0 2px 2px',
-                    opacity: 0.6,
-                  }}
-                />
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '16px' }}>{icon}</span>
-                  <div
-                    data-light-text=""
-                    style={{
-                      fontSize: '15px',
-                      fontWeight: 600,
-                      color: textPrimary,
-                    }}
-                  >
-                    {title}
-                  </div>
-                </div>
-                <div data-light-text-secondary="" style={{ fontSize: '14px', color: textSecondary, lineHeight: 1.7 }}>
-                  {desc}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-
-        {/* ======================================================
-            SECTION 7 — PRICING
-        ====================================================== */}
-        <section data-section="" style={{ paddingTop: '80px', paddingBottom: '120px', position: 'relative' }}>
-          <h2
-            className="gradient-text"
-            style={{
-              fontSize: '32px',
-              fontWeight: 600,
-              letterSpacing: '-0.03em',
-              marginBottom: '48px',
-            }}
-          >
-            Start free. Pay when it&apos;s useful.
-          </h2>
-
-          {/* Ambient glow behind pricing */}
-          <div
-            className="glow-orb"
-            style={{
-              width: '500px',
-              height: '500px',
-              background: 'radial-gradient(circle, rgba(91,91,214,0.10) 0%, transparent 70%)',
-              top: '50px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-            }}
-          />
-
-          <div
-            data-pricing-grid=""
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '16px',
-              position: 'relative',
-              zIndex: 1,
-              alignItems: 'start',
-            }}
-          >
-            {/* Free */}
-            <div
-              className="glass-card glass-glow"
-              style={{
-                padding: '32px 28px',
-                display: 'flex',
-                flexDirection: 'column',
-              }}
-            >
-              <div data-light-text-secondary="" style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px', color: textSecondary }}>
-                Free
-              </div>
-              <div data-light-text="" style={{ fontSize: '36px', fontWeight: 600, letterSpacing: '-0.03em', marginBottom: '4px' }}>
-                &pound;0
-              </div>
-              <div data-light-text-tertiary="" style={{ fontSize: '13px', color: textTertiary, marginBottom: '28px' }}>
-                For getting started
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px', flex: 1 }}>
-                {[
-                  '5 deals',
-                  'Signal extraction',
-                  'Manual deal scoring',
-                  'Basic pipeline view',
-                ].map((f) => (
-                  <div key={f} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                    <span style={{ color: accent, fontSize: '14px', lineHeight: '20px', flexShrink: 0 }}>&#10003;</span>
-                    <span data-light-text-secondary="" style={{ fontSize: '13px', color: textSecondary, lineHeight: '20px' }}>{f}</span>
-                  </div>
-                ))}
-              </div>
-              <Link
-                href="/sign-up"
-                data-cta-button=""
-                className="cta-secondary"
-                data-light-text=""
-                data-light-border=""
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '44px',
-                  borderRadius: '8px',
-                  border: '1px solid rgba(255,255,255,0.10)',
-                  color: textPrimary,
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  textDecoration: 'none',
-                }}
-              >
-                Start free
-              </Link>
-            </div>
-
-            {/* Starter — highlighted & elevated with indigo glow */}
-            <div
-              data-starter-elevate=""
-              className="glass-card glass-glow glass-glow-indigo"
-              style={{
-                padding: '40px 28px 32px',
-                display: 'flex',
-                flexDirection: 'column',
-                border: `1px solid rgba(91,91,214,0.4)`,
-                position: 'relative',
-                overflow: 'visible',
-                transform: 'translateY(-8px)',
-                boxShadow: '0 0 50px rgba(91,91,214,0.15), 0 0 100px rgba(91,91,214,0.06), 0 20px 60px rgba(0,0,0,0.3)',
-                background: 'rgba(255,255,255,0.06)',
-              }}
-            >
-              {/* Stronger glow behind starter */}
-              <div
-                className="glow-orb"
-                style={{
-                  width: '250px',
-                  height: '250px',
-                  background: 'radial-gradient(circle, rgba(91,91,214,0.15) 0%, transparent 70%)',
-                  top: '-60px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  filter: 'blur(80px)',
-                }}
-              />
-              {/* "Most popular" badge with shimmer */}
-              <div
-                className="badge-shimmer"
-                style={{
-                  position: 'absolute',
-                  top: '-12px',
-                  left: '24px',
-                  background: `linear-gradient(135deg, ${accent}, #8B5CF6)`,
-                  color: '#fff',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  padding: '4px 14px',
-                  borderRadius: '100px',
-                  zIndex: 2,
-                  boxShadow: '0 0 16px rgba(91,91,214,0.3)',
-                }}
-              >
-                Most popular
-              </div>
-              <div data-light-text-secondary="" style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px', color: textSecondary, position: 'relative' }}>
-                Starter
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '4px', position: 'relative' }}>
-                <span data-light-text="" style={{ fontSize: '36px', fontWeight: 600, letterSpacing: '-0.03em', color: 'rgba(255,255,255,0.95)' }}>&pound;79</span>
-                <span data-light-text-tertiary="" style={{ fontSize: '14px', color: textTertiary }}>/mo</span>
-              </div>
-              <div data-light-text-tertiary="" style={{ fontSize: '13px', color: textTertiary, marginBottom: '28px', position: 'relative' }}>
-                For growing teams
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px', flex: 1, position: 'relative' }}>
-                {[
-                  'Unlimited deals',
-                  'ML deal scoring',
-                  'Daily AI briefing',
-                  'Score simulator',
-                  'Conversation intelligence',
-                  'Risk & stall detection',
-                ].map((f) => (
-                  <div key={f} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                    <span style={{ color: accent, fontSize: '14px', lineHeight: '20px', flexShrink: 0 }}>&#10003;</span>
-                    <span data-light-text-secondary="" style={{ fontSize: '13px', color: textSecondary, lineHeight: '20px' }}>{f}</span>
-                  </div>
-                ))}
-              </div>
-              <Link
-                href="/sign-up"
-                data-cta-button=""
-                className="cta-primary"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '44px',
-                  borderRadius: '8px',
-                  background: accent,
-                  color: '#fff',
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  textDecoration: 'none',
-                  position: 'relative',
-                }}
-              >
-                Start free &rarr;
-              </Link>
-            </div>
-
-            {/* Pro */}
-            <div
-              className="glass-card glass-glow"
-              style={{
-                padding: '32px 28px',
-                display: 'flex',
-                flexDirection: 'column',
-              }}
-            >
-              <div data-light-text-secondary="" style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px', color: textSecondary }}>
-                Pro
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '4px' }}>
-                <span data-light-text="" style={{ fontSize: '36px', fontWeight: 600, letterSpacing: '-0.03em' }}>&pound;149</span>
-                <span data-light-text-tertiary="" style={{ fontSize: '14px', color: textTertiary }}>/mo</span>
-              </div>
-              <div data-light-text-tertiary="" style={{ fontSize: '13px', color: textTertiary, marginBottom: '28px' }}>
-                For scaling revenue teams
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '32px', flex: 1 }}>
-                {[
-                  'Everything in Starter',
-                  'Collateral generation',
-                  'HubSpot sync',
-                  'Battlecards & case studies',
-                  'Priority support',
-                  'Team analytics',
-                ].map((f) => (
-                  <div key={f} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                    <span style={{ color: accent, fontSize: '14px', lineHeight: '20px', flexShrink: 0 }}>&#10003;</span>
-                    <span data-light-text-secondary="" style={{ fontSize: '13px', color: textSecondary, lineHeight: '20px' }}>{f}</span>
-                  </div>
-                ))}
-              </div>
-              <Link
-                href="/sign-up"
-                data-cta-button=""
-                className="cta-secondary"
-                data-light-text=""
-                data-light-border=""
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  height: '44px',
-                  borderRadius: '8px',
-                  border: '1px solid rgba(255,255,255,0.10)',
-                  color: textPrimary,
-                  fontSize: '13px',
-                  fontWeight: 500,
-                  textDecoration: 'none',
-                }}
-              >
-                Start free
-              </Link>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      {/* ======================================================
-          SECTION 8 — CTA + FOOTER
-      ====================================================== */}
-      <section
-        data-section=""
-        style={{
-          paddingTop: '0',
-          paddingBottom: '80px',
-          textAlign: 'center',
-          position: 'relative',
-        }}
-      >
-        {/* Section divider */}
-        <div className="section-divider" style={{ marginBottom: '80px' }} />
-
-        {/* Ambient glow */}
-        <div
-          className="glow-orb"
-          style={{
-            width: '500px',
-            height: '500px',
-            background: 'radial-gradient(circle, rgba(91,91,214,0.08) 0%, transparent 70%)',
-            top: '-100px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-          }}
-        />
-
-        <div style={{ maxWidth: maxW, margin: '0 auto', padding: '0 24px', position: 'relative', zIndex: 1 }}>
-          <h2
-            className="gradient-text"
-            style={{
-              fontSize: '32px',
-              fontWeight: 600,
-              letterSpacing: '-0.03em',
-              marginBottom: '12px',
-            }}
-          >
-            Connect your pipeline to your roadmap.
-          </h2>
-          <p
-            data-light-text-secondary=""
-            style={{
-              fontSize: '18px',
-              color: textSecondary,
-              marginBottom: '32px',
-            }}
-          >
-            Free to start. Your first deal scored in minutes.
-          </p>
-          <Link
-            href="/sign-up"
-            data-cta-button=""
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <Link href="/sign-up"
             className="cta-primary"
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '0 32px',
-              height: '48px',
-              background: accent,
-              borderRadius: '8px',
-              color: '#fff',
-              fontSize: '15px',
-              fontWeight: 500,
-              textDecoration: 'none',
-            }}
-          >
-            Start free &rarr;
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              padding: '12px 28px', borderRadius: '10px', fontWeight: 700,
+              fontSize: '15px', color: '#fff', background: '#6366f1',
+              transition: 'background 0.15s',
+            }}>
+            Start for free
+          </Link>
+          <a href="#product"
+            className="cta-secondary"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              padding: '12px 28px', borderRadius: '10px', fontWeight: 600,
+              fontSize: '15px', color: 'rgba(241,245,249,0.75)',
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.10)',
+              transition: 'all 0.15s',
+            }}>
+            See how it works ↓
+          </a>
+        </div>
+
+        {/* Loop diagram hero illustration */}
+        <div id="product" style={{ marginTop: '64px', display: 'flex', justifyContent: 'center', gap: '0', alignItems: 'center', flexWrap: 'wrap', position: 'relative' }}>
+          {[
+            { label: 'Deal logged', sub: 'Win/loss patterns', color: '#10b981', icon: '📊' },
+            { label: 'Gap detected', sub: 'Ranked by revenue', color: '#6366f1', icon: '🎯' },
+            { label: 'Linear linked', sub: 'Engineers see context', color: '#3b82f6', icon: '🔗' },
+            { label: 'Rep notified', sub: 'Re-engagement email', color: '#f59e0b', icon: '✉️' },
+          ].map((node, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
+              <div style={{
+                padding: '16px 20px', borderRadius: '12px',
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                textAlign: 'center', minWidth: '130px',
+                backdropFilter: 'blur(16px)',
+              }}>
+                <div style={{ fontSize: '22px', marginBottom: '6px' }}>{node.icon}</div>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: node.color, marginBottom: '3px' }}>{node.label}</div>
+                <div style={{ fontSize: '11px', color: 'rgba(241,245,249,0.40)' }}>{node.sub}</div>
+              </div>
+              {i < 3 && (
+                <div style={{
+                  width: '28px', height: '2px', background: 'linear-gradient(90deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05))',
+                  flexShrink: 0, position: 'relative',
+                }}>
+                  <div style={{
+                    position: 'absolute', right: '-3px', top: '-4px',
+                    width: '8px', height: '8px', border: '2px solid rgba(255,255,255,0.15)',
+                    borderLeft: 'none', borderBottom: 'none',
+                    transform: 'rotate(45deg)',
+                  }} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── The Loop Section ──────────────────────────────────────────────────── */}
+      <section style={{ padding: '80px 24px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ maxWidth: '960px', margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+            <h2 style={{ fontSize: '32px', fontWeight: 800, letterSpacing: '-0.02em', color: '#f1f5f9', marginBottom: '12px' }}>
+              The Revenue-to-Product loop, automated
+            </h2>
+            <p style={{ fontSize: '16px', color: 'rgba(241,245,249,0.55)', maxWidth: '480px', margin: '0 auto' }}>
+              Four steps that turn sales conversations into shipped features — automatically.
+            </p>
+          </div>
+
+          <div className="loop-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+            {[
+              {
+                step: '01', title: 'Log deal outcomes', body: 'Every meeting note, win reason, and objection feeds the intelligence engine.',
+                color: '#10b981', bg: 'rgba(16,185,129,0.06)', border: 'rgba(16,185,129,0.14)',
+              },
+              {
+                step: '02', title: 'Halvex detects gaps', body: 'ML ranks product gaps by revenue at stake. SSO blocking £240k? You\'ll know.',
+                color: '#6366f1', bg: 'rgba(99,102,241,0.06)', border: 'rgba(99,102,241,0.14)',
+              },
+              {
+                step: '03', title: 'Auto-links to Linear', body: 'Issues are linked to your backlog. Engineers see the business context behind every ticket.',
+                color: '#3b82f6', bg: 'rgba(59,130,246,0.06)', border: 'rgba(59,130,246,0.14)',
+              },
+              {
+                step: '04', title: 'Reps get notified', body: 'When it ships, sales gets a re-engagement email drafted. Close the loop.',
+                color: '#f59e0b', bg: 'rgba(245,158,11,0.06)', border: 'rgba(245,158,11,0.14)',
+              },
+            ].map(card => (
+              <div key={card.step} className="loop-card" style={{
+                padding: '24px', borderRadius: '12px',
+                background: card.bg, border: `1px solid ${card.border}`,
+                transition: 'all 0.15s',
+              }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: card.color, letterSpacing: '0.08em', marginBottom: '12px' }}>{card.step}</div>
+                <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#f1f5f9', marginBottom: '8px', letterSpacing: '-0.01em' }}>{card.title}</h3>
+                <p style={{ fontSize: '13px', color: 'rgba(241,245,249,0.55)', lineHeight: 1.6 }}>{card.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── For Sales / For Product ───────────────────────────────────────────── */}
+      <section style={{ padding: '80px 24px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ maxWidth: '960px', margin: '0 auto' }}>
+          <div className="for-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+            {[
+              {
+                audience: 'For sales teams',
+                color: '#6366f1',
+                headline: 'Know which deals are at risk before it\'s too late',
+                points: [
+                  'Deal health ring shows win probability at a glance',
+                  'Competitive battlecards built from your actual wins',
+                  'Ask anything in Slack: "What\'s blocking Acme?"',
+                  'Get notified when a requested feature ships',
+                  'MCP tools for Claude Desktop',
+                ],
+              },
+              {
+                audience: 'For product teams',
+                color: '#10b981',
+                headline: 'Build what actually moves revenue',
+                points: [
+                  'See which features are blocking the most ARR',
+                  'Every Linear ticket shows the business context',
+                  'Prioritise by revenue impact, not gut feel',
+                  'Close the loop: ship it → reps get notified',
+                  'Win/loss data feeds directly into your roadmap',
+                ],
+              },
+            ].map(col => (
+              <div key={col.audience} style={{
+                padding: '32px', borderRadius: '14px',
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+              }}>
+                <div style={{
+                  display: 'inline-flex', padding: '3px 12px', borderRadius: '100px',
+                  background: `${col.color}15`, border: `1px solid ${col.color}30`,
+                  fontSize: '11px', fontWeight: 600, color: col.color, marginBottom: '16px',
+                  letterSpacing: '0.04em',
+                }}>
+                  {col.audience}
+                </div>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#f1f5f9', letterSpacing: '-0.02em', marginBottom: '20px', lineHeight: 1.3 }}>
+                  {col.headline}
+                </h3>
+                <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {col.points.map((point, i) => (
+                    <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13px', color: 'rgba(241,245,249,0.65)' }}>
+                      <span style={{ color: col.color, flexShrink: 0, marginTop: '2px', fontSize: '12px' }}>✓</span>
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Integrations ─────────────────────────────────────────────────────── */}
+      <section id="integrations" style={{ padding: '80px 24px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ maxWidth: '960px', margin: '0 auto', textAlign: 'center' }}>
+          <h2 style={{ fontSize: '28px', fontWeight: 800, letterSpacing: '-0.02em', color: '#f1f5f9', marginBottom: '10px' }}>
+            Integrations
+          </h2>
+          <p style={{ fontSize: '14px', color: 'rgba(241,245,249,0.45)', marginBottom: '40px' }}>
+            Halvex connects your sales stack to your engineering stack.
+          </p>
+          <div className="int-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px', maxWidth: '720px', margin: '0 auto' }}>
+            {[
+              { name: 'HubSpot', color: '#ff7a59', available: true },
+              { name: 'Linear', color: '#5e6ad2', available: true },
+              { name: 'Slack', color: '#4a154b', available: true },
+              { name: 'Claude MCP', color: '#6366f1', available: true },
+              { name: 'GitHub', color: '#6e7681', available: false },
+              { name: 'Salesforce', color: '#00a1e0', available: false },
+            ].map(int => (
+              <div key={int.name} style={{
+                padding: '14px 10px', borderRadius: '10px',
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+                textAlign: 'center', opacity: int.available ? 1 : 0.4,
+              }}>
+                <div style={{
+                  width: '32px', height: '32px', borderRadius: '8px',
+                  background: `${int.color}20`, border: `1px solid ${int.color}30`,
+                  margin: '0 auto 8px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '11px', fontWeight: 700, color: int.color,
+                }}>
+                  {int.name[0]}
+                </div>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(241,245,249,0.65)' }}>{int.name}</div>
+                {!int.available && <div style={{ fontSize: '9px', color: 'rgba(241,245,249,0.28)', marginTop: '2px' }}>Soon</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Pricing ──────────────────────────────────────────────────────────── */}
+      <section id="pricing" style={{ padding: '80px 24px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ maxWidth: '860px', margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: '48px' }}>
+            <h2 style={{ fontSize: '32px', fontWeight: 800, letterSpacing: '-0.02em', color: '#f1f5f9', marginBottom: '10px' }}>Pricing</h2>
+            <p style={{ fontSize: '15px', color: 'rgba(241,245,249,0.50)' }}>Start free. Upgrade when you need more.</p>
+          </div>
+
+          <div className="pricing-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', alignItems: 'start' }}>
+            {[
+              {
+                name: 'Free', price: 0, featured: false,
+                features: ['Up to 5 deals', 'MCP access', 'Basic intelligence', 'Community support'],
+              },
+              {
+                name: 'Growth', price: 69, featured: true,
+                features: ['Unlimited deals', 'Slack + Linear + HubSpot', 'Full MCP access', 'Win playbook & battlecards', 'Revenue-to-Product loop', '1 workspace'],
+              },
+              {
+                name: 'Scale', price: 149, featured: false,
+                features: ['Everything in Growth', 'Multi-workspace', 'Priority support', 'Custom brain refresh', 'Advanced ML models', 'Early access'],
+              },
+            ].map(tier => (
+              <div key={tier.name} className="pricing-card" style={{
+                padding: '28px 24px', borderRadius: '14px',
+                background: tier.featured ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.03)',
+                border: tier.featured ? '1px solid rgba(99,102,241,0.30)' : '1px solid rgba(255,255,255,0.08)',
+                transition: 'border-color 0.15s',
+                position: 'relative',
+              }}>
+                {tier.featured && (
+                  <div style={{
+                    position: 'absolute', top: '-11px', left: '50%', transform: 'translateX(-50%)',
+                    padding: '2px 16px', borderRadius: '100px',
+                    background: '#6366f1', fontSize: '11px', fontWeight: 700, color: '#fff',
+                    letterSpacing: '0.04em',
+                  }}>Most popular</div>
+                )}
+                <div style={{ fontSize: '15px', fontWeight: 700, color: '#f1f5f9', marginBottom: '10px' }}>{tier.name}</div>
+                <div style={{ marginBottom: '20px' }}>
+                  <span style={{ fontSize: '32px', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.03em' }}>
+                    {tier.price === 0 ? 'Free' : `$${tier.price}`}
+                  </span>
+                  {tier.price > 0 && <span style={{ fontSize: '13px', color: 'rgba(241,245,249,0.40)', marginLeft: '4px' }}>/mo</span>}
+                </div>
+                <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+                  {tier.features.map((f, i) => (
+                    <li key={i} style={{ display: 'flex', gap: '8px', fontSize: '13px', color: 'rgba(241,245,249,0.65)', alignItems: 'flex-start' }}>
+                      <span style={{ color: tier.featured ? '#818cf8' : '#10b981', flexShrink: 0 }}>✓</span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Link href="/sign-up" style={{
+                  display: 'block', textAlign: 'center',
+                  padding: '10px', borderRadius: '8px', fontWeight: 600, fontSize: '13px',
+                  background: tier.featured ? '#6366f1' : 'rgba(255,255,255,0.05)',
+                  border: tier.featured ? 'none' : '1px solid rgba(255,255,255,0.10)',
+                  color: tier.featured ? '#fff' : 'rgba(241,245,249,0.75)',
+                  transition: 'opacity 0.15s',
+                }}>
+                  {tier.price === 0 ? 'Get started free' : 'Start free trial'}
+                </Link>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '13px', color: 'rgba(241,245,249,0.40)' }}>
+            Need more? <a href="mailto:hello@halvex.io" style={{ color: '#818cf8' }}>Contact us for Enterprise pricing</a>
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA ──────────────────────────────────────────────────────────────── */}
+      <section style={{ padding: '80px 24px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
+          <h2 style={{ fontSize: '32px', fontWeight: 800, letterSpacing: '-0.02em', color: '#f1f5f9', marginBottom: '12px' }}>
+            Start closing the loop today
+          </h2>
+          <p style={{ fontSize: '15px', color: 'rgba(241,245,249,0.50)', marginBottom: '28px' }}>
+            Free to start. Add your first 3 deals and watch intelligence unlock.
+          </p>
+          <Link href="/sign-up"
+            className="cta-primary"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              padding: '13px 32px', borderRadius: '10px', fontWeight: 700,
+              fontSize: '15px', color: '#fff', background: '#6366f1',
+              transition: 'background 0.15s',
+            }}>
+            Get started free →
           </Link>
         </div>
       </section>
 
-      <footer
-        style={{
-          position: 'relative',
-          padding: '48px 24px 64px',
-          textAlign: 'center',
-        }}
-      >
-        {/* Gradient line separator */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '1px',
-            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)',
-          }}
-        />
-        <p
-          data-light-text-secondary=""
-          style={{
-            fontSize: '15px',
-            color: textSecondary,
-            lineHeight: 1.7,
-            maxWidth: '520px',
-            margin: '0 auto 16px',
-          }}
-        >
-          Halvex &mdash; Pipeline meets roadmap. Built for B2B SaaS teams.
-        </p>
-        <p data-light-text-tertiary="" style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)' }}>
-          London, UK &middot; Halvex Ltd
-        </p>
+      {/* ── Footer ───────────────────────────────────────────────────────────── */}
+      <footer style={{
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+        padding: '32px 24px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        flexWrap: 'wrap', gap: '12px',
+        maxWidth: '960px', margin: '0 auto',
+      }}>
+        <div style={{ fontSize: '12px', color: 'rgba(241,245,249,0.35)' }}>
+          Halvex — The Revenue-to-Product Intelligence platform
+        </div>
+        <div style={{ display: 'flex', gap: '20px' }}>
+          {[
+            { label: 'Privacy', href: '/privacy' },
+            { label: 'Terms', href: '/terms' },
+            { label: 'Sign in', href: '/sign-in' },
+          ].map(l => (
+            <Link key={l.label} href={l.href} className="nav-link"
+              style={{ fontSize: '12px', color: 'rgba(241,245,249,0.35)', transition: 'color 0.15s' }}>
+              {l.label}
+            </Link>
+          ))}
+        </div>
       </footer>
     </div>
   )
