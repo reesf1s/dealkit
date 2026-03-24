@@ -51,12 +51,7 @@ type SlackEventPayload = SlackUrlVerification | SlackEventCallback
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  // Guard: Slack must be configured
-  if (!isSlackConfigured()) {
-    return NextResponse.json({ error: 'Slack app not configured' }, { status: 503 })
-  }
-
-  // Read raw body for signature verification
+  // Read raw body first — needed for both url_verification and signature check
   let rawBody: string
   try {
     rawBody = await req.text()
@@ -64,8 +59,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Could not read body' }, { status: 400 })
   }
 
-  // Handle Slack URL verification challenge BEFORE signature check —
-  // Slack sends the challenge without a valid signature during initial setup.
+  // Handle Slack URL verification challenge FIRST — before any other checks.
+  // Slack sends this without a valid signature during initial setup, and it
+  // must return 200 immediately regardless of whether env vars are configured.
   let payload: SlackEventPayload
   try {
     payload = JSON.parse(rawBody) as SlackEventPayload
@@ -77,7 +73,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ challenge: payload.challenge })
   }
 
-  // Verify signature for all other events
+  // Guard: Slack must be configured for all other event types
+  if (!isSlackConfigured()) {
+    return NextResponse.json({ error: 'Slack app not configured' }, { status: 503 })
+  }
+
+  // Verify signature for all non-verification events
   const timestamp = req.headers.get('x-slack-request-timestamp') ?? ''
   const signature = req.headers.get('x-slack-signature') ?? ''
 
