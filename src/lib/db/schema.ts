@@ -623,8 +623,15 @@ export const dealLinearLinks = pgTable('deal_linear_links', {
   relevanceScore:  integer('relevance_score').notNull().default(0), // 0-100 (scaled from 0.0-1.0)
   linkType:        text('link_type').notNull().default('feature_gap'), // 'feature_gap'|'competitor_signal'|'manual'
   status:          text('status').notNull().default('suggested'),     // 'suggested'|'confirmed'|'dismissed'|'in_cycle'|'deployed'
-  scopedAt:        timestamp('scoped_at', { withTimezone: true }),
-  deployedAt:      timestamp('deployed_at', { withTimezone: true }),
+  scopedAt:                    timestamp('scoped_at', { withTimezone: true }),
+  deployedAt:                  timestamp('deployed_at', { withTimezone: true }),
+  // Phase 3 — cycle planning
+  scopedDescription:           text('scoped_description'),
+  scopedUserStory:             text('scoped_user_story'),
+  scopedAcceptanceCriteria:    text('scoped_acceptance_criteria'),
+  cycleId:                     text('cycle_id'),
+  assigneeId:                  text('assignee_id'),
+  assigneeName:                text('assignee_name'),
   createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:       timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [

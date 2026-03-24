@@ -25,6 +25,15 @@ import { getWorkspaceBrain } from '@/lib/workspace-brain'
 import { getRelevantContext } from '@/lib/agent-context'
 import { decrypt, getEncryptionKey } from '@/lib/encrypt'
 import { getIssue } from '@/lib/linear-client'
+import {
+  getUpcomingCycle,
+  getCycleIssues,
+  scopeIssueToCycle,
+  assignIssue,
+  updateIssueDescription,
+  getTeamMembers,
+} from '@/lib/linear-cycle'
+import { generateScopedIssue } from '@/lib/scope-generator'
 import type { ToolContext, ToolResult } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -285,66 +294,314 @@ export const halvex_mark_issue_released = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const halvex_scope_issue_to_cycle = {
-  description: 'Generate a user story and acceptance criteria for a Linear issue based on deal context, ready to add to the next cycle. Use when user says "scope issue X for the Coke deal" or "add ENG-42 to cycle". Returns the user story — Phase 3 will auto-add to cycle.',
+  description: 'Scope a Linear issue for a deal: generates a customer-centric user story + ACs, updates the Linear issue description, adds it to the upcoming cycle, optionally assigns a dev. Use when user says "scope issue X for Coke" or "add ENG-42 to cycle" or "only issue 36, we have capacity".',
   parameters: z.object({
     dealQuery: z.string().describe('Deal name or company name'),
     linearIssueId: z.string().describe('Linear issue identifier e.g. "ENG-42"'),
+    assigneeId: z.string().optional().describe('Linear user ID to assign the issue to (optional)'),
   }),
   execute: async (
-    { dealQuery, linearIssueId }: { dealQuery: string; linearIssueId: string },
+    { dealQuery, linearIssueId, assigneeId }: { dealQuery: string; linearIssueId: string; assigneeId?: string },
     ctx: ToolContext,
   ): Promise<ToolResult> => {
-    // Get deal context
+    // 1. Deal context
     const context = await getRelevantContext(ctx.workspaceId, dealQuery, 1)
     const deal = context.relevantDeals[0]
     if (!deal) return { result: `No deal found matching "${dealQuery}"` }
 
-    // Get issue from cache or live
-    const [cached] = await db
+    const issueIdUpper = linearIssueId.toUpperCase()
+
+    // 2. Check for cached scoped content (only call Haiku once per issue+deal)
+    const [existingLink] = await db
+      .select()
+      .from(dealLinearLinks)
+      .where(and(
+        eq(dealLinearLinks.workspaceId, ctx.workspaceId),
+        eq(dealLinearLinks.dealId, deal.id),
+        eq(dealLinearLinks.linearIssueId, issueIdUpper),
+      ))
+      .limit(1)
+
+    // 3. Issue from cache
+    const [cachedIssue] = await db
       .select()
       .from(linearIssuesCache)
       .where(and(
         eq(linearIssuesCache.workspaceId, ctx.workspaceId),
-        eq(linearIssuesCache.linearIssueId, linearIssueId.toUpperCase()),
+        eq(linearIssuesCache.linearIssueId, issueIdUpper),
       ))
       .limit(1)
 
-    const issueTitle = cached?.title ?? linearIssueId
-    const issueDesc = cached?.description ?? ''
+    const issueTitle = cachedIssue?.title ?? issueIdUpper
+    const issueDescription = cachedIssue?.description ?? null
 
-    // Update link status to in_cycle
+    // 4. Get Linear API key + integration
+    const [integration] = await db
+      .select({ apiKeyEnc: linearIntegrations.apiKeyEnc, teamId: linearIntegrations.teamId })
+      .from(linearIntegrations)
+      .where(eq(linearIntegrations.workspaceId, ctx.workspaceId))
+      .limit(1)
+
+    if (!integration) {
+      return { result: 'Linear is not connected. Please connect Linear in Settings.' }
+    }
+
+    const apiKey = decrypt(integration.apiKeyEnc, getEncryptionKey())
+
+    // 5. Generate scoped content (use cache if already generated)
+    let userStory: string
+    let acceptanceCriteria: string[]
+    let scopedDescription: string
+
+    if (existingLink?.scopedUserStory) {
+      userStory = existingLink.scopedUserStory
+      acceptanceCriteria = existingLink.scopedAcceptanceCriteria
+        ? existingLink.scopedAcceptanceCriteria.split('\n').filter(Boolean)
+        : []
+      scopedDescription = existingLink.scopedDescription ?? ''
+    } else {
+      const dealRisks = Array.isArray(deal.dealRisks) ? (deal.dealRisks as string[]) : []
+      const scoped = await generateScopedIssue({
+        dealName: deal.dealName,
+        prospectCompany: deal.prospectCompany,
+        dealNotes: deal.notes ?? null,
+        dealRisks,
+        issueTitle,
+        issueDescription,
+      })
+      userStory = scoped.userStory
+      acceptanceCriteria = scoped.acceptanceCriteria
+      scopedDescription = scoped.description
+    }
+
+    // 6. Update Linear issue description with scoped content
+    const halvexContent = [
+      `**Deal:** ${deal.dealName} (${deal.prospectCompany})`,
+      '',
+      `**User Story:** ${userStory}`,
+      '',
+      '**Acceptance Criteria:**',
+      ...acceptanceCriteria.map(ac => `- [ ] ${ac}`),
+    ].join('\n')
+
+    try {
+      await updateIssueDescription(
+        cachedIssue?.linearIssueId ?? issueIdUpper,
+        halvexContent,
+        issueDescription,
+        apiKey,
+      )
+    } catch {
+      // Non-fatal — we still update our DB and add to cycle
+    }
+
+    // 7. Get upcoming cycle and add issue to it
+    const cycle = await getUpcomingCycle(integration.teamId, apiKey)
+    if (!cycle) {
+      return { result: `Could not find an upcoming cycle for this team. Create a cycle in Linear first.` }
+    }
+
+    // Linear accepts identifier (e.g. "ENG-36") or UUID in issueUpdate
+    try {
+      await scopeIssueToCycle(issueIdUpper, cycle.id, apiKey)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      return { result: `Failed to add ${issueIdUpper} to cycle: ${msg}` }
+    }
+
+    // 8. Assign if requested
+    let assigneeName: string | null = null
+    if (assigneeId) {
+      try {
+        await assignIssue(issueIdUpper, assigneeId, apiKey)
+        // Look up name from team members
+        const members = await getTeamMembers(integration.teamId, apiKey)
+        assigneeName = members.find(m => m.id === assigneeId)?.name ?? assigneeId
+      } catch { /* non-fatal */ }
+    }
+
+    // 9. Persist scoped content + cycle info to DB
     await db
       .update(dealLinearLinks)
-      .set({ status: 'in_cycle', scopedAt: new Date(), updatedAt: new Date() })
+      .set({
+        status: 'in_cycle',
+        scopedAt: new Date(),
+        updatedAt: new Date(),
+        scopedDescription,
+        scopedUserStory: userStory,
+        scopedAcceptanceCriteria: acceptanceCriteria.join('\n'),
+        cycleId: cycle.id,
+        ...(assigneeId ? { assigneeId, assigneeName: assigneeName ?? assigneeId } : {}),
+      })
       .where(and(
         eq(dealLinearLinks.workspaceId, ctx.workspaceId),
         eq(dealLinearLinks.dealId, deal.id),
-        eq(dealLinearLinks.linearIssueId, linearIssueId.toUpperCase()),
+        eq(dealLinearLinks.linearIssueId, issueIdUpper),
       ))
 
-    const dealRisks = (deal.dealRisks as string[]) ?? []
-    const riskContext = dealRisks.length > 0 ? `\nDeal risks that this solves: ${dealRisks.slice(0, 2).join(', ')}` : ''
+    // 10. Audit log
+    await db.insert(mcpActionLog).values({
+      workspaceId: ctx.workspaceId,
+      actionType: 'issue_scoped_to_cycle',
+      dealId: deal.id,
+      linearIssueId: issueIdUpper,
+      triggeredBy: 'slack',
+      status: 'complete',
+      result: {
+        cycleName: cycle.name ?? `Cycle #${cycle.number}`,
+        cycleId: cycle.id,
+        assigneeName,
+        userStoryPreview: userStory.slice(0, 100),
+      },
+    })
+
+    const cycleName = cycle.name ?? `Cycle #${cycle.number}`
+    const cycleRange = cycle.startsAt && cycle.endsAt
+      ? ` (${new Date(cycle.startsAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}–${new Date(cycle.endsAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })})`
+      : ''
+    const assigneeNote = assigneeName ? `\n*Assigned to:* ${assigneeName}` : ''
 
     return {
       result: [
-        `📋 **User Story for ${linearIssueId}** (scoped for ${deal.dealName}/${deal.prospectCompany}):`,
+        `✅ *${issueIdUpper}* scoped and added to *${cycleName}*${cycleRange}`,
+        assigneeNote,
         '',
-        `**Issue:** ${issueTitle}`,
-        issueDesc ? `**Description:** ${issueDesc.slice(0, 200)}` : '',
-        riskContext,
+        `*User Story:* ${userStory}`,
         '',
-        `**User Story:**`,
-        `As a ${deal.prospectCompany} user, I want ${issueTitle.toLowerCase()} so that I can [benefit relevant to their use case].`,
+        `*Acceptance Criteria:*`,
+        ...acceptanceCriteria.map(ac => `• ${ac}`),
         '',
-        `**Acceptance Criteria:**`,
-        `- [ ] Feature works as described in the issue`,
-        `- [ ] ${deal.prospectCompany} can access it in their account`,
-        `- [ ] No regression in existing functionality`,
-        '',
-        `Link status updated to **in_cycle**. ✅`,
-        `_(Note: Automatic cycle assignment coming in Phase 3)_`,
-      ].filter(Boolean).join('\n'),
+        `*Deal:* ${deal.dealName} (${deal.prospectCompany}) — status updated to \`in_cycle\`.`,
+      ].filter(s => s !== null && s !== undefined).join('\n'),
     }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// halvex_get_cycle_candidates
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const halvex_get_cycle_candidates = {
+  description: 'Get confirmed Linear issues linked to a deal that could go into the next cycle to help convert it. Use when user asks "what can I put in next cycle to convert the Coke deal?" or "what issues should we prioritise for this deal?".',
+  parameters: z.object({
+    dealQuery: z.string().describe('Deal name or company name'),
+  }),
+  execute: async (
+    { dealQuery }: { dealQuery: string },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const context = await getRelevantContext(ctx.workspaceId, dealQuery, 1)
+    const deal = context.relevantDeals[0]
+    if (!deal) return { result: `No deal found matching "${dealQuery}"` }
+
+    const links = await db
+      .select()
+      .from(dealLinearLinks)
+      .where(and(
+        eq(dealLinearLinks.workspaceId, ctx.workspaceId),
+        eq(dealLinearLinks.dealId, deal.id),
+      ))
+
+    const candidates = links.filter(l => l.status === 'confirmed' || l.status === 'suggested')
+    const inCycle = links.filter(l => l.status === 'in_cycle')
+
+    if (candidates.length === 0 && inCycle.length === 0) {
+      return {
+        result: `No confirmed issues linked to *${deal.dealName}* yet. Confirm some suggestions first, or link issues manually.`,
+      }
+    }
+
+    const lines: string[] = [
+      `*${deal.dealName}* (${deal.prospectCompany}) — cycle candidates:`,
+      '',
+    ]
+
+    if (candidates.length > 0) {
+      lines.push('*Available to scope:*')
+      for (const l of candidates.sort((a, b) => b.relevanceScore - a.relevanceScore)) {
+        const status = l.status === 'suggested' ? '💡 suggested' : '✅ confirmed'
+        lines.push(`• *${l.linearIssueId}* — ${l.linearTitle ?? l.linearIssueId} (relevance: ${l.relevanceScore}%, ${status})`)
+      }
+    }
+
+    if (inCycle.length > 0) {
+      lines.push('')
+      lines.push('*Already in cycle:*')
+      for (const l of inCycle) {
+        const cycleName = l.cycleId ? ` (cycle ${l.cycleId.slice(0, 8)})` : ''
+        lines.push(`• 🔄 *${l.linearIssueId}* — ${l.linearTitle ?? l.linearIssueId}${cycleName}`)
+      }
+    }
+
+    if (candidates.length > 0) {
+      lines.push('')
+      lines.push(`Shall I scope these into user stories and add them to the next cycle? Reply with the issue number(s) if you only want specific ones.`)
+    }
+
+    return { result: lines.join('\n') }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// halvex_get_upcoming_cycle
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const halvex_get_upcoming_cycle = {
+  description: 'Get the upcoming or active Linear cycle for the workspace — name, dates, issues already in it, and capacity. Use when user asks "what is in the next cycle?" or "how full is the upcoming sprint?".',
+  parameters: z.object({}),
+  execute: async (
+    _: Record<string, never>,
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const [integration] = await db
+      .select({ apiKeyEnc: linearIntegrations.apiKeyEnc, teamId: linearIntegrations.teamId, teamName: linearIntegrations.teamName })
+      .from(linearIntegrations)
+      .where(eq(linearIntegrations.workspaceId, ctx.workspaceId))
+      .limit(1)
+
+    if (!integration) {
+      return { result: 'Linear is not connected. Please connect Linear in Settings.' }
+    }
+
+    const apiKey = decrypt(integration.apiKeyEnc, getEncryptionKey())
+
+    const cycle = await getUpcomingCycle(integration.teamId, apiKey)
+    if (!cycle) {
+      return { result: `No upcoming cycle found for ${integration.teamName ?? 'your team'}. Create one in Linear.` }
+    }
+
+    const cycleName = cycle.name ?? `Cycle #${cycle.number}`
+    const dateRange = cycle.startsAt && cycle.endsAt
+      ? `${new Date(cycle.startsAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${new Date(cycle.endsAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+      : 'No dates set'
+
+    const total = cycle.issueCount
+    const completed = cycle.completedIssueCount
+    const remaining = total - completed
+
+    const lines: string[] = [
+      `*${cycleName}* — ${dateRange}`,
+      `*Issues:* ${total} total (${completed} done, ${remaining} remaining)`,
+    ]
+
+    // Fetch cycle issues for context
+    try {
+      const issues = await getCycleIssues(cycle.id, apiKey)
+      if (issues.length > 0) {
+        lines.push('')
+        lines.push('*In this cycle:*')
+        for (const i of issues.slice(0, 8)) {
+          const assignee = i.assignee ? ` (${i.assignee.name})` : ''
+          const state = i.state.type === 'completed' ? '✅' : i.state.type === 'started' ? '🔄' : '○'
+          lines.push(`${state} *${i.identifier}* — ${i.title}${assignee}`)
+        }
+        if (issues.length > 8) {
+          lines.push(`_...and ${issues.length - 8} more_`)
+        }
+      }
+    } catch { /* non-fatal */ }
+
+    return { result: lines.join('\n') }
   },
 }
 
@@ -563,6 +820,8 @@ export const slackTools = {
   halvex_dismiss_link,
   halvex_mark_issue_released,
   halvex_scope_issue_to_cycle,
+  halvex_get_cycle_candidates,
+  halvex_get_upcoming_cycle,
   halvex_search_linear_issues,
   halvex_get_linear_issue,
   halvex_find_at_risk_deals,
