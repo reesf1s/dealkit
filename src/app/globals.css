@@ -10,7 +10,7 @@
   ══════════════════════════════════════════════════ */
 
   /* Base backgrounds — the Dimensions contrast system */
-  --bg-base: #080a12;           /* sidebar, darkest */
+  --bg-base: #060910;           /* sidebar, darkest */
   --bg-surface: #111827;         /* main content area */
   --bg-elevated: #1a2035;        /* cards on surface */
   --bg-glass: rgba(255,255,255,0.05);
@@ -52,7 +52,7 @@
   --glass-bg-strong: rgba(99, 102, 241, 0.12);
   --glass-border: rgba(255, 255, 255, 0.10);
   --glass-border-strong: rgba(255, 255, 255, 0.18);
-  --glass-blur: blur(16px);
+  --glass-blur: none;
 
   /* Status colors */
   --health-green: #10b981;
@@ -143,22 +143,18 @@ html, body {
 }
 
 /* ══════════════════════════════════════════════════
-   GLASS CARD SYSTEM — Dimensions aesthetic
-   rgba(255,255,255,0.05) + backdrop-filter + hairline border
+   CARD SYSTEM — Midnight navy, no blur
+   Solid elevated backgrounds + hairline border.
 ══════════════════════════════════════════════════ */
 
 .glass-card {
-  background: var(--bg-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
 }
 
 .glass-hero {
   background: var(--bg-hero);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(99, 102, 241, 0.2);
   border-radius: var(--radius-lg);
 }
