@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useState, useRef, useEffect } from 'react'
 import useSWR from 'swr'
 import {
-  Zap, Plus, Clock, ArrowRight, GitBranch, ChevronDown,
+  Zap, Plus, Clock, ArrowRight, GitBranch, ChevronDown, Play, Loader2,
 } from 'lucide-react'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
@@ -290,7 +290,14 @@ function SelectField({
 
 // ─── Workflow card ────────────────────────────────────────────────────────────
 
-function WorkflowCard({ workflow, onToggle }: { workflow: Workflow; onToggle: (id: string, active: boolean) => void }) {
+function WorkflowCard({ workflow, onToggle, onRun }: { workflow: Workflow; onToggle: (id: string, active: boolean) => void; onRun?: (id: string) => Promise<void> }) {
+  const [running, setRunning] = useState(false)
+
+  const handleRun = async () => {
+    if (!onRun || running) return
+    setRunning(true)
+    try { await onRun(workflow.id) } finally { setRunning(false) }
+  }
   const renderTokens = (tokens?: WorkflowToken[], fallback?: string) => {
     if (!tokens) return <span style={{ fontSize: '12px', color: '#64748b' }}>{fallback}</span>
     return (
@@ -343,11 +350,31 @@ function WorkflowCard({ workflow, onToggle }: { workflow: Workflow; onToggle: (i
           </div>
           {/* Last run info */}
           {workflow.lastRunAt && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
-              <span style={{ fontSize: '10px', color: '#334155' }}>Last run: {timeAgoStr(workflow.lastRunAt)}</span>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginTop: '6px' }}>
+              <span style={{ fontSize: '10px', color: '#334155', flexShrink: 0 }}>Last run: {timeAgoStr(workflow.lastRunAt)}</span>
               {workflow.lastOutput && (
                 <span style={{ fontSize: '10px', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>· {workflow.lastOutput}</span>
               )}
+            </div>
+          )}
+          {/* Run now button — only for saved (non-template) workflows */}
+          {onRun && (
+            <div style={{ marginTop: '8px' }}>
+              <button
+                onClick={handleRun}
+                disabled={running}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '4px',
+                  padding: '4px 10px', borderRadius: '6px',
+                  background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.20)',
+                  color: '#818cf8', fontSize: '11px', fontWeight: 600,
+                  cursor: running ? 'not-allowed' : 'pointer',
+                  opacity: running ? 0.6 : 1,
+                }}
+              >
+                {running ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={10} />}
+                {running ? 'Running…' : 'Run now'}
+              </button>
             </div>
           )}
         </div>
@@ -435,6 +462,15 @@ export default function WorkflowsPage() {
       // Local template — just update local state
       setLocalTemplates(prev => prev.map(w => w.id === id ? { ...w, active } : w))
     }
+  }
+
+  const handleRun = async (id: string) => {
+    await fetch('/api/workflows/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workflowId: id }),
+    })
+    mutateSaved()
   }
 
   const handleAddWorkflow = async () => {
@@ -622,7 +658,12 @@ export default function WorkflowsPage() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {workflowList.map(w => (
-            <WorkflowCard key={w.id} workflow={w} onToggle={handleToggle} />
+            <WorkflowCard
+              key={w.id}
+              workflow={w}
+              onToggle={handleToggle}
+              onRun={savedIds.has(w.id) ? handleRun : undefined}
+            />
           ))}
         </div>
       </div>
