@@ -5,19 +5,17 @@ import { useState } from 'react'
 import useSWR from 'swr'
 import {
   Plug, CheckCircle2, Copy, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp, Loader2,
+  Zap, Database,
 } from 'lucide-react'
 import { useToast } from '@/components/shared/Toast'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 const card: React.CSSProperties = {
-  background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.04), transparent)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'var(--bg-surface)',
+  border: '1px solid var(--border-subtle)',
   borderRadius: '1rem',
   padding: '24px',
-  boxShadow: '0 2px 20px rgba(0,0,0,0.40)',
 }
 
 function StatusDot({ connected }: { connected: boolean | null }) {
@@ -45,28 +43,90 @@ function StatusBadge({ connected }: { connected: boolean | null }) {
   )
 }
 
-function ConfigSection({ children, label }: { children: React.ReactNode; label?: string }) {
+function McpSection({ mcpApiKey, showMcpKey, setShowMcpKey, regenerating, regenerateMcpKey, copyToClipboard }: {
+  mcpApiKey: string | null
+  showMcpKey: boolean
+  setShowMcpKey: (v: (prev: boolean) => boolean) => void
+  regenerating: boolean
+  regenerateMcpKey: () => void
+  copyToClipboard: (text: string) => void
+}) {
   const [open, setOpen] = useState(false)
   return (
-    <div style={{ marginTop: '16px' }}>
+    <div style={card}>
       <button
         onClick={() => setOpen(v => !v)}
         style={{
-          display: 'flex', alignItems: 'center', gap: '6px',
-          background: 'none', border: 'none', cursor: 'pointer',
-          color: '#818cf8', fontSize: '12px', fontWeight: 600, padding: 0,
+          width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 0,
         }}
       >
-        {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-        {label ?? 'Configure'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: '14px' }}>🤖</span>
+          </div>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '16px', fontWeight: 700, color: '#e2e8f0' }}>Claude MCP</span>
+              <StatusBadge connected={mcpApiKey != null} />
+            </div>
+            <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>AI Interface — power users</p>
+          </div>
+        </div>
+        {open ? <ChevronUp size={16} color="#64748b" /> : <ChevronDown size={16} color="#64748b" />}
       </button>
+
       {open && (
-        <div style={{
-          marginTop: '12px', padding: '16px',
-          background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.14)',
-          borderRadius: '10px',
-        }}>
-          {children}
+        <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--border-subtle)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <div style={{ flex: 1, padding: '8px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontFamily: 'monospace', fontSize: '12px', color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {mcpApiKey ? (showMcpKey ? mcpApiKey : '••••••••••••••••••••••••••••••••') : 'No key yet — click Generate to create one'}
+            </div>
+            {mcpApiKey && (
+              <>
+                <button onClick={() => setShowMcpKey(v => !v)} style={{ width: '34px', height: '34px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', cursor: 'pointer' }}>
+                  {showMcpKey ? <EyeOff size={13} /> : <Eye size={13} />}
+                </button>
+                <button onClick={() => copyToClipboard(mcpApiKey)} style={{ width: '34px', height: '34px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', cursor: 'pointer' }}>
+                  <Copy size={13} />
+                </button>
+              </>
+            )}
+            <button onClick={regenerateMcpKey} disabled={regenerating} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0 12px', height: '34px', borderRadius: '8px', background: mcpApiKey ? 'rgba(248,113,113,0.08)' : 'rgba(99,102,241,0.12)', border: `1px solid ${mcpApiKey ? 'rgba(248,113,113,0.18)' : 'rgba(99,102,241,0.25)'}`, color: mcpApiKey ? '#f87171' : '#818cf8', fontSize: '11px', fontWeight: 600, cursor: regenerating ? 'not-allowed' : 'pointer', opacity: regenerating ? 0.6 : 1 }}>
+              <RefreshCw size={11} style={{ animation: regenerating ? 'spin 1s linear infinite' : 'none' }} />
+              {mcpApiKey ? 'Regenerate' : 'Generate key'}
+            </button>
+          </div>
+          <p style={{ fontSize: '12px', color: '#475569', margin: '0 0 16px' }}>Add this key to your Claude MCP configuration to enable AI-native deal workflows.</p>
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Endpoint URL</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ flex: 1, padding: '7px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', fontFamily: 'monospace', fontSize: '12px', color: '#94a3b8' }}>
+                https://halvex.ai/api/mcp
+              </div>
+              <button onClick={() => copyToClipboard('https://halvex.ai/api/mcp')} style={{ width: '34px', height: '34px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', cursor: 'pointer' }}>
+                <Copy size={13} />
+              </button>
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Available tools (6)</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {[
+                { name: 'halvex_get_deal_health', desc: 'Health score, risks & recommendations for any deal' },
+                { name: 'halvex_find_at_risk_deals', desc: 'All deals needing immediate attention this week' },
+                { name: 'halvex_get_linked_issues', desc: 'Linear issues blocking or linked to a deal' },
+                { name: 'halvex_get_win_loss_signals', desc: 'Workspace-level win rate, patterns & loss reasons' },
+                { name: 'halvex_scope_issue', desc: 'Generate user story + ACs and push to Linear cycle' },
+                { name: 'halvex_draft_release_email', desc: 'Draft a release notification for a prospect' },
+              ].map(t => (
+                <div key={t.name} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 10px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.10)', borderRadius: '8px' }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: '11px', fontWeight: 600, color: '#818cf8', whiteSpace: 'nowrap', flexShrink: 0 }}>{t.name}</span>
+                  <span style={{ fontSize: '11px', color: '#64748b' }}>{t.desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -89,23 +149,14 @@ export default function ConnectionsPage() {
   const slackData = slackRes?.data
   const mcpApiKey: string | null = mcpKeyRes?.data?.mcpApiKey ?? null
 
-  // HubSpot state
   const [hubspotToken, setHubspotToken] = useState('')
   const [hubspotConnecting, setHubspotConnecting] = useState(false)
   const [hubspotSyncing, setHubspotSyncing] = useState(false)
   const [hubspotDisconnecting, setHubspotDisconnecting] = useState(false)
-
-  // Linear state
-  const [linearApiKey, setLinearApiKey] = useState('')
-  const [linearConnecting, setLinearConnecting] = useState(false)
   const [linearDisconnecting, setLinearDisconnecting] = useState(false)
   const [linearSyncing, setLinearSyncing] = useState(false)
   const [linearRematching, setLinearRematching] = useState(false)
-
-  // Slack state
   const [slackDisconnecting, setSlackDisconnecting] = useState(false)
-
-  // MCP state
   const [showMcpKey, setShowMcpKey] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
 
@@ -119,13 +170,10 @@ export default function ConnectionsPage() {
     if (!hubspotToken.trim()) return
     setHubspotConnecting(true)
     try {
-      const res = await fetch('/api/integrations/hubspot/connect', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: hubspotToken.trim() }),
-      })
+      const res = await fetch('/api/integrations/hubspot/connect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: hubspotToken.trim() }) })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Connection failed')
-      toast('HubSpot connected! Click "Sync deals" to import your pipeline.', 'success')
+      toast('HubSpot connected!', 'success')
       setHubspotToken('')
       mutateHubspot()
     } catch (e: unknown) { toast(e instanceof Error ? e.message : 'Connection failed', 'error') }
@@ -152,24 +200,6 @@ export default function ConnectionsPage() {
       mutateHubspot()
     } catch { toast('Failed to disconnect', 'error') }
     finally { setHubspotDisconnecting(false) }
-  }
-
-  async function handleLinearConnect(e: React.FormEvent) {
-    e.preventDefault()
-    if (!linearApiKey.trim()) return
-    setLinearConnecting(true)
-    try {
-      const res = await fetch('/api/integrations/linear/connect', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: linearApiKey.trim() }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Connection failed')
-      toast('Linear connected!', 'success')
-      setLinearApiKey('')
-      mutateLinear()
-    } catch (e: unknown) { toast(e instanceof Error ? e.message : 'Connection failed', 'error') }
-    finally { setLinearConnecting(false) }
   }
 
   async function handleLinearDisconnect() {
@@ -227,41 +257,35 @@ export default function ConnectionsPage() {
     finally { setRegenerating(false) }
   }
 
+  const actionBtn = (color: string, borderColor: string) => ({
+    display: 'flex', alignItems: 'center', gap: '5px',
+    padding: '6px 14px', borderRadius: '8px',
+    background: `rgba(${color},0.12)`, border: `1px solid rgba(${color},0.22)`,
+    color: `rgb(${color})`, fontSize: '12px', fontWeight: 600 as const,
+    cursor: 'pointer' as const, fontFamily: 'inherit',
+  })
+
   return (
-    <div style={{ maxWidth: '800px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+    <div style={{ maxWidth: '720px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <div style={{
-          width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
-          background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 0 14px rgba(99,102,241,0.20)',
-        }}>
+        <div style={{ width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0, background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Plug size={18} color="#818cf8" />
         </div>
         <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.02em', margin: 0 }}>
-            Integrations
-          </h1>
-          <p style={{ fontSize: '13px', color: '#475569', margin: 0 }}>
-            Connect your tools to activate AI-powered workflows
-          </p>
+          <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.02em', margin: 0 }}>Your Loop</h1>
+          <p style={{ fontSize: '13px', color: '#475569', margin: 0 }}>Connect the tools your team already uses. Halvex handles the handoff between them.</p>
         </div>
       </div>
 
-      {/* Connection status strip */}
-      <div style={{
-        display: 'flex', gap: '10px', flexWrap: 'wrap',
-        padding: '14px 18px',
-        background: 'rgba(255,255,255,0.02)',
-        border: '1px solid rgba(255,255,255,0.05)',
-        borderRadius: '12px',
-      }}>
+      {/* Status strip */}
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px' }}>
         {[
-          { label: 'HubSpot', connected: hubspotConnected },
-          { label: 'Linear', connected: linearConnected },
           { label: 'Slack', connected: slackConnected },
+          { label: 'Linear', connected: linearConnected },
+          { label: 'HubSpot', connected: hubspotConnected },
           { label: 'MCP', connected: mcpApiKey != null },
         ].map(({ label, connected }) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
@@ -271,70 +295,141 @@ export default function ConnectionsPage() {
         ))}
       </div>
 
-      {/* HubSpot */}
+      {/* ── 1. Slack — Your Revenue Interface ── */}
       <div style={card}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '4px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: '14px' }}>🟠</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'rgba(74,144,226,0.12)', border: '1px solid rgba(74,144,226,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: '14px' }}>💬</span>
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '16px', fontWeight: 700, color: '#e2e8f0' }}>Slack</span>
+              <StatusBadge connected={slackConnected} />
             </div>
-            <span style={{ fontSize: '16px', fontWeight: 700, color: '#e2e8f0' }}>HubSpot</span>
-            <StatusBadge connected={hubspotConnected} />
+            <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Your Revenue Interface — rep-facing</p>
           </div>
         </div>
-        <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 0' }}>
-          Sync deals, contacts, and activities from your CRM.
-        </p>
+        <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 0' }}>Ask about deals, get notified when issues ship, and close loops — without leaving your workflow.</p>
+
+        {slackConnected ? (
+          <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {slackData?.slackTeamName && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#34d399' }}>
+                <CheckCircle2 size={12} /> Connected to <strong>{slackData.slackTeamName}</strong>
+              </div>
+            )}
+            <button onClick={handleSlackDisconnect} disabled={slackDisconnecting} style={{ ...actionBtn('248,113,113', '248,113,113'), cursor: slackDisconnecting ? 'not-allowed' : 'pointer', opacity: slackDisconnecting ? 0.6 : 1, width: 'fit-content' }}>
+              {slackDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+            </button>
+          </div>
+        ) : (
+          <div style={{ marginTop: '16px' }}>
+            <a
+              href="/api/integrations/slack/install"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '8px',
+                padding: '10px 20px', borderRadius: '8px',
+                background: 'linear-gradient(135deg, rgba(74,144,226,0.15), rgba(99,102,241,0.10))',
+                border: '1px solid rgba(74,144,226,0.30)',
+                color: '#60a5fa', fontSize: '13px', fontWeight: 600, textDecoration: 'none',
+              }}
+            >
+              <Zap size={14} /> Connect Slack
+            </a>
+          </div>
+        )}
+      </div>
+
+      {/* ── 2. Linear — Your Product Interface ── */}
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: '14px' }}>🔷</span>
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '16px', fontWeight: 700, color: '#e2e8f0' }}>Linear</span>
+              <StatusBadge connected={linearConnected} />
+            </div>
+            <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Your Product Interface — PM-facing</p>
+          </div>
+        </div>
+        <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 0' }}>Halvex matches your deals to open Linear issues. Sales gaps become product priorities automatically.</p>
+
+        {linearConnected ? (
+          <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {linearData?.teamName && <div style={{ fontSize: '12px', color: '#475569' }}>Team: <span style={{ color: '#94a3b8', fontWeight: 600 }}>{linearData.teamName}</span></div>}
+            {linearData?.workspaceName && <div style={{ fontSize: '12px', color: '#475569' }}>Workspace: <span style={{ color: '#94a3b8', fontWeight: 600 }}>{linearData.workspaceName}</span></div>}
+            {linearData?.lastSyncAt && <div style={{ fontSize: '12px', color: '#475569' }}>Last sync: <span style={{ color: '#94a3b8' }}>{new Date(linearData.lastSyncAt).toLocaleString()}</span></div>}
+            <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+              <button onClick={handleLinearSync} disabled={linearSyncing} style={{ ...actionBtn('129,140,248', '129,140,248'), cursor: linearSyncing ? 'not-allowed' : 'pointer', opacity: linearSyncing ? 0.6 : 1 }}>
+                <RefreshCw size={11} style={{ animation: linearSyncing ? 'spin 1s linear infinite' : 'none' }} />
+                {linearSyncing ? 'Syncing…' : 'Sync issues'}
+              </button>
+              <button onClick={handleLinearRematch} disabled={linearRematching} style={{ ...actionBtn('99,102,241', '99,102,241'), cursor: linearRematching ? 'not-allowed' : 'pointer', opacity: linearRematching ? 0.6 : 1 }}>
+                {linearRematching ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : null}
+                {linearRematching ? 'Rematching…' : 'Rematch to deals'}
+              </button>
+              <button onClick={handleLinearDisconnect} disabled={linearDisconnecting} style={{ ...actionBtn('248,113,113', '248,113,113'), cursor: linearDisconnecting ? 'not-allowed' : 'pointer', opacity: linearDisconnecting ? 0.6 : 1 }}>
+                {linearDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginTop: '16px' }}>
+            <a
+              href="/api/integrations/linear/install"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '8px',
+                padding: '10px 20px', borderRadius: '8px',
+                background: 'linear-gradient(135deg, rgba(129,140,248,0.15), rgba(99,102,241,0.10))',
+                border: '1px solid rgba(129,140,248,0.30)',
+                color: '#818cf8', fontSize: '13px', fontWeight: 600, textDecoration: 'none',
+              }}
+            >
+              <Database size={14} /> Connect Linear
+            </a>
+          </div>
+        )}
+      </div>
+
+      {/* ── 3. HubSpot — Deal Source (optional) ── */}
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: '14px' }}>🟠</span>
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '16px', fontWeight: 700, color: '#e2e8f0' }}>HubSpot</span>
+              <StatusBadge connected={hubspotConnected} />
+              <span style={{ fontSize: '10px', color: '#64748b', padding: '1px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>Optional</span>
+            </div>
+            <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Deal Source — sync your CRM pipeline</p>
+          </div>
+        </div>
+        <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 0' }}>Sync deals, contacts, and activities from your CRM.</p>
 
         {hubspotConnected ? (
           <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {hubspotData?.portalId && (
-              <div style={{ fontSize: '12px', color: '#475569' }}>
-                Portal: <span style={{ color: '#94a3b8', fontWeight: 600 }}>{hubspotData.portalId}</span>
-              </div>
-            )}
-            {hubspotData?.syncCount != null && (
-              <div style={{ fontSize: '12px', color: '#475569' }}>{hubspotData.syncCount} deals synced</div>
-            )}
-            {hubspotData?.lastSync && (
-              <div style={{ fontSize: '12px', color: '#475569' }}>Last sync: {new Date(hubspotData.lastSync).toLocaleString()}</div>
-            )}
+            {hubspotData?.portalId && <div style={{ fontSize: '12px', color: '#475569' }}>Portal: <span style={{ color: '#94a3b8', fontWeight: 600 }}>{hubspotData.portalId}</span></div>}
+            {hubspotData?.syncCount != null && <div style={{ fontSize: '12px', color: '#475569' }}>{hubspotData.syncCount} deals synced</div>}
+            {hubspotData?.lastSync && <div style={{ fontSize: '12px', color: '#475569' }}>Last sync: {new Date(hubspotData.lastSync).toLocaleString()}</div>}
             <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
-              <button
-                onClick={handleHubspotSync}
-                disabled={hubspotSyncing}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '5px',
-                  padding: '6px 14px', borderRadius: '8px',
-                  background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.22)',
-                  color: '#fb923c', fontSize: '12px', fontWeight: 600, cursor: hubspotSyncing ? 'not-allowed' : 'pointer',
-                  opacity: hubspotSyncing ? 0.6 : 1,
-                }}
-              >
+              <button onClick={handleHubspotSync} disabled={hubspotSyncing} style={{ ...actionBtn('251,146,60', '251,146,60'), cursor: hubspotSyncing ? 'not-allowed' : 'pointer', opacity: hubspotSyncing ? 0.6 : 1 }}>
                 <RefreshCw size={11} style={{ animation: hubspotSyncing ? 'spin 1s linear infinite' : 'none' }} />
                 {hubspotSyncing ? 'Syncing…' : 'Sync deals'}
               </button>
-              <button
-                onClick={handleHubspotDisconnect}
-                disabled={hubspotDisconnecting}
-                style={{
-                  padding: '6px 14px', borderRadius: '8px',
-                  background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.18)',
-                  color: '#f87171', fontSize: '12px', fontWeight: 600, cursor: hubspotDisconnecting ? 'not-allowed' : 'pointer',
-                  opacity: hubspotDisconnecting ? 0.6 : 1,
-                }}
-              >
+              <button onClick={handleHubspotDisconnect} disabled={hubspotDisconnecting} style={{ ...actionBtn('248,113,113', '248,113,113'), cursor: hubspotDisconnecting ? 'not-allowed' : 'pointer', opacity: hubspotDisconnecting ? 0.6 : 1 }}>
                 {hubspotDisconnecting ? 'Disconnecting…' : 'Disconnect'}
               </button>
             </div>
           </div>
         ) : (
-          <ConfigSection label="Connect HubSpot">
+          <div style={{ marginTop: '16px' }}>
             <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 12px' }}>
-              Enter your HubSpot Private App access token to connect.{' '}
-              <a href="https://developers.hubspot.com/docs/api/private-apps" target="_blank" rel="noopener noreferrer" style={{ color: '#818cf8', textDecoration: 'none' }}>
-                Get a token →
-              </a>
+              Enter your HubSpot Private App access token.{' '}
+              <a href="https://developers.hubspot.com/docs/api/private-apps" target="_blank" rel="noopener noreferrer" style={{ color: '#818cf8', textDecoration: 'none' }}>Get a token →</a>
             </p>
             <form onSubmit={handleHubspotConnect} style={{ display: 'flex', gap: '8px' }}>
               <input
@@ -342,348 +437,28 @@ export default function ConnectionsPage() {
                 value={hubspotToken}
                 onChange={e => setHubspotToken(e.target.value)}
                 placeholder="pat-na1-..."
-                style={{
-                  flex: 1, padding: '8px 12px', borderRadius: '8px', fontSize: '12px',
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)',
-                  color: '#e2e8f0', outline: 'none', fontFamily: 'monospace',
-                }}
+                style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', fontSize: '12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: '#e2e8f0', outline: 'none', fontFamily: 'monospace' }}
                 onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.40)')}
                 onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.10)')}
               />
-              <button
-                type="submit"
-                disabled={hubspotConnecting || !hubspotToken.trim()}
-                style={{
-                  padding: '8px 16px', borderRadius: '8px',
-                  background: 'rgba(251,146,60,0.15)', border: '1px solid rgba(251,146,60,0.30)',
-                  color: '#fb923c', fontSize: '12px', fontWeight: 600,
-                  cursor: hubspotConnecting || !hubspotToken.trim() ? 'not-allowed' : 'pointer',
-                  opacity: hubspotConnecting || !hubspotToken.trim() ? 0.6 : 1,
-                  display: 'flex', alignItems: 'center', gap: '5px',
-                }}
-              >
+              <button type="submit" disabled={hubspotConnecting || !hubspotToken.trim()} style={{ padding: '8px 16px', borderRadius: '8px', background: 'rgba(251,146,60,0.15)', border: '1px solid rgba(251,146,60,0.30)', color: '#fb923c', fontSize: '12px', fontWeight: 600, cursor: hubspotConnecting || !hubspotToken.trim() ? 'not-allowed' : 'pointer', opacity: hubspotConnecting || !hubspotToken.trim() ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '5px' }}>
                 {hubspotConnecting && <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />}
                 {hubspotConnecting ? 'Connecting…' : 'Connect'}
               </button>
             </form>
-          </ConfigSection>
-        )}
-      </div>
-
-      {/* Linear */}
-      <div style={card}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '4px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: '14px' }}>🔷</span>
-            </div>
-            <span style={{ fontSize: '16px', fontWeight: 700, color: '#e2e8f0' }}>Linear</span>
-            <StatusBadge connected={linearConnected} />
-          </div>
-        </div>
-        <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 0' }}>
-          Link product issues to deals. Track sprint progress against pipeline.
-        </p>
-
-        {linearConnected ? (
-          <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {linearData?.teamName && (
-              <div style={{ fontSize: '12px', color: '#475569' }}>
-                Team: <span style={{ color: '#94a3b8', fontWeight: 600 }}>{linearData.teamName}</span>
-              </div>
-            )}
-            {linearData?.workspaceName && (
-              <div style={{ fontSize: '12px', color: '#475569' }}>
-                Workspace: <span style={{ color: '#94a3b8', fontWeight: 600 }}>{linearData.workspaceName}</span>
-              </div>
-            )}
-            {linearData?.lastSyncAt && (
-              <div style={{ fontSize: '12px', color: '#475569' }}>
-                Last sync: <span style={{ color: '#94a3b8' }}>{new Date(linearData.lastSyncAt).toLocaleString()}</span>
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
-              <button
-                onClick={handleLinearSync}
-                disabled={linearSyncing}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '5px',
-                  padding: '6px 14px', borderRadius: '8px',
-                  background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.22)',
-                  color: '#818cf8', fontSize: '12px', fontWeight: 600,
-                  cursor: linearSyncing ? 'not-allowed' : 'pointer',
-                  opacity: linearSyncing ? 0.6 : 1,
-                }}
-              >
-                <RefreshCw size={11} style={{ animation: linearSyncing ? 'spin 1s linear infinite' : 'none' }} />
-                {linearSyncing ? 'Syncing…' : 'Sync issues'}
-              </button>
-              <button
-                onClick={handleLinearRematch}
-                disabled={linearRematching}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '5px',
-                  padding: '6px 14px', borderRadius: '8px',
-                  background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.20)',
-                  color: '#a5b4fc', fontSize: '12px', fontWeight: 600,
-                  cursor: linearRematching ? 'not-allowed' : 'pointer',
-                  opacity: linearRematching ? 0.6 : 1,
-                }}
-              >
-                {linearRematching ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : null}
-                {linearRematching ? 'Rematching…' : 'Rematch to deals'}
-              </button>
-              <button
-                onClick={handleLinearDisconnect}
-                disabled={linearDisconnecting}
-                style={{
-                  padding: '6px 14px', borderRadius: '8px',
-                  background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.18)',
-                  color: '#f87171', fontSize: '12px', fontWeight: 600,
-                  cursor: linearDisconnecting ? 'not-allowed' : 'pointer',
-                  opacity: linearDisconnecting ? 0.6 : 1,
-                }}
-              >
-                {linearDisconnecting ? 'Disconnecting…' : 'Disconnect'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <ConfigSection label="Connect Linear">
-            <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 12px' }}>
-              Enter your Linear Personal API key.{' '}
-              <a href="https://linear.app/settings/api" target="_blank" rel="noopener noreferrer" style={{ color: '#818cf8', textDecoration: 'none' }}>
-                Get a key →
-              </a>
-            </p>
-            <form onSubmit={handleLinearConnect} style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="password"
-                value={linearApiKey}
-                onChange={e => setLinearApiKey(e.target.value)}
-                placeholder="lin_api_..."
-                style={{
-                  flex: 1, padding: '8px 12px', borderRadius: '8px', fontSize: '12px',
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)',
-                  color: '#e2e8f0', outline: 'none', fontFamily: 'monospace',
-                }}
-                onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.40)')}
-                onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.10)')}
-              />
-              <button
-                type="submit"
-                disabled={linearConnecting || !linearApiKey.trim()}
-                style={{
-                  padding: '8px 16px', borderRadius: '8px',
-                  background: 'rgba(129,140,248,0.15)', border: '1px solid rgba(129,140,248,0.30)',
-                  color: '#818cf8', fontSize: '12px', fontWeight: 600,
-                  cursor: linearConnecting || !linearApiKey.trim() ? 'not-allowed' : 'pointer',
-                  opacity: linearConnecting || !linearApiKey.trim() ? 0.6 : 1,
-                  display: 'flex', alignItems: 'center', gap: '5px',
-                }}
-              >
-                {linearConnecting && <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />}
-                {linearConnecting ? 'Connecting…' : 'Connect'}
-              </button>
-            </form>
-          </ConfigSection>
-        )}
-      </div>
-
-      {/* Slack */}
-      <div style={card}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '4px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: '14px' }}>💬</span>
-            </div>
-            <span style={{ fontSize: '16px', fontWeight: 700, color: '#e2e8f0' }}>Slack</span>
-            <StatusBadge connected={slackConnected} />
-          </div>
-        </div>
-        <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 0' }}>
-          Receive deal alerts, release notifications, and AI briefings in Slack.
-        </p>
-
-        {slackConnected ? (
-          <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {slackData?.teamName && (
-              <div style={{ fontSize: '12px', color: '#475569' }}>
-                Workspace: <span style={{ color: '#94a3b8', fontWeight: 600 }}>{slackData.teamName}</span>
-              </div>
-            )}
-            <div style={{ fontSize: '12px', color: '#34d399', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <CheckCircle2 size={12} /> Ready to send notifications
-            </div>
-            <div style={{ marginTop: '4px' }}>
-              <button
-                onClick={handleSlackDisconnect}
-                disabled={slackDisconnecting}
-                style={{
-                  padding: '6px 14px', borderRadius: '8px',
-                  background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.18)',
-                  color: '#f87171', fontSize: '12px', fontWeight: 600,
-                  cursor: slackDisconnecting ? 'not-allowed' : 'pointer',
-                  opacity: slackDisconnecting ? 0.6 : 1,
-                }}
-              >
-                {slackDisconnecting ? 'Disconnecting…' : 'Disconnect'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div style={{ marginTop: '16px' }}>
-            <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 12px' }}>
-              Connect Slack via OAuth to get deal health alerts and release notifications.
-            </p>
-            <a
-              href="/api/integrations/slack/install"
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px',
-                padding: '8px 16px', borderRadius: '8px',
-                background: 'rgba(74,222,128,0.10)', border: '1px solid rgba(74,222,128,0.20)',
-                color: '#4ade80', fontSize: '12px', fontWeight: 600, textDecoration: 'none',
-              }}
-            >
-              <span style={{ fontSize: '14px' }}>💬</span>
-              Connect with Slack
-            </a>
           </div>
         )}
       </div>
 
-      {/* Claude MCP */}
-      <div style={card}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '4px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: '14px' }}>🤖</span>
-            </div>
-            <span style={{ fontSize: '16px', fontWeight: 700, color: '#e2e8f0' }}>Claude MCP</span>
-            <StatusBadge connected={mcpApiKey != null} />
-          </div>
-        </div>
-        <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 0' }}>
-          Connect Halvex to Claude&apos;s Model Context Protocol for AI-native workflows.
-        </p>
-
-        <div style={{ marginTop: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-            <div style={{
-              flex: 1, padding: '8px 12px',
-              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: '8px', fontFamily: 'monospace', fontSize: '12px', color: '#94a3b8',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {mcpApiKey
-                ? (showMcpKey ? mcpApiKey : '••••••••••••••••••••••••••••••••')
-                : 'No key yet — click Regenerate to generate one'}
-            </div>
-            {mcpApiKey && (
-              <>
-                <button
-                  onClick={() => setShowMcpKey(v => !v)}
-                  style={{
-                    width: '34px', height: '34px', borderRadius: '8px',
-                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#64748b', cursor: 'pointer',
-                  }}
-                >
-                  {showMcpKey ? <EyeOff size={13} /> : <Eye size={13} />}
-                </button>
-                <button
-                  onClick={() => copyToClipboard(mcpApiKey)}
-                  style={{
-                    width: '34px', height: '34px', borderRadius: '8px',
-                    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#64748b', cursor: 'pointer',
-                  }}
-                >
-                  <Copy size={13} />
-                </button>
-              </>
-            )}
-            <button
-              onClick={regenerateMcpKey}
-              disabled={regenerating}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '5px',
-                padding: '0 12px', height: '34px', borderRadius: '8px',
-                background: mcpApiKey ? 'rgba(248,113,113,0.08)' : 'rgba(99,102,241,0.12)',
-                border: `1px solid ${mcpApiKey ? 'rgba(248,113,113,0.18)' : 'rgba(99,102,241,0.25)'}`,
-                color: mcpApiKey ? '#f87171' : '#818cf8',
-                fontSize: '11px', fontWeight: 600, cursor: regenerating ? 'not-allowed' : 'pointer',
-                opacity: regenerating ? 0.6 : 1,
-              }}
-            >
-              <RefreshCw size={11} style={{ animation: regenerating ? 'spin 1s linear infinite' : 'none' }} />
-              {mcpApiKey ? 'Regenerate' : 'Generate key'}
-            </button>
-          </div>
-          <p style={{ fontSize: '12px', color: '#475569', margin: '0 0 16px' }}>
-            Add this key to your Claude MCP configuration to enable AI-native deal workflows.
-          </p>
-
-          {/* Endpoint URL */}
-          <div style={{ marginBottom: '16px' }}>
-            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Endpoint URL</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{
-                flex: 1, padding: '7px 12px',
-                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '8px', fontFamily: 'monospace', fontSize: '12px', color: '#94a3b8',
-              }}>
-                https://halvex.ai/api/mcp
-              </div>
-              <button
-                onClick={() => copyToClipboard('https://halvex.ai/api/mcp')}
-                style={{
-                  width: '34px', height: '34px', borderRadius: '8px',
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#64748b', cursor: 'pointer',
-                }}
-              >
-                <Copy size={13} />
-              </button>
-            </div>
-          </div>
-
-          {/* Available tools */}
-          <div>
-            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Available tools (6)</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {[
-                { name: 'halvex_get_deal_health', desc: 'Health score, risks & recommendations for any deal' },
-                { name: 'halvex_find_at_risk_deals', desc: 'All deals needing immediate attention this week' },
-                { name: 'halvex_get_linked_issues', desc: 'Linear issues blocking or linked to a deal' },
-                { name: 'halvex_get_win_loss_signals', desc: 'Workspace-level win rate, patterns & loss reasons' },
-                { name: 'halvex_scope_issue', desc: 'Generate user story + ACs and push to Linear cycle' },
-                { name: 'halvex_draft_release_email', desc: 'Draft a release notification for a prospect' },
-              ].map(t => (
-                <div key={t.name} style={{
-                  display: 'flex', alignItems: 'flex-start', gap: '10px',
-                  padding: '8px 10px',
-                  background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.10)',
-                  borderRadius: '8px',
-                }}>
-                  <span style={{
-                    fontFamily: 'monospace', fontSize: '11px', fontWeight: 600,
-                    color: '#818cf8', whiteSpace: 'nowrap', flexShrink: 0,
-                  }}>{t.name}</span>
-                  <span style={{ fontSize: '11px', color: '#64748b' }}>{t.desc}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
+      {/* ── 4. Claude MCP (collapsed) ── */}
+      <McpSection
+        mcpApiKey={mcpApiKey}
+        showMcpKey={showMcpKey}
+        setShowMcpKey={setShowMcpKey}
+        regenerating={regenerating}
+        regenerateMcpKey={regenerateMcpKey}
+        copyToClipboard={copyToClipboard}
+      />
     </div>
   )
 }

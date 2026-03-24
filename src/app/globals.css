@@ -9,15 +9,13 @@
      no harsh borders, indigo glow from top.
   ══════════════════════════════════════════════════ */
 
-  /* Backgrounds — midnight navy, NOT pure black */
-  --bg-base: #060910;          /* sidebar — deepest */
-  --bg-surface: #0d1117;       /* main content area */
-  --bg-elevated: #111827;      /* elevated cards */
-  --bg-hover: rgba(255,255,255,0.04);
-  --bg-selected: rgba(255,255,255,0.07);
-  --bg-glass: rgba(255,255,255,0.04);
-  --bg-glass-hover: rgba(255,255,255,0.07);
-  --bg-hero: rgba(99,102,241,0.08);
+  /* Base backgrounds — the Dimensions contrast system */
+  --bg-base: #060910;           /* sidebar, darkest */
+  --bg-surface: #111827;         /* main content area */
+  --bg-elevated: #1a2035;        /* cards on surface */
+  --bg-glass: rgba(255,255,255,0.05);
+  --bg-glass-hover: rgba(255,255,255,0.08);
+  --bg-hero: rgba(99,102,241,0.1);
 
   /* The glow — soft indigo radial from top-center */
   --glow-primary: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99,102,241,0.16) 0%, transparent 70%);
@@ -51,12 +49,12 @@
   --sidebar-border: rgba(255, 255, 255, 0.05);
   --sidebar-width: 220px;
 
-  /* Glass surfaces — NO blur, just subtle bg tint */
-  --glass-bg: rgba(255, 255, 255, 0.04);
-  --glass-bg-hover: rgba(255, 255, 255, 0.07);
-  --glass-bg-strong: rgba(99, 102, 241, 0.10);
-  --glass-border: rgba(255, 255, 255, 0.07);
-  --glass-border-strong: rgba(255, 255, 255, 0.12);
+  /* Glass surfaces */
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-bg-hover: rgba(255, 255, 255, 0.08);
+  --glass-bg-strong: rgba(99, 102, 241, 0.12);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-border-strong: rgba(255, 255, 255, 0.18);
   --glass-blur: none;
 
   /* Status colors */
@@ -150,9 +148,8 @@ html, body {
 }
 
 /* ══════════════════════════════════════════════════
-   CARD SYSTEM — Midnight navy aesthetic
-   Elevation through background shade, NOT blur.
-   No backdrop-filter. No heavy borders.
+   CARD SYSTEM — Midnight navy, no blur
+   Solid elevated backgrounds + hairline border.
 ══════════════════════════════════════════════════ */
 
 .glass-card {
@@ -163,7 +160,7 @@ html, body {
 
 .glass-hero {
   background: var(--bg-hero);
-  border: 1px solid rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.2);
   border-radius: var(--radius-lg);
 }
 

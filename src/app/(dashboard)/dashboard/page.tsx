@@ -5,9 +5,8 @@ import { useState, useEffect, useRef } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
 import {
-  AlertTriangle, ArrowUpRight, Brain, Send,
-  RefreshCw, Zap, CheckCircle2, TrendingDown,
-  GitBranch, Layers,
+  Send, RefreshCw, Brain, Zap, CheckCircle2,
+  ArrowUpRight, Clock, AlertCircle,
 } from 'lucide-react'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
@@ -23,42 +22,36 @@ function timeAgo(date: string | Date): string {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
-function formatCurrency(n: number): string {
-  if (n >= 1_000_000) return `£${(n / 1_000_000).toFixed(1)}m`
-  if (n >= 1_000) return `£${Math.round(n / 1_000)}k`
-  return `£${Math.round(n)}`
+function formatCurrency(n: number | string | null): string {
+  if (!n) return ''
+  const v = Number(n)
+  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}m`
+  if (v >= 1_000) return `$${Math.round(v / 1_000)}k`
+  return `$${Math.round(v)}`
 }
 
-const STAGE_LABELS: Record<string, string> = {
-  prospecting: 'Prospecting',
-  qualification: 'Qualification',
-  discovery: 'Discovery',
-  proposal: 'Proposal',
-  negotiation: 'Negotiation',
-}
-
-const RISK_COLORS: Record<string, string> = {
-  high: 'var(--accent-danger)',
-  medium: 'var(--accent-warning)',
-  low: 'var(--accent-success)',
-}
-
-// ─── Left Column: Revenue at Risk ────────────────────────────────────────────
-function RevenueAtRiskColumn() {
-  const { data, isLoading } = useSWR('/api/dashboard/summary', fetcher, {
-    revalidateOnFocus: false,
-    dedupingInterval: 120000,
+// ─── Left Column: Signal ─────────────────────────────────────────────────────
+function SignalColumn() {
+  const { data, isLoading } = useSWR('/api/dashboard/loop-signals', fetcher, {
+    revalidateOnFocus: false, dedupingInterval: 60000,
   })
-  const summary = data?.data
+  const signals: any[] = data?.data?.signals ?? []
+  const [startingLoop, setStartingLoop] = useState<string | null>(null)
+
+  async function handleStartLoop(dealId: string) {
+    setStartingLoop(dealId)
+    try {
+      await fetch(`/api/deals/${dealId}/start-loop`, { method: 'POST' })
+    } finally {
+      setStartingLoop(null)
+    }
+  }
 
   return (
     <div style={{
       background: 'var(--bg-surface)',
       borderRight: '1px solid var(--border-subtle)',
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      overflow: 'hidden',
+      display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden',
     }}>
       {/* Header */}
       <div style={{
@@ -66,126 +59,159 @@ function RevenueAtRiskColumn() {
         borderBottom: '1px solid var(--border-subtle)',
         flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <TrendingDown size={14} color="var(--accent-danger)" />
-          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Revenue at Risk</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+          <AlertCircle size={14} color="var(--accent-warning)" />
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Signal</span>
         </div>
-        {isLoading ? (
-          <div style={{ height: '18px', width: '120px', borderRadius: '4px' }} className="skeleton" />
-        ) : summary ? (
-          <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--accent-danger)', letterSpacing: '-0.03em', lineHeight: 1 }}>
-            {formatCurrency(summary.revenueAtRisk)}
-            <span style={{ fontSize: '12px', fontWeight: 400, color: 'var(--text-tertiary)', marginLeft: '6px' }}>
-              across {summary.dealsAtRisk} deal{summary.dealsAtRisk !== 1 ? 's' : ''}
-            </span>
-          </div>
-        ) : (
-          <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>No open deals</div>
-        )}
+        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+          {isLoading ? 'Loading…' : signals.length > 0
+            ? `${signals.length} deal${signals.length !== 1 ? 's' : ''} with unactioned gaps`
+            : 'No unactioned gaps'}
+        </div>
       </div>
 
-      {/* Deal list */}
+      {/* List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
         {isLoading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px' }}>
-            {[1, 2, 3].map(i => (
-              <div key={i} style={{ height: '72px', borderRadius: '8px' }} className="skeleton" />
-            ))}
+            {[1, 2, 3].map(i => <div key={i} style={{ height: '72px', borderRadius: '8px' }} className="skeleton" />)}
           </div>
-        ) : summary?.topDeals?.length > 0 ? (
+        ) : signals.length > 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {summary.topDeals.map((deal: any) => (
-              <Link key={deal.id} href={`/deals/${deal.id}`} style={{ textDecoration: 'none' }}>
-                <div
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: 'var(--radius-md)',
-                    background: 'var(--bg-glass)',
-                    border: `1px solid var(--border-subtle)`,
-                    borderLeft: `3px solid ${RISK_COLORS[deal.riskLevel]}`,
-                    transition: 'background var(--transition-fast)',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-glass-hover)'}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-glass)'}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {deal.company ?? deal.name}
-                      </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-                        {STAGE_LABELS[deal.stage] ?? deal.stage}
-                        {deal.daysStale > 0 && ` · ${deal.daysStale}d stale`}
-                      </div>
+            {signals.map((deal: any) => (
+              <div key={deal.id} style={{
+                padding: '10px 12px',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--bg-glass)',
+                border: '1px solid var(--border-subtle)',
+                borderLeft: '3px solid var(--accent-warning)',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+                  <Link href={`/deals/${deal.id}`} style={{ textDecoration: 'none', flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {deal.company}
                     </div>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
-                      {formatCurrency(deal.value)}
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                      {deal.suggestedCount} matching issue{deal.suggestedCount !== 1 ? 's' : ''} · {deal.stage}
                     </div>
-                  </div>
-                  {deal.primaryBlocker && (
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '5px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      Missing: {deal.primaryBlocker}
+                  </Link>
+                  {deal.dealValue && (
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0 }}>
+                      {formatCurrency(deal.dealValue)}
                     </div>
                   )}
-                  <div style={{
-                    marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px',
-                    padding: '2px 8px', borderRadius: '100px',
-                    background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.20)',
-                    fontSize: '11px', fontWeight: 500, color: '#818cf8',
-                  }}>
-                    {deal.topAction}
-                  </div>
                 </div>
-              </Link>
+                <button
+                  onClick={() => handleStartLoop(deal.id)}
+                  disabled={startingLoop === deal.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    padding: '5px 12px', borderRadius: 'var(--radius-sm)',
+                    background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)',
+                    color: 'var(--accent-primary)', fontSize: '11px', fontWeight: 600,
+                    cursor: startingLoop === deal.id ? 'not-allowed' : 'pointer',
+                    opacity: startingLoop === deal.id ? 0.6 : 1,
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  <Zap size={10} />
+                  {startingLoop === deal.id ? 'Starting…' : 'Start Loop'}
+                </button>
+              </div>
             ))}
           </div>
         ) : (
-          <div style={{ textAlign: 'center', padding: '40px 16px' }}>
+          <div style={{ textAlign: 'center', padding: '40px 16px', margin: 'auto' }}>
             <CheckCircle2 size={24} style={{ color: 'var(--accent-success)', marginBottom: '10px' }} />
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Pipeline looks healthy</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px' }}>No at-risk deals detected</div>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>No signals yet</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px', lineHeight: 1.6 }}>
+              Add a deal to get started. Halvex will find matching Linear issues automatically.
+            </div>
             <Link href="/deals" style={{
               display: 'inline-flex', alignItems: 'center', gap: '4px',
               marginTop: '12px', padding: '6px 14px', borderRadius: 'var(--radius-sm)',
               background: 'var(--bg-glass)', border: '1px solid var(--border-default)',
-              fontSize: '12px', color: 'var(--text-secondary)',
+              fontSize: '12px', color: 'var(--text-secondary)', textDecoration: 'none',
             }}>
-              View deals <ArrowUpRight size={10} />
+              Add a deal <ArrowUpRight size={10} />
             </Link>
           </div>
         )}
       </div>
-
-      {/* Focus bullets */}
-      {!isLoading && summary?.focusBullets?.length > 0 && (
-        <div style={{
-          borderTop: '1px solid var(--border-subtle)',
-          padding: '12px 16px',
-          flexShrink: 0,
-          background: 'var(--bg-hero)',
-        }}>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
-            What to focus on
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            {summary.focusBullets.map((bullet: string, i: number) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '7px', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                <span style={{ color: 'var(--accent-primary)', flexShrink: 0, marginTop: '1px' }}>•</span>
-                {bullet}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
-// ─── Middle Column: Ask Halvex ────────────────────────────────────────────────
+// ─── Middle Column: In-Flight + Ask Halvex ────────────────────────────────────
+function InFlightSection({ inFlight, isLoading }: { inFlight: any[]; isLoading: boolean }) {
+  if (isLoading) {
+    return (
+      <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {[1, 2].map(i => <div key={i} style={{ height: '60px', borderRadius: '8px' }} className="skeleton" />)}
+      </div>
+    )
+  }
+  if (inFlight.length === 0) {
+    return (
+      <div style={{ padding: '16px 20px', textAlign: 'center' }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>No loops in flight yet</div>
+      </div>
+    )
+  }
+
+  const loopStageLabel: Record<string, { label: string; color: string; bg: string }> = {
+    awaiting_approval: { label: 'Awaiting PM approval', color: '#f59e0b', bg: 'rgba(245,158,11,0.10)' },
+    in_cycle:          { label: 'In cycle', color: '#60a5fa', bg: 'rgba(96,165,250,0.10)' },
+  }
+
+  return (
+    <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {inFlight.map((deal: any) => {
+        const stage = loopStageLabel[deal.loopStage] ?? loopStageLabel.in_cycle
+        return (
+          <Link key={deal.id} href={`/deals/${deal.id}`} style={{ textDecoration: 'none' }}>
+            <div style={{
+              padding: '9px 12px', borderRadius: 'var(--radius-sm)',
+              background: 'var(--bg-glass)', border: '1px solid var(--border-subtle)',
+              borderLeft: `3px solid ${stage.color}`,
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {deal.company}
+                  </div>
+                  <div style={{ marginTop: '3px', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '1px 7px', borderRadius: '100px', background: stage.bg, fontSize: '10px', fontWeight: 600, color: stage.color }}>
+                    {deal.loopStage === 'awaiting_approval' && <Clock size={9} />}
+                    {stage.label}
+                  </div>
+                </div>
+                {deal.pendingActionCreatedAt && (
+                  <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', flexShrink: 0 }}>
+                    {timeAgo(deal.pendingActionCreatedAt)}
+                  </span>
+                )}
+              </div>
+              {deal.inCycleIssues?.length > 0 && (
+                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {deal.inCycleIssues.map((i: any) => i.linearIssueId).join(' · ')}
+                </div>
+              )}
+            </div>
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
+
 function AskHalvexColumn() {
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
   const brain = brainRes?.data
+
+  const { data: loopData, isLoading: loopLoading } = useSWR('/api/dashboard/loop-signals', fetcher, {
+    revalidateOnFocus: false, dedupingInterval: 60000,
+  })
+  const inFlight: any[] = loopData?.data?.inFlight ?? []
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputText, setInputText] = useState('')
@@ -198,7 +224,6 @@ function AskHalvexColumn() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, chatLoading])
 
-  // Dynamic suggested prompts from brain data
   const suggestedPrompts = (() => {
     const prompts: string[] = []
     const topComp = brain?.competitivePatterns?.[0]?.competitor
@@ -206,7 +231,7 @@ function AskHalvexColumn() {
     const topUrgent = brain?.urgentDeals?.[0]
     if (topUrgent) prompts.push(`What's blocking ${topUrgent.company}?`)
     prompts.push('Which deal is closest to closing?')
-    prompts.push('Summarise our pipeline health')
+    prompts.push('Summarise pipeline health')
     return prompts.slice(0, 4)
   })()
 
@@ -225,11 +250,9 @@ function AskHalvexColumn() {
         body: JSON.stringify({ message: q }),
       })
       const json = await res.json()
-      // Detect intent from response metadata
       if (json.intent) setIntent(json.intent)
       else setIntent(null)
-      const reply = json.reply ?? json.message ?? json.data?.reply ?? 'No response'
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }])
+      setMessages(prev => [...prev, { role: 'assistant', content: json.reply ?? json.message ?? json.data?.reply ?? 'No response' }])
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Failed to get a response. Try again.' }])
     } finally {
@@ -241,69 +264,67 @@ function AskHalvexColumn() {
   return (
     <div style={{
       background: 'var(--bg-surface)',
-      display: 'flex',
-      flexDirection: 'column',
+      display: 'flex', flexDirection: 'column',
       borderRight: '1px solid var(--border-subtle)',
       height: '100%',
     }}>
-      {/* Header */}
+      {/* In-Flight section at top */}
+      <div style={{ flexShrink: 0, borderBottom: '1px solid var(--border-subtle)' }}>
+        <div style={{ padding: '14px 20px 10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Zap size={13} color="#60a5fa" />
+          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+            In-Flight
+            {inFlight.length > 0 && (
+              <span style={{ marginLeft: '6px', fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '100px', background: 'rgba(96,165,250,0.12)', color: '#60a5fa' }}>
+                {inFlight.length}
+              </span>
+            )}
+          </span>
+        </div>
+        <InFlightSection inFlight={inFlight} isLoading={loopLoading} />
+      </div>
+
+      {/* Ask Halvex header */}
       <div style={{
-        padding: '18px 22px 14px',
+        padding: '14px 22px 10px',
         borderBottom: '1px solid var(--border-subtle)',
         display: 'flex', alignItems: 'center', gap: '12px',
         flexShrink: 0,
       }}>
         <div style={{
-          width: '32px', height: '32px', borderRadius: 'var(--radius-sm)',
-          background: 'var(--bg-hero)',
-          border: '1px solid rgba(99,102,241,0.25)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0,
+          width: '28px', height: '28px', borderRadius: 'var(--radius-sm)',
+          background: 'var(--bg-hero)', border: '1px solid rgba(99,102,241,0.25)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}>
-          <Brain size={16} color="var(--accent-primary)" />
+          <Brain size={14} color="var(--accent-primary)" />
         </div>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Ask Halvex</span>
-            <span style={{
-              width: '6px', height: '6px', borderRadius: '50%',
-              background: 'var(--accent-success)',
-              animation: 'pulse-dot 2.4s ease-in-out infinite',
-            }} />
+            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Ask Halvex</span>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent-success)', animation: 'pulse-dot 2.4s ease-in-out infinite' }} />
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '1px' }}>Ask about deals, competitors, or pipeline</div>
+          <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '1px' }}>Ask about deals, competitors, or pipeline</div>
         </div>
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {messages.length === 0 ? (
-          <div style={{ margin: 'auto', textAlign: 'center', padding: '32px 16px', maxWidth: '340px' }}>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Your pipeline intelligence</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.7, marginBottom: '20px' }}>
+          <div style={{ margin: 'auto', textAlign: 'center', padding: '24px 16px', maxWidth: '340px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Your pipeline intelligence</div>
+            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', lineHeight: 1.7, marginBottom: '16px' }}>
               Ask about deals, win patterns, or what&apos;s blocking revenue.
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
               {suggestedPrompts.map((prompt, i) => (
                 <button
                   key={i}
                   onClick={() => { setInputText(prompt); inputRef.current?.focus() }}
                   style={{
-                    padding: '8px 14px', borderRadius: 'var(--radius-sm)', textAlign: 'left',
+                    padding: '7px 12px', borderRadius: 'var(--radius-sm)', textAlign: 'left',
                     background: 'var(--bg-glass)', border: '1px solid var(--border-subtle)',
-                    color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer',
-                    transition: 'all var(--transition-fast)',
+                    color: 'var(--text-secondary)', fontSize: '11px', cursor: 'pointer',
                     fontFamily: 'inherit',
-                  }}
-                  onMouseEnter={e => {
-                    (e.currentTarget as HTMLElement).style.background = 'var(--bg-glass-hover)'
-                    ;(e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'
-                    ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-default)'
-                  }}
-                  onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.background = 'var(--bg-glass)'
-                    ;(e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'
-                    ;(e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'
                   }}
                 >
                   {prompt}
@@ -315,16 +336,13 @@ function AskHalvexColumn() {
           messages.map((msg, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
               <div style={{
-                maxWidth: '86%',
-                padding: '9px 13px',
+                maxWidth: '86%', padding: '9px 13px',
                 borderRadius: msg.role === 'user' ? '12px 12px 3px 12px' : '12px 12px 12px 3px',
                 background: msg.role === 'user' ? 'var(--accent-primary)' : 'var(--bg-glass)',
                 border: msg.role === 'user' ? 'none' : '1px solid var(--border-subtle)',
                 fontSize: '13px',
                 color: msg.role === 'user' ? '#fff' : 'var(--text-secondary)',
-                lineHeight: 1.65,
-                whiteSpace: 'pre-wrap',
-                backdropFilter: msg.role === 'assistant' ? 'blur(16px)' : undefined,
+                lineHeight: 1.65, whiteSpace: 'pre-wrap',
               }}>
                 {msg.content}
               </div>
@@ -334,48 +352,28 @@ function AskHalvexColumn() {
 
         {chatLoading && (
           <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-            <div style={{
-              padding: '9px 13px', borderRadius: '12px 12px 12px 3px',
-              background: 'var(--bg-glass)', border: '1px solid var(--border-subtle)',
-            }}>
+            <div style={{ padding: '9px 13px', borderRadius: '12px 12px 12px 3px', background: 'var(--bg-glass)', border: '1px solid var(--border-subtle)' }}>
               <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                 {[0, 0.2, 0.4].map((delay, i) => (
-                  <div key={i} style={{
-                    width: '5px', height: '5px', borderRadius: '50%',
-                    background: 'var(--accent-primary)',
-                    animation: `bounce 1.2s ${delay}s infinite`,
-                  }} />
+                  <div key={i} style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--accent-primary)', animation: `bounce 1.2s ${delay}s infinite` }} />
                 ))}
               </div>
             </div>
           </div>
         )}
-
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Intent chip */}
       {intent && (
-        <div style={{
-          padding: '0 20px 8px', flexShrink: 0,
-          display: 'flex', alignItems: 'center', gap: '6px',
-        }}>
-          <div style={{
-            fontSize: '11px', color: 'var(--accent-primary)',
-            background: 'var(--bg-hero)', border: '1px solid rgba(99,102,241,0.20)',
-            padding: '3px 10px', borderRadius: '100px',
-          }}>
+        <div style={{ padding: '0 20px 8px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--accent-primary)', background: 'var(--bg-hero)', border: '1px solid rgba(99,102,241,0.20)', padding: '3px 10px', borderRadius: '100px' }}>
             {intent}
           </div>
         </div>
       )}
 
       {/* Input */}
-      <div style={{
-        padding: '12px 18px 16px',
-        borderTop: '1px solid var(--border-subtle)',
-        flexShrink: 0,
-      }}>
+      <div style={{ padding: '10px 18px 14px', borderTop: '1px solid var(--border-subtle)', flexShrink: 0 }}>
         <form onSubmit={handleSend} style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
           <textarea
             ref={inputRef}
@@ -388,11 +386,9 @@ function AskHalvexColumn() {
             style={{
               flex: 1, resize: 'none', padding: '9px 13px',
               borderRadius: 'var(--radius-sm)', fontSize: '13px', lineHeight: 1.5,
-              background: 'var(--bg-glass)',
-              border: '1px solid var(--border-subtle)',
+              background: 'var(--bg-glass)', border: '1px solid var(--border-subtle)',
               color: 'var(--text-primary)', outline: 'none',
               caretColor: 'var(--accent-primary)', fontFamily: 'inherit',
-              transition: 'border-color var(--transition-fast)',
             }}
             onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.40)')}
             onBlur={e => (e.target.style.borderColor = 'var(--border-subtle)')}
@@ -402,12 +398,10 @@ function AskHalvexColumn() {
             disabled={chatLoading || !inputText.trim()}
             style={{
               width: '38px', height: '38px', borderRadius: 'var(--radius-sm)', flexShrink: 0,
-              background: 'var(--accent-primary)',
-              border: 'none',
+              background: 'var(--accent-primary)', border: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: chatLoading || !inputText.trim() ? 'not-allowed' : 'pointer',
               opacity: chatLoading || !inputText.trim() ? 0.4 : 1,
-              transition: 'opacity var(--transition-fast)',
             }}
           >
             {chatLoading
@@ -420,164 +414,80 @@ function AskHalvexColumn() {
   )
 }
 
-// ─── Right Column: Product Signal ────────────────────────────────────────────
-function ProductSignalColumn() {
-  const { data, isLoading } = useSWR('/api/dashboard/product-signals', fetcher, {
-    revalidateOnFocus: false,
-    dedupingInterval: 120000,
+// ─── Right Column: Closed Loops ───────────────────────────────────────────────
+function ClosedLoopsColumn() {
+  const { data, isLoading } = useSWR('/api/dashboard/loop-signals', fetcher, {
+    revalidateOnFocus: false, dedupingInterval: 60000,
   })
-  const signals = data?.data
+  const closedLoops: any[] = data?.data?.closedLoops ?? []
+  const closedCount: number = data?.data?.closedCount ?? 0
 
   return (
     <div style={{
       background: 'var(--bg-surface)',
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      overflow: 'hidden',
+      display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden',
     }}>
       {/* Header */}
       <div style={{
         padding: '18px 18px 14px',
-        borderBottom: '1px solid var(--border-subtle)',
-        flexShrink: 0,
+        borderBottom: '1px solid var(--border-subtle)', flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Layers size={14} color="var(--accent-warning)" />
-          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Product Signal</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+          <CheckCircle2 size={14} color="var(--accent-success)" />
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Closed Loops</span>
         </div>
-        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Gaps costing revenue</div>
+        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+          {isLoading ? 'Loading…' : closedCount > 0
+            ? `${closedCount} loop${closedCount !== 1 ? 's' : ''} closed this week`
+            : 'No loops closed this week'}
+        </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-        {/* Product Gaps */}
-        <div>
-          <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
-            Product Gaps
+      {/* List */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
+        {isLoading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px' }}>
+            {[1, 2, 3].map(i => <div key={i} style={{ height: '64px', borderRadius: '8px' }} className="skeleton" />)}
           </div>
-          {isLoading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {[1, 2, 3].map(i => (
-                <div key={i} style={{ height: '56px', borderRadius: '8px' }} className="skeleton" />
-              ))}
-            </div>
-          ) : signals?.gaps?.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {signals.gaps.map((gap: any, i: number) => (
-                <Link key={i} href="/product-gaps" style={{ textDecoration: 'none' }}>
-                  <div style={{
-                    padding: '9px 12px', borderRadius: 'var(--radius-sm)',
-                    background: 'var(--bg-glass)', border: '1px solid var(--border-subtle)',
-                    transition: 'background var(--transition-fast)',
-                  }}
-                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-glass-hover)'}
-                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-glass)'}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {gap.title}
-                      </span>
-                      {gap.linkedLinearIssueId ? (
-                        <span style={{ fontSize: '10px', color: 'var(--accent-success)', flexShrink: 0, marginLeft: '8px' }}>● In cycle</span>
-                      ) : (
-                        <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', flexShrink: 0, marginLeft: '8px' }}>○ No issue</span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '3px', fontVariantNumeric: 'tabular-nums' }}>
-                      {formatCurrency(gap.revenueAtRisk)} · {gap.dealsBlocked} deal{gap.dealsBlocked !== 1 ? 's' : ''}
-                    </div>
-                  </div>
-                </Link>
-              ))}
-              <Link href="/product-gaps" style={{
-                display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '2px',
-                fontSize: '11px', color: 'var(--accent-primary)',
-              }}>
-                All gaps <ArrowUpRight size={10} />
-              </Link>
-            </div>
-          ) : (
-            <div style={{ padding: '20px 0', textAlign: 'center' }}>
-              <GitBranch size={18} style={{ color: 'var(--text-tertiary)', marginBottom: '8px' }} />
-              <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>No gaps logged yet</div>
-              <Link href="/product-gaps" style={{ fontSize: '11px', color: 'var(--accent-primary)', marginTop: '6px', display: 'inline-block' }}>
-                Add product gap →
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* Loop Activity */}
-        {!isLoading && signals?.recentLoops?.length > 0 && (
-          <div>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
-              Loop Activity
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              {signals.recentLoops.map((loop: any) => (
-                <div key={loop.id} style={{
-                  display: 'flex', alignItems: 'flex-start', gap: '8px',
-                  padding: '7px 10px', borderRadius: 'var(--radius-sm)',
-                  background: 'var(--bg-glass)', border: '1px solid var(--border-subtle)',
+        ) : closedLoops.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {closedLoops.map((loop: any) => (
+              <Link key={loop.id} href={`/deals/${loop.id}`} style={{ textDecoration: 'none' }}>
+                <div style={{
+                  padding: '10px 12px', borderRadius: 'var(--radius-md)',
+                  background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.18)',
+                  borderLeft: '3px solid var(--accent-success)',
                 }}>
-                  <Zap size={11} color="var(--accent-primary)" style={{ flexShrink: 0, marginTop: '1px' }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      {loop.issueId && <span style={{ color: 'var(--accent-primary)', fontWeight: 600, marginRight: '4px' }}>{loop.issueId}</span>}
-                      {loop.label}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {loop.company}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--accent-success)', marginTop: '2px' }}>
+                        ✓ {loop.issueCount} issue{loop.issueCount !== 1 ? 's' : ''} shipped
+                      </div>
                     </div>
-                    {loop.dealName && (
-                      <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '1px' }}>→ {loop.dealName}</div>
+                    {loop.deployedAt && (
+                      <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', flexShrink: 0 }}>
+                        {timeAgo(loop.deployedAt)}
+                      </span>
                     )}
                   </div>
-                  <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', flexShrink: 0 }}>
-                    {timeAgo(loop.createdAt)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Recent AI Actions */}
-        {!isLoading && signals?.recentActions?.length > 0 && (
-          <div>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
-              Recent AI Actions
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {signals.recentActions.map((action: any) => (
-                <div
-                  key={action.id}
-                  style={{
-                    display: 'flex', alignItems: 'flex-start', gap: '8px',
-                    padding: '6px 10px', borderRadius: 'var(--radius-sm)',
-                    background: 'var(--bg-glass)', border: '1px solid var(--border-subtle)',
-                    cursor: action.dealId ? 'pointer' : 'default',
-                    transition: 'background var(--transition-fast)',
-                  }}
-                  onClick={() => { if (action.dealId) window.location.href = `/deals/${action.dealId}` }}
-                  onMouseEnter={e => { if (action.dealId) (e.currentTarget as HTMLElement).style.background = 'var(--bg-glass-hover)' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-glass)' }}
-                >
-                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)', flex: 1 }}>{action.label}</span>
-                  {action.dealName && (
-                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', flexShrink: 0 }}>{action.dealName}</span>
+                  {loop.dealValue && (
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px', fontVariantNumeric: 'tabular-nums' }}>
+                      {formatCurrency(loop.dealValue)} at stake
+                    </div>
                   )}
                 </div>
-              ))}
-            </div>
+              </Link>
+            ))}
           </div>
-        )}
-
-        {/* Empty state */}
-        {!isLoading && !signals?.gaps?.length && !signals?.recentLoops?.length && !signals?.recentActions?.length && (
+        ) : (
           <div style={{ textAlign: 'center', padding: '40px 16px', margin: 'auto' }}>
-            <Layers size={24} style={{ color: 'var(--text-tertiary)', marginBottom: '10px' }} />
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>No signals yet</div>
+            <div style={{ fontSize: '32px', marginBottom: '12px' }}>🔄</div>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>No closed loops yet</div>
             <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px', lineHeight: 1.6 }}>
-              Product gaps appear as you log deal notes.
+              When Linear issues ship and link back to deals, closed loops will appear here.
             </div>
           </div>
         )}
@@ -598,13 +508,14 @@ export default function DashboardPage() {
       overflow: 'hidden',
       margin: '-22px -24px',
     }}>
-      <RevenueAtRiskColumn />
+      <SignalColumn />
       <AskHalvexColumn />
-      <ProductSignalColumn />
+      <ClosedLoopsColumn />
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-5px); } }
+        @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
       `}</style>
     </div>
   )

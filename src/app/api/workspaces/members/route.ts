@@ -11,7 +11,7 @@ export async function GET() {
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { workspaceId } = await getWorkspaceContext(userId)
     const members = await db
-      .select({ id: workspaceMemberships.id, userId: workspaceMemberships.userId, role: workspaceMemberships.role, createdAt: workspaceMemberships.createdAt, email: users.email })
+      .select({ id: workspaceMemberships.id, userId: workspaceMemberships.userId, role: workspaceMemberships.role, appRole: workspaceMemberships.appRole, createdAt: workspaceMemberships.createdAt, email: users.email })
       .from(workspaceMemberships)
       .innerJoin(users, eq(workspaceMemberships.userId, users.id))
       .where(eq(workspaceMemberships.workspaceId, workspaceId))
@@ -22,6 +22,27 @@ export async function GET() {
       { error: 'Internal server error', details: process.env.NODE_ENV === 'development' ? (err as Error).message : undefined },
       { status: 500 }
     )
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const { userId } = await auth()
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { workspaceId, role } = await getWorkspaceContext(userId)
+    if (role !== 'owner' && role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const { targetUserId, appRole } = await req.json()
+    if (!targetUserId || !appRole || !['sales', 'product', 'admin'].includes(appRole)) {
+      return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+    }
+    await db
+      .update(workspaceMemberships)
+      .set({ appRole })
+      .where(and(eq(workspaceMemberships.workspaceId, workspaceId), eq(workspaceMemberships.userId, targetUserId)))
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error('[PATCH /api/workspaces/members]', err)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 

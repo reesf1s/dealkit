@@ -40,6 +40,8 @@ import {
 import { generateScopedIssue } from '@/lib/scope-generator'
 import { extractDealSignalText } from '@/lib/linear-signal-match'
 import { findMatchingIssues } from '@/lib/deal-linear-matcher'
+import { getUserRole } from '@/lib/roles'
+import { requestPmApproval, getClerkUserIdFromSlack } from '@/lib/pm-approval'
 import type { ToolContext, ToolResult } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1238,6 +1240,7 @@ export const halvex_bulk_scope_to_cycle = {
       .select({
         dealName: dealLogs.dealName,
         prospectCompany: dealLogs.prospectCompany,
+        dealValue: dealLogs.dealValue,
         notes: dealLogs.notes,
         dealRisks: dealLogs.dealRisks,
       })
@@ -1246,6 +1249,28 @@ export const halvex_bulk_scope_to_cycle = {
       .limit(1)
 
     if (!dealRow) return { result: `Deal not found.` }
+
+    // 1b. Role check — sales reps route to PM approval; product/admin scope directly
+    const clerkUserId = ctx.userId
+      ? await getClerkUserIdFromSlack(ctx.userId, ctx.workspaceId).catch(() => null)
+      : null
+    const userRole = clerkUserId
+      ? await getUserRole(clerkUserId, ctx.workspaceId).catch(() => 'sales' as const)
+      : 'sales' as const
+
+    if (userRole === 'sales') {
+      const msg = await requestPmApproval({
+        workspaceId: ctx.workspaceId,
+        repSlackUserId: ctx.userId,
+        repChannelId: ctx.channelId ?? ctx.userId,
+        dealId: deal.id,
+        dealName: dealRow.dealName,
+        company: dealRow.prospectCompany,
+        dealValue: dealRow.dealValue ?? null,
+        issueIds,
+      })
+      return { result: msg }
+    }
 
     // 2. Get Linear integration
     const [integration] = await db

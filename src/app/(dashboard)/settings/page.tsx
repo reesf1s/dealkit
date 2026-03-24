@@ -32,6 +32,7 @@ type Member = {
   userId: string
   email: string
   role: 'owner' | 'admin' | 'member'
+  appRole: 'sales' | 'product' | 'admin'
   createdAt: string
 }
 
@@ -53,16 +54,116 @@ const PLAN_DETAILS: Record<Plan, { name: string; price: string; color: string; b
 function SectionCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <div style={{
-      background: 'linear-gradient(135deg, rgba(99,102,241,0.07), rgba(59,130,246,0.03), transparent)',
-      backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-      border: '1px solid rgba(255,255,255,0.08)', borderRadius: '1rem', overflow: 'hidden',
-      boxShadow: '0 2px 20px rgba(0,0,0,0.30)',
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border-subtle)', borderRadius: '1rem', overflow: 'hidden',
     }}>
       <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
         <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0', margin: 0, marginBottom: description ? '3px' : 0 }}>{title}</h2>
         {description && <p style={{ fontSize: '11px', color: '#475569', margin: 0 }}>{description}</p>}
       </div>
       <div style={{ padding: '16px 18px' }}>{children}</div>
+    </div>
+  )
+}
+
+const APP_ROLE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+  sales:   { label: 'Sales',   color: '#818cf8', bg: 'rgba(129,140,248,0.10)' },
+  product: { label: 'Product', color: '#34d399', bg: 'rgba(52,211,153,0.10)' },
+  admin:   { label: 'Admin',   color: '#f59e0b', bg: 'rgba(245,158,11,0.10)' },
+}
+
+function MembersList({
+  members, currentUserId, isAdmin, onRemove, onRoleChange,
+}: {
+  members: Member[]
+  currentUserId: string | undefined
+  isAdmin: boolean
+  onRemove: (userId: string, email: string) => void
+  onRoleChange: () => void
+}) {
+  const { toast } = useToast()
+  const [updatingRole, setUpdatingRole] = useState<string | null>(null)
+
+  async function handleAppRoleChange(targetUserId: string, appRole: string) {
+    setUpdatingRole(targetUserId)
+    try {
+      const res = await fetch('/api/workspaces/members', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId, appRole }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      toast(`Role updated to ${appRole}`, 'success')
+      onRoleChange()
+    } catch { toast('Failed to update role', 'error') }
+    finally { setUpdatingRole(null) }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {members.map(m => {
+        const roleInfo = APP_ROLE_LABELS[m.appRole ?? 'sales'] ?? APP_ROLE_LABELS.sales
+        const isMe = m.userId === currentUserId
+        return (
+          <div key={m.id} style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '8px 10px', borderRadius: '8px',
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            gap: '8px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+              <div style={{
+                width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
+                background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.3))',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '11px', fontWeight: 700, color: 'var(--accent)',
+              }}>
+                {m.email[0].toUpperCase()}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: '12px', color: 'var(--text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.email}</p>
+                <p style={{ fontSize: '10px', color: 'var(--text-tertiary)', margin: 0, textTransform: 'capitalize' }}>{m.role}</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+              {isAdmin && !isMe ? (
+                <select
+                  value={m.appRole ?? 'sales'}
+                  onChange={e => handleAppRoleChange(m.userId, e.target.value)}
+                  disabled={updatingRole === m.userId}
+                  style={{
+                    padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
+                    background: roleInfo.bg, color: roleInfo.color,
+                    border: `1px solid ${roleInfo.color}33`,
+                    cursor: 'pointer', outline: 'none', fontFamily: 'inherit',
+                    opacity: updatingRole === m.userId ? 0.6 : 1,
+                  }}
+                >
+                  <option value="sales">Sales</option>
+                  <option value="product">Product</option>
+                  <option value="admin">Admin</option>
+                </select>
+              ) : (
+                <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '6px', background: roleInfo.bg, color: roleInfo.color, border: `1px solid ${roleInfo.color}33` }}>
+                  {roleInfo.label}
+                </span>
+              )}
+              {isAdmin && !isMe && (
+                <button onClick={() => onRemove(m.userId, m.email)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '4px', borderRadius: '5px', display: 'flex', alignItems: 'center' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--danger)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
+              {isMe && (
+                <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--surface)', padding: '2px 7px', borderRadius: '4px' }}>you</span>
+              )}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -349,42 +450,13 @@ export default function SettingsPage() {
               </p>
 
               {/* Members list */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {members.map(m => (
-                  <div key={m.id} style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '8px 10px', borderRadius: '8px',
-                    background: 'var(--surface)', border: '1px solid var(--border)',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{
-                        width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
-                        background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.3))',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: '11px', fontWeight: 700, color: 'var(--accent)',
-                      }}>
-                        {m.email[0].toUpperCase()}
-                      </div>
-                      <div>
-                        <p style={{ fontSize: '12px', color: 'var(--text-primary)', margin: 0 }}>{m.email}</p>
-                        <p style={{ fontSize: '10px', color: 'var(--text-tertiary)', margin: 0, textTransform: 'capitalize' }}>{m.role}</p>
-                      </div>
-                    </div>
-                    {isOwner && m.userId !== dbUser?.id && (
-                      <button onClick={() => handleRemoveMember(m.userId, m.email)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '4px', borderRadius: '5px', display: 'flex', alignItems: 'center' }}
-                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--danger)')}
-                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    )}
-                    {m.userId === dbUser?.id && (
-                      <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--surface)', padding: '2px 7px', borderRadius: '4px' }}>you</span>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <MembersList
+                members={members}
+                currentUserId={dbUser?.id}
+                isAdmin={isOwner || dbUser?.role === 'admin'}
+                onRemove={handleRemoveMember}
+                onRoleChange={mutateMembers}
+              />
 
               {/* Join another workspace */}
               <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border)' }}>
@@ -820,10 +892,8 @@ function CompanyBrainSection() {
 
   return (
     <div style={{
-      background: 'linear-gradient(135deg, rgba(99,102,241,0.07), rgba(59,130,246,0.03), transparent)',
-      backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-      border: '1px solid rgba(255,255,255,0.08)', borderRadius: '1rem', overflow: 'hidden',
-      boxShadow: '0 2px 20px rgba(0,0,0,0.30)',
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border-subtle)', borderRadius: '1rem', overflow: 'hidden',
     }}>
       <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>

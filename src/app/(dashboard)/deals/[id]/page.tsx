@@ -99,6 +99,107 @@ function highlightSignals(text: string, competitors: string[]): string {
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
+// ─── Loop state banner ───────────────────────────────────────────────────────
+
+function LoopStateBanner({ dealId }: { dealId: string }) {
+  const { data, isLoading, mutate } = useSWR(`/api/deals/${dealId}/loop-status`, fetcher, {
+    revalidateOnFocus: false, refreshInterval: 30000,
+  })
+  const [starting, setStarting] = useState(false)
+  const loop = data?.data
+
+  if (isLoading || !loop) return null
+
+  async function handleStartLoop() {
+    setStarting(true)
+    try {
+      await fetch(`/api/deals/${dealId}/start-loop`, { method: 'POST' })
+      await mutate()
+    } finally { setStarting(false) }
+  }
+
+  const baseStyle: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    gap: '12px', padding: '12px 16px', borderRadius: '10px',
+    fontSize: '13px', flexWrap: 'wrap' as const,
+  }
+
+  if (loop.state === 'none') {
+    return (
+      <div style={{ ...baseStyle, border: '1px dashed rgba(99,102,241,0.35)', background: 'rgba(99,102,241,0.04)' }}>
+        <span style={{ color: 'var(--text-tertiary)' }}>No loop active for this deal</span>
+        <button
+          onClick={handleStartLoop}
+          disabled={starting}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '5px',
+            padding: '6px 14px', borderRadius: '7px',
+            background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)',
+            color: 'var(--accent-primary)', fontSize: '12px', fontWeight: 600,
+            cursor: starting ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+            opacity: starting ? 0.6 : 1,
+          }}
+        >
+          <Zap size={11} /> {starting ? 'Starting…' : 'Start Loop'}
+        </button>
+      </div>
+    )
+  }
+
+  if (loop.state === 'awaiting_approval') {
+    const minsAgo = loop.requestedAt
+      ? Math.floor((Date.now() - new Date(loop.requestedAt).getTime()) / 60000)
+      : null
+    return (
+      <div style={{ ...baseStyle, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', fontWeight: 500 }}>
+          <span>⏳</span> Awaiting product team approval
+          {minsAgo !== null && (
+            <span style={{ fontSize: '11px', fontWeight: 400, color: 'rgba(245,158,11,0.7)' }}>
+              · Requested {minsAgo < 60 ? `${minsAgo}m ago` : `${Math.floor(minsAgo / 60)}h ago`}
+            </span>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  if (loop.state === 'in_cycle') {
+    return (
+      <div style={{ ...baseStyle, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.25)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#60a5fa', fontWeight: 500 }}>
+          <span>🔄</span> {loop.issueCount} issue{loop.issueCount !== 1 ? 's' : ''} in the product cycle
+        </div>
+        {loop.issues?.length > 0 && (
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
+            {loop.issues.slice(0, 3).map((issue: any) => (
+              <span key={issue.linearIssueId} style={{
+                fontSize: '11px', padding: '2px 8px', borderRadius: '100px',
+                background: 'rgba(96,165,250,0.12)', color: '#93c5fd',
+              }}>
+                {issue.linearIssueId}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (loop.state === 'shipped') {
+    const deployedDate = loop.deployedAt ? new Date(loop.deployedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : null
+    return (
+      <div style={{ ...baseStyle, background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.25)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-success)', fontWeight: 500 }}>
+          <span>✅</span> Loop closed — {loop.deployedCount} feature{loop.deployedCount !== 1 ? 's' : ''} shipped{deployedDate ? ` ${deployedDate}` : ''}
+        </div>
+      </div>
+    )
+  }
+
+  return null
+}
+
 // ─── Workspace members hook ─────────────────────────────────────────────────
 
 interface WorkspaceMember {
@@ -4739,8 +4840,6 @@ export default function DealDetailPage() {
       {deal ? (
         <div style={{
           background: 'var(--bg-hero)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
           border: '1px solid rgba(99,102,241,0.20)',
           borderRadius: '1.25rem',
           padding: isMobile ? '20px' : '24px 28px',
@@ -4896,12 +4995,14 @@ export default function DealDetailPage() {
         <div style={{ height: '148px', background: 'rgba(99,102,241,0.08)', borderRadius: '1.25rem', border: '1px solid rgba(99,102,241,0.15)' }} />
       )}
 
+      {/* ── Loop state banner ──────────────────────────────────────────── */}
+      {id && <LoopStateBanner dealId={id} />}
+
       {/* ── Tab pills ──────────────────────────────────────────────────── */}
       <div style={{
         display: 'flex', gap: '4px',
-        background: 'linear-gradient(135deg, rgba(99,102,241,0.10), rgba(59,130,246,0.05), transparent)',
-        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255,255,255,0.08)',
+        background: 'var(--bg-surface)',
+        border: '1px solid var(--border-subtle)',
         borderRadius: '10px', padding: '4px',
         overflowX: isMobile ? 'auto' : undefined, scrollbarWidth: 'none',
       }}>
