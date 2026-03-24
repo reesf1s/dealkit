@@ -180,12 +180,17 @@ function PlaybookPanel({ brain, isLoading }: { brain: any; isLoading: boolean })
               {competitivePatterns.slice(0, 5).map((p: any, i: number) => {
                 const wr = typeof p.winRate === 'number' ? p.winRate : null
                 const color = wr != null ? (wr >= 60 ? '#34d399' : wr >= 40 ? '#fbbf24' : '#f87171') : '#64748b'
+                const slug = encodeURIComponent(p.competitor.toLowerCase().replace(/\s+/g, '-'))
                 return (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Link key={i} href={`/intelligence/competitors/${slug}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', borderRadius: '6px', padding: '4px 6px', margin: '-4px -6px' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                  >
                     <span style={{ flex: 1, fontSize: '12px', color: '#94a3b8' }}>vs {p.competitor}</span>
                     {wr != null && <span style={{ fontSize: '11px', fontWeight: 700, color, flexShrink: 0 }}>{wr}% win</span>}
                     {p.topWinCondition && <span style={{ fontSize: '10px', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '120px' }}>{p.topWinCondition}</span>}
-                  </div>
+                    <ArrowUpRight size={11} style={{ color: '#334155', flexShrink: 0 }} />
+                  </Link>
                 )
               })}
             </div>

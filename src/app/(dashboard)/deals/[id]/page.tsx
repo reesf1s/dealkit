@@ -4603,6 +4603,10 @@ export default function DealDetailPage() {
   const [meetingNotesDraft, setMeetingNotesDraft] = useState('')
   const [meetingLogging, setMeetingLogging] = useState(false)
   const [meetingToast, setMeetingToast] = useState<string | null>(null)
+  const [shareLoading, setShareLoading] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
+  const [shareToken, setShareToken] = useState<string | null>(deal?.dealShareToken ?? null)
+  const [isShared, setIsShared] = useState<boolean>(deal?.dealIsShared ?? false)
 
   const [isMobile, setIsMobile] = useState(false)
   useEffect(() => {
@@ -4612,6 +4616,14 @@ export default function DealDetailPage() {
     mq.addEventListener('change', handler)
     return () => mq.removeEventListener('change', handler)
   }, [])
+
+  // Sync share state from loaded deal
+  useEffect(() => {
+    if (deal) {
+      setShareToken(deal.dealShareToken ?? null)
+      setIsShared(deal.dealIsShared ?? false)
+    }
+  }, [deal?.dealShareToken, deal?.dealIsShared])
 
   // Register active deal for AI chat sidebar
   useEffect(() => {
@@ -4790,6 +4802,41 @@ export default function DealDetailPage() {
                   onMouseLeave={e => { e.currentTarget.style.background = 'rgba(52,211,153,0.10)' }}
                 >
                   <MessageSquare size={13} /> Log meeting
+                </button>
+                <button
+                  onClick={async () => {
+                    setShareLoading(true)
+                    try {
+                      const res = await fetch(`/api/deals/${id}/share`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ enable: !isShared }),
+                      })
+                      const json = await res.json()
+                      if (json.data) {
+                        setIsShared(json.data.shared)
+                        setShareToken(json.data.shareToken)
+                        if (json.data.shared && json.data.shareToken) {
+                          const url = `${window.location.origin}/deal-share/${json.data.shareToken}`
+                          await navigator.clipboard.writeText(url).catch(() => {})
+                          setShareCopied(true)
+                          setTimeout(() => setShareCopied(false), 3000)
+                        }
+                      }
+                    } finally { setShareLoading(false) }
+                  }}
+                  disabled={shareLoading}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
+                    background: isShared ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.06)',
+                    border: isShared ? '1px solid rgba(99,102,241,0.35)' : '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: '8px', color: isShared ? '#818cf8' : '#94a3b8',
+                    fontSize: '13px', fontWeight: 600, cursor: shareLoading ? 'not-allowed' : 'pointer',
+                    opacity: shareLoading ? 0.7 : 1,
+                  }}
+                >
+                  <Link2 size={13} />
+                  {shareLoading ? 'Working…' : shareCopied ? 'Copied!' : isShared ? 'Shared' : 'Share'}
                 </button>
                 <button
                   onClick={async () => {

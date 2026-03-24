@@ -249,6 +249,9 @@ export const dealLogs = pgTable('deal_logs', {
   noteEmbedding: text('note_embedding'),   // stored as text, cast to vector in SQL
   dealEmbedding: text('deal_embedding'),   // stored as text, cast to vector in SQL
   // Migration v25: actual column type is vector(1536) — Drizzle uses text since it lacks native vector support
+  dealShareToken: text('deal_share_token').unique(),   // public share link token
+  dealIsShared: boolean('deal_is_shared').default(false).notNull(),
+  // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS deal_share_token text UNIQUE, ADD COLUMN IF NOT EXISTS deal_is_shared boolean NOT NULL DEFAULT false;
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
