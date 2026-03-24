@@ -330,6 +330,11 @@ a {
    ANIMATIONS
 ══════════════════════════════════════════════════ */
 
+.skeleton {
+  background: var(--skeleton-from);
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
 @keyframes skeleton-shimmer {
   0%   { opacity: 1; }
   50%  { opacity: 0.4; }

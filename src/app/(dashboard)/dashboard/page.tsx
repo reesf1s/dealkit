@@ -279,11 +279,6 @@ export default function DashboardPage() {
                   Pipeline looks healthy
                 </div>
               )}
-              {overview?.summary && !isLoading && (
-                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', marginTop: '2px', lineHeight: 1.4 }}>
-                  {overview.summary.length > 120 ? overview.summary.slice(0, 120) + '…' : overview.summary}
-                </div>
-              )}
             </div>
           </div>
           <button
@@ -308,6 +303,32 @@ export default function DashboardPage() {
           </button>
         </div>
 
+        {/* AI Briefing — natural language overview */}
+        {(overview?.summary || isLoading) && (
+          <div style={{
+            padding: '14px 22px',
+            borderBottom: '1px solid rgba(255,255,255,0.05)',
+            background: 'rgba(99,102,241,0.03)',
+          }}>
+            {isLoading ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <SkeletonLine w="95%" h="13px" />
+                <SkeletonLine w="80%" h="13px" />
+              </div>
+            ) : (
+              <p style={{
+                fontSize: '13px',
+                color: 'rgba(255,255,255,0.58)',
+                lineHeight: 1.65,
+                margin: 0,
+                letterSpacing: '-0.005em',
+              }}>
+                {overview.summary}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Priority list */}
         <div style={{ padding: '8px 12px 12px' }}>
           {isLoading ? (
@@ -331,7 +352,7 @@ export default function DashboardPage() {
                 Halvex will surface deal risks and actions here as they emerge.<br />
                 Add meeting notes to deals to activate AI intelligence.
               </div>
-              <Link href="/pipeline" style={{
+              <Link href="/deals" style={{
                 display: 'inline-flex', alignItems: 'center', gap: '5px',
                 padding: '8px 16px', borderRadius: '8px',
                 background: 'rgba(99,102,241,0.12)',
@@ -435,7 +456,7 @@ export default function DashboardPage() {
 
               {/* Show more link */}
               {(brain?.urgentDeals?.length ?? 0) > 5 && (
-                <Link href="/pipeline" style={{
+                <Link href="/deals" style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
                   padding: '9px', borderRadius: '9px', textDecoration: 'none',
                   fontSize: '12px', fontWeight: 500, color: 'rgba(255,255,255,0.35)',
@@ -507,9 +528,9 @@ export default function DashboardPage() {
         </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {[
-            { label: 'Slack', icon: <MessageSquare size={12} />, connected: slackConnected, href: '/company' },
-            { label: 'Linear', icon: <GitBranch size={12} />, connected: linearConnected, href: '/company' },
-            { label: 'HubSpot', icon: <Brain size={12} />, connected: hubspotConnected, href: '/company' },
+            { label: 'Slack', icon: <MessageSquare size={12} />, connected: slackConnected, href: '/settings' },
+            { label: 'Linear', icon: <GitBranch size={12} />, connected: linearConnected, href: '/settings' },
+            { label: 'HubSpot', icon: <Brain size={12} />, connected: hubspotConnected, href: '/settings' },
           ].map(({ label, icon, connected, href }) => (
             <Link
               key={label}

@@ -7,9 +7,10 @@ import { useState, useEffect } from 'react'
 import {
   BookOpen, TrendingUp, TrendingDown, Target, AlertTriangle,
   ArrowUpRight, Users, Clock, Award, Lock, Info,
-  CheckCircle, BarChart3, Zap, Shield, ChevronRight
+  CheckCircle, BarChart3, Zap, Shield, ChevronRight, Swords, Brain,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
+import { PageTabs } from '@/components/shared/PageTabs'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -190,6 +191,13 @@ function EmptyState({ totalDeals, winCount, lossCount, recentDeals }: { totalDea
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', maxWidth: '800px' }}>
+      <PageTabs tabs={[
+        { label: 'Competitors',  href: '/competitors',  icon: Swords        },
+        { label: 'Case Studies', href: '/case-studies', icon: BookOpen      },
+        { label: 'Feature Gaps', href: '/product-gaps', icon: AlertTriangle },
+        { label: 'Playbook',     href: '/playbook',     icon: TrendingUp    },
+        { label: 'Models',       href: '/models',       icon: Brain         },
+      ]} />
       {/* Header */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>

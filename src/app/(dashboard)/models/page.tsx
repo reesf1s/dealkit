@@ -7,8 +7,9 @@ import Link from 'next/link'
 import {
   Brain, TrendingUp, Target, Zap, Star, BarChart3, Award, AlertTriangle,
   CheckCircle, Clock, ArrowUpRight, ChevronRight, Lock, Info, Activity,
-  Database, Cpu, Shield, GitBranch, Users
+  Database, Cpu, Shield, GitBranch, Users, Swords, BookOpen,
 } from 'lucide-react'
+import { PageTabs } from '@/components/shared/PageTabs'
 
 // ── Forecast accuracy types ───────────────────────────────────────────────────
 interface BucketData { bucket: string; predicted: number; wonRate: number }
@@ -654,6 +655,13 @@ export default function ModelsPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', maxWidth: '960px' }}>
+      <PageTabs tabs={[
+        { label: 'Competitors',  href: '/competitors',  icon: Swords        },
+        { label: 'Case Studies', href: '/case-studies', icon: BookOpen      },
+        { label: 'Feature Gaps', href: '/product-gaps', icon: AlertTriangle },
+        { label: 'Playbook',     href: '/playbook',     icon: TrendingUp    },
+        { label: 'Models',       href: '/models',       icon: Brain         },
+      ]} />
 
       {/* ── ML Milestone celebration banner ── */}
       {showMlMilestoneBanner && (

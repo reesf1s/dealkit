@@ -20,9 +20,9 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 // Flat 4-item nav
 const NAV_ITEMS = [
   { href: '/dashboard',   icon: LayoutDashboard, label: 'Today',         matchPaths: ['/dashboard'] },
-  { href: '/pipeline',    icon: GitBranch,       label: 'Deals',         matchPaths: ['/pipeline', '/deals'] },
+  { href: '/deals',       icon: GitBranch,       label: 'Deals',         matchPaths: ['/deals', '/pipeline'] },
   { href: '/competitors', icon: Brain,           label: 'Intelligence',  matchPaths: ['/competitors', '/case-studies', '/product-gaps', '/models', '/collateral', '/playbook'] },
-  { href: '/company',     icon: Plug,            label: 'Connect',       matchPaths: ['/company', '/onboarding'] },
+  { href: '/settings',    icon: Plug,            label: 'Workflows',     matchPaths: ['/settings', '/company', '/onboarding'] },
 ]
 
 export default function Sidebar() {
@@ -345,9 +345,9 @@ export default function Sidebar() {
             key={item.href}
             {...item}
             badge={
-              item.href === '/pipeline' && urgentCount > 0
+              item.href === '/deals' && urgentCount > 0
                 ? { count: urgentCount, color: '#f87171' }
-                : item.href === '/company' && unmatchedEmailCount > 0
+                : item.href === '/settings' && unmatchedEmailCount > 0
                 ? { count: unmatchedEmailCount, color: '#fbbf24' }
                 : undefined
             }
@@ -473,9 +473,9 @@ export default function Sidebar() {
   // Mobile bottom tab bar items
   const MOBILE_TABS = [
     { href: '/dashboard',   icon: LayoutDashboard, label: 'Today' },
-    { href: '/pipeline',    icon: GitBranch,        label: 'Deals' },
+    { href: '/deals',       icon: GitBranch,        label: 'Deals' },
     { href: '/competitors', icon: Brain,            label: 'Intel' },
-    { href: '/company',     icon: Plug,             label: 'Connect' },
+    { href: '/settings',    icon: Plug,             label: 'Workflows' },
   ]
 
   return (

@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Plus, X, RefreshCw, Swords, BookOpen, AlertTriangle } from 'lucide-react'
+import { Plus, X, RefreshCw, Swords, BookOpen, AlertTriangle, TrendingUp, Brain } from 'lucide-react'
 import { PageTabs } from '@/components/shared/PageTabs'
 import { CompetitorTable } from '@/components/competitors/CompetitorTable'
 import { CompetitorForm } from '@/components/competitors/CompetitorForm'
@@ -100,6 +100,8 @@ export default function CompetitorsPage() {
     { label: 'Competitors',   href: '/competitors',   icon: Swords        },
     { label: 'Case Studies',  href: '/case-studies',  icon: BookOpen      },
     { label: 'Feature Gaps',  href: '/product-gaps',  icon: AlertTriangle },
+    { label: 'Playbook',      href: '/playbook',      icon: TrendingUp    },
+    { label: 'Models',        href: '/models',        icon: Brain         },
   ]
 
   return (

@@ -5,9 +5,10 @@ import { useState } from 'react'
 import useSWR from 'swr'
 import {
   AlertTriangle, CheckCircle, Clock, Package, ChevronDown, ChevronUp,
-  Info, Download, Lock, BarChart3, Trash2, List, Columns,
+  Info, Download, Lock, BarChart3, Trash2, List, Columns, Swords, BookOpen, TrendingUp, Brain,
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/format'
+import { PageTabs } from '@/components/shared/PageTabs'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -255,6 +256,13 @@ export default function ProductGapsPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '960px' }}>
+      <PageTabs tabs={[
+        { label: 'Competitors',  href: '/competitors',  icon: Swords        },
+        { label: 'Case Studies', href: '/case-studies', icon: BookOpen      },
+        { label: 'Feature Gaps', href: '/product-gaps', icon: AlertTriangle },
+        { label: 'Playbook',     href: '/playbook',     icon: TrendingUp    },
+        { label: 'Models',       href: '/models',       icon: Brain         },
+      ]} />
 
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
