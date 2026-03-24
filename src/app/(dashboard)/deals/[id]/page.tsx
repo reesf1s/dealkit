@@ -3223,9 +3223,16 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Deal Score</div>
-        {mlPrediction?.confidence && (
+        {mlPrediction?.confidence ? (
           <div style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '100px', background: 'var(--accent-subtle)', color: 'var(--accent)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             {mlPrediction.confidence} confidence
+          </div>
+        ) : (
+          <div
+            title="Score is estimated from text signals and a global prior. Your private ML model activates after 50 logged deals."
+            style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '100px', background: 'rgba(0,0,0,0.05)', color: 'var(--text-tertiary)', fontWeight: '500', cursor: 'default' }}
+          >
+            Scores are estimates
           </div>
         )}
       </div>
