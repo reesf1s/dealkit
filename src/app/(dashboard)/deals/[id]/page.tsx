@@ -21,7 +21,6 @@ import type { DealContact, DealLink as DealLinkType, DealLinkType as LinkTypeEnu
 import { useSidebar } from '@/components/layout/SidebarContext'
 import { getScoreColor, getScoreDisplay } from '@/lib/deal-context'
 import { track, Events } from '@/lib/analytics'
-import { ProductIssuesPanel } from '@/components/deals/ProductIssuesPanel'
 
 // ─── Signal highlighting helper ──────────────────────────────────────────────
 
@@ -4438,11 +4437,9 @@ function AiActivitySection({ dealId }: { dealId: string }) {
 
   return (
     <div style={{
-      background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.04), transparent)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: '1rem',
+      background: 'var(--bg-elevated)',
+      border: '1px solid var(--border-subtle)',
+      borderRadius: 'var(--radius-md)',
       padding: '20px 24px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>

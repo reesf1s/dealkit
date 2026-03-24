@@ -301,6 +301,9 @@ a {
   /* Old text vars */
   --text-accent: #818cf8;
 
+  /* Card background alias */
+  --card-bg: var(--bg-elevated);
+
   /* Old glass card vars — no blur in new system */
   --glass-card-bg: var(--bg-elevated);
   --glass-card-border: var(--border-subtle);
