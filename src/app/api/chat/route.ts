@@ -83,10 +83,27 @@ function looksLikeMeetingTranscript(text: string): boolean {
   return keywordMatches >= 2 || (lineCount >= 8 && keywordMatches >= 1)
 }
 
+// High-confidence patterns that short-circuit the LLM classifier.
+// These are unambiguous regardless of extra context (e.g. "create a deal named X, not the Y deal").
+const HIGH_CONFIDENCE_PATTERNS: Array<[RegExp, Intent]> = [
+  [/\b(create|add|log|track|start|open|record)\s+(a\s+)?(new\s+)?deal\b/i, 'deal_create'],
+  [/\bnew\s+(deal|prospect|opportunity)\b/i, 'deal_create'],
+  [/\bdeal\s+(called|named)\s+\S/i, 'deal_create'],
+  [/\bdelete\s+(the\s+)?deal\b/i, 'deal_delete'],
+  [/\bremove\s+(the\s+)?deal\b/i, 'deal_delete'],
+]
+
+function detectHighConfidenceIntent(text: string): Intent | null {
+  for (const [pattern, intent] of HIGH_CONFIDENCE_PATTERNS) {
+    if (pattern.test(text)) return intent
+  }
+  return null
+}
+
 // Fallback regex-based classifier (used when Haiku call fails)
 function detectIntentFallback(text: string): Intent {
   const lower = text.toLowerCase()
-  if (/\b(new deal|new prospect|add.*deal|create.*deal|log.*deal)\b/i.test(text)) return 'deal_create'
+  if (/\b(new deal|new prospect|add.*deal|create.*deal|log.*deal|deal named|deal called)\b/i.test(text)) return 'deal_create'
   if (looksLikeMeetingTranscript(text)) return 'meeting_notes'
   if (/battlecard|add competitor|create competitor|new competitor|track.*competitor/i.test(text)) return 'competitor_battlecard'
   if (/product\s+gap|feature\s+gap|feature\s+request|missing\s+feature/i.test(text)) return 'product_gap'
@@ -104,6 +121,10 @@ function detectIntentFallback(text: string): Intent {
 }
 
 async function classifyIntent(text: string): Promise<Intent> {
+  // Short-circuit for high-confidence patterns — avoids LLM misclassification on ambiguous phrasing
+  const highConf = detectHighConfidenceIntent(text)
+  if (highConf) return highConf
+
   try {
     const msg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
