@@ -9,7 +9,7 @@ import {
   LayoutDashboard, GitBranch, Brain, Zap,
   Plug, Settings, LogOut, Search,
   ChevronLeft, ChevronRight,
-  X, MessageSquare, CreditCard,
+  X, MessageSquare,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 import { identify } from '@/lib/analytics'
@@ -23,7 +23,6 @@ const NAV_ITEMS = [
   { href: '/intelligence', icon: Brain,           label: 'Intelligence', matchPaths: ['/intelligence', '/competitors', '/case-studies', '/product-gaps', '/models', '/collateral', '/playbook'] },
   { href: '/workflows',    icon: Zap,             label: 'Workflows',    matchPaths: ['/workflows'] },
   { href: '/connections',  icon: Plug,            label: 'Integrations', matchPaths: ['/connections'] },
-  { href: '/billing',      icon: CreditCard,      label: 'Billing',      matchPaths: ['/billing'] },
   { href: '/settings',     icon: Settings,        label: 'Settings',     matchPaths: ['/settings', '/company', '/onboarding'] },
 ]
 

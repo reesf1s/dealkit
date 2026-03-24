@@ -25,12 +25,10 @@ const STAGES = [
 ]
 
 const card: React.CSSProperties = {
-  background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.04), transparent)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  border: '1px solid rgba(255,255,255,0.07)',
+  background: 'var(--bg-elevated)',
+  border: '1px solid var(--border-subtle)',
   borderRadius: '12px',
-  boxShadow: '0 2px 20px rgba(0,0,0,0.30)',
+  boxShadow: 'var(--shadow-card)',
 }
 
 function DealMiniCard({ deal, currencySymbol }: { deal: any; currencySymbol: string }) {

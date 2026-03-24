@@ -4,28 +4,33 @@
 
 :root {
   /* ══════════════════════════════════════════════════
-     HALVEX — DIMENSIONS-STYLE DESIGN SYSTEM
-     Inspired by dimensions.dev: sidebar #080a12,
-     content area #111827 — the contrast is the brand.
+     HALVEX — MIDNIGHT NAVY DESIGN SYSTEM
+     Superhuman-style: very dark, depth through elevation,
+     no harsh borders, indigo glow from top.
   ══════════════════════════════════════════════════ */
 
-  /* Base backgrounds — the Dimensions contrast system */
-  --bg-base: #080a12;           /* sidebar, darkest */
-  --bg-surface: #111827;         /* main content area */
-  --bg-elevated: #1a2035;        /* cards on surface */
-  --bg-glass: rgba(255,255,255,0.05);
-  --bg-glass-hover: rgba(255,255,255,0.08);
-  --bg-hero: rgba(99,102,241,0.1);
+  /* Backgrounds — midnight navy, NOT pure black */
+  --bg-base: #060910;          /* sidebar — deepest */
+  --bg-surface: #0d1117;       /* main content area */
+  --bg-elevated: #111827;      /* elevated cards */
+  --bg-hover: rgba(255,255,255,0.04);
+  --bg-selected: rgba(255,255,255,0.07);
+  --bg-glass: rgba(255,255,255,0.04);
+  --bg-glass-hover: rgba(255,255,255,0.07);
+  --bg-hero: rgba(99,102,241,0.08);
 
-  /* Borders — hairline only */
-  --border-subtle: rgba(255,255,255,0.07);
-  --border-default: rgba(255,255,255,0.10);
-  --border-strong: rgba(255,255,255,0.18);
+  /* The glow — soft indigo radial from top-center */
+  --glow-primary: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99,102,241,0.16) 0%, transparent 70%);
+
+  /* Borders — almost invisible, separation by shade not lines */
+  --border-subtle: rgba(255,255,255,0.05);
+  --border-default: rgba(255,255,255,0.08);
+  --border-strong: rgba(255,255,255,0.14);
 
   /* Typography */
-  --text-primary: #f1f5f9;
-  --text-secondary: rgba(241,245,249,0.6);
-  --text-tertiary: rgba(241,245,249,0.35);
+  --text-primary: #e2e8f0;
+  --text-secondary: rgba(226,232,240,0.55);
+  --text-tertiary: rgba(226,232,240,0.30);
   --text-inverse: #0a0b0f;
 
   /* Accent palette */
@@ -38,21 +43,21 @@
   /* Legacy accent aliases */
   --accent: #6366f1;
   --accent-light: #818cf8;
-  --accent-bg: rgba(99, 102, 241, 0.12);
-  --accent-bg-hover: rgba(99, 102, 241, 0.20);
+  --accent-bg: rgba(99, 102, 241, 0.10);
+  --accent-bg-hover: rgba(99, 102, 241, 0.18);
 
   /* Sidebar */
-  --sidebar-bg: #080a12;
-  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-bg: #060910;
+  --sidebar-border: rgba(255, 255, 255, 0.05);
   --sidebar-width: 220px;
 
-  /* Glass surfaces */
-  --glass-bg: rgba(255, 255, 255, 0.05);
-  --glass-bg-hover: rgba(255, 255, 255, 0.08);
-  --glass-bg-strong: rgba(99, 102, 241, 0.12);
-  --glass-border: rgba(255, 255, 255, 0.10);
-  --glass-border-strong: rgba(255, 255, 255, 0.18);
-  --glass-blur: blur(16px);
+  /* Glass surfaces — NO blur, just subtle bg tint */
+  --glass-bg: rgba(255, 255, 255, 0.04);
+  --glass-bg-hover: rgba(255, 255, 255, 0.07);
+  --glass-bg-strong: rgba(99, 102, 241, 0.10);
+  --glass-border: rgba(255, 255, 255, 0.07);
+  --glass-border-strong: rgba(255, 255, 255, 0.12);
+  --glass-blur: none;
 
   /* Status colors */
   --health-green: #10b981;
@@ -61,13 +66,13 @@
   --health-amber-bg: rgba(245, 158, 11, 0.10);
   --health-red: #ef4444;
   --health-red-bg: rgba(239, 68, 68, 0.10);
-  --health-grey: rgba(241, 245, 249, 0.35);
-  --health-grey-bg: rgba(241, 245, 249, 0.06);
+  --health-grey: rgba(226, 232, 240, 0.30);
+  --health-grey-bg: rgba(226, 232, 240, 0.05);
 
-  /* Shadows */
-  --shadow-card: 0 1px 12px rgba(0, 0, 0, 0.30), 0 1px 3px rgba(0, 0, 0, 0.15);
-  --shadow-card-hover: 0 4px 24px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.20);
-  --shadow-sidebar: 2px 0 24px rgba(0, 0, 0, 0.30);
+  /* Shadows — elevation through shadow not blur */
+  --shadow-card: 0 1px 8px rgba(0, 0, 0, 0.40), 0 1px 2px rgba(0, 0, 0, 0.20);
+  --shadow-card-hover: 0 4px 20px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.25);
+  --shadow-sidebar: 2px 0 20px rgba(0, 0, 0, 0.40);
 
   /* Spacing */
   --space-1: 4px;
@@ -80,7 +85,7 @@
   --space-10: 40px;
   --space-12: 48px;
 
-  /* Radius — tighter than before */
+  /* Radius */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
@@ -93,24 +98,24 @@
   --transition-slow: 320ms cubic-bezier(0.4, 0, 0.2, 1);
 
   /* shadcn/Tailwind compat — dark navy theme */
-  --background: 222 47% 8%;
-  --foreground: 213 31% 95%;
-  --card: 222 47% 9%;
-  --card-foreground: 213 31% 92%;
-  --popover: 222 47% 10%;
-  --popover-foreground: 213 31% 92%;
+  --background: 222 47% 5%;
+  --foreground: 213 31% 89%;
+  --card: 222 47% 7%;
+  --card-foreground: 213 31% 89%;
+  --popover: 222 47% 8%;
+  --popover-foreground: 213 31% 89%;
   --primary: 239 84% 67%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 222 47% 13%;
-  --secondary-foreground: 213 31% 92%;
-  --muted: 222 47% 13%;
-  --muted-foreground: 215 16% 47%;
+  --secondary: 222 47% 10%;
+  --secondary-foreground: 213 31% 89%;
+  --muted: 222 47% 10%;
+  --muted-foreground: 215 16% 40%;
   --accent: 239 84% 67%;
   --accent-foreground: 0 0% 100%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  --border: 222 47% 16%;
-  --input: 222 47% 16%;
+  --border: 222 47% 12%;
+  --input: 222 47% 12%;
   --ring: 239 84% 67%;
   --radius: 10px;
 }
@@ -129,8 +134,10 @@ html.dark, .dark {
 html, body {
   height: 100%;
   min-height: 100%;
-  /* Flat surface — no gradient noise. Contrast is in the layout. */
-  background-color: var(--bg-base) !important;
+  /* Midnight navy base with soft indigo glow from top */
+  background-color: var(--bg-surface);
+  background-image: var(--glow-primary);
+  background-attachment: fixed;
   color: var(--text-primary);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
   font-size: 14px;
@@ -143,28 +150,25 @@ html, body {
 }
 
 /* ══════════════════════════════════════════════════
-   GLASS CARD SYSTEM — Dimensions aesthetic
-   rgba(255,255,255,0.05) + backdrop-filter + hairline border
+   CARD SYSTEM — Midnight navy aesthetic
+   Elevation through background shade, NOT blur.
+   No backdrop-filter. No heavy borders.
 ══════════════════════════════════════════════════ */
 
 .glass-card {
-  background: var(--bg-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
 }
 
 .glass-hero {
   background: var(--bg-hero);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(99, 102, 241, 0.15);
   border-radius: var(--radius-lg);
 }
 
 .glass-card:hover {
-  background: var(--bg-glass-hover);
+  background: color-mix(in srgb, var(--bg-elevated), rgba(255,255,255,0.03) 100%);
   border-color: var(--border-default);
 }
 
@@ -173,7 +177,7 @@ html, body {
 }
 
 .glass-card-hover:hover {
-  background: var(--bg-glass-hover);
+  background: color-mix(in srgb, var(--bg-elevated), rgba(255,255,255,0.03) 100%);
   border-color: var(--border-default);
   box-shadow: var(--shadow-card-hover);
 }
@@ -182,6 +186,18 @@ html, body {
   background: var(--bg-base);
   border-right: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-sidebar);
+}
+
+/* Row items — background on hover, no border */
+.row-item {
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+.row-item:hover {
+  background: var(--bg-hover);
+}
+.row-item.selected {
+  background: var(--bg-selected);
 }
 
 /* ══════════════════════════════════════════════════
@@ -210,19 +226,17 @@ html, body {
     linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  opacity: 0.12;
+  opacity: 0.08;
   transition: opacity var(--transition-base);
   pointer-events: none;
 }
 
 .frost-border:hover::before {
-  opacity: 0.22;
+  opacity: 0.14;
 }
 
 .glass {
-  background: var(--bg-glass);
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
+  background: var(--bg-elevated);
   box-shadow: var(--shadow-card);
 }
 
@@ -241,17 +255,17 @@ html, body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(241, 245, 249, 0.10);
+  background: rgba(226, 232, 240, 0.08);
   border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(241, 245, 249, 0.18);
+  background: rgba(226, 232, 240, 0.14);
 }
 
 /* Selection */
 ::selection {
   background: rgba(99, 102, 241, 0.28);
-  color: rgba(241, 245, 249, 0.95);
+  color: rgba(226, 232, 240, 0.95);
 }
 
 /* Focus ring */
@@ -281,25 +295,25 @@ a {
   --bg: var(--bg-base);
   --bg-surface-legacy: var(--bg-surface);
   --surface: rgba(255, 255, 255, 0.03);
-  --elevated: rgba(255, 255, 255, 0.06);
-  --overlay: rgba(255, 255, 255, 0.09);
+  --elevated: rgba(255, 255, 255, 0.05);
+  --overlay: rgba(255, 255, 255, 0.08);
 
   /* Old text vars */
   --text-accent: #818cf8;
 
-  /* Old glass card vars */
-  --glass-card-bg: rgba(255, 255, 255, 0.05);
-  --glass-card-border: rgba(255, 255, 255, 0.10);
+  /* Old glass card vars — no blur in new system */
+  --glass-card-bg: var(--bg-elevated);
+  --glass-card-border: var(--border-subtle);
   --glass-card-shadow: var(--shadow-card);
-  --glass-glow-accent: rgba(99, 102, 241, 0.10);
-  --glass-glow-green: rgba(16, 185, 129, 0.10);
-  --glass-glow-amber: rgba(245, 158, 11, 0.10);
-  --glass-glow-red: rgba(239, 68, 68, 0.10);
+  --glass-glow-accent: rgba(99, 102, 241, 0.08);
+  --glass-glow-green: rgba(16, 185, 129, 0.08);
+  --glass-glow-amber: rgba(245, 158, 11, 0.08);
+  --glass-glow-red: rgba(239, 68, 68, 0.08);
 
   /* Frost compat */
   --frost-border-width: 1px;
-  --frost-opacity: 0.12;
-  --frost-opacity-hover: 0.22;
+  --frost-opacity: 0.08;
+  --frost-opacity-hover: 0.14;
 
   /* Semantic status compat */
   --success: var(--accent-success);
@@ -310,27 +324,27 @@ a {
   --danger-muted: var(--health-red-bg);
 
   /* Skeleton shimmer */
-  --skeleton-from: rgba(241, 245, 249, 0.05);
-  --skeleton-to: rgba(241, 245, 249, 0.03);
+  --skeleton-from: rgba(226, 232, 240, 0.04);
+  --skeleton-to: rgba(226, 232, 240, 0.02);
 
   /* ds-* namespace compat */
   --ds-bg-page: var(--bg-base);
   --ds-bg-sidebar: var(--bg-base);
-  --ds-bg-card: var(--bg-glass);
-  --ds-bg-hover: var(--bg-glass-hover);
+  --ds-bg-card: var(--bg-elevated);
+  --ds-bg-hover: var(--bg-hover);
   --ds-bg-active: var(--accent-bg);
-  --ds-bg-input: rgba(255, 255, 255, 0.05);
+  --ds-bg-input: rgba(255, 255, 255, 0.04);
   --ds-bg-elevated: var(--bg-elevated);
-  --ds-glass-bg: var(--bg-glass);
+  --ds-glass-bg: var(--bg-elevated);
   --ds-glass-border: var(--border-subtle);
-  --ds-glass-blur: var(--glass-blur);
-  --ds-glass-hover: var(--bg-glass-hover);
+  --ds-glass-blur: none;
+  --ds-glass-hover: var(--bg-hover);
   --ds-border: var(--border-subtle);
   --ds-border-hover: var(--border-default);
   --ds-text-1: var(--text-primary);
   --ds-text-2: var(--text-secondary);
   --ds-text-3: var(--text-tertiary);
-  --ds-text-4: rgba(241, 245, 249, 0.15);
+  --ds-text-4: rgba(226, 232, 240, 0.15);
   --ds-accent: var(--accent-primary);
   --ds-accent-hover: var(--accent-light);
   --ds-accent-soft: var(--accent-bg);
@@ -340,7 +354,7 @@ a {
   --ds-amber-soft: var(--health-amber-bg);
   --ds-red: var(--health-red);
   --ds-red-soft: var(--health-red-bg);
-  --ds-glow-accent: rgba(99, 102, 241, 0.10);
+  --ds-glow-accent: rgba(99, 102, 241, 0.08);
   --ds-radius-sm: var(--radius-sm);
   --ds-radius-md: var(--radius-md);
   --ds-radius-lg: var(--radius-lg);
@@ -372,9 +386,9 @@ h2 {
 
 .skeleton {
   background: linear-gradient(90deg,
-    rgba(241,245,249,0.04) 0%,
-    rgba(241,245,249,0.08) 50%,
-    rgba(241,245,249,0.04) 100%);
+    rgba(226,232,240,0.03) 0%,
+    rgba(226,232,240,0.06) 50%,
+    rgba(226,232,240,0.03) 100%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
 }

@@ -19,8 +19,7 @@ function StatCard({ label, value, sub, color }: {
 }) {
   return (
     <div style={{
-      background: 'var(--bg-glass)',
-      backdropFilter: 'blur(16px)',
+      background: 'var(--bg-elevated)',
       border: '1px solid var(--border-subtle)',
       borderRadius: 'var(--radius-md)',
       padding: '16px 18px',
@@ -57,9 +56,7 @@ function PlaybookPanel({ brain, isLoading }: { brain: any; isLoading: boolean })
   const hasEnoughData = totalDeals >= 10 || winFactors.length > 0
 
   const card: React.CSSProperties = {
-    background: 'var(--bg-glass)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
+    background: 'var(--bg-elevated)',
     border: '1px solid var(--border-subtle)',
     borderRadius: 'var(--radius-md)',
     padding: '20px 22px',
@@ -150,7 +147,7 @@ function PlaybookPanel({ brain, isLoading }: { brain: any; isLoading: boolean })
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {winFactors.map((f: any, i: number) => (
-                <FactorBar key={i} label={f.label ?? f.feature} importance={f.importance} direction="helps" />
+                <FactorBar key={i} label={f.name ?? f.label ?? f.feature} importance={f.importance} direction="helps" />
               ))}
             </div>
           </div>
@@ -163,7 +160,7 @@ function PlaybookPanel({ brain, isLoading }: { brain: any; isLoading: boolean })
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {lossFactors.map((f: any, i: number) => (
-                <FactorBar key={i} label={f.label ?? f.feature} importance={f.importance} direction="hurts" />
+                <FactorBar key={i} label={f.name ?? f.label ?? f.feature} importance={f.importance} direction="hurts" />
               ))}
             </div>
           </div>
@@ -265,12 +262,18 @@ export default function IntelligencePage() {
 
   const topBlocker = (brain?.productGapPriority ?? [])[0]?.title ?? null
 
-  // Win signals from brain
-  const winSignals: any[] = (brain?.winPatterns ?? brain?.objectionWinMap ?? []).slice(0, 5)
-  const riskSignals: any[] = (brain?.dealRiskPatterns ?? brain?.riskPatterns ?? []).slice(0, 5)
-  const productGaps: any[] = (brain?.productGapPriority ?? brain?.productGapSignals ?? []).slice(0, 5)
-  const mlAccuracy = brain?.mlAccuracy ?? brain?.modelAccuracy ?? null
-  const mlDealCount = brain?.mlTrainingCount ?? brain?.dealCount ?? null
+  // Win signals — objectionWinMap has { theme, winsWithTheme, winRateWithTheme (0-100) }
+  const winSignals: any[] = ((brain?.objectionWinMap ?? []) as any[])
+    .map((s: any) => ({ ...s, objection: s.theme, winRate: typeof s.winRateWithTheme === 'number' ? s.winRateWithTheme / 100 : s.winRate }))
+    .slice(0, 5)
+  // Risk signals — keyPatterns has { label, dealIds, companies }
+  const riskSignals: any[] = ((brain?.keyPatterns ?? []) as any[])
+    .map((p: any) => ({ ...p, pattern: p.label, dealCount: p.dealIds?.length ?? 0 }))
+    .slice(0, 5)
+  const productGaps: any[] = (brain?.productGapPriority ?? []).slice(0, 5)
+  // ML accuracy lives inside mlModel
+  const mlAccuracy: number | null = brain?.mlModel?.looAccuracy ?? null
+  const mlDealCount: number | null = brain?.mlModel?.trainingSize ?? null
   const competitivePatterns: any[] = brain?.competitivePatterns ?? []
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
@@ -286,9 +289,7 @@ export default function IntelligencePage() {
   })
 
   const card: React.CSSProperties = {
-    background: 'var(--bg-glass)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
+    background: 'var(--bg-elevated)',
     border: '1px solid var(--border-subtle)',
     borderRadius: 'var(--radius-md)',
     padding: '20px 22px',
