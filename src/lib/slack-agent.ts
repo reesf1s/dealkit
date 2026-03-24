@@ -129,9 +129,11 @@ Slack/Linear tools:
 - halvex_link_issue_to_deal — manually link an issue to a deal
 - halvex_confirm_link — confirm a suggested link
 - halvex_dismiss_link — dismiss a link
-- halvex_mark_issue_released — mark issue as deployed (basic, no notification)
+- halvex_mark_issue_released — mark issue as deployed, trigger release email flow
 - halvex_mark_issue_deployed — mark issue as deployed + fire proactive Slack DM notification
-- halvex_scope_issue_to_cycle — generate user story + AC for an issue
+- halvex_get_cycle_candidates — list confirmed issues for a deal that could go into next cycle
+- halvex_get_upcoming_cycle — show upcoming cycle: name, dates, issues already in it
+- halvex_scope_issue_to_cycle — scope issue to cycle: generates user story + ACs, updates Linear, adds to cycle, optionally assigns dev
 - halvex_search_linear_issues — search issues by keyword
 - halvex_get_linear_issue — get details of a specific issue
 - halvex_find_at_risk_deals — show deals needing attention
