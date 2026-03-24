@@ -25,8 +25,8 @@ export function PageTabs({ tabs }: { tabs: PageTab[] }) {
       gap: '2px',
       marginBottom: '24px',
       padding: '3px',
-      background: 'rgba(255,255,255,0.05)',
-      border: '1px solid rgba(255,255,255,0.09)',
+      background: 'rgba(0,0,0,0.04)',
+      border: '1px solid rgba(0,0,0,0.07)',
       borderRadius: '10px',
       width: 'fit-content',
       backdropFilter: 'blur(12px)',
@@ -47,28 +47,27 @@ export function PageTabs({ tabs }: { tabs: PageTab[] }) {
               borderRadius: '7px',
               fontSize: '12px',
               fontWeight: active ? '600' : '500',
-              color: active ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.42)',
-              background: active ? 'rgba(124,58,237,0.22)' : 'transparent',
+              color: active ? '#6366f1' : '#6e6e73',
+              background: active ? 'rgba(99,102,241,0.10)' : 'transparent',
               textDecoration: 'none',
-              border: active ? '1px solid rgba(124,58,237,0.35)' : '1px solid transparent',
+              border: active ? '1px solid rgba(99,102,241,0.18)' : '1px solid transparent',
               transition: 'all 0.12s ease',
               whiteSpace: 'nowrap',
-              boxShadow: active ? '0 0 12px rgba(124,58,237,0.15)' : 'none',
             }}
             onMouseEnter={e => {
               if (!active) {
-                (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.75)'
-                ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'
+                (e.currentTarget as HTMLElement).style.color = '#1d1d1f'
+                ;(e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)'
               }
             }}
             onMouseLeave={e => {
               if (!active) {
-                (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.42)'
+                (e.currentTarget as HTMLElement).style.color = '#6e6e73'
                 ;(e.currentTarget as HTMLElement).style.background = 'transparent'
               }
             }}
           >
-            {Icon && <Icon size={12} color={active ? '#A78BFA' : 'currentColor'} strokeWidth={2} />}
+            {Icon && <Icon size={12} color={active ? '#6366f1' : 'currentColor'} strokeWidth={2} />}
             {tab.label}
           </Link>
         )

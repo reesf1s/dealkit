@@ -10,21 +10,21 @@ interface ThemeCtx {
 }
 
 const ThemeContext = createContext<ThemeCtx>({
-  theme: 'dark',
+  theme: 'light',
   toggleTheme: () => {},
 })
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  // Always dark — Dimension aesthetic
-  const [theme] = useState<Theme>('dark')
+  // Always light — macOS Sonoma / Dimension aesthetic
+  const [theme] = useState<Theme>('light')
 
   useEffect(() => {
-    document.documentElement.classList.add('dark')
-    document.documentElement.classList.remove('light')
-    localStorage.setItem('halvex-theme', 'dark')
+    document.documentElement.classList.add('light')
+    document.documentElement.classList.remove('dark')
+    localStorage.setItem('halvex-theme', 'light')
   }, [])
 
-  // No-op: theme is permanently dark
+  // No-op: theme is permanently light
   const toggleTheme = () => {}
 
   return (

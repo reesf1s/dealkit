@@ -67,10 +67,10 @@ export default function TopNav() {
       right: 0,
       height: '52px',
       zIndex: 30,
-      background: 'rgba(8, 12, 26, 0.78)',
-      backdropFilter: 'blur(24px)',
-      WebkitBackdropFilter: 'blur(24px)',
-      borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
+      background: 'rgba(255, 255, 255, 0.72)',
+      backdropFilter: 'blur(20px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+      borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
       display: 'flex',
       alignItems: 'center',
       padding: '0 20px',
@@ -86,22 +86,22 @@ export default function TopNav() {
           className="mobile-menu-btn"
           style={{
             display: 'none', width: '30px', height: '30px', borderRadius: '7px',
-            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
+            background: 'rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.08)',
             alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
           }}
         >
-          <Menu size={14} style={{ color: 'rgba(255,255,255,0.55)' }} />
+          <Menu size={14} style={{ color: '#6e6e73' }} />
         </button>
 
         {/* Breadcrumb */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.30)', fontWeight: 400, letterSpacing: '-0.01em' }}>
+          <span style={{ fontSize: '12px', color: '#aeaeb2', fontWeight: 400, letterSpacing: '-0.01em' }}>
             Halvex
           </span>
-          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.20)' }}>/</span>
+          <span style={{ fontSize: '12px', color: '#d1d1d6' }}>/</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <Icon size={12} style={{ color: '#a78bfa', flexShrink: 0 }} />
-            <span style={{ fontSize: '13px', fontWeight: 500, color: 'rgba(255,255,255,0.90)', letterSpacing: '-0.02em' }}>
+            <Icon size={12} style={{ color: '#6366f1', flexShrink: 0 }} />
+            <span style={{ fontSize: '13px', fontWeight: 500, color: '#1d1d1f', letterSpacing: '-0.02em' }}>
               {label}
             </span>
           </div>
@@ -120,8 +120,8 @@ export default function TopNav() {
         style={{
           width: '260px',
           height: '30px',
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.09)',
+          background: 'rgba(0,0,0,0.04)',
+          border: '1px solid rgba(0,0,0,0.08)',
           borderRadius: '8px',
           display: 'flex',
           alignItems: 'center',
@@ -132,22 +132,22 @@ export default function TopNav() {
           flexShrink: 0,
         }}
         onMouseEnter={e => {
-          (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'
-          ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.15)'
+          (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.06)'
+          ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(0,0,0,0.12)'
         }}
         onMouseLeave={e => {
-          (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'
-          ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.09)'
+          (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)'
+          ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(0,0,0,0.08)'
         }}
       >
-        <Search size={12} style={{ color: 'rgba(255,255,255,0.35)', flexShrink: 0 }} />
-        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)', flex: 1, textAlign: 'left', letterSpacing: '-0.01em' }}>
+        <Search size={12} style={{ color: '#aeaeb2', flexShrink: 0 }} />
+        <span style={{ fontSize: '12px', color: '#aeaeb2', flex: 1, textAlign: 'left', letterSpacing: '-0.01em' }}>
           Search anything...
         </span>
         <span style={{
-          fontSize: '10px', color: 'rgba(255,255,255,0.28)',
-          background: 'rgba(255,255,255,0.06)',
-          border: '1px solid rgba(255,255,255,0.09)',
+          fontSize: '10px', color: '#aeaeb2',
+          background: 'rgba(0,0,0,0.06)',
+          border: '1px solid rgba(0,0,0,0.08)',
           padding: '1px 5px', borderRadius: '4px',
           letterSpacing: '0.02em', flexShrink: 0,
         }}>⌘P</span>
@@ -162,16 +162,15 @@ export default function TopNav() {
             display: 'flex', alignItems: 'center', gap: '5px',
             padding: '4px 10px', borderRadius: '7px',
             background: urgentCount > 0 ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)',
-            border: `1px solid ${urgentCount > 0 ? 'rgba(239,68,68,0.20)' : 'rgba(16,185,129,0.20)'}`,
+            border: `1px solid ${urgentCount > 0 ? 'rgba(239,68,68,0.18)' : 'rgba(16,185,129,0.18)'}`,
           }}>
             <div style={{
               width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0,
               background: urgentCount > 0 ? '#ef4444' : '#10b981',
-              boxShadow: urgentCount > 0 ? '0 0 5px rgba(239,68,68,0.60)' : '0 0 5px rgba(16,185,129,0.55)',
             }} />
             <span style={{
               fontSize: '11px', fontWeight: 500, letterSpacing: '-0.01em',
-              color: urgentCount > 0 ? '#f87171' : '#34d399',
+              color: urgentCount > 0 ? '#ef4444' : '#10b981',
               whiteSpace: 'nowrap',
             }}>
               {urgentCount > 0 ? `${urgentCount} flagged` : 'AI ready'}
@@ -187,28 +186,25 @@ export default function TopNav() {
             display: 'flex', alignItems: 'center', gap: '6px',
             borderRadius: '7px', fontSize: '12px', fontWeight: 500,
             letterSpacing: '-0.01em', cursor: 'pointer',
-            background: 'rgba(124, 58, 237, 0.18)',
-            border: '1px solid rgba(124, 58, 237, 0.32)',
-            color: '#c4b5fd',
+            background: 'rgba(99, 102, 241, 0.10)',
+            border: '1px solid rgba(99, 102, 241, 0.20)',
+            color: '#6366f1',
             transition: 'all 0.12s', flexShrink: 0,
-            boxShadow: '0 0 12px rgba(124,58,237,0.10)',
           }}
           onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.28)'
-            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,58,237,0.50)'
-            ;(e.currentTarget as HTMLElement).style.boxShadow = '0 0 20px rgba(124,58,237,0.20)'
+            (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.18)'
+            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.32)'
           }}
           onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.background = 'rgba(124,58,237,0.18)'
-            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,58,237,0.32)'
-            ;(e.currentTarget as HTMLElement).style.boxShadow = '0 0 12px rgba(124,58,237,0.10)'
+            (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.10)'
+            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.20)'
           }}
         >
-          <MessageSquare size={11} style={{ color: '#a78bfa', flexShrink: 0 }} />
+          <MessageSquare size={11} style={{ color: '#6366f1', flexShrink: 0 }} />
           Ask AI
           <span style={{
-            fontSize: '10px', color: 'rgba(167,139,250,0.55)',
-            background: 'rgba(124,58,237,0.20)', padding: '1px 4px',
+            fontSize: '10px', color: 'rgba(99,102,241,0.55)',
+            background: 'rgba(99,102,241,0.10)', padding: '1px 4px',
             borderRadius: '3px',
           }}>⌘K</span>
         </button>
@@ -216,10 +212,10 @@ export default function TopNav() {
         {/* Avatar */}
         <div style={{
           width: '30px', height: '30px', borderRadius: '50%',
-          background: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+          background: 'linear-gradient(135deg, #6366f1, #818cf8)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '12px', fontWeight: 700, color: '#fff',
-          boxShadow: '0 0 14px rgba(124,58,237,0.45)',
+          boxShadow: '0 2px 8px rgba(99,102,241,0.30)',
           cursor: 'default', flexShrink: 0, letterSpacing: '-0.01em',
         }}>
           {avatarLetter}

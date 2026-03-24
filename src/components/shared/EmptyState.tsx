@@ -29,15 +29,14 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
           width: '52px',
           height: '52px',
           borderRadius: '12px',
-          background: 'rgba(124, 58, 237, 0.12)',
-          border: '1px solid rgba(124, 58, 237, 0.22)',
+          background: 'rgba(99, 102, 241, 0.10)',
+          border: '1px solid rgba(99, 102, 241, 0.18)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 0 20px rgba(124,58,237,0.12)',
         }}
       >
-        <Icon size={20} strokeWidth={1.5} style={{ color: '#a78bfa' }} />
+        <Icon size={20} strokeWidth={1.5} style={{ color: '#6366f1' }} />
       </div>
 
       {/* Text */}
@@ -46,7 +45,7 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
           style={{
             fontSize: '15px',
             fontWeight: 600,
-            color: 'rgba(255,255,255,0.88)',
+            color: '#1d1d1f',
             letterSpacing: '-0.01em',
             margin: 0,
           }}
@@ -56,7 +55,7 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
         <p
           style={{
             fontSize: '13px',
-            color: 'rgba(255,255,255,0.42)',
+            color: '#6e6e73',
             lineHeight: 1.6,
             margin: 0,
           }}
@@ -76,19 +75,19 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
             fontSize: '13px',
             fontWeight: 600,
             color: '#fff',
-            background: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
-            border: '1px solid rgba(124,58,237,0.50)',
+            background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
+            border: '1px solid rgba(99,102,241,0.40)',
             cursor: 'pointer',
             transition: 'all 150ms ease',
-            boxShadow: '0 0 16px rgba(124,58,237,0.25)',
+            boxShadow: '0 2px 8px rgba(99,102,241,0.25)',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'translateY(-1px)'
-            e.currentTarget.style.boxShadow = '0 0 24px rgba(124,58,237,0.40)'
+            e.currentTarget.style.boxShadow = '0 4px 16px rgba(99,102,241,0.35)'
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = '0 0 16px rgba(124,58,237,0.25)'
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(99,102,241,0.25)'
           }}
         >
           {action.label}
