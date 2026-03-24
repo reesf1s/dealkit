@@ -34,6 +34,7 @@ interface DealLinearLink {
   status: 'suggested' | 'confirmed' | 'dismissed' | 'in_cycle' | 'deployed'
   hasReleaseEmail?: boolean
   scopedUserStory: string | null
+  addressesRisk: string | null
   cycleId: string | null
   assigneeName: string | null
   createdAt: string
@@ -293,6 +294,19 @@ export function ProductIssuesPanel({ dealId }: Props) {
                           DEPLOYED
                         </span>
                       )}
+                      {/* Release email sent badge */}
+                      {isDeployed && link.hasReleaseEmail && (
+                        <span style={{
+                          fontSize: '9px', fontWeight: 600,
+                          padding: '1px 5px', borderRadius: '10px',
+                          background: 'color-mix(in srgb, #6366F1 15%, transparent)',
+                          color: '#818CF8',
+                          flexShrink: 0,
+                          letterSpacing: '0.02em',
+                        }}>
+                          EMAIL SENT
+                        </span>
+                      )}
                       {isInCycle && link.assigneeName && (
                         <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', flexShrink: 0 }}>
                           → {link.assigneeName}
@@ -361,13 +375,22 @@ export function ProductIssuesPanel({ dealId }: Props) {
                   )}
                 </div>
 
-                {/* User story expand panel */}
+                {/* User story + objection expand panel */}
                 {isExpanded && link.scopedUserStory && (
                   <div style={{
                     padding: '8px 14px 10px 36px',
                     background: 'color-mix(in srgb, var(--accent) 4%, transparent)',
                     borderTop: '1px solid var(--border)',
                   }}>
+                    {link.addressesRisk && (
+                      <div style={{
+                        fontSize: '10px', color: 'var(--text-tertiary)',
+                        marginBottom: '4px', lineHeight: 1.4,
+                        fontStyle: 'italic',
+                      }}>
+                        → addresses &ldquo;{link.addressesRisk}&rdquo;
+                      </div>
+                    )}
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
                       {link.scopedUserStory}
                     </div>

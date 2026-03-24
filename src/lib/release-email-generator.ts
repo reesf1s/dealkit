@@ -41,6 +41,7 @@ interface IssueContext {
   title: string
   description: string | null
   scopedUserStory: string | null  // from deal_linear_links (user story scoped in Phase 3)
+  addressesRisk: string | null    // verbatim objection text this issue addresses
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -120,9 +121,13 @@ async function fetchIssueContext(
   dealId: string,
   linearIssueId: string,
 ): Promise<IssueContext | null> {
-  // Get the scoped user story from the link (set in Phase 3)
+  // Get the scoped user story + objection mapping from the link (set in Phase 3)
   const [link] = await db
-    .select({ linearTitle: dealLinearLinks.linearTitle })
+    .select({
+      linearTitle: dealLinearLinks.linearTitle,
+      scopedUserStory: dealLinearLinks.scopedUserStory,
+      addressesRisk: dealLinearLinks.addressesRisk,
+    })
     .from(dealLinearLinks)
     .where(and(
       eq(dealLinearLinks.workspaceId, workspaceId),
@@ -150,7 +155,8 @@ async function fetchIssueContext(
     linearIssueId,
     title,
     description: cached?.description ?? null,
-    scopedUserStory: null,  // Phase 3 stores user stories in the response but not in the DB column (yet)
+    scopedUserStory: link?.scopedUserStory ?? null,
+    addressesRisk: link?.addressesRisk ?? null,
   }
 }
 
@@ -166,8 +172,9 @@ Also draft a short Slack message the rep can send internally (or directly to the
 
 Rules for the email:
 - Professional but conversational tone — not a cold email, not a marketing blast
+- CRITICAL: If an objection signal is provided, echo the prospect's EXACT concern in the email body. Use phrasing like "You mentioned that [verbatim objection] — we've built [feature] specifically to fix that."
+- Do NOT paraphrase or soften the objection — use their words so they recognise their own feedback
 - Lead with what shipped and why it matters to them specifically
-- Explicitly connect each feature to their stated concerns or objection signals
 - Clear, soft CTA: "I'd love to show you this in action — are you free this week?"
 - Keep the body under 200 words
 - No emojis, no bullet lists in the email body
@@ -207,7 +214,8 @@ export async function generateReleaseEmail(
     contactEmail ? `Contact email: ${contactEmail}` : '',
     deal.notes ? `Deal notes (context): ${deal.notes.slice(0, 400)}` : '',
     deal.successCriteria ? `Their success criteria: ${deal.successCriteria.slice(0, 300)}` : '',
-    deal.dealRisks.length > 0 ? `Key objection signals / deal risks: ${deal.dealRisks.slice(0, 3).join('; ')}` : '',
+    deal.dealRisks.length > 0 ? `Their objections (use these verbatim in the email): ${deal.dealRisks.slice(0, 3).join('; ')}` : '',
+    issue.addressesRisk ? `Primary objection this feature addresses (echo this exactly): "${issue.addressesRisk}"` : '',
     '',
     `Feature shipped: ${issue.title}`,
     issue.description ? `Feature description: ${issue.description.slice(0, 300)}` : '',
@@ -267,8 +275,9 @@ Also draft a short Slack message the rep can send to the prospect to schedule a 
 
 Rules for the email:
 - Lead with the business impact: "We've shipped everything on your wishlist"
-- Explicitly map each feature to the objection or concern it addresses
-- Make the prospect feel heard — you built this partly for them
+- CRITICAL: For each feature, explicitly echo the prospect's VERBATIM objection text. Say "You told us [exact objection] — we built [feature] to fix that." Use their own words so they recognise their feedback.
+- Do NOT paraphrase — use the exact objection phrases provided in the context
+- Make the prospect feel heard — you built this specifically for them
 - Clear CTA: propose a specific call to do a live walkthrough
 - Keep under 250 words, no bullet lists, professional but warm
 - Subject line should feel personal and specific
@@ -306,9 +315,10 @@ export async function generateBatchReleaseEmail(
   const primaryContact = deal.contacts?.[0]
   const contactName = deal.contactName ?? primaryContact?.name ?? null
 
-  const issuesList = issues.map((i, idx) =>
-    `${idx + 1}. "${i.title}"${i.description ? ` — ${i.description.slice(0, 200)}` : ''}${i.scopedUserStory ? ` (user story: ${i.scopedUserStory.slice(0, 150)})` : ''}`
-  ).join('\n')
+  const issuesList = issues.map((i, idx) => {
+    const objection = i.addressesRisk ? ` | Addresses objection (echo verbatim): "${i.addressesRisk}"` : ''
+    return `${idx + 1}. "${i.title}"${i.description ? ` — ${i.description.slice(0, 200)}` : ''}${i.scopedUserStory ? ` (user story: ${i.scopedUserStory.slice(0, 150)})` : ''}${objection}`
+  }).join('\n')
 
   const userPrompt = [
     `Company: ${deal.prospectCompany}`,
@@ -316,7 +326,7 @@ export async function generateBatchReleaseEmail(
     deal.notes ? `Deal context: ${deal.notes.slice(0, 400)}` : '',
     deal.successCriteria ? `Their success criteria: ${deal.successCriteria.slice(0, 300)}` : '',
     deal.dealRisks.length > 0
-      ? `Key objection signals / concerns they raised:\n${deal.dealRisks.slice(0, 4).map(r => `- ${r}`).join('\n')}`
+      ? `Their objections (use these verbatim in the email):\n${deal.dealRisks.slice(0, 4).map(r => `- "${r}"`).join('\n')}`
       : '',
     '',
     `Features shipped (${issues.length} total):`,
@@ -346,11 +356,11 @@ export async function generateBatchReleaseEmail(
     }
   }
 
-  // Build shipped summary (simple heuristic: pair each issue with a risk)
+  // Build shipped summary — use the stored addressesRisk if available, fall back gracefully
   const shippedSummary = issues.slice(0, 5).map((issue, idx) => ({
     issueId: issue.linearIssueId,
     title: issue.title,
-    addressesObjection: deal.dealRisks[idx] ?? deal.dealRisks[0] ?? 'a key blocker the team raised',
+    addressesObjection: issue.addressesRisk ?? deal.dealRisks[idx] ?? deal.dealRisks[0] ?? 'a key blocker the team raised',
   }))
 
   return {

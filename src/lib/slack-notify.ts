@@ -10,7 +10,7 @@
  */
 
 import { db } from '@/lib/db'
-import { slackConnections, slackUserMappings, mcpActionLog, dealLogs, dealLinearLinks, linearIssuesCache } from '@/lib/db/schema'
+import { slackConnections, slackUserMappings, mcpActionLog, dealLogs, dealLinearLinks, linearIssuesCache, hubspotIntegrations } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { decrypt, getEncryptionKey } from '@/lib/encrypt'
 import { slackPostMessage, slackOpenDm } from '@/lib/slack-client'
@@ -214,6 +214,7 @@ export async function notifyAllIssuesDeployed(
         linearIssueId: dealLinearLinks.linearIssueId,
         linearTitle: dealLinearLinks.linearTitle,
         scopedUserStory: dealLinearLinks.scopedUserStory,
+        addressesRisk: dealLinearLinks.addressesRisk,
       })
       .from(dealLinearLinks)
       .where(and(
@@ -241,6 +242,7 @@ export async function notifyAllIssuesDeployed(
           title: link.linearTitle ?? link.linearIssueId,
           description: cached?.description ?? null,
           scopedUserStory: link.scopedUserStory ?? null,
+          addressesRisk: link.addressesRisk ?? null,
         }
       })
     )
@@ -260,6 +262,14 @@ export async function notifyAllIssuesDeployed(
     const batchEmail = await generateBatchReleaseEmail(workspaceId, dealContext, issueContexts)
     if (!batchEmail) return
 
+    // Check if HubSpot is connected for this workspace
+    const [hsIntegration] = await db
+      .select({ id: hubspotIntegrations.id })
+      .from(hubspotIntegrations)
+      .where(eq(hubspotIntegrations.workspaceId, workspaceId))
+      .limit(1)
+    const hubspotConnected = Boolean(hsIntegration)
+
     const blocks = allIssuesDeployedBlocks({
       dealName: deal.dealName,
       company: deal.prospectCompany,
@@ -269,6 +279,7 @@ export async function notifyAllIssuesDeployed(
       emailSubject: batchEmail.subject,
       emailBody: batchEmail.body,
       callSchedulingMessage: batchEmail.callSchedulingMessage,
+      hubspotConnected,
     })
 
     const fallbackText = `🚀 All issues shipped for ${deal.dealName} (${deal.prospectCompany})! Here's a draft email to re-engage them.`

@@ -633,6 +633,9 @@ export const dealLinearLinks = pgTable('deal_linear_links', {
   cycleId:                     text('cycle_id'),
   assigneeId:                  text('assignee_id'),
   assigneeName:                text('assignee_name'),
+  // Phase 4 — closed loop improvements
+  addressesRisk:               text('addresses_risk'),         // which deal objection/risk this issue addresses
+  slackNotifiedAt:             timestamp('slack_notified_at', { withTimezone: true }), // when "all shipped" Slack DM was sent
   createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:       timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [

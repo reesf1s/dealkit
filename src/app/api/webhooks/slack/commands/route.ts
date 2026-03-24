@@ -87,19 +87,28 @@ export async function POST(req: NextRequest) {
         return
       }
 
-      // Handle empty command: show help
+      // Handle empty command or "help": show help
       const query = text.trim()
-      if (!query) {
+      if (!query || query.toLowerCase() === 'help') {
         await postToResponseUrl(responseUrl, {
           response_type: 'ephemeral',
           text: [
-            '*Usage:* `/halvex [question]`',
+            '*Halvex — your AI sales copilot* 🤖',
             '',
-            '*Examples:*',
-            '• `/halvex how is the Coke deal?`',
-            '• `/halvex what deals need attention?`',
-            '• `/halvex what can I build to convert Acme?`',
+            'Ask me about any deal and I\'ll give you the health score, flag Linear issues that would help close it, and offer to scope them into your next sprint. When those issues ship, I\'ll draft a personalised release email to your prospect.',
+            '',
+            '*The full flow:*',
+            '1. Ask about a deal → I return health score, stage, risk signals',
+            '2. I find matching Linear issues that address those signals',
+            '3. Say "yes" (or list specific IDs like "ENG-36 and ENG-42") → I write user stories + acceptance criteria, update Linear, and add them to the sprint',
+            '4. When issues ship → I DM you a personalised release email to send to the prospect',
+            '',
+            '*Example commands:*',
+            '• `/halvex what\'s the latest on the Miro deal?`',
+            '• `/halvex what deals need my attention?`',
+            '• `/halvex what can we build to close Acme?`',
             '• `/halvex why are we losing deals?`',
+            '• `/halvex link ENG-42 to the Coke deal`',
           ].join('\n'),
         })
         return

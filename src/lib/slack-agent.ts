@@ -101,6 +101,12 @@ function isCancellation(text: string): boolean {
   return /^\s*(no|nope|cancel|stop|nevermind|never mind|skip)\s*\.?\s*$/i.test(text)
 }
 
+/** Extract Linear issue IDs (e.g. ENG-36, ENG-42) from a reply. */
+function extractIssueIds(text: string): string[] {
+  const matches = text.match(/([A-Z]+-\d+)/gi) ?? []
+  return [...new Set(matches.map(m => m.toUpperCase()))]
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // System prompt
 // ─────────────────────────────────────────────────────────────────────────────
@@ -278,6 +284,23 @@ export async function handleSlackMessage(
   if (pending && isCancellation(text)) {
     await resolvePendingAction(pending.id, 'error')
     return textResult("Got it — cancelled. What else can I help with?")
+  }
+
+  // ── Partial confirmation: user listed specific issue IDs (e.g. "just ENG-36 and ENG-42") ──
+  if (pending) {
+    const partialIds = extractIssueIds(text)
+    if (partialIds.length > 0) {
+      await resolvePendingAction(pending.id, 'complete')
+      const followUpText = `${pending.payload.prompt}\n\nUser wants to scope only these specific issues: ${partialIds.join(', ')}. Execute the action for ONLY these IDs, not all of them.`
+      return handleSlackMessage(followUpText, workspaceId, slackUserId, channelId)
+    }
+    // Ambiguous response — ask to clarify
+    const pendingParams = pending.payload.params as { issueIds?: string[] } | undefined
+    const exampleIds = pendingParams?.issueIds?.slice(0, 2).join(' and ') ?? 'ENG-36 and ENG-42'
+    return textResult(
+      `Just to confirm — should I scope all the issues, or only specific ones? ` +
+      `You can say _"yes"_ to scope all, or list them, e.g. _"${exampleIds}"_.`
+    )
   }
 
   // ── Load workspace context ────────────────────────────────────────────────
