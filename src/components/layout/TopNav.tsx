@@ -65,18 +65,19 @@ export default function TopNav() {
       top: 0,
       left: `${sidebarWidth}px`,
       right: 0,
-      height: '52px',
+      height: '56px',
       zIndex: 30,
-      background: 'rgba(255, 255, 255, 0.72)',
-      backdropFilter: 'blur(20px) saturate(180%)',
-      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-      borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+      background: 'rgba(255, 255, 255, 0.60)',
+      backdropFilter: 'blur(24px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+      borderBottom: '1px solid rgba(255, 255, 255, 0.50)',
+      boxShadow: '0 1px 0 rgba(0,0,0,0.04)',
       display: 'flex',
       alignItems: 'center',
-      padding: '0 20px',
+      padding: '0 24px',
       gap: '12px',
       justifyContent: 'space-between',
-      transition: 'left 0.18s cubic-bezier(0.4,0,0.2,1)',
+      transition: 'left 0.20s cubic-bezier(0.4,0,0.2,1)',
     }}>
 
       {/* Left: Mobile hamburger + page label */}
@@ -94,14 +95,14 @@ export default function TopNav() {
         </button>
 
         {/* Breadcrumb */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ fontSize: '12px', color: '#aeaeb2', fontWeight: 400, letterSpacing: '-0.01em' }}>
             Halvex
           </span>
-          <span style={{ fontSize: '12px', color: '#d1d1d6' }}>/</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <Icon size={12} style={{ color: '#6366f1', flexShrink: 0 }} />
-            <span style={{ fontSize: '13px', fontWeight: 500, color: '#1d1d1f', letterSpacing: '-0.02em' }}>
+          <span style={{ fontSize: '13px', color: '#d1d1d6', fontWeight: 300 }}>/</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Icon size={13} style={{ color: '#6366f1', flexShrink: 0 }} />
+            <span style={{ fontSize: '14px', fontWeight: 600, color: '#1d1d1f', letterSpacing: '-0.02em' }}>
               {label}
             </span>
           </div>
@@ -118,26 +119,29 @@ export default function TopNav() {
       <button
         onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
         style={{
-          width: '260px',
-          height: '30px',
-          background: 'rgba(0,0,0,0.04)',
-          border: '1px solid rgba(0,0,0,0.08)',
-          borderRadius: '8px',
+          width: '280px',
+          height: '34px',
+          background: 'rgba(255,255,255,0.55)',
+          border: '1px solid rgba(255,255,255,0.65)',
+          borderRadius: '10px',
           display: 'flex',
           alignItems: 'center',
-          gap: '7px',
-          padding: '0 10px',
+          gap: '8px',
+          padding: '0 12px',
           cursor: 'pointer',
-          transition: 'border-color 0.12s, background 0.12s',
+          transition: 'all 0.15s ease',
           flexShrink: 0,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
         }}
         onMouseEnter={e => {
-          (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.06)'
-          ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(0,0,0,0.12)'
+          ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.80)'
+          ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.85)'
+          ;(e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(99,102,241,0.08)'
         }}
         onMouseLeave={e => {
-          (e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.04)'
-          ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(0,0,0,0.08)'
+          ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.55)'
+          ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.65)'
+          ;(e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)'
         }}
       >
         <Search size={12} style={{ color: '#aeaeb2', flexShrink: 0 }} />
@@ -146,8 +150,8 @@ export default function TopNav() {
         </span>
         <span style={{
           fontSize: '10px', color: '#aeaeb2',
-          background: 'rgba(0,0,0,0.06)',
-          border: '1px solid rgba(0,0,0,0.08)',
+          background: 'rgba(0,0,0,0.05)',
+          border: '1px solid rgba(0,0,0,0.06)',
           padding: '1px 5px', borderRadius: '4px',
           letterSpacing: '0.02em', flexShrink: 0,
         }}>⌘P</span>
@@ -182,30 +186,33 @@ export default function TopNav() {
         <button
           onClick={toggleCopilot}
           style={{
-            height: '30px', padding: '0 10px',
-            display: 'flex', alignItems: 'center', gap: '6px',
-            borderRadius: '7px', fontSize: '12px', fontWeight: 500,
+            height: '34px', padding: '0 14px',
+            display: 'flex', alignItems: 'center', gap: '7px',
+            borderRadius: '10px', fontSize: '13px', fontWeight: 600,
             letterSpacing: '-0.01em', cursor: 'pointer',
             background: 'rgba(99, 102, 241, 0.10)',
-            border: '1px solid rgba(99, 102, 241, 0.20)',
+            border: '1px solid rgba(99, 102, 241, 0.22)',
             color: '#6366f1',
-            transition: 'all 0.12s', flexShrink: 0,
+            transition: 'all 0.15s', flexShrink: 0,
+            boxShadow: '0 2px 8px rgba(99,102,241,0.08)',
           }}
           onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.18)'
-            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.32)'
+            ;(e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.18)'
+            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.35)'
+            ;(e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(99,102,241,0.18)'
           }}
           onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.10)'
-            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.20)'
+            ;(e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.10)'
+            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.22)'
+            ;(e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(99,102,241,0.08)'
           }}
         >
-          <MessageSquare size={11} style={{ color: '#6366f1', flexShrink: 0 }} />
+          <MessageSquare size={13} style={{ color: '#6366f1', flexShrink: 0 }} />
           Ask AI
           <span style={{
             fontSize: '10px', color: 'rgba(99,102,241,0.55)',
-            background: 'rgba(99,102,241,0.10)', padding: '1px 4px',
-            borderRadius: '3px',
+            background: 'rgba(99,102,241,0.10)', padding: '2px 5px',
+            borderRadius: '4px',
           }}>⌘K</span>
         </button>
 

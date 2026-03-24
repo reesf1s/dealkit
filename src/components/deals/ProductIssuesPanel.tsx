@@ -159,11 +159,14 @@ export function ProductIssuesPanel({ dealId }: Props) {
 
   return (
     <div style={{
-      background: 'var(--card-bg)',
-      border: '1px solid var(--card-border)',
-      borderRadius: '8px',
+      background: 'rgba(255, 255, 255, 0.65)',
+      backdropFilter: 'blur(24px) saturate(180%)',
+      WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+      border: '1px solid rgba(255, 255, 255, 0.55)',
+      borderRadius: '16px',
       overflow: 'hidden',
       marginBottom: '16px',
+      boxShadow: '0 4px 24px rgba(99,102,241,0.08), 0 1px 3px rgba(0,0,0,0.06)',
     }}>
       {/* Header */}
       <div style={{
@@ -171,8 +174,8 @@ export function ProductIssuesPanel({ dealId }: Props) {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '10px 14px',
-        borderBottom: visibleLinks.length > 0 || showLinkInput ? '1px solid var(--border)' : undefined,
-        background: 'var(--surface)',
+        borderBottom: visibleLinks.length > 0 || showLinkInput ? '1px solid rgba(0,0,0,0.06)' : undefined,
+        background: 'rgba(255,255,255,0.40)',
       }}>
         <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
           Product Issues

@@ -23,13 +23,13 @@ function makeFmt(sym: string) {
 }
 
 const CARD_STYLE: React.CSSProperties = {
-  background: 'rgba(255, 255, 255, 0.72)',
-  backdropFilter: 'blur(20px) saturate(180%)',
-  WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-  border: '1px solid rgba(0, 0, 0, 0.08)',
-  borderRadius: '14px',
+  background: 'rgba(255, 255, 255, 0.65)',
+  backdropFilter: 'blur(24px) saturate(180%)',
+  WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+  border: '1px solid rgba(255, 255, 255, 0.55)',
+  borderRadius: '16px',
   overflow: 'hidden',
-  boxShadow: '0 2px 20px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04)',
+  boxShadow: '0 4px 24px rgba(99,102,241,0.08), 0 1px 3px rgba(0,0,0,0.06)',
 }
 
 const CARD_HEADER_STYLE: React.CSSProperties = {
