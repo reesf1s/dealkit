@@ -426,6 +426,14 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
     `,
   },
   {
+    version: 30,
+    name: 'workspace_knowledge_base',
+    sql: `
+      ALTER TABLE workspaces
+        ADD COLUMN IF NOT EXISTS knowledge_base_text TEXT
+    `,
+  },
+  {
     version: 28,
     name: 'ensure_embeddings_1536',
     sql: `

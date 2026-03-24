@@ -4865,6 +4865,121 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
   )
 }
 
+// ─── AI Activity Section ─────────────────────────────────────────────────────
+
+const ACTION_TYPE_LABELS: Record<string, string> = {
+  scope_issue: 'Scoped Linear issue',
+  draft_email: 'Drafted email',
+  slack_notify: 'Sent Slack alert',
+  link_created: 'Linked issue',
+  link_confirmed: 'Confirmed link',
+  link_dismissed: 'Dismissed link',
+  risk_alert: 'Risk alert fired',
+  deal_scored: 'Deal scored',
+}
+
+const ACTION_TYPE_ICONS: Record<string, string> = {
+  scope_issue: '🔗',
+  draft_email: '✉️',
+  slack_notify: '💬',
+  link_created: '🔗',
+  link_confirmed: '✅',
+  link_dismissed: '✖️',
+  risk_alert: '⚠️',
+  deal_scored: '🎯',
+}
+
+function timeAgoShort(isoStr: string): string {
+  const diff = Date.now() - new Date(isoStr).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24)
+  return `${d}d ago`
+}
+
+function AiActivitySection({ dealId }: { dealId: string }) {
+  const { data, isLoading } = useSWR<{ data: any[] }>(`/api/deals/${dealId}/ai-activity`, fetcher, { revalidateOnFocus: false })
+  const actions = data?.data ?? []
+
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.04), transparent)',
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      border: '1px solid rgba(255,255,255,0.08)',
+      borderRadius: '1rem',
+      padding: '20px 24px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+        <Zap size={14} color="#818cf8" />
+        <span style={{ fontSize: '13px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.01em' }}>AI Activity</span>
+        {actions.length > 0 && (
+          <span style={{
+            fontSize: '10px', fontWeight: 700, padding: '1px 7px', borderRadius: '100px',
+            background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)',
+          }}>{actions.length}</span>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} style={{ height: '40px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)' }} className="skeleton" />
+          ))}
+        </div>
+      ) : actions.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '24px 0', color: 'rgba(255,255,255,0.30)', fontSize: '13px' }}>
+          No AI actions recorded yet for this deal.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {actions.map((action: any) => {
+            const label = ACTION_TYPE_LABELS[action.actionType] ?? action.actionType
+            const icon = ACTION_TYPE_ICONS[action.actionType] ?? '⚡'
+            const isError = action.status === 'error'
+            const isPending = action.status === 'pending' || action.status === 'awaiting_confirmation'
+            const statusColor = isError ? '#f87171' : isPending ? '#fbbf24' : '#34d399'
+            const desc = action.result?.summary ?? action.result?.message ?? action.payload?.title ?? action.payload?.subject ?? null
+
+            return (
+              <div key={action.id} style={{
+                display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px',
+                borderRadius: '8px', background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.06)',
+              }}>
+                <span style={{ fontSize: '14px', flexShrink: 0, marginTop: '1px' }}>{icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#e2e8f0' }}>{label}</span>
+                    <span style={{
+                      fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '100px',
+                      background: `${statusColor}18`, color: statusColor, border: `1px solid ${statusColor}30`,
+                    }}>{action.status}</span>
+                    {action.triggeredBy && (
+                      <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)' }}>via {action.triggeredBy}</span>
+                    )}
+                  </div>
+                  {desc && (
+                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.50)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {desc}
+                    </div>
+                  )}
+                </div>
+                <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.30)', flexShrink: 0, marginTop: '2px' }}>
+                  {timeAgoShort(action.createdAt)}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function DealDetailPage() {
   const { id } = useParams() as { id: string }
   const { data, mutate } = useSWR(id ? `/api/deals/${id}` : null, fetcher)
@@ -5166,6 +5281,9 @@ export default function DealDetailPage() {
           )}
         </div>
       )}
+
+      {/* AI Activity */}
+      {deal && <AiActivitySection dealId={id} />}
     </div>
   )
 }
