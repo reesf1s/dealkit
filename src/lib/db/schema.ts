@@ -104,6 +104,9 @@ export const workspaceMemberships = pgTable('workspace_memberships', {
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
   role: workspaceRoleEnum('role').notNull().default('member'),
+  // app_role controls product-feature access (separate from workspace admin role)
+  // Migration: 008_roles_and_pending_actions.sql
+  appRole: text('app_role').notNull().default('sales'),  // 'sales' | 'product' | 'admin'
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique().on(t.workspaceId, t.userId)])
 
@@ -703,6 +706,27 @@ export const slackUserMappings = pgTable('slack_user_mappings', {
   createdAt:            timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique().on(t.workspaceId, t.clerkUserId)])
 
+/**
+ * slack_pending_actions  (explicit state for multi-step Slack confirmation flows)
+ * Holds pending actions while waiting for PM approval.
+ * Separate from mcp_action_log (audit) so we can query by user efficiently.
+ * Migration: 008_roles_and_pending_actions.sql
+ */
+export const slackPendingActions = pgTable('slack_pending_actions', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  workspaceId:    uuid('workspace_id')
+    .notNull()
+    .references(() => workspaces.id, { onDelete: 'cascade' }),
+  slackUserId:    text('slack_user_id').notNull(),    // Slack user ID who owns this pending action
+  slackChannelId: text('slack_channel_id').notNull(), // channel to reply to when resolved
+  actionType:     text('action_type').notNull(),       // 'confirm_prioritisation' | 'pm_approve_prioritisation'
+  dealId:         uuid('deal_id').references(() => dealLogs.id, { onDelete: 'cascade' }),
+  payload:        jsonb('payload').notNull().default({}),
+  expiresAt:      timestamp('expires_at', { withTimezone: true }).notNull()
+    .default(sql`now() + interval '24 hours'`),
+  createdAt:      timestamp('created_at', { withTimezone: true }).defaultNow(),
+})
+
 // Relations
 export const linearIntegrationsRelations = relations(linearIntegrations, ({ one }) => ({
   workspace: one(workspaces, { fields: [linearIntegrations.workspaceId], references: [workspaces.id] }),
@@ -728,6 +752,11 @@ export const slackConnectionsRelations = relations(slackConnections, ({ one }) =
 
 export const slackUserMappingsRelations = relations(slackUserMappings, ({ one }) => ({
   workspace: one(workspaces, { fields: [slackUserMappings.workspaceId], references: [workspaces.id] }),
+}))
+
+export const slackPendingActionsRelations = relations(slackPendingActions, ({ one }) => ({
+  workspace: one(workspaces, { fields: [slackPendingActions.workspaceId], references: [workspaces.id] }),
+  deal: one(dealLogs, { fields: [slackPendingActions.dealId], references: [dealLogs.id] }),
 }))
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -848,3 +877,6 @@ export const workspaceMlModels = pgTable('workspace_ml_models', {
 
 export type WorkspaceMlModelRow = typeof workspaceMlModels.$inferSelect
 export type NewWorkspaceMlModelRow = typeof workspaceMlModels.$inferInsert
+
+export type SlackPendingActionRow = typeof slackPendingActions.$inferSelect
+export type NewSlackPendingActionRow = typeof slackPendingActions.$inferInsert
