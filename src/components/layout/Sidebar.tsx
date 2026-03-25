@@ -18,7 +18,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 // 6-item flat nav
 const NAV_ITEMS = [
-  { href: '/dashboard',    icon: LayoutDashboard, label: 'Today',        matchPaths: ['/dashboard'] },
+  { href: '/',             icon: LayoutDashboard, label: 'Today',        matchPaths: ['/', '/dashboard'] },
   { href: '/deals',        icon: GitBranch,       label: 'Deals',        matchPaths: ['/deals', '/pipeline'] },
   { href: '/intelligence', icon: Brain,           label: 'Intelligence', matchPaths: ['/intelligence', '/competitors', '/case-studies', '/product-gaps', '/models', '/collateral', '/playbook'] },
   { href: '/workflows',    icon: Zap,             label: 'Loops',        matchPaths: ['/workflows'] },
@@ -445,7 +445,7 @@ export default function Sidebar() {
 
   // Mobile bottom tab bar items
   const MOBILE_TABS = [
-    { href: '/dashboard',   icon: LayoutDashboard, label: 'Today' },
+    { href: '/',            icon: LayoutDashboard, label: 'Today' },
     { href: '/deals',       icon: GitBranch,        label: 'Deals' },
     { href: '/intelligence', icon: Brain,           label: 'Intel' },
     { href: '/workflows',   icon: Zap,             label: 'Flows' },
