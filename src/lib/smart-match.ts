@@ -41,7 +41,7 @@ function cosineSimilarity(a: number[], b: number[]): number {
  * Linear states: Triage, Backlog, Todo, In Progress, In Review, In QA, RFQA, Done, Cancelled
  * Our states: identified, in_cycle, shipped
  */
-function linearStatusToLoopStatus(linearStatus: string | null): string {
+export function linearStatusToLoopStatus(linearStatus: string | null): string {
   if (!linearStatus) return 'identified'
   const s = linearStatus.toLowerCase()
   if (s === 'done' || s === 'completed') return 'shipped'
@@ -324,7 +324,7 @@ function charTrigrams(text: string): Set<string> {
  *
  * Returns 0-100. Zero API calls. All native algorithms.
  */
-function scoreMatch(gapText: string, issueTitle: string, issueDesc: string | null): number {
+export function scoreMatch(gapText: string, issueTitle: string, issueDesc: string | null): number {
   const gapTokens = tokenize(gapText)
   const titleTokens = tokenize(issueTitle)
   const descTokens = tokenize(issueDesc ?? '')
@@ -395,6 +395,19 @@ function scoreMatch(gapText: string, issueTitle: string, issueDesc: string | nul
   if (totalHits < 2 && combined < 40) return 0
 
   return Math.round(combined)
+}
+
+// ─── isRealFeature guard ──────────────────────────────────────────────────────
+
+/**
+ * Returns true if the gap text looks like a genuine product feature request
+ * (not a meeting note artifact, date string, or vague meta-request).
+ */
+export function checkIsRealFeature(gapText: string): boolean {
+  return gapText.length >= 10 && gapText.length <= 150
+    && !/^(page \d|what success|the poc|gospace lead|drew proposed|\[?\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))/i.test(gapText)
+    && !gapText.includes('...')
+    && !/^(need the ability|need to|we need|they need|please let me)/i.test(gapText)
 }
 
 // ─── Main matching function ──────────────────────────────────────────────────
@@ -802,15 +815,7 @@ ${allText.slice(0, 4000)}`,
 
     // Tier 3: No confident match → CREATE new Linear issue
     if (!didLink && linearApiKey && integration) {
-      // Accept concise feature titles (8-120 chars); reject meeting note fragments
-      const isRealFeature = gapText.length >= 8 && gapText.length <= 120
-        // Reject obvious meeting note fragments (dates, presenter names, page refs)
-        && !/^(page \d|\[?\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i.test(gapText)
-        // Reject truncated or incomplete text
-        && !gapText.endsWith('...')
-        // Reject if already linked to an existing issue (dedup check done earlier via `existing` check)
-
-      if (isRealFeature) {
+      if (checkIsRealFeature(gapText)) {
         try {
           // Map context to Linear priority; fall back to severity-based priority
           const linearPriority = gap.context && CONTEXT_PRIORITY[gap.context] !== undefined

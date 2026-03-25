@@ -15,6 +15,14 @@ import {
   getCycleIssues,
 } from '../linear-cycle'
 import { generateScopedIssue } from '../scope-generator'
+import Anthropic from '@anthropic-ai/sdk'
+
+// Module-level mock — factory registered before any test runs
+vi.mock('@anthropic-ai/sdk', () => ({
+  default: vi.fn(),
+}))
+
+const MockedAnthropic = vi.mocked(Anthropic)
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -316,16 +324,13 @@ describe('generateScopedIssue', () => {
       ],
     }
 
-    // Mock the Anthropic SDK
-    vi.mock('@anthropic-ai/sdk', () => ({
-      default: vi.fn().mockImplementation(() => ({
-        messages: {
-          create: vi.fn().mockResolvedValue({
-            content: [{ type: 'text', text: JSON.stringify(mockResponse) }],
-          }),
-        },
-      })),
-    }))
+    MockedAnthropic.mockImplementation(() => ({
+      messages: {
+        create: vi.fn().mockResolvedValue({
+          content: [{ type: 'text', text: JSON.stringify(mockResponse) }],
+        }),
+      },
+    }) as unknown as Anthropic)
 
     const result = await generateScopedIssue({
       dealName: 'Coke Q2',
@@ -343,15 +348,13 @@ describe('generateScopedIssue', () => {
   })
 
   it('throws on malformed JSON', async () => {
-    vi.mock('@anthropic-ai/sdk', () => ({
-      default: vi.fn().mockImplementation(() => ({
-        messages: {
-          create: vi.fn().mockResolvedValue({
-            content: [{ type: 'text', text: 'not json at all' }],
-          }),
-        },
-      })),
-    }))
+    MockedAnthropic.mockImplementation(() => ({
+      messages: {
+        create: vi.fn().mockResolvedValue({
+          content: [{ type: 'text', text: 'not json at all' }],
+        }),
+      },
+    }) as unknown as Anthropic)
 
     await expect(generateScopedIssue({
       dealName: 'Test',
