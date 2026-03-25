@@ -21,6 +21,22 @@ import { decrypt, getEncryptionKey } from '@/lib/encrypt'
 
 const MAX_LINKS_PER_DEAL = 5
 
+/**
+ * Map a Linear issue status to our loop status.
+ * Linear states: Triage, Backlog, Todo, In Progress, In Review, Done, Cancelled
+ * Our states: suggested, confirmed, in_cycle, shipped
+ */
+function linearStatusToLoopStatus(linearStatus: string | null): 'suggested' | 'in_cycle' | 'shipped' {
+  if (!linearStatus) return 'suggested'
+  const s = linearStatus.toLowerCase()
+  // Shipped/done
+  if (s === 'done' || s === 'completed' || s === 'cancelled' || s === 'canceled') return 'shipped'
+  // In cycle — actively being worked on
+  if (s === 'in progress' || s === 'in review' || s === 'started') return 'in_cycle'
+  // Everything else (Triage, Backlog, Todo) = suggested
+  return 'suggested'
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface ProductGap {
@@ -334,6 +350,8 @@ export async function smartMatchDeal(
         .limit(1)
 
       if (!existing) {
+        // Set status based on actual Linear issue state
+        const loopStatus = linearStatusToLoopStatus(bestMatch.status)
         await db.insert(dealLinearLinks).values({
           workspaceId,
           dealId,
@@ -342,11 +360,11 @@ export async function smartMatchDeal(
           linearTitle: bestMatch.title,
           relevanceScore: bestScore,
           linkType: 'feature_gap',
-          status: 'suggested',
+          status: loopStatus,
           addressesRisk: gapText.slice(0, 200),
         }).onConflictDoNothing()
         linked++
-        console.log(`[smart-match] ${deal.prospectCompany}: "${gapText}" → ${bestMatch.linearIssueId} (${bestMatch.title}) [score=${bestScore}]`)
+        console.log(`[smart-match] ${deal.prospectCompany}: "${gapText}" → ${bestMatch.linearIssueId} (${bestMatch.title}) [score=${bestScore}, linearStatus=${bestMatch.status}, loopStatus=${loopStatus}]`)
       }
     } else if (linearApiKey && integration) {
       // No match — create the issue on Linear

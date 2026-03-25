@@ -153,15 +153,15 @@ function Skeleton({ h = 60 }: { h?: number }) {
 function RevenueImpactStrip({ currency }: { currency: string }) {
   const { data: dealsRes } = useSWR<{ data: DealRow[] }>(
     '/api/deals', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60000 },
+    { revalidateOnFocus: false, dedupingInterval: 3000000 },
   )
   const { data: loopsRes } = useSWR<{ data: LoopEntry[] }>(
     '/api/loops', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 30000 },
+    { revalidateOnFocus: false, dedupingInterval: 300000 },
   )
   const { data: brainData } = useSWR<BrainData>(
     '/api/brain', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60000 },
+    { revalidateOnFocus: false, dedupingInterval: 3000000 },
   )
 
   const deals = (dealsRes?.data ?? []).filter(
@@ -228,11 +228,11 @@ function RevenueImpactStrip({ currency }: { currency: string }) {
 function CoreLoopCard({ currency }: { currency: string }) {
   const { data: loopsRes, isLoading } = useSWR<{ data: LoopEntry[] }>(
     '/api/loops', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 30000 },
+    { revalidateOnFocus: false, dedupingInterval: 300000 },
   )
   const { data: brainData } = useSWR<BrainData>(
     '/api/brain', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60000 },
+    { revalidateOnFocus: false, dedupingInterval: 3000000 },
   )
 
   const loops = loopsRes?.data ?? []
@@ -353,15 +353,15 @@ function CoreLoopCard({ currency }: { currency: string }) {
 function SalesActionsCard({ currency }: { currency: string }) {
   const { data: summaryRes, isLoading } = useSWR<SummaryData>(
     '/api/dashboard/summary', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60000 },
+    { revalidateOnFocus: false, dedupingInterval: 3000000 },
   )
   const { data: brainData } = useSWR<BrainData>(
     '/api/brain', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60000 },
+    { revalidateOnFocus: false, dedupingInterval: 3000000 },
   )
   const { data: loopsRes } = useSWR<{ data: LoopEntry[] }>(
     '/api/loops', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 30000 },
+    { revalidateOnFocus: false, dedupingInterval: 300000 },
   )
 
   const topDeals = summaryRes?.data?.topDeals ?? []
@@ -451,7 +451,7 @@ function SalesActionsCard({ currency }: { currency: string }) {
 function ActiveLoopsTable({ currency }: { currency: string }) {
   const { data: loopsRes, isLoading } = useSWR<{ data: LoopEntry[] }>(
     '/api/loops', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 30000 },
+    { revalidateOnFocus: false, dedupingInterval: 300000 },
   )
   const loops = loopsRes?.data ?? []
 
@@ -719,7 +719,7 @@ function AIFocusBriefingCard() {
 function TopSalesActionsCard({ currency }: { currency: string }) {
   const { data: summaryRes } = useSWR<SummaryData>(
     '/api/dashboard/summary', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60000 },
+    { revalidateOnFocus: false, dedupingInterval: 3000000 },
   )
   const topDeals = summaryRes?.data?.topDeals ?? []
 
@@ -768,11 +768,11 @@ function TopSalesActionsCard({ currency }: { currency: string }) {
 function DealsAtRiskCard({ currency }: { currency: string }) {
   const { data: brainData } = useSWR<BrainData>(
     '/api/brain', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60000 },
+    { revalidateOnFocus: false, dedupingInterval: 3000000 },
   )
   const { data: summaryRes } = useSWR<SummaryData>(
     '/api/dashboard/summary', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60000 },
+    { revalidateOnFocus: false, dedupingInterval: 3000000 },
   )
 
   const brain = brainData?.data
@@ -840,11 +840,11 @@ function DealsAtRiskCard({ currency }: { currency: string }) {
 function IssuesUnlockRevenueCard({ currency }: { currency: string }) {
   const { data: brainData } = useSWR<BrainData>(
     '/api/brain', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60000 },
+    { revalidateOnFocus: false, dedupingInterval: 3000000 },
   )
   const { data: loopsRes } = useSWR<{ data: LoopEntry[] }>(
     '/api/loops', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 30000 },
+    { revalidateOnFocus: false, dedupingInterval: 300000 },
   )
 
   const brain = brainData?.data
@@ -952,7 +952,7 @@ function SectionLabel({ label }: { label: string }) {
 function BrainStatus() {
   const { data: brainData } = useSWR<BrainData>(
     '/api/brain', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60000 },
+    { revalidateOnFocus: false, dedupingInterval: 3000000 },
   )
 
   const isStale = brainData?.meta?.isStale ?? true

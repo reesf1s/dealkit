@@ -376,7 +376,7 @@ function CoreLoopTable({
               <th style={thStyle}>Deal</th>
               <th style={thStyle}>Revenue</th>
               <th style={thStyle}>Issue</th>
-              <th style={thStyle}>Risk addressed</th>
+              <th style={thStyle}>Why matched</th>
               <th style={thStyle}>Status</th>
               <th style={{ ...thStyle, textAlign: 'right' }}>Days</th>
               <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
@@ -464,28 +464,33 @@ function CoreLoopTable({
                           <span style={{
                             fontSize: '11px',
                             color: 'rgba(255,255,255,0.6)',
-                            maxWidth: '200px',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
+                            lineHeight: '1.4',
                             display: 'block',
                           }}>
                             {loop.linearTitle}
                           </span>
                         )}
+                        {loop.linearIssueUrl && (
+                          <a
+                            href={loop.linearIssueUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            style={{ fontSize: '9px', color: 'rgba(255,255,255,0.3)', textDecoration: 'none' }}
+                          >
+                            Open in Linear ↗
+                          </a>
+                        )}
                       </div>
                     </td>
 
-                    {/* Risk addressed */}
+                    {/* Why matched */}
                     <td style={tdStyle}>
                       {loop.addressesRisk ? (
                         <span style={{
                           fontSize: '11px',
                           color: 'rgba(255,255,255,0.55)',
-                          maxWidth: '140px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
+                          lineHeight: '1.4',
                           display: 'block',
                         }}>
                           {loop.addressesRisk}
