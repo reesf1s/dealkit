@@ -362,6 +362,7 @@ function scoreMatch(gapText: string, issueTitle: string, issueDesc: string | nul
 export async function smartMatchDeal(
   workspaceId: string,
   dealId: string,
+  options: { skipHaiku?: boolean } = {},
 ): Promise<MatchResult> {
   // 1. Load deal with its extracted gaps
   const [deal] = await db
@@ -452,7 +453,8 @@ export async function smartMatchDeal(
 
   // If no extracted gaps, use Haiku to extract them from raw meeting notes
   // This costs ~$0.001 per deal and only runs once (result is stored)
-  if (productGaps.length === 0) {
+  // Skipped during batch rematch to avoid timeouts — only runs on single-deal matching
+  if (productGaps.length === 0 && !options.skipHaiku) {
     const allText = [deal.meetingNotes, deal.notes, deal.description].filter(Boolean).join('\n\n')
     if (allText.length > 50) {
       if (!process.env.ANTHROPIC_API_KEY) {
@@ -790,13 +792,8 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
   totalCreated: number
   results: MatchResult[]
 }> {
-  // Wipe ALL auto-generated links so rematch starts completely fresh.
-  // Manual links (user-created) are preserved.
-  // Status sync SQL runs AFTER matching to set correct statuses on fresh links.
-  await db.delete(dealLinearLinks).where(and(
-    eq(dealLinearLinks.workspaceId, workspaceId),
-    sql`${dealLinearLinks.linkType} != 'manual'`,
-  ))
+  // NON-DESTRUCTIVE: match all deals first, THEN clean up orphaned auto-links.
+  // This prevents data loss if the function times out halfway.
 
   const openDeals = await db
     .select({ id: dealLogs.id })
@@ -810,12 +807,17 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
   let totalCreated = 0
   const results: MatchResult[] = []
 
-  // Process sequentially — each deal is fast (no API calls for matching)
+  // Process all deals — skipHaiku to stay within timeout
+  // Each deal uses existing gaps (Sources A-D) + vector matching (fast)
   for (const deal of openDeals) {
-    const result = await smartMatchDeal(workspaceId, deal.id)
-    totalLinked += result.linked
-    totalCreated += result.created
-    results.push(result)
+    try {
+      const result = await smartMatchDeal(workspaceId, deal.id, { skipHaiku: true })
+      totalLinked += result.linked
+      totalCreated += result.created
+      results.push(result)
+    } catch (e) {
+      console.warn(`[smart-match] Deal ${deal.id} failed:`, e instanceof Error ? e.message : e)
+    }
   }
 
   // Sync ALL link statuses from Linear cache (catches any status changes since link creation)
