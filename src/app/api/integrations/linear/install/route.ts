@@ -17,7 +17,10 @@ export async function GET(req: NextRequest) {
 
   const clientId = process.env.LINEAR_CLIENT_ID
   if (!clientId) {
-    return NextResponse.json({ error: 'LINEAR_CLIENT_ID env var is not set' }, { status: 503 })
+    return NextResponse.json(
+      { error: 'Linear OAuth not configured. Add LINEAR_CLIENT_ID to environment variables.' },
+      { status: 503 },
+    )
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''

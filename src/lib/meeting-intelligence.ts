@@ -115,6 +115,7 @@ export async function extractAndLinkFeatures(
     const extraction = await extractFeaturesFromNotes(notes)
     if (extraction.features.length === 0 && extraction.painPoints.length === 0) return
 
+    const totalFeatures = extraction.features.length
     let linkedCount = 0
     let stubCount = 0
 
@@ -190,7 +191,8 @@ export async function extractAndLinkFeatures(
     }
 
     // 5. Send Slack DM to the rep if connected
-    if (linkedCount > 0 || stubCount > 0) {
+    // Fire DM whenever features were found in the notes, even if all matching/stub attempts failed
+    if (totalFeatures > 0 || extraction.painPoints.length > 0) {
       await notifyRepAboutExtraction(
         workspaceId,
         repClerkUserId,
@@ -198,6 +200,7 @@ export async function extractAndLinkFeatures(
         deal.prospectCompany,
         linkedCount,
         stubCount,
+        totalFeatures,
       )
     }
   } catch (e) {
@@ -217,6 +220,7 @@ async function notifyRepAboutExtraction(
   company: string,
   linkedCount: number,
   stubCount: number,
+  totalFeatures: number,
 ): Promise<void> {
   try {
     const botToken = await getSlackBotToken(workspaceId)
@@ -238,19 +242,28 @@ async function notifyRepAboutExtraction(
 
     if (!slackUserId) return
 
-    const parts: string[] = [
-      `🔍 *Meeting notes analysed for ${company}*`,
-      '',
-    ]
-    if (linkedCount > 0) {
-      parts.push(`• Matched *${linkedCount}* existing Linear issue${linkedCount !== 1 ? 's' : ''} to this deal`)
+    let text: string
+    if (linkedCount === 0 && stubCount === 0 && totalFeatures > 0) {
+      // Features were found but all matching/stub attempts failed — use friendly fallback
+      text = `🔍 I analysed *${company}* — I found *${totalFeatures}* potential feature gap${totalFeatures !== 1 ? 's' : ''}. Connect Linear to match them to issues, or ask me anything about this deal in Slack.\n\n_Ask me: "latest on ${company}"_`
+    } else if (linkedCount === 0 && stubCount > 0) {
+      // No Linear issues matched — stubs created, guide user to connect/review
+      text = `🔍 I analysed *${company}* — I found *${stubCount}* potential feature gap${stubCount !== 1 ? 's' : ''}. Connect Linear to match them to issues, or ask me anything about this deal in Slack.\n\n_Ask me: "latest on ${company}"_`
+    } else {
+      const parts: string[] = [
+        `🔍 *Meeting notes analysed for ${company}*`,
+        '',
+      ]
+      if (linkedCount > 0) {
+        parts.push(`• Matched *${linkedCount}* existing Linear issue${linkedCount !== 1 ? 's' : ''} to this deal`)
+      }
+      if (stubCount > 0) {
+        parts.push(`• Found *${stubCount}* new feature request${stubCount !== 1 ? 's' : ''} not yet in Linear`)
+      }
+      parts.push('', `Ask me _"latest on ${company}"_ to review them.`)
+      text = parts.join('\n')
     }
-    if (stubCount > 0) {
-      parts.push(`• Found *${stubCount}* new feature request${stubCount !== 1 ? 's' : ''} not yet in Linear`)
-    }
-    parts.push('', `Ask me _"latest on ${company}"_ to review them.`)
 
-    const text = parts.join('\n')
     const dmChannel = await slackOpenDm(botToken, slackUserId)
     if (dmChannel) {
       await slackPostMessage(botToken, dmChannel, markdownToBlocks(text), text)

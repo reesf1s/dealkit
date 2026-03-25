@@ -19,6 +19,7 @@ function OnboardingInner() {
   const searchParams = useSearchParams()
 
   const [step, setStep] = useState<Step>('slack')
+  const [initializing, setInitializing] = useState(true)
 
   // Slack state
   const [slackConnected, setSlackConnected] = useState(false)
@@ -28,6 +29,8 @@ function OnboardingInner() {
   const [linearConnected, setLinearConnected] = useState(false)
   const [linearTeamName, setLinearTeamName] = useState<string | null>(null)
   const [linearSyncing, setLinearSyncing] = useState(false)
+  const [linearError, setLinearError] = useState<string | null>(null)
+  const [linearConnecting, setLinearConnecting] = useState(false)
 
   // Deal state
   const [company, setCompany] = useState('')
@@ -48,6 +51,7 @@ function OnboardingInner() {
           .then(r => r.json())
           .then(d => { if (d.data?.slackTeamName) setSlackTeamName(d.data.slackTeamName) })
           .catch(() => {})
+        setInitializing(false)
         setTimeout(() => setStep('linear'), 1500)
         return
       }
@@ -65,6 +69,7 @@ function OnboardingInner() {
           }
           if (linearData?.data?.teamName) setLinearTeamName(linearData.data.teamName)
         })
+        setInitializing(false)
         setTimeout(() => { setLinearSyncing(false); setStep('deal') }, 2500)
         return
       }
@@ -91,10 +96,36 @@ function OnboardingInner() {
 
       if (hasSlack && hasLinear) setStep('deal')
       else if (hasSlack) setStep('linear')
+
+      setInitializing(false)
     }
 
     init()
   }, [searchParams])
+
+  async function handleLinearConnect() {
+    setLinearError(null)
+    setLinearConnecting(true)
+    const url = '/api/integrations/linear/install?returnTo=/onboarding'
+    try {
+      const res = await fetch(url, { redirect: 'manual' })
+      // opaqueredirect means the install route redirected us to Linear's OAuth — proceed
+      if (res.type === 'opaqueredirect' || res.status === 0) {
+        window.location.href = url
+        return
+      }
+      const data = await res.json().catch(() => ({}))
+      if (data.error) {
+        setLinearError(data.error)
+        setLinearConnecting(false)
+        return
+      }
+      // Unexpected non-redirect response — try the redirect anyway
+      window.location.href = url
+    } catch {
+      window.location.href = url
+    }
+  }
 
   async function handleDealSave() {
     if (!company.trim() || dealSaving) return
@@ -210,6 +241,8 @@ function OnboardingInner() {
       </div>
     )
   }
+
+  if (initializing) return null
 
   return (
     <div style={{ maxWidth: '480px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '32px', paddingTop: '8px' }}>
@@ -337,12 +370,28 @@ function OnboardingInner() {
                   'Deals matched to relevant issues by AI similarity',
                   'Sales can request prioritization without pestering eng',
                 ]} />
-                <a
-                  href="/api/integrations/linear/install?returnTo=/onboarding"
-                  style={primaryBtn}
+                <button
+                  onClick={handleLinearConnect}
+                  disabled={linearConnecting}
+                  style={{ ...primaryBtn, opacity: linearConnecting ? 0.7 : 1, cursor: linearConnecting ? 'not-allowed' : 'pointer' }}
                 >
-                  <Database size={14} /> Connect Linear
-                </a>
+                  {linearConnecting
+                    ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Connecting…</>
+                    : <><Database size={14} /> Connect Linear</>}
+                </button>
+                {linearError && (
+                  <div style={{
+                    padding: '10px 14px',
+                    background: 'rgba(239,68,68,0.06)',
+                    border: '1px solid rgba(239,68,68,0.20)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '12px',
+                    color: 'var(--accent-danger)',
+                    lineHeight: 1.5,
+                  }}>
+                    {linearError}
+                  </div>
+                )}
               </>
             )}
           </div>
