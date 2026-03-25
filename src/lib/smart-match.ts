@@ -15,7 +15,7 @@
 
 import { db } from '@/lib/db'
 import { eq, and, sql } from 'drizzle-orm'
-import { dealLogs, dealLinearLinks, linearIssuesCache, linearIntegrations } from '@/lib/db/schema'
+import { dealLogs, dealLinearLinks, linearIssuesCache, linearIntegrations, productGaps as productGapsTable } from '@/lib/db/schema'
 import { createIssue } from '@/lib/linear-client'
 import { decrypt, getEncryptionKey } from '@/lib/encrypt'
 import { generateEmbedding } from '@/lib/openai-embeddings'
@@ -41,13 +41,15 @@ function cosineSimilarity(a: number[], b: number[]): number {
  * Linear states: Triage, Backlog, Todo, In Progress, In Review, In QA, RFQA, Done, Cancelled
  * Our states: identified, in_cycle, shipped
  */
-function linearStatusToLoopStatus(linearStatus: string | null): string {
-  if (!linearStatus) return 'identified'
+function linearStatusToLoopStatus(linearStatus: string | null, cycleId: string | null = null): string {
+  if (!linearStatus) return cycleId ? 'in_cycle' : 'identified'
   const s = linearStatus.toLowerCase()
   if (s === 'done' || s === 'completed' || s === 'cancelled' || s === 'canceled') return 'shipped'
   if (s === 'in progress') return 'in_progress'
   if (s === 'in review') return 'in_review'
   if (['in qa', 'rfqa', 'started'].includes(s)) return 'in_cycle'
+  // In a cycle but not yet started (Todo/Backlog/Triage) = "in cycle"
+  if (cycleId) return 'in_cycle'
   return 'identified'
 }
 
@@ -421,6 +423,29 @@ export async function smartMatchDeal(
     }
   } catch { /* non-fatal */ }
 
+  // Source D: productGaps table (curated gaps from analyze-notes — highest quality)
+  try {
+    const pgRows = await db
+      .select({ title: productGapsTable.title, description: productGapsTable.description })
+      .from(productGapsTable)
+      .where(and(
+        eq(productGapsTable.workspaceId, workspaceId),
+        sql`${productGapsTable.sourceDeals}::jsonb @> ${JSON.stringify([dealId])}::jsonb`,
+        sql`${productGapsTable.status} NOT IN ('wont_fix', 'shipped')`,
+      ))
+    for (const pg of pgRows) {
+      if (pg.title && pg.title.length >= 10) {
+        const isDupe = productGaps.some(g => g.gap.toLowerCase().slice(0, 30) === pg.title!.toLowerCase().slice(0, 30))
+        if (!isDupe) {
+          productGaps.push({ gap: pg.title, description: pg.description ?? '', severity: 'high' })
+        }
+      }
+    }
+    if (pgRows.length > 0) {
+      console.log(`[smart-match] ${deal.prospectCompany}: added ${pgRows.length} gaps from productGaps table`)
+    }
+  } catch { /* non-fatal */ }
+
   // If no extracted gaps, use Haiku to extract them from raw meeting notes
   // This costs ~$0.001 per deal and only runs once (result is stored)
   if (productGaps.length === 0) {
@@ -514,6 +539,7 @@ ${allText.slice(0, 4000)}`,
       linearIssueUrl: linearIssuesCache.linearIssueUrl,
       status: linearIssuesCache.status,
       priority: linearIssuesCache.priority,
+      cycleId: linearIssuesCache.cycleId,
     })
     .from(linearIssuesCache)
     .where(eq(linearIssuesCache.workspaceId, workspaceId))
@@ -657,7 +683,7 @@ ${allText.slice(0, 4000)}`,
 
       if (!existing) {
         // Set status based on actual Linear issue state
-        const loopStatus = linearStatusToLoopStatus(bestMatch.status)
+        const loopStatus = linearStatusToLoopStatus(bestMatch.status, bestMatch.cycleId ?? null)
         await db.insert(dealLinearLinks).values({
           workspaceId,
           dealId,
@@ -767,6 +793,7 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
         WHEN lic.status = 'In Progress' THEN 'in_progress'
         WHEN lic.status = 'In Review' THEN 'in_review'
         WHEN lic.status IN ('In QA', 'RFQA') THEN 'in_cycle'
+        WHEN lic.cycle_id IS NOT NULL THEN 'in_cycle'
         ELSE dll.status
       END,
       updated_at = NOW()
