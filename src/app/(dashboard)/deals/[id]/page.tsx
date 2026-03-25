@@ -4152,6 +4152,7 @@ function LinearColumn({ dealId }: { dealId: string }) {
               in_review: { label: 'In Review', color: '#8b5cf6' },
               in_cycle: { label: 'In Cycle', color: '#3b82f6' },
               identified: { label: 'Identified', color: '#f59e0b' },
+              cancelled: { label: 'Cancelled', color: '#6b7280' },
             }
             const st = STATUS_MAP[link.status] ?? { label: 'Identified', color: '#f59e0b' }
             const statusColor = st.color

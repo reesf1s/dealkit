@@ -44,7 +44,8 @@ function cosineSimilarity(a: number[], b: number[]): number {
 function linearStatusToLoopStatus(linearStatus: string | null): string {
   if (!linearStatus) return 'identified'
   const s = linearStatus.toLowerCase()
-  if (s === 'done' || s === 'completed' || s === 'cancelled' || s === 'canceled') return 'shipped'
+  if (s === 'done' || s === 'completed') return 'shipped'
+  if (s === 'cancelled' || s === 'canceled') return 'cancelled'
   if (s === 'in progress' || s === 'in qa' || s === 'rfqa' || s === 'started') return 'in_progress'
   if (s === 'in review') return 'in_review'
   // Todo, Backlog, Triage = identified (not yet being worked on)
@@ -106,16 +107,15 @@ function stem(word: string): string {
 
   // Irregular forms
   const irregulars: Record<string, string> = {
-    'sitting': 'sit', 'seated': 'sit', 'sat': 'sit',
     'preferences': 'prefer', 'preferred': 'prefer',
     'predictability': 'predict', 'predictable': 'predict',
-    'attendance': 'attend', 'attending': 'attend',
     'consistency': 'consist', 'consistent': 'consist',
-    'occupancy': 'occupy', 'occupied': 'occupy',
-    'allocation': 'allocat', 'allocated': 'allocat',
     'utilisation': 'util', 'utilization': 'util',
-    'neighbourhood': 'neighbor', 'neighborhood': 'neighbor',
-    'colocation': 'colocat', 'co-location': 'colocat',
+    'allocation': 'allocat', 'allocated': 'allocat',
+    'authentication': 'authent', 'authenticating': 'authent',
+    'customization': 'custom', 'customizable': 'custom', 'customisation': 'custom',
+    'synchronization': 'synchron', 'synchronisation': 'synchron',
+    'notification': 'notif', 'notifications': 'notif',
   }
   if (irregulars[w]) return irregulars[w]
 
@@ -143,20 +143,26 @@ function stem(word: string): string {
 // ─── Concept phrase preprocessing ────────────────────────────────────────────
 
 const CONCEPT_PHRASES: [RegExp, string][] = [
-  [/sit next to/gi, 'colocat proximity'],
-  [/next to each other/gi, 'colocat proximity'],
-  [/same desk area/gi, 'desk consist'],
-  [/break\s*down\s*by/gi, 'segment breakdown'],
-  [/how often/gi, 'frequency'],
-  [/come in to/gi, 'attend'],
-  [/work from home/gi, 'remote wfh'],
-  [/in the office/gi, 'attend onsit'],
+  // Auth
+  [/single sign[\s-]?on/gi, 'sso authent'],
+  [/two[\s-]?factor/gi, 'mfa authent'],
+  [/multi[\s-]?factor/gi, 'mfa authent'],
+  [/role[\s-]?based/gi, 'rbac permiss'],
+  // Data operations (kept separate: export ≠ import)
+  [/(?:bulk|data|csv)\s*export/gi, 'export csv'],
+  [/export\s*(?:to\s*)?(?:csv|excel|spreadsheet)/gi, 'export csv'],
+  [/(?:bulk|data|csv)\s*import/gi, 'import ingest'],
+  // Real-time & streaming
   [/real[\s-]?time/gi, 'realtim live'],
-  [/single sign[\s-]?on/gi, 'sso auth'],
-  [/two[\s-]?factor/gi, 'mfa auth'],
-  [/day of the week/gi, 'weekday'],
-  [/per\s*cent\w*/gi, 'percentag'],
+  // Analytics breakdown
+  [/break\s*down\s*by/gi, 'segment breakdown'],
   [/broken down/gi, 'segment breakdown'],
+  // Misc SaaS
+  [/audit\s*log/gi, 'audit secur'],
+  [/open\s*api/gi, 'api endpoint'],
+  [/white[\s-]?label/gi, 'custom brand'],
+  [/custom\s*field/gi, 'custom configur'],
+  [/per\s*cent\w*/gi, 'percent rate'],
 ]
 
 function applyConceptPhrases(text: string): string {
@@ -186,61 +192,88 @@ function tokenize(text: string): string[] {
     .filter(w => w.length >= 3)
 }
 
-// ─── Synonym dictionary (50+ groups) ─────────────────────────────────────────
+// ─── Synonym dictionary — domain-agnostic SaaS product gaps ──────────────────
+// IMPORTANT: import and export are in SEPARATE groups — they are opposite operations.
 
 const SYNONYM_GROUPS: string[][] = [
-  // Workplace & space
+  // Auth & SSO
+  ['sso', 'saml', 'oauth', 'oidc', 'okta', 'authent', 'auth', 'login', 'singl'],
+  // MFA / two-factor
+  ['mfa', '2fa', 'totp', 'multifactor', 'twofactor'],
+  // Permissions & RBAC
+  ['permiss', 'role', 'rbac', 'access', 'entitl', 'privileg'],
+  // Integrations & connectors (NOT import/export)
+  ['integrat', 'connect', 'plugin', 'addon', 'extens', 'embed'],
+  // Sync
+  ['sync', 'synchron', 'replic', 'mirror'],
+  // API & webhooks
+  ['api', 'rest', 'graphql', 'endpoint', 'webhook', 'sdk'],
+  // Data EXPORT — do NOT combine with import
+  ['export', 'download', 'csv', 'spreadsheet', 'extract', 'output'],
+  // Data IMPORT — do NOT combine with export
+  ['import', 'upload', 'ingest', 'input', 'load'],
+  // Reporting & analytics
+  ['report', 'analyt', 'analys', 'insight', 'metric', 'statist'],
+  // Dashboards & views
+  ['dashboard', 'panel', 'view', 'overview', 'summar', 'screen', 'display'],
+  // Charts & visualization
+  ['chart', 'graph', 'visual', 'plot'],
+  // Segmentation & filtering
+  ['segment', 'breakdown', 'categor', 'filter', 'group', 'slice'],
+  // Search & discovery
+  ['search', 'find', 'lookup', 'discov', 'queri'],
+  // Forecasting & trends
+  ['forecast', 'predict', 'trend', 'estimat', 'project'],
+  // Notifications & alerts
+  ['notif', 'alert', 'remind', 'warn', 'digest'],
+  // Messaging & communication channels
+  ['email', 'slack', 'messag', 'communicat', 'sms', 'chat'],
+  // Billing & subscriptions
+  ['bill', 'invoic', 'payment', 'subscript', 'pric', 'charg'],
+  // Plans & quotas
+  ['plan', 'tier', 'quota', 'limit', 'entitl'],
+  // User & member management
+  ['user', 'employ', 'member', 'person', 'staff'],
+  // Teams & orgs
   ['team', 'group', 'department', 'org'],
-  ['desk', 'seat', 'workstat', 'station'],
-  ['area', 'zone', 'section', 'region', 'neighbor'],
-  ['sit', 'seat', 'locat', 'colocat', 'proxim'],
-  ['space', 'room', 'offic', 'floor', 'build'],
-  ['employ', 'people', 'person', 'staff', 'user', 'worker'],
-  ['occupy', 'occupanc', 'util', 'usag', 'capac'],
-  ['allocat', 'assign', 'distribut'],
-  // Behaviour & analytics
-  ['predict', 'pattern', 'consist', 'trend'],
-  ['attend', 'presenc', 'visit', 'frequenc'],
-  ['analys', 'analyz', 'analyt', 'insight', 'report'],
-  ['compare', 'comparison', 'versus', 'benchmark', 'correlat'],
-  ['segment', 'breakdown', 'categor', 'group'],
-  // Tech & integrations
-  ['integrat', 'connect', 'sync', 'synchron'],
-  ['book', 'reserv', 'schedul'],
-  ['dashboard', 'panel', 'view', 'screen', 'display', 'overview'],
-  ['forecast', 'project', 'estimat'],
-  ['sensor', 'iot', 'devic', 'hardwar'],
-  ['api', 'endpoint', 'webhook', 'rest'],
-  ['sso', 'authent', 'auth', 'login', 'saml', 'oauth'],
-  ['secur', 'complianc', 'soc', 'gdpr', 'privac', 'encrypt'],
-  ['import', 'export', 'upload', 'download', 'ingest'],
-  ['fix', 'bug', 'error', 'broken', 'repair'],
-  ['creat', 'add', 'build', 'implement'],
-  ['automat', 'workflow', 'trigger', 'rule'],
-  ['notif', 'alert', 'email', 'remind'],
-  ['permiss', 'role', 'access', 'rbac'],
-  ['custom', 'config', 'configur', 'setting', 'prefer'],
-  ['mobil', 'app', 'ios', 'android', 'phone'],
-  ['map', 'floorplan', 'layout', 'visual'],
-  ['survey', 'feedback', 'nps', 'satisfact', 'rat'],
-  ['cost', 'pric', 'spend', 'budget', 'expens', 'roi'],
-  ['migrat', 'transfer', 'transit'],
-  ['test', 'trial', 'pilot', 'poc', 'evaluat'],
-  ['scal', 'growth', 'enterpris', 'perform'],
-  ['data', 'dataset', 'record', 'entri', 'tabl'],
-  ['filter', 'search', 'query', 'find', 'sort'],
-  ['plan', 'scenario', 'model', 'simulat'],
-  ['hybrid', 'flexibl', 'flex', 'remote', 'wfh', 'onsit'],
-  ['badg', 'swip', 'checkin', 'entry'],
-  ['wayfind', 'navigat', 'direct', 'locat'],
-  ['amen', 'facil', 'servic'],
-  ['visitor', 'guest', 'contractor', 'extern', 'recept'],
-  ['calendar', 'outlook', 'gcal', 'ical', 'event', 'meet'],
-  ['slack', 'chat', 'messag', 'communicat'],
-  ['week', 'weekday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
-  ['heatmap', 'heat', 'thermal', 'densit'],
+  // Workspace & tenant
+  ['workspace', 'tenant', 'account', 'compan'],
+  // Workflows & automations
+  ['automat', 'workflow', 'rule', 'trigger', 'action'],
+  // Approvals & review
+  ['approv', 'review', 'approv', 'sign'],
+  // Sort & ordering
+  ['sort', 'rank', 'order'],
+  // Security & compliance
+  ['secur', 'complianc', 'gdpr', 'hipaa', 'privac', 'encrypt', 'audit', 'soc'],
+  // Mobile & native apps
+  ['mobil', 'ios', 'android', 'nativ', 'app'],
+  // Performance & scalability
+  ['scal', 'perform', 'speed', 'latenc', 'fast'],
+  // Data & records
+  ['data', 'record', 'entri', 'dataset', 'tabl'],
+  // Configuration & settings
+  ['custom', 'configur', 'config', 'setting', 'prefer'],
+  // Bugs & fixes
+  ['fix', 'bug', 'error', 'broken', 'repair', 'issu'],
+  // Building & implementing features
+  ['creat', 'add', 'build', 'implement', 'develop'],
+  // Calendar & scheduling
+  ['calendar', 'schedul', 'event', 'appoint', 'meet'],
+  // CRM & pipeline
+  ['crm', 'pipeline', 'opportunit', 'lead', 'deal'],
+  // Contacts & prospects
+  ['contact', 'prospect', 'customer', 'client'],
+  // Real-time & streaming
   ['realtim', 'live', 'stream', 'instant'],
-  ['percentag', 'ratio', 'proport', 'rate'],
+  // Comparison & benchmarking
+  ['compare', 'comparison', 'versus', 'benchmark', 'correlat'],
+  // Migration & transfer
+  ['migrat', 'transfer', 'transit'],
+  // Survey & feedback
+  ['survey', 'feedback', 'nps', 'satisfact'],
+  // Cost & ROI
+  ['cost', 'pric', 'spend', 'budget', 'expens', 'roi'],
 ]
 
 /** Build a lookup: stemmed word → group index */
@@ -380,6 +413,18 @@ export async function smartMatchDeal(
     .limit(1)
 
   if (!deal) return { linked: 0, created: 0, dealName: '' }
+
+  // Prune stale system-generated 'suggested' links before re-matching
+  // (matchAllOpenDeals does this globally; smartMatchDeal must do it per-deal)
+  try {
+    await db.execute(sql`
+      DELETE FROM deal_linear_links
+      WHERE deal_id = ${dealId}::uuid
+        AND workspace_id = ${workspaceId}
+        AND status = 'suggested'
+        AND link_type = 'feature_gap'
+    `)
+  } catch { /* non-fatal */ }
 
   // 2. Extract product gaps from multiple sources
   let productGaps: ProductGap[] = []
@@ -663,8 +708,8 @@ ${allText.slice(0, 4000)}`,
           : nlpScore
 
         topScores.push({ id: issue.linearIssueId, title: issue.title.slice(0, 40), score: combined, vecScore, nlpScore })
-        // Threshold: 25 for NLP-only, 40 for hybrid (vectors are more reliable)
-        const threshold = (gapEmbedding && issue.embedding) ? 40 : 25
+        // Threshold: 40 for both NLP-only and hybrid — a score of 25 NLP-only is too weak
+        const threshold = 40
         if (combined > bestScore && combined >= threshold) {
           bestScore = combined
           bestMatch = issue
@@ -701,8 +746,8 @@ ${allText.slice(0, 4000)}`,
     }
 
     // For curated productGaps table entries: require ≥60 to link (otherwise create)
-    // For other sources: ≥25 is enough
-    const linkThreshold = gap.source === 'product_gaps_table' ? 60 : 25
+    // For signals/criteria/haiku sources: require ≥40 (NLP-only too weak below this)
+    const linkThreshold = gap.source === 'product_gaps_table' ? 60 : 40
 
     let didLink = false
     if (bestMatch && bestScore >= linkThreshold && !conflictDetected) {
@@ -726,7 +771,7 @@ ${allText.slice(0, 4000)}`,
           relevanceScore: Math.round(bestScore),
           linkType: 'feature_gap',
           status: loopStatus,
-          addressesRisk: gapText.slice(0, 150),
+          addressesRisk: (gap.description ? gap.description.slice(0, 150) : `Product gap identified in ${deal.prospectCompany} deal`),
         }).onConflictDoNothing()
         linked++
         didLink = true
@@ -738,10 +783,13 @@ ${allText.slice(0, 4000)}`,
 
     // Tier 3: No confident match → CREATE new Linear issue
     if (!didLink && linearApiKey && integration) {
-      const isRealFeature = gapText.length >= 10 && gapText.length <= 150
-        && !/^(page \d|what success|the poc|gospace lead|drew proposed|\[?\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))/i.test(gapText)
-        && !gapText.includes('...')
-        && !/^(need the ability|need to|we need|they need|please let me)/i.test(gapText)
+      // Accept concise feature titles (8-120 chars); reject meeting note fragments
+      const isRealFeature = gapText.length >= 8 && gapText.length <= 120
+        // Reject obvious meeting note fragments (dates, presenter names, page refs)
+        && !/^(page \d|\[?\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)|^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i.test(gapText)
+        // Reject truncated or incomplete text
+        && !gapText.endsWith('...')
+        // Reject if already linked to an existing issue (dedup check done earlier via `existing` check)
 
       if (isRealFeature) {
         try {
@@ -772,7 +820,7 @@ ${allText.slice(0, 4000)}`,
           relevanceScore: 100,
           linkType: 'feature_gap',
           status: 'identified',
-          addressesRisk: gapText.slice(0, 150),
+          addressesRisk: (gap.description ? gap.description.slice(0, 150) : `Product gap identified in ${deal.prospectCompany} deal`),
         }).onConflictDoNothing()
 
         created++
@@ -832,6 +880,7 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
       UPDATE deal_linear_links dll
       SET status = CASE
         WHEN lic.status IN ('Done', 'Completed') THEN 'shipped'
+        WHEN lic.status IN ('Cancelled', 'Canceled') THEN 'cancelled'
         WHEN lic.status = 'In Progress' THEN 'in_progress'
         WHEN lic.status = 'In Review' THEN 'in_review'
         WHEN lic.status IN ('In QA', 'RFQA', 'Started') THEN 'in_progress'
@@ -865,6 +914,7 @@ export async function syncLoopStatuses(workspaceId: string): Promise<void> {
       UPDATE deal_linear_links dll
       SET status = CASE
         WHEN lic.status IN ('Done', 'Completed') THEN 'shipped'
+        WHEN lic.status IN ('Cancelled', 'Canceled') THEN 'cancelled'
         WHEN lic.status = 'In Progress' THEN 'in_progress'
         WHEN lic.status = 'In Review' THEN 'in_review'
         WHEN lic.status IN ('In QA', 'RFQA', 'Started') THEN 'in_progress'
