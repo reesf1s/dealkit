@@ -129,7 +129,7 @@ export async function fetchTeamIssues(
   cursor?: string,
   since?: string,
 ): Promise<{ issues: LinearIssue[]; nextCursor: string | null }> {
-  const sinceVar    = since ? ', $since: DateTime' : ''
+  const sinceVar    = since ? ', $since: DateTimeOrDuration' : ''
   const sinceFilter = since ? '\n          updatedAt: { gt: $since }' : ''
 
   const data = await gql<{
