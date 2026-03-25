@@ -19,7 +19,7 @@ import { db } from '@/lib/db'
 import { eq, and, sql } from 'drizzle-orm'
 import { linearIntegrations, dealLinearLinks, dealLogs } from '@/lib/db/schema'
 import { syncLinearIssues } from '@/lib/linear-sync'
-import { smartMatchAllDeals } from '@/lib/smart-match'
+import { syncLoopStatuses } from '@/lib/smart-match'
 import { notifyIssueDeployed, notifyAllIssuesDeployed } from '@/lib/slack-notify'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -215,10 +215,10 @@ export async function POST(req: NextRequest) {
     ).catch(() => { /* non-fatal */ })
   }
 
-  // Re-sync all issues and re-match for this workspace (fire-and-forget)
+  // Re-sync issues and update link statuses (NOT a full rematch — don't wipe links)
   Promise.all([
     syncLinearIssues(workspaceId),
-    smartMatchAllDeals(workspaceId),
+    syncLoopStatuses(workspaceId),
   ]).catch(err => console.error('[webhook/linear] re-sync failed:', err))
 
   return NextResponse.json({ data: { received: true, verified: true } })

@@ -15,7 +15,7 @@ import { db } from '@/lib/db'
 import { dealLogs, linearIssuesCache } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { syncLinearIssues } from '@/lib/linear-sync'
-import { smartMatchAllDeals } from '@/lib/smart-match'
+import { syncLoopStatuses } from '@/lib/smart-match'
 
 export async function POST() {
   try {
@@ -27,8 +27,9 @@ export async function POST() {
     // 1. Sync latest issues from Linear and re-embed them
     const syncResult = await syncLinearIssues(workspaceId)
 
-    // 2. Run signal matching for all open deals
-    const matchResult = await smartMatchAllDeals(workspaceId)
+    // 2. Sync loop statuses (NOT full rematch — user triggers that explicitly)
+    await syncLoopStatuses(workspaceId)
+    const matchResult = { totalLinked: 0, totalCreated: 0, results: [] }
 
     // 3. Count open deals and cached issues for response context
     const [dealsRow] = await db

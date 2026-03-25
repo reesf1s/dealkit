@@ -11,7 +11,7 @@ import { after } from 'next/server'
 import { NextResponse } from 'next/server'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { syncLinearIssues } from '@/lib/linear-sync'
-import { smartMatchAllDeals } from '@/lib/smart-match'
+import { syncLoopStatuses } from '@/lib/smart-match'
 
 export async function POST() {
   try {
@@ -24,12 +24,12 @@ export async function POST() {
     const result = await syncLinearIssues(workspaceId, true)  // force full sync on manual trigger
     console.log(`[linear-sync] Sync complete:`, result)
 
-    // After sync, re-match all open deals in background
+    // After sync, update statuses on existing links (NOT a full rematch — don't wipe links)
     after(async () => {
       try {
-        await smartMatchAllDeals(workspaceId)
+        await syncLoopStatuses(workspaceId)
       } catch (err) {
-        console.error('[linear-sync] Background rematch failed:', err)
+        console.error('[linear-sync] Background status sync failed:', err)
       }
     })
 

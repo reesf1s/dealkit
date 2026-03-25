@@ -847,3 +847,34 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
   console.log(`[smart-match] Complete: ${totalLinked} linked, ${totalCreated} created across ${openDeals.length} deals`)
   return { totalLinked, totalCreated, results }
 }
+
+// ─── Lightweight status sync (safe for background/webhook/cron) ─────────────
+
+/**
+ * Sync deal_linear_links statuses from linear_issues_cache.
+ * Does NOT wipe or re-match — only updates statuses on existing links.
+ * Safe to call from sync, webhooks, cron jobs.
+ */
+export async function syncLoopStatuses(workspaceId: string): Promise<void> {
+  try {
+    await db.execute(sql`
+      UPDATE deal_linear_links dll
+      SET status = CASE
+        WHEN lic.status IN ('Done', 'Completed') THEN 'shipped'
+        WHEN lic.status = 'In Progress' THEN 'in_progress'
+        WHEN lic.status = 'In Review' THEN 'in_review'
+        WHEN lic.status IN ('In QA', 'RFQA', 'Started') THEN 'in_progress'
+        WHEN lic.cycle_id IS NOT NULL THEN 'in_cycle'
+        ELSE dll.status
+      END,
+      updated_at = NOW()
+      FROM linear_issues_cache lic
+      WHERE lic.linear_issue_id = dll.linear_issue_id
+        AND lic.workspace_id = dll.workspace_id
+        AND dll.workspace_id = ${workspaceId}
+    `)
+    console.log(`[smart-match] syncLoopStatuses: updated for workspace ${workspaceId.slice(0, 8)}`)
+  } catch (e) {
+    console.warn('[smart-match] syncLoopStatuses failed:', e)
+  }
+}
