@@ -17,6 +17,7 @@ import { ensureLinksColumn } from '@/lib/api-helpers'
 import { extractTextSignals, heuristicScore } from '@/lib/text-signals'
 import { buildDealBriefing, scoreNarrationPrompt, type ActionItemContext } from '@/lib/brain-narrator'
 import { NoteExtractionSchema, buildCorrectionPrompt, type NoteExtraction } from '@/lib/extraction-schema'
+import { smartMatchDeal } from '@/lib/smart-match'
 
 const anthropic = new Anthropic()
 
@@ -571,6 +572,16 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
     after(async () => {
       console.log(`[brain] Rebuild triggered by: analyze_notes at ${new Date().toISOString()}`)
       await requestBrainRebuild(workspaceId, 'analyze_notes')
+    })
+
+    // Auto-trigger smart matching after extraction so product gaps → Linear links are created
+    const _smWs = workspaceId, _smId = id
+    after(async () => {
+      try {
+        await smartMatchDeal(_smWs, _smId)
+      } catch (e) {
+        console.warn('[analyze-notes] smartMatchDeal after() failed:', e instanceof Error ? e.message : e)
+      }
     })
 
     return NextResponse.json({ data: { deal: updatedDeal, productGaps: createdGaps, parsed } })

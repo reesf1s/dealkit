@@ -59,7 +59,17 @@ interface ProductGap {
   description?: string
   quote?: string
   severity?: string
+  context?: 'deal_blocker' | 'nice_to_have' | 'on_roadmap' | 'competitor_advantage' | 'mentioned'
   source?: 'signals' | 'criteria' | 'product_gaps_table' | 'haiku'
+}
+
+// Map gap context to Linear priority number
+const CONTEXT_PRIORITY: Record<string, number> = {
+  deal_blocker: 1,         // Urgent
+  competitor_advantage: 2, // High
+  nice_to_have: 3,         // Medium
+  mentioned: 4,            // Low
+  // on_roadmap → gaps are skipped before reaching creation
 }
 
 interface MatchResult {
@@ -404,6 +414,8 @@ export async function smartMatchDeal(
       id: dealLogs.id,
       dealName: dealLogs.dealName,
       prospectCompany: dealLogs.prospectCompany,
+      dealValue: dealLogs.dealValue,
+      stage: dealLogs.stage,
       meetingNotes: dealLogs.meetingNotes,
       description: dealLogs.description,
       notes: dealLogs.notes,
@@ -573,6 +585,13 @@ ${allText.slice(0, 4000)}`,
       }
       } // end ANTHROPIC_API_KEY check
     }
+  }
+
+  // Filter out on_roadmap gaps — already planned, no need to create Linear issues
+  const onRoadmapCount = productGaps.filter(g => g.context === 'on_roadmap').length
+  if (onRoadmapCount > 0) {
+    console.log(`[smart-match] ${deal.prospectCompany}: skipping ${onRoadmapCount} on_roadmap gap(s)`)
+    productGaps = productGaps.filter(g => g.context !== 'on_roadmap')
   }
 
   if (productGaps.length === 0) {
@@ -793,14 +812,30 @@ ${allText.slice(0, 4000)}`,
 
       if (isRealFeature) {
         try {
+          // Map context to Linear priority; fall back to severity-based priority
+          const linearPriority = gap.context && CONTEXT_PRIORITY[gap.context] !== undefined
+            ? CONTEXT_PRIORITY[gap.context]
+            : (gap.severity === 'high' ? 2 : 3)
+
+          // Build rich deal context block
+          const dealContextLines = [
+            `**Deal:** ${deal.dealName}`,
+            `**Company:** ${deal.prospectCompany}`,
+            deal.dealValue ? `**Deal value:** $${Number(deal.dealValue).toLocaleString()}` : null,
+            deal.stage ? `**Stage:** ${deal.stage}` : null,
+            `**Blocker:** ${gap.context === 'deal_blocker' ? 'Yes' : 'No'}`,
+          ].filter(Boolean).join('\n')
+
+          const issueDescription = `**Product gap from ${deal.prospectCompany} deal**\n\n` +
+            (gap.description ? `${gap.description}\n\n` : '') +
+            (gap.quote ? `> "${gap.quote}"\n\n` : '') +
+            `**Deal context:**\n${dealContextLines}\n\n` +
+            `---\n*Auto-created by DealKit — product gap from sales intelligence*`
+
           const newIssue = await createIssue(linearApiKey, integration.teamId, {
             title: gapText.slice(0, 120),
-            description: `**Product gap from ${deal.prospectCompany} deal**\n\n` +
-              (gap.description ? `${gap.description}\n\n` : '') +
-              (gap.quote ? `> "${gap.quote}"\n\n` : '') +
-              `Priority: ${gap.severity ?? 'medium'}\n\n` +
-              `---\n*Auto-created by Halvex — product gap from sales intelligence*`,
-            priority: gap.severity === 'high' ? 2 : 3,
+            description: issueDescription,
+            priority: linearPriority,
           })
           await db.insert(linearIssuesCache).values({
             workspaceId,
@@ -849,21 +884,58 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
   // NON-DESTRUCTIVE: match all deals first, THEN clean up orphaned auto-links.
   // This prevents data loss if the function times out halfway.
 
-  const openDeals = await db
-    .select({ id: dealLogs.id })
-    .from(dealLogs)
-    .where(and(
-      eq(dealLogs.workspaceId, workspaceId),
-      sql`${dealLogs.stage} NOT IN ('closed_won', 'closed_lost')`,
-    ))
+  // Load deals with meetingNotes + note_signals_json so we know which need extraction
+  const openDealsRaw = await db.execute<{
+    id: string
+    meeting_notes: string | null
+    note_signals_json: string | null
+  }>(sql`
+    SELECT id, meeting_notes, note_signals_json
+    FROM deal_logs
+    WHERE workspace_id = ${workspaceId}
+      AND stage NOT IN ('closed_won', 'closed_lost')
+  `)
+
+  function hasProductGaps(signalsJson: string | null): boolean {
+    if (!signalsJson) return false
+    try {
+      const s = typeof signalsJson === 'string' ? JSON.parse(signalsJson) : signalsJson
+      return Array.isArray(s?.product_gaps) && s.product_gaps.length > 0
+    } catch { return false }
+  }
+
+  // Partition: deals that need Haiku extraction vs those that already have gaps
+  const needsExtraction = openDealsRaw.filter(
+    d => !hasProductGaps(d.note_signals_json) && (d.meeting_notes?.length ?? 0) > 100
+  )
+  const extractionIds = new Set(needsExtraction.map(d => d.id))
+
+  console.log(`[smart-match] ${openDealsRaw.length} open deals — ${needsExtraction.length} need extraction, ${openDealsRaw.length - needsExtraction.length} have existing gaps`)
 
   let totalLinked = 0
   let totalCreated = 0
   const results: MatchResult[] = []
 
-  // Process all deals — skipHaiku to stay within timeout
-  // Each deal uses existing gaps (Sources A-D) + vector matching (fast)
-  for (const deal of openDeals) {
+  // Phase 1: Extract + match for deals without gaps (parallel batches of 5)
+  for (let i = 0; i < needsExtraction.length; i += 5) {
+    const batch = needsExtraction.slice(i, i + 5)
+    const batchResults = await Promise.allSettled(
+      batch.map(d => smartMatchDeal(workspaceId, d.id, { skipHaiku: false }))
+    )
+    for (const r of batchResults) {
+      if (r.status === 'fulfilled') {
+        totalLinked += r.value.linked
+        totalCreated += r.value.created
+        results.push(r.value)
+      } else {
+        console.warn('[smart-match] Batch extraction deal failed:', r.reason instanceof Error ? r.reason.message : r.reason)
+      }
+    }
+  }
+
+  // Phase 2: Match-only for deals that already have gaps (skipHaiku: fast path)
+  for (const deal of openDealsRaw) {
+    if (extractionIds.has(deal.id)) continue // already processed in phase 1
     try {
       const result = await smartMatchDeal(workspaceId, deal.id, { skipHaiku: true })
       totalLinked += result.linked
@@ -897,7 +969,7 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
     console.warn('[smart-match] Status sync failed:', e)
   }
 
-  console.log(`[smart-match] Complete: ${totalLinked} linked, ${totalCreated} created across ${openDeals.length} deals`)
+  console.log(`[smart-match] Complete: ${totalLinked} linked, ${totalCreated} created across ${openDealsRaw.length} deals`)
   return { totalLinked, totalCreated, results }
 }
 

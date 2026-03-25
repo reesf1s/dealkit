@@ -27,6 +27,7 @@ interface ExtractedFeature {
   title: string
   description: string
   priority: 'blocker' | 'nice-to-have'
+  context: 'deal_blocker' | 'nice_to_have' | 'on_roadmap' | 'competitor_advantage' | 'mentioned'
 }
 
 interface ExtractionResult {
@@ -34,13 +35,15 @@ interface ExtractionResult {
   painPoints: string[]
 }
 
+const VALID_CONTEXTS = ['deal_blocker', 'nice_to_have', 'on_roadmap', 'competitor_advantage', 'mentioned'] as const
+
 // ─── Haiku extraction ────────────────────────────────────────────────────────
 
-async function extractFeaturesFromNotes(notes: string): Promise<ExtractionResult> {
+export async function extractFeaturesFromNotes(notes: string): Promise<ExtractionResult> {
   try {
     const msg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 300,
+      max_tokens: 400,
       messages: [{
         role: 'user',
         content: `Extract product feature requests from these meeting notes.
@@ -50,11 +53,18 @@ RULES:
 - Think: "what would the Linear issue be titled?"
 - Good: "Team co-location analytics", "SSO integration", "Real-time occupancy dashboard"
 - Bad: "We need the ability to see teams", "They want better reporting"
-- ONLY extract features that BLOCK the deal (hard requirements, not nice-to-haves)
-- Max 5 features
+- Extract ALL mentioned product features, categorised by context (see below)
+- Max 5 features total
+
+context values:
+- "deal_blocker": prospect explicitly says it BLOCKS or PREVENTS their decision
+- "competitor_advantage": a competitor has this feature and prospect is comparing
+- "nice_to_have": prospect wants it but it's not blocking ("would be nice", "ideally")
+- "on_roadmap": prospect mentions we already have this planned / on roadmap
+- "mentioned": casually mentioned, no strong signal
 
 Return ONLY valid JSON:
-{"features":[{"title":"string","description":"string","priority":"blocker"|"nice-to-have"}],"painPoints":["string"]}
+{"features":[{"title":"string","description":"string","priority":"blocker"|"nice-to-have","context":"deal_blocker"|"nice_to_have"|"on_roadmap"|"competitor_advantage"|"mentioned"}],"painPoints":["string"]}
 
 Notes:
 ${notes.slice(0, 3000)}`,
@@ -71,6 +81,9 @@ ${notes.slice(0, 3000)}`,
           title: String(f.title ?? '').slice(0, 120),
           description: String(f.description ?? '').slice(0, 300),
           priority: f.priority === 'blocker' ? 'blocker' : 'nice-to-have',
+          context: VALID_CONTEXTS.includes(f.context as typeof VALID_CONTEXTS[number])
+            ? f.context
+            : 'mentioned',
         }))
         : [],
       painPoints: Array.isArray(parsed.painPoints)
@@ -139,6 +152,7 @@ export async function extractAndLinkFeatures(
           gap: f.title,
           description: f.description,
           severity: f.priority === 'blocker' ? 'high' : 'medium',
+          context: f.context,
         }))
 
         // Deduplicate by first 30 chars of gap text
