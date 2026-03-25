@@ -423,26 +423,32 @@ export async function smartMatchDeal(
     }
   } catch { /* non-fatal */ }
 
-  // Source D: productGaps table (curated gaps from analyze-notes — highest quality)
+  // Source D: ALL open product gaps for this workspace (curated from analyze-notes)
+  // Load workspace-wide, then filter to gaps relevant to this deal
   try {
     const pgRows = await db
-      .select({ title: productGapsTable.title, description: productGapsTable.description })
+      .select({ title: productGapsTable.title, description: productGapsTable.description, sourceDeals: productGapsTable.sourceDeals })
       .from(productGapsTable)
       .where(and(
         eq(productGapsTable.workspaceId, workspaceId),
-        sql`${productGapsTable.sourceDeals}::jsonb @> ${JSON.stringify([dealId])}::jsonb`,
         sql`${productGapsTable.status} NOT IN ('wont_fix', 'shipped')`,
       ))
+    let added = 0
     for (const pg of pgRows) {
-      if (pg.title && pg.title.length >= 10) {
-        const isDupe = productGaps.some(g => g.gap.toLowerCase().slice(0, 30) === pg.title!.toLowerCase().slice(0, 30))
-        if (!isDupe) {
-          productGaps.push({ gap: pg.title, description: pg.description ?? '', severity: 'high' })
-        }
+      if (!pg.title || pg.title.length < 10) continue
+      // Include if: gap is from this deal, or gap has no source (general), or gap has sources (any deal)
+      const sources = Array.isArray(pg.sourceDeals) ? pg.sourceDeals as string[] : []
+      const isForThisDeal = sources.length === 0 || sources.includes(dealId)
+      if (!isForThisDeal) continue
+
+      const isDupe = productGaps.some(g => g.gap.toLowerCase().slice(0, 30) === pg.title!.toLowerCase().slice(0, 30))
+      if (!isDupe) {
+        productGaps.push({ gap: pg.title, description: pg.description ?? '', severity: 'high' })
+        added++
       }
     }
-    if (pgRows.length > 0) {
-      console.log(`[smart-match] ${deal.prospectCompany}: added ${pgRows.length} gaps from productGaps table`)
+    if (added > 0) {
+      console.log(`[smart-match] ${deal.prospectCompany}: added ${added} gaps from productGaps table (${pgRows.length} total in workspace)`)
     }
   } catch { /* non-fatal */ }
 
@@ -670,28 +676,31 @@ ${allText.slice(0, 4000)}`,
       console.log(`[smart-match] ${deal.prospectCompany} gap "${gapText.slice(0, 50)}" → best=${Math.round(bestScore)} [${matchMethod}], top3=[${top3}]`)
     }
 
-    // Product name conflict detection — if gap and issue mention different vendors, reject
-    if (bestMatch && bestScore < 60) {
+    // ── Three-tier matching: high confidence → medium with conflict check → create ──
+
+    // Product name conflict detection for medium-confidence matches
+    let conflictDetected = false
+    if (bestMatch && bestScore >= 40 && bestScore < 60) {
       const gapWords = gapText.toLowerCase().split(/\s+/)
       const issueWords = bestMatch.title.toLowerCase().split(/\s+/)
-      for (const keyword of ['integration', 'connector', 'sync', 'plugin', 'api']) {
+      for (const keyword of ['integration', 'connector', 'sync', 'plugin', 'api', 'dashboard', 'platform']) {
         const gapIdx = gapWords.indexOf(keyword)
         const issueIdx = issueWords.indexOf(keyword)
         if (gapIdx > 0 && issueIdx > 0) {
           const gapProduct = gapWords[gapIdx - 1]
           const issueProduct = issueWords[issueIdx - 1]
           if (gapProduct !== issueProduct && gapProduct.length > 3 && issueProduct.length > 3) {
-            console.log(`[smart-match] Product conflict: "${gapProduct} ${keyword}" vs "${issueProduct} ${keyword}" — rejecting (score ${Math.round(bestScore)})`)
-            bestMatch = null
-            bestScore = 0
+            console.log(`[smart-match] Product conflict: "${gapProduct} ${keyword}" vs "${issueProduct} ${keyword}" — creating instead (score ${Math.round(bestScore)})`)
+            conflictDetected = true
             break
           }
         }
       }
     }
 
-    if (bestMatch && bestScore >= 40) {
-      // Link it — check for existing first
+    // Tier 1 (≥60) or Tier 2 (≥40, no conflict): LINK to existing issue
+    let didLink = false
+    if (bestMatch && bestScore >= 40 && !conflictDetected) {
       const [existing] = await db
         .select({ id: dealLinearLinks.id })
         .from(dealLinearLinks)
@@ -702,7 +711,6 @@ ${allText.slice(0, 4000)}`,
         .limit(1)
 
       if (!existing) {
-        // Set status based on actual Linear issue state
         const loopStatus = linearStatusToLoopStatus(bestMatch.status, bestMatch.cycleId ?? null)
         await db.insert(dealLinearLinks).values({
           workspaceId,
@@ -716,11 +724,16 @@ ${allText.slice(0, 4000)}`,
           addressesRisk: gapText.slice(0, 150),
         }).onConflictDoNothing()
         linked++
-        console.log(`[smart-match] ${deal.prospectCompany}: "${gapText}" → ${bestMatch.linearIssueId} (${bestMatch.title}) [score=${bestScore}, linearStatus=${bestMatch.status}, loopStatus=${loopStatus}]`)
+        didLink = true
+        console.log(`[smart-match] LINKED: ${deal.prospectCompany}: "${gapText.slice(0,50)}" → ${bestMatch.linearIssueId} (${bestMatch.title.slice(0,40)}) [score=${Math.round(bestScore)}, status=${loopStatus}]`)
+      } else {
+        didLink = true // already linked, don't create duplicate
       }
-    } else if (linearApiKey && integration) {
-      // No match — create the issue on Linear if it looks like a real product feature
-      const isRealFeature = gapText.length >= 15 && gapText.length <= 150
+    }
+
+    // Tier 3: No confident match → CREATE new Linear issue
+    if (!didLink && linearApiKey && integration) {
+      const isRealFeature = gapText.length >= 10 && gapText.length <= 150
         && !/^(page \d|what success|the poc|gospace lead|drew proposed|\[?\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))/i.test(gapText)
         && !gapText.includes('...')
         && !/^(need the ability|need to|we need|they need|please let me)/i.test(gapText)
@@ -729,7 +742,11 @@ ${allText.slice(0, 4000)}`,
         try {
           const newIssue = await createIssue(linearApiKey, integration.teamId, {
             title: gapText.slice(0, 120),
-            description: `**Product gap from ${deal.prospectCompany} deal**\n\n${gap.quote ? `> "${gap.quote}"\n\n` : ''}Severity: ${gap.severity ?? 'medium'}\n\n---\n*Auto-created by Halvex — matched to deal blocker*`,
+            description: `**Product gap from ${deal.prospectCompany} deal**\n\n` +
+              (gap.description ? `${gap.description}\n\n` : '') +
+              (gap.quote ? `> "${gap.quote}"\n\n` : '') +
+              `Priority: ${gap.severity ?? 'medium'}\n\n` +
+              `---\n*Auto-created by Halvex — product gap from sales intelligence*`,
             priority: gap.severity === 'high' ? 2 : 3,
           })
           await db.insert(linearIssuesCache).values({
@@ -776,12 +793,12 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
   totalCreated: number
   results: MatchResult[]
 }> {
-  // Wipe only unconfirmed auto-generated links.
-  // Preserve: manual links, and auto-links that have progressed (in_progress, in_review, in_cycle, shipped).
+  // Wipe ALL auto-generated links so rematch starts completely fresh.
+  // Manual links (user-created) are preserved.
+  // Status sync SQL runs AFTER matching to set correct statuses on fresh links.
   await db.delete(dealLinearLinks).where(and(
     eq(dealLinearLinks.workspaceId, workspaceId),
     sql`${dealLinearLinks.linkType} != 'manual'`,
-    sql`${dealLinearLinks.status} IN ('suggested', 'identified')`,
   ))
 
   const openDeals = await db
