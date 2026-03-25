@@ -1,18 +1,52 @@
 /**
- * POST /api/dashboard/focus-briefing
- * Generates a structured daily focus briefing using Claude Haiku.
- * Returns plain text (not streaming) for easy consumption.
+ * GET  /api/dashboard/focus-briefing — returns cached briefing (no API call)
+ * POST /api/dashboard/focus-briefing — regenerates briefing via Haiku, caches it
+ *
+ * Briefing is stored in workspaces.focus_briefing_cache JSONB column.
+ * Only regenerates on explicit POST (refresh button). GET is free.
  */
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { dealLogs } from '@/lib/db/schema'
+import { dealLogs, workspaces } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { getWorkspaceBrain } from '@/lib/workspace-brain'
+
+interface CachedBriefing {
+  text: string
+  generatedAt: string
+}
+
+// ─── GET: return cached briefing (zero API cost) ────────────────────────────
+
+export async function GET() {
+  try {
+    const { userId } = await auth()
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const { workspaceId } = await getWorkspaceContext(userId)
+
+    const [ws] = await db
+      .select({ cache: sql<CachedBriefing | null>`focus_briefing_cache` })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId))
+      .limit(1)
+
+    const cached = ws?.cache as CachedBriefing | null
+    if (cached?.text) {
+      return NextResponse.json({ text: cached.text, generatedAt: cached.generatedAt, cached: true })
+    }
+    return NextResponse.json({ text: null, cached: false })
+  } catch (e) {
+    console.error('[focus-briefing] GET error:', e)
+    return NextResponse.json({ text: null, cached: false })
+  }
+}
+
+// ─── POST: regenerate briefing via Haiku + cache it ─────────────────────────
 
 export async function POST() {
   try {
@@ -20,7 +54,6 @@ export async function POST() {
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { workspaceId } = await getWorkspaceContext(userId)
 
-    // Load deals + brain
     const [deals, brain] = await Promise.all([
       db.select().from(dealLogs).where(eq(dealLogs.workspaceId, workspaceId)),
       getWorkspaceBrain(workspaceId),
@@ -28,10 +61,10 @@ export async function POST() {
 
     const openDeals = deals.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
     if (openDeals.length === 0) {
-      return NextResponse.json({ text: 'No open deals in your pipeline yet. Add a deal to get started.' })
+      const text = 'No open deals in your pipeline yet. Add a deal to get started.'
+      return NextResponse.json({ text, cached: false })
     }
 
-    // Build concise deal context for Haiku
     const dealLines = openDeals
       .sort((a, b) => (Number(b.dealValue) || 0) - (Number(a.dealValue) || 0))
       .slice(0, 15)
@@ -46,7 +79,6 @@ export async function POST() {
       })
       .join('\n')
 
-    // Brain context
     const staleDeals = brain?.staleDeals?.slice(0, 5).map(s => `${s.company}: ${s.daysSinceUpdate}d stale`).join(', ') || 'none'
     const urgentDeals = brain?.urgentDeals?.slice(0, 5).map(u => `${u.company}: ${u.reason}`).join(', ') || 'none'
 
@@ -95,7 +127,14 @@ Write ONLY the briefing. No preamble.`
     })
 
     const text = resp.content[0].type === 'text' ? resp.content[0].text.trim() : ''
-    return NextResponse.json({ text })
+
+    // Cache in DB
+    const cache: CachedBriefing = { text, generatedAt: new Date().toISOString() }
+    await db.execute(
+      sql`UPDATE workspaces SET focus_briefing_cache = ${JSON.stringify(cache)}::jsonb WHERE id = ${workspaceId}::uuid`
+    )
+
+    return NextResponse.json({ text, generatedAt: cache.generatedAt, cached: false })
   } catch (e) {
     console.error('[focus-briefing]', e)
     const msg = e instanceof Error ? e.message : 'Failed to generate briefing'

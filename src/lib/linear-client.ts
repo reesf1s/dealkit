@@ -249,3 +249,55 @@ export async function updateIssueDescription(
     { id: issueId, description: newDescription },
   )
 }
+
+/**
+ * Create a new Linear issue in the workspace's default team.
+ * Returns the created issue with its identifier (e.g. "ENG-142").
+ */
+export async function createIssue(
+  apiKey: string,
+  teamId: string,
+  input: {
+    title: string
+    description?: string
+    priority?: number // 0=none, 1=urgent, 2=high, 3=medium, 4=low
+  },
+): Promise<LinearIssue> {
+  const data = await gql<{
+    issueCreate: {
+      success: boolean
+      issue: LinearIssue
+    }
+  }>(
+    apiKey,
+    `mutation CreateIssue($teamId: String!, $title: String!, $description: String, $priority: Int) {
+      issueCreate(input: {
+        teamId: $teamId
+        title: $title
+        description: $description
+        priority: $priority
+      }) {
+        success
+        issue {
+          id identifier title description url priority
+          state { id name type }
+          cycle { id number }
+          assignee { id name }
+          updatedAt
+        }
+      }
+    }`,
+    {
+      teamId,
+      title: input.title,
+      description: input.description ?? null,
+      priority: input.priority ?? 3, // default: medium
+    },
+  )
+
+  if (!data.issueCreate.success) {
+    throw new Error('Linear issueCreate mutation failed')
+  }
+
+  return data.issueCreate.issue
+}

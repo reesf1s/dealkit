@@ -556,24 +556,37 @@ function ActiveLoopsTable({ currency }: { currency: string }) {
 
 function AIFocusBriefingCard() {
   const [briefing, setBriefing] = useState<string | null>(null)
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [hasLoaded, setHasLoaded] = useState(false)
 
-  // Auto-load on mount
+  // Load CACHED briefing on mount (GET = zero API cost)
   useEffect(() => {
-    loadBriefing()
+    fetch('/api/dashboard/focus-briefing')
+      .then(r => r.json())
+      .then(data => {
+        if (data?.text) {
+          setBriefing(data.text)
+          setGeneratedAt(data.generatedAt ?? null)
+        }
+        setHasLoaded(true)
+      })
+      .catch(() => setHasLoaded(true))
   }, [])
 
-  async function loadBriefing() {
+  // Regenerate on explicit refresh (POST = Haiku API call)
+  async function regenerate() {
     setLoading(true)
     try {
       const res = await fetch('/api/dashboard/focus-briefing', { method: 'POST' })
       const data = await res.json()
-      if (data?.text) setBriefing(data.text)
+      if (data?.text) {
+        setBriefing(data.text)
+        setGeneratedAt(data.generatedAt ?? null)
+      }
       setHasLoaded(true)
     } catch (e) {
-      console.error('Failed to load briefing:', e)
-      setHasLoaded(true)
+      console.error('Failed to generate briefing:', e)
     } finally {
       setLoading(false)
     }
@@ -654,9 +667,16 @@ function AIFocusBriefingCard() {
   return (
     <div style={{ ...glass.card, padding: '14px 16px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-        <div style={{ ...cardHeader, marginBottom: 0 }}>🧠 What to focus on today</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ ...cardHeader, marginBottom: 0 }}>🧠 What to focus on today</span>
+          {generatedAt && (
+            <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.25)' }}>
+              {new Date(generatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+        </div>
         <button
-          onClick={loadBriefing}
+          onClick={regenerate}
           disabled={loading}
           style={{
             background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
