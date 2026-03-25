@@ -46,6 +46,22 @@ function formatVal(v: number, sym: string): string {
   return `${sym}${v}`
 }
 
+function fmtPipeline(n: number, sym: string): string {
+  if (n >= 1_000_000) return `${sym}${(n / 1_000_000).toFixed(1)}m`
+  if (n >= 1_000) return `${sym}${Math.round(n / 1_000)}k`
+  return n > 0 ? `${sym}${Math.round(n)}` : '—'
+}
+
+function StatCard({ label, value, accent }: { label: string; value: string | number; accent?: 'amber' | 'green' | 'red' }) {
+  const color = accent === 'amber' ? '#fbbf24' : accent === 'green' ? '#34d399' : accent === 'red' ? '#f87171' : 'rgba(255,255,255,0.88)'
+  return (
+    <div>
+      <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.38)', fontWeight: 500, marginBottom: '4px' }}>{label}</div>
+      <div style={{ fontSize: '22px', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1, color }}>{value}</div>
+    </div>
+  )
+}
+
 // Enterprise-density deal row card
 function DealMiniCard({ deal, currencySymbol }: { deal: any; currencySymbol: string }) {
   const score = deal.conversionScore ?? 0
@@ -127,6 +143,7 @@ export default function DealsPage() {
   const { data, isLoading, error, mutate } = useSWR<{ data: DealLog[] }>('/api/deals', fetcher)
   const { data: configData } = useSWR('/api/pipeline-config', fetcher, { revalidateOnFocus: false })
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
+  const { data: loopSignalsRes } = useSWR('/api/dashboard/loop-signals', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
 
   const deals = data?.data ?? []
   const dbError = isDbNotConfigured(error)
@@ -135,6 +152,9 @@ export default function DealsPage() {
   const mlPredictions: any[] = brain?.mlPredictions ?? []
 
   const activeDeals = deals.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+  const totalPipelineValue = activeDeals.reduce((sum: number, d: any) => sum + (Number(d.dealValue) || 0), 0)
+  const winRatePct: number | null = brain?.winRate ?? null
+  const activeLoopCount: number = loopSignalsRes?.data?.inFlight?.length ?? 0
 
   // Intelligence mode — grouped by health score band
   const atRisk = activeDeals.filter(d => (d.conversionScore ?? 0) > 0 && (d.conversionScore ?? 0) < 40)
@@ -236,6 +256,19 @@ export default function DealsPage() {
       </div>
 
       {dbError && <SetupBanner context="Add a DATABASE_URL to start logging deals and tracking your win rate." />}
+
+      {/* ── Pipeline Intelligence Strip ── */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12,
+        padding: '16px', background: 'rgba(255,255,255,0.04)',
+        backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
+        borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
+      }}>
+        <StatCard label="Pipeline Value" value={isLoading ? '—' : fmtPipeline(totalPipelineValue, currencySymbol)} />
+        <StatCard label="At Risk" value={isLoading ? '—' : `${atRisk.length} deal${atRisk.length !== 1 ? 's' : ''}`} accent={!isLoading && atRisk.length > 0 ? 'amber' : undefined} />
+        <StatCard label="Win Rate" value={winRatePct != null ? `${winRatePct}%` : '—'} accent={winRatePct != null && winRatePct >= 50 ? 'green' : winRatePct != null ? 'amber' : undefined} />
+        <StatCard label="Active Loops" value={activeLoopCount > 0 ? activeLoopCount : '—'} />
+      </div>
 
       {/* ══ INTELLIGENCE MODE ══ */}
       {mode === 'intelligence' && (

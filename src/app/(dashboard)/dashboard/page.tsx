@@ -528,20 +528,42 @@ function ClosedLoopsColumn() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const colHeight = 'calc(100vh - 96px)'
+  const { data: signalData } = useSWR('/api/dashboard/loop-signals', fetcher, {
+    revalidateOnFocus: false, dedupingInterval: 60000,
+  })
+  const urgentCount: number = signalData?.data?.signals?.length ?? 0
+  const hour = new Date().getHours()
+  const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
 
   return (
     <div style={{
-      display: 'grid',
-      gridTemplateColumns: '28% 44% 28%',
-      height: colHeight,
-      overflow: 'hidden',
-      margin: '-22px -24px',
-      /* Extra radial depth layer — main gradient visible through glass columns */
+      display: 'flex', flexDirection: 'column',
+      height: colHeight, overflow: 'hidden', margin: '-22px -24px',
       background: 'radial-gradient(ellipse 60% 50% at 20% 40%, rgba(124,109,245,0.12), transparent)',
     }}>
-      <SignalColumn />
-      <AskHalvexColumn />
-      <ClosedLoopsColumn />
+      {/* Greeting header */}
+      <div style={{
+        padding: '14px 24px 12px',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        flexShrink: 0,
+      }}>
+        <h1 style={{ fontSize: '1.125rem', fontWeight: 600, color: 'rgba(255,255,255,0.92)', margin: 0, letterSpacing: '-0.02em' }}>
+          Good {timeOfDay}
+        </h1>
+        <p style={{ color: 'rgba(255,255,255,0.40)', margin: '3px 0 0', fontSize: '12px' }}>
+          {urgentCount > 0 ? `${urgentCount} deal${urgentCount > 1 ? 's' : ''} need attention today` : 'Pipeline looks healthy'}
+        </p>
+      </div>
+
+      {/* 3-column grid */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: '28% 44% 28%',
+        flex: 1, overflow: 'hidden',
+      }}>
+        <SignalColumn />
+        <AskHalvexColumn />
+        <ClosedLoopsColumn />
+      </div>
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
