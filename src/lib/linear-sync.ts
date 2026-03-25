@@ -16,7 +16,7 @@ import { decrypt, getEncryptionKey } from '@/lib/encrypt'
 import { fetchTeamIssues, type LinearIssue } from '@/lib/linear-client'
 import { embedLinearIssues } from '@/lib/semantic-search'
 import { embedNullLinearIssues } from '@/lib/deal-embeddings'
-import { matchAllOpenDeals } from '@/lib/linear-signal-match'
+import { smartMatchAllDeals } from '@/lib/smart-match'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -181,9 +181,9 @@ export async function syncLinearIssues(workspaceId: string, forceFullSync = fals
   // their links updated when new issues are pulled from Linear.
   after(async () => {
     try {
-      await matchAllOpenDeals(workspaceId, 'cron')
+      await smartMatchAllDeals(workspaceId)
     } catch (err) {
-      console.error('[linear-sync] matchAllOpenDeals failed:', err)
+      console.error('[linear-sync] smartMatchAllDeals failed:', err)
     }
   })
 

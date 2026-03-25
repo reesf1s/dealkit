@@ -15,7 +15,7 @@ import { db } from '@/lib/db'
 import { dealLogs, linearIssuesCache } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { syncLinearIssues } from '@/lib/linear-sync'
-import { matchAllOpenDeals } from '@/lib/linear-signal-match'
+import { smartMatchAllDeals } from '@/lib/smart-match'
 
 export async function POST() {
   try {
@@ -28,7 +28,7 @@ export async function POST() {
     const syncResult = await syncLinearIssues(workspaceId)
 
     // 2. Run signal matching for all open deals
-    const matchResult = await matchAllOpenDeals(workspaceId, 'user')
+    const matchResult = await smartMatchAllDeals(workspaceId)
 
     // 3. Count open deals and cached issues for response context
     const [dealsRow] = await db
@@ -54,9 +54,9 @@ export async function POST() {
 
     return NextResponse.json({
       data: {
-        matched: matchResult.linked + matchResult.suggested,
-        confirmed: matchResult.linked,
-        suggested: matchResult.suggested,
+        matched: matchResult.totalLinked + matchResult.totalCreated,
+        linked: matchResult.totalLinked,
+        created: matchResult.totalCreated,
         deals_checked: Number(dealsRow?.value ?? 0),
         issues_checked: Number(issuesRow?.value ?? 0),
         synced: syncResult.synced,

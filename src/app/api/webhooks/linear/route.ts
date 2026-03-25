@@ -16,10 +16,10 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { createHmac } from 'crypto'
 import { db } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, sql } from 'drizzle-orm'
 import { linearIntegrations, dealLinearLinks, dealLogs } from '@/lib/db/schema'
 import { syncLinearIssues } from '@/lib/linear-sync'
-import { matchAllOpenDeals } from '@/lib/linear-signal-match'
+import { smartMatchAllDeals } from '@/lib/smart-match'
 import { notifyIssueDeployed, notifyAllIssuesDeployed } from '@/lib/slack-notify'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -182,17 +182,39 @@ export async function POST(req: NextRequest) {
   const issueIdentifier = payload.data.identifier
   const stateType = payload.data.state?.type
 
-  // Phase 4: detect issue completion and trigger deployment flow (fire-and-forget)
-  if (payload.action === 'update' && stateType === 'completed' && issueIdentifier) {
-    handleIssueCompleted(workspaceId, issueIdentifier, payload.data.title).catch(
-      err => console.error('[webhook/linear] handleIssueCompleted failed:', err),
-    )
+  // Update loop status based on Linear state changes
+  if (payload.action === 'update' && issueIdentifier && stateType) {
+    // started → in_cycle (issue is being worked on)
+    if (stateType === 'started') {
+      db.update(dealLinearLinks)
+        .set({ status: 'in_cycle', updatedAt: new Date() })
+        .where(and(
+          eq(dealLinearLinks.workspaceId, workspaceId),
+          eq(dealLinearLinks.linearIssueId, issueIdentifier),
+          // Only upgrade suggested/confirmed → in_cycle (never downgrade shipped)
+          sql`${dealLinearLinks.status} IN ('suggested', 'confirmed', 'awaiting_approval')`,
+        ))
+        .then(() => console.log(`[webhook/linear] ${issueIdentifier} → in_cycle`))
+        .catch(err => console.error('[webhook/linear] in_cycle update failed:', err))
+    }
+
+    // completed → deployed (issue shipped)
+    if (stateType === 'completed') {
+      handleIssueCompleted(workspaceId, issueIdentifier, payload.data.title).catch(
+        err => console.error('[webhook/linear] handleIssueCompleted failed:', err),
+      )
+    }
+
+    // Also update the cached issue status
+    db.execute(
+      sql`UPDATE linear_issues_cache SET status = ${payload.data.state?.name ?? stateType}, cached_at = NOW() WHERE workspace_id = ${workspaceId}::uuid AND linear_issue_id = ${issueIdentifier}`
+    ).catch(() => { /* non-fatal */ })
   }
 
   // Re-sync all issues and re-match for this workspace (fire-and-forget)
   Promise.all([
     syncLinearIssues(workspaceId),
-    matchAllOpenDeals(workspaceId),
+    smartMatchAllDeals(workspaceId),
   ]).catch(err => console.error('[webhook/linear] re-sync failed:', err))
 
   return NextResponse.json({ data: { received: true, verified: true } })

@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { linearIntegrations } from '@/lib/db/schema'
 import { syncLinearIssues } from '@/lib/linear-sync'
-import { matchAllOpenDeals } from '@/lib/linear-signal-match'
+import { smartMatchAllDeals } from '@/lib/smart-match'
 
 export async function GET(req: NextRequest) {
   const secret = req.headers.get('authorization')
@@ -34,9 +34,9 @@ export async function GET(req: NextRequest) {
       const syncResult = await syncLinearIssues(workspaceId)
       totalSynced += syncResult.synced
 
-      const matchResult = await matchAllOpenDeals(workspaceId)
-      totalLinked += matchResult.linked
-      totalSuggested += matchResult.suggested
+      const matchResult = await smartMatchAllDeals(workspaceId)
+      totalLinked += matchResult.totalLinked
+      totalSuggested += matchResult.totalCreated
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       errors.push(`workspace=${workspaceId.slice(0, 8)}: ${msg}`)

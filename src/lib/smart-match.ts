@@ -101,8 +101,10 @@ export async function smartMatchDeal(
 
   if (!deal) return { linked: 0, created: 0, dealName: '' }
 
-  // 2. Extract product gaps from note_signals_json (stored in DB but not in Drizzle schema)
+  // 2. Extract product gaps from multiple sources
   let productGaps: ProductGap[] = []
+
+  // Source A: note_signals_json (extracted by meeting notes processing)
   try {
     const [signalsRow] = await db.execute<{ note_signals_json: string | null }>(
       sql`SELECT note_signals_json FROM deal_logs WHERE id = ${dealId}::uuid LIMIT 1`
@@ -111,7 +113,29 @@ export async function smartMatchDeal(
       const signals = typeof signalsRow.note_signals_json === 'string'
         ? JSON.parse(signalsRow.note_signals_json)
         : signalsRow.note_signals_json
-      productGaps = (signals?.product_gaps ?? []).filter((g: ProductGap) => g.gap?.trim())
+      const gaps = (signals?.product_gaps ?? []).filter((g: ProductGap) => g.gap?.trim())
+      productGaps.push(...gaps)
+    }
+  } catch { /* non-fatal */ }
+
+  // Source B: success_criteria (often contains specific product requirements)
+  try {
+    const [scRow] = await db.execute<{ success_criteria: string | null }>(
+      sql`SELECT success_criteria FROM deal_logs WHERE id = ${dealId}::uuid LIMIT 1`
+    )
+    if (scRow?.success_criteria) {
+      // Split by newlines or bullet points — each line is a criterion
+      const lines = scRow.success_criteria
+        .split(/[\n\r]+/)
+        .map(l => l.replace(/^[\s*\-•]+/, '').trim())
+        .filter(l => l.length > 10 && l.length < 200)
+      for (const line of lines) {
+        // Avoid duplicating gaps we already have
+        const isDupe = productGaps.some(g => g.gap.toLowerCase().includes(line.toLowerCase().slice(0, 30)))
+        if (!isDupe) {
+          productGaps.push({ gap: line, severity: 'medium' })
+        }
+      }
     }
   } catch { /* non-fatal */ }
 
@@ -276,10 +300,12 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
   totalCreated: number
   results: MatchResult[]
 }> {
-  // First: clear old suggested links (keep confirmed/manual/in_cycle/deployed)
+  // Wipe all auto-generated links so rematch starts fresh.
+  // Keep only manual links (user explicitly created these).
+  // This means resync always fixes previous mistakes.
   await db.delete(dealLinearLinks).where(and(
     eq(dealLinearLinks.workspaceId, workspaceId),
-    eq(dealLinearLinks.status, 'suggested'),
+    sql`${dealLinearLinks.linkType} != 'manual'`,
   ))
 
   const openDeals = await db
