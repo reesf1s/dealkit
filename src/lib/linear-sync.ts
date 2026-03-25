@@ -85,7 +85,7 @@ async function upsertIssues(workspaceId: string, issues: LinearIssue[]): Promise
  * Sync all Linear issues for a workspace and re-embed them.
  * Returns the number of issues synced and embedded.
  */
-export async function syncLinearIssues(workspaceId: string): Promise<SyncResult> {
+export async function syncLinearIssues(workspaceId: string, forceFullSync = false): Promise<SyncResult> {
   const [integration] = await db
     .select()
     .from(linearIntegrations)
@@ -108,8 +108,26 @@ export async function syncLinearIssues(workspaceId: string): Promise<SyncResult>
     return { synced: 0, embedded: 0, pagesFetched: 0 }
   }
 
-  // Incremental sync: only fetch issues updated since the last successful sync
-  const since = integration.lastSyncAt?.toISOString()
+  // Incremental sync: only fetch issues updated since the last successful sync.
+  // Force full sync if requested, or if the last sync had an error, or if we have
+  // 0 cached issues (previous sync was partial / broken).
+  let since: string | undefined
+  if (!forceFullSync && !integration.syncError && integration.lastSyncAt) {
+    // Check if we actually have cached issues — if not, do a full sync anyway
+    const [{ count: cachedCount }] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(linearIssuesCache)
+      .where(eq(linearIssuesCache.workspaceId, workspaceId))
+    if (Number(cachedCount) > 0) {
+      since = integration.lastSyncAt.toISOString()
+    } else {
+      console.log('[linear-sync] 0 cached issues — forcing full sync')
+    }
+  } else if (forceFullSync) {
+    console.log('[linear-sync] Full sync forced')
+  } else if (integration.syncError) {
+    console.log('[linear-sync] Previous sync had error — forcing full sync')
+  }
 
   let cursor: string | null = null
   let synced = 0

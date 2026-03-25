@@ -168,8 +168,11 @@ export async function fetchTeamIssues(
     { teamId, after: cursor ?? null, ...(since ? { since } : {}) },
   )
 
+  const issues = data.team.issues.nodes
+  console.log(`[linear-client] fetchTeamIssues: got ${issues.length} issues, hasNext=${data.team.issues.pageInfo.hasNextPage}, since=${since ?? 'none'}`)
+
   return {
-    issues: data.team.issues.nodes,
+    issues,
     nextCursor: data.team.issues.pageInfo.hasNextPage
       ? data.team.issues.pageInfo.endCursor
       : null,

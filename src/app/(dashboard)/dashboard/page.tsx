@@ -561,7 +561,7 @@ function PipelineOverviewCard({ currency }: { currency: string }) {
 
   return (
     <div style={{ ...glass.card, padding: '14px 16px' }}>
-      <div style={{ ...cardHeader }}>AI pipeline overview</div>
+      <div style={{ ...cardHeader }}>📊 Pipeline summary</div>
       {brain?.dailyBriefing ? (
         <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.65)', margin: 0, lineHeight: '1.55' }}>
           {brain.dailyBriefing}
@@ -592,7 +592,7 @@ function TopSalesActionsCard({ currency }: { currency: string }) {
 
   return (
     <div style={{ ...glass.card, padding: '14px 16px' }}>
-      <div style={{ ...cardHeader }}>Top 3 sales actions today</div>
+      <div style={{ ...cardHeader }}>🎯 Do now — 3 actions to move the needle</div>
       {topDeals.length === 0 ? (
         <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>No urgent actions right now.</p>
       ) : (
@@ -656,7 +656,7 @@ function DealsAtRiskCard({ currency }: { currency: string }) {
 
   return (
     <div style={{ ...glass.card, padding: '14px 16px' }}>
-      <div style={{ ...cardHeader }}>Top 3 deals at risk</div>
+      <div style={{ ...cardHeader }}>⚠️ Deals at risk — needs attention</div>
       {atRisk.length === 0 ? (
         <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>No deals at risk right now.</p>
       ) : (
@@ -747,7 +747,7 @@ function IssuesUnlockRevenueCard({ currency }: { currency: string }) {
 
   return (
     <div style={{ ...glass.card, padding: '14px 16px' }}>
-      <div style={{ ...cardHeader }}>Top 3 issues to unlock revenue</div>
+      <div style={{ ...cardHeader }}>🔧 PM — ship these to unlock revenue</div>
       {!hasProductGaps && !hasLoopIssues ? (
         <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>
           Link deals to Linear issues to see which features unlock the most revenue.
@@ -888,48 +888,38 @@ export default function TodayPage() {
         }
       `}</style>
 
-      {/* Header */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-        marginBottom: '20px',
-      }}>
-        <div>
-          <h1 style={{
-            fontSize: '18px', fontWeight: 700, color: 'rgba(255,255,255,0.92)', margin: 0,
-            letterSpacing: '-0.02em',
-          }}>
-            Today
+      {/* Header + pipeline strip */}
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
+          <h1 style={{ fontSize: '18px', fontWeight: 700, color: 'rgba(255,255,255,0.92)', margin: 0, letterSpacing: '-0.02em' }}>
+            Today <span style={{ fontSize: '12px', fontWeight: 400, color: 'rgba(255,255,255,0.3)', marginLeft: '8px' }}>{dateStr}</span>
           </h1>
-          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>{dateStr}</span>
+          <BrainStatus />
         </div>
-        <BrainStatus />
-      </div>
-
-      {/* Revenue Impact Strip */}
-      <div style={{ marginBottom: '16px' }}>
         <RevenueImpactStrip currency={currency} />
       </div>
 
-      {/* Core Loop */}
-      <SectionLabel label="Core loop" />
-      <div style={{ marginBottom: '20px' }}>
-        <CoreLoopCard currency={currency} />
-      </div>
-
-      {/* 4 intelligence cards in 2x2 grid */}
+      {/* === THE 4 CARDS — this is the 5-second view === */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
         gap: '12px',
-        marginBottom: '20px',
+        marginBottom: '24px',
       }}>
-        <PipelineOverviewCard currency={currency} />
-        <TopSalesActionsCard currency={currency} />
-        <DealsAtRiskCard currency={currency} />
-        <IssuesUnlockRevenueCard currency={currency} />
+        {/* LEFT COLUMN: Sales / CEO / CFO */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <TopSalesActionsCard currency={currency} />
+          <DealsAtRiskCard currency={currency} />
+        </div>
+
+        {/* RIGHT COLUMN: Product / PM */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <IssuesUnlockRevenueCard currency={currency} />
+          <PipelineOverviewCard currency={currency} />
+        </div>
       </div>
 
-      {/* Active Loops Table */}
+      {/* Active Loops — detail view below the fold */}
       <SectionLabel label="Active loops" />
       <ActiveLoopsTable currency={currency} />
     </div>

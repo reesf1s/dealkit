@@ -20,8 +20,8 @@ export async function POST() {
 
     const { workspaceId } = await getWorkspaceContext(userId)
 
-    console.log(`[linear-sync] Starting manual sync for workspace ${workspaceId}`)
-    const result = await syncLinearIssues(workspaceId)
+    console.log(`[linear-sync] Starting manual full sync for workspace ${workspaceId}`)
+    const result = await syncLinearIssues(workspaceId, true)  // force full sync on manual trigger
     console.log(`[linear-sync] Sync complete:`, result)
 
     // After sync, re-match all open deals in background
