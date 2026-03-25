@@ -427,10 +427,10 @@ export default function CommandPalette() {
         style={{
           width: '600px',
           maxHeight: mode === 'ai' ? '580px' : '480px',
-          background: 'var(--bg)',
+          background: 'rgba(14, 10, 35, 0.85)',
           backdropFilter: 'blur(28px)',
           WebkitBackdropFilter: 'blur(28px)',
-          border: '1px solid var(--border-strong)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '8px',
           boxShadow: '0 40px 100px rgba(0,0,0,0.9), 0 0 0 1px rgba(99,102,241,0.1)',
           display: 'flex',

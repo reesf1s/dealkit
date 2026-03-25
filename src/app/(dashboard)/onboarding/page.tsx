@@ -134,8 +134,10 @@ function OnboardingInner() {
   // ── Shared styles ────────────────────────────────────────────────────────────
 
   const card: React.CSSProperties = {
-    background: 'var(--bg-surface)',
-    border: '1px solid var(--border-subtle)',
+    background: 'rgba(255,255,255,0.08)',
+    backdropFilter: 'blur(24px)',
+    WebkitBackdropFilter: 'blur(24px)',
+    border: '1px solid rgba(255,255,255,0.12)',
     borderRadius: 'var(--radius-md)',
     padding: '24px',
   }

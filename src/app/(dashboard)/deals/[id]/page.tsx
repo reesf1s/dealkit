@@ -5001,8 +5001,10 @@ export default function DealDetailPage() {
       {/* ── Tab pills ──────────────────────────────────────────────────── */}
       <div style={{
         display: 'flex', gap: '4px',
-        background: 'var(--bg-surface)',
-        border: '1px solid var(--border-subtle)',
+        background: 'rgba(255,255,255,0.04)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: '10px', padding: '4px',
         overflowX: isMobile ? 'auto' : undefined, scrollbarWidth: 'none',
       }}>
@@ -5043,7 +5045,7 @@ export default function DealDetailPage() {
       {/* ── Log Meeting modal ─────────────────────────────────────────── */}
       {logMeetingOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)', zIndex: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ background: '#0d0f1a', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '16px', width: '100%', maxWidth: '560px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ background: 'rgba(14, 10, 35, 0.80)', backdropFilter: 'blur(28px)', WebkitBackdropFilter: 'blur(28px)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '16px', width: '100%', maxWidth: '560px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
                 <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#e2e8f0', margin: 0, letterSpacing: '-0.02em' }}>Log meeting</h3>

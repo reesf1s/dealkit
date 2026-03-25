@@ -392,3 +392,71 @@ h2 { font-size: 11px; font-weight: 600; color: var(--text-tertiary); text-transf
   0%, 60%, 100% { transform: translateY(0); }
   30%            { transform: translateY(-5px); }
 }
+
+/* ══════════════════════════════════════════════════
+   GLASSMORPHISM UTILITIES
+   Glass inputs, ghost buttons, dropdowns, popovers.
+══════════════════════════════════════════════════ */
+
+/* Glass input fields */
+.glass-input,
+input.glass-input,
+textarea.glass-input,
+select.glass-input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.glass-input:focus,
+input.glass-input:focus,
+textarea.glass-input:focus,
+select.glass-input:focus {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(99, 102, 241, 0.45);
+  outline: none;
+}
+
+/* Ghost / secondary buttons */
+.btn-glass,
+.btn-secondary,
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.btn-glass:hover,
+.btn-secondary:hover,
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Dropdown / popover panels */
+.glass-dropdown,
+.glass-popover {
+  background: rgba(14, 10, 35, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.60);
+}
+
+/* Update glass-sidebar to include blur */
+.glass-sidebar {
+  background: rgba(6, 4, 18, 0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-right: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: var(--shadow-sidebar);
+}
