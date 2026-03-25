@@ -422,6 +422,9 @@ export async function smartMatchDeal(
   if (productGaps.length === 0) {
     const allText = [deal.meetingNotes, deal.notes, deal.description].filter(Boolean).join('\n\n')
     if (allText.length > 50) {
+      if (!process.env.ANTHROPIC_API_KEY) {
+        console.error(`[smart-match] ${deal.prospectCompany}: ANTHROPIC_API_KEY not set — cannot extract gaps from ${allText.length} chars of notes`)
+      } else {
       console.log(`[smart-match] ${deal.prospectCompany}: no pre-extracted gaps — running Haiku extraction on ${allText.length} chars of notes`)
       try {
         const Anthropic = (await import('@anthropic-ai/sdk')).default
@@ -485,8 +488,9 @@ ${allText.slice(0, 4000)}`,
           } catch { /* non-fatal */ }
         }
       } catch (e) {
-        console.warn(`[smart-match] Haiku extraction failed for ${deal.prospectCompany}:`, e)
+        console.error(`[smart-match] Haiku extraction FAILED for ${deal.prospectCompany} (${allText.length} chars):`, e instanceof Error ? e.message : e)
       }
+      } // end ANTHROPIC_API_KEY check
     }
   }
 
@@ -537,32 +541,37 @@ ${allText.slice(0, 4000)}`,
   }
 
   // 5. Load issue embeddings for vector matching
+  // CRITICAL: Read pgvector_embedding (1536-dim OpenAI), NOT embedding (336-dim TF-IDF).
+  // Gap text is embedded with OpenAI (1536-dim). Dimensions must match for cosine similarity.
   type IssueWithEmbed = typeof issues[0] & { embedding: number[] | null }
   const issueEmbeddings: IssueWithEmbed[] = []
   try {
-    const embRows = await db.execute<{ linear_issue_id: string; embedding: string | null }>(
-      sql`SELECT linear_issue_id, embedding FROM linear_issues_cache WHERE workspace_id = ${workspaceId} AND embedding IS NOT NULL`
+    const embRows = await db.execute<{ linear_issue_id: string; pgvec: string | null }>(
+      sql`SELECT linear_issue_id, pgvector_embedding::text as pgvec FROM linear_issues_cache WHERE workspace_id = ${workspaceId} AND pgvector_embedding IS NOT NULL`
     )
     const embedMap = new Map<string, number[]>()
     for (const row of embRows) {
-      if (row.embedding) {
+      if (row.pgvec) {
         try {
-          embedMap.set(row.linear_issue_id, JSON.parse(row.embedding))
+          // Postgres vector format: [0.1,0.2,...] — same as JSON array
+          embedMap.set(row.linear_issue_id, JSON.parse(row.pgvec))
         } catch { /* skip malformed */ }
       }
     }
     for (const issue of issues) {
       issueEmbeddings.push({ ...issue, embedding: embedMap.get(issue.linearIssueId) ?? null })
     }
+    const withEmbed = issueEmbeddings.filter(i => i.embedding !== null).length
+    const sampleDim = issueEmbeddings.find(i => i.embedding)?.embedding?.length ?? 0
+    console.log(`[smart-match] ${deal.prospectCompany}: loaded ${withEmbed}/${issues.length} OpenAI embeddings (${sampleDim}-dim)`)
   } catch (e) {
-    console.warn('[smart-match] Failed to load embeddings, falling back to keyword-only:', e)
+    console.warn('[smart-match] Failed to load pgvector embeddings, falling back to keyword-only:', e)
     for (const issue of issues) {
       issueEmbeddings.push({ ...issue, embedding: null })
     }
   }
 
   const hasAnyEmbeddings = issueEmbeddings.some(i => i.embedding !== null)
-  console.log(`[smart-match] ${deal.prospectCompany}: ${hasAnyEmbeddings ? issueEmbeddings.filter(i => i.embedding).length + ' issues with embeddings' : 'no embeddings, keyword-only'}`)
 
   // 6. Match each gap to Linear issues using vector + keyword hybrid
   let linked = 0
@@ -717,12 +726,12 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
   totalCreated: number
   results: MatchResult[]
 }> {
-  // Wipe all auto-generated links so rematch starts fresh.
-  // Keep only manual links (user explicitly created these).
-  // This means resync always fixes previous mistakes.
+  // Wipe only unconfirmed auto-generated links.
+  // Preserve: manual links, and auto-links that have progressed (in_progress, in_review, in_cycle, shipped).
   await db.delete(dealLinearLinks).where(and(
     eq(dealLinearLinks.workspaceId, workspaceId),
     sql`${dealLinearLinks.linkType} != 'manual'`,
+    sql`${dealLinearLinks.status} IN ('suggested', 'identified')`,
   ))
 
   const openDeals = await db
@@ -743,6 +752,28 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
     totalLinked += result.linked
     totalCreated += result.created
     results.push(result)
+  }
+
+  // Sync ALL link statuses from Linear cache (catches any status changes since link creation)
+  try {
+    await db.execute(sql`
+      UPDATE deal_linear_links dll
+      SET status = CASE
+        WHEN lic.status IN ('Done', 'Completed') THEN 'shipped'
+        WHEN lic.status = 'In Progress' THEN 'in_progress'
+        WHEN lic.status = 'In Review' THEN 'in_review'
+        WHEN lic.status IN ('In QA', 'RFQA') THEN 'in_cycle'
+        ELSE dll.status
+      END,
+      updated_at = NOW()
+      FROM linear_issues_cache lic
+      WHERE lic.linear_issue_id = dll.linear_issue_id
+        AND lic.workspace_id = dll.workspace_id
+        AND dll.workspace_id = ${workspaceId}
+    `)
+    console.log(`[smart-match] Synced link statuses from Linear cache`)
+  } catch (e) {
+    console.warn('[smart-match] Status sync failed:', e)
   }
 
   console.log(`[smart-match] Complete: ${totalLinked} linked, ${totalCreated} created across ${openDeals.length} deals`)
