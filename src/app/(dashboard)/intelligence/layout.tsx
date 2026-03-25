@@ -14,7 +14,11 @@ export default function IntelligenceLayout({ children }: { children: React.React
   const pathname = usePathname()
   return (
     <div style={{ maxWidth: '1040px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+      <div style={{
+        display: 'flex', gap: '2px', padding: '4px',
+        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: '12px', width: 'fit-content',
+      }}>
         {tabs.map(tab => {
           const isActive = tab.href === '/intelligence'
             ? pathname === '/intelligence'
@@ -24,14 +28,27 @@ export default function IntelligenceLayout({ children }: { children: React.React
               key={tab.href}
               href={tab.href}
               style={{
-                padding: '8px 16px',
-                fontSize: '14px',
-                color: isActive ? 'rgba(255,255,255,0.93)' : 'rgba(255,255,255,0.45)',
-                borderBottom: isActive ? '2px solid rgba(139,124,248,0.8)' : '2px solid transparent',
+                padding: '8px 20px',
+                fontSize: '13px',
+                fontWeight: isActive ? 600 : 500,
+                color: isActive ? 'white' : 'rgba(255,255,255,0.6)',
+                background: isActive ? '#7c3aed' : 'transparent',
+                borderRadius: '8px',
                 textDecoration: 'none',
-                fontWeight: isActive ? 500 : 400,
-                marginBottom: '-1px',
-                transition: 'color 0.15s ease',
+                transition: 'all 0.2s ease',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => {
+                if (!isActive) {
+                  (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.1)'
+                  ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.8)'
+                }
+              }}
+              onMouseLeave={e => {
+                if (!isActive) {
+                  (e.currentTarget as HTMLElement).style.background = 'transparent'
+                  ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.6)'
+                }
               }}
             >
               {tab.label}
