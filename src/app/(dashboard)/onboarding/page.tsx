@@ -157,7 +157,7 @@ function OnboardingInner() {
         body: JSON.stringify({
           dealName: `${company.trim()} — New deal`,
           prospectCompany: company.trim(),
-          dealValue: dealValue ? Number(dealValue.replace(/[^0-9.]/g, '')) : null,
+          dealValue: dealValue !== '' ? Number(dealValue.replace(/[^0-9.]/g, '')) : null,
           stage,
         }),
       })
@@ -749,7 +749,7 @@ function OnboardingInner() {
           {/* Go to dashboard */}
           {!discoverLoading && (
             <button
-              onClick={() => router.push('/dashboard?onboarded=1')}
+              onClick={() => router.push('/')}
               style={primaryBtn}
             >
               Go to dashboard <ArrowRight size={14} />
