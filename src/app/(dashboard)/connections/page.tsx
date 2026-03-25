@@ -218,7 +218,7 @@ export default function ConnectionsPage() {
       const res = await fetch('/api/integrations/linear/sync', { method: 'POST' })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Sync failed')
-      toast(`Synced ${json.data?.issuesSynced ?? json.data?.count ?? 0} issues from Linear`, 'success')
+      toast(`Synced ${json.data?.synced ?? json.data?.issuesSynced ?? json.data?.count ?? 0} issues from Linear`, 'success')
       mutateLinear()
     } catch (e: unknown) { toast(e instanceof Error ? e.message : 'Sync failed', 'error') }
     finally { setLinearSyncing(false) }

@@ -1,6 +1,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
+import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
 import type { LoopEntry } from '@/app/api/loops/route'
@@ -187,12 +188,16 @@ function RevenueImpactStrip({ currency }: { currency: string }) {
 
   const atRiskCount = (brain?.urgentDeals?.length ?? 0) + (brain?.staleDeals?.length ?? 0)
 
+  // Pipeline stats
+  const scores = deals.map((d: any) => Number(d.conversionScore) || 0).filter((s: number) => s > 0)
+  const avgScore = scores.length ? Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length) : 0
+
   const metrics = [
+    { label: 'Open deals', value: `${deals.length}`, color: 'rgba(255,255,255,0.9)' },
     { label: 'Pipeline', value: fmtCurrency(totalPipeline, currency), color: 'rgba(255,255,255,0.9)' },
-    { label: 'Issues linked', value: `${issuesLinked}`, sub: `across ${uniqueDealsWithLoops} deals`, color: 'rgba(255,255,255,0.9)' },
-    { label: 'Revenue blocked', value: fmtCurrency(revenueBlocked, currency), color: '#ef4444' },
-    { label: 'Revenue unlocked', value: fmtCurrency(revenueUnlocked, currency) || '–', color: '#22c55e' },
-    { label: 'At risk', value: `${atRiskCount} deals`, color: atRiskCount > 0 ? '#f59e0b' : '#22c55e' },
+    { label: 'Avg score', value: `${avgScore}%`, color: avgScore >= 50 ? '#22c55e' : avgScore >= 30 ? '#f59e0b' : '#ef4444' },
+    { label: 'Issues linked', value: `${issuesLinked}`, color: 'rgba(255,255,255,0.9)' },
+    { label: 'At risk', value: `${atRiskCount}`, color: atRiskCount > 0 ? '#f59e0b' : '#22c55e' },
   ]
 
   return (
@@ -212,9 +217,6 @@ function RevenueImpactStrip({ currency }: { currency: string }) {
           <span style={{ fontSize: '15px', fontWeight: 700, color: m.color, letterSpacing: '-0.02em' }}>
             {m.value}
           </span>
-          {'sub' in m && m.sub && (
-            <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.3)' }}>{m.sub}</span>
-          )}
         </div>
       ))}
     </div>
@@ -550,71 +552,166 @@ function ActiveLoopsTable({ currency }: { currency: string }) {
   )
 }
 
-// ─── Card 1: Pipeline Summary ───────────────────────────────────────────────
+// ─── Card 1: AI Focus Briefing ──────────────────────────────────────────────
 
-function PipelineOverviewCard({ currency }: { currency: string }) {
-  const { data: brainData } = useSWR<BrainData>(
-    '/api/brain', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60000 },
-  )
-  const { data: dealsRes } = useSWR<{ data: DealRow[] }>(
-    '/api/deals', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60000 },
-  )
-  const brain = brainData?.data
-  const allDeals = dealsRes?.data ?? []
-  const openDeals = allDeals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
-  const totalPipeline = openDeals.reduce((acc: number, d: any) => acc + (Number(d.dealValue) || 0), 0)
-  const scores = openDeals.map((d: any) => Number(d.conversionScore) || 0).filter((s: number) => s > 0)
-  const avgScore = scores.length ? Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length) : 0
-  const wonDeals = allDeals.filter((d: any) => d.stage === 'closed_won')
-  const lostDeals = allDeals.filter((d: any) => d.stage === 'closed_lost')
-  const winRate = wonDeals.length + lostDeals.length > 0
-    ? Math.round((wonDeals.length / (wonDeals.length + lostDeals.length)) * 100)
-    : null
+function AIFocusBriefingCard() {
+  const [briefing, setBriefing] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
 
-  const statStyle: React.CSSProperties = {
-    display: 'flex', flexDirection: 'column', gap: '1px', flex: 1,
+  // Auto-load on mount
+  useEffect(() => {
+    loadBriefing()
+  }, [])
+
+  async function loadBriefing() {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{
+            role: 'user',
+            content: `Give me a structured daily focus briefing for today. Format it exactly like this:
+
+🔴 **Urgent — Unblock These Now**
+(Top 2-3 deals that need immediate action — explain WHAT to do and WHY)
+
+🟡 **High Value — Push Forward**
+(Next 2-3 deals with solvable blockers — explain the specific next step)
+
+🟢 **Quick Checks**
+(1-2 deals that just need a status check or confirmation)
+
+End with a one-line summary of total revenue at stake in the urgent+high value deals.
+
+Be specific — use real deal names, contact names, £ values, and concrete actions. No generic advice.`
+          }],
+        }),
+      })
+      const data = await res.json()
+      // Extract text from streaming response or direct response
+      const text = data?.text ?? data?.choices?.[0]?.message?.content ?? data?.content ?? null
+      if (text) setBriefing(text)
+      setHasLoaded(true)
+    } catch (e) {
+      console.error('Failed to load briefing:', e)
+      setHasLoaded(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Simple markdown-like rendering
+  function renderBriefing(text: string) {
+    return text.split('\n').map((line, i) => {
+      const trimmed = line.trim()
+      if (!trimmed) return <div key={i} style={{ height: '6px' }} />
+
+      // Section headers with emoji
+      if (trimmed.startsWith('🔴') || trimmed.startsWith('🟡') || trimmed.startsWith('🟢')) {
+        return (
+          <div key={i} style={{
+            fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.85)',
+            marginTop: i > 0 ? '10px' : '0', marginBottom: '4px',
+          }}>
+            {trimmed.replace(/\*\*/g, '')}
+          </div>
+        )
+      }
+
+      // Numbered items
+      if (/^\d+\./.test(trimmed)) {
+        const [num, ...rest] = trimmed.split('.')
+        const content = rest.join('.').trim()
+        // Bold deal names
+        const formatted = content.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+        return (
+          <div key={i} style={{
+            display: 'flex', gap: '6px', marginBottom: '4px', paddingLeft: '2px',
+          }}>
+            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', fontWeight: 700, width: '14px', flexShrink: 0 }}>
+              {num}.
+            </span>
+            <span
+              style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.5' }}
+              dangerouslySetInnerHTML={{ __html: formatted }}
+            />
+          </div>
+        )
+      }
+
+      // Bullet points
+      if (trimmed.startsWith('►') || trimmed.startsWith('•') || trimmed.startsWith('-')) {
+        const content = trimmed.slice(1).trim().replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+        return (
+          <div key={i} style={{
+            display: 'flex', gap: '6px', marginBottom: '3px', paddingLeft: '2px',
+          }}>
+            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', flexShrink: 0 }}>►</span>
+            <span
+              style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', lineHeight: '1.5' }}
+              dangerouslySetInnerHTML={{ __html: content }}
+            />
+          </div>
+        )
+      }
+
+      // Separator
+      if (trimmed === '---') {
+        return <div key={i} style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '6px 0' }} />
+      }
+
+      // Regular text (summary line)
+      const formatted = trimmed.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+      return (
+        <span
+          key={i}
+          style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)', lineHeight: '1.5', display: 'block' }}
+          dangerouslySetInnerHTML={{ __html: formatted }}
+        />
+      )
+    })
   }
 
   return (
     <div style={{ ...glass.card, padding: '14px 16px' }}>
-      <div style={{ ...cardHeader }}>📊 Pipeline summary</div>
-
-      {/* Stats grid — always shows real data */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: brain?.dailyBriefing ? '10px' : '0' }}>
-        <div style={statStyle}>
-          <span style={{ fontSize: '16px', fontWeight: 700, color: 'rgba(255,255,255,0.9)', letterSpacing: '-0.02em' }}>
-            {openDeals.length}
-          </span>
-          <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)' }}>open deals</span>
-        </div>
-        <div style={statStyle}>
-          <span style={{ fontSize: '16px', fontWeight: 700, color: 'rgba(255,255,255,0.9)', letterSpacing: '-0.02em' }}>
-            {fmtCurrency(totalPipeline, currency)}
-          </span>
-          <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)' }}>pipeline</span>
-        </div>
-        <div style={statStyle}>
-          <span style={{ fontSize: '16px', fontWeight: 700, color: avgScore >= 50 ? '#22c55e' : avgScore >= 30 ? '#f59e0b' : '#ef4444', letterSpacing: '-0.02em' }}>
-            {avgScore}%
-          </span>
-          <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)' }}>avg score</span>
-        </div>
-        {winRate !== null && (
-          <div style={statStyle}>
-            <span style={{ fontSize: '16px', fontWeight: 700, color: '#22c55e', letterSpacing: '-0.02em' }}>
-              {winRate}%
-            </span>
-            <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)' }}>win rate</span>
-          </div>
-        )}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+        <div style={{ ...cardHeader, marginBottom: 0 }}>🧠 What to focus on today</div>
+        <button
+          onClick={loadBriefing}
+          disabled={loading}
+          style={{
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
+            borderRadius: '6px', padding: '3px 8px', cursor: loading ? 'not-allowed' : 'pointer',
+            fontSize: '10px', color: 'rgba(255,255,255,0.5)', fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', gap: '4px',
+            opacity: loading ? 0.5 : 1, transition: 'opacity 0.15s',
+          }}
+        >
+          <span style={{ display: 'inline-block', animation: loading ? 'spin 1s linear infinite' : 'none' }}>↻</span>
+          {loading ? 'Thinking...' : 'Refresh'}
+        </button>
       </div>
 
-      {/* AI briefing if available */}
-      {brain?.dailyBriefing && (
-        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: '1.5', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px' }}>
-          {brain.dailyBriefing}
+      {loading && !briefing && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '20px 0' }}>
+          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
+            Analysing your pipeline...
+          </span>
+        </div>
+      )}
+
+      {briefing && (
+        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+          {renderBriefing(briefing)}
+        </div>
+      )}
+
+      {!briefing && hasLoaded && !loading && (
+        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>
+          Click refresh to generate your daily focus briefing.
         </p>
       )}
     </div>
@@ -939,24 +1036,21 @@ export default function TodayPage() {
         <RevenueImpactStrip currency={currency} />
       </div>
 
-      {/* === THE 4 CARDS — this is the 5-second view === */}
+      {/* AI Focus Briefing — full width */}
+      <div style={{ marginBottom: '16px' }}>
+        <AIFocusBriefingCard />
+      </div>
+
+      {/* 3 cards: Sales actions | Deals at risk | PM issues */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
+        gridTemplateColumns: '1fr 1fr 1fr',
         gap: '12px',
         marginBottom: '24px',
       }}>
-        {/* LEFT COLUMN: Sales / CEO / CFO */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <TopSalesActionsCard currency={currency} />
-          <DealsAtRiskCard currency={currency} />
-        </div>
-
-        {/* RIGHT COLUMN: Product / PM */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <IssuesUnlockRevenueCard currency={currency} />
-          <PipelineOverviewCard currency={currency} />
-        </div>
+        <TopSalesActionsCard currency={currency} />
+        <DealsAtRiskCard currency={currency} />
+        <IssuesUnlockRevenueCard currency={currency} />
       </div>
 
       {/* Active Loops — detail view below the fold */}

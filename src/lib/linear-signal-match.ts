@@ -52,30 +52,35 @@ async function logActionDeduped(values: {
   result?: Record<string, unknown> | null
   status?: string
 }): Promise<void> {
-  // Check for a duplicate in the last 60 seconds
-  const recent = await db.execute<{ count: string }>(
-    sql`SELECT COUNT(*) AS count
-        FROM mcp_action_log
-        WHERE workspace_id = ${values.workspaceId}::uuid
-          AND action_type = ${values.actionType}
-          AND deal_id = ${values.dealId ?? null}::uuid
-          AND (linear_issue_id = ${values.linearIssueId ?? null} OR (linear_issue_id IS NULL AND ${values.linearIssueId ?? null} IS NULL))
-          AND created_at > NOW() - INTERVAL '60 seconds'
-        LIMIT 1`
-  )
+  try {
+    // Check for a duplicate in the last 60 seconds
+    const recent = await db.execute<{ count: string }>(
+      sql`SELECT COUNT(*) AS count
+          FROM mcp_action_log
+          WHERE workspace_id = ${values.workspaceId}::uuid
+            AND action_type = ${values.actionType}
+            AND deal_id = ${values.dealId ?? null}::uuid
+            AND linear_issue_id = ${values.linearIssueId ?? null}
+            AND created_at > NOW() - INTERVAL '60 seconds'
+          LIMIT 1`
+    )
 
-  if (parseInt(recent[0]?.count ?? '0', 10) > 0) return
+    if (parseInt(recent[0]?.count ?? '0', 10) > 0) return
 
-  await db.insert(mcpActionLog).values({
-    workspaceId: values.workspaceId,
-    actionType: values.actionType,
-    dealId: values.dealId ?? undefined,
-    linearIssueId: values.linearIssueId ?? undefined,
-    triggeredBy: values.triggeredBy ?? undefined,
-    payload: values.payload ?? undefined,
-    result: values.result ?? undefined,
-    status: values.status ?? 'complete',
-  })
+    await db.insert(mcpActionLog).values({
+      workspaceId: values.workspaceId,
+      actionType: values.actionType,
+      dealId: values.dealId ?? undefined,
+      linearIssueId: values.linearIssueId ?? undefined,
+      triggeredBy: values.triggeredBy ?? undefined,
+      payload: values.payload ?? undefined,
+      result: values.result ?? undefined,
+      status: values.status ?? 'complete',
+    })
+  } catch (err) {
+    // Audit log is non-fatal — don't block matching if it fails
+    console.warn('[linear-signal-match] logActionDeduped failed (non-fatal):', err)
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
