@@ -153,9 +153,13 @@ function applyConceptPhrases(text: string): string {
 function tokenize(text: string): string[] {
   // 1. Apply concept phrases
   let processed = applyConceptPhrases(text)
-  // 2. Lowercase, strip punctuation, split hyphens
-  processed = processed.toLowerCase().replace(/[^a-z0-9\s]/g, ' ')
-  // 3. Split, filter, stem
+  // 2. Lowercase
+  processed = processed.toLowerCase()
+  // 3. Expand hyphenated words: "co-location" → "co location colocation"
+  processed = processed.replace(/(\w+)-(\w+)/g, (_, a, b) => `${a} ${b} ${a}${b}`)
+  // 4. Strip remaining punctuation
+  processed = processed.replace(/[^a-z0-9\s]/g, ' ')
+  // 5. Split, filter stop words, stem
   return processed
     .split(/\s+/)
     .filter(w => w.length > 2 && !STOP_WORDS.has(w))
@@ -420,7 +424,7 @@ export async function smartMatchDeal(
     return { linked: 0, created: 0, dealName: deal.dealName }
   }
 
-  console.log(`[smart-match] ${deal.prospectCompany}: ${productGaps.length} product gaps to match`)
+  console.log(`[smart-match] ${deal.prospectCompany}: ${productGaps.length} gaps to match. First gap: "${(productGaps[0]?.gap ?? '').slice(0, 80)}"`)
 
   // 3. Load all Linear issues for this workspace (filter out garbage)
   const allIssues = await db
@@ -447,6 +451,8 @@ export async function smartMatchDeal(
     return true
   })
 
+  console.log(`[smart-match] ${deal.prospectCompany}: ${issues.length} issues in cache (${allIssues.length} total, ${allIssues.length - issues.length} filtered)`)
+
   // 4. Load Linear integration for issue creation
   const [integration] = await db
     .select({ apiKeyEnc: linearIntegrations.apiKeyEnc, teamId: linearIntegrations.teamId })
@@ -472,6 +478,9 @@ export async function smartMatchDeal(
     let bestMatch: typeof issues[0] | null = null
     let bestScore = 0
 
+    // Track top 3 scores for debugging
+    const topScores: { id: string; title: string; score: number }[] = []
+
     for (const issue of issues) {
       // Direct substring: "Appspace integration" in "Appspace integration setup"
       const issueTitleLower = issue.title.toLowerCase()
@@ -483,11 +492,18 @@ export async function smartMatchDeal(
 
       // Multi-signal scoring (keyword + synonym + bigram + fuzzy)
       const score = scoreMatch(gapText, issue.title, issue.description)
+      // Track top scores
+      topScores.push({ id: issue.linearIssueId, title: issue.title.slice(0, 40), score })
       if (score > bestScore && score >= 25) {
         bestScore = score
         bestMatch = issue
       }
     }
+
+    // Log top 3 for diagnostics
+    topScores.sort((a, b) => b.score - a.score)
+    const top3 = topScores.slice(0, 3).map(s => `${s.id}(${s.score})`).join(', ')
+    console.log(`[smart-match] ${deal.prospectCompany} gap "${gapText.slice(0, 50)}" → best=${bestScore}, top3=[${top3}]`)
 
     if (bestMatch && bestScore >= 25) {
       // Link it — check for existing first
