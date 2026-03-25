@@ -136,6 +136,7 @@ export async function matchDealToIssues(
   workspaceId: string,
   dealId: string,
   triggeredBy: 'cron' | 'user' | 'webhook' = 'cron',
+  opts: { skipPgvector?: boolean } = {},
 ): Promise<MatchResult> {
   const [deal] = await db
     .select({
@@ -159,9 +160,10 @@ export async function matchDealToIssues(
   const signalText = extractDealSignalText(deal)
   if (!signalText) return { linked: 0, suggested: 0 }
 
-  // Find similar issues — pgvector primary, TF-IDF fallback
+  // Find similar issues — TF-IDF in bulk mode, pgvector for single-deal
   const similar = await findMatchingIssues(dealId, workspaceId, deal, {
     limit: 25,
+    skipPgvector: opts.skipPgvector,
     minSimilarity: SUGGEST_THRESHOLD / 100,
   })
 
@@ -327,10 +329,21 @@ export async function matchAllOpenDeals(
   let totalLinked = 0
   let totalSuggested = 0
 
-  for (const deal of openDeals) {
-    const result = await matchDealToIssues(workspaceId, deal.id, triggeredBy)
-    totalLinked += result.linked
-    totalSuggested += result.suggested
+  // Process deals in parallel batches of 5 for speed
+  const BATCH_SIZE = 5
+  for (let i = 0; i < openDeals.length; i += BATCH_SIZE) {
+    const batch = openDeals.slice(i, i + BATCH_SIZE)
+    const results = await Promise.allSettled(
+      batch.map(deal => matchDealToIssues(workspaceId, deal.id, triggeredBy, { skipPgvector: true }))
+    )
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        totalLinked += r.value.linked
+        totalSuggested += r.value.suggested
+      } else {
+        console.warn('[matchAllOpenDeals] Deal match failed:', r.reason)
+      }
+    }
   }
 
   return { linked: totalLinked, suggested: totalSuggested }

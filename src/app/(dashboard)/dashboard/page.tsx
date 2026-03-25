@@ -833,8 +833,8 @@ function IssuesUnlockRevenueCard({ currency }: { currency: string }) {
   // Use productGapPriority if available, otherwise derive from loops
   const productGaps = brain?.productGapPriority?.slice(0, 3) ?? []
 
-  // Fallback: group loops by issue, sum revenue
-  const issueRevenue = new Map<string, { id: string; title: string | null; revenue: number; dealCount: number; status: string | null }>()
+  // Group loops by issue, sum revenue, track companies
+  const issueRevenue = new Map<string, { id: string; title: string | null; revenue: number; dealCount: number; status: string | null; company: string | null }>()
   for (const loop of loops) {
     if (loop.loopStatus === 'shipped') continue // already done
     const existing = issueRevenue.get(loop.linearIssueId)
@@ -848,6 +848,7 @@ function IssuesUnlockRevenueCard({ currency }: { currency: string }) {
         revenue: loop.dealValue || 0,
         dealCount: 1,
         status: loop.loopStatus,
+        company: loop.company,
       })
     }
   }
@@ -855,56 +856,40 @@ function IssuesUnlockRevenueCard({ currency }: { currency: string }) {
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 3)
 
-  const hasProductGaps = productGaps.length > 0
   const hasLoopIssues = topIssues.length > 0
 
   return (
     <div style={{ ...glass.card, padding: '14px 16px' }}>
       <div style={{ ...cardHeader }}>🔧 PM — ship these to unlock revenue</div>
-      {!hasProductGaps && !hasLoopIssues ? (
+      {!hasLoopIssues ? (
         <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>
-          Link deals to Linear issues to see which features unlock the most revenue.
+          Rematch deals to Linear issues to see which features unlock the most revenue.
         </p>
-      ) : hasProductGaps ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {productGaps.map((gap, i) => (
-            <div key={i} style={{ padding: '6px 8px', borderRadius: '6px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 500, color: 'rgba(255,255,255,0.8)', flex: 1 }}>
-                  {gap.gap}
-                </span>
-                <span style={{ fontSize: '10px', fontWeight: 600, color: '#ef4444', flexShrink: 0 }}>
-                  {fmtCurrency(gap.openRevenue, currency)}
-                </span>
-              </div>
-              <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)', paddingLeft: '0' }}>
-                {gap.dealCount} deal{gap.dealCount !== 1 ? 's' : ''} blocked → ship this to unlock revenue
-              </div>
-            </div>
-          ))}
-        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {topIssues.map((issue) => {
             const statusColor = issue.status === 'in_cycle' ? '#3b82f6'
               : issue.status === 'awaiting_approval' ? '#f59e0b'
+              : issue.status === 'suggested' ? 'rgba(255,255,255,0.3)'
               : 'rgba(255,255,255,0.3)'
             const statusLabel = issue.status === 'in_cycle' ? 'In cycle'
               : issue.status === 'awaiting_approval' ? 'Awaiting PM'
+              : issue.status === 'suggested' ? 'Suggested'
+              : issue.status === 'confirmed' ? 'Confirmed'
               : stageFmt(issue.status ?? '')
 
             return (
               <div key={issue.id} style={{ padding: '6px 8px', borderRadius: '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-                  <span style={{ fontFamily: 'monospace', fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: '10px', color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>
                     {issue.id}
-                  </span>
-                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {issue.title ?? issue.id}
                   </span>
                   <span style={{ fontSize: '10px', fontWeight: 600, color: '#ef4444', flexShrink: 0 }}>
                     {fmtCurrency(issue.revenue, currency)}
                   </span>
+                </div>
+                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', marginBottom: '3px', lineHeight: '1.4' }}>
+                  {issue.title ?? issue.id}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '9px', color: 'rgba(255,255,255,0.35)' }}>
@@ -912,8 +897,13 @@ function IssuesUnlockRevenueCard({ currency }: { currency: string }) {
                     {statusLabel}
                   </span>
                   <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.3)' }}>
-                    · {issue.dealCount} deal{issue.dealCount !== 1 ? 's' : ''} waiting
+                    · {issue.dealCount} deal{issue.dealCount !== 1 ? 's' : ''} blocked
                   </span>
+                  {issue.company && (
+                    <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.3)' }}>
+                      · {issue.company}
+                    </span>
+                  )}
                 </div>
               </div>
             )

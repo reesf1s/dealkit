@@ -134,25 +134,24 @@ export async function findMatchingIssues(
     description?: string | null
     successCriteria?: string | null
   },
-  opts: { limit?: number; minSimilarity?: number } = {},
+  opts: { limit?: number; minSimilarity?: number; skipPgvector?: boolean } = {},
 ): Promise<LinearIssueMatch[]> {
   const limit = opts.limit ?? 25
   const minSimilarity = opts.minSimilarity ?? 0.15
 
-  // Try pgvector first
-  if (isEmbeddingAvailable()) {
+  // Try pgvector first (skip in bulk mode — too slow with OpenAI calls per deal)
+  if (!opts.skipPgvector && isEmbeddingAvailable()) {
     try {
       const results = await findMatchingIssuesPgvector(dealId, workspaceId, dealData, limit)
       if (results.length > 0) {
         return results.filter(r => r.similarity >= minSimilarity)
       }
-      // No results — may mean embeddings aren't populated yet; fall through to TF-IDF
     } catch (err) {
       console.warn('[deal-linear-matcher] pgvector match failed, falling back to TF-IDF:', err)
     }
   }
 
-  // Fallback: TF-IDF
+  // TF-IDF — local, instant, no API calls
   const signalText = extractDealSignalText({
     notes: dealData.notes ?? null,
     meetingNotes: dealData.meetingNotes ?? null,
