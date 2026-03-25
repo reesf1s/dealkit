@@ -550,32 +550,72 @@ function ActiveLoopsTable({ currency }: { currency: string }) {
   )
 }
 
-// ─── Card 1: AI Pipeline Overview ───────────────────────────────────────────
+// ─── Card 1: Pipeline Summary ───────────────────────────────────────────────
 
 function PipelineOverviewCard({ currency }: { currency: string }) {
   const { data: brainData } = useSWR<BrainData>(
     '/api/brain', fetcher,
     { revalidateOnFocus: false, dedupingInterval: 60000 },
   )
+  const { data: dealsRes } = useSWR<{ data: DealRow[] }>(
+    '/api/deals', fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 60000 },
+  )
   const brain = brainData?.data
+  const allDeals = dealsRes?.data ?? []
+  const openDeals = allDeals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+  const totalPipeline = openDeals.reduce((acc: number, d: any) => acc + (Number(d.dealValue) || 0), 0)
+  const scores = openDeals.map((d: any) => Number(d.conversionScore) || 0).filter((s: number) => s > 0)
+  const avgScore = scores.length ? Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length) : 0
+  const wonDeals = allDeals.filter((d: any) => d.stage === 'closed_won')
+  const lostDeals = allDeals.filter((d: any) => d.stage === 'closed_lost')
+  const winRate = wonDeals.length + lostDeals.length > 0
+    ? Math.round((wonDeals.length / (wonDeals.length + lostDeals.length)) * 100)
+    : null
+
+  const statStyle: React.CSSProperties = {
+    display: 'flex', flexDirection: 'column', gap: '1px', flex: 1,
+  }
 
   return (
     <div style={{ ...glass.card, padding: '14px 16px' }}>
       <div style={{ ...cardHeader }}>📊 Pipeline summary</div>
-      {brain?.dailyBriefing ? (
-        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.65)', margin: 0, lineHeight: '1.55' }}>
+
+      {/* Stats grid — always shows real data */}
+      <div style={{ display: 'flex', gap: '12px', marginBottom: brain?.dailyBriefing ? '10px' : '0' }}>
+        <div style={statStyle}>
+          <span style={{ fontSize: '16px', fontWeight: 700, color: 'rgba(255,255,255,0.9)', letterSpacing: '-0.02em' }}>
+            {openDeals.length}
+          </span>
+          <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)' }}>open deals</span>
+        </div>
+        <div style={statStyle}>
+          <span style={{ fontSize: '16px', fontWeight: 700, color: 'rgba(255,255,255,0.9)', letterSpacing: '-0.02em' }}>
+            {fmtCurrency(totalPipeline, currency)}
+          </span>
+          <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)' }}>pipeline</span>
+        </div>
+        <div style={statStyle}>
+          <span style={{ fontSize: '16px', fontWeight: 700, color: avgScore >= 50 ? '#22c55e' : avgScore >= 30 ? '#f59e0b' : '#ef4444', letterSpacing: '-0.02em' }}>
+            {avgScore}%
+          </span>
+          <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)' }}>avg score</span>
+        </div>
+        {winRate !== null && (
+          <div style={statStyle}>
+            <span style={{ fontSize: '16px', fontWeight: 700, color: '#22c55e', letterSpacing: '-0.02em' }}>
+              {winRate}%
+            </span>
+            <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)' }}>win rate</span>
+          </div>
+        )}
+      </div>
+
+      {/* AI briefing if available */}
+      {brain?.dailyBriefing && (
+        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)', margin: 0, lineHeight: '1.5', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '8px' }}>
           {brain.dailyBriefing}
         </p>
-      ) : (
-        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>
-          Brain is learning. Add deals and meeting notes to generate insights.
-        </p>
-      )}
-      {brain?.winLossIntel && brain.winLossIntel.winRate > 0 && (
-        <div style={{ marginTop: '8px', fontSize: '10px', color: 'rgba(255,255,255,0.45)' }}>
-          Win rate: <span style={{ color: '#22c55e', fontWeight: 600 }}>{Math.round(brain.winLossIntel.winRate * 100)}%</span>
-          {' '}({brain.winLossIntel.winCount}W / {brain.winLossIntel.lossCount}L)
-        </div>
       )}
     </div>
   )

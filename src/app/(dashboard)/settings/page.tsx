@@ -126,7 +126,7 @@ function MembersList({
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-              {isAdmin && !isMe ? (
+              {isAdmin ? (
                 <select
                   value={m.appRole ?? 'sales'}
                   onChange={e => handleAppRoleChange(m.userId, e.target.value)}

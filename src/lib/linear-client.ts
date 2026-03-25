@@ -129,52 +129,53 @@ export async function fetchTeamIssues(
   cursor?: string,
   since?: string,
 ): Promise<{ issues: LinearIssue[]; nextCursor: string | null }> {
+  // Use top-level issues query — works across all teams and avoids
+  // team-scoped filter issues. Filter out completed/canceled states.
   const sinceVar    = since ? ', $since: DateTimeOrDuration' : ''
-  const sinceFilter = since ? '\n          updatedAt: { gt: $since }' : ''
+  const sinceFilter = since ? ', updatedAt: { gt: $since }' : ''
 
   const data = await gql<{
-    team: {
-      issues: {
-        nodes: LinearIssue[]
-        pageInfo: { hasNextPage: boolean; endCursor: string | null }
-      }
+    issues: {
+      nodes: LinearIssue[]
+      pageInfo: { hasNextPage: boolean; endCursor: string | null }
     }
   }>(
     apiKey,
-    `query FetchIssues($teamId: String!, $after: String${sinceVar}) {
-      team(id: $teamId) {
-        issues(
-          first: 100
-          after: $after
-          filter: { state: { type: { nin: ["completed", "cancelled"] } }${sinceFilter} }
-          orderBy: updatedAt
-        ) {
-          nodes {
-            id
-            identifier
-            title
-            description
-            url
-            priority
-            state { id name type }
-            cycle { id number }
-            assignee { id name }
-            updatedAt
-          }
-          pageInfo { hasNextPage endCursor }
+    `query FetchIssues($after: String${sinceVar}) {
+      issues(
+        first: 100
+        after: $after
+        filter: {
+          state: { type: { nin: ["completed", "canceled"] } }
+          ${sinceFilter}
         }
+        orderBy: updatedAt
+      ) {
+        nodes {
+          id
+          identifier
+          title
+          description
+          url
+          priority
+          state { id name type }
+          cycle { id number }
+          assignee { id name }
+          updatedAt
+        }
+        pageInfo { hasNextPage endCursor }
       }
     }`,
-    { teamId, after: cursor ?? null, ...(since ? { since } : {}) },
+    { after: cursor ?? null, ...(since ? { since } : {}) },
   )
 
-  const issues = data.team.issues.nodes
-  console.log(`[linear-client] fetchTeamIssues: got ${issues.length} issues, hasNext=${data.team.issues.pageInfo.hasNextPage}, since=${since ?? 'none'}`)
+  const issues = data.issues.nodes
+  console.log(`[linear-client] fetchTeamIssues: got ${issues.length} issues, hasNext=${data.issues.pageInfo.hasNextPage}, since=${since ?? 'none'}`)
 
   return {
     issues,
-    nextCursor: data.team.issues.pageInfo.hasNextPage
-      ? data.team.issues.pageInfo.endCursor
+    nextCursor: data.issues.pageInfo.hasNextPage
+      ? data.issues.pageInfo.endCursor
       : null,
   }
 }
