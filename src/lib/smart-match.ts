@@ -396,22 +396,26 @@ export async function smartMatchDeal(
     }
   } catch { /* non-fatal */ }
 
-  // Source B: success_criteria (often contains specific product requirements)
+  // Source B: success_criteria — only use SHORT lines that look like feature titles
   try {
     const [scRow] = await db.execute<{ success_criteria: string | null }>(
       sql`SELECT success_criteria FROM deal_logs WHERE id = ${dealId}::uuid LIMIT 1`
     )
     if (scRow?.success_criteria) {
-      // Split by newlines or bullet points — each line is a criterion
       const lines = scRow.success_criteria
         .split(/[\n\r]+/)
-        .map(l => l.replace(/^[\s*\-•]+/, '').trim())
-        .filter(l => l.length > 10 && l.length < 200)
-      for (const line of lines) {
-        // Avoid duplicating gaps we already have
+        .map(l => l.replace(/^[\s*\-•\d.]+/, '').trim())
+        .filter(l => {
+          if (l.length < 15 || l.length > 100) return false // must be concise feature-length
+          // Skip paragraphs that are criteria descriptions, not feature titles
+          if (/^(if successful|success criteria|the poc|please let|we will|they want|ensure that)/i.test(l)) return false
+          if (/recurring contract|commercial terms|procurement/i.test(l)) return false
+          return true
+        })
+      for (const line of lines.slice(0, 3)) { // max 3 from success criteria
         const isDupe = productGaps.some(g => g.gap.toLowerCase().includes(line.toLowerCase().slice(0, 30)))
         if (!isDupe) {
-          productGaps.push({ gap: line, severity: 'medium' })
+          productGaps.push({ gap: line.slice(0, 100), severity: 'medium' })
         }
       }
     }
@@ -660,10 +664,10 @@ ${allText.slice(0, 4000)}`,
           linearIssueId: bestMatch.linearIssueId,
           linearIssueUrl: bestMatch.linearIssueUrl,
           linearTitle: bestMatch.title,
-          relevanceScore: bestScore,
+          relevanceScore: Math.round(bestScore),
           linkType: 'feature_gap',
           status: loopStatus,
-          addressesRisk: gapText.slice(0, 200),
+          addressesRisk: gapText.slice(0, 150),
         }).onConflictDoNothing()
         linked++
         console.log(`[smart-match] ${deal.prospectCompany}: "${gapText}" → ${bestMatch.linearIssueId} (${bestMatch.title}) [score=${bestScore}, linearStatus=${bestMatch.status}, loopStatus=${loopStatus}]`)
@@ -700,7 +704,7 @@ ${allText.slice(0, 4000)}`,
           relevanceScore: 100,
           linkType: 'feature_gap',
           status: 'identified',
-          addressesRisk: gapText.slice(0, 200),
+          addressesRisk: gapText.slice(0, 150),
         }).onConflictDoNothing()
 
         created++
