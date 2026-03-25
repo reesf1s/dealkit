@@ -31,6 +31,8 @@ export interface LoopEntry {
   linearIssueUrl: string | null
   daysInStatus: number | null
   issueCount: number
+  closeDate: string | null
+  conversionScore: number | null
   createdAt: Date
   updatedAt: Date
 }
@@ -74,6 +76,8 @@ export async function GET() {
         dealName: dealLogs.dealName,
         dealValue: dealLogs.dealValue,
         stage: dealLogs.stage,
+        closeDate: dealLogs.closeDate,
+        conversionScore: dealLogs.conversionScore,
       })
       .from(dealLogs)
       .where(eq(dealLogs.workspaceId, workspaceId))
@@ -133,6 +137,8 @@ export async function GET() {
           linearIssueUrl: link.linearIssueUrl,
           daysInStatus,
           issueCount: dealLinks.length,
+          closeDate: deal.closeDate ? new Date(deal.closeDate).toISOString() : null,
+          conversionScore: deal.conversionScore ? Number(deal.conversionScore) : null,
           createdAt: new Date(link.createdAt),
           updatedAt: new Date(link.updatedAt),
       })

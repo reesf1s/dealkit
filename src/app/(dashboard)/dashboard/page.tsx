@@ -838,87 +838,121 @@ function DealsAtRiskCard({ currency }: { currency: string }) {
 // ─── Card 4: Top 3 Linear Issues to Unlock Revenue ─────────────────────────
 
 function IssuesUnlockRevenueCard({ currency }: { currency: string }) {
-  const { data: brainData } = useSWR<BrainData>(
-    '/api/brain', fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 3000000 },
-  )
   const { data: loopsRes } = useSWR<{ data: LoopEntry[] }>(
     '/api/loops', fetcher,
     { revalidateOnFocus: false, dedupingInterval: 300000 },
   )
 
-  const brain = brainData?.data
   const loops = loopsRes?.data ?? []
 
-  // Use productGapPriority if available, otherwise derive from loops
-  const productGaps = brain?.productGapPriority?.slice(0, 3) ?? []
+  // Group loops by issue with composite priority scoring
+  const issueData = new Map<string, {
+    id: string; title: string | null; revenue: number; dealCount: number
+    status: string | null; companies: string[]; closestCloseDate: Date | null
+    urgencyScore: number; cycleBonus: number
+  }>()
 
-  // Group loops by issue, sum revenue, track companies
-  const issueRevenue = new Map<string, { id: string; title: string | null; revenue: number; dealCount: number; status: string | null; company: string | null }>()
   for (const loop of loops) {
-    if (loop.loopStatus === 'shipped') continue // already done
-    const existing = issueRevenue.get(loop.linearIssueId)
+    if (loop.loopStatus === 'shipped') continue
+    const existing = issueData.get(loop.linearIssueId)
+    const closeDate = loop.closeDate ? new Date(loop.closeDate) : null
+
     if (existing) {
       existing.revenue += loop.dealValue || 0
       existing.dealCount++
+      if (loop.company && !existing.companies.includes(loop.company)) existing.companies.push(loop.company)
+      if (closeDate && (!existing.closestCloseDate || closeDate < existing.closestCloseDate)) {
+        existing.closestCloseDate = closeDate
+      }
     } else {
-      issueRevenue.set(loop.linearIssueId, {
+      issueData.set(loop.linearIssueId, {
         id: loop.linearIssueId,
         title: loop.linearTitle,
         revenue: loop.dealValue || 0,
         dealCount: 1,
         status: loop.loopStatus,
-        company: loop.company,
+        companies: loop.company ? [loop.company] : [],
+        closestCloseDate: closeDate,
+        urgencyScore: 0,
+        cycleBonus: loop.loopStatus === 'in_cycle' ? 80 : 20,
       })
     }
   }
-  const topIssues = Array.from(issueRevenue.values())
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 3)
 
-  const hasLoopIssues = topIssues.length > 0
+  // Calculate composite priority: revenue (40%) + deals (20%) + urgency (25%) + cycle (15%)
+  const issues = Array.from(issueData.values())
+  const maxRevenue = Math.max(...issues.map(i => i.revenue), 1)
+  const maxDeals = Math.max(...issues.map(i => i.dealCount), 1)
+
+  const scored = issues.map(issue => {
+    // Urgency from close date
+    let urgency = 5
+    if (issue.closestCloseDate) {
+      const daysUntil = Math.ceil((issue.closestCloseDate.getTime() - Date.now()) / 86400000)
+      if (daysUntil <= 7) urgency = 100
+      else if (daysUntil <= 14) urgency = 80
+      else if (daysUntil <= 30) urgency = 60
+      else if (daysUntil <= 60) urgency = 40
+      else if (daysUntil <= 90) urgency = 20
+    }
+    issue.urgencyScore = urgency
+
+    const revenueNorm = (issue.revenue / maxRevenue) * 100
+    const dealsNorm = (issue.dealCount / maxDeals) * 100
+    const priority = revenueNorm * 0.40 + dealsNorm * 0.20 + urgency * 0.25 + issue.cycleBonus * 0.15
+
+    return { ...issue, priority }
+  })
+    .sort((a, b) => b.priority - a.priority)
+    .slice(0, 3)
 
   return (
     <div style={{ ...glass.card, padding: '14px 16px' }}>
       <div style={{ ...cardHeader }}>🔧 PM — ship these to unlock revenue</div>
-      {!hasLoopIssues ? (
+      {scored.length === 0 ? (
         <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>
           Rematch deals to Linear issues to see which features unlock the most revenue.
         </p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {topIssues.map((issue) => {
-            const statusColor = issue.status === 'in_cycle' ? '#3b82f6'
-              : issue.status === 'shipped' ? '#22c55e'
-              : '#f59e0b'
-            const statusLabel = issue.status === 'in_cycle' ? 'In Cycle'
-              : issue.status === 'shipped' ? 'Shipped'
-              : 'Identified'
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {scored.map((issue) => {
+            const statusColor = issue.status === 'in_cycle' ? '#3b82f6' : '#f59e0b'
+            const statusLabel = issue.status === 'in_cycle' ? 'In Cycle' : 'Identified'
+            const daysUntilClose = issue.closestCloseDate
+              ? Math.ceil((issue.closestCloseDate.getTime() - Date.now()) / 86400000)
+              : null
+            const urgentClose = daysUntilClose !== null && daysUntilClose <= 14
 
             return (
-              <div key={issue.id} style={{ padding: '6px 8px', borderRadius: '6px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+              <div key={issue.id} style={{ padding: '8px 10px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
                   <span style={{ fontFamily: 'monospace', fontSize: '10px', color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>
                     {issue.id}
                   </span>
-                  <span style={{ fontSize: '10px', fontWeight: 600, color: '#ef4444', flexShrink: 0 }}>
+                  <span style={{ flex: 1 }} />
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#ef4444', flexShrink: 0 }}>
                     {fmtCurrency(issue.revenue, currency)}
                   </span>
                 </div>
-                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.75)', marginBottom: '3px', lineHeight: '1.4' }}>
+                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.8)', marginBottom: '4px', lineHeight: '1.4', fontWeight: 500 }}>
                   {issue.title ?? issue.id}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '9px', color: 'rgba(255,255,255,0.35)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '9px', color: statusColor }}>
                     <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: statusColor }} />
                     {statusLabel}
                   </span>
-                  <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.3)' }}>
-                    · {issue.dealCount} deal{issue.dealCount !== 1 ? 's' : ''} blocked
+                  <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)' }}>
+                    {issue.dealCount} deal{issue.dealCount !== 1 ? 's' : ''} blocked
                   </span>
-                  {issue.company && (
+                  {issue.companies.length > 0 && (
                     <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.3)' }}>
-                      · {issue.company}
+                      {issue.companies.join(', ')}
+                    </span>
+                  )}
+                  {urgentClose && (
+                    <span style={{ fontSize: '9px', fontWeight: 600, color: '#ef4444' }}>
+                      closes in {daysUntilClose}d
                     </span>
                   )}
                 </div>
