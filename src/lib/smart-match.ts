@@ -283,8 +283,8 @@ export async function smartMatchDeal(
 
   console.log(`[smart-match] ${deal.prospectCompany}: ${productGaps.length} product gaps to match`)
 
-  // 3. Load all Linear issues for this workspace
-  const issues = await db
+  // 3. Load all Linear issues for this workspace (filter out garbage)
+  const allIssues = await db
     .select({
       linearIssueId: linearIssuesCache.linearIssueId,
       title: linearIssuesCache.title,
@@ -295,6 +295,18 @@ export async function smartMatchDeal(
     })
     .from(linearIssuesCache)
     .where(eq(linearIssuesCache.workspaceId, workspaceId))
+
+  // Filter out issues that look like meeting note fragments or garbage
+  const issues = allIssues.filter(issue => {
+    const t = issue.title
+    if (t.length < 8) return false   // too short to be a real issue
+    if (t.length > 200) return false  // likely a pasted paragraph, not a title
+    // Skip issues that start with common meeting note patterns
+    if (/^(page \d|what success|the poc|gospace lead|drew proposed|\[?\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))/i.test(t)) return false
+    // Skip cancelled/duplicate
+    if (issue.status === 'Canceled' || issue.status === 'Cancelled' || issue.status === 'Duplicate') return false
+    return true
+  })
 
   // 4. Load Linear integration for issue creation
   const [integration] = await db

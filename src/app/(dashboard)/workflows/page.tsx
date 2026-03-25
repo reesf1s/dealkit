@@ -139,7 +139,10 @@ function SkeletonRow() {
 // ─── Summary Strip ───────────────────────────────────────────────────────────
 
 function SummaryStrip({ loops }: { loops: LoopEntry[] }) {
-  const totalRevenue = loops.reduce((sum, l) => sum + (l.dealValue ?? 0), 0)
+  // Deduplicate revenue by deal (don't count same deal multiple times)
+  const uniqueDealRevenue = new Map<string, number>()
+  for (const l of loops) { if (!uniqueDealRevenue.has(l.dealId)) uniqueDealRevenue.set(l.dealId, l.dealValue ?? 0) }
+  const totalRevenue = Array.from(uniqueDealRevenue.values()).reduce((sum, v) => sum + v, 0)
   const awaitingPM = loops.filter(l => l.loopStatus === 'awaiting_approval').length
   const inCycle = loops.filter(l => l.loopStatus === 'in_cycle').length
   const shipped = loops.filter(l => l.loopStatus === 'shipped').length

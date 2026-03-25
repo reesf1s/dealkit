@@ -228,7 +228,8 @@ export async function extractAndLinkFeatures(
       }
 
       // 4. No match found → CREATE the issue on Linear and link it
-      if (!matched && linearApiKey && integration) {
+      // Only create if the feature title looks like a real product requirement (>20 chars, not a sentence fragment)
+      if (!matched && linearApiKey && integration && feature.title.length > 20 && !feature.title.includes('...')) {
         try {
           const halvexContext = `> **Halvex**: Extracted from ${deal.prospectCompany} deal notes.\n> Feature priority: ${feature.priority}\n\n`
           const newIssue = await createIssue(linearApiKey, integration.teamId, {
