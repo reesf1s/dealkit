@@ -4145,11 +4145,17 @@ function LinearColumn({ dealId }: { dealId: string }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {visibleLinks.map((link: any) => {
-            const isInCycle = link.status === 'in_cycle'
-            const isDeployed = link.status === 'deployed'
-            const isConfirmed = link.status === 'confirmed' || isInCycle || isDeployed
-            const statusColor = isDeployed ? '#34d399' : isInCycle ? 'rgba(255,255,255,0.70)' : isConfirmed ? 'rgba(255,255,255,0.70)' : 'rgba(255,255,255,0.35)'
-            const statusLabel = isDeployed ? 'Deployed' : isInCycle ? 'In Cycle' : isConfirmed ? 'Confirmed' : 'Suggested'
+            const STATUS_MAP: Record<string, { label: string; color: string }> = {
+              shipped: { label: 'Shipped', color: '#34d399' },
+              deployed: { label: 'Shipped', color: '#34d399' },
+              in_progress: { label: 'In Progress', color: '#3b82f6' },
+              in_review: { label: 'In Review', color: '#8b5cf6' },
+              in_cycle: { label: 'In Cycle', color: '#3b82f6' },
+              identified: { label: 'Identified', color: '#f59e0b' },
+            }
+            const st = STATUS_MAP[link.status] ?? { label: 'Identified', color: '#f59e0b' }
+            const statusColor = st.color
+            const statusLabel = st.label
             return (
               <div
                 key={link.id}
