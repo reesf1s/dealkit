@@ -52,14 +52,14 @@ export default function Sidebar() {
     return paths.some(p => pathname === p || pathname.startsWith(p + '/'))
   }
 
-  const w = collapsed ? '56px' : '216px'
+  const w = collapsed ? '52px' : '216px'
 
   // Brain age indicator
   const brainAgeInfo = brain?.updatedAt
     ? (() => {
         const mins = Math.floor((Date.now() - new Date(brain.updatedAt).getTime()) / 60000)
         const label = mins < 1 ? 'live' : mins < 60 ? `${mins}m ago` : mins < 1440 ? `${Math.floor(mins / 60)}h ago` : `${Math.floor(mins / 1440)}d ago`
-        const color = mins < 60 ? '#34d399' : mins < 1440 ? '#fbbf24' : '#f87171'
+        const color = mins < 60 ? '#10b981' : mins < 1440 ? '#f59e0b' : '#ef4444'
         return { label, color, mins }
       })()
     : null
@@ -80,47 +80,47 @@ export default function Sidebar() {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '9px',
-          padding: collapsed ? '0' : '0 10px 0 12px',
+          gap: '8px',
+          padding: collapsed ? '0' : '0 10px 0 11px',
           justifyContent: collapsed ? 'center' : 'flex-start',
-          height: '32px',
-          borderRadius: '8px',
-          marginBottom: '2px',
+          height: '30px',
+          borderRadius: '6px',
+          marginBottom: '1px',
           textDecoration: 'none',
-          fontSize: '13px',
-          fontWeight: active ? 600 : 400,
+          fontSize: '12.5px',
+          fontWeight: active ? 500 : 400,
           letterSpacing: '-0.01em',
-          color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-          background: active ? 'rgba(99,102,241,0.08)' : 'transparent',
-          borderLeft: active && !collapsed ? '2px solid var(--accent-primary)' : '2px solid transparent',
-          transition: 'all 0.15s ease',
+          color: active ? 'var(--text-primary)' : 'rgba(226,232,240,0.40)',
+          background: active ? 'rgba(255,255,255,0.06)' : 'transparent',
+          borderLeft: active && !collapsed ? '2px solid #7c6df5' : '2px solid transparent',
+          transition: 'all 0.12s ease',
           position: 'relative',
           flexShrink: 0,
-          width: collapsed ? '40px' : undefined,
-          margin: collapsed ? '0 auto 2px' : undefined,
+          width: collapsed ? '36px' : undefined,
+          margin: collapsed ? '0 auto 1px' : undefined,
         }}
         onMouseEnter={e => {
           if (!active) {
             const el = e.currentTarget as HTMLElement
-            el.style.background = 'rgba(255,255,255,0.04)'
-            el.style.color = 'var(--text-primary)'
+            el.style.background = 'rgba(255,255,255,0.03)'
+            el.style.color = 'rgba(226,232,240,0.65)'
           }
         }}
         onMouseLeave={e => {
           if (!active) {
             const el = e.currentTarget as HTMLElement
             el.style.background = 'transparent'
-            el.style.color = 'var(--text-secondary)'
+            el.style.color = 'rgba(226,232,240,0.40)'
           }
         }}
       >
         <div style={{ position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <Icon
-            size={16}
+            size={14}
             style={{
-              color: active ? 'var(--accent-primary)' : 'var(--text-tertiary)',
+              color: active ? '#7c6df5' : 'rgba(226,232,240,0.30)',
               display: 'block',
-              transition: 'color 0.15s ease',
+              transition: 'color 0.12s ease',
             }}
           />
           {badge && badge.count > 0 && (
@@ -137,9 +137,9 @@ export default function Sidebar() {
         {!collapsed && badge && badge.count > 0 && (
           <span style={{
             fontSize: '10px', fontWeight: 600,
-            color: badge.color === '#f87171' ? '#f87171' : '#fbbf24',
-            background: badge.color === '#f87171' ? 'rgba(248,113,113,0.12)' : 'rgba(251,191,36,0.12)',
-            padding: '1px 6px', borderRadius: '100px',
+            color: badge.color === '#ef4444' ? '#f87171' : '#fbbf24',
+            background: badge.color === '#ef4444' ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.10)',
+            padding: '1px 5px', borderRadius: '100px',
           }}>{badge.count}</span>
         )}
       </Link>
@@ -147,46 +147,47 @@ export default function Sidebar() {
   }
 
   function Divider() {
-    return <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', margin: '6px 0' }} />
+    return <div style={{ height: '1px', background: 'rgba(255,255,255,0.04)', margin: '5px 0' }} />
   }
 
   const SidebarContent = (
     <aside style={{
       position: 'fixed', left: 0, top: 0, bottom: 0, width: w,
-      background: 'var(--bg-base)',
-      borderRight: '1px solid var(--border-subtle)',
+      background: 'rgba(8, 6, 20, 0.72)',
+      backdropFilter: 'blur(28px)',
+      WebkitBackdropFilter: 'blur(28px)',
+      borderRight: '1px solid rgba(255,255,255,0.06)',
       display: 'flex', flexDirection: 'column', zIndex: 40,
       transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)',
       overflow: 'hidden',
-      boxShadow: 'var(--shadow-sidebar)',
     }}>
 
       {/* ── Logo row ── */}
       <div style={{
-        padding: collapsed ? '16px 0 12px' : '16px 12px 12px',
+        padding: collapsed ? '14px 0 10px' : '14px 10px 10px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: collapsed ? 'center' : 'space-between',
         flexShrink: 0,
         borderBottom: '1px solid rgba(255,255,255,0.04)',
-        marginBottom: '8px',
+        marginBottom: '6px',
       }}>
         {!collapsed && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
             <div style={{
-              width: '28px', height: '28px',
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.90) 0%, rgba(139,92,246,0.80) 100%)',
-              borderRadius: '9px',
+              width: '26px', height: '26px',
+              background: 'rgba(124,109,245,0.10)',
+              border: '1px solid rgba(124,109,245,0.25)',
+              borderRadius: '7px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0,
-              boxShadow: '0 0 16px rgba(99,102,241,0.40), 0 0 0 1px rgba(255,255,255,0.12)',
             }}>
-              <Brain size={14} color="rgba(255,255,255,0.95)" strokeWidth={2} />
+              <Brain size={13} color="#7c6df5" strokeWidth={1.8} />
             </div>
             <span style={{
-              color: '#e2e8f0',
+              color: 'rgba(226,232,240,0.90)',
               letterSpacing: '3px',
-              fontSize: '11px',
+              fontSize: '10.5px',
               fontWeight: 600,
               textTransform: 'uppercase',
             }}>HALVEX</span>
@@ -194,13 +195,13 @@ export default function Sidebar() {
         )}
         {collapsed && (
           <div style={{
-            width: '28px', height: '28px',
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.90) 0%, rgba(139,92,246,0.80) 100%)',
-            borderRadius: '9px',
+            width: '26px', height: '26px',
+            background: 'rgba(124,109,245,0.10)',
+            border: '1px solid rgba(124,109,245,0.25)',
+            borderRadius: '7px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 16px rgba(99,102,241,0.40), 0 0 0 1px rgba(255,255,255,0.12)',
           }}>
-            <Brain size={14} color="rgba(255,255,255,0.95)" strokeWidth={2} />
+            <Brain size={13} color="#7c6df5" strokeWidth={1.8} />
           </div>
         )}
 
@@ -208,48 +209,48 @@ export default function Sidebar() {
           onClick={() => { mobileOpen ? closeMobile() : toggleCollapsed() }}
           style={{
             background: 'none', border: 'none',
-            color: '#334155', cursor: 'pointer',
-            padding: '4px', borderRadius: '6px', display: 'flex',
+            color: 'rgba(226,232,240,0.20)', cursor: 'pointer',
+            padding: '4px', borderRadius: '5px', display: 'flex',
             transition: 'color 0.12s, background 0.12s',
           }}
           onMouseEnter={e => {
-            ;(e.currentTarget as HTMLElement).style.color = '#64748b'
-            ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'
+            ;(e.currentTarget as HTMLElement).style.color = 'rgba(226,232,240,0.50)'
+            ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'
           }}
           onMouseLeave={e => {
-            ;(e.currentTarget as HTMLElement).style.color = '#334155'
+            ;(e.currentTarget as HTMLElement).style.color = 'rgba(226,232,240,0.20)'
             ;(e.currentTarget as HTMLElement).style.background = 'transparent'
           }}
         >
-          {mobileOpen ? <X size={13} /> : collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
+          {mobileOpen ? <X size={12} /> : collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
         </button>
       </div>
 
       {/* ── Search ── */}
-      <div style={{ padding: collapsed ? '0 0 6px' : '0 8px 6px', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ padding: collapsed ? '0 0 5px' : '0 8px 5px', display: 'flex', justifyContent: 'center' }}>
         {!collapsed ? (
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
             style={{
-              width: '100%', height: '32px', borderRadius: '10px',
+              width: '100%', height: '28px', borderRadius: '6px',
               background: 'rgba(255,255,255,0.03)',
               border: '1px solid rgba(255,255,255,0.06)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', padding: '0 10px',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', padding: '0 9px',
               transition: 'all 0.12s ease',
             }}
             onMouseEnter={e => {
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.10)'
+              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.09)'
             }}
             onMouseLeave={e => {
               ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'
               ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'
             }}
           >
-            <Search size={11} style={{ color: '#334155', flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: '12px', color: '#334155', textAlign: 'left' }}>Search</span>
+            <Search size={11} style={{ color: 'rgba(226,232,240,0.25)', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: '11.5px', color: 'rgba(226,232,240,0.25)', textAlign: 'left' }}>Search</span>
             <span style={{
-              fontSize: '10px', color: '#1e293b',
+              fontSize: '10px', color: 'rgba(226,232,240,0.18)',
               background: 'rgba(255,255,255,0.04)', padding: '1px 5px',
               borderRadius: '4px', letterSpacing: '0.02em',
             }}>⌘P</span>
@@ -259,46 +260,46 @@ export default function Sidebar() {
             onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
             title="Search (⌘P)"
             style={{
-              width: '36px', height: '32px', borderRadius: '10px',
+              width: '32px', height: '28px', borderRadius: '6px',
               background: 'rgba(255,255,255,0.03)',
               border: '1px solid rgba(255,255,255,0.06)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 0.12s ease',
             }}
           >
-            <Search size={11} style={{ color: '#334155' }} />
+            <Search size={11} style={{ color: 'rgba(226,232,240,0.25)' }} />
           </button>
         )}
       </div>
 
       {/* ── Ask AI ── */}
-      <div style={{ padding: collapsed ? '0 0 10px' : '0 8px 10px', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ padding: collapsed ? '0 0 8px' : '0 8px 8px', display: 'flex', justifyContent: 'center' }}>
         {!collapsed ? (
           <button
             onClick={toggleCopilot}
             style={{
-              width: '100%', height: '32px', borderRadius: '10px',
-              background: 'rgba(99,102,241,0.10)',
-              border: '1px solid rgba(99,102,241,0.20)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', padding: '0 10px',
+              width: '100%', height: '28px', borderRadius: '6px',
+              background: 'rgba(124,109,245,0.07)',
+              border: '1px solid rgba(124,109,245,0.18)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', padding: '0 9px',
               transition: 'all 0.12s ease',
             }}
             onMouseEnter={e => {
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.18)'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.35)'
+              ;(e.currentTarget as HTMLElement).style.background = 'rgba(124,109,245,0.13)'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,109,245,0.30)'
             }}
             onMouseLeave={e => {
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.10)'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.20)'
+              ;(e.currentTarget as HTMLElement).style.background = 'rgba(124,109,245,0.07)'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,109,245,0.18)'
             }}
           >
-            <MessageSquare size={12} style={{ color: '#818cf8', flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: '12px', fontWeight: 500, color: '#818cf8', textAlign: 'left', letterSpacing: '-0.01em' }}>
+            <MessageSquare size={11} style={{ color: '#7c6df5', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: '11.5px', fontWeight: 500, color: '#7c6df5', textAlign: 'left', letterSpacing: '-0.01em' }}>
               Ask AI
             </span>
             <span style={{
-              fontSize: '10px', color: 'rgba(129,140,248,0.45)',
-              background: 'rgba(99,102,241,0.10)', padding: '1px 5px',
+              fontSize: '10px', color: 'rgba(124,109,245,0.40)',
+              background: 'rgba(124,109,245,0.07)', padding: '1px 5px',
               borderRadius: '4px',
             }}>⌘K</span>
           </button>
@@ -307,14 +308,14 @@ export default function Sidebar() {
             onClick={toggleCopilot}
             title="Ask AI (⌘K)"
             style={{
-              width: '36px', height: '32px', borderRadius: '10px',
-              background: 'rgba(99,102,241,0.10)',
-              border: '1px solid rgba(99,102,241,0.20)',
+              width: '32px', height: '28px', borderRadius: '6px',
+              background: 'rgba(124,109,245,0.07)',
+              border: '1px solid rgba(124,109,245,0.18)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 0.12s ease',
             }}
           >
-            <MessageSquare size={12} style={{ color: '#818cf8' }} />
+            <MessageSquare size={11} style={{ color: '#7c6df5' }} />
           </button>
         )}
       </div>
@@ -327,9 +328,9 @@ export default function Sidebar() {
             {...item}
             badge={
               item.href === '/deals' && urgentCount > 0
-                ? { count: urgentCount, color: '#f87171' }
+                ? { count: urgentCount, color: '#ef4444' }
                 : item.href === '/settings' && unmatchedEmailCount > 0
-                ? { count: unmatchedEmailCount, color: '#fbbf24' }
+                ? { count: unmatchedEmailCount, color: '#f59e0b' }
                 : undefined
             }
           />
@@ -347,21 +348,20 @@ export default function Sidebar() {
         {!collapsed && brainAgeInfo && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: '7px',
-            padding: '6px 10px', marginBottom: '6px', borderRadius: '10px',
+            padding: '5px 9px', marginBottom: '6px', borderRadius: '6px',
             background: 'rgba(255,255,255,0.02)',
-            border: '1px solid rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.04)',
           }}>
             <div style={{
-              width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0,
+              width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0,
               background: brainAgeInfo.color,
-              boxShadow: `0 0 6px ${brainAgeInfo.color}`,
               animation: brainAgeInfo.mins < 2 ? 'pulse-dot 2s ease-in-out infinite' : 'none',
             }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '11px', fontWeight: 500, color: '#475569' }}>
+              <div style={{ fontSize: '11px', fontWeight: 500, color: 'rgba(226,232,240,0.45)' }}>
                 {urgentCount > 0 ? `${urgentCount} deals flagged` : 'Intelligence ready'}
               </div>
-              <div style={{ fontSize: '10px', color: '#334155', marginTop: '1px' }}>
+              <div style={{ fontSize: '10px', color: 'rgba(226,232,240,0.22)', marginTop: '1px' }}>
                 Updated {brainAgeInfo.label}
               </div>
             </div>
@@ -374,50 +374,50 @@ export default function Sidebar() {
             onClick={() => signOut({ redirectUrl: '/' })}
             title="Sign out"
             style={{
-              width: '36px', height: '32px', borderRadius: '10px',
+              width: '32px', height: '28px', borderRadius: '6px',
               background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.05)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: '#334155', margin: '0 auto',
+              cursor: 'pointer', color: 'rgba(226,232,240,0.25)', margin: '0 auto',
               transition: 'all 0.12s',
             }}
             onMouseEnter={e => {
-              ;(e.currentTarget as HTMLElement).style.color = '#64748b'
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
+              ;(e.currentTarget as HTMLElement).style.color = 'rgba(226,232,240,0.50)'
+              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'
             }}
             onMouseLeave={e => {
-              ;(e.currentTarget as HTMLElement).style.color = '#334155'
+              ;(e.currentTarget as HTMLElement).style.color = 'rgba(226,232,240,0.25)'
               ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'
             }}
           >
-            <LogOut size={12} />
+            <LogOut size={11} />
           </button>
         ) : (
           <div style={{
             display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '7px 10px', borderRadius: '10px',
+            padding: '6px 9px', borderRadius: '6px',
             background: 'rgba(255,255,255,0.02)',
-            border: '1px solid rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.04)',
           }}>
             <div style={{
-              width: '24px', height: '24px', borderRadius: '50%',
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.80), rgba(139,92,246,0.70))',
+              width: '22px', height: '22px', borderRadius: '50%',
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.10)',
               flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.90)',
-              boxShadow: '0 0 0 1px rgba(255,255,255,0.10)',
+              fontSize: '10px', fontWeight: 600, color: 'rgba(226,232,240,0.70)',
             }}>
               {user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0]?.toUpperCase() ?? '?'}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
-                fontSize: '12px', fontWeight: 500, letterSpacing: '-0.01em',
-                color: '#94a3b8',
+                fontSize: '11.5px', fontWeight: 500, letterSpacing: '-0.01em',
+                color: 'rgba(226,232,240,0.65)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
                 {user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Account'}
               </div>
               <div style={{
-                fontSize: '10px', color: '#334155',
+                fontSize: '10px', color: 'rgba(226,232,240,0.28)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px',
               }}>
                 {user?.emailAddresses?.[0]?.emailAddress ?? ''}
@@ -427,12 +427,12 @@ export default function Sidebar() {
               onClick={() => signOut({ redirectUrl: '/' })}
               style={{
                 background: 'none', border: 'none', padding: '3px',
-                color: '#334155', borderRadius: '4px',
+                color: 'rgba(226,232,240,0.22)', borderRadius: '4px',
                 display: 'flex', alignItems: 'center', cursor: 'pointer',
                 transition: 'color 0.12s',
               }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#64748b'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#334155'}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'rgba(226,232,240,0.50)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'rgba(226,232,240,0.22)'}
               title="Sign out"
             >
               <LogOut size={11} />
@@ -458,7 +458,7 @@ export default function Sidebar() {
       {/* Mobile backdrop */}
       {mobileOpen && (
         <div
-          style={{ position: 'fixed', inset: 0, zIndex: 39, background: 'rgba(0,0,0,0.70)', backdropFilter: 'blur(4px)' }}
+          style={{ position: 'fixed', inset: 0, zIndex: 39, background: 'rgba(0,0,0,0.75)' }}
           onClick={closeMobile}
         />
       )}
@@ -480,7 +480,7 @@ export default function Sidebar() {
       <nav className="mobile-bottom-nav" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
         height: '56px',
-        background: '#080a10',
+        background: '#07090e',
         borderTop: '1px solid rgba(255,255,255,0.06)',
         display: 'none',
         alignItems: 'center', justifyContent: 'space-around',
@@ -494,14 +494,14 @@ export default function Sidebar() {
               href={tab.href}
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: '3px', textDecoration: 'none', padding: '6px 12px', borderRadius: '8px',
+                gap: '3px', textDecoration: 'none', padding: '6px 12px', borderRadius: '7px',
                 minWidth: '48px', minHeight: '44px',
               }}
             >
-              <tab.icon size={20} style={{ color: active ? '#818cf8' : '#475569' }} />
+              <tab.icon size={20} style={{ color: active ? '#7c6df5' : 'rgba(226,232,240,0.30)' }} />
               <span style={{
-                fontSize: '10px', fontWeight: active ? 600 : 400,
-                color: active ? '#818cf8' : '#475569',
+                fontSize: '10px', fontWeight: active ? 500 : 400,
+                color: active ? '#7c6df5' : 'rgba(226,232,240,0.30)',
                 lineHeight: 1,
               }}>{tab.label}</span>
             </Link>
@@ -512,12 +512,12 @@ export default function Sidebar() {
           style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             gap: '3px', background: 'none', border: 'none', cursor: 'pointer',
-            padding: '6px 12px', borderRadius: '8px',
+            padding: '6px 12px', borderRadius: '7px',
             minWidth: '48px', minHeight: '44px',
           }}
         >
-          <MessageSquare size={20} style={{ color: '#818cf8' }} />
-          <span style={{ fontSize: '10px', fontWeight: 400, color: '#818cf8', lineHeight: 1 }}>Ask AI</span>
+          <MessageSquare size={20} style={{ color: '#7c6df5' }} />
+          <span style={{ fontSize: '10px', fontWeight: 400, color: '#7c6df5', lineHeight: 1 }}>Ask AI</span>
         </button>
       </nav>
 
