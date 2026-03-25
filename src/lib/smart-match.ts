@@ -18,8 +18,23 @@ import { eq, and, sql } from 'drizzle-orm'
 import { dealLogs, dealLinearLinks, linearIssuesCache, linearIntegrations } from '@/lib/db/schema'
 import { createIssue } from '@/lib/linear-client'
 import { decrypt, getEncryptionKey } from '@/lib/encrypt'
+import { generateEmbedding } from '@/lib/openai-embeddings'
 
 const MAX_LINKS_PER_DEAL = 5
+
+// ─── Cosine similarity for vector matching ──────────────────────────────────
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length || a.length === 0) return 0
+  let dot = 0, magA = 0, magB = 0
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i]
+    magA += a[i] * a[i]
+    magB += b[i] * b[i]
+  }
+  const denom = Math.sqrt(magA) * Math.sqrt(magB)
+  return denom === 0 ? 0 : dot / denom
+}
 
 /**
  * Map a Linear issue status to our loop status.
@@ -521,47 +536,102 @@ ${allText.slice(0, 4000)}`,
     try { linearApiKey = decrypt(integration.apiKeyEnc, getEncryptionKey()) } catch { /* non-fatal */ }
   }
 
-  // 5. Match each gap to Linear issues
+  // 5. Load issue embeddings for vector matching
+  type IssueWithEmbed = typeof issues[0] & { embedding: number[] | null }
+  const issueEmbeddings: IssueWithEmbed[] = []
+  try {
+    const embRows = await db.execute<{ linear_issue_id: string; embedding: string | null }>(
+      sql`SELECT linear_issue_id, embedding FROM linear_issues_cache WHERE workspace_id = ${workspaceId} AND embedding IS NOT NULL`
+    )
+    const embedMap = new Map<string, number[]>()
+    for (const row of embRows) {
+      if (row.embedding) {
+        try {
+          embedMap.set(row.linear_issue_id, JSON.parse(row.embedding))
+        } catch { /* skip malformed */ }
+      }
+    }
+    for (const issue of issues) {
+      issueEmbeddings.push({ ...issue, embedding: embedMap.get(issue.linearIssueId) ?? null })
+    }
+  } catch (e) {
+    console.warn('[smart-match] Failed to load embeddings, falling back to keyword-only:', e)
+    for (const issue of issues) {
+      issueEmbeddings.push({ ...issue, embedding: null })
+    }
+  }
+
+  const hasAnyEmbeddings = issueEmbeddings.some(i => i.embedding !== null)
+  console.log(`[smart-match] ${deal.prospectCompany}: ${hasAnyEmbeddings ? issueEmbeddings.filter(i => i.embedding).length + ' issues with embeddings' : 'no embeddings, keyword-only'}`)
+
+  // 6. Match each gap to Linear issues using vector + keyword hybrid
   let linked = 0
   let created = 0
 
   for (const gap of productGaps.slice(0, MAX_LINKS_PER_DEAL)) {
     const gapText = gap.gap
 
-    // Strategy A: Direct title substring match
+    // Strategy A: Direct title substring match (instant, no API)
     const titleLower = gapText.toLowerCase()
-    // Find issues where the gap text appears in the title or vice versa
-    let bestMatch: typeof issues[0] | null = null
+    let bestMatch: typeof issueEmbeddings[0] | null = null
     let bestScore = 0
+    let matchMethod = ''
 
-    // Track top 3 scores for debugging
-    const topScores: { id: string; title: string; score: number }[] = []
-
-    for (const issue of issues) {
-      // Direct substring: "Appspace integration" in "Appspace integration setup"
+    for (const issue of issueEmbeddings) {
       const issueTitleLower = issue.title.toLowerCase()
       if (issueTitleLower.includes(titleLower) || titleLower.includes(issueTitleLower)) {
         bestMatch = issue
         bestScore = 95
+        matchMethod = 'substring'
         break
-      }
-
-      // Multi-signal scoring (keyword + synonym + bigram + fuzzy)
-      const score = scoreMatch(gapText, issue.title, issue.description)
-      // Track top scores
-      topScores.push({ id: issue.linearIssueId, title: issue.title.slice(0, 40), score })
-      if (score > bestScore && score >= 25) {
-        bestScore = score
-        bestMatch = issue
       }
     }
 
-    // Log top 3 for diagnostics
-    topScores.sort((a, b) => b.score - a.score)
-    const top3 = topScores.slice(0, 3).map(s => `${s.id}(${s.score})`).join(', ')
-    console.log(`[smart-match] ${deal.prospectCompany} gap "${gapText.slice(0, 50)}" → best=${bestScore}, top3=[${top3}]`)
+    // Strategy B: Hybrid vector + keyword scoring
+    if (!bestMatch || bestScore < 95) {
+      // Embed the gap text (1 API call, ~$0.00001)
+      let gapEmbedding: number[] | null = null
+      if (hasAnyEmbeddings) {
+        try {
+          gapEmbedding = await generateEmbedding(gapText)
+        } catch (e) {
+          console.warn(`[smart-match] Failed to embed gap "${gapText.slice(0, 40)}":`, e)
+        }
+      }
 
-    if (bestMatch && bestScore >= 25) {
+      const topScores: { id: string; title: string; score: number; vecScore: number; nlpScore: number }[] = []
+
+      for (const issue of issueEmbeddings) {
+        // Vector similarity (primary signal: 60%)
+        let vecScore = 0
+        if (gapEmbedding && issue.embedding) {
+          const sim = cosineSimilarity(gapEmbedding, issue.embedding)
+          vecScore = Math.max(0, sim * 100) // 0-100 scale
+        }
+
+        // Native NLP score (secondary signal: 40%)
+        const nlpScore = scoreMatch(gapText, issue.title, issue.description)
+
+        // Hybrid: 60% vector, 40% NLP (or 100% NLP if no vectors)
+        const combined = gapEmbedding && issue.embedding
+          ? vecScore * 0.6 + nlpScore * 0.4
+          : nlpScore
+
+        topScores.push({ id: issue.linearIssueId, title: issue.title.slice(0, 40), score: combined, vecScore, nlpScore })
+        if (combined > bestScore && combined >= 20) {
+          bestScore = combined
+          bestMatch = issue
+          matchMethod = gapEmbedding ? 'hybrid' : 'nlp'
+        }
+      }
+
+      // Log top 3
+      topScores.sort((a, b) => b.score - a.score)
+      const top3 = topScores.slice(0, 3).map(s => `${s.id}(v${Math.round(s.vecScore)}+n${Math.round(s.nlpScore)}=${Math.round(s.score)})`).join(', ')
+      console.log(`[smart-match] ${deal.prospectCompany} gap "${gapText.slice(0, 50)}" → best=${Math.round(bestScore)} [${matchMethod}], top3=[${top3}]`)
+    }
+
+    if (bestMatch && bestScore >= 20) {
       // Link it — check for existing first
       const [existing] = await db
         .select({ id: dealLinearLinks.id })

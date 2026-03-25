@@ -113,7 +113,7 @@ const FILTER_TABS: { id: FilterTab; label: string }[] = [
   { id: 'shipped', label: 'Shipped' },
 ]
 
-const FLOW_STEPS = ['Suggested', 'Confirmed', 'In Cycle', 'Shipped']
+const FLOW_STEPS = ['Identified', 'In Progress', 'In Review', 'Shipped']
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -195,7 +195,12 @@ function SummaryStrip({ loops }: { loops: LoopEntry[] }) {
 
 function RevenueBlockedBanner({ loops }: { loops: LoopEntry[] }) {
   const nonShipped = loops.filter(l => l.loopStatus !== 'shipped')
-  const blockedRevenue = nonShipped.reduce((sum, l) => sum + (l.dealValue ?? 0), 0)
+  // Deduplicate revenue by deal — don't count same deal multiple times
+  const uniqueDeals = new Map<string, number>()
+  for (const l of nonShipped) {
+    if (!uniqueDeals.has(l.dealId)) uniqueDeals.set(l.dealId, l.dealValue ?? 0)
+  }
+  const blockedRevenue = Array.from(uniqueDeals.values()).reduce((sum, v) => sum + v, 0)
   const issueCount = nonShipped.length
 
   if (blockedRevenue === 0) return null
