@@ -608,7 +608,6 @@ export const linearIssuesCache = pgTable('linear_issues_cache', {
   description:    text('description'),
   status:         text('status'),                            // e.g. "Todo", "In Progress"
   cycleId:        text('cycle_id'),
-  cycleNumber:    integer('cycle_number'),
   assigneeId:     text('assignee_id'),
   assigneeName:   text('assignee_name'),
   priority:       integer('priority').notNull().default(0), // 0=no priority,1=urgent,2=high,3=medium,4=low
