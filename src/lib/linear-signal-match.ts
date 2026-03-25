@@ -30,7 +30,7 @@ const AUTO_CONFIRM_THRESHOLD = 80
  * lower than dense neural embeddings — 0.15 is a genuine keyword overlap at this scale.
  * This ensures successCriteria keyword matches (e.g. Atlassian) are not filtered out.
  */
-const SUGGEST_THRESHOLD = 15
+const SUGGEST_THRESHOLD = 5
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Deduplication helper
@@ -100,16 +100,23 @@ export function extractDealSignalText(deal: {
   lostReason: string | null
   description: string | null
   successCriteria?: string | null
+  dealName?: string | null
+  prospectCompany?: string | null
 }): string {
   const risks = Array.isArray(deal.dealRisks)
-    ? (deal.dealRisks as string[]).join(' ')
+    ? (deal.dealRisks as Array<string | { risk: string }>).map(r =>
+        typeof r === 'string' ? r : r?.risk ?? ''
+      ).join(' ')
     : ''
 
   return [
+    deal.dealName ?? '',
+    deal.prospectCompany ?? '',
     risks,
     deal.successCriteria ?? '',
     deal.notes ?? '',
-    deal.meetingNotes ?? '',
+    // Limit meeting notes to first 2000 chars — full transcripts add noise
+    (deal.meetingNotes ?? '').slice(0, 2000),
     deal.lostReason ?? '',
     deal.description ?? '',
   ]
@@ -158,7 +165,12 @@ export async function matchDealToIssues(
   if (!deal) return { linked: 0, suggested: 0 }
 
   const signalText = extractDealSignalText(deal)
-  if (!signalText) return { linked: 0, suggested: 0 }
+  if (!signalText) {
+    console.log(`[match] ${deal.prospectCompany}: no signal text — skipping`)
+    return { linked: 0, suggested: 0 }
+  }
+
+  console.log(`[match] ${deal.prospectCompany}: signal text ${signalText.length} chars, finding matches...`)
 
   // Find similar issues — TF-IDF in bulk mode, pgvector for single-deal
   const similar = await findMatchingIssues(dealId, workspaceId, deal, {
@@ -166,6 +178,8 @@ export async function matchDealToIssues(
     skipPgvector: opts.skipPgvector,
     minSimilarity: SUGGEST_THRESHOLD / 100,
   })
+
+  console.log(`[match] ${deal.prospectCompany}: found ${similar.length} matches (threshold ${SUGGEST_THRESHOLD / 100})`)
 
   if (similar.length === 0) return { linked: 0, suggested: 0 }
 
