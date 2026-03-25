@@ -476,6 +476,42 @@ function CoreLoopTable({
                             {loop.linearTitle}
                           </span>
                         )}
+                        {/* Cycle + Linear status badges */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '3px' }}>
+                          {loop.isInCurrentCycle && loop.cycleName && (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '3px',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: 'rgba(139,92,246,0.15)',
+                              border: '1px solid rgba(139,92,246,0.3)',
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              color: '#a78bfa',
+                              whiteSpace: 'nowrap',
+                            }}>
+                              ◎ {loop.cycleName}
+                            </span>
+                          )}
+                          {loop.linearStatus && (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: 'rgba(255,255,255,0.06)',
+                              border: '1px solid rgba(255,255,255,0.1)',
+                              fontSize: '10px',
+                              fontWeight: 500,
+                              color: 'rgba(255,255,255,0.45)',
+                              whiteSpace: 'nowrap',
+                            }}>
+                              {loop.linearStatus}
+                            </span>
+                          )}
+                        </div>
                         {loop.linearIssueUrl && (
                           <a
                             href={loop.linearIssueUrl}

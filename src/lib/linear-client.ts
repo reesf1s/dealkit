@@ -31,7 +31,7 @@ export interface LinearIssue {
     name: string     // e.g. "Todo", "In Progress", "Done"
     type: string     // e.g. "started", "unstarted", "completed"
   }
-  cycle: { id: string; number: number } | null
+  cycle: { id: string; number: number; name: string; startsAt: string | null; endsAt: string | null } | null
   assignee: { id: string; name: string } | null
   updatedAt: string
 }
@@ -166,7 +166,7 @@ export async function fetchTeamIssues(
           url
           priority
           state { id name type }
-          cycle { id number }
+          cycle { id number name startsAt endsAt }
           assignee { id name }
           updatedAt
         }
@@ -201,7 +201,7 @@ export async function getIssue(
         issue(id: $id) {
           id identifier title description url priority
           state { id name type }
-          cycle { id number }
+          cycle { id number name startsAt endsAt }
           assignee { id name }
           updatedAt
         }
@@ -281,7 +281,7 @@ export async function createIssue(
         issue {
           id identifier title description url priority
           state { id name type }
-          cycle { id number }
+          cycle { id number name startsAt endsAt }
           assignee { id name }
           updatedAt
         }

@@ -608,6 +608,10 @@ export const linearIssuesCache = pgTable('linear_issues_cache', {
   description:    text('description'),
   status:         text('status'),                            // e.g. "Todo", "In Progress"
   cycleId:        text('cycle_id'),
+  cycleName:      text('cycle_name'),                        // e.g. "Sprint 12"
+  cycleNumber:    integer('cycle_number'),                   // numeric cycle index
+  cycleStartsAt:  timestamp('cycle_starts_at', { withTimezone: true }),
+  cycleEndsAt:    timestamp('cycle_ends_at', { withTimezone: true }),
   assigneeId:     text('assignee_id'),
   assigneeName:   text('assignee_name'),
   priority:       integer('priority').notNull().default(0), // 0=no priority,1=urgent,2=high,3=medium,4=low

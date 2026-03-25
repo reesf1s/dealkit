@@ -412,7 +412,7 @@ export async function writeHalvexSectionToLinear(
     return
   }
 
-  // Get all confirmed links for this issue
+  // Get all active links for this issue (confirmed + in_cycle + deployed + shipped)
   const confirmedLinks = await db
     .select({ dealId: dealLinearLinks.dealId })
     .from(dealLinearLinks)
@@ -420,7 +420,7 @@ export async function writeHalvexSectionToLinear(
       and(
         eq(dealLinearLinks.workspaceId, workspaceId),
         eq(dealLinearLinks.linearIssueId, linearIssueId),
-        eq(dealLinearLinks.status, 'confirmed'),
+        inArray(dealLinearLinks.status, ['confirmed', 'in_cycle', 'deployed', 'shipped']),
       ),
     )
 
