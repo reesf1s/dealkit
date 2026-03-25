@@ -126,7 +126,7 @@ function LoopStateBanner({ dealId }: { dealId: string }) {
 
   if (loop.state === 'none') {
     return (
-      <div style={{ ...baseStyle, border: '1px dashed rgba(99,102,241,0.35)', background: 'rgba(99,102,241,0.04)' }}>
+      <div style={{ ...baseStyle, border: '1px dashed rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.03)' }}>
         <span style={{ color: 'var(--text-tertiary)' }}>No loop active for this deal</span>
         <button
           onClick={handleStartLoop}
@@ -134,7 +134,7 @@ function LoopStateBanner({ dealId }: { dealId: string }) {
           style={{
             display: 'flex', alignItems: 'center', gap: '5px',
             padding: '6px 14px', borderRadius: '7px',
-            background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)',
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
             color: 'var(--accent-primary)', fontSize: '12px', fontWeight: 600,
             cursor: starting ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
             opacity: starting ? 0.6 : 1,
@@ -444,7 +444,7 @@ function AssigneePicker({
 }
 
 const STAGE_COLORS: Record<string, string> = {
-  prospecting: 'var(--text-tertiary)', qualification: '#3B82F6', discovery: '#8B5CF6',
+  prospecting: 'var(--text-tertiary)', qualification: '#3B82F6', discovery: 'rgba(255,255,255,0.70)',
   proposal: 'var(--warning)', negotiation: 'var(--danger)', closed_won: 'var(--success)', closed_lost: 'var(--text-tertiary)',
 }
 
@@ -786,9 +786,9 @@ function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: s
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
                 padding: '8px 16px', borderRadius: '8px',
-                background: updateText.trim() && !analysing ? 'linear-gradient(135deg, #6366F1, #7C3AED)' : 'var(--surface)',
+                background: updateText.trim() && !analysing ? 'rgba(255,255,255,0.90)' : 'var(--surface)',
                 border: updateText.trim() && !analysing ? 'none' : '1px solid var(--border)',
-                color: updateText.trim() && !analysing ? '#fff' : 'var(--text-tertiary)',
+                color: updateText.trim() && !analysing ? '#0a0b0f' : 'var(--text-tertiary)',
                 fontSize: '13px', fontWeight: '600', cursor: updateText.trim() && !analysing ? 'pointer' : 'not-allowed',
                 transition: 'all 0.15s',
               }}
@@ -1252,7 +1252,7 @@ function MeetingPrepTab({ dealId, deal, objectionWinMap = [], objectionCondition
         <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
           {playbook.map((tip, i) => (
             <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-              <div style={{ width: '18px', height: '18px', borderRadius: '5px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '10px', fontWeight: 700, color: 'var(--accent)', marginTop: '1px' }}>
+              <div style={{ width: '18px', height: '18px', borderRadius: '5px', background: 'var(--accent-subtle)', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '10px', fontWeight: 700, color: 'var(--accent)', marginTop: '1px' }}>
                 {i + 1}
               </div>
               <span style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{tip}</span>
@@ -1350,7 +1350,7 @@ function MeetingPrepTab({ dealId, deal, objectionWinMap = [], objectionCondition
         if (relevant.length === 0) return null
         return (
           <div style={cardStyle}>
-            {sectionTitle('Champion Effect on Your Objections', '#A78BFA')}
+            {sectionTitle('Champion Effect on Your Objections', 'rgba(255,255,255,0.60)')}
             <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '10px', lineHeight: 1.5 }}>
               In {currentStage.replace('_', ' ')} stage, having a champion changes the odds for each objection type.
             </div>
@@ -1358,10 +1358,10 @@ function MeetingPrepTab({ dealId, deal, objectionWinMap = [], objectionCondition
               {relevant.map((entry: any, i: number) => {
                 const sb = entry.stageStat
                 const lift = sb.championLift as number | null
-                const liftColor = lift != null && lift >= 10 ? 'var(--success)' : lift != null && lift >= 0 ? '#A78BFA' : 'var(--danger)'
+                const liftColor = lift != null && lift >= 10 ? 'var(--success)' : lift != null && lift >= 0 ? 'rgba(255,255,255,0.60)' : 'var(--danger)'
                 const liftLabel = lift != null ? (lift >= 0 ? `+${lift}pts with champion` : `${lift}pts without champion`) : null
                 return (
-                  <div key={i} style={{ padding: '9px 12px', background: 'rgba(167,139,250,0.04)', border: '1px solid rgba(167,139,250,0.12)', borderRadius: '8px' }}>
+                  <div key={i} style={{ padding: '9px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
                       <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 600, textTransform: 'capitalize' }}>{entry.theme}</span>
                       {liftLabel && (
@@ -1434,10 +1434,10 @@ function MeetingPrepTab({ dealId, deal, objectionWinMap = [], objectionCondition
         <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '4px' }}>
           <button onClick={generateFullBrief} disabled={loading} style={{
             display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 24px',
-            background: loading ? 'var(--accent-subtle)' : 'linear-gradient(135deg, #6366F1, #7C3AED)',
+            background: loading ? 'var(--accent-subtle)' : 'rgba(255,255,255,0.90)',
             boxShadow: loading ? 'none' : 'var(--shadow)',
             border: loading ? '1px solid var(--accent)' : 'none',
-            borderRadius: '9px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer',
+            borderRadius: '9px', color: loading ? 'var(--text-secondary)' : '#0a0b0f', fontSize: '13px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer',
           }}>
             {loading
               ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Generating full brief…</>
@@ -2014,7 +2014,7 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
               </Dialog.Close>
               <button onClick={save} disabled={saving} style={{
                 height: '34px', padding: '0 18px', borderRadius: '7px', fontSize: '13px', fontWeight: 600,
-                color: '#fff', background: saving ? 'var(--surface)' : 'linear-gradient(135deg, #6366F1, #7C3AED)',
+                color: saving ? 'var(--text-secondary)' : '#0a0b0f', background: saving ? 'var(--surface)' : 'rgba(255,255,255,0.90)',
                 border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
               }}>
                 {saving ? 'Saving…' : 'Save changes'}
@@ -2377,7 +2377,7 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate, members }: { dealId: strin
             </span>
           </div>
           <div style={{ height: '6px', background: 'var(--surface-hover)', borderRadius: '3px', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${criteria.length ? (achieved / criteria.length) * 100 : 0}%`, background: 'linear-gradient(90deg, #6366F1, #22C55E)', borderRadius: '3px', transition: 'width 0.1s ease' }} />
+            <div style={{ height: '100%', width: `${criteria.length ? (achieved / criteria.length) * 100 : 0}%`, background: 'linear-gradient(90deg, rgba(255,255,255,0.80), #22C55E)', borderRadius: '3px', transition: 'width 0.1s ease' }} />
           </div>
         </div>
       )}
@@ -2449,7 +2449,7 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate, members }: { dealId: strin
                       onChange={e => setNoteText(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') saveNote(c.id); if (e.key === 'Escape') setEditingNote(null) }}
                       placeholder="How was this achieved?"
-                      style={{ flex: 1, background: 'var(--surface)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: '6px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '12px', outline: 'none' }}
+                      style={{ flex: 1, background: 'var(--surface)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '12px', outline: 'none' }}
                     />
                     <button onClick={() => saveNote(c.id)} style={{ padding: '5px 10px', background: 'var(--accent-subtle)', border: 'none', borderRadius: '6px', color: 'var(--accent)', fontSize: '11px', cursor: 'pointer' }}>Save</button>
                     <button onClick={() => setEditingNote(null)} style={{ padding: '5px 8px', background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
@@ -2477,7 +2477,7 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate, members }: { dealId: strin
           <button
             onClick={extract}
             disabled={loading || !text.trim()}
-            style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', background: loading ? 'var(--accent-subtle)' : 'linear-gradient(135deg, #6366F1, #7C3AED)', border: loading ? '1px solid var(--accent)' : 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: loading || !text.trim() ? 'not-allowed' : 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', background: loading ? 'var(--accent-subtle)' : 'rgba(255,255,255,0.90)', border: loading ? '1px solid var(--accent)' : 'none', borderRadius: '8px', color: loading ? 'var(--text-secondary)' : '#0a0b0f', fontSize: '13px', fontWeight: '600', cursor: loading || !text.trim() ? 'not-allowed' : 'pointer' }}
           >
             {loading ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Extracting…</> : <><Sparkles size={13} /> Extract Criteria</>}
           </button>
@@ -2592,7 +2592,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate, members }: { dealId: string; d
             </div>
           </div>
           <div style={{ height: '6px', background: 'var(--surface-hover)', borderRadius: '3px', overflow: 'hidden', display: 'flex' }}>
-            <div style={{ height: '100%', width: `${totalTasks ? (completeTasks / totalTasks) * 100 : 0}%`, background: 'linear-gradient(90deg, #6366F1, #22C55E)', borderRadius: '3px 0 0 3px', transition: 'width 0.1s ease' }} />
+            <div style={{ height: '100%', width: `${totalTasks ? (completeTasks / totalTasks) * 100 : 0}%`, background: 'linear-gradient(90deg, rgba(255,255,255,0.80), #22C55E)', borderRadius: '3px 0 0 3px', transition: 'width 0.1s ease' }} />
             <div style={{ height: '100%', width: `${totalTasks ? (inProgressTasks / totalTasks) * 100 : 0}%`, background: 'var(--accent)', transition: 'width 0.1s ease' }} />
           </div>
         </div>
@@ -2697,7 +2697,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate, members }: { dealId: string; d
                   }}
                 />
                 <button type="submit" disabled={!(newTaskText[phase.id]?.trim())} style={{
-                  padding: '0 10px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.2)',
+                  padding: '0 10px', background: 'var(--accent-subtle)', border: '1px solid rgba(255,255,255,0.08)',
                   borderRadius: '6px', color: 'var(--accent)', cursor: 'pointer', display: 'flex', alignItems: 'center',
                 }}>
                   <Plus size={12} />
@@ -2728,7 +2728,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate, members }: { dealId: string; d
           <button
             onClick={extract}
             disabled={loading || !text.trim()}
-            style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', background: loading ? 'var(--accent-subtle)' : 'linear-gradient(135deg, #6366F1, #7C3AED)', border: loading ? '1px solid var(--accent)' : 'none', borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600', cursor: loading || !text.trim() ? 'not-allowed' : 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', background: loading ? 'var(--accent-subtle)' : 'rgba(255,255,255,0.90)', border: loading ? '1px solid var(--accent)' : 'none', borderRadius: '8px', color: loading ? 'var(--text-secondary)' : '#0a0b0f', fontSize: '13px', fontWeight: '600', cursor: loading || !text.trim() ? 'not-allowed' : 'pointer' }}
           >
             {loading ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Parsing…</> : <><Sparkles size={13} /> Create Plan</>}
           </button>
@@ -3128,10 +3128,10 @@ function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
   }
 
   const typeBadgeColors: Record<string, { bg: string; text: string }> = {
-    proposal: { bg: 'rgba(99,102,241,0.1)', text: 'var(--accent)' },
+    proposal: { bg: 'rgba(255,255,255,0.06)', text: 'var(--accent)' },
     case_study: { bg: 'rgba(34,197,94,0.1)', text: 'var(--success)' },
     one_pager: { bg: 'rgba(245,158,11,0.1)', text: 'var(--warning)' },
-    email_sequence: { bg: 'rgba(167,139,250,0.1)', text: '#7C3AED' },
+    email_sequence: { bg: 'rgba(255,255,255,0.06)', text: 'rgba(255,255,255,0.80)' },
     battle_card: { bg: 'rgba(239,68,68,0.1)', text: 'var(--danger)' },
     roi_calculator: { bg: 'rgba(16,185,129,0.1)', text: '#059669' },
     custom: { bg: 'var(--surface-hover)', text: 'var(--text-secondary)' },
@@ -3158,8 +3158,8 @@ function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
           href={`/collateral?dealId=${dealId}`}
           style={{
             display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-            background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
-            borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: '600',
+            background: 'rgba(255,255,255,0.90)',
+            borderRadius: '8px', color: '#0a0b0f', fontSize: '13px', fontWeight: '600',
             textDecoration: 'none',
           }}
         >
@@ -3186,8 +3186,8 @@ function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
             href={`/collateral?dealId=${dealId}`}
             style={{
               display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px',
-              background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
-              borderRadius: '9px', color: '#fff', fontSize: '13px', fontWeight: '600',
+              background: 'rgba(255,255,255,0.90)',
+              borderRadius: '9px', color: '#0a0b0f', fontSize: '13px', fontWeight: '600',
               textDecoration: 'none', boxShadow: 'var(--shadow)',
             }}
           >
@@ -3239,7 +3239,7 @@ function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
                     href={`/collateral/${c.id}`}
                     style={{
                       flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                      padding: '7px 12px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.2)',
+                      padding: '7px 12px', background: 'var(--accent-subtle)', border: '1px solid rgba(255,255,255,0.08)',
                       borderRadius: '7px', color: 'var(--accent)', fontSize: '12px', fontWeight: 600,
                       textDecoration: 'none',
                     }}
@@ -3479,7 +3479,7 @@ function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPredic
 
       {/* Archetype */}
       {archetype && (
-        <div style={{ padding: '10px 12px', background: 'var(--accent-subtle)', border: '1px solid rgba(79,70,229,0.15)', borderRadius: '8px' }}>
+        <div style={{ padding: '10px 12px', background: 'var(--accent-subtle)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px' }}>
           <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>Deal Archetype</div>
           <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{archetype.label}</div>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{archetype.winRate}% win rate for this type · {String(archetype.winningCharacteristic)}</div>
@@ -3961,9 +3961,9 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
                 padding: '8px 16px', borderRadius: '8px',
-                background: updateText.trim() && !analysing ? 'linear-gradient(135deg, #6366F1, #7C3AED)' : 'var(--surface)',
+                background: updateText.trim() && !analysing ? 'rgba(255,255,255,0.90)' : 'var(--surface)',
                 border: updateText.trim() && !analysing ? 'none' : '1px solid var(--border)',
-                color: updateText.trim() && !analysing ? '#fff' : 'var(--text-tertiary)',
+                color: updateText.trim() && !analysing ? '#0a0b0f' : 'var(--text-tertiary)',
                 fontSize: '13px', fontWeight: '600', cursor: updateText.trim() && !analysing ? 'pointer' : 'not-allowed',
                 transition: 'all 0.15s',
               }}
@@ -4125,7 +4125,7 @@ function LinearColumn({ dealId }: { dealId: string }) {
         <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.40)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           Linked Issues
         </span>
-        <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '100px', background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.25)', fontWeight: 700, letterSpacing: '0.04em' }}>
+        <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '100px', background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.60)', border: '1px solid rgba(255,255,255,0.10)', fontWeight: 700, letterSpacing: '0.04em' }}>
           MCP
         </span>
       </div>
@@ -4148,7 +4148,7 @@ function LinearColumn({ dealId }: { dealId: string }) {
             const isInCycle = link.status === 'in_cycle'
             const isDeployed = link.status === 'deployed'
             const isConfirmed = link.status === 'confirmed' || isInCycle || isDeployed
-            const statusColor = isDeployed ? '#34d399' : isInCycle ? '#818cf8' : isConfirmed ? '#818cf8' : 'rgba(255,255,255,0.35)'
+            const statusColor = isDeployed ? '#34d399' : isInCycle ? 'rgba(255,255,255,0.70)' : isConfirmed ? 'rgba(255,255,255,0.70)' : 'rgba(255,255,255,0.35)'
             const statusLabel = isDeployed ? 'Deployed' : isInCycle ? 'In Cycle' : isConfirmed ? 'Confirmed' : 'Suggested'
             return (
               <div
@@ -4161,7 +4161,7 @@ function LinearColumn({ dealId }: { dealId: string }) {
                   cursor: link.linearIssueUrl ? 'pointer' : 'default',
                   transition: 'border-color 0.15s',
                 }}
-                onMouseEnter={e => { if (link.linearIssueUrl) (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.28)' }}
+                onMouseEnter={e => { if (link.linearIssueUrl) (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.12)' }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)' }}
               >
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
@@ -4202,15 +4202,15 @@ function LinearColumn({ dealId }: { dealId: string }) {
         disabled={discovering}
         style={{
           width: '100%', padding: '10px', borderRadius: '8px',
-          background: discovering ? 'rgba(99,102,241,0.08)' : 'linear-gradient(135deg, rgba(99,102,241,0.22), rgba(139,92,246,0.16))',
-          border: '1px solid rgba(99,102,241,0.28)',
-          color: '#818cf8', fontSize: '12px', fontWeight: 600,
+          background: discovering ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.08)',
+          border: '1px solid rgba(255,255,255,0.12)',
+          color: 'rgba(255,255,255,0.70)', fontSize: '12px', fontWeight: 600,
           cursor: discovering ? 'not-allowed' : 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
           transition: 'all 0.15s',
         }}
-        onMouseEnter={e => { if (!discovering) { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(99,102,241,0.30), rgba(139,92,246,0.22))'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.42)' } }}
-        onMouseLeave={e => { if (!discovering) { e.currentTarget.style.background = 'linear-gradient(135deg, rgba(99,102,241,0.22), rgba(139,92,246,0.16))'; e.currentTarget.style.borderColor = 'rgba(99,102,241,0.28)' } }}
+        onMouseEnter={e => { if (!discovering) { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)' } }}
+        onMouseLeave={e => { if (!discovering) { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)' } }}
       >
         {discovering
           ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Discovering…</>
@@ -4246,7 +4246,7 @@ function DealBriefingCard({ dealId }: { dealId: string }) {
         <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.40)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           AI Briefing
         </span>
-        <Sparkles size={13} color="#818cf8" />
+        <Sparkles size={13} color="rgba(255,255,255,0.70)" />
       </div>
 
       {isLoading || !data ? (
@@ -4328,7 +4328,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
   ].filter(Boolean) as { label: string; value: string }[]
 
   const expansionColors: Record<string, string> = {
-    upsell: '#818cf8', cross_sell: '#a78bfa', renewal: '#34d399', expansion: '#fbbf24',
+    upsell: 'rgba(255,255,255,0.70)', cross_sell: 'rgba(255,255,255,0.60)', renewal: '#34d399', expansion: '#fbbf24',
   }
 
   return (
@@ -4363,7 +4363,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
               </div>
               {dealGaps.slice(0, 4).map((g: any) => (
                 <div key={g.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0, marginTop: '5px', background: g.priority === 'critical' ? '#f87171' : g.priority === 'high' ? '#fbbf24' : '#818cf8' }} />
+                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0, marginTop: '5px', background: g.priority === 'critical' ? '#f87171' : g.priority === 'high' ? '#fbbf24' : 'rgba(255,255,255,0.70)' }} />
                   <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.70)', lineHeight: 1.4 }}>{g.title}</span>
                 </div>
               ))}
@@ -4544,12 +4544,12 @@ function AiActivitySection({ dealId }: { dealId: string }) {
       padding: '20px 24px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-        <Zap size={14} color="#818cf8" />
+        <Zap size={14} color="rgba(255,255,255,0.70)" />
         <span style={{ fontSize: '13px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.01em' }}>AI Activity</span>
         {actions.length > 0 && (
           <span style={{
             fontSize: '10px', fontWeight: 700, padding: '1px 7px', borderRadius: '100px',
-            background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)',
+            background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.70)', border: '1px solid rgba(255,255,255,0.10)',
           }}>{actions.length}</span>
         )}
       </div>
@@ -4632,10 +4632,10 @@ function TeamTab({ deal, currencySymbol = '£' }: { deal: any; currencySymbol?: 
               <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
                 <div style={{
                   width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
-                  background: 'linear-gradient(135deg, rgba(99,102,241,0.28), rgba(139,92,246,0.18))',
-                  border: '1px solid rgba(99,102,241,0.25)',
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.10)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '14px', fontWeight: 700, color: '#818cf8',
+                  fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.70)',
                 }}>
                   {c.name?.[0]?.toUpperCase() ?? '?'}
                 </div>
@@ -4643,7 +4643,7 @@ function TeamTab({ deal, currencySymbol = '£' }: { deal: any; currencySymbol?: 
                   <div style={{ fontSize: '14px', fontWeight: 600, color: 'rgba(255,255,255,0.90)', marginBottom: '2px' }}>{c.name}</div>
                   {c.title && <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.50)', marginBottom: '2px' }}>{c.title}</div>}
                   {c.email && (
-                    <a href={`mailto:${c.email}`} style={{ fontSize: '12px', color: '#818cf8', textDecoration: 'none' }}
+                    <a href={`mailto:${c.email}`} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.70)', textDecoration: 'none' }}
                       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.textDecoration = 'underline' }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.textDecoration = 'none' }}
                     >
@@ -4766,7 +4766,7 @@ export default function DealDetailPage() {
   if (!deal && data !== undefined) {
     return (
       <div style={{ textAlign: 'center', padding: '80px', color: 'rgba(255,255,255,0.30)' }}>
-        Deal not found. <Link href="/deals" style={{ color: '#818cf8' }}>Back to deals</Link>
+        Deal not found. <Link href="/deals" style={{ color: 'rgba(255,255,255,0.70)' }}>Back to deals</Link>
       </div>
     )
   }
@@ -4781,14 +4781,14 @@ export default function DealDetailPage() {
     qualification:{ bg: 'rgba(100,116,139,0.18)', color: '#94a3b8' },
     discovery:    { bg: 'rgba(59,130,246,0.18)',  color: '#60a5fa' },
     proposal:     { bg: 'rgba(251,191,36,0.18)',  color: '#fbbf24' },
-    negotiation:  { bg: 'rgba(139,92,246,0.18)',  color: '#a78bfa' },
+    negotiation:  { bg: 'rgba(255,255,255,0.08)',  color: 'rgba(255,255,255,0.60)' },
     closed_won:   { bg: 'rgba(52,211,153,0.18)',  color: '#34d399' },
     closed_lost:  { bg: 'rgba(248,113,113,0.18)', color: '#f87171' },
   }
   const stageBadge = STAGE_BADGE[deal?.stage ?? ''] ?? { bg: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.50)' }
 
   const expansionTypeColors: Record<string, string> = {
-    upsell: '#818cf8', cross_sell: '#a78bfa', renewal: '#34d399', expansion: '#fbbf24',
+    upsell: 'rgba(255,255,255,0.70)', cross_sell: 'rgba(255,255,255,0.60)', renewal: '#34d399', expansion: '#fbbf24',
   }
   const expansionTypeLabels: Record<string, string> = {
     upsell: 'Upsell', cross_sell: 'Cross-sell', renewal: 'Renewal', expansion: 'Expansion',
@@ -4817,7 +4817,7 @@ export default function DealDetailPage() {
           <span>Expansion from:</span>
           <Link
             href={`/deals/${deal.parentDealId}`}
-            style={{ color: '#818cf8', textDecoration: 'none', fontWeight: 600 }}
+            style={{ color: 'rgba(255,255,255,0.70)', textDecoration: 'none', fontWeight: 600 }}
             onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
             onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
           >
@@ -4826,9 +4826,9 @@ export default function DealDetailPage() {
           {deal.expansionType && (
             <span style={{
               fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '100px',
-              background: `color-mix(in srgb, ${expansionTypeColors[deal.expansionType] ?? '#818cf8'} 14%, transparent)`,
-              color: expansionTypeColors[deal.expansionType] ?? '#818cf8',
-              border: `1px solid color-mix(in srgb, ${expansionTypeColors[deal.expansionType] ?? '#818cf8'} 28%, transparent)`,
+              background: `color-mix(in srgb, ${expansionTypeColors[deal.expansionType] ?? 'rgba(255,255,255,0.70)'} 14%, transparent)`,
+              color: expansionTypeColors[deal.expansionType] ?? 'rgba(255,255,255,0.70)',
+              border: `1px solid color-mix(in srgb, ${expansionTypeColors[deal.expansionType] ?? 'rgba(255,255,255,0.70)'} 28%, transparent)`,
             }}>
               {expansionTypeLabels[deal.expansionType] ?? deal.expansionType}
             </span>
@@ -4840,10 +4840,10 @@ export default function DealDetailPage() {
       {deal ? (
         <div style={{
           background: 'var(--bg-hero)',
-          border: '1px solid rgba(99,102,241,0.20)',
+          border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: '1.25rem',
           padding: isMobile ? '20px' : '24px 28px',
-          boxShadow: '0 4px 24px rgba(99,102,241,0.12)',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.20)',
         }}>
           <div style={{
             display: 'flex',
@@ -4955,9 +4955,9 @@ export default function DealDetailPage() {
                   disabled={shareLoading}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-                    background: isShared ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.06)',
-                    border: isShared ? '1px solid rgba(99,102,241,0.35)' : '1px solid rgba(255,255,255,0.12)',
-                    borderRadius: '8px', color: isShared ? '#818cf8' : '#94a3b8',
+                    background: isShared ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.06)',
+                    border: isShared ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: '8px', color: isShared ? 'rgba(255,255,255,0.70)' : '#94a3b8',
                     fontSize: '13px', fontWeight: 600, cursor: shareLoading ? 'not-allowed' : 'pointer',
                     opacity: shareLoading ? 0.7 : 1,
                   }}
@@ -4974,11 +4974,11 @@ export default function DealDetailPage() {
                   disabled={discoveringIssues}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-                    background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
-                    border: '1px solid rgba(99,102,241,0.40)',
-                    borderRadius: '8px', color: '#fff', fontSize: '13px', fontWeight: 600,
+                    background: 'rgba(255,255,255,0.90)',
+                    border: '1px solid rgba(255,255,255,0.14)',
+                    borderRadius: '8px', color: '#0a0b0f', fontSize: '13px', fontWeight: 600,
                     cursor: discoveringIssues ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 0 18px rgba(99,102,241,0.28)',
+                    boxShadow: '0 0 18px rgba(0,0,0,0.25)',
                     opacity: discoveringIssues ? 0.75 : 1,
                   }}
                 >
@@ -4992,7 +4992,7 @@ export default function DealDetailPage() {
           </div>
         </div>
       ) : (
-        <div style={{ height: '148px', background: 'rgba(99,102,241,0.08)', borderRadius: '1.25rem', border: '1px solid rgba(99,102,241,0.15)' }} />
+        <div style={{ height: '148px', background: 'rgba(255,255,255,0.06)', borderRadius: '1.25rem', border: '1px solid rgba(255,255,255,0.08)' }} />
       )}
 
       {/* ── Loop state banner ──────────────────────────────────────────── */}
@@ -5025,7 +5025,7 @@ export default function DealDetailPage() {
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{
             padding: isMobile ? '12px 16px' : '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '500',
             color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-tertiary)',
-            borderBottom: activeTab === tab.id ? '2px solid #6366F1' : '2px solid transparent',
+            borderBottom: activeTab === tab.id ? '2px solid rgba(255,255,255,0.80)' : '2px solid transparent',
             marginBottom: '-1px', transition: 'color 0.1s',
             minHeight: isMobile ? '44px' : undefined, flexShrink: 0,
           }}>
@@ -5064,10 +5064,10 @@ export default function DealDetailPage() {
                 width: '100%', resize: 'vertical', padding: '12px 14px',
                 background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)',
                 borderRadius: '10px', fontSize: '13px', lineHeight: 1.6,
-                color: 'rgba(255,255,255,0.82)', outline: 'none', caretColor: '#818cf8',
+                color: 'rgba(255,255,255,0.82)', outline: 'none', caretColor: 'rgba(255,255,255,0.70)',
                 fontFamily: 'inherit',
               }}
-              onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.40)')}
+              onFocus={e => (e.target.style.borderColor = 'rgba(255,255,255,0.14)')}
               onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.10)')}
             />
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
@@ -5100,9 +5100,9 @@ export default function DealDetailPage() {
                 }}
                 style={{
                   padding: '9px 20px', borderRadius: '8px',
-                  background: meetingLogging || !meetingNotesDraft.trim() ? 'rgba(99,102,241,0.40)' : 'linear-gradient(135deg, #4f46e5, #6366f1)',
-                  border: '1px solid rgba(99,102,241,0.40)',
-                  color: '#fff', fontSize: '13px', fontWeight: 600,
+                  background: meetingLogging || !meetingNotesDraft.trim() ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.90)',
+                  border: '1px solid rgba(255,255,255,0.14)',
+                  color: meetingLogging || !meetingNotesDraft.trim() ? 'var(--text-secondary)' : '#0a0b0f', fontSize: '13px', fontWeight: 600,
                   cursor: meetingLogging || !meetingNotesDraft.trim() ? 'not-allowed' : 'pointer',
                 }}
               >

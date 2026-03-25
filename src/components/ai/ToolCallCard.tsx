@@ -51,7 +51,7 @@ export default function ToolCallCard({ invocation }: ToolCallCardProps) {
       background: 'var(--glass-tool-card, rgba(15, 12, 30, 0.6))',
       backdropFilter: 'blur(12px)',
       WebkitBackdropFilter: 'blur(12px)',
-      border: `1px solid ${isDone ? (isToolError ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)') : 'rgba(99,102,241,0.2)'}`,
+      border: `1px solid ${isDone ? (isToolError ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)') : 'rgba(255,255,255,0.08)'}`,
       overflow: 'hidden',
       transition: 'border-color 0.2s',
       boxShadow: isDone && !isToolError
@@ -71,7 +71,7 @@ export default function ToolCallCard({ invocation }: ToolCallCardProps) {
           background: 'none',
           border: 'none',
           cursor: resultText ? 'pointer' : 'default',
-          color: isDone ? (isToolError ? '#FCD34D' : '#6EE7B7') : '#A5B4FC',
+          color: isDone ? (isToolError ? '#FCD34D' : '#6EE7B7') : 'rgba(255,255,255,0.70)',
           fontSize: '11.5px',
           fontWeight: 500,
           fontFamily: 'inherit',
@@ -98,8 +98,8 @@ export default function ToolCallCard({ invocation }: ToolCallCardProps) {
             <span style={{
               width: '12px', height: '12px',
               borderRadius: '50%',
-              border: '2px solid rgba(99,102,241,0.4)',
-              borderTopColor: '#6366F1',
+              border: '2px solid rgba(255,255,255,0.14)',
+              borderTopColor: 'rgba(255,255,255,0.80)',
               animation: 'spin 0.8s linear infinite',
             }} />
           </span>

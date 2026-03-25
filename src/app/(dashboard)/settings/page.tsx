@@ -42,7 +42,7 @@ const PLAN_DETAILS: Record<Plan, { name: string; price: string; color: string; b
     features: ['1 product', '1 competitor', '2 case studies', '5 deal logs', '3 AI collateral pieces'],
   },
   starter: {
-    name: 'Starter', price: '$79/mo', color: '#6366F1', bg: 'var(--accent-subtle)',
+    name: 'Starter', price: '$79/mo', color: 'rgba(255,255,255,0.80)', bg: 'var(--accent-subtle)',
     features: ['5 products', '15 competitors', 'Unlimited case studies', 'Unlimited deals', 'Unlimited collateral', 'AI meeting prep', '.docx export'],
   },
   pro: {
@@ -67,7 +67,7 @@ function SectionCard({ title, description, children }: { title: string; descript
 }
 
 const APP_ROLE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  sales:   { label: 'Sales',   color: '#818cf8', bg: 'rgba(129,140,248,0.10)' },
+  sales:   { label: 'Sales',   color: 'rgba(255,255,255,0.70)', bg: 'rgba(255,255,255,0.06)' },
   product: { label: 'Product', color: '#34d399', bg: 'rgba(52,211,153,0.10)' },
   admin:   { label: 'Admin',   color: '#f59e0b', bg: 'rgba(245,158,11,0.10)' },
 }
@@ -114,7 +114,7 @@ function MembersList({
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
               <div style={{
                 width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
-                background: 'linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.3))',
+                background: 'rgba(255,255,255,0.12)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: '11px', fontWeight: 700, color: 'var(--accent)',
               }}>
@@ -427,7 +427,7 @@ export default function SettingsPage() {
                     <code style={{
                       fontSize: '12px', fontWeight: 600, color: 'var(--accent)',
                       background: 'var(--accent-subtle)', padding: '3px 8px', borderRadius: '6px',
-                      border: '1px solid rgba(99,102,241,0.25)', fontFamily: 'monospace',
+                      border: '1px solid rgba(255,255,255,0.10)', fontFamily: 'monospace',
                     }}>
                       {dbUser?.workspaceSlug ?? '—'}
                     </code>
@@ -508,7 +508,7 @@ export default function SettingsPage() {
                       style={{
                         height: '32px', padding: '0 14px', borderRadius: '7px', fontSize: '12px', fontWeight: isActive ? '600' : '400',
                         background: isActive ? 'var(--accent-subtle)' : 'var(--surface)',
-                        border: isActive ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)',
+                        border: isActive ? '1px solid rgba(255,255,255,0.14)' : '1px solid var(--border)',
                         color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
                         cursor: savingCurrency ? 'not-allowed' : 'pointer',
                         transition: 'all 0.1s',
@@ -544,7 +544,7 @@ export default function SettingsPage() {
                         height: '48px', padding: '0 16px', borderRadius: '7px', fontSize: '12px',
                         fontWeight: isActive ? '600' : '400', textAlign: 'left',
                         background: isActive ? 'var(--accent-subtle)' : 'var(--surface)',
-                        border: isActive ? '1px solid rgba(99,102,241,0.4)' : '1px solid var(--border)',
+                        border: isActive ? '1px solid rgba(255,255,255,0.14)' : '1px solid var(--border)',
                         color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
                         cursor: savingDisplay ? 'not-allowed' : 'pointer',
                         transition: 'all 0.1s', display: 'flex', flexDirection: 'column', gap: '2px',
@@ -647,7 +647,7 @@ export default function SettingsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
             {/* Explainer */}
-            <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.14)' }}>
+            <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'var(--accent-subtle)', border: '1px solid rgba(255,255,255,0.06)' }}>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.7 }}>
                 When enabled, Halvex contributes <strong style={{ color: 'var(--text-primary)' }}>10 anonymised behavioural signals</strong> per closed deal to a shared learning pool.
                 In return, your predictions are benchmarked against industry data and new workspaces start with a pre-calibrated model instead of a 50/50 coin flip.
@@ -760,7 +760,7 @@ export default function SettingsPage() {
             </div>
 
             {/* Rights */}
-            <div style={{ padding: '10px 14px', borderRadius: '9px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.15)' }}>
+            <div style={{ padding: '10px 14px', borderRadius: '9px', background: 'var(--accent-subtle)', border: '1px solid rgba(255,255,255,0.08)' }}>
               <p style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600, margin: '0 0 6px' }}>Your rights (GDPR / CCPA)</p>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>
                 Access, correct, export, or delete your data at any time using the buttons below, or email <a href="mailto:privacy@halvex.ai" style={{ color: 'var(--accent)' }}>privacy@halvex.ai</a>. We respond within 30 days.
@@ -770,7 +770,7 @@ export default function SettingsPage() {
             {/* Links */}
             <div style={{ display: 'flex', gap: '8px' }}>
               <a href="/privacy" target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--accent)', backgroundColor: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.2)', textDecoration: 'none' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--accent)', backgroundColor: 'var(--accent-subtle)', border: '1px solid rgba(255,255,255,0.08)', textDecoration: 'none' }}>
                 <ExternalLink size={11} />
                 Privacy Policy
               </a>
@@ -905,8 +905,8 @@ function CompanyBrainSection() {
             onClick={() => setEditing(true)}
             style={{
               padding: '6px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
-              background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.22)',
-              color: '#818cf8', cursor: 'pointer',
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
+              color: 'rgba(255,255,255,0.70)', cursor: 'pointer',
             }}
           >
             Edit
@@ -939,7 +939,7 @@ function CompanyBrainSection() {
                     value={form[key as keyof typeof form]}
                     onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
                     style={inputStyle}
-                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(99,102,241,0.40)')}
+                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)')}
                     onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
                   />
                 ) : (
@@ -947,7 +947,7 @@ function CompanyBrainSection() {
                     value={form[key as keyof typeof form]}
                     onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
                     style={taStyle}
-                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(99,102,241,0.40)')}
+                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)')}
                     onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
                   />
                 )}
@@ -959,9 +959,9 @@ function CompanyBrainSection() {
                 disabled={saving}
                 style={{
                   padding: '8px 16px', borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
-                  border: '1px solid rgba(99,102,241,0.40)',
-                  color: '#fff', fontSize: '13px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer',
+                  background: 'rgba(255,255,255,0.90)',
+                  border: '1px solid rgba(255,255,255,0.14)',
+                  color: '#0a0b0f', fontSize: '13px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer',
                   opacity: saving ? 0.6 : 1,
                 }}
               >
@@ -1046,7 +1046,7 @@ function JoinWorkspaceForm({ onJoined }: { onJoined: () => void }) {
       <button type="submit" disabled={loading || !slug.trim()}
         style={{
           height: '30px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 600,
-          color: '#fff', background: 'linear-gradient(135deg, var(--accent), #7C3AED)',
+          color: '#fff', background: 'linear-gradient(135deg, var(--accent), rgba(255,255,255,0.80))',
           border: 'none', cursor: loading || !slug.trim() ? 'not-allowed' : 'pointer',
           opacity: loading || !slug.trim() ? 0.6 : 1, whiteSpace: 'nowrap',
         }}>

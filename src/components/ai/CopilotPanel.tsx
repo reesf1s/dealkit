@@ -119,7 +119,7 @@ function stageBadgeColor(stage: string): { bg: string; text: string; border: str
   if (s.includes('close') || s.includes('won')) return { bg: 'rgba(16,185,129,0.12)', text: '#6EE7B7', border: 'rgba(16,185,129,0.25)' }
   if (s.includes('negot')) return { bg: 'rgba(245,158,11,0.12)', text: '#FCD34D', border: 'rgba(245,158,11,0.25)' }
   if (s.includes('lost') || s.includes('churn')) return { bg: 'rgba(239,68,68,0.12)', text: '#FCA5A5', border: 'rgba(239,68,68,0.25)' }
-  return { bg: 'var(--accent-subtle)', text: 'var(--text-secondary)', border: 'rgba(99,102,241,0.25)' }
+  return { bg: 'rgba(255,255,255,0.06)', text: 'var(--text-secondary)', border: 'rgba(255,255,255,0.10)' }
 }
 
 // ── Typing dots ─────────────────────────────────────────────────────────────
@@ -282,8 +282,8 @@ export default function CopilotPanel() {
         @keyframes copilotFadeIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: translateY(0) } }
         @keyframes copilotSlideIn { from { transform: translateX(100%) } to { transform: translateX(0) } }
         @keyframes copilotPulse {
-          0%, 100% { box-shadow: 0 2px 16px rgba(99,102,241,0.2), 0 0 0 0 rgba(99,102,241,0.1); }
-          50% { box-shadow: 0 2px 16px rgba(99,102,241,0.3), 0 0 0 6px rgba(99,102,241,0); }
+          0%, 100% { box-shadow: 0 2px 16px rgba(255,255,255,0.08), 0 0 0 0 rgba(255,255,255,0.06); }
+          50% { box-shadow: 0 2px 16px rgba(255,255,255,0.12), 0 0 0 6px rgba(255,255,255,0); }
         }
         .copilot-messages::-webkit-scrollbar { width: 3px; }
         .copilot-messages::-webkit-scrollbar-track { background: transparent; }
@@ -304,7 +304,7 @@ export default function CopilotPanel() {
             alignItems: 'center',
             gap: '8px',
             padding: '10px 18px',
-            background: 'linear-gradient(145deg, rgba(99,102,241,0.9), rgba(124,58,237,0.85))',
+            background: 'rgba(255,255,255,0.12)',
             border: '1px solid rgba(255,255,255,0.15)',
             borderRadius: '100px',
             color: '#fff',
@@ -312,17 +312,17 @@ export default function CopilotPanel() {
             fontWeight: 600,
             fontFamily: 'inherit',
             cursor: 'pointer',
-            boxShadow: '0 4px 24px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.15)',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.15)',
             animation: 'copilotPulse 3s ease-in-out infinite',
             transition: 'transform 0.15s, box-shadow 0.15s',
           }}
           onMouseEnter={e => {
             e.currentTarget.style.transform = 'translateY(-2px) scale(1.03)'
-            e.currentTarget.style.boxShadow = '0 6px 28px rgba(99,102,241,0.45), inset 0 1px 0 rgba(255,255,255,0.15)'
+            e.currentTarget.style.boxShadow = '0 6px 28px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.15)'
           }}
           onMouseLeave={e => {
             e.currentTarget.style.transform = 'translateY(0) scale(1)'
-            e.currentTarget.style.boxShadow = '0 4px 24px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.15)'
+            e.currentTarget.style.boxShadow = '0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.15)'
           }}
         >
           <Sparkles size={14} />
@@ -365,7 +365,7 @@ export default function CopilotPanel() {
           backdropFilter: 'blur(24px) saturate(180%)',
           WebkitBackdropFilter: 'blur(24px) saturate(180%)',
           borderLeft: '1px solid var(--glass-card-border)',
-          boxShadow: '-8px 0 40px rgba(0,0,0,0.5), -2px 0 16px rgba(99,102,241,0.08)',
+          boxShadow: '-8px 0 40px rgba(0,0,0,0.5), -2px 0 16px rgba(255,255,255,0.04)',
           transform: copilotOpen ? 'translateX(0)' : 'translateX(100%)',
           transition: 'transform 0.3s cubic-bezier(0.4,0,0.2,1), width 0.2s ease',
           pointerEvents: copilotOpen ? 'auto' : 'none',
@@ -377,14 +377,14 @@ export default function CopilotPanel() {
           alignItems: 'center',
           gap: '10px',
           padding: '16px 18px',
-          borderBottom: '1px solid rgba(99,102,241,0.1)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
           flexShrink: 0,
         }}>
           <div style={{
             width: '30px', height: '30px', borderRadius: '9px',
             background: 'linear-gradient(145deg, rgba(120,110,255,0.24), rgba(100,80,220,0.14))',
             border: '1px solid var(--border-strong)',
-            boxShadow: '0 1px 8px rgba(99,102,241,0.18), inset 0 1px 0 rgba(255,255,255,0.1)',
+            boxShadow: '0 1px 8px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.1)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0,
           }}>
@@ -450,7 +450,7 @@ export default function CopilotPanel() {
         {/* ── Context ribbon ── */}
         <div style={{
           padding: '8px 18px',
-          borderBottom: '1px solid rgba(99,102,241,0.08)',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
           flexShrink: 0,
         }}>
           {activeDeal ? (
@@ -461,10 +461,10 @@ export default function CopilotPanel() {
               <div style={{
                 width: '7px', height: '7px', borderRadius: '50%',
                 background: 'var(--accent)', flexShrink: 0,
-                boxShadow: '0 0 6px rgba(99,102,241,0.5)',
+                boxShadow: '0 0 6px rgba(255,255,255,0.25)',
               }} />
               <span style={{ color: 'var(--text-secondary)' }}>Working on</span>
-              <span style={{ color: '#C7D2FE', fontWeight: 600 }}>{activeDeal.company}</span>
+              <span style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>{activeDeal.company}</span>
               <span style={{
                 fontSize: '10px', fontWeight: 600,
                 padding: '2px 8px', borderRadius: '100px',
@@ -513,13 +513,13 @@ export default function CopilotPanel() {
                   marginBottom: '14px',
                   padding: '9px 14px', borderRadius: '10px',
                   background: 'var(--accent-subtle)',
-                  border: '1px solid rgba(99,102,241,0.15)',
+                  border: '1px solid rgba(255,255,255,0.08)',
                   display: 'flex', alignItems: 'center', gap: '7px',
                   lineHeight: '1.6',
                 }}>
                   <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
                   <span>
-                    Ready — I know everything about <strong style={{ color: '#C7D2FE' }}>{activeDeal.company}</strong>
+                    Ready — I know everything about <strong style={{ color: 'rgba(255,255,255,0.85)' }}>{activeDeal.company}</strong>
                   </span>
                 </div>
               )}
@@ -550,8 +550,8 @@ export default function CopilotPanel() {
                     }}
                     onMouseEnter={e => {
                       e.currentTarget.style.background = 'var(--accent-subtle)'
-                      e.currentTarget.style.borderColor = 'rgba(99,102,241,0.25)'
-                      e.currentTarget.style.color = '#C7D2FE'
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'
+                      e.currentTarget.style.color = 'rgba(255,255,255,0.85)'
                     }}
                     onMouseLeave={e => {
                       e.currentTarget.style.background = 'var(--copilot-msg-bg)'
@@ -571,8 +571,8 @@ export default function CopilotPanel() {
               <div style={{
                 marginTop: '16px',
                 padding: '10px 14px',
-                background: 'rgba(99,102,241,0.04)',
-                border: '1px solid rgba(99,102,241,0.1)',
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.06)',
                 borderRadius: '10px',
                 fontSize: '11px',
                 color: 'var(--text-tertiary)',
@@ -597,10 +597,10 @@ export default function CopilotPanel() {
                     background: 'var(--glass-user-msg, var(--copilot-user-bg))',
                     backdropFilter: 'blur(12px)',
                     WebkitBackdropFilter: 'blur(12px)',
-                    border: '1px solid rgba(99,102,241,0.18)',
+                    border: '1px solid rgba(255,255,255,0.10)',
                   }}>
                     <p style={{
-                      fontSize: '13.5px', color: '#C7D2FE', margin: 0,
+                      fontSize: '13.5px', color: 'rgba(255,255,255,0.85)', margin: 0,
                       lineHeight: '1.6', whiteSpace: 'pre-wrap',
                     }}>
                       {msg.content}
@@ -690,18 +690,18 @@ export default function CopilotPanel() {
                     style={{
                       padding: '5px 12px', borderRadius: '100px', cursor: 'pointer',
                       background: 'var(--accent-subtle)',
-                      border: '1px solid rgba(99,102,241,0.15)',
+                      border: '1px solid rgba(255,255,255,0.08)',
                       color: 'var(--text-tertiary)', fontSize: '11px', fontWeight: 500,
                       transition: 'all 140ms', fontFamily: 'inherit',
                     }}
                     onMouseEnter={e => {
                       e.currentTarget.style.background = 'var(--accent-subtle)'
-                      e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
                       e.currentTarget.style.color = 'var(--text-secondary)'
                     }}
                     onMouseLeave={e => {
                       e.currentTarget.style.background = 'var(--accent-subtle)'
-                      e.currentTarget.style.borderColor = 'rgba(99,102,241,0.15)'
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
                       e.currentTarget.style.color = 'var(--text-tertiary)'
                     }}
                   >
@@ -736,7 +736,7 @@ export default function CopilotPanel() {
           onSubmit={onSubmit}
           style={{
             padding: '12px 18px 16px',
-            borderTop: '1px solid rgba(99,102,241,0.1)',
+            borderTop: '1px solid rgba(255,255,255,0.06)',
             flexShrink: 0,
           }}
         >
@@ -757,7 +757,7 @@ export default function CopilotPanel() {
                   width: '100%',
                   resize: 'none',
                   background: 'var(--bg-secondary)',
-                  border: '1px solid rgba(99,102,241,0.15)',
+                  border: '1px solid rgba(255,255,255,0.08)',
                   borderRadius: '8px',
                   color: 'var(--text-primary)',
                   fontSize: '13.5px',
@@ -771,11 +771,11 @@ export default function CopilotPanel() {
                   transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s',
                 }}
                 onFocus={e => {
-                  e.currentTarget.style.borderColor = 'rgba(99,102,241,0.4)'
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.08)'
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)'
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(255,255,255,0.04)'
                 }}
                 onBlur={e => {
-                  e.currentTarget.style.borderColor = 'rgba(99,102,241,0.15)'
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
                   e.currentTarget.style.boxShadow = 'none'
                 }}
               />
@@ -806,7 +806,7 @@ export default function CopilotPanel() {
                   width: '38px', height: '38px', flexShrink: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   background: input.trim()
-                    ? 'linear-gradient(145deg, rgba(99,102,241,0.9), rgba(124,58,237,0.85))'
+                    ? 'rgba(255,255,255,0.90)'
                     : 'var(--surface)',
                   border: input.trim()
                     ? '1px solid rgba(255,255,255,0.18)'
@@ -814,24 +814,24 @@ export default function CopilotPanel() {
                   borderRadius: '10px',
                   cursor: input.trim() ? 'pointer' : 'default',
                   boxShadow: input.trim()
-                    ? '0 2px 14px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.15)'
+                    ? '0 2px 14px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.15)'
                     : 'none',
                   transition: 'all 180ms cubic-bezier(0.4,0,0.2,1)',
                 }}
                 onMouseEnter={e => {
                   if (input.trim()) {
                     e.currentTarget.style.transform = 'translateY(-1px)'
-                    e.currentTarget.style.boxShadow = '0 4px 18px rgba(99,102,241,0.5), inset 0 1px 0 rgba(255,255,255,0.15)'
+                    e.currentTarget.style.boxShadow = '0 4px 18px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.15)'
                   }
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.transform = 'translateY(0)'
                   e.currentTarget.style.boxShadow = input.trim()
-                    ? '0 2px 14px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.15)'
+                    ? '0 2px 14px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.15)'
                     : 'none'
                 }}
               >
-                <Send size={14} color={input.trim() ? '#fff' : '#444'} />
+                <Send size={14} color={input.trim() ? '#0a0b0f' : '#444'} />
               </button>
             )}
           </div>

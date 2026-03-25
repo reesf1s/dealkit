@@ -34,7 +34,7 @@ export default function ModelsPage() {
       {/* Win Probability Model */}
       <div style={card}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-          <BarChart2 size={15} style={{ color: '#7c3aed' }} />
+          <BarChart2 size={15} style={{ color: 'rgba(255,255,255,0.80)' }} />
           <span style={{ fontSize: '13px', fontWeight: 600, color: 'white' }}>Win Probability Model</span>
         </div>
         {isLoading ? (
@@ -42,12 +42,12 @@ export default function ModelsPage() {
         ) : (
           <div style={{
             padding: '24px', borderRadius: '12px',
-            background: 'linear-gradient(135deg, rgba(124,58,237,0.15) 0%, rgba(79,70,229,0.1) 100%)',
-            border: '1px solid rgba(124,58,237,0.3)',
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.12)',
           }}>
             {mlAccuracy != null ? (
               <div>
-                <div style={{ fontSize: '48px', fontWeight: 700, color: '#7c3aed', letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+                <div style={{ fontSize: '48px', fontWeight: 700, color: 'rgba(255,255,255,0.80)', letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                   {Math.round(mlAccuracy * 100)}%
                 </div>
                 <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginTop: '12px', lineHeight: 1.6 }}>
@@ -117,10 +117,10 @@ export default function ModelsPage() {
                 <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>{f.name ?? f.label ?? f.feature}</span>
-                    <span style={{ fontSize: '11px', color: '#7c3aed', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{(importance * 100).toFixed(1)}%</span>
+                    <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.80)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{(importance * 100).toFixed(1)}%</span>
                   </div>
                   <div style={{ height: '3px', borderRadius: '2px', background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, background: '#7c3aed', borderRadius: '2px' }} />
+                    <div style={{ height: '100%', width: `${pct}%`, background: 'rgba(255,255,255,0.80)', borderRadius: '2px' }} />
                   </div>
                 </div>
               )

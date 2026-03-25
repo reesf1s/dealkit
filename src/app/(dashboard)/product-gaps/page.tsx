@@ -66,7 +66,7 @@ const statusConfig: Record<GapStatus, { label: string; color: string; bg: string
   open:       { label: 'Open',        color: '#f59e0b',          bg: 'color-mix(in srgb, #f59e0b 12%, transparent)',   icon: <AlertTriangle size={10} /> },
   on_roadmap: { label: 'On Roadmap',  color: '#06b6d4',          bg: 'color-mix(in srgb, #06b6d4 12%, transparent)',   icon: <Clock size={10} /> },
   shipped:    { label: 'Shipped',     color: 'var(--success)',   bg: 'color-mix(in srgb, var(--success) 12%, transparent)', icon: <CheckCircle size={10} /> },
-  in_review:  { label: 'In Review',   color: '#818cf8',          bg: 'color-mix(in srgb, #818cf8 12%, transparent)',   icon: <Info size={10} /> },
+  in_review:  { label: 'In Review',   color: 'rgba(255,255,255,0.70)',          bg: 'color-mix(in srgb, rgba(255,255,255,0.70) 12%, transparent)',   icon: <Info size={10} /> },
 }
 
 const statusOrder: GapStatus[] = ['open', 'in_review', 'on_roadmap', 'shipped']
@@ -76,7 +76,7 @@ function getPriorityBadge(gap: EnrichedGap): { label: string; color: string; bg:
   const freq = gap.frequency ?? 0
   if (freq >= 3 && rev >= 5000)  return { label: 'Critical', color: '#ef4444', bg: 'color-mix(in srgb, #ef4444 12%, transparent)' }
   if (freq >= 2 || rev >= 2000)  return { label: 'High',     color: '#f59e0b', bg: 'color-mix(in srgb, #f59e0b 12%, transparent)' }
-  if (freq >= 1 && rev > 0)      return { label: 'Medium',   color: '#6366f1', bg: 'color-mix(in srgb, #6366f1 12%, transparent)' }
+  if (freq >= 1 && rev > 0)      return { label: 'Medium',   color: 'rgba(255,255,255,0.80)', bg: 'color-mix(in srgb, rgba(255,255,255,0.80) 12%, transparent)' }
   return                                { label: 'Low',      color: 'var(--text-tertiary)', bg: 'var(--surface)' }
 }
 

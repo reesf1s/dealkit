@@ -91,9 +91,9 @@ function CollateralCard({
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '3px',
               fontSize: '10px', fontWeight: 600,
-              color: 'var(--accent, #6366F1)',
-              background: 'rgba(99,102,241,0.08)',
-              border: '1px solid rgba(99,102,241,0.18)',
+              color: 'rgba(255,255,255,0.80)',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: '4px',
               padding: '1px 6px',
               textDecoration: 'none',
@@ -212,14 +212,14 @@ function CollateralCard({
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: '6px',
-              backgroundColor: 'rgba(99,102,241,0.1)',
-              border: '1px solid rgba(99,102,241,0.2)',
+              backgroundColor: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.08)',
               cursor: 'pointer',
-              color: '#6366F1',
+              color: 'rgba(255,255,255,0.80)',
               transition: 'background-color 150ms ease',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.2)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.1)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
           >
             <Download size={12} strokeWidth={2} />
           </button>

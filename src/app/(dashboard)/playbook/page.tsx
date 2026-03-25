@@ -250,8 +250,8 @@ function EmptyState({ totalDeals, winCount, lossCount, recentDeals }: { totalDea
             title="Your Winning Formula"
             description="The top 5 factors that predict a won deal in YOUR pipeline."
             unlockText="Unlocks at 10 deals"
-            iconColor="rgb(99,102,241)"
-            bgTint="rgba(79,70,229,0.05)"
+            iconColor="rgba(255,255,255,0.80)"
+            bgTint="rgba(255,255,255,0.04)"
           />
           <LockedCard
             title="Your Losing Pattern"
@@ -285,8 +285,8 @@ function EmptyState({ totalDeals, winCount, lossCount, recentDeals }: { totalDea
             title="Forecast Calibration"
             description="How accurate your ML predictions are, with monthly tracking."
             unlockText="Unlocks at 30 deals"
-            iconColor="rgb(139,92,246)"
-            bgTint="rgba(139,92,246,0.05)"
+            iconColor="rgba(255,255,255,0.70)"
+            bgTint="rgba(255,255,255,0.04)"
           />
         </div>
       </div>
@@ -672,7 +672,7 @@ export default function PlaybookPage() {
 
       {/* ── Forecast Calibration ── */}
       <Section
-        icon={<BarChart3 size={18} style={{ color: 'rgb(139,92,246)' }} />}
+        icon={<BarChart3 size={18} style={{ color: 'rgba(255,255,255,0.70)' }} />}
         title="Forecast Calibration"
         subtitle="How well your ML win predictions match actual outcomes over time"
         tooltip="Calibration measures whether deals scored at 70%+ actually close 70% of the time. A well-calibrated model gives you reliable pipeline forecasts."
@@ -719,7 +719,7 @@ export default function PlaybookPage() {
                       <div style={{ flex: 1 }}>
                         <AnimatedBar
                           pct={c.aucRoc != null ? c.aucRoc * 100 : (c.accuracy ?? 0)}
-                          color="rgb(139,92,246)"
+                          color="rgba(255,255,255,0.70)"
                           height={5}
                         />
                       </div>

@@ -23,7 +23,7 @@ interface CollateralViewerProps {
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h3 style={{ fontSize: '11px', fontWeight: 700, color: '#6366F1', letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 10px' }}>
+    <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.80)', letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 10px' }}>
       {children}
     </h3>
   )
@@ -42,7 +42,7 @@ function BulletList({ items, color = '#EBEBEB' }: { items: string[]; color?: str
     <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '6px' }}>
       {items.map((item, i) => (
         <li key={i} style={{ display: 'flex', gap: '8px', fontSize: '13px', color, lineHeight: 1.5 }}>
-          <span style={{ color: '#6366F1', flexShrink: 0 }}>•</span>
+          <span style={{ color: 'rgba(255,255,255,0.80)', flexShrink: 0 }}>•</span>
           {item}
         </li>
       ))}
@@ -166,10 +166,10 @@ function CaseStudyDocViewer({ content }: { content: CaseStudyDocContent }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Hero */}
-      <Card style={{ backgroundColor: 'rgba(99,102,241,0.06)', borderColor: 'rgba(99,102,241,0.2)' }}>
+      <Card style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.08)' }}>
         <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', margin: '0 0 6px' }}>{content.headline}</h1>
         <p style={{ fontSize: '15px', color: '#888', margin: '0 0 12px', lineHeight: 1.5 }}>{content.subheadline}</p>
-        <p style={{ fontSize: '13px', color: '#6366F1', margin: 0, fontWeight: 500 }}>{content.customerName} — {content.customerDescription}</p>
+        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.80)', margin: 0, fontWeight: 500 }}>{content.customerName} — {content.customerDescription}</p>
       </Card>
 
       {/* Metrics */}
@@ -210,7 +210,7 @@ function CaseStudyDocViewer({ content }: { content: CaseStudyDocContent }) {
 
       {/* CTA */}
       <Card>
-        <p style={{ fontSize: '15px', fontWeight: 600, color: '#6366F1', margin: 0 }}>{content.callToAction}</p>
+        <p style={{ fontSize: '15px', fontWeight: 600, color: 'rgba(255,255,255,0.80)', margin: 0 }}>{content.callToAction}</p>
       </Card>
     </div>
   )
@@ -221,7 +221,7 @@ function CaseStudyDocViewer({ content }: { content: CaseStudyDocContent }) {
 function OnePagerViewer({ content }: { content: OnePagerContent }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <Card style={{ backgroundColor: 'rgba(99,102,241,0.06)', borderColor: 'rgba(99,102,241,0.2)' }}>
+      <Card style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.08)' }}>
         <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', margin: '0 0 6px' }}>{content.headline}</h1>
         <p style={{ fontSize: '15px', color: '#888', margin: 0 }}>{content.subheadline}</p>
       </Card>
@@ -256,7 +256,7 @@ function OnePagerViewer({ content }: { content: OnePagerContent }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {content.howItWorks.map((step) => (
               <div key={step.step} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                <span style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: 'rgba(99,102,241,0.2)', color: '#6366F1', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.80)', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   {step.step}
                 </span>
                 <div>
@@ -283,8 +283,8 @@ function OnePagerViewer({ content }: { content: OnePagerContent }) {
         </Card>
       )}
 
-      <Card style={{ backgroundColor: 'rgba(99,102,241,0.06)', borderColor: 'rgba(99,102,241,0.2)' }}>
-        <p style={{ fontSize: '15px', fontWeight: 600, color: '#6366F1', margin: 0 }}>{content.callToAction}</p>
+      <Card style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.08)' }}>
+        <p style={{ fontSize: '15px', fontWeight: 600, color: 'rgba(255,255,255,0.80)', margin: 0 }}>{content.callToAction}</p>
         {content.contactInfo && <p style={{ fontSize: '13px', color: '#888', margin: '6px 0 0' }}>{content.contactInfo}</p>}
       </Card>
     </div>
@@ -299,7 +299,7 @@ const CATEGORY_COLORS: Record<ObjectionCategory, { color: string; bg: string }> 
   timing: { color: '#06B6D4', bg: 'rgba(6,182,212,0.1)' },
   authority: { color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)' },
   need: { color: '#22C55E', bg: 'rgba(34,197,94,0.1)' },
-  trust: { color: '#6366F1', bg: 'rgba(99,102,241,0.1)' },
+  trust: { color: '#3B82F6', bg: 'rgba(59,130,246,0.1)' },
   other: { color: '#888', bg: 'rgba(136,136,136,0.1)' },
 }
 
@@ -396,7 +396,7 @@ function TalkTrackSectionCard({ section, title }: { section: TalkTrackSection; t
             )}
             <div>
               <p style={{ fontSize: '11px', fontWeight: 600, color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>Transition</p>
-              <p style={{ fontSize: '13px', color: '#6366F1', fontStyle: 'italic', margin: 0 }}>&quot;{section.transitionPhrase}&quot;</p>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.70)', fontStyle: 'italic', margin: 0 }}>&quot;{section.transitionPhrase}&quot;</p>
             </div>
           </div>
         </div>
@@ -484,7 +484,7 @@ function EmailSequenceViewer({ content }: { content: EmailSequenceContent }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
                 <p style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>CTA</p>
-                <p style={{ fontSize: '13px', color: '#6366F1', fontWeight: 500, margin: 0 }}>{email.callToAction}</p>
+                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.80)', fontWeight: 500, margin: 0 }}>{email.callToAction}</p>
               </div>
               {email.sendingTips.length > 0 && (
                 <div>
@@ -525,7 +525,7 @@ function markdownToHtml(md: string): string {
     .replace(/^### (.+)$/gm, '<h3 style="font-size:14px;font-weight:700;color:#A78BFA;margin:14px 0 6px">$1</h3>')
     .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#EBEBEB">$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/^[-•] (.+)$/gm, '<div style="display:flex;gap:8px;margin:3px 0"><span style="color:#6366F1;flex-shrink:0">•</span><span>$1</span></div>')
+    .replace(/^[-•] (.+)$/gm, '<div style="display:flex;gap:8px;margin:3px 0"><span style="color:rgba(255,255,255,0.80);flex-shrink:0">•</span><span>$1</span></div>')
     .replace(/\n{2,}/g, '<br/><br/>')
     .replace(/\n/g, '<br/>')
 }

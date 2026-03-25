@@ -76,7 +76,7 @@ export default function CaseStudiesPage() {
 
         <button
           onClick={() => setAddOpen(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#fff', background: 'linear-gradient(135deg, var(--accent-hover), #7C3AED)', border: 'none', cursor: 'pointer', boxShadow: '0 0 16px rgba(99,102,241,0.3)', transition: 'opacity 0.1s ease' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, color: '#0a0b0f', background: 'rgba(255,255,255,0.90)', border: 'none', cursor: 'pointer', boxShadow: '0 0 16px rgba(0,0,0,0.25)', transition: 'opacity 0.1s ease' }}
           onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9' }}
           onMouseLeave={(e) => { e.currentTarget.style.opacity = '1' }}
         >

@@ -18,18 +18,18 @@ function renderInline(text: string): React.ReactNode {
     if (part.startsWith('`') && part.endsWith('`'))
       return (
         <code key={i} style={{
-          background: 'rgba(99,102,241,0.15)',
+          background: 'rgba(255,255,255,0.08)',
           padding: '1px 6px',
           borderRadius: '4px',
           fontSize: '12px',
-          color: '#A5B4FC',
+          color: 'rgba(255,255,255,0.70)',
         }}>{part.slice(1, -1)}</code>
       )
     if (part.startsWith('~~') && part.endsWith('~~'))
       return <span key={i} style={{ textDecoration: 'line-through', color: '#6B7280' }}>{part.slice(2, -2)}</span>
     const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
     if (linkMatch)
-      return <Link key={i} href={linkMatch[2]} style={{ color: '#818CF8', textDecoration: 'underline' }}>{linkMatch[1]}</Link>
+      return <Link key={i} href={linkMatch[2]} style={{ color: 'rgba(255,255,255,0.70)', textDecoration: 'underline' }}>{linkMatch[1]}</Link>
     return part
   })
 }
@@ -55,18 +55,18 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
       elements.push(
         <pre key={elements.length} style={{
           background: 'rgba(15, 12, 30, 0.9)',
-          border: '1px solid rgba(99,102,241,0.15)',
+          border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: '8px',
           padding: '10px 14px',
           margin: '6px 0',
           overflowX: 'auto',
           fontSize: '12px',
           lineHeight: '1.6',
-          color: '#A5B4FC',
+          color: 'rgba(255,255,255,0.70)',
           fontFamily: 'ui-monospace, "SF Mono", Menlo, monospace',
         }}>
           {lang && (
-            <div style={{ fontSize: '10px', color: '#6366F1', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.80)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               {lang}
             </div>
           )}
@@ -118,7 +118,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
     if (line.startsWith('- ') || line.startsWith('• ')) {
       elements.push(
         <div key={elements.length} style={{ display: 'flex', gap: '8px', marginBottom: '3px' }}>
-          <span style={{ color: '#6366F1', flexShrink: 0, marginTop: '2px', fontSize: '10px' }}>&#9658;</span>
+          <span style={{ color: 'rgba(255,255,255,0.80)', flexShrink: 0, marginTop: '2px', fontSize: '10px' }}>&#9658;</span>
           <span>{renderInline(line.slice(2))}</span>
         </div>
       )
@@ -132,7 +132,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
       const text = line.replace(/^\d+\.\s/, '')
       elements.push(
         <div key={elements.length} style={{ display: 'flex', gap: '8px', marginBottom: '3px' }}>
-          <span style={{ color: '#6366F1', flexShrink: 0, fontSize: '11px', fontWeight: 700, marginTop: '2px', minWidth: '14px' }}>
+          <span style={{ color: 'rgba(255,255,255,0.80)', flexShrink: 0, fontSize: '11px', fontWeight: 700, marginTop: '2px', minWidth: '14px' }}>
             {num}.
           </span>
           <span>{renderInline(text)}</span>

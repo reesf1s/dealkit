@@ -362,7 +362,7 @@ function FeatureImportanceChart({ features, isPlaceholder }: { features: { name:
         const barWidth = mounted ? Math.min(100, f.pct) : 0
         const isPositive = f.direction !== 'negative'
         const barColor = isPlaceholder
-          ? 'rgba(99,102,241,0.60)'
+          ? 'rgba(255,255,255,0.25)'
           : isPositive ? '#34d399' : '#f87171'
         return (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

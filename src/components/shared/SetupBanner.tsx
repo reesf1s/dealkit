@@ -19,10 +19,10 @@ export default function SetupBanner({ inline, context }: SetupBannerProps) {
       }}>
         <div style={{
           width: '44px', height: '44px', borderRadius: '8px',
-          background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)',
+          background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <Database size={20} color="#6366F1" />
+          <Database size={20} color="rgba(255,255,255,0.80)" />
         </div>
         <div>
           <div style={{ fontSize: '14px', fontWeight: '600', color: '#EBEBEB', marginBottom: '4px' }}>
@@ -39,8 +39,8 @@ export default function SetupBanner({ inline, context }: SetupBannerProps) {
           style={{
             display: 'inline-flex', alignItems: 'center', gap: '5px',
             padding: '7px 14px', borderRadius: '7px',
-            background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
-            color: '#818CF8', fontSize: '12px', fontWeight: '500', textDecoration: 'none',
+            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)',
+            color: 'rgba(255,255,255,0.70)', fontSize: '12px', fontWeight: '500', textDecoration: 'none',
           }}
         >
           Get free database <ExternalLink size={11} />
@@ -51,17 +51,17 @@ export default function SetupBanner({ inline, context }: SetupBannerProps) {
 
   return (
     <div style={{
-      background: 'rgba(99,102,241,0.05)',
-      border: '1px solid rgba(99,102,241,0.18)',
+      background: 'rgba(255,255,255,0.06)',
+      border: '1px solid rgba(255,255,255,0.10)',
       borderRadius: '8px', padding: '20px 24px',
       display: 'flex', alignItems: 'flex-start', gap: '16px',
     }}>
       <div style={{
         width: '38px', height: '38px', borderRadius: '10px', flexShrink: 0,
-        background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
+        background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <Database size={17} color="#818CF8" />
+        <Database size={17} color="rgba(255,255,255,0.70)" />
       </div>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: '14px', fontWeight: '600', color: '#EBEBEB', marginBottom: '4px' }}>
@@ -78,9 +78,9 @@ export default function SetupBanner({ inline, context }: SetupBannerProps) {
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
               padding: '8px 14px', borderRadius: '8px',
-              background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
-              color: '#fff', fontSize: '12px', fontWeight: '600', textDecoration: 'none',
-              boxShadow: '0 0 16px rgba(99,102,241,0.3)',
+              background: 'rgba(255,255,255,0.90)',
+              color: '#0a0b0f', fontSize: '12px', fontWeight: '600', textDecoration: 'none',
+              boxShadow: '0 0 16px rgba(0,0,0,0.25)',
             }}
           >
             Get free Neon database <ExternalLink size={11} />
@@ -91,7 +91,7 @@ export default function SetupBanner({ inline, context }: SetupBannerProps) {
             background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
             fontSize: '12px', color: '#888',
           }}>
-            <span style={{ fontFamily: 'monospace', fontSize: '11px', color: '#6366F1' }}>DATABASE_URL</span>
+            <span style={{ fontFamily: 'monospace', fontSize: '11px', color: 'rgba(255,255,255,0.80)' }}>DATABASE_URL</span>
             <span>→ Vercel env vars → Redeploy</span>
           </div>
         </div>
@@ -110,18 +110,18 @@ export function SetupAlert() {
       style={{
         display: 'flex', alignItems: 'center', gap: '10px',
         padding: '10px 16px', borderRadius: '10px',
-        background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)',
+        background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)',
         textDecoration: 'none', transition: 'border-color 0.15s',
       }}
     >
-      <div style={{ width: '26px', height: '26px', background: 'rgba(99,102,241,0.12)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <Database size={13} color="#818CF8" />
+      <div style={{ width: '26px', height: '26px', background: 'rgba(255,255,255,0.06)', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Database size={13} color="rgba(255,255,255,0.70)" />
       </div>
       <div style={{ flex: 1 }}>
         <span style={{ fontSize: '13px', color: '#EBEBEB', fontWeight: '500' }}>Database not connected — </span>
-        <span style={{ fontSize: '13px', color: '#818CF8' }}>get a free Neon database to enable all features</span>
+        <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.70)' }}>get a free Neon database to enable all features</span>
       </div>
-      <ExternalLink size={13} color="#6366F1" />
+      <ExternalLink size={13} color="rgba(255,255,255,0.80)" />
     </a>
   )
 }

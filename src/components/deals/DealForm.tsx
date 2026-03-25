@@ -25,7 +25,7 @@ function Input({ value, onChange, placeholder, type = 'text' }: { value: string;
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', boxSizing: 'border-box', transition: 'border-color 150ms ease' }}
-      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.6)' }}
+      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.30)' }}
       onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
     />
   )
@@ -39,7 +39,7 @@ function Textarea({ value, onChange, placeholder, rows = 3 }: { value: string; o
       placeholder={placeholder}
       rows={rows}
       style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, transition: 'border-color 150ms ease', fontFamily: 'inherit' }}
-      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.6)' }}
+      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.30)' }}
       onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
     />
   )
@@ -140,7 +140,7 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
       prospectName: cleanContacts[0]?.name ?? null,
       prospectTitle: cleanContacts[0]?.title ?? null,
       contacts: cleanContacts,
-      dealValue: form.dealValue ? Number(form.dealValue) : null,
+      dealValue: form.dealValue !== '' ? Number(form.dealValue) : null,
       stage: form.stage,
       dealType: form.dealType,
       recurringInterval: form.dealType === 'recurring' ? form.recurringInterval : null,
@@ -185,7 +185,7 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
             value={form.assignedRepId}
             onChange={(e) => u({ assignedRepId: e.target.value })}
             style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: form.assignedRepId ? '#EBEBEB' : '#666', fontSize: '13px', outline: 'none', boxSizing: 'border-box', cursor: 'pointer', fontFamily: 'inherit' }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.6)' }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.30)' }}
             onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
           >
             <option value="">Unassigned</option>
@@ -248,8 +248,8 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
               style={{
                 flex: 1, height: '34px', borderRadius: '6px', fontSize: '13px', fontWeight: 500,
                 color: form.dealType === type ? '#EBEBEB' : '#555',
-                backgroundColor: form.dealType === type ? 'rgba(99,102,241,0.15)' : 'transparent',
-                border: `1px solid ${form.dealType === type ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                backgroundColor: form.dealType === type ? 'rgba(255,255,255,0.08)' : 'transparent',
+                border: `1px solid ${form.dealType === type ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.08)'}`,
                 cursor: 'pointer', transition: 'all 150ms ease',
               }}
             >
@@ -300,7 +300,7 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
             color: '#EBEBEB', fontSize: '13px', outline: 'none',
             boxSizing: 'border-box', transition: 'border-color 150ms ease'
           }}
-          onFocus={(e) => { e.currentTarget.style.borderColor = errors.dealValue ? '#EF4444' : 'rgba(99,102,241,0.6)' }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = errors.dealValue ? '#EF4444' : 'rgba(255,255,255,0.30)' }}
           onBlur={(e) => { e.currentTarget.style.borderColor = errors.dealValue ? '#EF4444' : 'rgba(255,255,255,0.1)' }}
         />
         {errors.dealValue && (
@@ -345,11 +345,11 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
                 onClick={addContact}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '4px',
-                  fontSize: '11px', color: '#6366F1', background: 'none', border: 'none',
+                  fontSize: '11px', color: 'rgba(255,255,255,0.80)', background: 'none', border: 'none',
                   cursor: 'pointer', padding: 0, fontWeight: 600,
                 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#818CF8' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#6366F1' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.70)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.80)' }}
               >
                 <Plus size={11} /> Add contact
               </button>
@@ -421,9 +421,9 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
         <button
           type="submit"
           disabled={loading}
-          style={{ height: '34px', padding: '0 18px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: loading ? '#333' : '#6366F1', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
-          onMouseEnter={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#4F46E5' }}
-          onMouseLeave={(e) => { if (!loading) e.currentTarget.style.backgroundColor = '#6366F1' }}
+          style={{ height: '34px', padding: '0 18px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#0a0b0f', backgroundColor: loading ? '#333' : 'rgba(255,255,255,0.90)', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
+          onMouseEnter={(e) => { if (!loading) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.80)' }}
+          onMouseLeave={(e) => { if (!loading) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.90)' }}
         >
           {loading ? 'Logging…' : 'Log deal'}
         </button>

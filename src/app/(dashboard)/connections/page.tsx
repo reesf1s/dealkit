@@ -62,7 +62,7 @@ function McpSection({ mcpApiKey, showMcpKey, setShowMcpKey, regenerating, regene
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ fontSize: '14px' }}>🤖</span>
           </div>
           <div style={{ textAlign: 'left' }}>
@@ -92,7 +92,7 @@ function McpSection({ mcpApiKey, showMcpKey, setShowMcpKey, regenerating, regene
                 </button>
               </>
             )}
-            <button onClick={regenerateMcpKey} disabled={regenerating} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0 12px', height: '34px', borderRadius: '8px', background: mcpApiKey ? 'rgba(248,113,113,0.08)' : 'rgba(99,102,241,0.12)', border: `1px solid ${mcpApiKey ? 'rgba(248,113,113,0.18)' : 'rgba(99,102,241,0.25)'}`, color: mcpApiKey ? '#f87171' : '#818cf8', fontSize: '11px', fontWeight: 600, cursor: regenerating ? 'not-allowed' : 'pointer', opacity: regenerating ? 0.6 : 1 }}>
+            <button onClick={regenerateMcpKey} disabled={regenerating} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0 12px', height: '34px', borderRadius: '8px', background: mcpApiKey ? 'rgba(248,113,113,0.08)' : 'rgba(255,255,255,0.06)', border: `1px solid ${mcpApiKey ? 'rgba(248,113,113,0.18)' : 'rgba(255,255,255,0.10)'}`, color: mcpApiKey ? '#f87171' : 'rgba(255,255,255,0.70)', fontSize: '11px', fontWeight: 600, cursor: regenerating ? 'not-allowed' : 'pointer', opacity: regenerating ? 0.6 : 1 }}>
               <RefreshCw size={11} style={{ animation: regenerating ? 'spin 1s linear infinite' : 'none' }} />
               {mcpApiKey ? 'Regenerate' : 'Generate key'}
             </button>
@@ -120,8 +120,8 @@ function McpSection({ mcpApiKey, showMcpKey, setShowMcpKey, regenerating, regene
                 { name: 'halvex_scope_issue', desc: 'Generate user story + ACs and push to Linear cycle' },
                 { name: 'halvex_draft_release_email', desc: 'Draft a release notification for a prospect' },
               ].map(t => (
-                <div key={t.name} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 10px', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.10)', borderRadius: '8px' }}>
-                  <span style={{ fontFamily: 'monospace', fontSize: '11px', fontWeight: 600, color: '#818cf8', whiteSpace: 'nowrap', flexShrink: 0 }}>{t.name}</span>
+                <div key={t.name} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '8px 10px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px' }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.70)', whiteSpace: 'nowrap', flexShrink: 0 }}>{t.name}</span>
                   <span style={{ fontSize: '11px', color: '#64748b' }}>{t.desc}</span>
                 </div>
               ))}
@@ -271,8 +271,8 @@ export default function ConnectionsPage() {
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <div style={{ width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0, background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Plug size={18} color="#818cf8" />
+        <div style={{ width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Plug size={18} color="rgba(255,255,255,0.70)" />
         </div>
         <div>
           <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.02em', margin: 0 }}>Your Loop</h1>
@@ -329,7 +329,7 @@ export default function ConnectionsPage() {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: '8px',
                 padding: '10px 20px', borderRadius: '8px',
-                background: 'linear-gradient(135deg, rgba(74,144,226,0.15), rgba(99,102,241,0.10))',
+                background: 'rgba(255,255,255,0.06)',
                 border: '1px solid rgba(74,144,226,0.30)',
                 color: '#60a5fa', fontSize: '13px', fontWeight: 600, textDecoration: 'none',
               }}
@@ -343,7 +343,7 @@ export default function ConnectionsPage() {
       {/* ── 2. Linear — Your Product Interface ── */}
       <div style={card}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-          <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'rgba(129,140,248,0.12)', border: '1px solid rgba(129,140,248,0.22)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '9px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <span style={{ fontSize: '14px' }}>🔷</span>
           </div>
           <div>
@@ -362,11 +362,11 @@ export default function ConnectionsPage() {
             {linearData?.workspaceName && <div style={{ fontSize: '12px', color: '#475569' }}>Workspace: <span style={{ color: '#94a3b8', fontWeight: 600 }}>{linearData.workspaceName}</span></div>}
             {linearData?.lastSyncAt && <div style={{ fontSize: '12px', color: '#475569' }}>Last sync: <span style={{ color: '#94a3b8' }}>{new Date(linearData.lastSyncAt).toLocaleString()}</span></div>}
             <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
-              <button onClick={handleLinearSync} disabled={linearSyncing} style={{ ...actionBtn('129,140,248', '129,140,248'), cursor: linearSyncing ? 'not-allowed' : 'pointer', opacity: linearSyncing ? 0.6 : 1 }}>
+              <button onClick={handleLinearSync} disabled={linearSyncing} style={{ ...actionBtn('255,255,255', '255,255,255'), cursor: linearSyncing ? 'not-allowed' : 'pointer', opacity: linearSyncing ? 0.6 : 1 }}>
                 <RefreshCw size={11} style={{ animation: linearSyncing ? 'spin 1s linear infinite' : 'none' }} />
                 {linearSyncing ? 'Syncing…' : 'Sync issues'}
               </button>
-              <button onClick={handleLinearRematch} disabled={linearRematching} style={{ ...actionBtn('99,102,241', '99,102,241'), cursor: linearRematching ? 'not-allowed' : 'pointer', opacity: linearRematching ? 0.6 : 1 }}>
+              <button onClick={handleLinearRematch} disabled={linearRematching} style={{ ...actionBtn('255,255,255', '255,255,255'), cursor: linearRematching ? 'not-allowed' : 'pointer', opacity: linearRematching ? 0.6 : 1 }}>
                 {linearRematching ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : null}
                 {linearRematching ? 'Rematching…' : 'Rematch to deals'}
               </button>
@@ -382,9 +382,9 @@ export default function ConnectionsPage() {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: '8px',
                 padding: '10px 20px', borderRadius: '8px',
-                background: 'linear-gradient(135deg, rgba(129,140,248,0.15), rgba(99,102,241,0.10))',
-                border: '1px solid rgba(129,140,248,0.30)',
-                color: '#818cf8', fontSize: '13px', fontWeight: 600, textDecoration: 'none',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                color: 'rgba(255,255,255,0.70)', fontSize: '13px', fontWeight: 600, textDecoration: 'none',
               }}
             >
               <Database size={14} /> Connect Linear
@@ -429,7 +429,7 @@ export default function ConnectionsPage() {
           <div style={{ marginTop: '16px' }}>
             <p style={{ fontSize: '12px', color: '#94a3b8', margin: '0 0 12px' }}>
               Enter your HubSpot Private App access token.{' '}
-              <a href="https://developers.hubspot.com/docs/api/private-apps" target="_blank" rel="noopener noreferrer" style={{ color: '#818cf8', textDecoration: 'none' }}>Get a token →</a>
+              <a href="https://developers.hubspot.com/docs/api/private-apps" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.70)', textDecoration: 'none' }}>Get a token →</a>
             </p>
             <form onSubmit={handleHubspotConnect} style={{ display: 'flex', gap: '8px' }}>
               <input
@@ -438,7 +438,7 @@ export default function ConnectionsPage() {
                 onChange={e => setHubspotToken(e.target.value)}
                 placeholder="pat-na1-..."
                 style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', fontSize: '12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: '#e2e8f0', outline: 'none', fontFamily: 'monospace' }}
-                onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.40)')}
+                onFocus={e => (e.target.style.borderColor = 'rgba(255,255,255,0.14)')}
                 onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.10)')}
               />
               <button type="submit" disabled={hubspotConnecting || !hubspotToken.trim()} style={{ padding: '8px 16px', borderRadius: '8px', background: 'rgba(251,146,60,0.15)', border: '1px solid rgba(251,146,60,0.30)', color: '#fb923c', fontSize: '12px', fontWeight: 600, cursor: hubspotConnecting || !hubspotToken.trim() ? 'not-allowed' : 'pointer', opacity: hubspotConnecting || !hubspotToken.trim() ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '5px' }}>

@@ -28,7 +28,7 @@ function Input({ value, onChange, placeholder }: { value: string; onChange: (v: 
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', boxSizing: 'border-box', transition: 'border-color 150ms ease' }}
-      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.6)' }}
+      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)' }}
       onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
     />
   )
@@ -42,7 +42,7 @@ function Textarea({ value, onChange, placeholder, rows = 4 }: { value: string; o
       placeholder={placeholder}
       rows={rows}
       style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, transition: 'border-color 150ms ease', fontFamily: 'inherit' }}
-      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.6)' }}
+      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)' }}
       onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
     />
   )
@@ -192,7 +192,7 @@ export function CaseStudyForm({ initialData, onSubmit, onGenerateDocument, submi
             type="button"
             onClick={addMetric}
             style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '30px', padding: '0 10px', width: 'fit-content', borderRadius: '6px', backgroundColor: 'transparent', border: '1px dashed rgba(255,255,255,0.12)', cursor: 'pointer', color: '#888', fontSize: '12px' }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#6366F1'; e.currentTarget.style.color = '#6366F1' }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; e.currentTarget.style.color = 'rgba(255,255,255,0.80)' }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#888' }}
           >
             <Plus size={12} strokeWidth={2.5} />
@@ -210,7 +210,7 @@ export function CaseStudyForm({ initialData, onSubmit, onGenerateDocument, submi
             width: '36px',
             height: '20px',
             borderRadius: '9999px',
-            backgroundColor: form.isPublic ? '#6366F1' : 'rgba(255,255,255,0.1)',
+            backgroundColor: form.isPublic ? 'rgba(255,255,255,0.90)' : 'rgba(255,255,255,0.1)',
             border: 'none',
             cursor: 'pointer',
             position: 'relative',
@@ -242,11 +242,11 @@ export function CaseStudyForm({ initialData, onSubmit, onGenerateDocument, submi
             type="button"
             onClick={onGenerateDocument}
             disabled={generating || !form.customerName.trim()}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#EBEBEB', backgroundColor: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', cursor: generating ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
-            onMouseEnter={(e) => { if (!generating) e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.2)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.1)' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#EBEBEB', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', cursor: generating ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
+            onMouseEnter={(e) => { if (!generating) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
           >
-            <Sparkles size={13} strokeWidth={2} style={{ color: '#6366F1' }} />
+            <Sparkles size={13} strokeWidth={2} style={{ color: 'rgba(255,255,255,0.80)' }} />
             {generating ? 'Generating…' : 'Generate Document'}
           </button>
         )}
@@ -254,9 +254,9 @@ export function CaseStudyForm({ initialData, onSubmit, onGenerateDocument, submi
         <button
           type="submit"
           disabled={loading || !form.customerName.trim()}
-          style={{ height: '34px', padding: '0 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: loading || !form.customerName.trim() ? '#333' : '#6366F1', border: 'none', cursor: loading || !form.customerName.trim() ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
-          onMouseEnter={(e) => { if (!loading && form.customerName.trim()) e.currentTarget.style.backgroundColor = '#4F46E5' }}
-          onMouseLeave={(e) => { if (!loading && form.customerName.trim()) e.currentTarget.style.backgroundColor = '#6366F1' }}
+          style={{ height: '34px', padding: '0 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#0a0b0f', backgroundColor: loading || !form.customerName.trim() ? '#333' : 'rgba(255,255,255,0.90)', border: 'none', cursor: loading || !form.customerName.trim() ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
+          onMouseEnter={(e) => { if (!loading && form.customerName.trim()) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.80)' }}
+          onMouseLeave={(e) => { if (!loading && form.customerName.trim()) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.90)' }}
         >
           {loading ? 'Saving…' : submitLabel}
         </button>

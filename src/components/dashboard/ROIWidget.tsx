@@ -85,9 +85,9 @@ export default function ROIWidget({ deals, collateralCount, currencySymbol = '£
       sublabel: 'annualised',
       value: !hasDeals ? '—' : openPipeline > 0 ? formatCurrency(openPipeline, currencySymbol) : '—',
       hint: !hasDeals ? 'Log a deal' : `${openDeals.length} open deal${openDeals.length !== 1 ? 's' : ''}`,
-      color: '#6366F1',
-      glow: 'rgba(99,102,241,0.12)',
-      border: 'rgba(99,102,241,0.15)',
+      color: '#3B82F6',
+      glow: 'rgba(59,130,246,0.12)',
+      border: 'rgba(59,130,246,0.15)',
     },
     {
       label: 'Avg Deal',
@@ -113,14 +113,14 @@ export default function ROIWidget({ deals, collateralCount, currencySymbol = '£
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
         <div style={{
           width: '24px', height: '24px', borderRadius: '6px',
-          background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.15))',
-          border: '1px solid rgba(99,102,241,0.25)',
+          background: 'rgba(255,255,255,0.08)',
+          border: '1px solid rgba(255,255,255,0.10)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="12" width="4" height="9" rx="1" fill="#818CF8" />
-            <rect x="10" y="7" width="4" height="14" rx="1" fill="#818CF8" />
-            <rect x="17" y="3" width="4" height="18" rx="1" fill="#818CF8" />
+            <rect x="3" y="12" width="4" height="9" rx="1" fill="rgba(255,255,255,0.70)" />
+            <rect x="10" y="7" width="4" height="14" rx="1" fill="rgba(255,255,255,0.70)" />
+            <rect x="17" y="3" width="4" height="18" rx="1" fill="rgba(255,255,255,0.70)" />
           </svg>
         </div>
         <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Revenue Impact</span>

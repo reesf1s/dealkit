@@ -102,7 +102,7 @@ export default function TopNav() {
           </span>
           <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.12)' }}>/</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <Icon size={12} style={{ color: '#818cf8', flexShrink: 0 }} />
+            <Icon size={12} style={{ color: 'rgba(255,255,255,0.70)', flexShrink: 0 }} />
             <span style={{ fontSize: '13px', fontWeight: 500, color: 'rgba(255,255,255,0.75)', letterSpacing: '-0.02em' }}>
               {label}
             </span>
@@ -189,25 +189,25 @@ export default function TopNav() {
             display: 'flex', alignItems: 'center', gap: '6px',
             borderRadius: '7px', fontSize: '12px', fontWeight: 500,
             letterSpacing: '-0.01em', cursor: 'pointer',
-            background: 'rgba(99,102,241,0.10)',
-            border: '1px solid rgba(99,102,241,0.20)',
-            color: '#818cf8',
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            color: 'rgba(255,255,255,0.70)',
             transition: 'all 0.12s', flexShrink: 0,
           }}
           onMouseEnter={e => {
-            ;(e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.18)'
-            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.32)'
+            ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'
+            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.12)'
           }}
           onMouseLeave={e => {
-            ;(e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.10)'
-            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.20)'
+            ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
+            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'
           }}
         >
-          <MessageSquare size={11} style={{ color: '#818cf8', flexShrink: 0 }} />
+          <MessageSquare size={11} style={{ color: 'rgba(255,255,255,0.70)', flexShrink: 0 }} />
           Ask AI
           <span style={{
-            fontSize: '10px', color: 'rgba(129,140,248,0.40)',
-            background: 'rgba(99,102,241,0.10)', padding: '1px 4px',
+            fontSize: '10px', color: 'rgba(255,255,255,0.25)',
+            background: 'rgba(255,255,255,0.06)', padding: '1px 4px',
             borderRadius: '3px',
           }}>⌘K</span>
         </button>
@@ -215,7 +215,7 @@ export default function TopNav() {
         {/* Avatar */}
         <div style={{
           width: '30px', height: '30px', borderRadius: '50%',
-          background: 'linear-gradient(135deg, rgba(99,102,241,0.80), rgba(139,92,246,0.70))',
+          background: 'rgba(255,255,255,0.14)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.90)',
           boxShadow: '0 0 0 1px rgba(255,255,255,0.10)',

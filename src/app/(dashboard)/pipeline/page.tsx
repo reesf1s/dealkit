@@ -99,7 +99,7 @@ function sortBoardDeals(deals: any[], sort: string): any[] {
 const STAGES = [
   { id: 'prospecting',   label: 'Prospecting',   color: '#6B7280' },
   { id: 'qualification', label: 'Qualification',  color: '#3B82F6' },
-  { id: 'discovery',     label: 'Discovery',      color: '#8B5CF6' },
+  { id: 'discovery',     label: 'Discovery',      color: 'rgba(255,255,255,0.70)' },
   { id: 'proposal',      label: 'Proposal',       color: '#F59E0B' },
   { id: 'negotiation',   label: 'Negotiation',    color: '#EF4444' },
   { id: 'closed_won',    label: 'Closed Won',     color: '#22C55E' },
@@ -511,7 +511,7 @@ function IntelListView({
         padding: '16px 20px',
         background: urgentCount > 0
           ? 'linear-gradient(135deg, rgba(248,113,113,0.07) 0%, rgba(255,255,255,0.03) 100%)'
-          : 'linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(255,255,255,0.03) 100%)',
+          : 'rgba(255,255,255,0.04)',
         ...cardStyle,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
@@ -533,9 +533,9 @@ function IntelListView({
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
                 padding: '7px 13px', borderRadius: '8px', cursor: 'pointer',
-                background: 'rgba(99,102,241,0.10)',
-                border: '1px solid rgba(99,102,241,0.20)',
-                color: '#818cf8', fontSize: '12px', fontWeight: 500,
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: 'rgba(255,255,255,0.70)', fontSize: '12px', fontWeight: 500,
               }}
             >
               <Brain size={12} /> Ask AI about pipeline
@@ -594,9 +594,9 @@ function IntelListView({
             <Link href="/deals" style={{
               display: 'inline-flex', alignItems: 'center', gap: '5px',
               padding: '8px 16px', borderRadius: '8px',
-              background: 'rgba(99,102,241,0.12)',
-              border: '1px solid rgba(99,102,241,0.22)',
-              color: '#818cf8', fontSize: '12px', fontWeight: 600, textDecoration: 'none',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.10)',
+              color: 'rgba(255,255,255,0.70)', fontSize: '12px', fontWeight: 600, textDecoration: 'none',
             }}>
               <Plus size={12} /> Add first deal
             </Link>
@@ -714,7 +714,7 @@ function PipelineSettings({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editLabel, setEditLabel] = useState('')
   const [newLabel, setNewLabel] = useState('')
-  const [newColor, setNewColor] = useState('#8B5CF6')
+  const [newColor, setNewColor] = useState('rgba(255,255,255,0.70)')
   const [editingColorId, setEditingColorId] = useState<string | null>(null)
 
   if (!open) return null
@@ -792,7 +792,7 @@ function PipelineSettings({
     onUpdate()
   }
 
-  const PRESET_COLORS = ['#6B7280', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444', '#22C55E', '#EC4899', '#14B8A6', '#F97316']
+  const PRESET_COLORS = ['#6B7280', '#3B82F6', 'rgba(255,255,255,0.70)', '#F59E0B', '#EF4444', '#22C55E', '#EC4899', '#14B8A6', '#F97316']
 
   return (
     <div style={{
@@ -1005,7 +1005,7 @@ function AnimatedBar({ pct, color }: { pct: number; color: string }) {
 }
 
 // ── Mini SVG Sparkline ────────────────────────────────────────────────────────
-function Sparkline({ points, color = '#6366f1', w = 100, h = 28 }: { points: number[]; color?: string; w?: number; h?: number }) {
+function Sparkline({ points, color = 'rgba(255,255,255,0.80)', w = 100, h = 28 }: { points: number[]; color?: string; w?: number; h?: number }) {
   if (points.length < 2) return null
   const min = Math.min(...points)
   const max = Math.max(...points)
@@ -1378,7 +1378,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
           {competitivePatterns.length > 0 && (
             <button
               onClick={() => onAsk('Analyse our competitive win/loss patterns and give me specific recommendations for how to beat each competitor we face.')}
-              style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+              style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
             >
               <Sparkles size={10} /> Competitive Strategy
             </button>
@@ -1462,7 +1462,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
                   )}
                   <button
                     onClick={() => onAsk(`The ${t.dealName} deal score is ${isDown ? 'declining' : 'improving'}: ${t.message ?? ''}. Review the deal and tell me what's driving this and what I should do now.`)}
-                    style={{ flexShrink: 0, padding: '4px 10px', borderRadius: '6px', background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', color: 'var(--accent)', fontSize: '10px', fontWeight: '600', cursor: 'pointer' }}
+                    style={{ flexShrink: 0, padding: '4px 10px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--accent)', fontSize: '10px', fontWeight: '600', cursor: 'pointer' }}
                   >
                     Ask AI
                   </button>
@@ -1571,7 +1571,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
           </div>
           <button
             onClick={() => onAsk("Analyse my pipeline trends and tell me what's changed, what the data says about where my revenue will come from this quarter, and what I should do differently.")}
-            style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 14px', borderRadius: '8px', background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10))', border: '1px solid rgba(99,102,241,0.25)', color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+            style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 14px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
           >
             <Sparkles size={10} /> Deep Analysis
           </button>
@@ -2301,6 +2301,6 @@ export default function PipelinePage() {
 // Utility: convert hex color to "r,g,b" string for rgba()
 function hexToRgb(hex: string): string {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
-  if (!result) return '124,58,237'
+  if (!result) return '255,255,255'
   return `${parseInt(result[1], 16)},${parseInt(result[2], 16)},${parseInt(result[3], 16)}`
 }

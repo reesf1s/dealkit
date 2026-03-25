@@ -50,7 +50,7 @@ export default async function LandingPage() {
           100% { stroke-dashoffset: 0; opacity: 0.6; }
         }
         .nav-link:hover { color: #f1f5f9 !important; }
-        .cta-primary:hover { background: #4f46e5 !important; }
+        .cta-primary:hover { background: rgba(255,255,255,0.90) !important; }
         .cta-secondary:hover { background: rgba(255,255,255,0.06) !important; border-color: rgba(255,255,255,0.16) !important; }
         .loop-card:hover { background: rgba(255,255,255,0.07) !important; border-color: rgba(255,255,255,0.14) !important; }
         .pricing-card:hover { border-color: rgba(255,255,255,0.14) !important; }
@@ -79,7 +79,7 @@ export default async function LandingPage() {
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
               width: '26px', height: '26px', borderRadius: '8px',
-              background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.80) 0%, rgba(255,255,255,0.70) 100%)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '13px', fontWeight: 800, color: '#fff',
             }}>H</div>
@@ -103,7 +103,7 @@ export default async function LandingPage() {
             className="cta-primary"
             style={{
               fontSize: '13px', fontWeight: 600, color: '#fff',
-              background: '#6366f1', padding: '7px 16px', borderRadius: '8px',
+              background: 'rgba(255,255,255,0.80)', padding: '7px 16px', borderRadius: '8px',
               transition: 'background 0.15s',
             }}>
             Get started →
@@ -116,11 +116,11 @@ export default async function LandingPage() {
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: '6px',
           padding: '4px 14px', borderRadius: '100px',
-          background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.25)',
-          fontSize: '11px', fontWeight: 600, color: '#818cf8', letterSpacing: '0.06em',
+          background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
+          fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.70)', letterSpacing: '0.06em',
           textTransform: 'uppercase', marginBottom: '28px',
         }}>
-          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#818cf8', animation: 'pulse-slow 2s infinite' }} />
+          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'rgba(255,255,255,0.70)', animation: 'pulse-slow 2s infinite' }} />
           Revenue-to-Product Intelligence
         </div>
 
@@ -131,7 +131,7 @@ export default async function LandingPage() {
         }}>
           Stop losing deals to features{' '}
           <span style={{
-            background: 'linear-gradient(135deg, #6366f1, #818cf8)',
+            background: 'linear-gradient(135deg, rgba(255,255,255,0.80), rgba(255,255,255,0.70))',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
           }}>you haven&apos;t built yet</span>
@@ -150,7 +150,7 @@ export default async function LandingPage() {
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '8px',
               padding: '12px 28px', borderRadius: '10px', fontWeight: 700,
-              fontSize: '15px', color: '#fff', background: '#6366f1',
+              fontSize: '15px', color: '#fff', background: 'rgba(255,255,255,0.80)',
               transition: 'background 0.15s',
             }}>
             Start for free
@@ -172,7 +172,7 @@ export default async function LandingPage() {
         <div id="product" style={{ marginTop: '64px', display: 'flex', justifyContent: 'center', gap: '0', alignItems: 'center', flexWrap: 'wrap', position: 'relative' }}>
           {[
             { label: 'Deal logged', sub: 'Win/loss patterns', color: '#10b981', icon: '📊' },
-            { label: 'Gap detected', sub: 'Ranked by revenue', color: '#6366f1', icon: '🎯' },
+            { label: 'Gap detected', sub: 'Ranked by revenue', color: 'rgba(255,255,255,0.80)', icon: '🎯' },
             { label: 'Linear linked', sub: 'Engineers see context', color: '#3b82f6', icon: '🔗' },
             { label: 'Rep notified', sub: 'Re-engagement email', color: '#f59e0b', icon: '✉️' },
           ].map((node, i) => (
@@ -225,7 +225,7 @@ export default async function LandingPage() {
               },
               {
                 step: '02', title: 'Halvex detects gaps', body: 'ML ranks product gaps by revenue at stake. SSO blocking £240k? You\'ll know.',
-                color: '#6366f1', bg: 'rgba(99,102,241,0.06)', border: 'rgba(99,102,241,0.14)',
+                color: 'rgba(255,255,255,0.80)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.06)',
               },
               {
                 step: '03', title: 'Auto-links to Linear', body: 'Issues are linked to your backlog. Engineers see the business context behind every ticket.',
@@ -257,7 +257,7 @@ export default async function LandingPage() {
             {[
               {
                 audience: 'For sales teams',
-                color: '#6366f1',
+                color: 'rgba(255,255,255,0.80)',
                 headline: 'Know which deals are at risk before it\'s too late',
                 points: [
                   'Deal health ring shows win probability at a glance',
@@ -323,7 +323,7 @@ export default async function LandingPage() {
               { name: 'HubSpot', color: '#ff7a59', available: true },
               { name: 'Linear', color: '#5e6ad2', available: true },
               { name: 'Slack', color: '#4a154b', available: true },
-              { name: 'Claude MCP', color: '#6366f1', available: true },
+              { name: 'Claude MCP', color: 'rgba(255,255,255,0.80)', available: true },
               { name: 'GitHub', color: '#6e7681', available: false },
               { name: 'Salesforce', color: '#00a1e0', available: false },
             ].map(int => (
@@ -374,8 +374,8 @@ export default async function LandingPage() {
             ].map(tier => (
               <div key={tier.name} className="pricing-card" style={{
                 padding: '28px 24px', borderRadius: '14px',
-                background: tier.featured ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.03)',
-                border: tier.featured ? '1px solid rgba(99,102,241,0.30)' : '1px solid rgba(255,255,255,0.08)',
+                background: tier.featured ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
+                border: tier.featured ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(255,255,255,0.08)',
                 transition: 'border-color 0.15s',
                 position: 'relative',
               }}>
@@ -383,7 +383,7 @@ export default async function LandingPage() {
                   <div style={{
                     position: 'absolute', top: '-11px', left: '50%', transform: 'translateX(-50%)',
                     padding: '2px 16px', borderRadius: '100px',
-                    background: '#6366f1', fontSize: '11px', fontWeight: 700, color: '#fff',
+                    background: 'rgba(255,255,255,0.80)', fontSize: '11px', fontWeight: 700, color: '#fff',
                     letterSpacing: '0.04em',
                   }}>Most popular</div>
                 )}
@@ -397,7 +397,7 @@ export default async function LandingPage() {
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
                   {tier.features.map((f, i) => (
                     <li key={i} style={{ display: 'flex', gap: '8px', fontSize: '13px', color: 'rgba(241,245,249,0.65)', alignItems: 'flex-start' }}>
-                      <span style={{ color: tier.featured ? '#818cf8' : '#10b981', flexShrink: 0 }}>✓</span>
+                      <span style={{ color: tier.featured ? 'rgba(255,255,255,0.70)' : '#10b981', flexShrink: 0 }}>✓</span>
                       {f}
                     </li>
                   ))}
@@ -405,7 +405,7 @@ export default async function LandingPage() {
                 <Link href="/sign-up" style={{
                   display: 'block', textAlign: 'center',
                   padding: '10px', borderRadius: '8px', fontWeight: 600, fontSize: '13px',
-                  background: tier.featured ? '#6366f1' : 'rgba(255,255,255,0.05)',
+                  background: tier.featured ? 'rgba(255,255,255,0.80)' : 'rgba(255,255,255,0.05)',
                   border: tier.featured ? 'none' : '1px solid rgba(255,255,255,0.10)',
                   color: tier.featured ? '#fff' : 'rgba(241,245,249,0.75)',
                   transition: 'opacity 0.15s',
@@ -417,7 +417,7 @@ export default async function LandingPage() {
           </div>
 
           <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '13px', color: 'rgba(241,245,249,0.40)' }}>
-            Need more? <a href="mailto:hello@halvex.io" style={{ color: '#818cf8' }}>Contact us for Enterprise pricing</a>
+            Need more? <a href="mailto:hello@halvex.io" style={{ color: 'rgba(255,255,255,0.70)' }}>Contact us for Enterprise pricing</a>
           </div>
         </div>
       </section>
@@ -436,7 +436,7 @@ export default async function LandingPage() {
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '8px',
               padding: '13px 32px', borderRadius: '10px', fontWeight: 700,
-              fontSize: '15px', color: '#fff', background: '#6366f1',
+              fontSize: '15px', color: '#fff', background: 'rgba(255,255,255,0.80)',
               transition: 'background 0.15s',
             }}>
             Get started free →

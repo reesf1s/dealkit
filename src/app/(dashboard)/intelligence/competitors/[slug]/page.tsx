@@ -9,7 +9,7 @@ import { ArrowLeft, TrendingUp, TrendingDown, Shield, Target, Swords, BarChart2,
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 const card: React.CSSProperties = {
-  background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.04), transparent)',
+  background: 'rgba(255,255,255,0.04)',
   backdropFilter: 'blur(20px)',
   WebkitBackdropFilter: 'blur(20px)',
   border: '1px solid rgba(255,255,255,0.08)',
@@ -115,7 +115,7 @@ export default function CompetitorBattlecardPage() {
       {linkedDeals.length > 0 && (
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           {[
-            { label: 'Deals tracked', value: String(linkedDeals.length), color: '#818cf8' },
+            { label: 'Deals tracked', value: String(linkedDeals.length), color: 'rgba(255,255,255,0.70)' },
             { label: 'Won', value: String(wonDeals.length), color: '#34d399' },
             { label: 'Lost', value: String(lostDeals.length), color: '#f87171' },
             { label: 'Win rate', value: linkedDeals.length > 0 ? `${Math.round((wonDeals.length / linkedDeals.length) * 100)}%` : '—', color: wonDeals.length > lostDeals.length ? '#34d399' : '#f87171' },
@@ -191,10 +191,10 @@ export default function CompetitorBattlecardPage() {
         <div style={card}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Shield size={15} style={{ color: '#818cf8' }} />
+              <Shield size={15} style={{ color: 'rgba(255,255,255,0.70)' }} />
               <span style={{ fontSize: '13px', fontWeight: 700, color: '#e2e8f0' }}>Profile</span>
             </div>
-            <Link href={`/competitors/${compProfile.id}`} style={{ fontSize: '11px', color: '#6366f1', textDecoration: 'none', fontWeight: 500 }}>
+            <Link href={`/competitors/${compProfile.id}`} style={{ fontSize: '11px', color: 'rgba(255,255,255,0.80)', textDecoration: 'none', fontWeight: 500 }}>
               Edit profile →
             </Link>
           </div>

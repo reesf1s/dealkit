@@ -54,20 +54,20 @@ export default function CookieBanner() {
         background: 'rgba(9,6,18,0.97)',
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
-        border: '1px solid rgba(139,92,246,0.25)',
+        border: '1px solid rgba(255,255,255,0.10)',
         borderRadius: '8px',
         padding: '20px',
-        boxShadow: '0 24px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,102,241,0.1)',
+        boxShadow: '0 24px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06)',
       }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
               width: '32px', height: '32px', borderRadius: '9px',
-              background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(139,92,246,0.25)',
+              background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
             }}>
-              <Cookie size={15} color="#A78BFA" />
+              <Cookie size={15} color="rgba(255,255,255,0.70)" />
             </div>
             <div>
               <div style={{ fontSize: '14px', fontWeight: '700', color: '#F0EEFF' }}>Cookie preferences</div>
@@ -81,7 +81,7 @@ export default function CookieBanner() {
 
         <p style={{ fontSize: '12px', color: '#9CA3AF', lineHeight: '1.7', marginBottom: '14px' }}>
           We use cookies to keep you signed in and remember your preferences.{' '}
-          <Link href="/privacy" style={{ color: '#818CF8' }}>Privacy Policy</Link>
+          <Link href="/privacy" style={{ color: 'rgba(255,255,255,0.70)' }}>Privacy Policy</Link>
         </p>
 
         {/* Detailed preferences */}
@@ -102,7 +102,7 @@ export default function CookieBanner() {
                   onClick={onChange}
                   style={{
                     width: '38px', height: '22px', borderRadius: '100px',
-                    background: value ? 'linear-gradient(135deg, #6366F1, #7C3AED)' : 'rgba(255,255,255,0.08)',
+                    background: value ? 'rgba(255,255,255,0.90)' : 'rgba(255,255,255,0.08)',
                     border: 'none', cursor: locked ? 'not-allowed' : 'pointer',
                     position: 'relative', transition: 'background 0.2s', flexShrink: 0,
                   }}
@@ -136,9 +136,9 @@ export default function CookieBanner() {
             <button onClick={savePreferences} style={{
               flex: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
               padding: '9px', borderRadius: '9px', border: 'none', cursor: 'pointer',
-              background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
-              boxShadow: '0 0 16px rgba(99,102,241,0.3)',
-              color: '#fff', fontSize: '12px', fontWeight: '600',
+              background: 'rgba(255,255,255,0.90)',
+              boxShadow: '0 0 16px rgba(0,0,0,0.25)',
+              color: '#0a0b0f', fontSize: '12px', fontWeight: '600',
             }}>
               <Check size={12} /> Save preferences
             </button>
@@ -154,9 +154,9 @@ export default function CookieBanner() {
               <button onClick={acceptAll} style={{
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                 padding: '9px', borderRadius: '9px', border: 'none', cursor: 'pointer',
-                background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
-                boxShadow: '0 0 16px rgba(99,102,241,0.3)',
-                color: '#fff', fontSize: '12px', fontWeight: '600',
+                background: 'rgba(255,255,255,0.90)',
+                boxShadow: '0 0 16px rgba(0,0,0,0.25)',
+                color: '#0a0b0f', fontSize: '12px', fontWeight: '600',
               }}>
                 Accept all
               </button>

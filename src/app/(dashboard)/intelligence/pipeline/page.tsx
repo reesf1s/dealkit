@@ -100,7 +100,7 @@ export default function PipelinePage() {
       <div style={card}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BarChart2 size={15} style={{ color: '#4f46e5' }} />
+            <BarChart2 size={15} style={{ color: 'rgba(255,255,255,0.90)' }} />
             <span style={{ fontSize: '13px', fontWeight: 600, color: 'white' }}>Competitive Landscape</span>
           </div>
         </div>

@@ -47,10 +47,10 @@ export function PageTabs({ tabs }: { tabs: PageTab[] }) {
               borderRadius: '7px',
               fontSize: '12px',
               fontWeight: active ? '600' : '500',
-              color: active ? '#818cf8' : 'rgba(255,255,255,0.45)',
-              background: active ? 'rgba(99,102,241,0.14)' : 'transparent',
+              color: active ? 'rgba(255,255,255,0.80)' : 'rgba(255,255,255,0.45)',
+              background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
               textDecoration: 'none',
-              border: active ? '1px solid rgba(99,102,241,0.22)' : '1px solid transparent',
+              border: active ? '1px solid rgba(255,255,255,0.10)' : '1px solid transparent',
               transition: 'all 0.12s ease',
               whiteSpace: 'nowrap',
             }}
@@ -67,7 +67,7 @@ export function PageTabs({ tabs }: { tabs: PageTab[] }) {
               }
             }}
           >
-            {Icon && <Icon size={12} color={active ? '#6366f1' : 'currentColor'} strokeWidth={2} />}
+            {Icon && <Icon size={12} color={active ? 'rgba(255,255,255,0.80)' : 'currentColor'} strokeWidth={2} />}
             {tab.label}
           </Link>
         )

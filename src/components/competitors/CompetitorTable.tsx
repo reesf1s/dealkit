@@ -114,7 +114,7 @@ export function CompetitorTable({ competitors, collateral, onDelete, onGenerateB
                 <Link
                   href={`/competitors/${competitor.id}`}
                   style={{ fontSize: '13px', fontWeight: 500, color: '#EBEBEB', textDecoration: 'none' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = '#6366F1' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.80)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.color = '#EBEBEB' }}
                 >
                   {competitor.name}
@@ -160,9 +160,9 @@ export function CompetitorTable({ competitors, collateral, onDelete, onGenerateB
                   onClick={() => handleGenerateBattlecard(competitor.id)}
                   disabled={isGenerating}
                   title={battlecard ? 'Regenerate battlecard' : 'Generate battlecard'}
-                  style={{ height: '28px', width: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', backgroundColor: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', cursor: isGenerating ? 'not-allowed' : 'pointer', color: '#6366F1' }}
-                  onMouseEnter={(e) => { if (!isGenerating) e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.2)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.1)' }}
+                  style={{ height: '28px', width: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', cursor: isGenerating ? 'not-allowed' : 'pointer', color: 'rgba(255,255,255,0.80)' }}
+                  onMouseEnter={(e) => { if (!isGenerating) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
                 >
                   <Sparkles size={12} strokeWidth={2} style={{ animation: isGenerating ? 'spin 1s linear infinite' : 'none' }} />
                 </button>

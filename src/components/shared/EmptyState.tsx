@@ -29,14 +29,14 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
           width: '52px',
           height: '52px',
           borderRadius: '12px',
-          background: 'rgba(99, 102, 241, 0.10)',
-          border: '1px solid rgba(99, 102, 241, 0.18)',
+          background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.10)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Icon size={20} strokeWidth={1.5} style={{ color: '#6366f1' }} />
+        <Icon size={20} strokeWidth={1.5} style={{ color: 'rgba(255,255,255,0.80)' }} />
       </div>
 
       {/* Text */}
@@ -74,20 +74,20 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
             borderRadius: '8px',
             fontSize: '13px',
             fontWeight: 600,
-            color: '#fff',
-            background: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
-            border: '1px solid rgba(99,102,241,0.40)',
+            background: 'rgba(255,255,255,0.90)',
+            color: '#0a0b0f',
+            border: '1px solid rgba(255,255,255,0.14)',
             cursor: 'pointer',
             transition: 'all 150ms ease',
-            boxShadow: '0 2px 8px rgba(99,102,241,0.25)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'translateY(-1px)'
-            e.currentTarget.style.boxShadow = '0 4px 16px rgba(99,102,241,0.35)'
+            e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.25)'
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = '0 2px 8px rgba(99,102,241,0.25)'
+            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.25)'
           }}
         >
           {action.label}

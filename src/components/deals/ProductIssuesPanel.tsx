@@ -199,8 +199,8 @@ export function ProductIssuesPanel({ dealId }: Props) {
             disabled={discovering}
             style={{
               display: 'flex', alignItems: 'center', gap: '4px',
-              fontSize: '11px', color: '#818cf8', background: 'rgba(99,102,241,0.10)',
-              border: '1px solid rgba(99,102,241,0.20)', borderRadius: '4px',
+              fontSize: '11px', color: 'rgba(255,255,255,0.70)', background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px',
               cursor: discovering ? 'not-allowed' : 'pointer', padding: '3px 8px',
               opacity: discovering ? 0.6 : 1,
             }}
@@ -296,9 +296,9 @@ export function ProductIssuesPanel({ dealId }: Props) {
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{
-                            fontSize: '10px', fontWeight: 700, color: '#818cf8',
-                            background: 'rgba(99,102,241,0.12)',
-                            border: '1px solid rgba(99,102,241,0.22)',
+                            fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.70)',
+                            background: 'rgba(255,255,255,0.06)',
+                            border: '1px solid rgba(255,255,255,0.10)',
                             borderRadius: '4px', padding: '1px 6px',
                             flexShrink: 0, textDecoration: 'none',
                             letterSpacing: '0.02em',
@@ -308,9 +308,9 @@ export function ProductIssuesPanel({ dealId }: Props) {
                         </a>
                       ) : (
                         <span style={{
-                          fontSize: '10px', fontWeight: 700, color: '#818cf8',
-                          background: 'rgba(99,102,241,0.12)',
-                          border: '1px solid rgba(99,102,241,0.22)',
+                          fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.70)',
+                          background: 'rgba(255,255,255,0.06)',
+                          border: '1px solid rgba(255,255,255,0.10)',
                           borderRadius: '4px', padding: '1px 6px',
                           flexShrink: 0, letterSpacing: '0.02em',
                         }}>
@@ -380,8 +380,8 @@ export function ProductIssuesPanel({ dealId }: Props) {
                         <span style={{
                           fontSize: '9px', fontWeight: 600,
                           padding: '1px 5px', borderRadius: '10px',
-                          background: 'color-mix(in srgb, #6366F1 15%, transparent)',
-                          color: '#818CF8',
+                          background: 'rgba(255,255,255,0.08)',
+                          color: 'rgba(255,255,255,0.70)',
                           flexShrink: 0,
                           letterSpacing: '0.02em',
                         }}>

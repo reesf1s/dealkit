@@ -210,8 +210,8 @@ export default function CollateralDetailPage() {
                 <button
                   onClick={handleShare}
                   disabled={shareLoading}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, color: item.isShared ? 'var(--accent)' : 'var(--text-primary)', backgroundColor: item.isShared ? 'var(--accent-subtle)' : 'var(--surface-hover)', border: item.isShared ? '1px solid rgba(99,102,241,0.3)' : '1px solid var(--surface-hover)', cursor: shareLoading ? 'not-allowed' : 'pointer', opacity: shareLoading ? 0.6 : 1, transition: 'background-color 0.1s ease' }}
-                  onMouseEnter={(e) => { if (!shareLoading) e.currentTarget.style.backgroundColor = item.isShared ? 'rgba(99,102,241,0.2)' : 'var(--border-strong)' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, color: item.isShared ? 'var(--accent)' : 'var(--text-primary)', backgroundColor: item.isShared ? 'var(--accent-subtle)' : 'var(--surface-hover)', border: item.isShared ? '1px solid rgba(255,255,255,0.12)' : '1px solid var(--surface-hover)', cursor: shareLoading ? 'not-allowed' : 'pointer', opacity: shareLoading ? 0.6 : 1, transition: 'background-color 0.1s ease' }}
+                  onMouseEnter={(e) => { if (!shareLoading) e.currentTarget.style.backgroundColor = item.isShared ? 'rgba(255,255,255,0.08)' : 'var(--border-strong)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = item.isShared ? 'var(--accent-subtle)' : 'var(--surface-hover)' }}
                 >
                   <Share2 size={13} strokeWidth={2} />

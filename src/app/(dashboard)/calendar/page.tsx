@@ -40,7 +40,7 @@ type CalEvent = {
 const EVENT_CONFIG: Record<string, {
   label: string; color: string; borderStyle?: string; icon: React.ElementType
 }> = {
-  meeting:         { label: 'Meeting',          color: '#6366F1', icon: Users },
+  meeting:         { label: 'Meeting',          color: 'rgba(255,255,255,0.80)', icon: Users },
   follow_up:       { label: 'Follow-up',        color: '#FBBF24', icon: Clock },
   demo:            { label: 'Demo',             color: '#34D399', icon: Zap },
   deadline:        { label: 'Deadline',         color: '#F87171', icon: AlertCircle },
@@ -456,8 +456,8 @@ function EventPopover({
             style={{
               flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
               padding: '8px 12px', borderRadius: '8px',
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.12))',
-              border: '1px solid rgba(99,102,241,0.3)',
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.12)',
               color: 'var(--accent)', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
             }}
           >
@@ -809,8 +809,8 @@ export default function CalendarPage() {
                       style={{
                         flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
                         padding: '5px 10px', borderRadius: '6px',
-                        background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.10))',
-                        border: '1px solid rgba(99,102,241,0.25)',
+                        background: 'rgba(255,255,255,0.06)',
+                        border: '1px solid rgba(255,255,255,0.10)',
                         color: 'var(--accent)', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
                       }}
                     >

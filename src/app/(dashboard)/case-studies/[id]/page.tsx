@@ -96,8 +96,8 @@ export default function CaseStudyDetailPage() {
 
           {/* Generated narrative */}
           {caseStudy.generatedNarrative && (
-            <div style={{ marginTop: '24px', background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '10px', padding: '20px' }}>
-              <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#6366F1', margin: '0 0 12px' }}>
+            <div style={{ marginTop: '24px', background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '20px' }}>
+              <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'rgba(255,255,255,0.80)', margin: '0 0 12px' }}>
                 Generated narrative
               </h2>
               <p style={{ fontSize: '13px', color: '#EBEBEB', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>

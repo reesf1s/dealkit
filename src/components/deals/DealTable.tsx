@@ -28,9 +28,9 @@ function stageBadge(stage: string) {
   return (
     <span style={{
       fontSize: '11px',
-      color: '#6366f1',
-      backgroundColor: 'rgba(99,102,241,0.10)',
-      border: '1px solid rgba(99,102,241,0.18)',
+      color: 'rgba(255,255,255,0.80)',
+      backgroundColor: 'rgba(255,255,255,0.06)',
+      border: '1px solid rgba(255,255,255,0.10)',
       padding: '2px 8px',
       borderRadius: '9999px',
       textTransform: 'capitalize',
@@ -43,8 +43,8 @@ function stageBadge(stage: string) {
 function SortIcon({ field, active, direction }: { field: string; active: boolean; direction: 'asc' | 'desc' }) {
   if (!active) return <ChevronUp size={12} style={{ color: '#d1d1d6' }} />
   return direction === 'asc'
-    ? <ChevronUp size={12} style={{ color: '#6366f1' }} />
-    : <ChevronDown size={12} style={{ color: '#6366f1' }} />
+    ? <ChevronUp size={12} style={{ color: 'rgba(255,255,255,0.80)' }} />
+    : <ChevronDown size={12} style={{ color: 'rgba(255,255,255,0.80)' }} />
 }
 
 export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: DealTableProps) {
@@ -120,9 +120,9 @@ export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: Dea
               borderRadius: '8px',
               fontSize: '12px',
               fontWeight: filter === tab.key ? 600 : 500,
-              color: filter === tab.key ? '#818cf8' : 'rgba(255,255,255,0.45)',
-              backgroundColor: filter === tab.key ? 'rgba(99,102,241,0.10)' : 'transparent',
-              border: filter === tab.key ? '1px solid rgba(99,102,241,0.20)' : '1px solid transparent',
+              color: filter === tab.key ? 'rgba(255,255,255,0.80)' : 'rgba(255,255,255,0.45)',
+              backgroundColor: filter === tab.key ? 'rgba(255,255,255,0.06)' : 'transparent',
+              border: filter === tab.key ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent',
               cursor: 'pointer',
               transition: 'all 150ms ease',
             }}
@@ -149,7 +149,7 @@ export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: Dea
 
       {/* Table */}
       <div style={{
-        background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.04), transparent)',
+        background: 'rgba(255,255,255,0.06)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         border: '1px solid rgba(255,255,255,0.08)',
@@ -207,7 +207,7 @@ export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: Dea
             }}
             onMouseEnter={(e) => {
               setHoveredId(deal.id)
-              e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.04)'
+              e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'
             }}
             onMouseLeave={(e) => {
               setHoveredId(null)
@@ -219,7 +219,7 @@ export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: Dea
             <div>
               <p style={{
                 fontSize: '13px', fontWeight: 600,
-                color: hoveredId === deal.id ? '#818cf8' : '#e2e8f0',
+                color: hoveredId === deal.id ? 'rgba(255,255,255,0.90)' : '#e2e8f0',
                 margin: 0, marginBottom: '1px',
                 transition: 'color 0.12s ease',
               }}>{deal.dealName}</p>

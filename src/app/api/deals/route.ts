@@ -84,7 +84,6 @@ export async function POST(req: NextRequest) {
       lostReason: lostReason ?? null,
       contractStartDate: safeDate(contractStartDate),
       contractEndDate: safeDate(contractEndDate),
-      assignedRepId: assignedRepId ?? null,
       createdAt: now, updatedAt: now,
     }).returning()
     let eventType = 'deal_log.created'

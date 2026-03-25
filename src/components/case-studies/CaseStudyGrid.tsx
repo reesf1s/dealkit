@@ -34,7 +34,7 @@ function CaseStudyCard({ caseStudy }: { caseStudy: CaseStudy }) {
           height: '100%',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)'
+          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
           e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
         }}
         onMouseLeave={(e) => {
@@ -69,8 +69,8 @@ function CaseStudyCard({ caseStudy }: { caseStudy: CaseStudy }) {
                 borderRadius: '9999px',
                 fontSize: '11px',
                 fontWeight: 500,
-                color: '#6366F1',
-                backgroundColor: 'rgba(99,102,241,0.12)',
+                color: 'rgba(255,255,255,0.80)',
+                backgroundColor: 'rgba(255,255,255,0.06)',
               }}
             >
               <Sparkles size={10} strokeWidth={2} />

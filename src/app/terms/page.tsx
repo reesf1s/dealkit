@@ -16,8 +16,8 @@ export default function TermsPage() {
       {/* Nav */}
       <nav style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 32px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '9px', textDecoration: 'none' }}>
-          <div style={{ width: '28px', height: '28px', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FileText size={13} color="#fff" />
+          <div style={{ width: '28px', height: '28px', background: 'rgba(255,255,255,0.90)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <FileText size={13} color="#0a0b0f" />
           </div>
           <span style={{ fontWeight: '700', fontSize: '14px', color: '#F0EEFF' }}>Halvex</span>
         </Link>
@@ -30,8 +30,8 @@ export default function TermsPage() {
           <p style={{ fontSize: '14px', color: '#6B7280' }}>Effective date: {EFFECTIVE_DATE} · Last updated: {EFFECTIVE_DATE}</p>
         </div>
 
-        <div style={{ background: 'rgba(99,102,241,0.07)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '10px', padding: '16px 20px', marginBottom: '32px' }}>
-          <p style={{ fontSize: '13px', color: '#A78BFA', lineHeight: '1.7' }}>
+        <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '16px 20px', marginBottom: '32px' }}>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.60)', lineHeight: '1.7' }}>
             <strong>Summary:</strong> By using Halvex you agree to these terms. We provide a sales intelligence platform on a subscription basis. You own your data. We may suspend accounts that violate these terms. You can cancel any time.
           </p>
         </div>
@@ -49,7 +49,7 @@ export default function TermsPage() {
         <Section title="3. Account registration">
           <P>You must provide accurate and complete registration information. You are responsible for maintaining the confidentiality of your account credentials and for all activity that occurs under your account.</P>
           <P>You must be at least 18 years old to use the Service. By using the Service, you represent that you meet this requirement.</P>
-          <P>You must notify us immediately at <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: '#818CF8' }}>{COMPANY_EMAIL}</a> if you suspect any unauthorised use of your account.</P>
+          <P>You must notify us immediately at <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: 'rgba(255,255,255,0.70)' }}>{COMPANY_EMAIL}</a> if you suspect any unauthorised use of your account.</P>
         </Section>
 
         <Section title="4. Subscription and payment">
@@ -118,7 +118,7 @@ export default function TermsPage() {
 
         <Section title="13. Governing law and disputes">
           <P>These Terms are governed by the laws of England and Wales. Any disputes will be subject to the exclusive jurisdiction of the courts of England and Wales.</P>
-          <P><strong>EU consumers:</strong> If you are a consumer in the EU, you may also have the right to use the EU Online Dispute Resolution platform at <a href="https://ec.europa.eu/odr" target="_blank" rel="noopener noreferrer" style={{ color: '#818CF8' }}>ec.europa.eu/odr</a>.</P>
+          <P><strong>EU consumers:</strong> If you are a consumer in the EU, you may also have the right to use the EU Online Dispute Resolution platform at <a href="https://ec.europa.eu/odr" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.70)' }}>ec.europa.eu/odr</a>.</P>
           <P><strong>US consumers:</strong> For California residents, any dispute resolution will comply with California consumer protection law requirements.</P>
         </Section>
 
@@ -127,7 +127,7 @@ export default function TermsPage() {
         </Section>
 
         <Section title="15. Contact">
-          <P>For legal enquiries: <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: '#818CF8' }}>{COMPANY_EMAIL}</a></P>
+          <P>For legal enquiries: <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: 'rgba(255,255,255,0.70)' }}>{COMPANY_EMAIL}</a></P>
         </Section>
       </div>
     </div>

@@ -128,11 +128,11 @@ export function DealInsights({ deals, currencySymbol = '£' }: DealInsightsProps
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
             <div style={{ padding: '16px 18px', borderRight: '1px solid rgba(0,0,0,0.06)' }}>
               <div style={{ fontSize: '10px', color: '#aeaeb2', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '5px' }}>MRR</div>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#6366f1', fontVariantNumeric: 'tabular-nums' }}>{fmt(mrr)}</div>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: 'rgba(255,255,255,0.80)', fontVariantNumeric: 'tabular-nums' }}>{fmt(mrr)}</div>
             </div>
             <div style={{ padding: '16px 18px' }}>
               <div style={{ fontSize: '10px', color: '#aeaeb2', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '5px' }}>ARR</div>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#818cf8', fontVariantNumeric: 'tabular-nums' }}>{fmt(arr)}</div>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: 'rgba(255,255,255,0.70)', fontVariantNumeric: 'tabular-nums' }}>{fmt(arr)}</div>
             </div>
           </div>
           <div style={{ padding: '10px 18px' }}>

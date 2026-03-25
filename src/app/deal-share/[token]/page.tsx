@@ -83,8 +83,8 @@ export default async function DealSharePage({ params }: Props) {
         <div style={{ marginBottom: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
             <span style={{
-              fontSize: '11px', fontWeight: 600, color: '#818cf8',
-              background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.22)',
+              fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.70)',
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
               borderRadius: '4px', padding: '2px 8px',
             }}>
               {stageLabel}
@@ -132,7 +132,7 @@ export default async function DealSharePage({ params }: Props) {
         {deal.successCriteria && (
           <div style={{ marginBottom: '32px' }}>
             <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 12px' }}>Success criteria</h2>
-            <div style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '10px', padding: '16px 20px' }}>
+            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '16px 20px' }}>
               <p style={{ fontSize: '14px', color: '#c7d2fe', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{deal.successCriteria}</p>
             </div>
           </div>
@@ -152,7 +152,7 @@ export default async function DealSharePage({ params }: Props) {
         <div style={{ marginTop: '64px', paddingTop: '24px', borderTop: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
           <p style={{ fontSize: '12px', color: '#334155', margin: 0 }}>
             Powered by{' '}
-            <span style={{ color: '#6366f1', fontWeight: 600 }}>Halvex</span>
+            <span style={{ color: 'rgba(255,255,255,0.80)', fontWeight: 600 }}>Halvex</span>
             {' '}· AI-powered sales intelligence
           </p>
         </div>

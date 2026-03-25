@@ -14,7 +14,7 @@ function formatDate(d: Date | string | null) {
 const CATEGORY_COLORS: Record<string, string> = {
   Security: '#EF4444',
   Integration: '#3B82F6',
-  Reporting: '#8B5CF6',
+  Reporting: 'rgba(255,255,255,0.70)',
   Performance: '#F59E0B',
   Compliance: '#10B981',
   Onboarding: '#06B6D4',
@@ -22,7 +22,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 }
 
 function categoryColor(cat: string) {
-  return CATEGORY_COLORS[cat] ?? '#6366F1'
+  return CATEGORY_COLORS[cat] ?? 'rgba(255,255,255,0.80)'
 }
 
 export default async function ShareCriteriaPage({ params }: Props) {
@@ -95,7 +95,7 @@ export default async function ShareCriteriaPage({ params }: Props) {
               </span>
             </div>
             <div style={{ height: '6px', background: 'rgba(255,255,255,0.06)', borderRadius: '3px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${criteria.length ? (achieved / criteria.length) * 100 : 0}%`, background: 'linear-gradient(90deg, #6366F1, #22C55E)', borderRadius: '3px' }} />
+              <div style={{ height: '100%', width: `${criteria.length ? (achieved / criteria.length) * 100 : 0}%`, background: 'linear-gradient(90deg, rgba(255,255,255,0.80), #22C55E)', borderRadius: '3px' }} />
             </div>
           </div>
         )}
@@ -127,7 +127,7 @@ export default async function ShareCriteriaPage({ params }: Props) {
                         </span>
                       </div>
                       {c.note && (
-                        <div style={{ marginLeft: '26px', marginTop: '5px', fontSize: '11px', color: '#818CF8', background: 'rgba(99,102,241,0.06)', borderRadius: '6px', padding: '5px 8px' }}>
+                        <div style={{ marginLeft: '26px', marginTop: '5px', fontSize: '11px', color: 'rgba(255,255,255,0.70)', background: 'rgba(255,255,255,0.06)', borderRadius: '6px', padding: '5px 8px' }}>
                           {c.note}
                         </div>
                       )}
@@ -143,7 +143,7 @@ export default async function ShareCriteriaPage({ params }: Props) {
         <div style={{ marginTop: '64px', paddingTop: '24px', borderTop: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
           <p style={{ fontSize: '12px', color: '#555', margin: 0 }}>
             Track your deals with AI at{' '}
-            <a href="https://halvex.ai" target="_blank" rel="noopener noreferrer" style={{ color: '#6366F1', textDecoration: 'none' }}>
+            <a href="https://halvex.ai" target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.80)', textDecoration: 'none' }}>
               halvex.ai
             </a>
           </p>

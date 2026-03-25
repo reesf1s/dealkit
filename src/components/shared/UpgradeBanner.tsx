@@ -27,25 +27,25 @@ export function UpgradeBanner({ message, plan = 'starter', dismissKey }: Props) 
     <div style={{
       display: 'flex', alignItems: 'center', gap: '12px',
       padding: '12px 16px',
-      background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(99,102,241,0.08))',
-      border: '1px solid rgba(124,58,237,0.25)',
+      background: 'rgba(255,255,255,0.06)',
+      border: '1px solid rgba(255,255,255,0.10)',
       borderRadius: '8px', marginBottom: '16px',
     }}>
       <div style={{
         width: '30px', height: '30px', borderRadius: '8px',
-        background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(139,92,246,0.25)',
+        background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>
-        <Zap size={14} color="#A78BFA" />
+        <Zap size={14} color="rgba(255,255,255,0.70)" />
       </div>
-      <div style={{ flex: 1, fontSize: '13px', color: '#C4B5FD', lineHeight: '1.5' }}>
+      <div style={{ flex: 1, fontSize: '13px', color: 'rgba(255,255,255,0.70)', lineHeight: '1.5' }}>
         {message}
       </div>
       <Link href="/settings#billing" style={{
         padding: '6px 14px', borderRadius: '7px', fontSize: '12px', fontWeight: '700',
-        background: 'linear-gradient(135deg, #6366F1, #7C3AED)',
-        boxShadow: '0 0 14px rgba(99,102,241,0.35)',
-        color: '#fff', textDecoration: 'none', flexShrink: 0, whiteSpace: 'nowrap',
+        background: 'rgba(255,255,255,0.90)',
+        boxShadow: '0 0 14px rgba(0,0,0,0.25)',
+        color: '#0a0b0f', textDecoration: 'none', flexShrink: 0, whiteSpace: 'nowrap',
       }}>
         Upgrade to {plan === 'pro' ? 'Pro' : 'Starter'} →
       </Link>

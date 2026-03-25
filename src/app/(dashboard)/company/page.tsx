@@ -82,7 +82,7 @@ export default function CompanyPage() {
       </div>
 
       {/* AI tip */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 16px', background: 'var(--accent-subtle)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: '10px', marginBottom: '24px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 16px', background: 'var(--accent-subtle)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', marginBottom: '24px' }}>
         <Sparkles size={14} color="var(--accent)" style={{ marginTop: '1px', flexShrink: 0 }} />
         <p style={{ fontSize: '12px', color: 'var(--accent)', margin: 0, lineHeight: '1.6' }}>
           <strong>Brain tip:</strong> Fill in your value propositions, differentiators, and common objections. The brain uses every field here to autonomously generate collateral and identify deal risks.

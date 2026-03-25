@@ -76,11 +76,11 @@ export default function ROICalc() {
           alignItems: 'center',
           gap: '6px',
           padding: '4px 12px',
-          background: 'rgba(99,102,241,0.12)',
-          border: '1px solid rgba(99,102,241,0.25)',
+          background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.10)',
           borderRadius: '100px',
           fontSize: '12px',
-          color: '#818CF8',
+          color: 'rgba(255,255,255,0.70)',
           fontWeight: 500,
           marginBottom: '20px',
         }}>
@@ -222,7 +222,7 @@ export default function ROICalc() {
             fontSize: '32px',
             fontWeight: 700,
             letterSpacing: '-0.04em',
-            color: '#6366F1',
+            color: 'rgba(255,255,255,0.80)',
             marginBottom: '6px',
             lineHeight: 1,
           }}>

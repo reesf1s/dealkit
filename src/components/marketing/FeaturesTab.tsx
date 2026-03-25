@@ -10,9 +10,9 @@ const TABS = [
     icon: Sparkles,
     headline: 'Sales docs that write themselves',
     subline: 'Six types of collateral generated from your actual deal data — not templates.',
-    color: '#818CF8',
-    accentBg: 'rgba(99,102,241,0.06)',
-    accentBorder: 'rgba(99,102,241,0.2)',
+    color: 'rgba(255,255,255,0.70)',
+    accentBg: 'rgba(255,255,255,0.06)',
+    accentBorder: 'rgba(255,255,255,0.08)',
     preview: {
       title: 'Battlecard: vs Salesforce',
       badge: 'Ready',
@@ -21,7 +21,7 @@ const TABS = [
         { label: 'Win angle', value: 'Faster implementation — 6 weeks vs 6 months', color: '#22C55E' },
         { label: 'Top objection', value: '"We already use Salesforce" → highlight integration cost', color: '#F59E0B' },
         { label: 'Landmine', value: 'Ask about their data migration history', color: '#EF4444' },
-        { label: 'Proof point', value: 'Acme Corp: 40% reduction in admin time after switch', color: '#818CF8' },
+        { label: 'Proof point', value: 'Acme Corp: 40% reduction in admin time after switch', color: 'rgba(255,255,255,0.70)' },
       ],
     },
   },
@@ -62,7 +62,7 @@ const TABS = [
       items: [
         { label: 'Their strength', value: 'Brand recognition + marketing suite bundling', color: '#EF4444' },
         { label: 'Their weakness', value: 'Sales-only teams overpay for unused features', color: '#22C55E' },
-        { label: 'Win rate vs them', value: '71% (9 wins, 4 losses)', color: '#818CF8' },
+        { label: 'Win rate vs them', value: '71% (9 wins, 4 losses)', color: 'rgba(255,255,255,0.70)' },
         { label: 'Key differentiator', value: 'Halvex costs 4x less for sales-only teams', color: '#22C55E' },
       ],
     },
@@ -154,7 +154,7 @@ export default function FeaturesTab() {
               'Export to .docx for sharing with your team',
             ].map(f => (
               <div key={f} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+                <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
                   <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: tab.color }} />
                 </div>
                 <span style={{ fontSize: '13px', color: '#C4B5FD', lineHeight: '1.5' }}>{f}</span>

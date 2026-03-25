@@ -384,14 +384,14 @@ export default function CommandPalette() {
             height: '44px', padding: '0 12px',
             cursor: 'pointer', borderRadius: '8px', margin: '0 6px',
             backgroundColor: isActive ? 'var(--accent-subtle)' : 'transparent',
-            border: isActive ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent',
+            border: isActive ? '1px solid rgba(255,255,255,0.10)' : '1px solid transparent',
             transition: 'all 0.05s',
           }}
         >
           <div style={{
             width: '26px', height: '26px', borderRadius: '7px',
-            background: 'rgba(99,102,241,0.15)',
-            border: '1px solid rgba(99,102,241,0.25)',
+            background: 'rgba(255,255,255,0.08)',
+            border: '1px solid rgba(255,255,255,0.10)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0,
           }}>
@@ -432,7 +432,7 @@ export default function CommandPalette() {
           WebkitBackdropFilter: 'blur(28px)',
           border: '1px solid rgba(255, 255, 255, 0.12)',
           borderRadius: '8px',
-          boxShadow: '0 40px 100px rgba(0,0,0,0.9), 0 0 0 1px rgba(99,102,241,0.1)',
+          boxShadow: '0 40px 100px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.06)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
