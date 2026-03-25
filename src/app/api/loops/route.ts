@@ -107,57 +107,38 @@ export async function GET() {
       const deal = dealMap.get(dealId)
       if (!deal) continue
 
-      const hasPending = pendingMap.has(dealId)
-      const hasInCycle = dealLinks.some(l => l.status === 'in_cycle')
-      const allDeployed = dealLinks.length > 0 && dealLinks.every(l => l.status === 'deployed')
+      // Emit one LoopEntry per link (not per deal) so every issue shows
+      for (const link of dealLinks) {
+        // Map link status to loop status
+        let loopStatus: LoopStatus = link.status as LoopStatus
+        if (!['suggested', 'confirmed', 'awaiting_approval', 'in_cycle', 'shipped'].includes(loopStatus)) {
+          if (link.status === 'deployed') loopStatus = 'shipped'
+          else loopStatus = 'suggested'
+        }
 
-      const hasSuggested = dealLinks.some(l => l.status === 'suggested')
-      const hasConfirmed = dealLinks.some(l => l.status === 'confirmed')
+        // Days in current status
+        const statusSince = link.scopedAt ? new Date(link.scopedAt) : new Date(link.createdAt)
+        const daysInStatus = Math.floor((now - statusSince.getTime()) / 86400000)
 
-      let loopStatus: LoopStatus
-      if (allDeployed) loopStatus = 'shipped'
-      else if (hasInCycle) loopStatus = 'in_cycle'
-      else if (hasPending) loopStatus = 'awaiting_approval'
-      else if (hasConfirmed) loopStatus = 'confirmed'
-      else if (hasSuggested) loopStatus = 'suggested'
-      else loopStatus = 'suggested'
-
-      // Prefer in_cycle link, then deployed, then first
-      const mainLink =
-        dealLinks.find(l => l.status === 'in_cycle') ??
-        dealLinks.find(l => l.status === 'deployed') ??
-        dealLinks[0]
-
-      // Calculate days in current status
-      let statusSince: Date | null = null
-      if (hasPending) {
-        const pa = pendingMap.get(dealId)
-        statusSince = pa ? new Date(pa) : null
-      } else if (mainLink.scopedAt) {
-        statusSince = new Date(mainLink.scopedAt)
-      } else {
-        statusSince = new Date(mainLink.createdAt)
-      }
-      const daysInStatus = statusSince ? Math.floor((now - statusSince.getTime()) / 86400000) : null
-
-      loops.push({
-        dealId,
-        dealName: deal.dealName ?? deal.company ?? 'Untitled',
-        company: deal.company ?? 'Unknown',
-        dealValue: deal.dealValue ? Number(deal.dealValue) : null,
-        stage: deal.stage ?? '',
-        loopStatus,
-        featureRequest: mainLink.linearTitle,
-        addressesRisk: mainLink.addressesRisk,
-        linearIssueId: mainLink.linearIssueId,
-        linearTitle: mainLink.linearTitle,
-        linearIssueUrl: mainLink.linearIssueUrl,
-        daysInStatus,
-        issueCount: dealLinks.length,
-        createdAt: new Date(mainLink.createdAt),
-        updatedAt: new Date(mainLink.updatedAt),
+        loops.push({
+          dealId,
+          dealName: deal.dealName ?? deal.company ?? 'Untitled',
+          company: deal.company ?? 'Unknown',
+          dealValue: deal.dealValue ? Number(deal.dealValue) : null,
+          stage: deal.stage ?? '',
+          loopStatus,
+          featureRequest: link.linearTitle,
+          addressesRisk: link.addressesRisk,
+          linearIssueId: link.linearIssueId,
+          linearTitle: link.linearTitle,
+          linearIssueUrl: link.linearIssueUrl,
+          daysInStatus,
+          issueCount: dealLinks.length,
+          createdAt: new Date(link.createdAt),
+          updatedAt: new Date(link.updatedAt),
       })
-    }
+      }  // end for link
+    }  // end for dealId
 
     // Fire-and-forget: sync Linear statuses for active loops in the background
     after(async () => {

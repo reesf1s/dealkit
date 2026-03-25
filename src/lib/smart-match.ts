@@ -37,42 +37,143 @@ interface MatchResult {
 
 // ─── Native keyword scoring (no LLM, no API) ────────────────────────────────
 
-function tokenize(text: string): Set<string> {
-  return new Set(
-    text.toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, ' ')
-      .split(/\s+/)
-      .filter(w => w.length > 2)
-  )
+// ─── Native smart scoring (no LLM, no API) ──────────────────────────────────
+
+/** Domain-specific synonym groups — native IP, no API needed */
+const SYNONYM_GROUPS: string[][] = [
+  ['team', 'teams', 'group', 'groups', 'department', 'org'],
+  ['desk', 'seat', 'workstation', 'workspace', 'station'],
+  ['area', 'zone', 'section', 'region', 'floor', 'neighbourhood', 'neighborhood'],
+  ['sit', 'sitting', 'seated', 'location', 'co-location', 'colocation', 'colocate'],
+  ['next', 'near', 'nearby', 'adjacent', 'proximity', 'close'],
+  ['predict', 'predictability', 'predictable', 'pattern', 'patterns', 'consistency', 'consistent'],
+  ['attend', 'attendance', 'presence', 'visit', 'visiting', 'frequency'],
+  ['analyse', 'analyze', 'analysis', 'analytics', 'insight', 'insights', 'report'],
+  ['integrate', 'integration', 'connect', 'connection', 'sync', 'synchronize'],
+  ['book', 'booking', 'reserve', 'reservation', 'schedule', 'scheduling'],
+  ['occupy', 'occupancy', 'utilisation', 'utilization', 'usage', 'capacity'],
+  ['allocate', 'allocation', 'assign', 'assignment', 'distribute', 'distribution'],
+  ['space', 'spaces', 'room', 'rooms', 'office', 'floor', 'building'],
+  ['employee', 'employees', 'people', 'person', 'staff', 'user', 'users', 'worker'],
+  ['dashboard', 'panel', 'view', 'screen', 'display', 'overview'],
+  ['forecast', 'forecasting', 'predict', 'prediction', 'projection', 'estimate'],
+  ['sensor', 'sensors', 'iot', 'device', 'devices', 'hardware'],
+  ['api', 'endpoint', 'interface', 'webhook', 'rest'],
+  ['sso', 'authentication', 'auth', 'login', 'saml', 'oauth'],
+  ['security', 'compliance', 'soc', 'gdpr', 'privacy', 'encryption'],
+  ['import', 'export', 'upload', 'download', 'ingest', 'ingestion'],
+  ['fix', 'bug', 'issue', 'error', 'broken', 'repair'],
+  ['create', 'add', 'new', 'build', 'implement'],
+]
+
+/** Build a lookup: word → canonical group index */
+const synonymLookup = new Map<string, number>()
+SYNONYM_GROUPS.forEach((group, idx) => {
+  for (const word of group) synonymLookup.set(word, idx)
+})
+
+function tokenize(text: string): string[] {
+  return text.toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2)
+}
+
+/** Generate bigrams from tokens */
+function bigrams(tokens: string[]): string[] {
+  const result: string[] = []
+  for (let i = 0; i < tokens.length - 1; i++) {
+    result.push(`${tokens[i]} ${tokens[i + 1]}`)
+  }
+  return result
+}
+
+/** Generate character trigrams for fuzzy matching */
+function charTrigrams(text: string): Set<string> {
+  const s = new Set<string>()
+  const clean = text.toLowerCase().replace(/[^a-z0-9]/g, '')
+  for (let i = 0; i <= clean.length - 3; i++) {
+    s.add(clean.slice(i, i + 3))
+  }
+  return s
 }
 
 /**
- * Score how well a gap description matches a Linear issue title+description.
- * Returns 0-100. Pure keyword overlap — no API calls.
+ * Multi-signal scoring: combines keyword, synonym, bigram, and fuzzy matching.
+ * Returns 0-100. Pure native algorithms — zero API calls.
+ *
+ * This is Halvex's core matching IP.
  */
-function keywordScore(gapText: string, issueTitle: string, issueDesc: string | null): number {
+function scoreMatch(gapText: string, issueTitle: string, issueDesc: string | null): number {
   const gapTokens = tokenize(gapText)
-  const issueTokens = tokenize(`${issueTitle} ${issueDesc ?? ''}`)
+  const titleTokens = tokenize(issueTitle)
+  const descTokens = tokenize(issueDesc ?? '')
+  const allIssueTokens = [...titleTokens, ...descTokens]
 
-  if (gapTokens.size === 0 || issueTokens.size === 0) return 0
+  if (gapTokens.length === 0 || allIssueTokens.length === 0) return 0
 
-  let matches = 0
-  for (const token of gapTokens) {
-    if (issueTokens.has(token)) matches++
-    // Also check if the token is a substring of any issue token (partial match)
-    else {
-      for (const iToken of issueTokens) {
-        if (iToken.includes(token) || token.includes(iToken)) {
-          matches += 0.5
-          break
-        }
+  const gapSet = new Set(gapTokens)
+  const titleSet = new Set(titleTokens)
+  const allSet = new Set(allIssueTokens)
+
+  // ── Signal 1: Exact keyword overlap (weighted) ────────────────────────
+  let titleHits = 0
+  let descHits = 0
+  for (const token of gapSet) {
+    if (titleSet.has(token)) titleHits++
+    else if (allSet.has(token)) descHits++
+  }
+  // Title matches are worth 2x
+  const keywordScore = gapSet.size > 0
+    ? ((titleHits * 2 + descHits) / (gapSet.size * 2)) * 100
+    : 0
+
+  // ── Signal 2: Synonym expansion ───────────────────────────────────────
+  let synonymHits = 0
+  for (const gapToken of gapSet) {
+    if (titleSet.has(gapToken) || allSet.has(gapToken)) continue // already counted
+    const gapGroup = synonymLookup.get(gapToken)
+    if (gapGroup === undefined) continue
+    for (const issueToken of allSet) {
+      if (synonymLookup.get(issueToken) === gapGroup) {
+        synonymHits++
+        break
       }
     }
   }
+  const synonymScore = gapSet.size > 0 ? (synonymHits / gapSet.size) * 80 : 0
 
-  // Jaccard-like score weighted towards gap coverage
-  const coverage = matches / gapTokens.size
-  return Math.round(coverage * 100)
+  // ── Signal 3: Bigram overlap (phrase matching) ────────────────────────
+  const gapBigrams = new Set(bigrams(gapTokens))
+  const issueBigrams = new Set(bigrams(allIssueTokens))
+  let bigramHits = 0
+  for (const bg of gapBigrams) {
+    if (issueBigrams.has(bg)) bigramHits++
+  }
+  const bigramScore = gapBigrams.size > 0 ? (bigramHits / gapBigrams.size) * 100 : 0
+
+  // ── Signal 4: Character trigram similarity (fuzzy) ────────────────────
+  const gapTrigrams = charTrigrams(gapText)
+  const issueTrigrams = charTrigrams(`${issueTitle} ${issueDesc ?? ''}`)
+  let trigramOverlap = 0
+  for (const tg of gapTrigrams) {
+    if (issueTrigrams.has(tg)) trigramOverlap++
+  }
+  const trigramScore = gapTrigrams.size > 0
+    ? (trigramOverlap / Math.max(gapTrigrams.size, issueTrigrams.size)) * 100
+    : 0
+
+  // ── Weighted combination ──────────────────────────────────────────────
+  // Keyword is most important, synonym gives credit for conceptual overlap,
+  // bigram catches phrases, trigram catches fuzzy/partial matches
+  const combined = (
+    keywordScore * 0.40 +
+    synonymScore * 0.25 +
+    bigramScore * 0.20 +
+    trigramScore * 0.15
+  )
+
+  return Math.round(combined)
 }
 
 // ─── Main matching function ──────────────────────────────────────────────────
@@ -213,15 +314,15 @@ export async function smartMatchDeal(
         break
       }
 
-      // Keyword scoring
-      const score = keywordScore(gapText, issue.title, issue.description)
-      if (score > bestScore && score >= 40) {
+      // Multi-signal scoring (keyword + synonym + bigram + fuzzy)
+      const score = scoreMatch(gapText, issue.title, issue.description)
+      if (score > bestScore && score >= 25) {
         bestScore = score
         bestMatch = issue
       }
     }
 
-    if (bestMatch && bestScore >= 40) {
+    if (bestMatch && bestScore >= 25) {
       // Link it — check for existing first
       const [existing] = await db
         .select({ id: dealLinearLinks.id })
