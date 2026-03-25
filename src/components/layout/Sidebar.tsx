@@ -153,10 +153,10 @@ export default function Sidebar() {
   const SidebarContent = (
     <aside style={{
       position: 'fixed', left: 0, top: 0, bottom: 0, width: w,
-      background: 'rgba(8, 6, 20, 0.72)',
-      backdropFilter: 'blur(28px)',
-      WebkitBackdropFilter: 'blur(28px)',
-      borderRight: '1px solid rgba(255,255,255,0.07)',
+      background: 'rgba(8, 6, 22, 0.55)',
+      backdropFilter: 'blur(24px)',
+      WebkitBackdropFilter: 'blur(24px)',
+      borderRight: '1px solid rgba(255, 255, 255, 0.07)',
       display: 'flex', flexDirection: 'column', zIndex: 40,
       transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)',
       overflow: 'hidden',
