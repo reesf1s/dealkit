@@ -567,33 +567,9 @@ function AIFocusBriefingCard() {
   async function loadBriefing() {
     setLoading(true)
     try {
-      const res = await fetch('/api/agent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [{
-            role: 'user',
-            content: `Give me a structured daily focus briefing for today. Format it exactly like this:
-
-🔴 **Urgent — Unblock These Now**
-(Top 2-3 deals that need immediate action — explain WHAT to do and WHY)
-
-🟡 **High Value — Push Forward**
-(Next 2-3 deals with solvable blockers — explain the specific next step)
-
-🟢 **Quick Checks**
-(1-2 deals that just need a status check or confirmation)
-
-End with a one-line summary of total revenue at stake in the urgent+high value deals.
-
-Be specific — use real deal names, contact names, £ values, and concrete actions. No generic advice.`
-          }],
-        }),
-      })
+      const res = await fetch('/api/dashboard/focus-briefing', { method: 'POST' })
       const data = await res.json()
-      // Extract text from streaming response or direct response
-      const text = data?.text ?? data?.choices?.[0]?.message?.content ?? data?.content ?? null
-      if (text) setBriefing(text)
+      if (data?.text) setBriefing(data.text)
       setHasLoaded(true)
     } catch (e) {
       console.error('Failed to load briefing:', e)
