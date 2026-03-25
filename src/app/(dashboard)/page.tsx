@@ -126,6 +126,15 @@ const glass = {
   } as React.CSSProperties,
 }
 
+const cardHeader: React.CSSProperties = {
+  fontSize: '10px',
+  fontWeight: 600,
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  color: 'rgba(255,255,255,0.4)',
+  marginBottom: '10px',
+}
+
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
 function Skeleton({ h = 60 }: { h?: number }) {
@@ -541,42 +550,263 @@ function ActiveLoopsTable({ currency }: { currency: string }) {
   )
 }
 
-// ─── Intelligence Briefing ──────────────────────────────────────────────────
+// ─── Card 1: AI Pipeline Overview ───────────────────────────────────────────
 
-function IntelligenceBriefing() {
+function PipelineOverviewCard({ currency }: { currency: string }) {
   const { data: brainData } = useSWR<BrainData>(
     '/api/brain', fetcher,
     { revalidateOnFocus: false, dedupingInterval: 60000 },
   )
   const brain = brainData?.data
 
-  if (!brain?.dailyBriefing && !brain?.winLossIntel && (brain?.topRisks ?? []).length === 0) {
-    return null
-  }
+  return (
+    <div style={{ ...glass.card, padding: '14px 16px' }}>
+      <div style={{ ...cardHeader }}>AI pipeline overview</div>
+      {brain?.dailyBriefing ? (
+        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.65)', margin: 0, lineHeight: '1.55' }}>
+          {brain.dailyBriefing}
+        </p>
+      ) : (
+        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>
+          Brain is learning. Add deals and meeting notes to generate insights.
+        </p>
+      )}
+      {brain?.winLossIntel && brain.winLossIntel.winRate > 0 && (
+        <div style={{ marginTop: '8px', fontSize: '10px', color: 'rgba(255,255,255,0.45)' }}>
+          Win rate: <span style={{ color: '#22c55e', fontWeight: 600 }}>{Math.round(brain.winLossIntel.winRate * 100)}%</span>
+          {' '}({brain.winLossIntel.winCount}W / {brain.winLossIntel.lossCount}L)
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Card 2: Top 3 Sales Actions ────────────────────────────────────────────
+
+function TopSalesActionsCard({ currency }: { currency: string }) {
+  const { data: summaryRes } = useSWR<SummaryData>(
+    '/api/dashboard/summary', fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 60000 },
+  )
+  const topDeals = summaryRes?.data?.topDeals ?? []
 
   return (
     <div style={{ ...glass.card, padding: '14px 16px' }}>
-      {/* Daily briefing */}
-      {brain?.dailyBriefing && (
-        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.65)', margin: '0 0 8px', lineHeight: '1.5' }}>
-          {brain.dailyBriefing}
-        </p>
+      <div style={{ ...cardHeader }}>Top 3 sales actions today</div>
+      {topDeals.length === 0 ? (
+        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>No urgent actions right now.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {topDeals.slice(0, 3).map((deal, i) => (
+            <Link key={deal.id} href={`/deals/${deal.id}`} style={{ textDecoration: 'none' }}>
+              <div style={{
+                display: 'flex', gap: '8px', alignItems: 'flex-start',
+                padding: '6px 8px', borderRadius: '6px',
+                transition: 'background 0.12s', cursor: 'pointer',
+              }}
+                onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.04)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
+              >
+                <span style={{
+                  fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.25)',
+                  width: '16px', flexShrink: 0, marginTop: '1px',
+                }}>
+                  {i + 1}.
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.85)', fontWeight: 500 }}>
+                    {deal.company} <span style={{ color: 'rgba(255,255,255,0.35)', fontWeight: 400 }}>({fmtCurrency(deal.value, currency)})</span>
+                  </div>
+                  <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.55)', marginTop: '2px' }}>
+                    → {deal.topAction}
+                  </div>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
       )}
+    </div>
+  )
+}
 
-      {/* Stats row */}
-      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-        {brain?.winLossIntel && brain.winLossIntel.winRate > 0 && (
-          <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)' }}>
-            Win rate: <span style={{ color: '#22c55e', fontWeight: 600 }}>{Math.round(brain.winLossIntel.winRate * 100)}%</span>
-            {' '}({brain.winLossIntel.winCount}W / {brain.winLossIntel.lossCount}L)
-          </span>
-        )}
-        {(brain?.topRisks ?? []).slice(0, 2).map((risk, i) => (
-          <span key={i} style={{ fontSize: '10px', color: '#f59e0b' }}>
-            {risk}
-          </span>
-        ))}
-      </div>
+// ─── Card 3: Top 3 Deals At Risk ────────────────────────────────────────────
+
+function DealsAtRiskCard({ currency }: { currency: string }) {
+  const { data: brainData } = useSWR<BrainData>(
+    '/api/brain', fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 60000 },
+  )
+  const { data: summaryRes } = useSWR<SummaryData>(
+    '/api/dashboard/summary', fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 60000 },
+  )
+
+  const brain = brainData?.data
+  const topDeals = summaryRes?.data?.topDeals ?? []
+
+  // Merge brain urgentDeals + staleDeals with summary risk data
+  const atRisk = topDeals
+    .filter(d => d.riskLevel === 'high' || d.riskLevel === 'medium')
+    .slice(0, 3)
+
+  // Enrich with brain reasons
+  const urgentMap = new Map((brain?.urgentDeals ?? []).map(u => [u.dealId, u]))
+  const staleMap = new Map((brain?.staleDeals ?? []).map(s => [s.dealId, s]))
+
+  return (
+    <div style={{ ...glass.card, padding: '14px 16px' }}>
+      <div style={{ ...cardHeader }}>Top 3 deals at risk</div>
+      {atRisk.length === 0 ? (
+        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>No deals at risk right now.</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {atRisk.map((deal) => {
+            const urgent = urgentMap.get(deal.id)
+            const stale = staleMap.get(deal.id)
+            const reason = deal.primaryBlocker
+              || urgent?.reason
+              || (stale ? `No activity in ${stale.daysSinceUpdate} days` : null)
+              || 'Score declining'
+
+            const dotColor = deal.riskLevel === 'high' ? '#ef4444' : '#f59e0b'
+
+            return (
+              <Link key={deal.id} href={`/deals/${deal.id}`} style={{ textDecoration: 'none' }}>
+                <div style={{
+                  padding: '6px 8px', borderRadius: '6px',
+                  transition: 'background 0.12s', cursor: 'pointer',
+                }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.04)' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.85)', flex: 1 }}>
+                      {deal.company}
+                    </span>
+                    <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>
+                      {fmtCurrency(deal.value, currency)}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '10px', color: dotColor, paddingLeft: '12px' }}>
+                    {reason}
+                  </div>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Card 4: Top 3 Linear Issues to Unlock Revenue ─────────────────────────
+
+function IssuesUnlockRevenueCard({ currency }: { currency: string }) {
+  const { data: brainData } = useSWR<BrainData>(
+    '/api/brain', fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 60000 },
+  )
+  const { data: loopsRes } = useSWR<{ data: LoopEntry[] }>(
+    '/api/loops', fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 30000 },
+  )
+
+  const brain = brainData?.data
+  const loops = loopsRes?.data ?? []
+
+  // Use productGapPriority if available, otherwise derive from loops
+  const productGaps = brain?.productGapPriority?.slice(0, 3) ?? []
+
+  // Fallback: group loops by issue, sum revenue
+  const issueRevenue = new Map<string, { id: string; title: string | null; revenue: number; dealCount: number; status: string | null }>()
+  for (const loop of loops) {
+    if (loop.loopStatus === 'shipped') continue // already done
+    const existing = issueRevenue.get(loop.linearIssueId)
+    if (existing) {
+      existing.revenue += loop.dealValue || 0
+      existing.dealCount++
+    } else {
+      issueRevenue.set(loop.linearIssueId, {
+        id: loop.linearIssueId,
+        title: loop.linearTitle,
+        revenue: loop.dealValue || 0,
+        dealCount: 1,
+        status: loop.loopStatus,
+      })
+    }
+  }
+  const topIssues = Array.from(issueRevenue.values())
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 3)
+
+  const hasProductGaps = productGaps.length > 0
+  const hasLoopIssues = topIssues.length > 0
+
+  return (
+    <div style={{ ...glass.card, padding: '14px 16px' }}>
+      <div style={{ ...cardHeader }}>Top 3 issues to unlock revenue</div>
+      {!hasProductGaps && !hasLoopIssues ? (
+        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>
+          Link deals to Linear issues to see which features unlock the most revenue.
+        </p>
+      ) : hasProductGaps ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {productGaps.map((gap, i) => (
+            <div key={i} style={{ padding: '6px 8px', borderRadius: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 500, color: 'rgba(255,255,255,0.8)', flex: 1 }}>
+                  {gap.gap}
+                </span>
+                <span style={{ fontSize: '10px', fontWeight: 600, color: '#ef4444', flexShrink: 0 }}>
+                  {fmtCurrency(gap.openRevenue, currency)}
+                </span>
+              </div>
+              <div style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)', paddingLeft: '0' }}>
+                {gap.dealCount} deal{gap.dealCount !== 1 ? 's' : ''} blocked → ship this to unlock revenue
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {topIssues.map((issue) => {
+            const statusColor = issue.status === 'in_cycle' ? '#3b82f6'
+              : issue.status === 'awaiting_approval' ? '#f59e0b'
+              : 'rgba(255,255,255,0.3)'
+            const statusLabel = issue.status === 'in_cycle' ? 'In cycle'
+              : issue.status === 'awaiting_approval' ? 'Awaiting PM'
+              : stageFmt(issue.status ?? '')
+
+            return (
+              <div key={issue.id} style={{ padding: '6px 8px', borderRadius: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>
+                    {issue.id}
+                  </span>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {issue.title ?? issue.id}
+                  </span>
+                  <span style={{ fontSize: '10px', fontWeight: 600, color: '#ef4444', flexShrink: 0 }}>
+                    {fmtCurrency(issue.revenue, currency)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '9px', color: 'rgba(255,255,255,0.35)' }}>
+                    <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: statusColor }} />
+                    {statusLabel}
+                  </span>
+                  <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.3)' }}>
+                    · {issue.dealCount} deal{issue.dealCount !== 1 ? 's' : ''} waiting
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -686,21 +916,17 @@ export default function TodayPage() {
         <CoreLoopCard currency={currency} />
       </div>
 
-      {/* Two columns: Sales actions + Intelligence */}
+      {/* 4 intelligence cards in 2x2 grid */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
-        gap: '16px',
+        gap: '12px',
         marginBottom: '20px',
       }}>
-        <div>
-          <SectionLabel label="Sales: what to do today" />
-          <SalesActionsCard currency={currency} />
-        </div>
-        <div>
-          <SectionLabel label="Intelligence" />
-          <IntelligenceBriefing />
-        </div>
+        <PipelineOverviewCard currency={currency} />
+        <TopSalesActionsCard currency={currency} />
+        <DealsAtRiskCard currency={currency} />
+        <IssuesUnlockRevenueCard currency={currency} />
       </div>
 
       {/* Active Loops Table */}

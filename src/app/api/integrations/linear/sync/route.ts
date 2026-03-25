@@ -4,6 +4,7 @@
  * After sync, re-matches all open deals against the updated issue cache.
  */
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60 // allow up to 60s for syncing many issues
 
 import { auth } from '@clerk/nextjs/server'
 import { after } from 'next/server'
@@ -19,16 +20,23 @@ export async function POST() {
 
     const { workspaceId } = await getWorkspaceContext(userId)
 
+    console.log(`[linear-sync] Starting manual sync for workspace ${workspaceId}`)
     const result = await syncLinearIssues(workspaceId)
+    console.log(`[linear-sync] Sync complete:`, result)
 
     // After sync, re-match all open deals in background
     after(async () => {
-      await matchAllOpenDeals(workspaceId, 'user')
+      try {
+        await matchAllOpenDeals(workspaceId, 'user')
+      } catch (err) {
+        console.error('[linear-sync] Background rematch failed:', err)
+      }
     })
 
     return NextResponse.json({ data: result })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error'
+    console.error('[linear-sync] Failed:', msg, e)
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
