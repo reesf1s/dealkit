@@ -57,22 +57,29 @@ async function gql<T>(
   query: string,
   variables?: Record<string, unknown>,
 ): Promise<T> {
+  // Linear OAuth tokens need "Bearer" prefix; raw API keys work without it.
+  // Always add "Bearer" — it works for both.
+  const authHeader = apiKey.startsWith('lin_api_') ? apiKey : `Bearer ${apiKey}`
+
   const res = await fetch(LINEAR_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: apiKey,
+      Authorization: authHeader,
     },
     body: JSON.stringify({ query, variables }),
   })
 
   if (!res.ok) {
-    throw new Error(`Linear API HTTP ${res.status}: ${await res.text()}`)
+    const body = await res.text()
+    console.error(`[linear-client] HTTP ${res.status}:`, body.slice(0, 500))
+    throw new Error(`Linear API HTTP ${res.status}: ${body}`)
   }
 
   const json = (await res.json()) as GqlResponse<T>
 
   if (json.errors?.length) {
+    console.error(`[linear-client] GraphQL errors:`, json.errors)
     throw new Error(`Linear API error: ${json.errors.map(e => e.message).join(', ')}`)
   }
 
