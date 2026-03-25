@@ -111,8 +111,8 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
 
   const validateForm = () => {
     const newErrors: { dealValue?: string; dealName?: string } = {}
-    if (!form.dealValue || Number(form.dealValue) <= 0) {
-      newErrors.dealValue = 'Deal value is required for ML scoring. Enter £0 if unknown.'
+    if (form.dealValue !== '' && form.dealValue !== '0' && Number(form.dealValue) < 0) {
+      newErrors.dealValue = 'Deal value cannot be negative.'
     }
     if (!form.dealName || form.dealName.trim().length < 2) {
       newErrors.dealName = 'Deal name is required (min 2 characters)'

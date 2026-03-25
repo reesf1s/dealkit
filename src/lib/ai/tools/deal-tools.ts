@@ -1208,7 +1208,79 @@ export const update_deal = {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TOOL 3: search_deals
+// TOOL 3: create_deal
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const create_deal = {
+  description: 'Create a new deal. Requires dealName and prospectCompany at minimum. Returns the created deal with its ID.',
+  parameters: z.object({
+    dealName: z.string().describe('Name for the deal'),
+    prospectCompany: z.string().describe('Company name'),
+    prospectName: z.string().optional().describe('Primary contact name'),
+    prospectTitle: z.string().optional().describe('Primary contact title'),
+    dealValue: z.number().optional().describe('Deal value in currency'),
+    stage: z.string().optional().describe('Deal stage (prospecting, qualification, discovery, proposal, negotiation)'),
+    notes: z.string().optional().describe('Initial notes or context about the deal'),
+    nextSteps: z.string().optional().describe('Next steps for the deal'),
+    closeDate: z.string().optional().describe('Expected close date (ISO format)'),
+    competitors: z.array(z.string()).optional().describe('Known competitor names'),
+  }),
+  execute: async (
+    params: {
+      dealName: string
+      prospectCompany: string
+      prospectName?: string
+      prospectTitle?: string
+      dealValue?: number
+      stage?: string
+      notes?: string
+      nextSteps?: string
+      closeDate?: string
+      competitors?: string[]
+    },
+    ctx: ToolContext,
+  ): Promise<ToolResult> => {
+    const now = new Date()
+    const fixDateYear = (d: Date): Date => { if (d.getFullYear() < 100) d.setFullYear(d.getFullYear() + 2000); return d }
+    const safeDate = (v: string | null | undefined): Date | null => v ? fixDateYear(new Date(v)) : null
+
+    const [deal] = await db.insert(dealLogs).values({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
+      dealName: params.dealName,
+      prospectCompany: params.prospectCompany,
+      prospectName: params.prospectName ?? null,
+      prospectTitle: params.prospectTitle ?? null,
+      dealValue: params.dealValue ?? null,
+      stage: (params.stage as 'prospecting' | 'qualification' | 'discovery' | 'proposal' | 'negotiation' | 'closed_won' | 'closed_lost') ?? 'prospecting',
+      notes: params.notes ?? null,
+      nextSteps: params.nextSteps ?? null,
+      closeDate: safeDate(params.closeDate),
+      competitors: params.competitors ?? [],
+      contacts: [],
+      createdAt: now,
+      updatedAt: now,
+    }).returning()
+
+    after(async () => {
+      await requestBrainRebuild(ctx.workspaceId, 'deal_created')
+    })
+
+    return {
+      result: `Deal **${deal.dealName}** (${deal.prospectCompany}) created successfully.\n\nID: \`${deal.id}\`\nStage: ${deal.stage}\n${deal.dealValue ? `Value: $${deal.dealValue.toLocaleString()}` : ''}`,
+      actions: [{
+        type: 'deal_created',
+        dealId: deal.id,
+        dealName: deal.dealName,
+        company: deal.prospectCompany,
+      }],
+      uiHint: 'refresh_deals',
+    }
+  },
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOOL 4: search_deals
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const search_deals = {

@@ -2,23 +2,36 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowRight, CheckCircle, Zap, Database, Loader2, MessageSquare } from 'lucide-react'
+import { ArrowRight, CheckCircle, Loader2, MessageSquare, Database, ExternalLink } from 'lucide-react'
 
-type Step = 'slack' | 'linear' | 'deal' | 'done'
+type Step = 'slack' | 'linear' | 'deal' | 'results'
 
 const STAGE_OPTIONS = [
-  { value: 'prospecting', label: 'Prospecting' },
-  { value: 'qualification', label: 'Qualification' },
-  { value: 'discovery', label: 'Discovery' },
-  { value: 'proposal', label: 'Proposal' },
-  { value: 'negotiation', label: 'Negotiation' },
+  { value: 'prospecting', label: 'Prospecting', score: 15 },
+  { value: 'qualification', label: 'Qualification', score: 30 },
+  { value: 'discovery', label: 'Discovery', score: 45 },
+  { value: 'proposal', label: 'Proposal', score: 65 },
+  { value: 'negotiation', label: 'Negotiation', score: 80 },
 ]
+
+interface DiscoveredIssue {
+  linearIssueId: string
+  linearTitle: string | null
+  linearIssueUrl: string | null
+  relevanceScore: number
+  linkType: string
+  addressesRisk: string | null
+}
 
 function OnboardingInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const [step, setStep] = useState<Step>('slack')
+  const initialStep = parseInt(searchParams.get('step') ?? '1', 10)
+  const stepMap: Record<number, Step> = { 1: 'slack', 2: 'linear', 3: 'deal', 4: 'results' }
+  const initialStepValue = stepMap[isNaN(initialStep) ? 1 : Math.min(Math.max(initialStep, 1), 4)] ?? 'slack'
+
+  const [step, setStep] = useState<Step>(initialStepValue)
   const [initializing, setInitializing] = useState(true)
 
   // Slack state
@@ -29,6 +42,7 @@ function OnboardingInner() {
   const [linearConnected, setLinearConnected] = useState(false)
   const [linearTeamName, setLinearTeamName] = useState<string | null>(null)
   const [linearSyncing, setLinearSyncing] = useState(false)
+  const [linearIssueCount, setLinearIssueCount] = useState<number | null>(null)
   const [linearError, setLinearError] = useState<string | null>(null)
   const [linearConnecting, setLinearConnecting] = useState(false)
 
@@ -39,7 +53,13 @@ function OnboardingInner() {
   const [waitingFor, setWaitingFor] = useState('')
   const [dealSaving, setDealSaving] = useState(false)
 
-  // Single init effect — handles OAuth redirects and status pre-checks
+  // Results state (aha moment)
+  const [dealScore, setDealScore] = useState<number | null>(null)
+  const [discoveredIssues, setDiscoveredIssues] = useState<DiscoveredIssue[]>([])
+  const [discoverLoading, setDiscoverLoading] = useState(false)
+  const [savedDealId, setSavedDealId] = useState<string | null>(null)
+
+  // Single init effect -- handles OAuth redirects and status pre-checks
   useEffect(() => {
     async function init() {
       const slackParam = searchParams.get('slack')
@@ -68,13 +88,14 @@ function OnboardingInner() {
             setSlackTeamName(slackData.data.slackTeamName ?? null)
           }
           if (linearData?.data?.teamName) setLinearTeamName(linearData.data.teamName)
+          if (linearData?.data?.issueCount != null) setLinearIssueCount(linearData.data.issueCount)
         })
         setInitializing(false)
         setTimeout(() => { setLinearSyncing(false); setStep('deal') }, 2500)
         return
       }
 
-      // No OAuth params — check existing connections (resuming onboarding)
+      // No OAuth params -- check existing connections (resuming onboarding)
       const [slackRes, linearRes] = await Promise.allSettled([
         fetch('/api/integrations/slack/status').then(r => r.json()),
         fetch('/api/integrations/linear/status').then(r => r.json()),
@@ -92,6 +113,7 @@ function OnboardingInner() {
         hasLinear = true
         setLinearConnected(true)
         setLinearTeamName(linearRes.value.data.teamName ?? null)
+        if (linearRes.value.data.issueCount != null) setLinearIssueCount(linearRes.value.data.issueCount)
       }
 
       if (hasSlack && hasLinear) setStep('deal')
@@ -109,7 +131,6 @@ function OnboardingInner() {
     const url = '/api/integrations/linear/install?returnTo=/onboarding'
     try {
       const res = await fetch(url, { redirect: 'manual' })
-      // opaqueredirect means the install route redirected us to Linear's OAuth — proceed
       if (res.type === 'opaqueredirect' || res.status === 0) {
         window.location.href = url
         return
@@ -120,7 +141,6 @@ function OnboardingInner() {
         setLinearConnecting(false)
         return
       }
-      // Unexpected non-redirect response — try the redirect anyway
       window.location.href = url
     } catch {
       window.location.href = url
@@ -145,31 +165,62 @@ function OnboardingInner() {
       if (!res.ok) throw new Error(data.error ?? 'Failed to save deal')
 
       const dealId = data.data?.id
-      // Fire gap analysis (non-blocking) — this is the Slack aha moment
+      setSavedDealId(dealId)
+
+      // Compute score from stage heuristic
+      const stageObj = STAGE_OPTIONS.find(s => s.value === stage)
+      setDealScore(stageObj?.score ?? 40)
+
+      // Move to results view immediately
+      setStep('results')
+      setDiscoverLoading(true)
+
+      // Fire both requests in parallel
+      const promises: Promise<unknown>[] = []
+
+      // 1. Meeting notes (gap analysis + Slack DM trigger)
       if (dealId && waitingFor.trim()) {
-        fetch(`/api/deals/${dealId}/meeting-notes`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ notes: waitingFor.trim() }),
-        }).catch(() => {})
+        promises.push(
+          fetch(`/api/deals/${dealId}/meeting-notes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes: waitingFor.trim() }),
+          }).catch(() => {})
+        )
       }
 
-      setStep('done')
+      // 2. Discover matching Linear issues
+      if (dealId) {
+        promises.push(
+          fetch(`/api/deals/${dealId}/discover-issues`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          })
+            .then(r => r.json())
+            .then(result => {
+              if (result.data?.links) {
+                setDiscoveredIssues(result.data.links)
+              }
+            })
+            .catch(() => {})
+        )
+      }
+
+      await Promise.allSettled(promises)
+      setDiscoverLoading(false)
     } catch {
-      // surface no error — user can retry
-    } finally {
       setDealSaving(false)
     }
   }
 
-  // ── Shared styles ────────────────────────────────────────────────────────────
+  // ── Shared styles ──────────────────────────────────────────────────────────
 
   const card: React.CSSProperties = {
-    background: 'rgba(255,255,255,0.08)',
+    background: 'rgba(255,255,255,0.06)',
     backdropFilter: 'blur(24px)',
     WebkitBackdropFilter: 'blur(24px)',
-    border: '1px solid rgba(255,255,255,0.12)',
-    borderRadius: 'var(--radius-md)',
+    border: '1px solid rgba(255,255,255,0.10)',
+    borderRadius: '14px',
     padding: '24px',
   }
 
@@ -178,14 +229,17 @@ function OnboardingInner() {
     height: '40px',
     padding: '0 12px',
     background: 'rgba(255,255,255,0.04)',
-    border: '1px solid var(--border-default)',
-    borderRadius: 'var(--radius-sm)',
+    border: '1px solid rgba(255,255,255,0.10)',
+    borderRadius: '8px',
     color: 'var(--text-primary)',
     fontSize: '13px',
     outline: 'none',
     fontFamily: 'inherit',
     boxSizing: 'border-box',
+    transition: 'border-color 0.15s',
   }
+
+  const focusBorder = 'rgba(255,255,255,0.28)'
 
   const primaryBtn: React.CSSProperties = {
     display: 'flex',
@@ -194,21 +248,27 @@ function OnboardingInner() {
     gap: '8px',
     width: '100%',
     padding: '12px',
-    borderRadius: 'var(--radius-sm)',
+    borderRadius: '8px',
     border: 'none',
     cursor: 'pointer',
-    background: 'linear-gradient(135deg, var(--accent-primary), #7C3AED)',
-    color: '#fff',
+    background: 'rgba(255,255,255,0.90)',
+    color: '#0a0b0f',
     fontSize: '14px',
     fontWeight: 600,
-    boxShadow: '0 0 20px rgba(99,102,241,0.25)',
     fontFamily: 'inherit',
-    transition: 'opacity 0.1s',
+    transition: 'opacity 0.15s',
     textDecoration: 'none',
   }
 
+  const disabledBtn: React.CSSProperties = {
+    ...primaryBtn,
+    background: 'rgba(255,255,255,0.12)',
+    color: 'rgba(255,255,255,0.35)',
+    cursor: 'not-allowed',
+  }
+
   const stepLabels = ['Connect Slack', 'Connect Linear', 'Add first deal']
-  const stepIndex: Record<Step, number> = { slack: 1, linear: 2, deal: 3, done: 4 }
+  const stepIndex: Record<Step, number> = { slack: 1, linear: 2, deal: 3, results: 3 }
   const currentStepNum = stepIndex[step]
 
   function SuccessBadge({ text }: { text: string }) {
@@ -216,12 +276,12 @@ function OnboardingInner() {
       <div style={{
         display: 'flex', alignItems: 'center', gap: '6px',
         padding: '8px 14px',
-        background: 'rgba(16,185,129,0.08)',
-        border: '1px solid rgba(16,185,129,0.25)',
-        borderRadius: 'var(--radius-sm)',
-        fontSize: '13px', color: 'var(--accent-success)', fontWeight: 500,
+        background: 'rgba(255,255,255,0.06)',
+        border: '1px solid rgba(255,255,255,0.15)',
+        borderRadius: '8px',
+        fontSize: '13px', color: 'rgba(255,255,255,0.80)', fontWeight: 500,
       }}>
-        <CheckCircle size={14} /> {text}
+        <CheckCircle size={14} style={{ color: 'rgba(255,255,255,0.60)' }} /> {text}
       </div>
     )
   }
@@ -234,7 +294,7 @@ function OnboardingInner() {
             display: 'flex', alignItems: 'flex-start', gap: '8px',
             fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5,
           }}>
-            <span style={{ color: 'var(--accent-primary)', marginTop: '1px', flexShrink: 0 }}>→</span>
+            <span style={{ color: 'rgba(255,255,255,0.40)', marginTop: '1px', flexShrink: 0 }}>-</span>
             {text}
           </div>
         ))}
@@ -247,40 +307,42 @@ function OnboardingInner() {
   return (
     <div style={{ maxWidth: '480px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '32px', paddingTop: '8px' }}>
 
-      {/* Progress */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {stepLabels.map((label, i) => {
-          const num = i + 1
-          const active = num === currentStepNum
-          const done = num < currentStepNum
-          return (
-            <div key={label} style={{ display: 'flex', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{
-                  width: '24px', height: '24px', borderRadius: '50%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '10px', fontWeight: 700, flexShrink: 0,
-                  background: done ? 'rgba(16,185,129,0.15)' : active ? 'rgba(99,102,241,0.2)' : 'transparent',
-                  border: done ? '1px solid rgba(16,185,129,0.35)' : active ? '1px solid rgba(99,102,241,0.5)' : '1px solid var(--border-subtle)',
-                  color: done ? 'var(--accent-success)' : active ? 'var(--accent-primary)' : 'var(--text-tertiary)',
-                }}>
-                  {done ? '✓' : num}
+      {/* Progress indicator — white dots + lines */}
+      {step !== 'results' && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0' }}>
+          {stepLabels.map((label, i) => {
+            const num = i + 1
+            const active = num === currentStepNum
+            const done = num < currentStepNum
+            return (
+              <div key={label} style={{ display: 'flex', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{
+                    width: '24px', height: '24px', borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '10px', fontWeight: 700, flexShrink: 0,
+                    background: done ? 'rgba(255,255,255,0.15)' : active ? 'rgba(255,255,255,0.12)' : 'transparent',
+                    border: done ? '1px solid rgba(255,255,255,0.30)' : active ? '1px solid rgba(255,255,255,0.25)' : '1px solid rgba(255,255,255,0.10)',
+                    color: done ? 'rgba(255,255,255,0.80)' : active ? 'rgba(255,255,255,0.90)' : 'rgba(255,255,255,0.25)',
+                  }}>
+                    {done ? '\u2713' : num}
+                  </div>
+                  <span style={{
+                    fontSize: '12px',
+                    fontWeight: active ? 500 : 400,
+                    color: active ? 'rgba(255,255,255,0.90)' : done ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.25)',
+                  }}>
+                    {label}
+                  </span>
                 </div>
-                <span style={{
-                  fontSize: '12px',
-                  fontWeight: active ? 500 : 400,
-                  color: active ? 'var(--text-primary)' : done ? 'var(--text-secondary)' : 'var(--text-tertiary)',
-                }}>
-                  {label}
-                </span>
+                {i < stepLabels.length - 1 && (
+                  <div style={{ width: '24px', height: '1px', background: 'rgba(255,255,255,0.10)', margin: '0 8px' }} />
+                )}
               </div>
-              {i < stepLabels.length - 1 && (
-                <div style={{ width: '24px', height: '1px', background: 'var(--border-subtle)', margin: '0 8px' }} />
-              )}
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* ── Step 1: Connect Slack ──────────────────────────────────────────── */}
       {step === 'slack' && (
@@ -288,24 +350,29 @@ function OnboardingInner() {
           <div style={{ textAlign: 'center' }}>
             <div style={{
               width: '52px', height: '52px', borderRadius: '14px',
-              background: 'linear-gradient(135deg, rgba(74,144,226,0.15), rgba(99,102,241,0.1))',
-              border: '1px solid rgba(74,144,226,0.3)',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.12)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               margin: '0 auto 16px',
             }}>
-              <MessageSquare size={22} color="#4A90E2" />
+              <MessageSquare size={22} color="rgba(255,255,255,0.70)" />
             </div>
             <h1 style={{ fontSize: '22px', fontWeight: 600, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '8px' }}>
               Connect Slack
             </h1>
             <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '340px', margin: '0 auto' }}>
-              Halvex works in Slack. Ask about deals, get notified when issues ship, and close loops — without leaving your workflow.
+              Halvex works in Slack. Ask about deals, get notified when issues ship, and close loops without leaving your workflow.
             </p>
           </div>
 
           <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {slackConnected ? (
-              <SuccessBadge text={slackTeamName ? `Connected to ${slackTeamName}` : 'Slack connected — advancing…'} />
+              <>
+                <SuccessBadge text={slackTeamName ? `Connected to ${slackTeamName}` : 'Slack connected'} />
+                <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.5 }}>
+                  Check your Slack DMs -- Halvex just said hello.
+                </div>
+              </>
             ) : (
               <>
                 <FeatureList items={[
@@ -317,7 +384,7 @@ function OnboardingInner() {
                   href="/api/integrations/slack/install?returnTo=/onboarding"
                   style={primaryBtn}
                 >
-                  <Zap size={14} /> Connect Slack
+                  <MessageSquare size={14} /> Connect Slack
                 </a>
               </>
             )}
@@ -337,18 +404,18 @@ function OnboardingInner() {
           <div style={{ textAlign: 'center' }}>
             <div style={{
               width: '52px', height: '52px', borderRadius: '14px',
-              background: 'linear-gradient(135deg, rgba(82,25,214,0.2), rgba(99,102,241,0.1))',
-              border: '1px solid rgba(82,25,214,0.3)',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.12)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               margin: '0 auto 16px',
             }}>
-              <Database size={22} color="#5219D6" />
+              <Database size={22} color="rgba(255,255,255,0.70)" />
             </div>
             <h1 style={{ fontSize: '22px', fontWeight: 600, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '8px' }}>
               Connect Linear
             </h1>
             <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '340px', margin: '0 auto' }}>
-              Halvex matches your deals to open Linear issues — so sales gaps become product priorities automatically.
+              Halvex matches your deals to open Linear issues so sales gaps become product priorities automatically.
             </p>
           </div>
 
@@ -359,7 +426,18 @@ function OnboardingInner() {
                 {linearSyncing && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-tertiary)' }}>
                     <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
-                    Syncing issues in background…
+                    Syncing issues in background...
+                  </div>
+                )}
+                {!linearSyncing && linearIssueCount != null && linearIssueCount > 0 && (
+                  <div style={{
+                    fontSize: '13px', color: 'rgba(255,255,255,0.65)',
+                    padding: '8px 14px',
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '8px',
+                  }}>
+                    {linearIssueCount} issues synced and ready for matching
                   </div>
                 )}
               </div>
@@ -373,10 +451,14 @@ function OnboardingInner() {
                 <button
                   onClick={handleLinearConnect}
                   disabled={linearConnecting}
-                  style={{ ...primaryBtn, opacity: linearConnecting ? 0.7 : 1, cursor: linearConnecting ? 'not-allowed' : 'pointer' }}
+                  style={{
+                    ...primaryBtn,
+                    opacity: linearConnecting ? 0.7 : 1,
+                    cursor: linearConnecting ? 'not-allowed' : 'pointer',
+                  }}
                 >
                   {linearConnecting
-                    ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Connecting…</>
+                    ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Connecting...</>
                     : <><Database size={14} /> Connect Linear</>}
                 </button>
                 {linearError && (
@@ -384,7 +466,7 @@ function OnboardingInner() {
                     padding: '10px 14px',
                     background: 'rgba(239,68,68,0.06)',
                     border: '1px solid rgba(239,68,68,0.20)',
-                    borderRadius: 'var(--radius-sm)',
+                    borderRadius: '8px',
                     fontSize: '12px',
                     color: 'var(--accent-danger)',
                     lineHeight: 1.5,
@@ -408,21 +490,11 @@ function OnboardingInner() {
       {step === 'deal' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{
-              width: '52px', height: '52px', borderRadius: '14px',
-              background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(99,102,241,0.1))',
-              border: '1px solid rgba(16,185,129,0.3)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 16px',
-              fontSize: '22px',
-            }}>
-              🎯
-            </div>
             <h1 style={{ fontSize: '22px', fontWeight: 600, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '8px' }}>
               Add your first deal
             </h1>
-            <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '340px', margin: '0 auto' }}>
-              Halvex will run a gap analysis and message you in Slack with matching Linear issues. That message is the loop starting.
+            <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '360px', margin: '0 auto' }}>
+              Halvex will run a gap analysis and message you in Slack with matching Linear issues.
             </p>
           </div>
 
@@ -439,8 +511,8 @@ function OnboardingInner() {
                 placeholder="e.g. Acme Corp"
                 autoFocus
                 style={input}
-                onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.4)')}
-                onBlur={e => (e.target.style.borderColor = 'var(--border-default)')}
+                onFocus={e => (e.target.style.borderColor = focusBorder)}
+                onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.10)')}
               />
             </div>
 
@@ -455,8 +527,8 @@ function OnboardingInner() {
                   onChange={e => setDealValue(e.target.value)}
                   placeholder="e.g. 50000"
                   style={input}
-                  onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.4)')}
-                  onBlur={e => (e.target.style.borderColor = 'var(--border-default)')}
+                  onFocus={e => (e.target.style.borderColor = focusBorder)}
+                  onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.10)')}
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -482,13 +554,13 @@ function OnboardingInner() {
               <textarea
                 value={waitingFor}
                 onChange={e => setWaitingFor(e.target.value)}
-                placeholder="e.g. They need SSO before they can buy. Procurement blocked on SOC 2. Eng team wants a native API…"
+                placeholder="e.g. They need SSO before they can buy. Procurement blocked on SOC 2. Eng team wants a native API..."
                 style={{
                   width: '100%',
                   padding: '10px 12px',
                   background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid var(--border-default)',
-                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid rgba(255,255,255,0.10)',
+                  borderRadius: '8px',
                   color: 'var(--text-primary)',
                   fontSize: '13px',
                   outline: 'none',
@@ -496,9 +568,10 @@ function OnboardingInner() {
                   boxSizing: 'border-box',
                   resize: 'vertical',
                   minHeight: '72px',
+                  transition: 'border-color 0.15s',
                 }}
-                onFocus={e => (e.target.style.borderColor = 'rgba(99,102,241,0.4)')}
-                onBlur={e => (e.target.style.borderColor = 'var(--border-default)')}
+                onFocus={e => (e.target.style.borderColor = focusBorder)}
+                onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.10)')}
               />
               <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
                 Halvex uses this to find matching Linear issues and kick off your first loop.
@@ -508,67 +581,180 @@ function OnboardingInner() {
             <button
               onClick={handleDealSave}
               disabled={!company.trim() || dealSaving}
-              style={{
+              style={!company.trim() ? disabledBtn : {
                 ...primaryBtn,
-                background: !company.trim() ? 'rgba(99,102,241,0.2)' : 'linear-gradient(135deg, var(--accent-primary), #7C3AED)',
-                boxShadow: !company.trim() ? 'none' : '0 0 20px rgba(99,102,241,0.25)',
-                cursor: !company.trim() || dealSaving ? 'not-allowed' : 'pointer',
+                cursor: dealSaving ? 'not-allowed' : 'pointer',
+                opacity: dealSaving ? 0.7 : 1,
               }}
             >
               {dealSaving
-                ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</>
-                : <>Save deal <ArrowRight size={14} /></>}
+                ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Analyzing...</>
+                : <>Save deal and discover issues <ArrowRight size={14} /></>}
             </button>
           </div>
         </div>
       )}
 
-      {/* ── Step 4: Done — aha moment ─────────────────────────────────────── */}
-      {step === 'done' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', textAlign: 'center' }}>
-          <div>
-            <div style={{
-              width: '64px', height: '64px', borderRadius: '18px',
-              background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(99,102,241,0.1))',
-              border: '1px solid rgba(16,185,129,0.3)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 20px',
-              boxShadow: '0 0 32px rgba(16,185,129,0.15)',
-            }}>
-              <CheckCircle size={28} color="var(--accent-success)" />
-            </div>
-            <h1 style={{ fontSize: '24px', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '10px' }}>
-              Your first loop is live
+      {/* ── Results panel (aha moment) ────────────────────────────────────── */}
+      {step === 'results' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <h1 style={{ fontSize: '22px', fontWeight: 600, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '8px' }}>
+              {discoverLoading
+                ? 'Running gap analysis...'
+                : discoveredIssues.length > 0
+                  ? `Found ${discoveredIssues.length} issue${discoveredIssues.length === 1 ? '' : 's'} that could help close ${company}`
+                  : `Deal saved — ${company}`}
             </h1>
-            <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', lineHeight: 1.7, maxWidth: '360px', margin: '0 auto' }}>
-              Halvex is running a gap analysis on your deal. Check Slack — you should have a message within seconds.
-            </p>
+            {!discoverLoading && (
+              <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '360px', margin: '0 auto' }}>
+                {discoveredIssues.length > 0
+                  ? 'These Linear issues match the blockers on this deal. Scope them to close the loop.'
+                  : 'No matching issues found yet. You can discover issues later from the deal page.'}
+              </p>
+            )}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {[
-              { icon: '💬', text: 'Slack connected — ask about deals anytime' },
-              { icon: '🔗', text: 'Linear synced — issues matched automatically' },
-              { icon: '🎯', text: 'Gap analysis running — check Slack now' },
-            ].map(item => (
-              <div key={item.text} style={{
-                display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '10px 14px', borderRadius: 'var(--radius-sm)',
-                background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.15)',
-                fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'left',
+          {/* Deal score card */}
+          {dealScore != null && (
+            <div style={{
+              ...card,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px',
+              padding: '16px 20px',
+            }}>
+              <div style={{
+                width: '48px', height: '48px', borderRadius: '12px',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)',
+                flexShrink: 0,
               }}>
-                <span>{item.icon}</span>
-                {item.text}
+                {dealScore}
               </div>
-            ))}
-          </div>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Initial deal score
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                  Based on {STAGE_OPTIONS.find(s => s.value === stage)?.label ?? stage} stage heuristic
+                </div>
+              </div>
+            </div>
+          )}
 
-          <button
-            onClick={() => router.push('/dashboard?onboarded=1')}
-            style={{ ...primaryBtn, fontSize: '14px', padding: '13px' }}
-          >
-            Go to dashboard <ArrowRight size={14} />
-          </button>
+          {/* Loading state */}
+          {discoverLoading && (
+            <div style={{
+              ...card,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              padding: '32px',
+              color: 'var(--text-tertiary)',
+              fontSize: '13px',
+            }}>
+              <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+              Matching deal signals to Linear issues...
+            </div>
+          )}
+
+          {/* Discovered issues list */}
+          {!discoverLoading && discoveredIssues.length > 0 && (
+            <div style={{ ...card, padding: '0', overflow: 'hidden' }}>
+              <div style={{
+                padding: '14px 20px',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)',
+                textTransform: 'uppercase', letterSpacing: '0.08em',
+              }}>
+                Matching Linear issues
+              </div>
+              {discoveredIssues.slice(0, 5).map((issue, i) => (
+                <div
+                  key={issue.linearIssueId}
+                  style={{
+                    padding: '14px 20px',
+                    borderBottom: i < Math.min(discoveredIssues.length, 5) - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px',
+                  }}
+                >
+                  <div style={{
+                    fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.40)',
+                    padding: '2px 6px',
+                    background: 'rgba(255,255,255,0.06)',
+                    borderRadius: '4px',
+                    flexShrink: 0,
+                    marginTop: '1px',
+                  }}>
+                    {issue.linearIssueId}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500, lineHeight: 1.4 }}>
+                      {issue.linearTitle ?? issue.linearIssueId}
+                    </div>
+                    {issue.addressesRisk && (
+                      <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px', lineHeight: 1.4 }}>
+                        Addresses: {issue.addressesRisk}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{
+                    fontSize: '11px', color: 'rgba(255,255,255,0.35)',
+                    flexShrink: 0,
+                    marginTop: '2px',
+                  }}>
+                    {issue.relevanceScore}%
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Scope CTA */}
+          {!discoverLoading && discoveredIssues.length > 0 && savedDealId && (
+            <button
+              onClick={() => router.push(`/deals/${savedDealId}?tab=issues`)}
+              style={{
+                ...primaryBtn,
+                background: 'rgba(255,255,255,0.08)',
+                color: 'rgba(255,255,255,0.85)',
+                border: '1px solid rgba(255,255,255,0.15)',
+              }}
+            >
+              <ExternalLink size={14} /> Scope these issues
+            </button>
+          )}
+
+          {/* Slack nudge */}
+          {!discoverLoading && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '10px',
+              padding: '12px 16px',
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '10px',
+              fontSize: '13px', color: 'var(--text-tertiary)',
+            }}>
+              <MessageSquare size={16} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.40)' }} />
+              Check Slack -- you should have a message from Halvex
+            </div>
+          )}
+
+          {/* Go to dashboard */}
+          {!discoverLoading && (
+            <button
+              onClick={() => router.push('/dashboard?onboarded=1')}
+              style={primaryBtn}
+            >
+              Go to dashboard <ArrowRight size={14} />
+            </button>
+          )}
         </div>
       )}
 

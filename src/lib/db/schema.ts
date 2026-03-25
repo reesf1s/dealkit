@@ -257,6 +257,8 @@ export const dealLogs = pgTable('deal_logs', {
   dealShareToken: text('deal_share_token').unique(),   // public share link token
   dealIsShared: boolean('deal_is_shared').default(false).notNull(),
   // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS deal_share_token text UNIQUE, ADD COLUMN IF NOT EXISTS deal_is_shared boolean NOT NULL DEFAULT false;
+  assignedRepId: text('assigned_rep_id'),  // nullable, Clerk user ID of assigned rep
+  // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS assigned_rep_id text;
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

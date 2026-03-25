@@ -12,14 +12,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/db'
-import { linearIntegrations } from '@/lib/db/schema'
+import { linearIntegrations, dealLogs } from '@/lib/db/schema'
 import { encrypt, getEncryptionKey } from '@/lib/encrypt'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { validateApiKey } from '@/lib/linear-client'
 import { syncLinearIssues } from '@/lib/linear-sync'
-import { count } from 'drizzle-orm'
-import { eq } from 'drizzle-orm'
-import { dealLogs } from '@/lib/db/schema'
+import { count, eq } from 'drizzle-orm'
 
 const LINEAR_TOKEN_URL = 'https://api.linear.app/oauth/token'
 
@@ -123,29 +121,23 @@ export async function GET(req: NextRequest) {
 
     console.log(`[linear/callback] Connected for workspace ${wsCtx.workspaceId}, team ${info.teamName}`)
 
+    // Check if any deals exist
+    const dealCountResult = await db.select({ count: count() })
+      .from(dealLogs)
+      .where(eq(dealLogs.workspaceId, wsCtx.workspaceId))
+
+    const hasDeals = (dealCountResult[0]?.count ?? 0) > 0
+
     // Sync issues in background (non-blocking)
     after(async () => {
       try { await syncLinearIssues(wsCtx.workspaceId) } catch { /* non-fatal */ }
     })
 
-    // Smart redirect after Linear OAuth:
-    // If returnTo was explicitly set (e.g. /onboarding), honour it.
-    // Otherwise: check deals count, redirect to onboarding step 3 if 0 deals.
-    const isOnboarding = returnTo.includes('/onboarding')
-    if (!isOnboarding) {
-      try {
-        const [{ value: dealCount }] = await db
-          .select({ value: count() })
-          .from(dealLogs)
-          .where(eq(dealLogs.workspaceId, wsCtx.workspaceId))
-
-        if (Number(dealCount) === 0) {
-          return NextResponse.redirect(`${appUrl}/onboarding?step=3`)
-        }
-      } catch { /* non-fatal — fall through to default returnTo */ }
+    if (!hasDeals) {
+      return NextResponse.redirect(`${appUrl}/onboarding?step=3`)
+    } else {
+      return NextResponse.redirect(`${appUrl}/`)
     }
-
-    return NextResponse.redirect(returnTo)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'unknown_error'
     console.error('[linear/callback] Error:', msg, e)

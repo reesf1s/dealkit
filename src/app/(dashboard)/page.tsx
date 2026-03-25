@@ -1,18 +1,13 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
-import {
-  ArrowUpRight, AlertCircle, Brain, Zap, Sparkles, Calendar, ChevronRight,
-  CheckCircle2, Clock, Target,
-} from 'lucide-react'
 import type { LoopEntry } from '@/app/api/loops/route'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
-// ─── Shared Types ─────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface BrainData {
   data?: {
@@ -46,41 +41,18 @@ interface BrainData {
       winRateWithTheme: number
     }>
     topRisks?: string[]
+    dailyBriefing?: string
+    dailyBriefingGeneratedAt?: string
     winLossIntel?: {
       winRate: number
       winCount: number
       lossCount: number
     }
-    // Halvex unified brain fields
-    dealActions?: Array<{
-      dealId: string
-      dealName: string
-      dealValue: number
-      action: string
-      reason: string
-      urgency: 'critical' | 'high' | 'medium'
-      confidence: number
-    }>
-    intentSignalsList?: Array<{
-      dealId: string
-      dealName: string
-      signal: string
-      signalType: 'competitor' | 'budget' | 'champion' | 'objection' | 'positive'
-      detectedAt: string
-      daysAgo: number
-    }>
-    dailyBriefing?: string
-    loopSummary?: {
-      activeLoops: number
-      waitingForPM: number
-      inCycle: number
-      shipped: number
-      revenueAtRisk: number
-    }
     updatedAt?: string
   }
   meta?: {
-    lastRebuilt?: string | null
+    lastRebuilt: string | null
+    isStale: boolean
   }
 }
 
@@ -120,805 +92,592 @@ interface ClosedLoop {
   issueCount: number
 }
 
-interface AIAction {
-  dealId: string
-  company: string
-  action: string
-  revenueAtRisk: number | null
-  confidence: number
-  type: 'stale' | 'objection' | 'feature' | 'urgent'
+interface SummaryData {
+  data: {
+    revenueAtRisk: number
+    dealsAtRisk: number
+    topDeals: Array<{
+      id: string
+      name: string
+      company: string
+      value: number
+      stage: string
+      urgencyScore: number
+      primaryBlocker: string | null
+      topAction: string
+      riskLevel: 'high' | 'medium' | 'low'
+      daysStale: number
+    }>
+    focusBullets: string[]
+  }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function timeAgo(date: string | Date): string {
-  const diff = Date.now() - new Date(date).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
+interface DealRow {
+  id: string
+  dealName: string
+  prospectCompany: string
+  stage: string
+  dealValue: number | null
+  conversionScore: number | null
+  closeDate: string | null
+  updatedAt: string
+  dealRisks: string[]
 }
 
-function formatCurrency(n: number | string | null | undefined): string {
+interface PipelineConfig {
+  data?: {
+    currency?: string
+    stages?: Array<{ id: string; label: string; color: string }>
+  }
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function fmtCurrency(n: number | string | null | undefined, sym = '\u00a3'): string {
   if (!n) return ''
   const v = Number(n)
-  if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}m`
-  if (v >= 1_000) return `$${Math.round(v / 1_000)}k`
-  return `$${Math.round(v)}`
+  if (v >= 1_000_000) return `${sym}${(v / 1_000_000).toFixed(1)}m`
+  if (v >= 1_000) return `${sym}${Math.round(v / 1_000)}k`
+  return `${sym}${Math.round(v)}`
 }
 
-function getRiskColor(score: number | null | undefined): string {
+function daysUntil(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return null
+  return Math.ceil((d.getTime() - Date.now()) / 86400000)
+}
+
+function riskDot(level: 'high' | 'medium' | 'low' | null | undefined): string {
+  if (level === 'high') return '#ef4444'
+  if (level === 'medium') return '#f59e0b'
+  return '#22c55e'
+}
+
+function scoreColor(score: number | null | undefined): string {
   if (!score || score <= 0) return '#ef4444'
   if (score >= 70) return '#22c55e'
   if (score >= 40) return '#f59e0b'
   return '#ef4444'
 }
 
-function buildAIActions(brain: BrainData['data'] | undefined): AIAction[] {
-  if (!brain) return []
-  const actions: AIAction[] = []
-
-  // From urgent deals
-  for (const ud of brain.urgentDeals?.slice(0, 2) ?? []) {
-    actions.push({
-      dealId: ud.dealId,
-      company: ud.company,
-      action: ud.topAction ?? ud.reason,
-      revenueAtRisk: null,
-      confidence: 75,
-      type: 'urgent',
-    })
-  }
-
-  // From stale deals: use objectionWinMap to generate smarter advice
-  for (const sd of brain.staleDeals?.slice(0, 3) ?? []) {
-    if (actions.find(a => a.dealId === sd.dealId)) continue
-    const daysLeft = 14 - sd.daysSinceUpdate
-    const winRateHint = brain.objectionWinMap?.[0]
-    const confidence = winRateHint ? Math.round(winRateHint.winRateWithTheme) : 65
-    const action = winRateHint
-      ? `Contact ${sd.company} — ${winRateHint.theme} concerns, addressed within 7 days, win ${confidence}% of the time`
-      : `Follow up with ${sd.company} — ${sd.daysSinceUpdate}d without contact. Avg stall before churn: 14d`
-
-    actions.push({
-      dealId: sd.dealId,
-      company: sd.company,
-      action,
-      revenueAtRisk: sd.dealValue ? Number(sd.dealValue) : null,
-      confidence,
-      type: 'stale',
-    })
-  }
-
-  // From key patterns
-  for (const kp of brain.keyPatterns?.slice(0, 1) ?? []) {
-    if (kp.dealIds.length === 0) continue
-    const company = kp.companies[0] ?? kp.dealNames?.[0] ?? 'Deal'
-    if (actions.find(a => a.dealId === kp.dealIds[0])) continue
-    actions.push({
-      dealId: kp.dealIds[0],
-      company,
-      action: `Pattern detected: "${kp.label}" across ${kp.dealIds.length} deal${kp.dealIds.length !== 1 ? 's' : ''}. Address proactively.`,
-      revenueAtRisk: null,
-      confidence: 70,
-      type: 'objection',
-    })
-  }
-
-  return actions.slice(0, 5)
+function stageFmt(s: string): string {
+  return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
-// ─── Daily Briefing Card ──────────────────────────────────────────────────────
+// ─── Glass style tokens ──────────────────────────────────────────────────────
 
-function DailyBriefingCard() {
-  const { data: brainData, isLoading } = useSWR<BrainData>('/api/brain', fetcher, {
-    revalidateOnFocus: false,
-    dedupingInterval: 300000,
-  })
-  const briefing = brainData?.data?.dailyBriefing
-  const updatedAt = brainData?.meta?.lastRebuilt ?? brainData?.data?.updatedAt
+const glass = {
+  card: {
+    background: 'rgba(255,255,255,0.05)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '10px',
+  } as React.CSSProperties,
+  cardHover: {
+    background: 'rgba(255,255,255,0.08)',
+  } as React.CSSProperties,
+}
 
-  function minutesAgo(ts: string): string {
-    const mins = Math.floor((Date.now() - new Date(ts).getTime()) / 60000)
-    if (mins < 1) return 'just now'
-    if (mins < 60) return `${mins}m ago`
-    return `${Math.floor(mins / 60)}h ago`
-  }
+const text = {
+  label: { fontSize: '10px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' as const, color: 'rgba(255,255,255,0.4)' },
+  data: { fontSize: '12px', color: 'rgba(255,255,255,0.85)' },
+  muted: { fontSize: '11px', color: 'rgba(255,255,255,0.45)' },
+  heading: { fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.9)' },
+}
 
-  if (isLoading) {
-    return (
-      <div style={{
-        background: 'rgba(124,58,237,0.06)',
-        border: '1px solid rgba(124,58,237,0.2)',
-        borderRadius: '16px',
-        padding: '20px 24px',
-        marginBottom: '28px',
-        animation: 'pulse 2s ease-in-out infinite',
-        height: '72px',
-      }} />
-    )
-  }
+// ─── Skeleton ────────────────────────────────────────────────────────────────
 
-  if (!briefing) return null
-
+function Skeleton({ h = 60 }: { h?: number }) {
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.06)',
-      backdropFilter: 'blur(18px)',
-      WebkitBackdropFilter: 'blur(18px)',
-      border: '1px solid rgba(124,58,237,0.4)',
-      borderRadius: '16px',
-      padding: '20px 24px',
-      marginBottom: '28px',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-        <Brain size={18} color="#a78bfa" style={{ flexShrink: 0, marginTop: '2px' }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Your Briefing
-            </span>
-            {updatedAt && (
-              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)' }}>
-                Updated {minutesAgo(updatedAt)}
-              </span>
-            )}
-          </div>
-          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.6, margin: 0 }}>
-            {briefing}
-          </p>
-        </div>
-      </div>
-    </div>
+      ...glass.card,
+      height: h,
+      animation: 'pulse 2s ease-in-out infinite',
+    }} />
   )
 }
 
-// ─── Skeleton Loader ──────────────────────────────────────────────────────────
+// ─── DO NOW Section ──────────────────────────────────────────────────────────
 
-function SkeletonCard({ height = 100 }: { height?: number }) {
-  return (
-    <div
-      style={{
-        background: 'rgba(255,255,255,0.06)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: '16px',
-        padding: '16px',
-        height,
-        animation: 'pulse 2s ease-in-out infinite',
-      }}
-    />
+function DoNowSection({ currency }: { currency: string }) {
+  const { data: summaryRes, isLoading: sumLoading } = useSWR<SummaryData>(
+    '/api/dashboard/summary', fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 60000 },
   )
-}
-
-// ─── Section 0 (left): In-Flight Loops ───────────────────────────────────────
-
-function InFlightLoopsSection() {
-  const { data: loopData, isLoading } = useSWR<LoopSignalResponse>(
-    '/api/dashboard/loop-signals',
-    fetcher,
+  const { data: brainData, isLoading: brainLoading } = useSWR<BrainData>(
+    '/api/brain', fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 60000 },
+  )
+  const { data: loopData } = useSWR<LoopSignalResponse>(
+    '/api/dashboard/loop-signals', fetcher,
     { revalidateOnFocus: false, dedupingInterval: 60000 },
   )
   const { data: loopsRes } = useSWR<{ data: LoopEntry[] }>(
-    '/api/loops',
-    fetcher,
+    '/api/loops', fetcher,
     { revalidateOnFocus: false, dedupingInterval: 30000 },
   )
-  const { data: brainData } = useSWR<BrainData>('/api/brain', fetcher, { revalidateOnFocus: false })
 
-  const inFlight = loopData?.data?.inFlight ?? []
+  const loading = sumLoading || brainLoading
+  const topDeals = summaryRes?.data?.topDeals ?? []
   const brain = brainData?.data
+  const inFlight = loopData?.data?.inFlight ?? []
   const loopEntries = loopsRes?.data ?? []
 
-  // Sort by brain risk: higher daysSinceUpdate = higher risk → show first
-  const sorted = [...inFlight].sort((a, b) => {
-    const aStale = brain?.staleDeals?.find(d => d.dealId === a.id)
-    const bStale = brain?.staleDeals?.find(d => d.dealId === b.id)
-    const aScore = aStale ? aStale.daysSinceUpdate : 0
-    const bScore = bStale ? bStale.daysSinceUpdate : 0
-    return bScore - aScore
-  })
-
-  if (isLoading) {
+  if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {[1, 2].map(i => <SkeletonCard key={i} />)}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        {[1, 2, 3].map(i => <Skeleton key={i} h={80} />)}
       </div>
     )
   }
 
-  if (inFlight.length === 0) {
+  if (topDeals.length === 0) {
     return (
-      <div style={{
-        background: 'rgba(255,255,255,0.06)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: '16px',
-        padding: '32px 24px',
-        textAlign: 'center',
-      }}>
-        <Zap size={20} style={{ color: '#7c3aed', marginBottom: '12px', opacity: 0.5 }} />
-        <p style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: '8px' }}>
-          Start your first loop
-        </p>
-        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '16px' }}>
-          Add a deal and meeting notes in the Deals tab. Halvex will automatically detect feature
-          requests and connect them to your Linear backlog.
-        </p>
-        <Link
-          href="/deals"
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            padding: '8px 14px', borderRadius: '8px',
-            background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)',
-            color: '#a78bfa', textDecoration: 'none', fontSize: '12px', fontWeight: 500,
-          }}
-        >
-          View Deals <ArrowUpRight size={12} />
-        </Link>
+      <div style={{ ...glass.card, padding: '20px', textAlign: 'center' }}>
+        <p style={{ ...text.muted, margin: 0 }}>No urgent deals. Pipeline is clear.</p>
       </div>
     )
   }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      {sorted.slice(0, 6).map((loop: InFlightLoop) => {
-        const statusLabel = loop.loopStage === 'awaiting_approval' ? 'Waiting for PM' : 'Approved — In Cycle'
-        const statusColor = loop.loopStage === 'awaiting_approval' ? '#f59e0b' : '#7c3aed'
-        const stale = brain?.staleDeals?.find(d => d.dealId === loop.id)
-        const riskReason = stale ? `Brain: No update in ${stale.daysSinceUpdate}d` : null
-        // Feature request from loops
-        const loopEntry = loopEntries.find(l => l.dealId === loop.id)
-
-        return (
-          <Link key={loop.id} href={`/deals/${loop.id}`} style={{ textDecoration: 'none' }}>
-            <div
-              style={{
-                background: 'rgba(255,255,255,0.06)',
-                backdropFilter: 'blur(18px)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderLeft: '3px solid #7c3aed',
-                borderRadius: '16px',
-                padding: '16px',
-                transition: 'all 0.2s ease',
-                cursor: 'pointer',
-              }}
-              onMouseEnter={e => {
-                const el = e.currentTarget as HTMLDivElement
-                el.style.background = 'rgba(255,255,255,0.08)'
-              }}
-              onMouseLeave={e => {
-                const el = e.currentTarget as HTMLDivElement
-                el.style.background = 'rgba(255,255,255,0.06)'
-              }}
-            >
-              {/* Header: Company + Deal Value */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.9)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {loop.company}
-                </div>
-                {loop.dealValue && (
-                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>
-                    {formatCurrency(loop.dealValue)}
-                  </div>
-                )}
-              </div>
-
-              {/* Feature request */}
-              {loopEntry?.featureRequest && (
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)', margin: '0 0 8px', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {loopEntry.featureRequest}
-                </p>
-              )}
-
-              {/* Status Badge */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '6px',
-                  padding: '4px 10px', borderRadius: '6px',
-                  background: `${statusColor}20`, border: `1px solid ${statusColor}40`,
-                  fontSize: '11px', fontWeight: 600, color: statusColor,
-                }}>
-                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: statusColor }} />
-                  {statusLabel}
-                </span>
-
-                {/* Matched Linear issue */}
-                {loop.inCycleIssues?.[0]?.linearIssueId && (
-                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
-                    {loop.inCycleIssues[0].linearIssueId}
-                  </span>
-                )}
-
-                {/* Days in status */}
-                {loopEntry?.daysInStatus != null && loopEntry.daysInStatus > 0 && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
-                    <Clock size={10} /> {loopEntry.daysInStatus}d
-                  </span>
-                )}
-
-                {/* View Loop button */}
-                <span style={{
-                  marginLeft: 'auto',
-                  display: 'inline-flex', alignItems: 'center', gap: '4px',
-                  fontSize: '11px', color: '#a78bfa',
-                }}>
-                  View <ChevronRight size={10} />
-                </span>
-              </div>
-
-              {/* Risk reason from brain */}
-              {riskReason && (
-                <div style={{ fontSize: '10px', color: '#f59e0b', marginTop: '8px' }}>
-                  ⚠ {riskReason}
-                </div>
-              )}
-
-              {/* Time */}
-              {loop.pendingActionCreatedAt && (
-                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>
-                  {timeAgo(loop.pendingActionCreatedAt)}
-                </div>
-              )}
-            </div>
-          </Link>
-        )
-      })}
-    </div>
-  )
-}
-
-// ─── Section 1 (right-top): AI Actions ───────────────────────────────────────
-
-function AIActionsSection() {
-  const { data: brainData, isLoading } = useSWR<BrainData>('/api/brain', fetcher, {
-    revalidateOnFocus: false,
-  })
-  const brain = brainData?.data
-
-  // Prefer pre-computed brain.dealActions; fall back to client-side derivation
-  const brainActions: AIAction[] = (brain?.dealActions ?? []).map(da => ({
-    dealId: da.dealId,
-    company: da.dealName,
-    action: da.action,
-    revenueAtRisk: da.dealValue > 0 ? da.dealValue : null,
-    confidence: Math.round(da.confidence * 100),
-    type: da.urgency === 'critical' ? 'urgent' : da.urgency === 'high' ? 'stale' : 'feature',
-  }))
-  const actions = brainActions.length > 0 ? brainActions : buildAIActions(brain)
-
-  if (isLoading) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {[1, 2, 3].map(i => <SkeletonCard key={i} height={72} />)}
-      </div>
-    )
-  }
-
-  if (actions.length === 0) {
-    return (
-      <div style={{
-        background: 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: '12px',
-        padding: '20px',
-        textAlign: 'center',
-      }}>
-        <CheckCircle2 size={16} color="#22c55e" style={{ marginBottom: '8px', opacity: 0.6 }} />
-        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', margin: 0 }}>
-          No urgent actions right now. Pipeline looks healthy.
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      {actions.map((action, i) => (
-        <Link key={`${action.dealId}-${i}`} href={`/deals/${action.dealId}`} style={{ textDecoration: 'none' }}>
-          <div
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              backdropFilter: 'blur(18px)',
-              border: '1px solid rgba(255,255,255,0.09)',
-              borderRadius: '12px',
-              padding: '12px 14px',
-              transition: 'all 0.15s ease',
-              cursor: 'pointer',
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.05)' }}
-          >
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-              <div style={{ flexShrink: 0, marginTop: '1px' }}>
-                <div style={{
-                  width: '20px', height: '20px', borderRadius: '5px',
-                  background: action.type === 'urgent' ? 'rgba(239,68,68,0.15)'
-                    : action.type === 'stale' ? 'rgba(245,158,11,0.15)'
-                    : 'rgba(124,58,237,0.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Sparkles size={10} color={
-                    action.type === 'urgent' ? '#ef4444'
-                    : action.type === 'stale' ? '#f59e0b'
-                    : '#a78bfa'
-                  } />
-                </div>
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {action.company}
-                </div>
-                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)', lineHeight: 1.4 }}>
-                  {action.action}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
-                  {action.revenueAtRisk && (
-                    <span style={{ fontSize: '10px', color: '#f59e0b', fontWeight: 600 }}>
-                      {formatCurrency(action.revenueAtRisk)} at risk
-                    </span>
-                  )}
-                  <span style={{
-                    fontSize: '10px', color: 'rgba(255,255,255,0.35)',
-                    padding: '1px 6px', borderRadius: '4px',
-                    background: 'rgba(255,255,255,0.05)',
-                  }}>
-                    {action.confidence}% confidence
-                  </span>
-                  <span style={{
-                    marginLeft: 'auto',
-                    fontSize: '10px', fontWeight: 600,
-                    color: '#7c3aed',
-                    padding: '2px 8px', borderRadius: '5px',
-                    background: 'rgba(124,58,237,0.12)',
-                    border: '1px solid rgba(124,58,237,0.2)',
-                  }}>
-                    Do it →
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Link>
-      ))}
-    </div>
-  )
-}
-
-// ─── Section 2 (right-middle): Intent Matching ───────────────────────────────
-
-interface DealWithActivity {
-  id: string
-  company: string
-  stage: string
-  dealValue: number | null
-  lastActivityAt: string | null
-  updatedAt: string | null
-  intentSignal?: string | null
-}
-
-function IntentMatchingSection() {
-  const { data: brainData, isLoading: brainLoading } = useSWR<BrainData>('/api/brain', fetcher, {
-    revalidateOnFocus: false,
-  })
-  const { data: dealsRes, isLoading: dealsLoading } = useSWR<{ data: DealWithActivity[] }>(
-    '/api/deals',
-    fetcher,
-    { revalidateOnFocus: false },
-  )
-
-  const isLoading = brainLoading && dealsLoading
-
-  // Prefer brain.intentSignalsList; fall back to recent deals from API
-  const brainSignals = brainData?.data?.intentSignalsList ?? []
-  const deals = dealsRes?.data ?? []
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-
-  const recentDeals = deals
-    .filter(d => {
-      const at = d.lastActivityAt ?? d.updatedAt
-      return at && new Date(at).getTime() > sevenDaysAgo
-        && d.stage !== 'closed_won' && d.stage !== 'closed_lost'
-    })
-    .slice(0, 5)
-    .map(d => ({
-      ...d,
-      lastAt: d.lastActivityAt ?? d.updatedAt,
-    }))
-
-  if (isLoading) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        {[1, 2].map(i => <SkeletonCard key={i} height={56} />)}
-      </div>
-    )
-  }
-
-  // Use brain signals if available
-  if (brainSignals.length > 0) {
-    const signalDotColor = (type: string) => {
-      if (type === 'champion') return '#22c55e'
-      if (type === 'competitor') return '#f59e0b'
-      if (type === 'budget') return '#60a5fa'
-      if (type === 'positive') return '#22c55e'
-      return '#a78bfa'
-    }
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        {brainSignals.map((sig, i) => (
-          <Link key={`${sig.dealId}-${i}`} href={`/deals/${sig.dealId}`} style={{ textDecoration: 'none' }}>
-            <div
-              style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '10px',
-                padding: '10px 12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                transition: 'all 0.15s',
-                cursor: 'pointer',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.05)' }}
-            >
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: signalDotColor(sig.signalType), flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {sig.dealName}
-                  </span>
-                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>
-                    {sig.daysAgo === 0 ? 'today' : `${sig.daysAgo}d ago`}
-                  </span>
-                </div>
-                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {sig.signal}
-                </div>
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
-    )
-  }
-
-  if (recentDeals.length === 0) {
-    return (
-      <div style={{
-        background: 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: '12px',
-        padding: '16px',
-        textAlign: 'center',
-      }}>
-        <Calendar size={14} color="rgba(255,255,255,0.3)" style={{ marginBottom: '8px' }} />
-        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', margin: 0 }}>
-          No intent signals in the last 7 days.
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      {recentDeals.map(deal => {
-        const stageFmt = (deal.stage ?? '').replace(/_/g, ' ')
-        const signal = (deal as { intentSignal?: string }).intentSignal ?? `Recent activity · ${stageFmt}`
-
-        return (
-          <Link key={deal.id} href={`/deals/${deal.id}`} style={{ textDecoration: 'none' }}>
-            <div
-              style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '10px',
-                padding: '10px 12px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                transition: 'all 0.15s',
-                cursor: 'pointer',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.05)' }}
-            >
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#60a5fa', flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {(deal as { prospectCompany?: string }).prospectCompany ?? deal.company ?? 'Untitled'}
-                  </span>
-                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>
-                    {timeAgo(deal.lastAt!)}
-                  </span>
-                </div>
-                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {signal}
-                </div>
-              </div>
-              {deal.dealValue && (
-                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>
-                  {formatCurrency(deal.dealValue)}
-                </div>
-              )}
-            </div>
-          </Link>
-        )
-      })}
-    </div>
-  )
-}
-
-// ─── Section 3 (right-bottom): Deals Needing Attention ───────────────────────
-
-function DealsNeedingAttentionSection() {
-  const { data: brainData } = useSWR<BrainData>('/api/brain', fetcher, {
-    revalidateOnFocus: false,
-  })
-  const staleDeals = brainData?.data?.staleDeals ?? []
-  const brain = brainData?.data
-
-  if (!brain) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {[1, 2, 3].map(i => <SkeletonCard key={i} height={56} />)}
-      </div>
-    )
-  }
-
-  const deals = staleDeals.slice(0, 5).map(deal => ({
-    ...deal,
-    riskColor: getRiskColor(deal.score ?? null),
-    reason: deal.daysSinceUpdate > 14 ? `No update in ${deal.daysSinceUpdate} days` : `Last update ${deal.daysSinceUpdate}d ago`,
-  }))
-
-  if (deals.length === 0) {
-    return (
-      <div style={{
-        background: 'rgba(255,255,255,0.06)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        borderRadius: '16px',
-        padding: '24px',
-        textAlign: 'center',
-      }}>
-        <AlertCircle size={16} style={{ color: '#10b981', marginBottom: '8px', opacity: 0.5 }} />
-        <p style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: '4px' }}>
-          All deals are healthy
-        </p>
-        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', margin: 0 }}>
-          No deals need immediate attention.
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      {deals.map(deal => (
-        <Link key={deal.dealId} href={`/deals/${deal.dealId}`} style={{ textDecoration: 'none' }}>
-          <div
-            style={{
-              background: 'rgba(255,255,255,0.05)',
-              backdropFilter: 'blur(18px)',
-              border: '1px solid rgba(255,255,255,0.09)',
-              borderRadius: '10px',
-              padding: '10px 12px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              transition: 'all 0.15s ease',
-              cursor: 'pointer',
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)' }}
-            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.05)' }}
-          >
-            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: deal.riskColor, flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.88)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: '2px' }}>
-                {deal.company}
-              </div>
-              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {deal.reason}
-              </div>
-            </div>
-            {deal.dealValue && (
-              <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>
-                {formatCurrency(deal.dealValue)}
-              </div>
-            )}
-          </div>
-        </Link>
-      ))}
-    </div>
-  )
-}
-
-// ─── Section label component ──────────────────────────────────────────────────
-
-function SectionHeader({ icon, label, count }: { icon: React.ReactNode; label: string; count?: number }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-      {icon}
-      <h2 style={{ fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.9)', margin: 0 }}>
-        {label}
-      </h2>
-      {count !== undefined && count > 0 && (
-        <span style={{
-          marginLeft: 'auto',
-          fontSize: '11px', fontWeight: 600,
-          padding: '2px 8px', borderRadius: '100px',
-          background: 'rgba(124,58,237,0.2)', color: '#a78bfa',
-        }}>
-          {count}
-        </span>
-      )}
-    </div>
-  )
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
-
-function LoopStatsRow() {
-  const { data: brainData } = useSWR<BrainData>('/api/brain', fetcher, { revalidateOnFocus: false })
-  const ls = brainData?.data?.loopSummary
-  if (!ls || ls.activeLoops === 0) return null
-
-  const stats = [
-    { label: 'Active loops', value: ls.activeLoops, color: '#a78bfa' },
-    { label: 'Waiting for PM', value: ls.waitingForPM, color: '#f59e0b' },
-    { label: 'In cycle', value: ls.inCycle, color: '#7c3aed' },
-    { label: 'Shipped', value: ls.shipped, color: '#22c55e' },
-  ]
-
-  return (
-    <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-      {stats.filter(s => s.value > 0).map(s => (
-        <div key={s.label} style={{
-          display: 'flex', alignItems: 'center', gap: '8px',
-          padding: '6px 14px',
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: '100px',
-        }}>
-          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>
-            {s.value} {s.label}
-          </span>
-        </div>
-      ))}
-      {ls.revenueAtRisk > 0 && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '8px',
-          padding: '6px 14px',
-          background: 'rgba(245,158,11,0.08)',
-          border: '1px solid rgba(245,158,11,0.2)',
-          borderRadius: '100px',
-        }}>
-          <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 600 }}>
-            {formatCurrency(ls.revenueAtRisk)} revenue in loops
-          </span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-export default function TodayPage() {
-  const { data: loopData } = useSWR<LoopSignalResponse>(
-    '/api/dashboard/loop-signals',
-    fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 60000 },
-  )
-
-  const inFlightCount = loopData?.data?.inFlight?.length ?? 0
-  const hour = new Date().getHours()
-  const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
 
   return (
     <div style={{
-      padding: '32px',
-      background: 'radial-gradient(ellipse 60% 50% at 20% 40%, rgba(124,58,237,0.08), transparent)',
+      ...glass.card,
+      borderRadius: '10px',
+      overflow: 'hidden',
     }}>
+      {topDeals.slice(0, 6).map((deal, idx) => {
+        const urgentEntry = brain?.urgentDeals?.find(u => u.dealId === deal.id)
+        const staleEntry = brain?.staleDeals?.find(s => s.dealId === deal.id)
+        const score = staleEntry?.score ?? null
+        const scoreDelta = staleEntry?.daysSinceUpdate && staleEntry.daysSinceUpdate > 7
+          ? Math.min(staleEntry.daysSinceUpdate, 20)
+          : null
+
+        // Find linked loops/linear issues
+        const dealLoops = loopEntries.filter(l => l.dealId === deal.id)
+        const dealInFlight = inFlight.filter(f => f.id === deal.id)
+        const allIssues = [
+          ...dealLoops.map(l => ({ id: l.linearIssueId, title: l.linearTitle })),
+          ...dealInFlight.flatMap(f => f.inCycleIssues.map(i => ({ id: i.linearIssueId, title: i.linearTitle ?? null }))),
+        ]
+        // Dedupe
+        const issueMap = new Map<string, string | null>()
+        allIssues.forEach(i => { if (!issueMap.has(i.id)) issueMap.set(i.id, i.title ?? null) })
+        const uniqueIssues = Array.from(issueMap.entries()).map(([id, title]) => ({ id, title }))
+
+        // Loop status
+        const loopStatus = dealInFlight[0]?.loopStage
+        const loopLabel = loopStatus === 'awaiting_approval' ? 'Awaiting PM'
+          : loopStatus === 'in_cycle' ? 'In cycle'
+          : dealLoops.length > 0 ? (dealLoops[0].loopStatus === 'shipped' ? 'Shipped' : dealLoops[0].loopStatus?.replace(/_/g, ' '))
+          : null
+
+        // Risk
+        const topRisk = deal.primaryBlocker
+          || (urgentEntry?.reason)
+          || (staleEntry ? `No update in ${staleEntry.daysSinceUpdate}d` : null)
+
+        // Close date
+        const closeDays = deal.daysStale !== undefined ? null : null // not available in summary, we show daysStale
+
+        const dotColor = deal.riskLevel === 'high' ? '#ef4444'
+          : deal.riskLevel === 'medium' ? '#f59e0b'
+          : '#22c55e'
+
+        return (
+          <Link key={deal.id} href={`/deals/${deal.id}`} style={{ textDecoration: 'none', display: 'block' }}>
+            <div
+              style={{
+                padding: '10px 14px',
+                borderBottom: idx < topDeals.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                transition: 'background 0.12s',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.06)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'transparent' }}
+            >
+              {/* Row 1: Company, value, closing */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <span style={{
+                  width: '6px', height: '6px', borderRadius: '50%',
+                  background: dotColor, flexShrink: 0,
+                }} />
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.9)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {deal.company}
+                </span>
+                {deal.value > 0 && (
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.6)', flexShrink: 0 }}>
+                    {fmtCurrency(deal.value, currency)}
+                  </span>
+                )}
+                {deal.daysStale > 0 && (
+                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', flexShrink: 0 }}>
+                    {deal.daysStale}d stale
+                  </span>
+                )}
+              </div>
+
+              {/* Row 2: Score, stage, risk */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px', paddingLeft: '14px' }}>
+                {score !== null && score !== undefined && (
+                  <span style={{ fontSize: '10px', color: scoreColor(score), fontWeight: 600 }}>
+                    Score: {score}
+                    {scoreDelta ? ` (dropped ${scoreDelta}pts)` : ''}
+                  </span>
+                )}
+                <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)' }}>
+                  {stageFmt(deal.stage)}
+                </span>
+                {loopLabel && (
+                  <span style={{
+                    fontSize: '9px', fontWeight: 600,
+                    padding: '1px 6px', borderRadius: '3px',
+                    background: loopStatus === 'in_cycle' ? 'rgba(34,197,94,0.12)' : 'rgba(245,158,11,0.12)',
+                    color: loopStatus === 'in_cycle' ? '#22c55e' : '#f59e0b',
+                    border: `1px solid ${loopStatus === 'in_cycle' ? 'rgba(34,197,94,0.2)' : 'rgba(245,158,11,0.2)'}`,
+                  }}>
+                    Loop: {loopLabel}
+                  </span>
+                )}
+              </div>
+
+              {/* Row 3: Risk reason */}
+              {topRisk && (
+                <div style={{ fontSize: '10px', color: '#f59e0b', paddingLeft: '14px', marginBottom: '3px' }}>
+                  Risk: {topRisk}
+                </div>
+              )}
+
+              {/* Row 4: Top action */}
+              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.55)', paddingLeft: '14px', marginBottom: uniqueIssues.length > 0 ? '3px' : '0' }}>
+                {'\u2192'} {deal.topAction}
+              </div>
+
+              {/* Row 5: Linked Linear issues */}
+              {uniqueIssues.length > 0 && (
+                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', paddingLeft: '14px' }}>
+                  {'\u2192'} {uniqueIssues.length} Linear issue{uniqueIssues.length !== 1 ? 's' : ''} linked
+                  <span style={{ fontFamily: 'monospace', marginLeft: '4px' }}>
+                    ({uniqueIssues.slice(0, 3).map(i => i.id).join(', ')}{uniqueIssues.length > 3 ? ', ...' : ''})
+                  </span>
+                </div>
+              )}
+            </div>
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Pipeline Health Strip ───────────────────────────────────────────────────
+
+function PipelineHealthStrip({ currency }: { currency: string }) {
+  const { data: dealsRes } = useSWR<{ data: DealRow[] }>(
+    '/api/deals', fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 60000 },
+  )
+  const { data: brainData } = useSWR<BrainData>(
+    '/api/brain', fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 60000 },
+  )
+
+  const deals = (dealsRes?.data ?? []).filter(
+    (d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost'
+  )
+  const brain = brainData?.data
+  const totalDeals = deals.length
+  const totalPipeline = deals.reduce((acc: number, d: any) => acc + (Number(d.dealValue) || 0), 0)
+  const scores = deals.map((d: any) => Number(d.conversionScore) || 0).filter((s: number) => s > 0)
+  const avgScore = scores.length > 0 ? Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length) : 0
+
+  // Forecast = sum of value * probability
+  const forecast = deals.reduce((acc: number, d: any) => {
+    const prob = (Number(d.conversionScore) || 50) / 100
+    return acc + (Number(d.dealValue) || 0) * prob
+  }, 0)
+
+  // Risk categories
+  const staleIds = new Set((brain?.staleDeals ?? []).map(s => s.dealId))
+  const urgentIds = new Set((brain?.urgentDeals ?? []).map(u => u.dealId))
+  const atRisk = deals.filter((d: any) => staleIds.has(d.id) || urgentIds.has(d.id)).length
+  const stale = deals.filter((d: any) => {
+    const days = Math.floor((Date.now() - new Date(d.updatedAt).getTime()) / 86400000)
+    return days > 14 && !staleIds.has(d.id) && !urgentIds.has(d.id)
+  }).length
+  const onTrack = totalDeals - atRisk - stale
+
+  const stats = [
+    { label: `${totalDeals} deals`, value: null },
+    { label: `${fmtCurrency(totalPipeline, currency)} pipeline`, value: null },
+    { label: `${avgScore} avg score`, value: null },
+    { label: `${fmtCurrency(forecast, currency)} forecast`, value: null },
+  ]
+
+  const buckets = [
+    { count: atRisk, label: 'at risk', color: '#ef4444' },
+    { count: onTrack, label: 'on track', color: '#22c55e' },
+    { count: stale, label: 'stale', color: '#f59e0b' },
+  ]
+
+  return (
+    <div style={{
+      ...glass.card,
+      padding: '10px 14px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '16px',
+      flexWrap: 'wrap',
+    }}>
+      {stats.map((s, i) => (
+        <span key={i} style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>
+          {s.label}
+          {i < stats.length - 1 && (
+            <span style={{ color: 'rgba(255,255,255,0.15)', marginLeft: '16px' }}>|</span>
+          )}
+        </span>
+      ))}
+      <span style={{ flex: 1 }} />
+      {buckets.map((b, i) => (
+        <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'rgba(255,255,255,0.5)' }}>
+          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: b.color }} />
+          {b.count} {b.label}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+// ─── Active Loops Table ──────────────────────────────────────────────────────
+
+function ActiveLoopsTable({ currency }: { currency: string }) {
+  const { data: loopsRes, isLoading } = useSWR<{ data: LoopEntry[] }>(
+    '/api/loops', fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 30000 },
+  )
+  const loops = loopsRes?.data ?? []
+
+  if (isLoading) {
+    return <Skeleton h={100} />
+  }
+
+  if (loops.length === 0) {
+    return (
+      <div style={{ ...glass.card, padding: '14px', textAlign: 'center' }}>
+        <p style={{ ...text.muted, margin: 0 }}>No active loops. Link a deal to a Linear issue to start one.</p>
+      </div>
+    )
+  }
+
+  const thStyle: React.CSSProperties = {
+    ...text.label,
+    padding: '6px 10px',
+    textAlign: 'left',
+    borderBottom: '1px solid rgba(255,255,255,0.08)',
+    whiteSpace: 'nowrap',
+  }
+  const tdStyle: React.CSSProperties = {
+    padding: '7px 10px',
+    fontSize: '11px',
+    color: 'rgba(255,255,255,0.75)',
+    borderBottom: '1px solid rgba(255,255,255,0.04)',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: '180px',
+  }
+
+  return (
+    <div style={{ ...glass.card, overflow: 'hidden' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            <th style={thStyle}>Deal</th>
+            <th style={thStyle}>Issue</th>
+            <th style={thStyle}>Status</th>
+            <th style={{ ...thStyle, textAlign: 'right' }}>Revenue</th>
+            <th style={{ ...thStyle, textAlign: 'right' }}>Days</th>
+          </tr>
+        </thead>
+        <tbody>
+          {loops.slice(0, 10).map(loop => {
+            const statusColor = loop.loopStatus === 'in_cycle' ? '#22c55e'
+              : loop.loopStatus === 'awaiting_approval' ? '#f59e0b'
+              : loop.loopStatus === 'shipped' ? '#3b82f6'
+              : 'rgba(255,255,255,0.4)'
+            const statusLabel = loop.loopStatus === 'in_cycle' ? 'In cycle'
+              : loop.loopStatus === 'awaiting_approval' ? 'Awaiting PM'
+              : loop.loopStatus === 'shipped' ? 'Shipped'
+              : stageFmt(loop.loopStatus ?? '')
+
+            const days = loop.daysInStatus
+            const warn = days !== null && days > 5
+
+            return (
+              <tr
+                key={`${loop.dealId}-${loop.linearIssueId}`}
+                style={{ cursor: 'pointer', transition: 'background 0.1s' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = 'rgba(255,255,255,0.04)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = 'transparent' }}
+                onClick={() => { window.location.href = `/deals/${loop.dealId}` }}
+              >
+                <td style={{ ...tdStyle, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>
+                  {loop.company}
+                </td>
+                <td style={tdStyle}>
+                  <span style={{ fontFamily: 'monospace', fontSize: '10px', color: 'rgba(255,255,255,0.5)' }}>
+                    {loop.linearIssueId}
+                  </span>
+                  {loop.linearTitle && (
+                    <span style={{ marginLeft: '6px', color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>
+                      ({loop.linearTitle.length > 30 ? loop.linearTitle.slice(0, 30) + '...' : loop.linearTitle})
+                    </span>
+                  )}
+                </td>
+                <td style={tdStyle}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: statusColor }} />
+                    {statusLabel}
+                  </span>
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>
+                  {fmtCurrency(loop.dealValue, currency)}
+                </td>
+                <td style={{ ...tdStyle, textAlign: 'right' }}>
+                  {days !== null ? `${days}d` : '-'}
+                  {warn && <span style={{ marginLeft: '3px', color: '#f59e0b' }}>{'\u26a0\ufe0f'}</span>}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ─── Intelligence Section ────────────────────────────────────────────────────
+
+function IntelligenceSection() {
+  const { data: brainData } = useSWR<BrainData>(
+    '/api/brain', fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 60000 },
+  )
+  const brain = brainData?.data
+
+  const insights: string[] = []
+
+  // Key patterns
+  for (const kp of brain?.keyPatterns ?? []) {
+    if (kp.dealIds.length > 1) {
+      insights.push(`${kp.dealIds.length} deals mention "${kp.label}" as a pattern.`)
+    }
+  }
+
+  // Win/loss intel
+  if (brain?.winLossIntel) {
+    const wl = brain.winLossIntel
+    if (wl.winRate > 0) {
+      insights.push(`Win rate: ${Math.round(wl.winRate * 100)}% (${wl.winCount}W / ${wl.lossCount}L).`)
+    }
+  }
+
+  // Top risks
+  for (const risk of (brain?.topRisks ?? []).slice(0, 2)) {
+    insights.push(risk)
+  }
+
+  // Daily briefing snippet
+  if (brain?.dailyBriefing) {
+    const brief = brain.dailyBriefing.length > 120 ? brain.dailyBriefing.slice(0, 120) + '...' : brain.dailyBriefing
+    insights.unshift(brief)
+  }
+
+  if (insights.length === 0) {
+    return (
+      <div style={{ ...glass.card, padding: '12px 14px' }}>
+        <p style={{ ...text.muted, margin: 0 }}>Brain is learning. Insights will appear after a few deals.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ ...glass.card, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      {insights.slice(0, 4).map((insight, i) => (
+        <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+          <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '10px', marginTop: '2px', flexShrink: 0 }}>{'\u2022'}</span>
+          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.65)', lineHeight: '1.4' }}>
+            {insight}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Section Header ──────────────────────────────────────────────────────────
+
+function SectionLabel({ emoji, label }: { emoji: string; label: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+      <span style={{ fontSize: '12px' }}>{emoji}</span>
+      <span style={{ ...text.label, color: 'rgba(255,255,255,0.5)' }}>{label}</span>
+    </div>
+  )
+}
+
+// ─── Brain Status Dot ────────────────────────────────────────────────────────
+
+function BrainDot() {
+  const { data: brainData } = useSWR<BrainData>(
+    '/api/brain', fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 60000 },
+  )
+
+  const isStale = brainData?.meta?.isStale ?? true
+  const lastRebuilt = brainData?.meta?.lastRebuilt
+  const color = !brainData?.data ? 'rgba(255,255,255,0.2)' : isStale ? '#f59e0b' : '#22c55e'
+
+  let label = 'Brain: offline'
+  if (brainData?.data && lastRebuilt) {
+    const mins = Math.floor((Date.now() - new Date(lastRebuilt).getTime()) / 60000)
+    if (mins < 60) label = `Brain: ${mins}m ago`
+    else if (mins < 1440) label = `Brain: ${Math.floor(mins / 60)}h ago`
+    else label = `Brain: ${Math.floor(mins / 1440)}d ago`
+  } else if (brainData?.data) {
+    label = 'Brain: active'
+  }
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>
+      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: color }} />
+      {label}
+    </span>
+  )
+}
+
+// ─── Main Page ───────────────────────────────────────────────────────────────
+
+export default function TodayPage() {
+  const { data: configRes } = useSWR<PipelineConfig>(
+    '/api/pipeline-config', fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 120000 },
+  )
+
+  const currency = (configRes?.data?.currency as string) || '\u00a3'
+
+  const today = new Date()
+  const dateStr = today.toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+
+  return (
+    <div style={{ padding: '24px 28px', maxWidth: '1100px' }}>
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 0.6; }
@@ -927,67 +686,43 @@ export default function TodayPage() {
       `}</style>
 
       {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'rgba(255,255,255,0.95)', margin: 0, marginBottom: '4px' }}>
-          Good {timeOfDay}
-        </h1>
-        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', margin: 0 }}>
-          {inFlightCount > 0
-            ? `${inFlightCount} loop${inFlightCount !== 1 ? 's' : ''} in flight`
-            : 'No loops in flight yet. Start one today.'}
-        </p>
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+        marginBottom: '20px',
+      }}>
+        <div>
+          <h1 style={{ fontSize: '18px', fontWeight: 700, color: 'rgba(255,255,255,0.9)', margin: '0 0 2px' }}>
+            TODAY
+            <span style={{ fontWeight: 400, color: 'rgba(255,255,255,0.35)', marginLeft: '10px', fontSize: '13px' }}>
+              {dateStr}
+            </span>
+          </h1>
+        </div>
+        <BrainDot />
       </div>
 
-      {/* Daily Briefing — full width above columns */}
-      <DailyBriefingCard />
+      {/* DO NOW */}
+      <SectionLabel emoji={'\u26a1'} label="DO NOW" />
+      <div style={{ marginBottom: '20px' }}>
+        <DoNowSection currency={currency} />
+      </div>
 
-      {/* Loop stats strip */}
-      <LoopStatsRow />
+      {/* PIPELINE HEALTH */}
+      <SectionLabel emoji={'\ud83d\udcca'} label="PIPELINE HEALTH" />
+      <div style={{ marginBottom: '20px' }}>
+        <PipelineHealthStrip currency={currency} />
+      </div>
 
-      {/* Two-column layout: 60% left / 40% right */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+      {/* ACTIVE LOOPS */}
+      <SectionLabel emoji={'\ud83d\udd04'} label="ACTIVE LOOPS" />
+      <div style={{ marginBottom: '20px' }}>
+        <ActiveLoopsTable currency={currency} />
+      </div>
 
-        {/* ── Left column: In-Flight Loops ── */}
-        <div>
-          <SectionHeader
-            icon={<Zap size={15} color="#7c3aed" />}
-            label="In-Flight Loops"
-            count={inFlightCount}
-          />
-          <InFlightLoopsSection />
-        </div>
-
-        {/* ── Right column: 3 stacked sections ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-
-          {/* Section 1: AI Actions */}
-          <div>
-            <SectionHeader
-              icon={<Sparkles size={15} color="#f59e0b" />}
-              label="AI Actions"
-            />
-            <AIActionsSection />
-          </div>
-
-          {/* Section 2: Intent Matching */}
-          <div>
-            <SectionHeader
-              icon={<Calendar size={15} color="#60a5fa" />}
-              label="Intent Matching"
-            />
-            <IntentMatchingSection />
-          </div>
-
-          {/* Section 3: Deals Needing Attention */}
-          <div>
-            <SectionHeader
-              icon={<AlertCircle size={15} color="#ef4444" />}
-              label="Deals Needing Attention"
-            />
-            <DealsNeedingAttentionSection />
-          </div>
-
-        </div>
+      {/* INTELLIGENCE */}
+      <SectionLabel emoji={'\ud83d\udca1'} label="INTELLIGENCE" />
+      <div style={{ marginBottom: '20px' }}>
+        <IntelligenceSection />
       </div>
     </div>
   )

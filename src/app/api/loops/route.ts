@@ -6,6 +6,7 @@
  */
 export const dynamic = 'force-dynamic'
 
+import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
@@ -152,6 +153,17 @@ export async function GET() {
         updatedAt: new Date(mainLink.updatedAt),
       })
     }
+
+    // Fire-and-forget: sync Linear statuses for active loops in the background
+    after(async () => {
+      try {
+        const { syncLinearIssues } = await import('@/lib/linear-sync')
+        if (syncLinearIssues) await syncLinearIssues(workspaceId)
+      } catch (e) {
+        // Non-fatal background task failure
+        console.error('[loops] background sync error:', e)
+      }
+    })
 
     return NextResponse.json({ data: loops })
   } catch (err) {

@@ -15,7 +15,16 @@ export async function GET() {
 
     // Auto-rebuild in background if brain is stale (version mismatch) or missing
     if (!brain || (brain.brainVersion ?? 0) < BRAIN_VERSION) {
-      after(async () => { await requestBrainRebuild(workspaceId, 'stale_version') })
+      after(async () => { await requestBrainRebuild(workspaceId, !brain ? 'missing_brain' : 'stale_version') })
+    }
+
+    // Prevent empty states on the Today page — signal that a build is in progress
+    if (!brain) {
+      return NextResponse.json({
+        status: 'building',
+        data: null,
+        meta: { lastRebuilt: null, isStale: true },
+      })
     }
 
     return NextResponse.json({

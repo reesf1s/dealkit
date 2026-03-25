@@ -242,24 +242,24 @@ export interface WorkspaceBrain {
   suggestedPrompts?: string[]              // top 4 contextual prompts computed during brain rebuild
   // ── One-time backfill flag — set after extraction backfill runs ────────────
   extractionBackfillDone?: boolean
-  // ── Halvex loop intelligence ──────────────────────────────────────────────
+  // ── Loop summary and AI-driven actions ──────────────────────────────────────
   loopSummary?: {
-    activeLoops: number         // count of pending + in_cycle links
-    waitingForPM: number        // count of links awaiting approval
-    inCycle: number             // count of links in_cycle
-    shipped: number             // count of deployed links
-    revenueAtRisk: number       // sum dealValue where status pending/in_cycle
+    activeLoops: number
+    waitingForPM: number
+    inCycle: number
+    shipped: number
+    revenueAtRisk: number
   }
   dealActions?: Array<{
     dealId: string
     dealName: string
     dealValue: number
-    action: string              // specific recommended action text
-    reason: string              // why, from win/loss patterns
+    action: string
+    reason: string
     urgency: 'critical' | 'high' | 'medium'
-    confidence: number          // 0-1
+    confidence: number
   }>
-  intentSignalsList?: Array<{
+  intentSignals?: Array<{
     dealId: string
     dealName: string
     signal: string
@@ -267,7 +267,8 @@ export interface WorkspaceBrain {
     detectedAt: string
     daysAgo: number
   }>
-  dailyBriefing?: string        // 2-3 sentence morning briefing from Claude Haiku
+  dailyBriefing?: string
+  dailyBriefingGeneratedAt?: string
 }
 
 export interface PipelineHealthIndex {
@@ -2352,175 +2353,6 @@ async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown')
       }))
   })()
 
-  // ── Halvex: Loop summary from deal_linear_links ───────────────────────────
-  let loopSummary: WorkspaceBrain['loopSummary'] | undefined
-  let dealActions: WorkspaceBrain['dealActions'] | undefined
-  let intentSignalsList: WorkspaceBrain['intentSignalsList'] | undefined
-  let dailyBriefing: WorkspaceBrain['dailyBriefing'] | undefined
-
-  try {
-    // Query loop stats — non-fatal if table doesn't exist yet
-    const linkRows = await db.execute<{
-      deal_id: string
-      status: string
-      deal_value: number | null
-    }>(sql`
-      SELECT dll.deal_id, dll.status, dl.deal_value
-      FROM deal_linear_links dll
-      JOIN deal_logs dl ON dl.id = dll.deal_id
-      WHERE dll.workspace_id = ${workspaceId}
-        AND dll.status NOT IN ('suggested', 'dismissed')
-    `).catch(() => [] as { deal_id: string; status: string; deal_value: number | null }[])
-
-    const linkArr = Array.isArray(linkRows) ? linkRows : (linkRows as any).rows ?? []
-
-    // Compute loop summary
-    const seenDeals = new Set<string>()
-    let waitingForPM = 0
-    let inCycle = 0
-    let shipped = 0
-    let revenueAtRisk = 0
-
-    for (const row of linkArr) {
-      if (row.status === 'in_cycle') inCycle++
-      else if (row.status === 'deployed') shipped++
-      else waitingForPM++ // pending/confirmed
-
-      if (!seenDeals.has(row.deal_id) && (row.status === 'in_cycle' || row.status !== 'deployed')) {
-        if (row.deal_value) revenueAtRisk += Number(row.deal_value)
-        seenDeals.add(row.deal_id)
-      }
-    }
-    const activeLoops = waitingForPM + inCycle
-
-    loopSummary = { activeLoops, waitingForPM, inCycle, shipped, revenueAtRisk }
-  } catch { /* non-fatal */ }
-
-  // ── Halvex: Intent signals from deal data ─────────────────────────────────
-  try {
-    const signals: NonNullable<WorkspaceBrain['intentSignalsList']> = []
-    for (const d of activeDeals.slice(0, 20)) {
-      const is = d.intentSignals as Record<string, unknown> | null
-      if (!is) continue
-      const updatedAt = d.updatedAt ? new Date(d.updatedAt) : now
-      const daysAgo = Math.floor((now.getTime() - updatedAt.getTime()) / 86400000)
-      if (is.championStatus && is.championStatus !== 'none') {
-        signals.push({
-          dealId: d.id,
-          dealName: d.dealName,
-          signal: `Champion ${is.championStatus === 'confirmed' ? 'confirmed' : 'suspected'}`,
-          signalType: 'champion',
-          detectedAt: updatedAt.toISOString(),
-          daysAgo,
-        })
-      }
-      if (is.budgetStatus === 'approved') {
-        signals.push({
-          dealId: d.id,
-          dealName: d.dealName,
-          signal: 'Budget approved',
-          signalType: 'budget',
-          detectedAt: updatedAt.toISOString(),
-          daysAgo,
-        })
-      }
-      const risks = (d.dealRisks as string[]) ?? []
-      const compRisk = risks.find(r => r.toLowerCase().includes('competitor') || r.toLowerCase().includes('evaluat'))
-      if (compRisk) {
-        signals.push({
-          dealId: d.id,
-          dealName: d.dealName,
-          signal: compRisk.slice(0, 80),
-          signalType: 'competitor',
-          detectedAt: updatedAt.toISOString(),
-          daysAgo,
-        })
-      }
-    }
-    if (signals.length > 0) intentSignalsList = signals.slice(0, 10)
-  } catch { /* non-fatal */ }
-
-  // ── Halvex: AI deal actions + daily briefing via Claude Haiku ─────────────
-  try {
-    if (activeDeals.length > 0) {
-      const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const haiku = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
-      // Build deal actions for stale/at-risk deals (up to 5)
-      const atRiskDeals = [
-        ...urgentDeals.slice(0, 2).map(ud => activeDeals.find(d => d.id === ud.dealId)).filter(Boolean),
-        ...staleDeals.slice(0, 3).map(sd => activeDeals.find(d => d.id === sd.dealId)).filter(Boolean),
-      ].filter((d, i, arr) => d && arr.indexOf(d) === i).slice(0, 5) as typeof activeDeals
-
-      if (atRiskDeals.length > 0) {
-        const patternsText = (objectionWinMap ?? []).slice(0, 3)
-          .map(p => `"${p.theme}" — addressed within 7d wins ${Math.round(p.winRateWithTheme)}% of the time`)
-          .join('; ')
-
-        const dealSummaries = atRiskDeals.map(d => {
-          const ud = urgentDeals.find(u => u.dealId === d.id)
-          const sd = staleDeals.find(s => s.dealId === d.id)
-          return `${d.prospectCompany} (${d.stage}, $${d.dealValue ?? 0}): ${ud?.reason ?? (sd ? `stale ${sd.daysSinceUpdate}d` : 'at risk')}`
-        }).join('\n')
-
-        const msg = await haiku.messages.create({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 400,
-          messages: [{
-            role: 'user',
-            content: `Win patterns: ${patternsText || 'No patterns yet'}.
-At-risk deals:
-${dealSummaries}
-
-For each deal, suggest ONE specific action the rep should take today. Return JSON array:
-[{"dealId":"id","action":"string","reason":"string","urgency":"critical"|"high"|"medium","confidence":0.7}]
-Use the actual deal names and companies. Be specific. Max 20 words per action.`,
-          }],
-        })
-
-        const raw = ((msg.content[0] as { type: string; text: string }).text ?? '').trim()
-        const match = raw.match(/\[[\s\S]*\]/)
-        if (match) {
-          const parsed = JSON.parse(match[0]) as Array<{ dealId?: string; action?: string; reason?: string; urgency?: string; confidence?: number }>
-          dealActions = atRiskDeals.map((d, i) => {
-            const suggestion = parsed[i] ?? {}
-            return {
-              dealId: d.id,
-              dealName: d.dealName ?? d.prospectCompany,
-              dealValue: d.dealValue ?? 0,
-              action: String(suggestion.action ?? `Follow up with ${d.prospectCompany}`),
-              reason: String(suggestion.reason ?? 'At risk of going cold'),
-              urgency: (['critical', 'high', 'medium'].includes(suggestion.urgency ?? '') ? suggestion.urgency : 'high') as 'critical' | 'high' | 'medium',
-              confidence: typeof suggestion.confidence === 'number' ? suggestion.confidence : 0.7,
-            }
-          })
-        }
-      }
-
-      // Daily briefing
-      const winRate = winLossIntel?.winRate ?? null
-      const topLoop = staleDeals[0]
-      const briefingMsg = await haiku.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 120,
-        messages: [{
-          role: 'user',
-          content: `Write a 2-3 sentence morning sales briefing. Facts:
-- ${activeDeals.length} active deals, ${loopSummary?.activeLoops ?? 0} loops in flight
-- ${urgentDeals.length} urgent deals need attention today
-- ${staleDeals.length} stale deals (no update 14+ days)
-- Win rate: ${winRate != null ? `${winRate}%` : 'not yet calculated'}
-${topLoop ? `- Top priority: ${topLoop.company} — ${topLoop.daysSinceUpdate} days without update` : ''}
-Write as "You have..." — concise, actionable, no markdown.`,
-        }],
-      })
-
-      dailyBriefing = ((briefingMsg.content[0] as { type: string; text: string }).text ?? '').trim()
-    }
-  } catch (e) {
-    console.warn('[brain] Halvex AI fields failed (non-fatal):', (e as Error)?.message)
-  }
-
   // ── Contextual suggested prompts for Ask AI ─────────────────────────────────
   const suggestedPrompts = _generateSuggestedPrompts({
     activeDeals,
@@ -2532,6 +2364,149 @@ Write as "You have..." — concise, actionable, no markdown.`,
     stageTransitionRows: stageTransitionRows as any[],
     now,
   })
+
+  // Compute loopSummary from dealLinearLinks
+  let loopSummary: WorkspaceBrain['loopSummary'] | undefined
+  try {
+    const { dealLinearLinks: dllTable } = await import('@/lib/db/schema')
+    const allLinks = await db.select({
+      status: dllTable.status,
+      dealId: dllTable.dealId,
+    }).from(dllTable).where(eq(dllTable.workspaceId, workspaceId))
+
+    const activeStatuses = ['suggested', 'confirmed', 'in_cycle']
+    const activeLinks = allLinks.filter(l => activeStatuses.includes(l.status ?? ''))
+    const inCycleLinks = allLinks.filter(l => l.status === 'in_cycle')
+    const shippedLinks = allLinks.filter(l => l.status === 'deployed')
+
+    // Revenue at risk = sum of deal values where loops are pending/in_cycle
+    const atRiskDealIds = new Set(activeLinks.map(l => l.dealId))
+    const atRiskDeals = snapshots.filter(d => atRiskDealIds.has(d.id) && d.dealValue)
+    const revenueAtRisk = atRiskDeals.reduce((sum, d) => sum + (d.dealValue ?? 0), 0)
+
+    loopSummary = {
+      activeLoops: activeLinks.length,
+      waitingForPM: activeLinks.filter(l => l.status === 'confirmed').length,
+      inCycle: inCycleLinks.length,
+      shipped: shippedLinks.length,
+      revenueAtRisk,
+    }
+  } catch (e) {
+    console.error('[brain] loopSummary error', e)
+  }
+
+  // Generate dealActions via Claude Haiku for at-risk/stale deals
+  let dealActions: WorkspaceBrain['dealActions'] | undefined
+  try {
+    const Anthropic = (await import('@anthropic-ai/sdk')).default
+    const anthropicClient = new Anthropic()
+
+    const dealsForActions = [
+      ...(urgentDeals ?? []).slice(0, 2).map(d => {
+        const snap = snapshots.find(s => s.id === d.dealId)
+        return { dealId: d.dealId, dealName: d.dealName, company: d.company, issue: d.reason, dealValue: snap?.dealValue ?? 0 }
+      }),
+      ...(staleDeals ?? []).slice(0, 3).map(d => {
+        const snap = snapshots.find(s => s.id === d.dealId)
+        return { dealId: d.dealId, dealName: d.dealName, company: d.company, issue: `No update in ${d.daysSinceUpdate}d`, dealValue: snap?.dealValue ?? 0 }
+      }),
+    ].slice(0, 5)
+
+    if (dealsForActions.length > 0) {
+      const dealContext = dealsForActions.map(d => {
+        return `Deal: ${d.dealName} | Company: ${d.company} | Value: £${(d.dealValue ?? 0).toLocaleString()} | Issue: ${d.issue}`
+      }).join('\n')
+
+      const winPatterns = (objectionWinMap ?? []).slice(0, 3).map(p => `"${p.theme}" → ${Math.round(p.winRateWithTheme * 100)}% win rate`).join(', ') || 'No patterns yet'
+
+      const resp = await anthropicClient.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 800,
+        messages: [{
+          role: 'user',
+          content: `You are a sales coach. For each deal below, generate ONE specific action to take TODAY to move it forward. Be concrete and brief (max 15 words per action).
+
+Win patterns from this pipeline: ${winPatterns}
+
+Deals:
+${dealContext}
+
+Respond with JSON array: [{"dealId":"...","action":"...","reason":"...","urgency":"critical|high|medium","confidence":0.0-1.0}]
+Only return the JSON array, nothing else.`
+        }]
+      })
+
+      const text = resp.content[0].type === 'text' ? resp.content[0].text.trim() : '[]'
+      const parsed = JSON.parse(text.replace(/```json\n?|\n?```/g, '')) as Array<{
+        dealId: string
+        action: string
+        reason: string
+        urgency: 'critical' | 'high' | 'medium'
+        confidence: number
+      }>
+
+      dealActions = parsed.map(a => {
+        const snap = snapshots.find(s => s.id === a.dealId)
+        return {
+          dealId: a.dealId,
+          dealName: snap?.name ?? a.dealId,
+          dealValue: snap?.dealValue ?? 0,
+          action: a.action,
+          reason: a.reason,
+          urgency: a.urgency,
+          confidence: a.confidence,
+        }
+      })
+    }
+  } catch (e) {
+    console.error('[brain] dealActions error', e)
+  }
+
+  // Generate daily briefing
+  let dailyBriefing: string | undefined
+  let dailyBriefingGeneratedAt: string | undefined
+  try {
+    const shouldRegenerate = !previousBrain?.dailyBriefingGeneratedAt ||
+      (Date.now() - new Date(previousBrain.dailyBriefingGeneratedAt).getTime()) > 6 * 60 * 60 * 1000 // 6 hours
+
+    if (shouldRegenerate && (dealActions?.length || staleDeals?.length)) {
+      const Anthropic = (await import('@anthropic-ai/sdk')).default
+      const anthropicClient = new Anthropic()
+
+      const topAction = dealActions?.[0]
+      const loopStats = loopSummary
+      const staleCount = staleDeals?.length ?? 0
+
+      const context = [
+        loopStats ? `Active loops: ${loopStats.activeLoops}, in cycle: ${loopStats.inCycle}, shipped: ${loopStats.shipped}` : '',
+        topAction ? `Highest priority deal: ${topAction.dealName} — ${topAction.action}` : '',
+        staleCount > 0 ? `${staleCount} deal(s) need follow-up` : '',
+        activeDeals.length > 0 ? `${activeDeals.length} active deals worth £${(totalValue ?? 0).toLocaleString()}` : '',
+      ].filter(Boolean).join('. ')
+
+      const resp = await anthropicClient.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 150,
+        messages: [{
+          role: 'user',
+          content: `You are a sales intelligence assistant. Write a 2-3 sentence daily briefing for a sales rep. Be specific, concise and motivating. Use the data below. Do NOT start with "Good morning" — start with the most important insight.
+
+Data: ${context}
+
+Write only the briefing text, no quotes, no preamble.`
+        }]
+      })
+
+      dailyBriefing = resp.content[0].type === 'text' ? resp.content[0].text.trim() : undefined
+      dailyBriefingGeneratedAt = new Date().toISOString()
+    } else if (previousBrain?.dailyBriefing) {
+      // Keep existing briefing
+      dailyBriefing = previousBrain.dailyBriefing
+      dailyBriefingGeneratedAt = previousBrain.dailyBriefingGeneratedAt
+    }
+  } catch (e) {
+    console.error('[brain] dailyBriefing error', e)
+  }
 
   const brain: WorkspaceBrain = {
     brainVersion: BRAIN_VERSION,
@@ -2571,9 +2546,9 @@ Write as "You have..." — concise, actionable, no markdown.`,
     suggestedPrompts,
     extractionBackfillDone,
     loopSummary,
-    dealActions: dealActions && dealActions.length > 0 ? dealActions : undefined,
-    intentSignalsList: intentSignalsList && intentSignalsList.length > 0 ? intentSignalsList : undefined,
+    dealActions,
     dailyBriefing,
+    dailyBriefingGeneratedAt,
   }
 
   await db.execute(sql`

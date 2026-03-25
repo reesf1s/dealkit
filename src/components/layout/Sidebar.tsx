@@ -59,7 +59,7 @@ export default function Sidebar() {
     ? (() => {
         const mins = Math.floor((Date.now() - new Date(brain.updatedAt).getTime()) / 60000)
         const label = mins < 1 ? 'live' : mins < 60 ? `${mins}m ago` : mins < 1440 ? `${Math.floor(mins / 60)}h ago` : `${Math.floor(mins / 1440)}d ago`
-        const color = mins < 60 ? '#10b981' : mins < 1440 ? '#f59e0b' : '#ef4444'
+        const color = mins < 60 ? '#34d399' : mins < 1440 ? '#fbbf24' : '#f87171'
         return { label, color, mins }
       })()
     : null
@@ -90,9 +90,9 @@ export default function Sidebar() {
           fontSize: '12.5px',
           fontWeight: active ? 500 : 400,
           letterSpacing: '-0.01em',
-          color: active ? 'var(--text-primary)' : 'rgba(226,232,240,0.40)',
-          background: active ? 'rgba(255,255,255,0.06)' : 'transparent',
-          borderLeft: active && !collapsed ? '2px solid #7c6df5' : '2px solid transparent',
+          color: active ? 'rgba(255,255,255,0.92)' : 'rgba(226,232,240,0.35)',
+          background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
+          borderLeft: active && !collapsed ? '2px solid rgba(255,255,255,0.60)' : '2px solid transparent',
           transition: 'all 0.12s ease',
           position: 'relative',
           flexShrink: 0,
@@ -102,15 +102,15 @@ export default function Sidebar() {
         onMouseEnter={e => {
           if (!active) {
             const el = e.currentTarget as HTMLElement
-            el.style.background = 'rgba(255,255,255,0.03)'
-            el.style.color = 'rgba(226,232,240,0.65)'
+            el.style.background = 'rgba(255,255,255,0.04)'
+            el.style.color = 'rgba(226,232,240,0.55)'
           }
         }}
         onMouseLeave={e => {
           if (!active) {
             const el = e.currentTarget as HTMLElement
             el.style.background = 'transparent'
-            el.style.color = 'rgba(226,232,240,0.40)'
+            el.style.color = 'rgba(226,232,240,0.35)'
           }
         }}
       >
@@ -118,7 +118,7 @@ export default function Sidebar() {
           <Icon
             size={14}
             style={{
-              color: active ? '#7c6df5' : 'rgba(226,232,240,0.30)',
+              color: active ? 'rgba(255,255,255,0.92)' : 'rgba(226,232,240,0.25)',
               display: 'block',
               transition: 'color 0.12s ease',
             }}
@@ -137,8 +137,8 @@ export default function Sidebar() {
         {!collapsed && badge && badge.count > 0 && (
           <span style={{
             fontSize: '10px', fontWeight: 600,
-            color: badge.color === '#ef4444' ? '#f87171' : '#fbbf24',
-            background: badge.color === '#ef4444' ? 'rgba(239,68,68,0.10)' : 'rgba(245,158,11,0.10)',
+            color: badge.color === '#f87171' ? '#f87171' : '#fbbf24',
+            background: badge.color === '#f87171' ? 'rgba(248,113,113,0.10)' : 'rgba(251,191,36,0.10)',
             padding: '1px 5px', borderRadius: '100px',
           }}>{badge.count}</span>
         )}
@@ -153,10 +153,10 @@ export default function Sidebar() {
   const SidebarContent = (
     <aside style={{
       position: 'fixed', left: 0, top: 0, bottom: 0, width: w,
-      background: 'rgba(8, 6, 20, 0.72)',
+      background: 'rgba(12, 10, 24, 0.72)',
       backdropFilter: 'blur(28px)',
       WebkitBackdropFilter: 'blur(28px)',
-      borderRight: '1px solid rgba(255,255,255,0.07)',
+      borderRight: '1px solid rgba(255,255,255,0.06)',
       display: 'flex', flexDirection: 'column', zIndex: 40,
       transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)',
       overflow: 'hidden',
@@ -176,16 +176,16 @@ export default function Sidebar() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
             <div style={{
               width: '26px', height: '26px',
-              background: 'rgba(124,109,245,0.10)',
-              border: '1px solid rgba(124,109,245,0.25)',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.10)',
               borderRadius: '7px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0,
             }}>
-              <Brain size={13} color="#7c6df5" strokeWidth={1.8} />
+              <Brain size={13} color="rgba(255,255,255,0.70)" strokeWidth={1.8} />
             </div>
             <span style={{
-              color: 'rgba(226,232,240,0.90)',
+              color: 'rgba(255,255,255,0.92)',
               letterSpacing: '3px',
               fontSize: '10.5px',
               fontWeight: 600,
@@ -196,12 +196,12 @@ export default function Sidebar() {
         {collapsed && (
           <div style={{
             width: '26px', height: '26px',
-            background: 'rgba(124,109,245,0.10)',
-            border: '1px solid rgba(124,109,245,0.25)',
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.10)',
             borderRadius: '7px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <Brain size={13} color="#7c6df5" strokeWidth={1.8} />
+            <Brain size={13} color="rgba(255,255,255,0.70)" strokeWidth={1.8} />
           </div>
         )}
 
@@ -209,16 +209,16 @@ export default function Sidebar() {
           onClick={() => { mobileOpen ? closeMobile() : toggleCollapsed() }}
           style={{
             background: 'none', border: 'none',
-            color: 'rgba(226,232,240,0.20)', cursor: 'pointer',
+            color: 'rgba(255,255,255,0.20)', cursor: 'pointer',
             padding: '4px', borderRadius: '5px', display: 'flex',
             transition: 'color 0.12s, background 0.12s',
           }}
           onMouseEnter={e => {
-            ;(e.currentTarget as HTMLElement).style.color = 'rgba(226,232,240,0.50)'
+            ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.50)'
             ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'
           }}
           onMouseLeave={e => {
-            ;(e.currentTarget as HTMLElement).style.color = 'rgba(226,232,240,0.20)'
+            ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.20)'
             ;(e.currentTarget as HTMLElement).style.background = 'transparent'
           }}
         >
@@ -239,18 +239,18 @@ export default function Sidebar() {
               transition: 'all 0.12s ease',
             }}
             onMouseEnter={e => {
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.09)'
+              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.10)'
             }}
             onMouseLeave={e => {
               ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'
               ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'
             }}
           >
-            <Search size={11} style={{ color: 'rgba(226,232,240,0.25)', flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: '11.5px', color: 'rgba(226,232,240,0.25)', textAlign: 'left' }}>Search</span>
+            <Search size={11} style={{ color: 'rgba(255,255,255,0.32)', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: '11.5px', color: 'rgba(255,255,255,0.32)', textAlign: 'left' }}>Search</span>
             <span style={{
-              fontSize: '10px', color: 'rgba(226,232,240,0.18)',
+              fontSize: '10px', color: 'rgba(255,255,255,0.20)',
               background: 'rgba(255,255,255,0.04)', padding: '1px 5px',
               borderRadius: '4px', letterSpacing: '0.02em',
             }}>⌘P</span>
@@ -267,7 +267,7 @@ export default function Sidebar() {
               transition: 'all 0.12s ease',
             }}
           >
-            <Search size={11} style={{ color: 'rgba(226,232,240,0.25)' }} />
+            <Search size={11} style={{ color: 'rgba(255,255,255,0.32)' }} />
           </button>
         )}
       </div>
@@ -279,27 +279,27 @@ export default function Sidebar() {
             onClick={toggleCopilot}
             style={{
               width: '100%', height: '28px', borderRadius: '6px',
-              background: 'rgba(124,109,245,0.07)',
-              border: '1px solid rgba(124,109,245,0.18)',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.08)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', padding: '0 9px',
               transition: 'all 0.12s ease',
             }}
             onMouseEnter={e => {
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(124,109,245,0.13)'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,109,245,0.30)'
+              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.09)'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.14)'
             }}
             onMouseLeave={e => {
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(124,109,245,0.07)'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(124,109,245,0.18)'
+              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'
+              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'
             }}
           >
-            <MessageSquare size={11} style={{ color: '#7c6df5', flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: '11.5px', fontWeight: 500, color: '#7c6df5', textAlign: 'left', letterSpacing: '-0.01em' }}>
+            <MessageSquare size={11} style={{ color: 'rgba(255,255,255,0.70)', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: '11.5px', fontWeight: 500, color: 'rgba(255,255,255,0.70)', textAlign: 'left', letterSpacing: '-0.01em' }}>
               Ask AI
             </span>
             <span style={{
-              fontSize: '10px', color: 'rgba(124,109,245,0.40)',
-              background: 'rgba(124,109,245,0.07)', padding: '1px 5px',
+              fontSize: '10px', color: 'rgba(255,255,255,0.22)',
+              background: 'rgba(255,255,255,0.04)', padding: '1px 5px',
               borderRadius: '4px',
             }}>⌘K</span>
           </button>
@@ -309,13 +309,13 @@ export default function Sidebar() {
             title="Ask AI (⌘K)"
             style={{
               width: '32px', height: '28px', borderRadius: '6px',
-              background: 'rgba(124,109,245,0.07)',
-              border: '1px solid rgba(124,109,245,0.18)',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.08)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 0.12s ease',
             }}
           >
-            <MessageSquare size={11} style={{ color: '#7c6df5' }} />
+            <MessageSquare size={11} style={{ color: 'rgba(255,255,255,0.70)' }} />
           </button>
         )}
       </div>
@@ -328,9 +328,9 @@ export default function Sidebar() {
             {...item}
             badge={
               item.href === '/deals' && urgentCount > 0
-                ? { count: urgentCount, color: '#ef4444' }
+                ? { count: urgentCount, color: '#f87171' }
                 : item.href === '/settings' && unmatchedEmailCount > 0
-                ? { count: unmatchedEmailCount, color: '#f59e0b' }
+                ? { count: unmatchedEmailCount, color: '#fbbf24' }
                 : undefined
             }
           />
@@ -358,10 +358,10 @@ export default function Sidebar() {
               animation: brainAgeInfo.mins < 2 ? 'pulse-dot 2s ease-in-out infinite' : 'none',
             }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '11px', fontWeight: 500, color: 'rgba(226,232,240,0.45)' }}>
+              <div style={{ fontSize: '11px', fontWeight: 500, color: 'rgba(255,255,255,0.45)' }}>
                 {urgentCount > 0 ? `${urgentCount} deals flagged` : 'Intelligence ready'}
               </div>
-              <div style={{ fontSize: '10px', color: 'rgba(226,232,240,0.22)', marginTop: '1px' }}>
+              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.22)', marginTop: '1px' }}>
                 Updated {brainAgeInfo.label}
               </div>
             </div>
@@ -378,15 +378,15 @@ export default function Sidebar() {
               background: 'rgba(255,255,255,0.03)',
               border: '1px solid rgba(255,255,255,0.05)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: 'rgba(226,232,240,0.25)', margin: '0 auto',
+              cursor: 'pointer', color: 'rgba(255,255,255,0.25)', margin: '0 auto',
               transition: 'all 0.12s',
             }}
             onMouseEnter={e => {
-              ;(e.currentTarget as HTMLElement).style.color = 'rgba(226,232,240,0.50)'
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'
+              ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.50)'
+              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
             }}
             onMouseLeave={e => {
-              ;(e.currentTarget as HTMLElement).style.color = 'rgba(226,232,240,0.25)'
+              ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.25)'
               ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'
             }}
           >
@@ -404,20 +404,20 @@ export default function Sidebar() {
               background: 'rgba(255,255,255,0.08)',
               border: '1px solid rgba(255,255,255,0.10)',
               flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '10px', fontWeight: 600, color: 'rgba(226,232,240,0.70)',
+              fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.70)',
             }}>
               {user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0]?.toUpperCase() ?? '?'}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
                 fontSize: '11.5px', fontWeight: 500, letterSpacing: '-0.01em',
-                color: 'rgba(226,232,240,0.65)',
+                color: 'rgba(255,255,255,0.65)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
                 {user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Account'}
               </div>
               <div style={{
-                fontSize: '10px', color: 'rgba(226,232,240,0.28)',
+                fontSize: '10px', color: 'rgba(255,255,255,0.28)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px',
               }}>
                 {user?.emailAddresses?.[0]?.emailAddress ?? ''}
@@ -427,12 +427,12 @@ export default function Sidebar() {
               onClick={() => signOut({ redirectUrl: '/' })}
               style={{
                 background: 'none', border: 'none', padding: '3px',
-                color: 'rgba(226,232,240,0.22)', borderRadius: '4px',
+                color: 'rgba(255,255,255,0.22)', borderRadius: '4px',
                 display: 'flex', alignItems: 'center', cursor: 'pointer',
                 transition: 'color 0.12s',
               }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'rgba(226,232,240,0.50)'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'rgba(226,232,240,0.22)'}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.50)'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.22)'}
               title="Sign out"
             >
               <LogOut size={11} />
@@ -480,10 +480,10 @@ export default function Sidebar() {
       <nav className="mobile-bottom-nav" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
         height: '56px',
-        background: 'rgba(6, 4, 18, 0.80)',
+        background: 'rgba(12, 10, 24, 0.80)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        borderTop: '1px solid rgba(255,255,255,0.07)',
+        borderTop: '1px solid rgba(255,255,255,0.06)',
         display: 'none',
         alignItems: 'center', justifyContent: 'space-around',
         zIndex: 1000, padding: '0 8px',
@@ -500,10 +500,10 @@ export default function Sidebar() {
                 minWidth: '48px', minHeight: '44px',
               }}
             >
-              <tab.icon size={20} style={{ color: active ? '#7c6df5' : 'rgba(226,232,240,0.30)' }} />
+              <tab.icon size={20} style={{ color: active ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.25)' }} />
               <span style={{
                 fontSize: '10px', fontWeight: active ? 500 : 400,
-                color: active ? '#7c6df5' : 'rgba(226,232,240,0.30)',
+                color: active ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.25)',
                 lineHeight: 1,
               }}>{tab.label}</span>
             </Link>
@@ -518,8 +518,8 @@ export default function Sidebar() {
             minWidth: '48px', minHeight: '44px',
           }}
         >
-          <MessageSquare size={20} style={{ color: '#7c6df5' }} />
-          <span style={{ fontSize: '10px', fontWeight: 400, color: '#7c6df5', lineHeight: 1 }}>Ask AI</span>
+          <MessageSquare size={20} style={{ color: 'rgba(255,255,255,0.70)' }} />
+          <span style={{ fontSize: '10px', fontWeight: 400, color: 'rgba(255,255,255,0.70)', lineHeight: 1 }}>Ask AI</span>
         </button>
       </nav>
 

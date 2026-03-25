@@ -13,11 +13,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/db'
 import { slackConnections, slackUserMappings, linearIntegrations, dealLogs } from '@/lib/db/schema'
-import { eq, count } from 'drizzle-orm'
 import { encrypt, getEncryptionKey } from '@/lib/encrypt'
 import { exchangeOAuthCode, isSlackConfigured, slackOpenDm, slackPostMessage } from '@/lib/slack-client'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { markdownToBlocks } from '@/lib/slack-blocks'
+import { count, eq } from 'drizzle-orm'
 
 export async function GET(req: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ''
@@ -108,34 +108,25 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // Smart redirect after Slack OAuth:
-    // If returnTo was explicitly set (e.g. /onboarding), honour it.
-    // Otherwise: check if Linear is connected and deals exist, then redirect appropriately.
-    const isOnboarding = returnTo.includes('/onboarding')
-    if (!isOnboarding) {
-      try {
-        const [linRow] = await db
-          .select({ id: linearIntegrations.id })
-          .from(linearIntegrations)
-          .where(eq(linearIntegrations.workspaceId, wsCtx.workspaceId))
-          .limit(1)
+    // Check if Linear is connected
+    const linearIntegration = await db.query.linearIntegrations.findFirst({
+      where: eq(linearIntegrations.workspaceId, wsCtx.workspaceId),
+    })
 
-        if (!linRow) {
-          return NextResponse.redirect(`${appUrl}/onboarding?step=2`)
-        }
+    // Check if any deals exist
+    const dealCountResult = await db.select({ count: count() })
+      .from(dealLogs)
+      .where(eq(dealLogs.workspaceId, wsCtx.workspaceId))
 
-        const [{ value: dealCount }] = await db
-          .select({ value: count() })
-          .from(dealLogs)
-          .where(eq(dealLogs.workspaceId, wsCtx.workspaceId))
+    const hasDeals = (dealCountResult[0]?.count ?? 0) > 0
 
-        if (Number(dealCount) === 0) {
-          return NextResponse.redirect(`${appUrl}/onboarding?step=3`)
-        }
-      } catch { /* non-fatal — fall through to default returnTo */ }
+    if (!linearIntegration) {
+      return NextResponse.redirect(`${appUrl}/onboarding?step=2`)
+    } else if (!hasDeals) {
+      return NextResponse.redirect(`${appUrl}/onboarding?step=3`)
+    } else {
+      return NextResponse.redirect(`${appUrl}/`)
     }
-
-    return NextResponse.redirect(returnTo)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'unknown_error'
     console.error('[slack/callback] Error:', msg, e)
