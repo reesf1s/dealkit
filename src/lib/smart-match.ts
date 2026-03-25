@@ -376,35 +376,37 @@ export async function smartMatchDeal(
         console.log(`[smart-match] ${deal.prospectCompany}: "${gapText}" → ${bestMatch.linearIssueId} (${bestMatch.title}) [score=${bestScore}, linearStatus=${bestMatch.status}, loopStatus=${loopStatus}]`)
       }
     } else if (linearApiKey && integration) {
-      // No match — create the issue on Linear
-      try {
-        const newIssue = await createIssue(linearApiKey, integration.teamId, {
-          title: gapText.slice(0, 120),
-          description: `**Product gap from ${deal.prospectCompany} deal**\n\n${gap.quote ? `> "${gap.quote}"\n\n` : ''}Severity: ${gap.severity ?? 'medium'}\n\n---\n*Auto-created by Halvex from deal meeting notes*`,
-          priority: gap.severity === 'high' ? 2 : 3,
-        })
+      // No match — create the issue on Linear if it looks like a real product feature
+      const isRealFeature = gapText.length >= 15 && gapText.length <= 150
+        && !/^(page \d|what success|the poc|gospace lead|drew proposed|\[?\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))/i.test(gapText)
+        && !gapText.includes('...')
+        && !/^(need the ability|need to|we need|they need|please let me)/i.test(gapText)
 
-        // Cache the new issue
-        await db.insert(linearIssuesCache).values({
-          workspaceId,
-          linearIssueId: newIssue.identifier,
-          linearIssueUrl: newIssue.url,
-          title: newIssue.title,
-          description: newIssue.description,
-          status: newIssue.state.name,
-          priority: newIssue.priority,
-        }).onConflictDoNothing()
-
-        // Link to deal
-        await db.insert(dealLinearLinks).values({
-          workspaceId,
-          dealId,
+      if (isRealFeature) {
+        try {
+          const newIssue = await createIssue(linearApiKey, integration.teamId, {
+            title: gapText.slice(0, 120),
+            description: `**Product gap from ${deal.prospectCompany} deal**\n\n${gap.quote ? `> "${gap.quote}"\n\n` : ''}Severity: ${gap.severity ?? 'medium'}\n\n---\n*Auto-created by Halvex — matched to deal blocker*`,
+            priority: gap.severity === 'high' ? 2 : 3,
+          })
+          await db.insert(linearIssuesCache).values({
+            workspaceId,
+            linearIssueId: newIssue.identifier,
+            linearIssueUrl: newIssue.url,
+            title: newIssue.title,
+            description: newIssue.description,
+            status: newIssue.state.name,
+            priority: newIssue.priority,
+          }).onConflictDoNothing()
+          await db.insert(dealLinearLinks).values({
+            workspaceId,
+            dealId,
           linearIssueId: newIssue.identifier,
           linearIssueUrl: newIssue.url,
           linearTitle: newIssue.title,
           relevanceScore: 100,
           linkType: 'feature_gap',
-          status: 'suggested',
+          status: 'identified',
           addressesRisk: gapText.slice(0, 200),
         }).onConflictDoNothing()
 
@@ -413,8 +415,11 @@ export async function smartMatchDeal(
       } catch (e) {
         console.warn(`[smart-match] Failed to create issue for "${gapText}":`, e)
       }
+      } else {
+        console.log(`[smart-match] ${deal.prospectCompany}: no match for "${gapText.slice(0, 50)}" — skipped (not a clear feature)`)
+      }
     } else {
-      console.log(`[smart-match] ${deal.prospectCompany}: no match for "${gapText}" and no Linear API key to create`)
+      console.log(`[smart-match] ${deal.prospectCompany}: no match for "${gapText.slice(0, 50)}" — no Linear API key`)
     }
   }
 

@@ -227,9 +227,13 @@ export async function extractAndLinkFeatures(
         console.warn('[meeting-intelligence] match failed for feature:', feature.title, e)
       }
 
-      // 4. No match found → CREATE the issue on Linear and link it
-      // Only create if the feature title looks like a real product requirement (>20 chars, not a sentence fragment)
-      if (!matched && linearApiKey && integration && feature.title.length > 20 && !feature.title.includes('...')) {
+      // 4. No match found → create on Linear if it looks like a real product feature
+      // Guard: title must be 15-120 chars, not a meeting note fragment
+      const isRealFeature = feature.title.length >= 15 && feature.title.length <= 120
+        && !/^(page \d|what success|the poc|gospace lead|drew proposed|\[?\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))/i.test(feature.title)
+        && !feature.title.includes('...')
+        && !/^(need the ability|need to|we need|they need|please let me know)/i.test(feature.title)
+      if (!matched && linearApiKey && integration && isRealFeature) {
         try {
           const halvexContext = `> **Halvex**: Extracted from ${deal.prospectCompany} deal notes.\n> Feature priority: ${feature.priority}\n\n`
           const newIssue = await createIssue(linearApiKey, integration.teamId, {
@@ -258,7 +262,7 @@ export async function extractAndLinkFeatures(
             linearTitle: newIssue.title,
             relevanceScore: 100, // auto-created for this deal
             linkType: 'feature_gap',
-            status: 'suggested',
+            status: 'identified',
             addressesRisk: feature.title,
           }).onConflictDoNothing()
 

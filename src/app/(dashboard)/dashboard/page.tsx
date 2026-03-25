@@ -1,8 +1,8 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState, useEffect } from 'react'
-import useSWR from 'swr'
+import { useState, useEffect, useCallback } from 'react'
+import useSWR, { useSWRConfig } from 'swr'
 import Link from 'next/link'
 import type { LoopEntry } from '@/app/api/loops/route'
 
@@ -995,6 +995,22 @@ export default function TodayPage() {
     month: 'long',
   })
 
+  const { mutate } = useSWRConfig()
+  const [refreshing, setRefreshing] = useState(false)
+
+  const handleRefreshAll = useCallback(async () => {
+    setRefreshing(true)
+    // Revalidate all SWR keys used on this page
+    await Promise.all([
+      mutate('/api/deals'),
+      mutate('/api/loops'),
+      mutate('/api/brain'),
+      mutate('/api/dashboard/summary'),
+      mutate('/api/pipeline-config'),
+    ])
+    setRefreshing(false)
+  }, [mutate])
+
   return (
     <div style={{ padding: '24px 28px', maxWidth: '1100px' }}>
       <style>{`
@@ -1006,15 +1022,32 @@ export default function TodayPage() {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.5; transform: scale(0.85); }
         }
+        @keyframes spin { to { transform: rotate(360deg) } }
       `}</style>
 
       {/* Header + pipeline strip */}
       <div style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '6px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
           <h1 style={{ fontSize: '18px', fontWeight: 700, color: 'rgba(255,255,255,0.92)', margin: 0, letterSpacing: '-0.02em' }}>
             Today <span style={{ fontSize: '12px', fontWeight: 400, color: 'rgba(255,255,255,0.3)', marginLeft: '8px' }}>{dateStr}</span>
           </h1>
-          <BrainStatus />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <BrainStatus />
+            <button
+              onClick={handleRefreshAll}
+              disabled={refreshing}
+              style={{
+                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
+                borderRadius: '6px', padding: '4px 10px', cursor: refreshing ? 'not-allowed' : 'pointer',
+                fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontFamily: 'inherit',
+                display: 'flex', alignItems: 'center', gap: '4px',
+                opacity: refreshing ? 0.5 : 1, transition: 'opacity 0.15s',
+              }}
+            >
+              <span style={{ display: 'inline-block', animation: refreshing ? 'spin 1s linear infinite' : 'none' }}>↻</span>
+              Refresh
+            </button>
+          </div>
         </div>
         <RevenueImpactStrip currency={currency} />
       </div>
