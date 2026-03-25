@@ -15,7 +15,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type PageTab = 'core' | 'custom'
-type FilterTab = 'all' | 'identified' | 'in_cycle' | 'shipped'
+type FilterTab = 'all' | 'identified' | 'in_progress' | 'in_cycle' | 'shipped'
 
 interface BrainData {
   data?: {
@@ -83,6 +83,16 @@ const STATUS_CONFIG: Record<LoopStatus, {
     dotColor: '#f59e0b',
     textColor: '#f59e0b',
   },
+  in_progress: {
+    label: 'In Progress',
+    dotColor: '#3b82f6',
+    textColor: '#3b82f6',
+  },
+  in_review: {
+    label: 'In Review',
+    dotColor: '#8b5cf6',
+    textColor: '#8b5cf6',
+  },
   in_cycle: {
     label: 'In Cycle',
     dotColor: '#3b82f6',
@@ -98,6 +108,7 @@ const STATUS_CONFIG: Record<LoopStatus, {
 const FILTER_TABS: { id: FilterTab; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'identified', label: 'Identified' },
+  { id: 'in_progress', label: 'In Progress' },
   { id: 'in_cycle', label: 'In Cycle' },
   { id: 'shipped', label: 'Shipped' },
 ]
@@ -132,14 +143,14 @@ function SummaryStrip({ loops }: { loops: LoopEntry[] }) {
   for (const l of loops) { if (!uniqueDealRevenue.has(l.dealId)) uniqueDealRevenue.set(l.dealId, l.dealValue ?? 0) }
   const totalRevenue = Array.from(uniqueDealRevenue.values()).reduce((sum, v) => sum + v, 0)
   const identified = loops.filter(l => l.loopStatus === 'identified').length
-  const inCycle = loops.filter(l => l.loopStatus === 'in_cycle').length
+  const inProgress = loops.filter(l => l.loopStatus === 'in_progress' || l.loopStatus === 'in_review' || l.loopStatus === 'in_cycle').length
   const shipped = loops.filter(l => l.loopStatus === 'shipped').length
 
   const items: { label: string; value: string; icon: React.ReactNode; color?: string }[] = [
     { label: 'Total Loops', value: String(loops.length), icon: <Zap size={13} /> },
     { label: 'Revenue at risk', value: fmtFull(totalRevenue), icon: <AlertTriangle size={13} />, color: totalRevenue > 0 ? '#f59e0b' : undefined },
     { label: 'Identified', value: String(identified), icon: <Timer size={13} />, color: identified > 0 ? '#f59e0b' : undefined },
-    { label: 'In Cycle', value: String(inCycle), icon: <Circle size={13} />, color: inCycle > 0 ? '#3b82f6' : undefined },
+    { label: 'In Progress', value: String(inProgress), icon: <Circle size={13} />, color: inProgress > 0 ? '#3b82f6' : undefined },
     { label: 'Shipped', value: String(shipped), icon: <Truck size={13} />, color: shipped > 0 ? '#22c55e' : undefined },
   ]
 
@@ -278,6 +289,7 @@ function CoreLoopTable({
   const counts: Record<FilterTab, number> = {
     all: loops.length,
     identified: loops.filter(l => l.loopStatus === 'identified').length,
+    in_progress: loops.filter(l => l.loopStatus === 'in_progress' || l.loopStatus === 'in_review').length,
     in_cycle: loops.filter(l => l.loopStatus === 'in_cycle').length,
     shipped: loops.filter(l => l.loopStatus === 'shipped').length,
   }

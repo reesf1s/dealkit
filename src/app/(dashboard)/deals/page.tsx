@@ -15,10 +15,12 @@ import type { LoopEntry, LoopStatus } from '@/app/api/loops/route'
 
 /* ── Constants ── */
 
-const LOOP_STATUS_CONFIG: Record<LoopStatus, { label: string; color: string }> = {
-  identified: { label: 'Identified', color: '#f59e0b' },
-  in_cycle:   { label: 'In Cycle',   color: '#3b82f6' },
-  shipped:    { label: 'Shipped',    color: '#22c55e' },
+const LOOP_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  identified:  { label: 'Identified',  color: '#f59e0b' },
+  in_progress: { label: 'In Progress', color: '#3b82f6' },
+  in_review:   { label: 'In Review',   color: '#8b5cf6' },
+  in_cycle:    { label: 'In Cycle',    color: '#3b82f6' },
+  shipped:     { label: 'Shipped',     color: '#22c55e' },
 }
 
 type Mode = 'intelligence' | 'kanban'

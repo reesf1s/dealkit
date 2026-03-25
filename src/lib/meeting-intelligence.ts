@@ -1,33 +1,27 @@
 /**
- * Meeting intelligence — auto-extract feature requests from meeting notes,
- * match them to Linear issues, and notify the rep via Slack.
- *
- * Called inside next/after() from the meeting-notes endpoint so it never
- * blocks the HTTP response.
+ * Meeting intelligence — extract feature requests from meeting notes
+ * and trigger smart matching to Linear issues.
  *
  * Flow:
  *   1. Use Claude Haiku to extract features + pain points from notes
- *   2. For each extracted feature, search Linear issues by similarity
- *   3. If similarity > 0.7 → auto-link to deal in deal_linear_links
- *   4. If no match → insert a stub in linear_issues_cache (pending PM review)
- *   5. Send a Slack DM to the rep summarising what was found
+ *   2. Store extracted features in note_signals_json
+ *   3. Trigger smartMatchDeal() which handles matching + creation
+ *   4. Send a Slack DM to the rep summarising what was found
+ *
+ * Called inside next/after() from the meeting-notes endpoint.
  */
 
 import Anthropic from '@anthropic-ai/sdk'
 import { db } from '@/lib/db'
-import { dealLogs, dealLinearLinks, linearIssuesCache, linearIntegrations, slackUserMappings } from '@/lib/db/schema'
+import { dealLogs, dealLinearLinks, slackUserMappings } from '@/lib/db/schema'
 import { and, eq, sql } from 'drizzle-orm'
-import { findMatchingIssues } from '@/lib/deal-linear-matcher'
-import { createIssue } from '@/lib/linear-client'
-import { decrypt, getEncryptionKey } from '@/lib/encrypt'
+import { smartMatchDeal } from '@/lib/smart-match'
 import { getSlackBotToken, slackOpenDm, slackPostMessage } from '@/lib/slack-client'
 import { markdownToBlocks } from '@/lib/slack-blocks'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface ExtractedFeature {
   title: string
@@ -40,18 +34,26 @@ interface ExtractionResult {
   painPoints: string[]
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Haiku extraction
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Haiku extraction ────────────────────────────────────────────────────────
 
 async function extractFeaturesFromNotes(notes: string): Promise<ExtractionResult> {
   try {
     const msg = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 200,
+      max_tokens: 300,
       messages: [{
         role: 'user',
-        content: `Extract product feature requests and pain points from these meeting notes. Return ONLY valid JSON:
+        content: `Extract product feature requests from these meeting notes.
+
+RULES:
+- Each feature title MUST be a concise product feature (3-8 words)
+- Think: "what would the Linear issue be titled?"
+- Good: "Team co-location analytics", "SSO integration", "Real-time occupancy dashboard"
+- Bad: "We need the ability to see teams", "They want better reporting"
+- ONLY extract features that BLOCK the deal (hard requirements, not nice-to-haves)
+- Max 5 features
+
+Return ONLY valid JSON:
 {"features":[{"title":"string","description":"string","priority":"blocker"|"nice-to-have"}],"painPoints":["string"]}
 
 Notes:
@@ -80,15 +82,11 @@ ${notes.slice(0, 3000)}`,
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main export
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Main: extract features + trigger smart match ────────────────────────────
 
 /**
- * Extract feature requests from meeting notes, match to Linear issues,
- * and notify the rep via Slack.
- *
- * Safe to call fire-and-forget — catches all errors internally.
+ * Extract feature requests from meeting notes, store them as product gaps,
+ * then trigger smart matching to find/create Linear issues.
  */
 export async function extractAndLinkFeatures(
   dealId: string,
@@ -97,15 +95,10 @@ export async function extractAndLinkFeatures(
   repClerkUserId?: string,
 ): Promise<void> {
   try {
-    // 1. Load deal context
     const [deal] = await db
       .select({
         dealName: dealLogs.dealName,
         prospectCompany: dealLogs.prospectCompany,
-        notes: dealLogs.notes,
-        meetingNotes: dealLogs.meetingNotes,
-        dealRisks: dealLogs.dealRisks,
-        description: dealLogs.description,
       })
       .from(dealLogs)
       .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId)))
@@ -113,189 +106,93 @@ export async function extractAndLinkFeatures(
 
     if (!deal) return
 
-    // 2. Extract features via Haiku
+    // 1. Extract features via Haiku
     const extraction = await extractFeaturesFromNotes(notes)
-    if (extraction.features.length === 0 && extraction.painPoints.length === 0) return
-
     const totalFeatures = extraction.features.length
-    let linkedCount = 0
-    let createdCount = 0
 
-    // Load Linear integration for issue creation
-    const [integration] = await db
-      .select({ id: linearIntegrations.id, apiKeyEnc: linearIntegrations.apiKeyEnc, teamId: linearIntegrations.teamId })
-      .from(linearIntegrations)
-      .where(eq(linearIntegrations.workspaceId, workspaceId))
-      .limit(1)
-
-    let linearApiKey: string | null = null
-    if (integration) {
-      try { linearApiKey = decrypt(integration.apiKeyEnc, getEncryptionKey()) } catch { /* non-fatal */ }
+    if (totalFeatures === 0 && extraction.painPoints.length === 0) {
+      console.log(`[meeting-intelligence] ${deal.prospectCompany}: no features extracted`)
+      return
     }
 
-    // 3. For each extracted feature, try to match existing Linear issues
-    for (const feature of extraction.features) {
-      let matched = false
+    console.log(`[meeting-intelligence] ${deal.prospectCompany}: extracted ${totalFeatures} features`)
 
+    // 2. Store extracted features in note_signals_json as product_gaps
+    if (totalFeatures > 0) {
       try {
-        // Strategy 1: Direct title substring search against cached issues (instant, no API)
-        const titleSearch = feature.title.toLowerCase()
-        const directMatches = await db
-          .select({ linearIssueId: linearIssuesCache.linearIssueId, title: linearIssuesCache.title, linearIssueUrl: linearIssuesCache.linearIssueUrl })
-          .from(linearIssuesCache)
-          .where(and(
-            eq(linearIssuesCache.workspaceId, workspaceId),
-            sql`LOWER(${linearIssuesCache.title}) LIKE ${'%' + titleSearch + '%'}`,
-          ))
-          .limit(3)
-
-        if (directMatches.length > 0) {
-          // Direct title match — high confidence, auto-link
-          const best = directMatches[0]
-          const existing = await db
-            .select({ id: dealLinearLinks.id })
-            .from(dealLinearLinks)
-            .where(and(eq(dealLinearLinks.dealId, dealId), eq(dealLinearLinks.linearIssueId, best.linearIssueId)))
-            .limit(1)
-
-          if (!existing.length) {
-            await db.insert(dealLinearLinks).values({
-              workspaceId,
-              dealId,
-              linearIssueId: best.linearIssueId,
-              linearIssueUrl: best.linearIssueUrl,
-              linearTitle: best.title,
-              relevanceScore: 90, // high confidence — direct title match
-              linkType: 'feature_gap',
-              status: 'suggested',
-              addressesRisk: feature.title,
-            }).onConflictDoNothing()
-            linkedCount++
-          }
-          matched = true
-          console.log(`[meeting-intelligence] Direct match: "${feature.title}" → ${best.linearIssueId} (${best.title})`)
-          continue
+        // Read existing signals
+        const [existing] = await db.execute<{ note_signals_json: string | null }>(
+          sql`SELECT note_signals_json FROM deal_logs WHERE id = ${dealId}::uuid LIMIT 1`
+        )
+        let signals: Record<string, unknown> = {}
+        if (existing?.note_signals_json) {
+          try {
+            signals = typeof existing.note_signals_json === 'string'
+              ? JSON.parse(existing.note_signals_json)
+              : existing.note_signals_json as Record<string, unknown>
+          } catch { /* start fresh */ }
         }
 
-        // Strategy 2: TF-IDF similarity (broader matching)
-        const dealData = {
-          dealName: deal.dealName,
-          prospectCompany: deal.prospectCompany,
-          notes: `${feature.title} ${feature.description}`,
-          meetingNotes: null as string | null,
-          dealRisks: null as unknown,
-          description: null as string | null,
+        // Merge new product_gaps with existing
+        const existingGaps = Array.isArray(signals.product_gaps) ? signals.product_gaps : []
+        const newGaps = extraction.features.map(f => ({
+          gap: f.title,
+          description: f.description,
+          severity: f.priority === 'blocker' ? 'high' : 'medium',
+        }))
+
+        // Deduplicate by first 30 chars of gap text
+        for (const ng of newGaps) {
+          const isDupe = existingGaps.some((eg: { gap: string }) =>
+            eg.gap?.toLowerCase().slice(0, 30) === ng.gap.toLowerCase().slice(0, 30)
+          )
+          if (!isDupe) existingGaps.push(ng)
         }
-        const matches = await findMatchingIssues(dealId, workspaceId, dealData, {
-          limit: 3,
-          minSimilarity: 0.05,
-          skipPgvector: true,
-        })
 
-        if (matches.length > 0) {
-          const best = matches[0]
-          const [issueInfo] = await db
-            .select({ title: linearIssuesCache.title, url: linearIssuesCache.linearIssueUrl })
-            .from(linearIssuesCache)
-            .where(and(eq(linearIssuesCache.workspaceId, workspaceId), eq(linearIssuesCache.linearIssueId, best.issueId)))
-            .limit(1)
+        signals.product_gaps = existingGaps
 
-          const existing = await db
-            .select({ id: dealLinearLinks.id })
-            .from(dealLinearLinks)
-            .where(and(eq(dealLinearLinks.dealId, dealId), eq(dealLinearLinks.linearIssueId, best.issueId)))
-            .limit(1)
+        await db.execute(
+          sql`UPDATE deal_logs SET note_signals_json = ${JSON.stringify(signals)}::text WHERE id = ${dealId}::uuid`
+        )
 
-          if (!existing.length) {
-            await db.insert(dealLinearLinks).values({
-              workspaceId,
-              dealId,
-              linearIssueId: best.issueId,
-              linearIssueUrl: issueInfo?.url ?? null,
-              linearTitle: issueInfo?.title ?? best.issueId,
-              relevanceScore: Math.round(best.similarity * 100),
-              linkType: 'feature_gap',
-              status: 'suggested',
-              addressesRisk: feature.title,
-            }).onConflictDoNothing()
-            linkedCount++
-          }
-          matched = true
-          console.log(`[meeting-intelligence] TF-IDF match: "${feature.title}" → ${best.issueId} (${Math.round(best.similarity * 100)}%)`)
-        }
+        console.log(`[meeting-intelligence] ${deal.prospectCompany}: stored ${existingGaps.length} product gaps in note_signals_json`)
       } catch (e) {
-        console.warn('[meeting-intelligence] match failed for feature:', feature.title, e)
-      }
-
-      // 4. No match found → create on Linear if it looks like a real product feature
-      // Guard: title must be 15-120 chars, not a meeting note fragment
-      const isRealFeature = feature.title.length >= 15 && feature.title.length <= 120
-        && !/^(page \d|what success|the poc|gospace lead|drew proposed|\[?\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))/i.test(feature.title)
-        && !feature.title.includes('...')
-        && !/^(need the ability|need to|we need|they need|please let me know)/i.test(feature.title)
-      if (!matched && linearApiKey && integration && isRealFeature) {
-        try {
-          const halvexContext = `> **Halvex**: Extracted from ${deal.prospectCompany} deal notes.\n> Feature priority: ${feature.priority}\n\n`
-          const newIssue = await createIssue(linearApiKey, integration.teamId, {
-            title: feature.title,
-            description: `${halvexContext}${feature.description}`,
-            priority: feature.priority === 'blocker' ? 2 : 3, // 2=high, 3=medium
-          })
-
-          // Cache the new issue
-          await db.insert(linearIssuesCache).values({
-            workspaceId,
-            linearIssueId: newIssue.identifier,
-            linearIssueUrl: newIssue.url,
-            title: newIssue.title,
-            description: newIssue.description,
-            status: newIssue.state.name,
-            priority: newIssue.priority,
-          }).onConflictDoNothing()
-
-          // Link to deal
-          await db.insert(dealLinearLinks).values({
-            workspaceId,
-            dealId,
-            linearIssueId: newIssue.identifier,
-            linearIssueUrl: newIssue.url,
-            linearTitle: newIssue.title,
-            relevanceScore: 100, // auto-created for this deal
-            linkType: 'feature_gap',
-            status: 'identified',
-            addressesRisk: feature.title,
-          }).onConflictDoNothing()
-
-          createdCount++
-          console.log(`[meeting-intelligence] Created Linear issue: ${newIssue.identifier} — "${feature.title}"`)
-        } catch (e) {
-          console.warn('[meeting-intelligence] Failed to create Linear issue:', feature.title, e)
-        }
+        console.warn('[meeting-intelligence] Failed to store product gaps:', e)
       }
     }
 
-    // 5. Send Slack DM to the rep if connected
-    // Fire DM whenever features were found in the notes, even if all matching/stub attempts failed
+    // 3. Trigger smart matching for this deal (matches + creates Linear issues)
+    const matchResult = await smartMatchDeal(workspaceId, dealId)
+    console.log(`[meeting-intelligence] ${deal.prospectCompany}: smart match result — linked=${matchResult.linked}, created=${matchResult.created}`)
+
+    // 4. Send Slack DM to the rep
     if (totalFeatures > 0 || extraction.painPoints.length > 0) {
+      // Count links for this deal
+      const links = await db
+        .select({ linearIssueId: dealLinearLinks.linearIssueId, linearTitle: dealLinearLinks.linearTitle })
+        .from(dealLinearLinks)
+        .where(and(
+          eq(dealLinearLinks.dealId, dealId),
+          eq(dealLinearLinks.workspaceId, workspaceId),
+        ))
+
       await notifyRepAboutExtraction(
         workspaceId,
         repClerkUserId,
         deal.dealName,
         deal.prospectCompany,
-        linkedCount,
-        createdCount,
+        matchResult.linked,
+        matchResult.created,
         totalFeatures,
+        links.map(l => ({ id: l.linearIssueId, title: l.linearTitle ?? l.linearIssueId })),
       )
     }
   } catch (e) {
-    // Never throw — this runs in after() and must not affect the response
     console.error('[meeting-intelligence] extractAndLinkFeatures failed:', e)
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Slack notification
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Slack notification ──────────────────────────────────────────────────────
 
 async function notifyRepAboutExtraction(
   workspaceId: string,
@@ -305,12 +202,12 @@ async function notifyRepAboutExtraction(
   linkedCount: number,
   createdCount: number,
   totalFeatures: number,
+  linkedIssues: { id: string; title: string }[],
 ): Promise<void> {
   try {
     const botToken = await getSlackBotToken(workspaceId)
     if (!botToken) return
 
-    // Find the rep's Slack user ID
     let slackUserId: string | null = null
     if (repClerkUserId) {
       const [mapping] = await db
@@ -326,28 +223,28 @@ async function notifyRepAboutExtraction(
 
     if (!slackUserId) return
 
-    let text: string
+    const parts: string[] = [`🔍 *Meeting notes analysed for ${company}*\n`]
+
+    if (linkedCount > 0) {
+      parts.push(`• Matched *${linkedCount}* existing Linear issue${linkedCount !== 1 ? 's' : ''}`)
+    }
+    if (createdCount > 0) {
+      parts.push(`• Created *${createdCount}* new Linear issue${createdCount !== 1 ? 's' : ''}`)
+    }
     if (linkedCount === 0 && createdCount === 0 && totalFeatures > 0) {
-      // Features were found but all matching/stub attempts failed — use friendly fallback
-      text = `🔍 I analysed *${company}* — I found *${totalFeatures}* potential feature gap${totalFeatures !== 1 ? 's' : ''}. Connect Linear to match them to issues, or ask me anything about this deal in Slack.\n\n_Ask me: "latest on ${company}"_`
-    } else if (linkedCount === 0 && createdCount > 0) {
-      // No Linear issues matched — stubs created, guide user to connect/review
-      text = `🔍 I analysed *${company}* — I found *${createdCount}* potential feature gap${createdCount !== 1 ? 's' : ''}. Connect Linear to match them to issues, or ask me anything about this deal in Slack.\n\n_Ask me: "latest on ${company}"_`
-    } else {
-      const parts: string[] = [
-        `🔍 *Meeting notes analysed for ${company}*`,
-        '',
-      ]
-      if (linkedCount > 0) {
-        parts.push(`• Matched *${linkedCount}* existing Linear issue${linkedCount !== 1 ? 's' : ''} to this deal`)
-      }
-      if (createdCount > 0) {
-        parts.push(`• Found *${createdCount}* new feature request${createdCount !== 1 ? 's' : ''} not yet in Linear`)
-      }
-      parts.push('', `Ask me _"latest on ${company}"_ to review them.`)
-      text = parts.join('\n')
+      parts.push(`• Found *${totalFeatures}* product gap${totalFeatures !== 1 ? 's' : ''} but no matching Linear issues yet`)
     }
 
+    if (linkedIssues.length > 0) {
+      parts.push('')
+      for (const issue of linkedIssues.slice(0, 5)) {
+        parts.push(`  → *${issue.id}*: ${issue.title}`)
+      }
+    }
+
+    parts.push('', `_Ask me "latest on ${company}" to review._`)
+
+    const text = parts.join('\n')
     const dmChannel = await slackOpenDm(botToken, slackUserId)
     if (dmChannel) {
       await slackPostMessage(botToken, dmChannel, markdownToBlocks(text), text)

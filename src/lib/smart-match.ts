@@ -26,11 +26,13 @@ const MAX_LINKS_PER_DEAL = 5
  * Linear states: Triage, Backlog, Todo, In Progress, In Review, In QA, RFQA, Done, Cancelled
  * Our states: identified, in_cycle, shipped
  */
-function linearStatusToLoopStatus(linearStatus: string | null): 'identified' | 'in_cycle' | 'shipped' {
+function linearStatusToLoopStatus(linearStatus: string | null): string {
   if (!linearStatus) return 'identified'
   const s = linearStatus.toLowerCase()
   if (s === 'done' || s === 'completed' || s === 'cancelled' || s === 'canceled') return 'shipped'
-  if (['in progress', 'in review', 'in qa', 'rfqa', 'started'].includes(s)) return 'in_cycle'
+  if (s === 'in progress') return 'in_progress'
+  if (s === 'in review') return 'in_review'
+  if (['in qa', 'rfqa', 'started'].includes(s)) return 'in_cycle'
   return 'identified'
 }
 

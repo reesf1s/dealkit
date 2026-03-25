@@ -184,18 +184,22 @@ export async function POST(req: NextRequest) {
 
   // Update loop status based on Linear state changes
   if (payload.action === 'update' && issueIdentifier && stateType) {
-    // started → in_cycle (issue is being worked on)
+    // started → map to granular status (never downgrade shipped)
     if (stateType === 'started') {
+      const stateName = payload.data.state?.name?.toLowerCase() ?? ''
+      let newStatus = 'in_cycle'
+      if (stateName === 'in progress') newStatus = 'in_progress'
+      else if (stateName === 'in review') newStatus = 'in_review'
+
       db.update(dealLinearLinks)
-        .set({ status: 'in_cycle', updatedAt: new Date() })
+        .set({ status: newStatus, updatedAt: new Date() })
         .where(and(
           eq(dealLinearLinks.workspaceId, workspaceId),
           eq(dealLinearLinks.linearIssueId, issueIdentifier),
-          // Only upgrade identified → in_cycle (never downgrade shipped)
-          sql`${dealLinearLinks.status} IN ('suggested', 'confirmed', 'awaiting_approval', 'identified')`,
+          sql`${dealLinearLinks.status} NOT IN ('shipped', 'deployed')`,
         ))
-        .then(() => console.log(`[webhook/linear] ${issueIdentifier} → in_cycle`))
-        .catch(err => console.error('[webhook/linear] in_cycle update failed:', err))
+        .then(() => console.log(`[webhook/linear] ${issueIdentifier} → ${newStatus}`))
+        .catch(err => console.error(`[webhook/linear] ${newStatus} update failed:`, err))
     }
 
     // completed → deployed (issue shipped)
