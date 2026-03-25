@@ -1,707 +1,515 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import useSWR from 'swr'
+import Link from 'next/link'
 import {
-  Zap, Plus, Clock, ArrowRight, GitBranch, ChevronDown, Play, Loader2,
+  Zap, Brain, ExternalLink, Clock, AlertTriangle, ChevronRight, Filter,
 } from 'lucide-react'
+import type { LoopEntry, LoopStatus } from '@/app/api/loops/route'
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
-// ─── Integration chip colours ────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-const INTEGRATION_CHIPS: Record<string, { label: string; color: string; bg: string }> = {
-  linear:       { label: '@linear',       color: '#818cf8', bg: 'rgba(129,140,248,0.14)' },
-  cyclecurrent: { label: '@cyclecurrent', color: '#a78bfa', bg: 'rgba(167,139,250,0.14)' },
-  hubspot:      { label: '@hubspot',      color: '#fb923c', bg: 'rgba(251,146,60,0.14)'  },
-  slack:        { label: '@slack',        color: '#4ade80', bg: 'rgba(74,222,128,0.14)'  },
-  deals:        { label: '@deals',        color: '#38bdf8', bg: 'rgba(56,189,248,0.14)'  },
+type FilterTab = 'all' | 'awaiting_approval' | 'in_cycle' | 'shipped'
+
+interface BrainData {
+  data?: {
+    staleDeals?: Array<{
+      dealId: string
+      company: string
+      dealValue?: number | null
+      daysSinceUpdate: number
+      score?: number | null
+    }>
+    productGapPriority?: Array<{
+      gapId: string
+      title: string
+      priority: string
+      status: string
+      revenueAtRisk: number
+      dealsBlocked: number
+    }>
+    keyPatterns?: Array<{
+      label: string
+      dealIds: string[]
+      companies: string[]
+      dealNames: string[]
+    }>
+  }
 }
 
-const MENTION_TRIGGERS = Object.keys(INTEGRATION_CHIPS)
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const TRIGGERS = [
-  'Every day at 8am',
-  'When a deal score drops',
-  'When a Linear issue ships',
-  'When a deal is updated',
-  'Manually',
-]
-
-const ACTIONS = [
-  'Notify me in Today tab',
-  'Send Slack DM',
-  'Update HubSpot',
-  'Create Linear issue',
-  'Draft release email',
-]
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface WorkflowChip {
-  type: 'mention'
-  key: string
-}
-type WorkflowToken = string | WorkflowChip
-
-interface Workflow {
-  id: string
-  title: string
-  trigger: string
-  action: string
-  active: boolean
-  isTemplate?: boolean
-  tokens?: WorkflowToken[]
-  // DB fields (present on saved workflows)
-  lastRunAt?: string | null
-  lastOutput?: string | null
+function formatCurrency(n: number | null | undefined): string {
+  if (!n) return ''
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}m`
+  if (n >= 1_000) return `$${Math.round(n / 1_000)}k`
+  return `$${Math.round(n)}`
 }
 
-// ─── Pre-built templates ──────────────────────────────────────────────────────
+function getRiskScore(dealId: string, brain: BrainData['data']): number {
+  const stale = brain?.staleDeals?.find(d => d.dealId === dealId)
+  if (!stale) return 0
+  const score = stale.score ?? 0
+  if (score <= 0) return 80
+  if (score < 40) return 70
+  if (score < 70) return 40
+  return 10
+}
 
-const DEFAULT_TEMPLATES: Workflow[] = [
-  {
-    id: 'daily-linked-issues',
-    title: 'Daily sprint briefing',
-    trigger: 'Every day at 8am',
-    action: 'Show in Today tab: @linear issues in @cyclecurrent linked to deals',
-    active: false,
-    isTemplate: true,
-    tokens: [
-      'Show in Today tab: ',
-      { type: 'mention', key: 'linear' },
-      ' issues in ',
-      { type: 'mention', key: 'cyclecurrent' },
-      ' linked to ',
-      { type: 'mention', key: 'deals' },
-    ],
+function getRiskReason(dealId: string, brain: BrainData['data']): string | null {
+  const stale = brain?.staleDeals?.find(d => d.dealId === dealId)
+  if (!stale) return null
+  return `No update in ${stale.daysSinceUpdate} days`
+}
+
+const STATUS_CONFIG: Record<LoopStatus, {
+  label: string
+  bg: string
+  color: string
+  border: string
+}> = {
+  awaiting_approval: {
+    label: 'Waiting for PM',
+    bg: 'rgba(245,158,11,0.2)',
+    color: '#f59e0b',
+    border: 'rgba(245,158,11,0.3)',
   },
-  {
-    id: 'deal-risk-alerts',
-    title: 'Deal score alert',
-    trigger: 'When a deal score drops below 40',
-    action: 'Send Slack DM with risk factors and suggested action',
-    active: false,
-    isTemplate: true,
-    tokens: [
-      'Send ',
-      { type: 'mention', key: 'slack' },
-      ' DM with risk factors and suggested action',
-    ],
+  in_cycle: {
+    label: 'Approved — In Cycle',
+    bg: 'rgba(124,58,237,0.2)',
+    color: '#7c3aed',
+    border: 'rgba(124,58,237,0.3)',
   },
-  {
-    id: 'release-loop',
-    title: 'Release loop',
-    trigger: 'When a Linear issue linked to a deal ships',
-    action: 'Draft release email for linked deal and notify via @slack',
-    active: false,
-    isTemplate: true,
-    tokens: [
-      'Draft release email for linked ',
-      { type: 'mention', key: 'deals' },
-      ' and notify via ',
-      { type: 'mention', key: 'slack' },
-    ],
+  shipped: {
+    label: 'Shipped',
+    bg: 'rgba(34,197,94,0.2)',
+    color: '#22c55e',
+    border: 'rgba(34,197,94,0.3)',
   },
+}
+
+const FILTER_TABS: { id: FilterTab; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'awaiting_approval', label: 'Waiting for PM' },
+  { id: 'in_cycle', label: 'In Cycle' },
+  { id: 'shipped', label: 'Shipped' },
 ]
 
-// ─── @ mention autocomplete textarea ─────────────────────────────────────────
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
 
-function MentionInput({
-  value,
-  onChange,
-  placeholder,
-}: {
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
-}) {
-  const [showDropdown, setShowDropdown] = useState(false)
-  const [dropdownQuery, setDropdownQuery] = useState('')
-  const [selectedIdx, setSelectedIdx] = useState(0)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  const filtered = MENTION_TRIGGERS.filter(k =>
-    k.startsWith(dropdownQuery.toLowerCase())
-  )
-
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const v = e.target.value
-    onChange(v)
-    const cursor = e.target.selectionStart ?? v.length
-    const before = v.slice(0, cursor)
-    const match = before.match(/@(\w*)$/)
-    if (match) {
-      setDropdownQuery(match[1])
-      setShowDropdown(true)
-      setSelectedIdx(0)
-    } else {
-      setShowDropdown(false)
-    }
-  }
-
-  const insertMention = (key: string) => {
-    const ta = textareaRef.current
-    if (!ta) return
-    const cursor = ta.selectionStart ?? value.length
-    const before = value.slice(0, cursor)
-    const after = value.slice(cursor)
-    const matchStart = before.lastIndexOf('@')
-    const newValue = before.slice(0, matchStart) + `@${key}` + ' ' + after
-    onChange(newValue)
-    setShowDropdown(false)
-    ta.focus()
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!showDropdown) return
-    if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIdx(i => Math.min(i + 1, filtered.length - 1)) }
-    if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIdx(i => Math.max(i - 1, 0)) }
-    if (e.key === 'Enter' || e.key === 'Tab') {
-      e.preventDefault()
-      if (filtered[selectedIdx]) insertMention(filtered[selectedIdx])
-    }
-    if (e.key === 'Escape') setShowDropdown(false)
-  }
-
-  const renderTokens = (): React.ReactNode[] => {
-    const parts = value.split(/(@\w+)/g)
-    return parts.map((part, i) => {
-      const key = part.replace('@', '')
-      const chip = INTEGRATION_CHIPS[key]
-      if (chip) {
-        return (
-          <span key={i} style={{
-            display: 'inline-block',
-            background: chip.bg, color: chip.color,
-            borderRadius: '4px', padding: '0 4px',
-            fontSize: '12px', fontWeight: 600, lineHeight: '1.5',
-          }}>
-            {chip.label}
-          </span>
-        )
-      }
-      return <span key={i}>{part}</span>
-    })
-  }
-
+function SkeletonCard() {
   return (
-    <div style={{ position: 'relative' }}>
-      <div style={{
-        position: 'absolute', inset: 0,
-        padding: '8px 10px', fontSize: '12px', lineHeight: '1.6',
-        color: 'transparent', pointerEvents: 'none',
-        wordBreak: 'break-word', whiteSpace: 'pre-wrap', userSelect: 'none',
-      }}>
-        {renderTokens()}
-      </div>
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        rows={2}
-        style={{
-          width: '100%', resize: 'none',
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: '8px', padding: '8px 10px',
-          fontSize: '12px', lineHeight: '1.6',
-          color: 'rgba(255,255,255,0.70)',
-          outline: 'none', caretColor: 'rgba(255,255,255,0.80)',
-        }}
-        onFocus={e => (e.currentTarget.style.borderColor = 'rgba(99,102,241,0.40)')}
-        onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; setShowDropdown(false) }}
-      />
-      {showDropdown && filtered.length > 0 && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, zIndex: 100,
-          background: '#0d0f1a', border: '1px solid rgba(99,102,241,0.25)',
-          borderRadius: '10px', padding: '4px', minWidth: '180px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.60)',
-        }}>
-          {filtered.map((key, idx) => {
-            const chip = INTEGRATION_CHIPS[key]
-            return (
-              <div
-                key={key}
-                onMouseDown={e => { e.preventDefault(); insertMention(key) }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '8px',
-                  padding: '7px 10px', borderRadius: '7px', cursor: 'pointer',
-                  background: idx === selectedIdx ? 'rgba(99,102,241,0.12)' : 'transparent',
-                }}
-              >
-                <span style={{
-                  background: chip.bg, color: chip.color,
-                  borderRadius: '4px', padding: '1px 6px',
-                  fontSize: '11px', fontWeight: 700,
-                }}>
-                  {chip.label}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
+    <div style={{
+      background: 'rgba(255,255,255,0.06)',
+      border: '1px solid rgba(255,255,255,0.1)',
+      borderRadius: '16px',
+      padding: '20px',
+      height: '120px',
+      animation: 'pulse 2s ease-in-out infinite',
+    }} />
   )
 }
 
-// ─── Select dropdown ──────────────────────────────────────────────────────────
+// ─── Intelligence Callout ─────────────────────────────────────────────────────
 
-function SelectField({
-  label, options, value, onChange
-}: {
-  label: string; options: string[]; value: string; onChange: (v: string) => void
-}) {
-  return (
-    <div>
-      <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '5px' }}>
-        {label}
-      </label>
-      <div style={{ position: 'relative' }}>
-        <select
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          style={{
-            width: '100%', appearance: 'none',
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: '8px', padding: '8px 32px 8px 12px',
-            fontSize: '13px', color: '#94a3b8',
-            outline: 'none', cursor: 'pointer',
-          }}
-          onFocus={e => (e.currentTarget.style.borderColor = 'rgba(99,102,241,0.40)')}
-          onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
-        >
-          <option value="" style={{ background: '#0d0f1a' }}>Select…</option>
-          {options.map(o => (
-            <option key={o} value={o} style={{ background: '#0d0f1a' }}>{o}</option>
-          ))}
-        </select>
-        <ChevronDown size={14} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', color: '#475569', pointerEvents: 'none' }} />
-      </div>
-    </div>
-  )
-}
+function IntelligenceCallout({ brain, totalDeals }: { brain: BrainData['data'] | undefined; totalDeals: number }) {
+  if (!brain) return null
 
-// ─── Workflow card ────────────────────────────────────────────────────────────
+  const topGap = brain.productGapPriority?.[0]
+  const topPattern = brain.keyPatterns?.[0]
 
-function WorkflowCard({ workflow, onToggle, onRun }: { workflow: Workflow; onToggle: (id: string, active: boolean) => void; onRun?: (id: string) => Promise<void> }) {
-  const [running, setRunning] = useState(false)
-
-  const handleRun = async () => {
-    if (!onRun || running) return
-    setRunning(true)
-    try { await onRun(workflow.id) } finally { setRunning(false) }
-  }
-  const renderTokens = (tokens?: WorkflowToken[], fallback?: string) => {
-    if (!tokens) return <span style={{ fontSize: '12px', color: '#64748b' }}>{fallback}</span>
-    return (
-      <span style={{ fontSize: '12px', lineHeight: 1.6 }}>
-        {tokens.map((t, i) => {
-          if (typeof t === 'string') return <span key={i} style={{ color: '#94a3b8' }}>{t}</span>
-          const chip = INTEGRATION_CHIPS[t.key]
-          if (!chip) return null
-          return (
-            <span key={i} style={{
-              display: 'inline-block',
-              background: chip.bg, color: chip.color,
-              borderRadius: '4px', padding: '0 5px',
-              fontSize: '11px', fontWeight: 700, margin: '0 1px',
-            }}>
-              {chip.label}
-            </span>
-          )
-        })}
-      </span>
-    )
+  let text = `Your AI brain analysed ${totalDeals} deal${totalDeals !== 1 ? 's' : ''}.`
+  if (topGap && topGap.revenueAtRisk > 0) {
+    text += ` Top risk: "${topGap.title}" is stalling ${topGap.dealsBlocked} deal${topGap.dealsBlocked !== 1 ? 's' : ''} worth ${formatCurrency(topGap.revenueAtRisk)}.`
+  } else if (topPattern) {
+    text += ` Top pattern: "${topPattern.label}" appears across ${topPattern.dealIds.length} deal${topPattern.dealIds.length !== 1 ? 's' : ''}.`
   }
 
   return (
     <div style={{
-      background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.04), transparent)',
-      border: `1px solid ${workflow.active ? 'rgba(99,102,241,0.20)' : 'rgba(255,255,255,0.06)'}`,
-      borderRadius: '14px', padding: '16px 20px',
-      transition: 'all 0.15s ease',
+      background: 'rgba(124,58,237,0.08)',
+      backdropFilter: 'blur(18px)',
+      border: '1px solid rgba(124,58,237,0.2)',
+      borderRadius: '12px',
+      padding: '14px 18px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: '16px',
     }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>{workflow.title}</span>
-            {workflow.isTemplate && (
-              <span style={{
-                fontSize: '9px', fontWeight: 700, letterSpacing: '0.06em',
-                padding: '1px 6px', borderRadius: '10px',
-                background: 'rgba(99,102,241,0.12)', color: '#818cf8',
-              }}>TEMPLATE</span>
-            )}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-            <Clock size={10} style={{ color: '#334155', flexShrink: 0 }} />
-            <span style={{ fontSize: '11px', color: '#475569' }}>{workflow.trigger}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-            <ArrowRight size={10} style={{ color: '#334155', flexShrink: 0, marginTop: '3px' }} />
-            <div>{renderTokens(workflow.tokens, workflow.action)}</div>
-          </div>
-          {/* Last run info */}
-          {workflow.lastRunAt && (
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', marginTop: '6px' }}>
-              <span style={{ fontSize: '10px', color: '#334155', flexShrink: 0 }}>Last run: {timeAgoStr(workflow.lastRunAt)}</span>
-              {workflow.lastOutput && (
-                <span style={{ fontSize: '10px', color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>· {workflow.lastOutput}</span>
-              )}
-            </div>
-          )}
-          {/* Run now button — only for saved (non-template) workflows */}
-          {onRun && (
-            <div style={{ marginTop: '8px' }}>
-              <button
-                onClick={handleRun}
-                disabled={running}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '4px',
-                  padding: '4px 10px', borderRadius: '6px',
-                  background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.20)',
-                  color: '#818cf8', fontSize: '11px', fontWeight: 600,
-                  cursor: running ? 'not-allowed' : 'pointer',
-                  opacity: running ? 0.6 : 1,
-                }}
-              >
-                {running ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={10} />}
-                {running ? 'Running…' : 'Run now'}
-              </button>
-            </div>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-          {/* Toggle */}
-          <button
-            onClick={() => onToggle(workflow.id, !workflow.active)}
-            style={{
-              width: '36px', height: '20px', borderRadius: '10px', border: 'none',
-              background: workflow.active ? '#6366f1' : 'rgba(255,255,255,0.10)',
-              cursor: 'pointer', position: 'relative',
-              transition: 'background 0.2s',
-            }}
-          >
-            <div style={{
-              width: '14px', height: '14px', borderRadius: '50%', background: '#fff',
-              position: 'absolute', top: '3px',
-              left: workflow.active ? '19px' : '3px',
-              transition: 'left 0.2s',
-              boxShadow: workflow.active ? '0 0 6px rgba(99,102,241,0.50)' : 'none',
-            }} />
-          </button>
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
+        <Brain size={15} color="#a78bfa" style={{ flexShrink: 0 }} />
+        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', margin: 0, lineHeight: 1.5 }}>
+          {text}
+        </p>
       </div>
+      <Link
+        href="/intelligence"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '5px 10px',
+          borderRadius: '6px',
+          background: 'rgba(124,58,237,0.15)',
+          border: '1px solid rgba(124,58,237,0.3)',
+          color: '#a78bfa',
+          textDecoration: 'none',
+          fontSize: '11px',
+          fontWeight: 600,
+          flexShrink: 0,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        View in Intelligence <ChevronRight size={10} />
+      </Link>
     </div>
   )
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Loop Card ────────────────────────────────────────────────────────────────
 
-function timeAgoStr(iso: string | null | undefined): string {
-  if (!iso) return ''
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
+function LoopCard({ loop, riskReason }: { loop: LoopEntry; riskReason: string | null }) {
+  const cfg = STATUS_CONFIG[loop.loopStatus]
+
+  let actionButton: React.ReactNode = null
+  if (loop.loopStatus === 'awaiting_approval') {
+    actionButton = (
+      <button
+        style={{
+          padding: '6px 12px',
+          borderRadius: '7px',
+          background: 'rgba(245,158,11,0.12)',
+          border: '1px solid rgba(245,158,11,0.25)',
+          color: '#f59e0b',
+          fontSize: '11px',
+          fontWeight: 600,
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        Remind PM
+      </button>
+    )
+  } else if (loop.loopStatus === 'in_cycle' && loop.linearIssueUrl) {
+    actionButton = (
+      <a
+        href={loop.linearIssueUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '6px 12px',
+          borderRadius: '7px',
+          background: 'rgba(124,58,237,0.12)',
+          border: '1px solid rgba(124,58,237,0.25)',
+          color: '#a78bfa',
+          textDecoration: 'none',
+          fontSize: '11px',
+          fontWeight: 600,
+          flexShrink: 0,
+        }}
+      >
+        View in Linear <ExternalLink size={10} />
+      </a>
+    )
+  } else if (loop.loopStatus === 'shipped') {
+    actionButton = (
+      <button
+        style={{
+          padding: '6px 12px',
+          borderRadius: '7px',
+          background: 'rgba(34,197,94,0.12)',
+          border: '1px solid rgba(34,197,94,0.25)',
+          color: '#22c55e',
+          fontSize: '11px',
+          fontWeight: 600,
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        Send Follow-up to Rep
+      </button>
+    )
+  }
+
+  return (
+    <Link href={`/deals/${loop.dealId}`} style={{ textDecoration: 'none' }}>
+      <div
+        style={{
+          background: 'rgba(255,255,255,0.06)',
+          backdropFilter: 'blur(18px)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderLeft: '3px solid #7c3aed',
+          borderRadius: '16px',
+          padding: '18px 20px',
+          transition: 'all 0.2s ease',
+          cursor: 'pointer',
+        }}
+        onMouseEnter={e => {
+          const el = e.currentTarget as HTMLDivElement
+          el.style.background = 'rgba(255,255,255,0.08)'
+          el.style.borderColor = 'rgba(255,255,255,0.15)'
+        }}
+        onMouseLeave={e => {
+          const el = e.currentTarget as HTMLDivElement
+          el.style.background = 'rgba(255,255,255,0.06)'
+          el.style.borderColor = 'rgba(255,255,255,0.1)'
+        }}
+      >
+        {/* Row 1: Company + Deal value + action */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '10px' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'rgba(255,255,255,0.92)' }}>
+                {loop.company}
+              </span>
+              {loop.dealValue && (
+                <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>
+                  {formatCurrency(loop.dealValue)}
+                </span>
+              )}
+            </div>
+          </div>
+          {/* Stop link propagation for action button */}
+          <div onClick={e => e.preventDefault()}>
+            {actionButton}
+          </div>
+        </div>
+
+        {/* Row 2: Feature request */}
+        {loop.featureRequest && (
+          <p style={{
+            fontSize: '12px',
+            color: 'rgba(255,255,255,0.65)',
+            margin: '0 0 10px',
+            lineHeight: 1.45,
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+          }}>
+            {loop.featureRequest}
+          </p>
+        )}
+
+        {/* Row 3: Status badge + Linear issue + time */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {/* Status badge */}
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+            padding: '3px 9px',
+            borderRadius: '6px',
+            background: cfg.bg,
+            border: `1px solid ${cfg.border}`,
+            fontSize: '11px',
+            fontWeight: 600,
+            color: cfg.color,
+          }}>
+            <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: cfg.color, display: 'inline-block' }} />
+            {cfg.label}
+          </span>
+
+          {/* Linear issue ID */}
+          {loop.linearIssueId && (
+            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+              {loop.linearIssueId}
+            </span>
+          )}
+
+          {/* Days in status */}
+          {loop.daysInStatus !== null && loop.daysInStatus > 0 && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
+              <Clock size={10} />
+              {loop.daysInStatus}d
+            </span>
+          )}
+
+          {/* Risk reason from brain */}
+          {riskReason && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#f59e0b' }}>
+              <AlertTriangle size={10} />
+              {riskReason}
+            </span>
+          )}
+        </div>
+      </div>
+    </Link>
+  )
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function WorkflowsPage() {
-  const { data: mcpActionsRes } = useSWR('/api/mcp-actions/recent?limit=5', fetcher, { revalidateOnFocus: false })
-  const recentActions: any[] = mcpActionsRes?.data ?? []
+export default function LoopsPage() {
+  const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
 
-  // DB-persisted workflows
-  const { data: savedRes, mutate: mutateSaved } = useSWR('/api/workflows', fetcher, { revalidateOnFocus: false })
-  const savedWorkflows: Workflow[] = (savedRes?.data ?? []).map((w: any) => ({
-    id: w.id,
-    title: w.name,
-    trigger: w.triggerType === 'schedule' ? (w.triggerConfig?.label ?? 'Every day at 8am') : w.triggerType,
-    action: w.actions?.[0]?.label ?? w.description ?? '',
-    active: w.isEnabled ?? false,
-    lastRunAt: w.lastRunAt,
-    lastOutput: w.lastOutput,
-  }))
+  const { data: loopsRes, isLoading: loopsLoading } = useSWR<{ data: LoopEntry[] }>(
+    '/api/loops',
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 30000 },
+  )
 
-  // Merge: show saved DB workflows first, then templates not yet saved
-  const savedIds = new Set(savedWorkflows.map(w => w.id))
-  const [localTemplates, setLocalTemplates] = useState<Workflow[]>(DEFAULT_TEMPLATES)
-  const unsavedTemplates = localTemplates.filter(t => t.isTemplate && !savedIds.has(t.id))
-  const workflowList: Workflow[] = [...savedWorkflows, ...unsavedTemplates]
+  const { data: brainRes } = useSWR<BrainData>(
+    '/api/brain',
+    fetcher,
+    { revalidateOnFocus: false },
+  )
 
-  const [showNewForm, setShowNewForm] = useState(false)
-  const [selectedTrigger, setSelectedTrigger] = useState('')
-  const [selectedAction, setSelectedAction] = useState('')
-  const [newTrigger, setNewTrigger] = useState('')
-  const [newAction, setNewAction] = useState('')
-  const handleRun = async (id: string): Promise<void> => {
-    await fetch('/api/workflows/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    })
-    mutateSaved()
-  }
+  const loops: LoopEntry[] = loopsRes?.data ?? []
+  const brain = brainRes?.data
 
-  const handleToggle = async (id: string, active: boolean) => {
-    // Optimistic update for saved workflows
-    if (savedIds.has(id)) {
-      mutateSaved(
-        { data: (savedRes?.data ?? []).map((w: any) => w.id === id ? { ...w, isEnabled: active } : w) },
-        false,
-      )
-      try {
-        await fetch('/api/workflows', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, isEnabled: active }),
-        })
-        mutateSaved()
-      } catch { mutateSaved() }
-    } else {
-      // Local template — just update local state
-      setLocalTemplates(prev => prev.map(w => w.id === id ? { ...w, active } : w))
-    }
-  }
+  // Filter
+  const filtered = loops.filter(l =>
+    activeFilter === 'all' ? true : l.loopStatus === activeFilter,
+  )
 
-  const handleAddWorkflow = async () => {
-    const trigger = selectedTrigger || newTrigger.trim()
-    const action = selectedAction || newAction.trim()
-    if (!trigger || !action) return
+  // Sort by deal value × risk score descending
+  const sorted = [...filtered].sort((a, b) => {
+    const aRisk = getRiskScore(a.dealId, brain)
+    const bRisk = getRiskScore(b.dealId, brain)
+    const aVal = (a.dealValue ?? 0) * (aRisk / 100 + 0.1)
+    const bVal = (b.dealValue ?? 0) * (bRisk / 100 + 0.1)
+    return bVal - aVal
+  })
 
-    try {
-      await fetch('/api/workflows', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'Custom workflow',
-          triggerType: 'manual',
-          triggerConfig: { label: trigger },
-          actions: [{ type: 'notify', label: action }],
-          outputTarget: action.toLowerCase().includes('today') ? 'today_tab' : 'slack',
-        }),
-      })
-      mutateSaved()
-    } catch {
-      // fallback: local state only
-    }
-    setSelectedTrigger(''); setSelectedAction(''); setNewTrigger(''); setNewAction('')
-    setShowNewForm(false)
-  }
-
-  const activeCount = workflowList.filter(w => w.active).length
-
-  const card: React.CSSProperties = {
-    background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.04), transparent)',
-    border: '1px solid rgba(255,255,255,0.07)',
-    borderRadius: '14px',
-    padding: '20px 24px',
+  const counts: Record<FilterTab, number> = {
+    all: loops.length,
+    awaiting_approval: loops.filter(l => l.loopStatus === 'awaiting_approval').length,
+    in_cycle: loops.filter(l => l.loopStatus === 'in_cycle').length,
+    shipped: loops.filter(l => l.loopStatus === 'shipped').length,
   }
 
   return (
-    <div style={{ maxWidth: '760px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+    <div style={{ maxWidth: '900px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 0.6; }
+          50% { opacity: 0.3; }
+        }
+      `}</style>
 
       {/* Header */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-          <div style={{
-            width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0,
-            background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 14px rgba(99,102,241,0.20)',
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+        <div>
+          <h1 style={{
+            fontSize: '20px',
+            fontWeight: 700,
+            color: 'rgba(255,255,255,0.95)',
+            margin: '0 0 3px',
+            letterSpacing: '-0.02em',
           }}>
-            <Zap size={18} color="#818cf8" />
-          </div>
-          <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.02em', margin: 0 }}>
-            Loops
+            Active Loops
           </h1>
-          <span style={{
-            fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em',
-            padding: '2px 8px', borderRadius: '10px',
-            background: 'rgba(99,102,241,0.12)', color: '#818cf8',
-          }}>
-            {activeCount} active
-          </span>
+          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)', margin: 0 }}>
+            ranked by revenue at risk
+          </p>
         </div>
-        <p style={{ fontSize: '13px', color: '#475569', margin: 0 }}>
-          Automate actions across integrations. Type <strong style={{ color: '#818cf8' }}>@</strong> to reference integrations.
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <Filter size={12} color="rgba(255,255,255,0.35)" />
+          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>{sorted.length} loop{sorted.length !== 1 ? 's' : ''}</span>
+        </div>
       </div>
 
-      {/* Create a workflow */}
-      {!showNewForm ? (
-        <button
-          onClick={() => setShowNewForm(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '14px 18px', borderRadius: '12px',
-            background: 'rgba(99,102,241,0.06)', border: '1px dashed rgba(99,102,241,0.25)',
-            color: '#818cf8', fontSize: '13px', fontWeight: 600,
-            cursor: 'pointer', width: '100%', textAlign: 'left',
-            transition: 'all 0.12s',
-          }}
-          onMouseEnter={e => {
-            const el = e.currentTarget as HTMLElement
-            el.style.background = 'rgba(99,102,241,0.10)'
-            el.style.borderColor = 'rgba(99,102,241,0.40)'
-          }}
-          onMouseLeave={e => {
-            const el = e.currentTarget as HTMLElement
-            el.style.background = 'rgba(99,102,241,0.06)'
-            el.style.borderColor = 'rgba(99,102,241,0.25)'
-          }}
-        >
-          <Plus size={16} />
-          Create a workflow
-        </button>
-      ) : (
+      {/* Intelligence callout */}
+      <IntelligenceCallout brain={brain} totalDeals={loops.length} />
+
+      {/* Filter bar */}
+      <div style={{ display: 'flex', gap: '4px', padding: '3px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', width: 'fit-content' }}>
+        {FILTER_TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveFilter(tab.id)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '7px',
+              fontSize: '12px',
+              fontWeight: activeFilter === tab.id ? 600 : 400,
+              color: activeFilter === tab.id ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)',
+              background: activeFilter === tab.id ? 'rgba(255,255,255,0.09)' : 'transparent',
+              border: `1px solid ${activeFilter === tab.id ? 'rgba(255,255,255,0.12)' : 'transparent'}`,
+              cursor: 'pointer',
+              transition: 'all 0.12s',
+            }}
+          >
+            {tab.label}
+            {counts[tab.id] > 0 && (
+              <span style={{
+                fontSize: '10px',
+                padding: '1px 6px',
+                borderRadius: '100px',
+                background: activeFilter === tab.id ? 'rgba(124,58,237,0.25)' : 'rgba(255,255,255,0.08)',
+                color: activeFilter === tab.id ? '#a78bfa' : 'rgba(255,255,255,0.35)',
+                fontWeight: 700,
+              }}>
+                {counts[tab.id]}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Loop cards */}
+      {loopsLoading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+        </div>
+      ) : sorted.length === 0 ? (
         <div style={{
-          background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(59,130,246,0.06), transparent)',
-          border: '1px solid rgba(99,102,241,0.25)',
-          borderRadius: '16px', padding: '20px',
+          background: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '16px',
+          padding: '48px 32px',
+          textAlign: 'center',
         }}>
-          <h3 style={{ fontSize: '14px', fontWeight: 700, color: '#e2e8f0', margin: '0 0 16px' }}>
-            Create a workflow
-          </h3>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '16px' }}>
-            <SelectField
-              label="Trigger"
-              options={TRIGGERS}
-              value={selectedTrigger}
-              onChange={v => { setSelectedTrigger(v); if (v) setNewTrigger('') }}
-            />
-            {!selectedTrigger && (
-              <div>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '5px' }}>
-                  Or describe your trigger
-                </label>
-                <MentionInput
-                  value={newTrigger}
-                  onChange={setNewTrigger}
-                  placeholder="e.g. Every morning at 8am, or when a deal health drops…"
-                />
-              </div>
-            )}
-
-            <SelectField
-              label="Action"
-              options={ACTIONS}
-              value={selectedAction}
-              onChange={v => { setSelectedAction(v); if (v) setNewAction('') }}
-            />
-            {!selectedAction && (
-              <div>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '5px' }}>
-                  Or describe your action — type @ to mention integrations
-                </label>
-                <MentionInput
-                  value={newAction}
-                  onChange={setNewAction}
-                  placeholder="e.g. Show in Today tab: @linear issues in @cyclecurrent linked to @deals"
-                />
-                <div style={{ marginTop: '6px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {Object.entries(INTEGRATION_CHIPS).map(([key, chip]) => (
-                    <span key={key} style={{
-                      background: chip.bg, color: chip.color,
-                      borderRadius: '4px', padding: '1px 6px',
-                      fontSize: '10px', fontWeight: 700, cursor: 'default',
-                    }}>
-                      {chip.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              onClick={handleAddWorkflow}
-              style={{
-                padding: '8px 18px', borderRadius: '8px',
-                background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
-                border: '1px solid rgba(99,102,241,0.40)',
-                color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-                boxShadow: '0 0 14px rgba(99,102,241,0.25)',
-              }}
-            >
-              Add workflow
-            </button>
-            <button
-              onClick={() => setShowNewForm(false)}
-              style={{
-                padding: '8px 14px', borderRadius: '8px',
-                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                color: '#64748b', fontSize: '13px', cursor: 'pointer',
-              }}
-            >
-              Cancel
-            </button>
-          </div>
+          <Zap size={24} color="#7c3aed" style={{ opacity: 0.4, marginBottom: '12px' }} />
+          <p style={{ fontSize: '14px', fontWeight: 600, color: 'rgba(255,255,255,0.6)', margin: '0 0 8px' }}>
+            No {activeFilter === 'all' ? '' : FILTER_TABS.find(t => t.id === activeFilter)?.label + ' '}loops yet
+          </p>
+          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', margin: 0 }}>
+            Loops start when a deal&apos;s feature request gets linked to a Linear issue.
+          </p>
+          <Link
+            href="/deals"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              marginTop: '16px',
+              padding: '8px 14px',
+              borderRadius: '8px',
+              background: 'rgba(124,58,237,0.15)',
+              border: '1px solid rgba(124,58,237,0.3)',
+              color: '#a78bfa',
+              textDecoration: 'none',
+              fontSize: '12px',
+              fontWeight: 500,
+            }}
+          >
+            Start a loop from Deals
+          </Link>
         </div>
-      )}
-
-      {/* Pre-built templates */}
-      <div>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
-          Loops
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {workflowList.map(w => (
-            <WorkflowCard
-              key={w.id}
-              workflow={w}
-              onToggle={handleToggle}
-              onRun={savedIds.has(w.id) ? handleRun : undefined}
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {sorted.map(loop => (
+            <LoopCard
+              key={loop.dealId}
+              loop={loop}
+              riskReason={getRiskReason(loop.dealId, brain)}
             />
           ))}
         </div>
-      </div>
-
-      {/* Recent MCP actions */}
-      {recentActions.length > 0 && (
-        <div style={card}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-            <GitBranch size={13} style={{ color: '#475569' }} />
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Recent AI actions
-            </span>
-          </div>
-          {recentActions.map((action: any) => {
-            const timeAgo = action.createdAt ? (() => {
-              const diff = Date.now() - new Date(action.createdAt).getTime()
-              const mins = Math.floor(diff / 60000)
-              if (mins < 60) return `${mins}m ago`
-              const hrs = Math.floor(mins / 60)
-              if (hrs < 24) return `${hrs}h ago`
-              return `${Math.floor(hrs / 24)}d ago`
-            })() : ''
-            return (
-              <div key={action.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#6366f1', flexShrink: 0 }} />
-                <span style={{ flex: 1, fontSize: '12px', color: '#94a3b8' }}>
-                  {action.label}
-                  {action.dealName && <span style={{ color: '#475569' }}> · {action.dealName}</span>}
-                </span>
-                <span style={{ fontSize: '10px', color: '#334155', flexShrink: 0 }}>{timeAgo}</span>
-              </div>
-            )
-          })}
-        </div>
       )}
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }

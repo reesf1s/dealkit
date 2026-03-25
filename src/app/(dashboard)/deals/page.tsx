@@ -5,13 +5,20 @@ import { useState } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Plus, X, Brain, Kanban, BarChart3, AlertTriangle, Target, TrendingUp } from 'lucide-react'
+import { Plus, X, Brain, Kanban, BarChart3, AlertTriangle, Target, TrendingUp, Zap } from 'lucide-react'
 import { DealForm } from '@/components/deals/DealForm'
 import { useToast } from '@/components/shared/Toast'
 import SetupBanner from '@/components/shared/SetupBanner'
 import { fetcher, isDbNotConfigured } from '@/lib/fetcher'
 import { getScoreColor } from '@/lib/deal-context'
 import type { DealLog } from '@/types'
+import type { LoopEntry, LoopStatus } from '@/app/api/loops/route'
+
+const LOOP_STATUS_CONFIG: Record<LoopStatus, { label: string; color: string; bg: string }> = {
+  awaiting_approval: { label: 'Waiting for PM', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' },
+  in_cycle:          { label: 'In Cycle',        color: '#7c3aed', bg: 'rgba(124,58,237,0.15)' },
+  shipped:           { label: 'Shipped',          color: '#22c55e', bg: 'rgba(34,197,94,0.15)'  },
+}
 
 type Mode = 'intelligence' | 'kanban' | 'ml'
 
@@ -63,12 +70,23 @@ function StatCard({ label, value, accent }: { label: string; value: string | num
 }
 
 // Enterprise-density deal row card
-function DealMiniCard({ deal, currencySymbol }: { deal: any; currencySymbol: string }) {
+function DealMiniCard({
+  deal,
+  currencySymbol,
+  loop,
+  isStale,
+}: {
+  deal: any
+  currencySymbol: string
+  loop?: LoopEntry | null
+  isStale?: boolean
+}) {
   const score = deal.conversionScore ?? 0
   const isClosed = deal.stage === 'closed_won' || deal.stage === 'closed_lost'
   const scoreColor = getScoreColor(score, isClosed)
   const dotColor = riskDot(score)
   const lastActivity = daysSince(deal.updatedAt)
+  const loopCfg = loop ? LOOP_STATUS_CONFIG[loop.loopStatus] : null
 
   return (
     <Link href={`/deals/${deal.id}`} style={{ textDecoration: 'none', display: 'block' }}>
@@ -81,6 +99,7 @@ function DealMiniCard({ deal, currencySymbol }: { deal: any; currencySymbol: str
           backdropFilter: 'blur(16px)',
           WebkitBackdropFilter: 'blur(16px)',
           border: '1px solid rgba(255,255,255,0.09)',
+          borderLeft: loop ? '2px solid #7c3aed' : undefined,
           cursor: 'pointer',
           transition: 'background 0.12s, border-color 0.12s',
         }}
@@ -97,7 +116,7 @@ function DealMiniCard({ deal, currencySymbol }: { deal: any; currencySymbol: str
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <div style={{
             width: '5px', height: '5px', borderRadius: '50%',
-            background: dotColor, flexShrink: 0,
+            background: isStale ? '#ef4444' : dotColor, flexShrink: 0,
           }} />
           <div style={{
             flex: 1, fontSize: '12px', fontWeight: 500,
@@ -113,11 +132,9 @@ function DealMiniCard({ deal, currencySymbol }: { deal: any; currencySymbol: str
             }}>{score}%</span>
           )}
         </div>
+
         {/* Row 2: value + last activity */}
-        <div style={{
-          display: 'flex', gap: '8px', marginTop: '3px',
-          paddingLeft: '11px',
-        }}>
+        <div style={{ display: 'flex', gap: '8px', marginTop: '3px', paddingLeft: '11px' }}>
           {deal.dealValue > 0 && (
             <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.38)', fontVariantNumeric: 'tabular-nums' }}>
               {formatVal(deal.dealValue, currencySymbol)}
@@ -129,6 +146,44 @@ function DealMiniCard({ deal, currencySymbol }: { deal: any; currencySymbol: str
             </span>
           )}
         </div>
+
+        {/* Row 3: Loop status badge OR Start Loop */}
+        {loopCfg ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '5px', paddingLeft: '11px' }}>
+            <Zap size={8} color={loopCfg.color} />
+            <span style={{
+              fontSize: '10px', fontWeight: 600,
+              color: loopCfg.color,
+            }}>
+              Loop: {loopCfg.label}
+            </span>
+            {loop?.featureRequest && (
+              <span style={{
+                fontSize: '10px', color: 'rgba(255,255,255,0.35)',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                maxWidth: '120px',
+              }}>
+                · {loop.featureRequest}
+              </span>
+            )}
+          </div>
+        ) : (
+          !isClosed && (
+            <div style={{ marginTop: '5px', paddingLeft: '11px' }}>
+              <span style={{
+                display: 'inline-block',
+                fontSize: '10px', fontWeight: 500,
+                color: 'rgba(124,58,237,0.7)',
+                padding: '1px 6px',
+                borderRadius: '4px',
+                background: 'rgba(124,58,237,0.08)',
+                border: '1px solid rgba(124,58,237,0.15)',
+              }}>
+                + Start Loop
+              </span>
+            </div>
+          )
+        )}
       </div>
     </Link>
   )
@@ -144,12 +199,20 @@ export default function DealsPage() {
   const { data: configData } = useSWR('/api/pipeline-config', fetcher, { revalidateOnFocus: false })
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
   const { data: loopSignalsRes } = useSWR('/api/dashboard/loop-signals', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
+  const { data: loopsRes } = useSWR<{ data: LoopEntry[] }>('/api/loops', fetcher, { revalidateOnFocus: false, dedupingInterval: 30000 })
 
   const deals = data?.data ?? []
   const dbError = isDbNotConfigured(error)
   const currencySymbol: string = configData?.data?.currency ?? '£'
   const brain = brainRes?.data
   const mlPredictions: any[] = brain?.mlPredictions ?? []
+
+  // Build loop map: dealId → LoopEntry
+  const loopMap = new Map<string, LoopEntry>()
+  for (const loop of (loopsRes?.data ?? [])) loopMap.set(loop.dealId, loop)
+
+  // Build stale deal set from brain
+  const staleDealIds = new Set<string>((brain?.staleDeals ?? []).map((d: { dealId: string }) => d.dealId))
 
   const activeDeals = deals.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
   const totalPipelineValue = activeDeals.reduce((sum: number, d: any) => sum + (Number(d.dealValue) || 0), 0)
@@ -301,7 +364,7 @@ export default function DealsPage() {
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', padding: '8px 0' }}>No deals in this band</div>
                   ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '4px' }}>
-                      {band.deals.map((deal: any) => <DealMiniCard key={deal.id} deal={deal} currencySymbol={currencySymbol} />)}
+                      {band.deals.map((deal: any) => <DealMiniCard key={deal.id} deal={deal} currencySymbol={currencySymbol} loop={loopMap.get(deal.id) ?? null} isStale={staleDealIds.has(deal.id)} />)}
                     </div>
                   )}
                 </div>
@@ -314,7 +377,7 @@ export default function DealsPage() {
                     <span style={{ marginLeft: 'auto', fontSize: '10px', color: 'var(--text-tertiary)', background: 'rgba(255,255,255,0.04)', padding: '1px 7px', borderRadius: '100px' }}>{unscored.length}</span>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '4px' }}>
-                    {unscored.map((deal: any) => <DealMiniCard key={deal.id} deal={deal} currencySymbol={currencySymbol} />)}
+                    {unscored.map((deal: any) => <DealMiniCard key={deal.id} deal={deal} currencySymbol={currencySymbol} loop={loopMap.get(deal.id) ?? null} isStale={staleDealIds.has(deal.id)} />)}
                   </div>
                 </div>
               )}
@@ -354,7 +417,7 @@ export default function DealsPage() {
                   </div>
                   <div>
                     {(dealsByStage[stage.id] ?? []).map(deal => (
-                      <DealMiniCard key={deal.id} deal={deal} currencySymbol={currencySymbol} />
+                      <DealMiniCard key={deal.id} deal={deal} currencySymbol={currencySymbol} loop={loopMap.get(deal.id) ?? null} isStale={staleDealIds.has(deal.id)} />
                     ))}
                     {(dealsByStage[stage.id] ?? []).length === 0 && (
                       <div style={{ height: '48px', borderRadius: '5px', border: '1px dashed rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
