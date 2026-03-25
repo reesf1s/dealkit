@@ -15,7 +15,7 @@ import { eq, and, sql, inArray } from 'drizzle-orm'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { dbErrResponse } from '@/lib/api-helpers'
 
-export type LoopStatus = 'awaiting_approval' | 'in_cycle' | 'shipped'
+export type LoopStatus = 'suggested' | 'confirmed' | 'awaiting_approval' | 'in_cycle' | 'shipped'
 
 export interface LoopEntry {
   dealId: string
@@ -60,7 +60,7 @@ export async function GET() {
       .where(
         and(
           eq(dealLinearLinks.workspaceId, workspaceId),
-          sql`${dealLinearLinks.status} NOT IN ('suggested', 'dismissed')`,
+          sql`${dealLinearLinks.status} NOT IN ('dismissed')`,
         ),
       )
 
@@ -111,11 +111,16 @@ export async function GET() {
       const hasInCycle = dealLinks.some(l => l.status === 'in_cycle')
       const allDeployed = dealLinks.length > 0 && dealLinks.every(l => l.status === 'deployed')
 
+      const hasSuggested = dealLinks.some(l => l.status === 'suggested')
+      const hasConfirmed = dealLinks.some(l => l.status === 'confirmed')
+
       let loopStatus: LoopStatus
-      if (hasPending) loopStatus = 'awaiting_approval'
-      else if (allDeployed) loopStatus = 'shipped'
+      if (allDeployed) loopStatus = 'shipped'
       else if (hasInCycle) loopStatus = 'in_cycle'
-      else loopStatus = 'awaiting_approval'
+      else if (hasPending) loopStatus = 'awaiting_approval'
+      else if (hasConfirmed) loopStatus = 'confirmed'
+      else if (hasSuggested) loopStatus = 'suggested'
+      else loopStatus = 'suggested'
 
       // Prefer in_cycle link, then deployed, then first
       const mainLink =

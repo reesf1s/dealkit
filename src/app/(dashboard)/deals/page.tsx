@@ -16,6 +16,8 @@ import type { LoopEntry, LoopStatus } from '@/app/api/loops/route'
 /* ── Constants ── */
 
 const LOOP_STATUS_CONFIG: Record<LoopStatus, { label: string; color: string }> = {
+  suggested:         { label: 'Suggested',   color: 'rgba(255,255,255,0.4)' },
+  confirmed:         { label: 'Confirmed',   color: '#a78bfa' },
   awaiting_approval: { label: 'Awaiting PM', color: '#f59e0b' },
   in_cycle:          { label: 'In Cycle',    color: '#3b82f6' },
   shipped:           { label: 'Shipped',     color: '#22c55e' },

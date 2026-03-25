@@ -15,7 +15,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type PageTab = 'core' | 'custom'
-type FilterTab = 'all' | 'awaiting_approval' | 'in_cycle' | 'shipped'
+type FilterTab = 'all' | 'suggested' | 'confirmed' | 'awaiting_approval' | 'in_cycle' | 'shipped'
 
 interface BrainData {
   data?: {
@@ -78,6 +78,16 @@ const STATUS_CONFIG: Record<LoopStatus, {
   dotColor: string
   textColor: string
 }> = {
+  suggested: {
+    label: 'Suggested',
+    dotColor: 'rgba(255,255,255,0.4)',
+    textColor: 'rgba(255,255,255,0.5)',
+  },
+  confirmed: {
+    label: 'Confirmed',
+    dotColor: '#a78bfa',
+    textColor: '#a78bfa',
+  },
   awaiting_approval: {
     label: 'Awaiting PM',
     dotColor: '#f59e0b',
@@ -97,6 +107,8 @@ const STATUS_CONFIG: Record<LoopStatus, {
 
 const FILTER_TABS: { id: FilterTab; label: string }[] = [
   { id: 'all', label: 'All' },
+  { id: 'suggested', label: 'Suggested' },
+  { id: 'confirmed', label: 'Confirmed' },
   { id: 'awaiting_approval', label: 'Awaiting PM' },
   { id: 'in_cycle', label: 'In Cycle' },
   { id: 'shipped', label: 'Shipped' },
@@ -274,6 +286,8 @@ function CoreLoopTable({
 
   const counts: Record<FilterTab, number> = {
     all: loops.length,
+    suggested: loops.filter(l => l.loopStatus === 'suggested').length,
+    confirmed: loops.filter(l => l.loopStatus === 'confirmed').length,
     awaiting_approval: loops.filter(l => l.loopStatus === 'awaiting_approval').length,
     in_cycle: loops.filter(l => l.loopStatus === 'in_cycle').length,
     shipped: loops.filter(l => l.loopStatus === 'shipped').length,
