@@ -16,11 +16,9 @@ import type { LoopEntry, LoopStatus } from '@/app/api/loops/route'
 /* ── Constants ── */
 
 const LOOP_STATUS_CONFIG: Record<LoopStatus, { label: string; color: string }> = {
-  suggested:         { label: 'Suggested',   color: 'rgba(255,255,255,0.4)' },
-  confirmed:         { label: 'Confirmed',   color: '#a78bfa' },
-  awaiting_approval: { label: 'Awaiting PM', color: '#f59e0b' },
-  in_cycle:          { label: 'In Cycle',    color: '#3b82f6' },
-  shipped:           { label: 'Shipped',     color: '#22c55e' },
+  identified: { label: 'Identified', color: '#f59e0b' },
+  in_cycle:   { label: 'In Cycle',   color: '#3b82f6' },
+  shipped:    { label: 'Shipped',    color: '#22c55e' },
 }
 
 type Mode = 'intelligence' | 'kanban'
@@ -301,7 +299,7 @@ export default function DealsPage() {
     if (!loops || loops.length === 0) return null
     const activeCount = loops.filter(l => l.loopStatus !== 'shipped').length
     // Worst status: awaiting_approval > in_cycle > shipped
-    const worst = loops.find(l => l.loopStatus === 'awaiting_approval')
+    const worst = loops.find(l => l.loopStatus === 'identified')
       ?? loops.find(l => l.loopStatus === 'in_cycle')
       ?? loops[0]
     const cfg = LOOP_STATUS_CONFIG[worst.loopStatus]
@@ -628,7 +626,7 @@ export default function DealsPage() {
                     {(dealsByStage[stage.id] ?? []).map((deal: any) => {
                       const score = deal.conversionScore ?? 0
                       const loops = loopMap.get(deal.id)
-                      const worstLoop = loops?.find(l => l.loopStatus === 'awaiting_approval')
+                      const worstLoop = loops?.find(l => l.loopStatus === 'identified')
                         ?? loops?.find(l => l.loopStatus === 'in_cycle')
                         ?? loops?.[0]
                       const loopCfg = worstLoop ? LOOP_STATUS_CONFIG[worstLoop.loopStatus] : null

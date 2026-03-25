@@ -15,7 +15,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type PageTab = 'core' | 'custom'
-type FilterTab = 'all' | 'suggested' | 'confirmed' | 'awaiting_approval' | 'in_cycle' | 'shipped'
+type FilterTab = 'all' | 'identified' | 'in_cycle' | 'shipped'
 
 interface BrainData {
   data?: {
@@ -78,18 +78,8 @@ const STATUS_CONFIG: Record<LoopStatus, {
   dotColor: string
   textColor: string
 }> = {
-  suggested: {
-    label: 'Suggested',
-    dotColor: 'rgba(255,255,255,0.4)',
-    textColor: 'rgba(255,255,255,0.5)',
-  },
-  confirmed: {
-    label: 'Confirmed',
-    dotColor: '#a78bfa',
-    textColor: '#a78bfa',
-  },
-  awaiting_approval: {
-    label: 'Awaiting PM',
+  identified: {
+    label: 'Identified',
     dotColor: '#f59e0b',
     textColor: '#f59e0b',
   },
@@ -107,9 +97,7 @@ const STATUS_CONFIG: Record<LoopStatus, {
 
 const FILTER_TABS: { id: FilterTab; label: string }[] = [
   { id: 'all', label: 'All' },
-  { id: 'suggested', label: 'Suggested' },
-  { id: 'confirmed', label: 'Confirmed' },
-  { id: 'awaiting_approval', label: 'Awaiting PM' },
+  { id: 'identified', label: 'Identified' },
   { id: 'in_cycle', label: 'In Cycle' },
   { id: 'shipped', label: 'Shipped' },
 ]
@@ -143,14 +131,14 @@ function SummaryStrip({ loops }: { loops: LoopEntry[] }) {
   const uniqueDealRevenue = new Map<string, number>()
   for (const l of loops) { if (!uniqueDealRevenue.has(l.dealId)) uniqueDealRevenue.set(l.dealId, l.dealValue ?? 0) }
   const totalRevenue = Array.from(uniqueDealRevenue.values()).reduce((sum, v) => sum + v, 0)
-  const awaitingPM = loops.filter(l => l.loopStatus === 'awaiting_approval').length
+  const identified = loops.filter(l => l.loopStatus === 'identified').length
   const inCycle = loops.filter(l => l.loopStatus === 'in_cycle').length
   const shipped = loops.filter(l => l.loopStatus === 'shipped').length
 
   const items: { label: string; value: string; icon: React.ReactNode; color?: string }[] = [
     { label: 'Total Loops', value: String(loops.length), icon: <Zap size={13} /> },
     { label: 'Revenue at risk', value: fmtFull(totalRevenue), icon: <AlertTriangle size={13} />, color: totalRevenue > 0 ? '#f59e0b' : undefined },
-    { label: 'Awaiting PM', value: String(awaitingPM), icon: <Timer size={13} />, color: awaitingPM > 0 ? '#f59e0b' : undefined },
+    { label: 'Identified', value: String(identified), icon: <Timer size={13} />, color: identified > 0 ? '#f59e0b' : undefined },
     { label: 'In Cycle', value: String(inCycle), icon: <Circle size={13} />, color: inCycle > 0 ? '#3b82f6' : undefined },
     { label: 'Shipped', value: String(shipped), icon: <Truck size={13} />, color: shipped > 0 ? '#22c55e' : undefined },
   ]
@@ -289,9 +277,7 @@ function CoreLoopTable({
 
   const counts: Record<FilterTab, number> = {
     all: loops.length,
-    suggested: loops.filter(l => l.loopStatus === 'suggested').length,
-    confirmed: loops.filter(l => l.loopStatus === 'confirmed').length,
-    awaiting_approval: loops.filter(l => l.loopStatus === 'awaiting_approval').length,
+    identified: loops.filter(l => l.loopStatus === 'identified').length,
     in_cycle: loops.filter(l => l.loopStatus === 'in_cycle').length,
     shipped: loops.filter(l => l.loopStatus === 'shipped').length,
   }
@@ -543,7 +529,7 @@ function CoreLoopTable({
                     {/* Actions */}
                     <td style={{ ...tdStyle, textAlign: 'right' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
-                        {loop.loopStatus === 'awaiting_approval' && (
+                        {loop.loopStatus === 'identified' && (
                           <>
                             <button
                               onClick={e => { e.stopPropagation() }}
@@ -568,9 +554,9 @@ function CoreLoopTable({
                               style={{
                                 padding: '4px 10px',
                                 borderRadius: '6px',
-                                background: `${STATUS_CONFIG.awaiting_approval.dotColor}12`,
-                                border: `1px solid ${STATUS_CONFIG.awaiting_approval.dotColor}25`,
-                                color: STATUS_CONFIG.awaiting_approval.textColor,
+                                background: `${STATUS_CONFIG.identified.dotColor}12`,
+                                border: `1px solid ${STATUS_CONFIG.identified.dotColor}25`,
+                                color: STATUS_CONFIG.identified.textColor,
                                 fontSize: '11px',
                                 fontWeight: 600,
                                 cursor: 'pointer',

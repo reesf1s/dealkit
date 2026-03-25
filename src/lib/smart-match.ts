@@ -23,18 +23,15 @@ const MAX_LINKS_PER_DEAL = 5
 
 /**
  * Map a Linear issue status to our loop status.
- * Linear states: Triage, Backlog, Todo, In Progress, In Review, Done, Cancelled
- * Our states: suggested, confirmed, in_cycle, shipped
+ * Linear states: Triage, Backlog, Todo, In Progress, In Review, In QA, RFQA, Done, Cancelled
+ * Our states: identified, in_cycle, shipped
  */
-function linearStatusToLoopStatus(linearStatus: string | null): 'suggested' | 'in_cycle' | 'shipped' {
-  if (!linearStatus) return 'suggested'
+function linearStatusToLoopStatus(linearStatus: string | null): 'identified' | 'in_cycle' | 'shipped' {
+  if (!linearStatus) return 'identified'
   const s = linearStatus.toLowerCase()
-  // Shipped/done
   if (s === 'done' || s === 'completed' || s === 'cancelled' || s === 'canceled') return 'shipped'
-  // In cycle — actively being worked on
-  if (s === 'in progress' || s === 'in review' || s === 'started') return 'in_cycle'
-  // Everything else (Triage, Backlog, Todo) = suggested
-  return 'suggested'
+  if (['in progress', 'in review', 'in qa', 'rfqa', 'started'].includes(s)) return 'in_cycle'
+  return 'identified'
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────

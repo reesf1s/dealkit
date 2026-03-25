@@ -191,8 +191,8 @@ export async function POST(req: NextRequest) {
         .where(and(
           eq(dealLinearLinks.workspaceId, workspaceId),
           eq(dealLinearLinks.linearIssueId, issueIdentifier),
-          // Only upgrade suggested/confirmed → in_cycle (never downgrade shipped)
-          sql`${dealLinearLinks.status} IN ('suggested', 'confirmed', 'awaiting_approval')`,
+          // Only upgrade identified → in_cycle (never downgrade shipped)
+          sql`${dealLinearLinks.status} IN ('suggested', 'confirmed', 'awaiting_approval', 'identified')`,
         ))
         .then(() => console.log(`[webhook/linear] ${issueIdentifier} → in_cycle`))
         .catch(err => console.error('[webhook/linear] in_cycle update failed:', err))

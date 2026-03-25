@@ -15,7 +15,7 @@ import { eq, and, sql, inArray } from 'drizzle-orm'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { dbErrResponse } from '@/lib/api-helpers'
 
-export type LoopStatus = 'suggested' | 'confirmed' | 'awaiting_approval' | 'in_cycle' | 'shipped'
+export type LoopStatus = 'identified' | 'in_cycle' | 'shipped'
 
 export interface LoopEntry {
   dealId: string
@@ -109,12 +109,11 @@ export async function GET() {
 
       // Emit one LoopEntry per link (not per deal) so every issue shows
       for (const link of dealLinks) {
-        // Map link status to loop status
-        let loopStatus: LoopStatus = link.status as LoopStatus
-        if (!['suggested', 'confirmed', 'awaiting_approval', 'in_cycle', 'shipped'].includes(loopStatus)) {
-          if (link.status === 'deployed') loopStatus = 'shipped'
-          else loopStatus = 'suggested'
-        }
+        // Map link status to simple loop status
+        let loopStatus: LoopStatus
+        if (link.status === 'deployed' || link.status === 'shipped') loopStatus = 'shipped'
+        else if (link.status === 'in_cycle') loopStatus = 'in_cycle'
+        else loopStatus = 'identified' // suggested, confirmed, awaiting_approval all = identified
 
         // Days in current status
         const statusSince = link.scopedAt ? new Date(link.scopedAt) : new Date(link.createdAt)

@@ -254,19 +254,21 @@ function CoreLoopCard({ currency }: { currency: string }) {
   }
 
   // Group loops by status
-  const awaitingPM = loops.filter(l => l.loopStatus === 'awaiting_approval')
+  const identified = loops.filter(l => l.loopStatus === 'identified')
   const inCycle = loops.filter(l => l.loopStatus === 'in_cycle')
   const shipped = loops.filter(l => l.loopStatus === 'shipped')
 
-  // Revenue by status
+  // Revenue by status (dedupe by deal)
   const revenueByStatus = (items: LoopEntry[]) => {
-    const dealIds = new Set(items.map(l => l.dealId))
-    return items.reduce((acc, l) => acc + (l.dealValue || 0), 0)
+    const seen = new Set<string>()
+    let total = 0
+    for (const l of items) { if (!seen.has(l.dealId)) { seen.add(l.dealId); total += l.dealValue || 0 } }
+    return total
   }
 
   const statuses = [
-    { label: 'Awaiting PM', count: awaitingPM.length, revenue: revenueByStatus(awaitingPM), color: '#f59e0b', dotPulse: true },
-    { label: 'In cycle', count: inCycle.length, revenue: revenueByStatus(inCycle), color: '#3b82f6', dotPulse: false },
+    { label: 'Identified', count: identified.length, revenue: revenueByStatus(identified), color: '#f59e0b', dotPulse: true },
+    { label: 'In Cycle', count: inCycle.length, revenue: revenueByStatus(inCycle), color: '#3b82f6', dotPulse: false },
     { label: 'Shipped', count: shipped.length, revenue: revenueByStatus(shipped), color: '#22c55e', dotPulse: false },
   ]
 
@@ -499,13 +501,11 @@ function ActiveLoopsTable({ currency }: { currency: string }) {
         <tbody>
           {loops.slice(0, 12).map(loop => {
             const statusColor = loop.loopStatus === 'in_cycle' ? '#3b82f6'
-              : loop.loopStatus === 'awaiting_approval' ? '#f59e0b'
               : loop.loopStatus === 'shipped' ? '#22c55e'
-              : 'rgba(255,255,255,0.3)'
-            const statusLabel = loop.loopStatus === 'in_cycle' ? 'In cycle'
-              : loop.loopStatus === 'awaiting_approval' ? 'Awaiting PM'
+              : '#f59e0b' // identified
+            const statusLabel = loop.loopStatus === 'in_cycle' ? 'In Cycle'
               : loop.loopStatus === 'shipped' ? 'Shipped'
-              : stageFmt(loop.loopStatus ?? '')
+              : 'Identified'
 
             const days = loop.daysInStatus
             const warn = days !== null && days > 5
@@ -889,14 +889,11 @@ function IssuesUnlockRevenueCard({ currency }: { currency: string }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {topIssues.map((issue) => {
             const statusColor = issue.status === 'in_cycle' ? '#3b82f6'
-              : issue.status === 'awaiting_approval' ? '#f59e0b'
-              : issue.status === 'suggested' ? 'rgba(255,255,255,0.3)'
-              : 'rgba(255,255,255,0.3)'
-            const statusLabel = issue.status === 'in_cycle' ? 'In cycle'
-              : issue.status === 'awaiting_approval' ? 'Awaiting PM'
-              : issue.status === 'suggested' ? 'Suggested'
-              : issue.status === 'confirmed' ? 'Confirmed'
-              : stageFmt(issue.status ?? '')
+              : issue.status === 'shipped' ? '#22c55e'
+              : '#f59e0b'
+            const statusLabel = issue.status === 'in_cycle' ? 'In Cycle'
+              : issue.status === 'shipped' ? 'Shipped'
+              : 'Identified'
 
             return (
               <div key={issue.id} style={{ padding: '6px 8px', borderRadius: '6px' }}>
