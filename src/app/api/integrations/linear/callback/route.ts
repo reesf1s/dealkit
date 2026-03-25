@@ -17,6 +17,9 @@ import { encrypt, getEncryptionKey } from '@/lib/encrypt'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { validateApiKey } from '@/lib/linear-client'
 import { syncLinearIssues } from '@/lib/linear-sync'
+import { count } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
+import { dealLogs } from '@/lib/db/schema'
 
 const LINEAR_TOKEN_URL = 'https://api.linear.app/oauth/token'
 
@@ -124,6 +127,23 @@ export async function GET(req: NextRequest) {
     after(async () => {
       try { await syncLinearIssues(wsCtx.workspaceId) } catch { /* non-fatal */ }
     })
+
+    // Smart redirect after Linear OAuth:
+    // If returnTo was explicitly set (e.g. /onboarding), honour it.
+    // Otherwise: check deals count, redirect to onboarding step 3 if 0 deals.
+    const isOnboarding = returnTo.includes('/onboarding')
+    if (!isOnboarding) {
+      try {
+        const [{ value: dealCount }] = await db
+          .select({ value: count() })
+          .from(dealLogs)
+          .where(eq(dealLogs.workspaceId, wsCtx.workspaceId))
+
+        if (Number(dealCount) === 0) {
+          return NextResponse.redirect(`${appUrl}/onboarding?step=3`)
+        }
+      } catch { /* non-fatal — fall through to default returnTo */ }
+    }
 
     return NextResponse.redirect(returnTo)
   } catch (e: unknown) {

@@ -146,6 +146,7 @@ export interface DealLog {
   expansionType?: ExpansionType | null
   projectPlan?: ProjectPlan | null
   conversionScore?: number | null
+  assignedRepId?: string | null
   createdAt: Date
   updatedAt: Date
 }

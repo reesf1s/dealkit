@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react'
 import type { DealContact, DealLog, DealStage } from '@/types'
 
@@ -47,6 +47,13 @@ function Textarea({ value, onChange, placeholder, rows = 3 }: { value: string; o
 
 const EMPTY_CONTACT: DealContact = { name: '', title: '', email: '' }
 
+interface WorkspaceMember {
+  userId: string
+  email: string
+  role: string
+  appRole: string
+}
+
 interface FormState {
   dealName: string
   prospectCompany: string
@@ -59,6 +66,7 @@ interface FormState {
   notes: string
   nextSteps: string
   lostReason: string
+  assignedRepId: string
 }
 
 export function DealForm({ onSubmit, loading = false }: DealFormProps) {
@@ -74,7 +82,16 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
     notes: '',
     nextSteps: '',
     lostReason: '',
+    assignedRepId: '',
   })
+  const [members, setMembers] = useState<WorkspaceMember[]>([])
+
+  useEffect(() => {
+    fetch('/api/workspace/members')
+      .then(r => r.json())
+      .then((d: { data?: WorkspaceMember[] }) => { if (d.data) setMembers(d.data) })
+      .catch(() => {})
+  }, [])
   const [contacts, setContacts] = useState<DealContact[]>([{ ...EMPTY_CONTACT }])
   const [expanded, setExpanded] = useState(false)
   const [errors, setErrors] = useState<{ dealValue?: string; dealName?: string }>({})
@@ -134,6 +151,7 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
       notes: form.notes || null,
       nextSteps: form.nextSteps || null,
       lostReason: form.lostReason || null,
+      assignedRepId: form.assignedRepId || null,
       wonDate: isWon ? now : null,
       lostDate: isLost ? now : null,
       closeDate: isClosed ? now : null,
@@ -158,6 +176,27 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
         <Label>Prospect company *</Label>
         <Input value={form.prospectCompany} onChange={(v) => u({ prospectCompany: v })} placeholder="e.g. Acme Corp" />
       </div>
+
+      {/* Assign Rep */}
+      {members.length > 0 && (
+        <div>
+          <Label>Assign rep</Label>
+          <select
+            value={form.assignedRepId}
+            onChange={(e) => u({ assignedRepId: e.target.value })}
+            style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: form.assignedRepId ? '#EBEBEB' : '#666', fontSize: '13px', outline: 'none', boxSizing: 'border-box', cursor: 'pointer', fontFamily: 'inherit' }}
+            onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.6)' }}
+            onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
+          >
+            <option value="">Unassigned</option>
+            {members.map(m => (
+              <option key={m.userId} value={m.userId}>
+                {m.email}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Outcome toggle */}
       <div>

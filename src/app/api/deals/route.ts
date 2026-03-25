@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Deal log limit reached. Your ${plan} plan allows up to ${limits.dealLogs} deals. Please upgrade.`, code: 'PLAN_LIMIT_REACHED' }, { status: 403 })
     }
     const body = await req.json()
-    const { dealName, prospectCompany, prospectName, prospectTitle, contacts, description, dealValue, stage, dealType, recurringInterval, competitors: dealCompetitors, notes, nextSteps, closeDate, wonDate, lostDate, lostReason, contractStartDate, contractEndDate } = body
+    const { dealName, prospectCompany, prospectName, prospectTitle, contacts, description, dealValue, stage, dealType, recurringInterval, competitors: dealCompetitors, notes, nextSteps, closeDate, wonDate, lostDate, lostReason, contractStartDate, contractEndDate, assignedRepId } = body
     if (!dealName || !prospectCompany) return NextResponse.json({ error: 'dealName and prospectCompany are required' }, { status: 400 })
     // Fix 2-digit year issue: new Date("0026-...") produces year 26 AD instead of 2026
     const fixDateYear = (d: Date): Date => { if (d.getFullYear() < 100) d.setFullYear(d.getFullYear() + 2000); return d }
@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
       workspaceId, userId, dealName, prospectCompany,
       prospectName: prospectName ?? null, prospectTitle: prospectTitle ?? null,
       contacts: contacts ?? [], description: description ?? null,
+      assignedRepId: assignedRepId ?? null,
       dealValue: dealValue ?? null,
       stage: stage ?? 'prospecting', dealType: dealType ?? 'one_off', recurringInterval: recurringInterval ?? null,
       competitors: dealCompetitors ?? [], notes: notes ?? null,

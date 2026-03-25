@@ -12,7 +12,8 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/db'
-import { slackConnections, slackUserMappings } from '@/lib/db/schema'
+import { slackConnections, slackUserMappings, linearIntegrations, dealLogs } from '@/lib/db/schema'
+import { eq, count } from 'drizzle-orm'
 import { encrypt, getEncryptionKey } from '@/lib/encrypt'
 import { exchangeOAuthCode, isSlackConfigured, slackOpenDm, slackPostMessage } from '@/lib/slack-client'
 import { getWorkspaceContext } from '@/lib/workspace'
@@ -105,6 +106,33 @@ export async function GET(req: NextRequest) {
       sendIntroDm(tokenResult.botToken, installedBySlackUserId).catch(
         e => console.warn('[slack/callback] Intro DM failed:', e),
       )
+    }
+
+    // Smart redirect after Slack OAuth:
+    // If returnTo was explicitly set (e.g. /onboarding), honour it.
+    // Otherwise: check if Linear is connected and deals exist, then redirect appropriately.
+    const isOnboarding = returnTo.includes('/onboarding')
+    if (!isOnboarding) {
+      try {
+        const [linRow] = await db
+          .select({ id: linearIntegrations.id })
+          .from(linearIntegrations)
+          .where(eq(linearIntegrations.workspaceId, wsCtx.workspaceId))
+          .limit(1)
+
+        if (!linRow) {
+          return NextResponse.redirect(`${appUrl}/onboarding?step=2`)
+        }
+
+        const [{ value: dealCount }] = await db
+          .select({ value: count() })
+          .from(dealLogs)
+          .where(eq(dealLogs.workspaceId, wsCtx.workspaceId))
+
+        if (Number(dealCount) === 0) {
+          return NextResponse.redirect(`${appUrl}/onboarding?step=3`)
+        }
+      } catch { /* non-fatal — fall through to default returnTo */ }
     }
 
     return NextResponse.redirect(returnTo)

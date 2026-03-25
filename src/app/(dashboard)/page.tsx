@@ -51,6 +51,36 @@ interface BrainData {
       winCount: number
       lossCount: number
     }
+    // Halvex unified brain fields
+    dealActions?: Array<{
+      dealId: string
+      dealName: string
+      dealValue: number
+      action: string
+      reason: string
+      urgency: 'critical' | 'high' | 'medium'
+      confidence: number
+    }>
+    intentSignalsList?: Array<{
+      dealId: string
+      dealName: string
+      signal: string
+      signalType: 'competitor' | 'budget' | 'champion' | 'objection' | 'positive'
+      detectedAt: string
+      daysAgo: number
+    }>
+    dailyBriefing?: string
+    loopSummary?: {
+      activeLoops: number
+      waitingForPM: number
+      inCycle: number
+      shipped: number
+      revenueAtRisk: number
+    }
+    updatedAt?: string
+  }
+  meta?: {
+    lastRebuilt?: string | null
   }
 }
 
@@ -177,6 +207,71 @@ function buildAIActions(brain: BrainData['data'] | undefined): AIAction[] {
   }
 
   return actions.slice(0, 5)
+}
+
+// ─── Daily Briefing Card ──────────────────────────────────────────────────────
+
+function DailyBriefingCard() {
+  const { data: brainData, isLoading } = useSWR<BrainData>('/api/brain', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 300000,
+  })
+  const briefing = brainData?.data?.dailyBriefing
+  const updatedAt = brainData?.meta?.lastRebuilt ?? brainData?.data?.updatedAt
+
+  function minutesAgo(ts: string): string {
+    const mins = Math.floor((Date.now() - new Date(ts).getTime()) / 60000)
+    if (mins < 1) return 'just now'
+    if (mins < 60) return `${mins}m ago`
+    return `${Math.floor(mins / 60)}h ago`
+  }
+
+  if (isLoading) {
+    return (
+      <div style={{
+        background: 'rgba(124,58,237,0.06)',
+        border: '1px solid rgba(124,58,237,0.2)',
+        borderRadius: '16px',
+        padding: '20px 24px',
+        marginBottom: '28px',
+        animation: 'pulse 2s ease-in-out infinite',
+        height: '72px',
+      }} />
+    )
+  }
+
+  if (!briefing) return null
+
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.06)',
+      backdropFilter: 'blur(18px)',
+      WebkitBackdropFilter: 'blur(18px)',
+      border: '1px solid rgba(124,58,237,0.4)',
+      borderRadius: '16px',
+      padding: '20px 24px',
+      marginBottom: '28px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+        <Brain size={18} color="#a78bfa" style={{ flexShrink: 0, marginTop: '2px' }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Your Briefing
+            </span>
+            {updatedAt && (
+              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)' }}>
+                Updated {minutesAgo(updatedAt)}
+              </span>
+            )}
+          </div>
+          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.6, margin: 0 }}>
+            {briefing}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ─── Skeleton Loader ──────────────────────────────────────────────────────────
@@ -379,7 +474,17 @@ function AIActionsSection() {
     revalidateOnFocus: false,
   })
   const brain = brainData?.data
-  const actions = buildAIActions(brain)
+
+  // Prefer pre-computed brain.dealActions; fall back to client-side derivation
+  const brainActions: AIAction[] = (brain?.dealActions ?? []).map(da => ({
+    dealId: da.dealId,
+    company: da.dealName,
+    action: da.action,
+    revenueAtRisk: da.dealValue > 0 ? da.dealValue : null,
+    confidence: Math.round(da.confidence * 100),
+    type: da.urgency === 'critical' ? 'urgent' : da.urgency === 'high' ? 'stale' : 'feature',
+  }))
+  const actions = brainActions.length > 0 ? brainActions : buildAIActions(brain)
 
   if (isLoading) {
     return (
@@ -492,16 +597,22 @@ interface DealWithActivity {
 }
 
 function IntentMatchingSection() {
-  const { data: dealsRes, isLoading } = useSWR<{ data: DealWithActivity[] }>(
+  const { data: brainData, isLoading: brainLoading } = useSWR<BrainData>('/api/brain', fetcher, {
+    revalidateOnFocus: false,
+  })
+  const { data: dealsRes, isLoading: dealsLoading } = useSWR<{ data: DealWithActivity[] }>(
     '/api/deals',
     fetcher,
     { revalidateOnFocus: false },
   )
 
+  const isLoading = brainLoading && dealsLoading
+
+  // Prefer brain.intentSignalsList; fall back to recent deals from API
+  const brainSignals = brainData?.data?.intentSignalsList ?? []
   const deals = dealsRes?.data ?? []
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
 
-  // Find deals with recent activity
   const recentDeals = deals
     .filter(d => {
       const at = d.lastActivityAt ?? d.updatedAt
@@ -518,6 +629,55 @@ function IntentMatchingSection() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {[1, 2].map(i => <SkeletonCard key={i} height={56} />)}
+      </div>
+    )
+  }
+
+  // Use brain signals if available
+  if (brainSignals.length > 0) {
+    const signalDotColor = (type: string) => {
+      if (type === 'champion') return '#22c55e'
+      if (type === 'competitor') return '#f59e0b'
+      if (type === 'budget') return '#60a5fa'
+      if (type === 'positive') return '#22c55e'
+      return '#a78bfa'
+    }
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {brainSignals.map((sig, i) => (
+          <Link key={`${sig.dealId}-${i}`} href={`/deals/${sig.dealId}`} style={{ textDecoration: 'none' }}>
+            <div
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '10px',
+                padding: '10px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                transition: 'all 0.15s',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.08)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'rgba(255,255,255,0.05)' }}
+            >
+              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: signalDotColor(sig.signalType), flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {sig.dealName}
+                  </span>
+                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>
+                    {sig.daysAgo === 0 ? 'today' : `${sig.daysAgo}d ago`}
+                  </span>
+                </div>
+                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {sig.signal}
+                </div>
+              </div>
+            </div>
+          </Link>
+        ))}
       </div>
     )
   }
@@ -543,7 +703,7 @@ function IntentMatchingSection() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       {recentDeals.map(deal => {
         const stageFmt = (deal.stage ?? '').replace(/_/g, ' ')
-        const signal = (deal as any).intentSignal ?? `Recent activity · ${stageFmt}`
+        const signal = (deal as { intentSignal?: string }).intentSignal ?? `Recent activity · ${stageFmt}`
 
         return (
           <Link key={deal.id} href={`/deals/${deal.id}`} style={{ textDecoration: 'none' }}>
@@ -566,7 +726,7 @@ function IntentMatchingSection() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {(deal as any).prospectCompany ?? deal.company ?? 'Untitled'}
+                    {(deal as { prospectCompany?: string }).prospectCompany ?? deal.company ?? 'Untitled'}
                   </span>
                   <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>
                     {timeAgo(deal.lastAt!)}
@@ -698,6 +858,51 @@ function SectionHeader({ icon, label, count }: { icon: React.ReactNode; label: s
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+function LoopStatsRow() {
+  const { data: brainData } = useSWR<BrainData>('/api/brain', fetcher, { revalidateOnFocus: false })
+  const ls = brainData?.data?.loopSummary
+  if (!ls || ls.activeLoops === 0) return null
+
+  const stats = [
+    { label: 'Active loops', value: ls.activeLoops, color: '#a78bfa' },
+    { label: 'Waiting for PM', value: ls.waitingForPM, color: '#f59e0b' },
+    { label: 'In cycle', value: ls.inCycle, color: '#7c3aed' },
+    { label: 'Shipped', value: ls.shipped, color: '#22c55e' },
+  ]
+
+  return (
+    <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+      {stats.filter(s => s.value > 0).map(s => (
+        <div key={s.label} style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          padding: '6px 14px',
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: '100px',
+        }}>
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 500 }}>
+            {s.value} {s.label}
+          </span>
+        </div>
+      ))}
+      {ls.revenueAtRisk > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '8px',
+          padding: '6px 14px',
+          background: 'rgba(245,158,11,0.08)',
+          border: '1px solid rgba(245,158,11,0.2)',
+          borderRadius: '100px',
+        }}>
+          <span style={{ fontSize: '12px', color: '#f59e0b', fontWeight: 600 }}>
+            {formatCurrency(ls.revenueAtRisk)} revenue in loops
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function TodayPage() {
   const { data: loopData } = useSWR<LoopSignalResponse>(
     '/api/dashboard/loop-signals',
@@ -722,7 +927,7 @@ export default function TodayPage() {
       `}</style>
 
       {/* Header */}
-      <div style={{ marginBottom: '32px' }}>
+      <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'rgba(255,255,255,0.95)', margin: 0, marginBottom: '4px' }}>
           Good {timeOfDay}
         </h1>
@@ -732,6 +937,12 @@ export default function TodayPage() {
             : 'No loops in flight yet. Start one today.'}
         </p>
       </div>
+
+      {/* Daily Briefing — full width above columns */}
+      <DailyBriefingCard />
+
+      {/* Loop stats strip */}
+      <LoopStatsRow />
 
       {/* Two-column layout: 60% left / 40% right */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>

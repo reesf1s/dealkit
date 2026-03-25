@@ -249,6 +249,8 @@ export const dealLogs = pgTable('deal_logs', {
   // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS scheduled_events jsonb NOT NULL DEFAULT '[]'::jsonb;
   noteSource: text('note_source').default('manual'),               // 'manual' | 'email' | 'hubspot' — where the last note came from
   // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS note_source text DEFAULT 'manual';
+  assignedRepId: text('assigned_rep_id'),  // Clerk userId of the assigned sales rep
+  // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS assigned_rep_id text;
   noteEmbedding: text('note_embedding'),   // stored as text, cast to vector in SQL
   dealEmbedding: text('deal_embedding'),   // stored as text, cast to vector in SQL
   // Migration v25: actual column type is vector(1536) — Drizzle uses text since it lacks native vector support
