@@ -523,7 +523,7 @@ export default function WorkflowsPage() {
             <Zap size={18} color="#818cf8" />
           </div>
           <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.02em', margin: 0 }}>
-            Workflows
+            Loops
           </h1>
           <span style={{
             fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em',
@@ -655,7 +655,7 @@ export default function WorkflowsPage() {
       {/* Pre-built templates */}
       <div>
         <div style={{ fontSize: '11px', fontWeight: 700, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '12px' }}>
-          Workflows
+          Loops
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {workflowList.map(w => (

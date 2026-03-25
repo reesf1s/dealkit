@@ -19,7 +19,7 @@ const PAGE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   '/collateral':   { label: 'Collateral',        Icon: FileText },
   '/product-gaps': { label: 'Product Gaps',      Icon: AlertTriangle },
   '/company':      { label: 'Integrations',      Icon: Plug },
-  '/workflows':    { label: 'Workflows',         Icon: Sparkles },
+  '/workflows':    { label: 'Loops',              Icon: Sparkles },
   '/intelligence': { label: 'Intelligence',      Icon: Brain  },
   '/competitors':  { label: 'Competitors',       Icon: Swords },
   '/case-studies': { label: 'Case Studies',      Icon: BookOpen },

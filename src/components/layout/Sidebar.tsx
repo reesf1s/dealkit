@@ -21,7 +21,7 @@ const NAV_ITEMS = [
   { href: '/dashboard',    icon: LayoutDashboard, label: 'Today',        matchPaths: ['/dashboard'] },
   { href: '/deals',        icon: GitBranch,       label: 'Deals',        matchPaths: ['/deals', '/pipeline'] },
   { href: '/intelligence', icon: Brain,           label: 'Intelligence', matchPaths: ['/intelligence', '/competitors', '/case-studies', '/product-gaps', '/models', '/collateral', '/playbook'] },
-  { href: '/workflows',    icon: Zap,             label: 'Workflows',    matchPaths: ['/workflows'] },
+  { href: '/workflows',    icon: Zap,             label: 'Loops',        matchPaths: ['/workflows'] },
   { href: '/connections',  icon: Plug,            label: 'Integrations', matchPaths: ['/connections'] },
   { href: '/settings',     icon: Settings,        label: 'Settings',     matchPaths: ['/settings', '/company', '/onboarding'] },
 ]
