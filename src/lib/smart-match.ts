@@ -58,6 +58,7 @@ interface ProductGap {
   description?: string
   quote?: string
   severity?: string
+  source?: 'signals' | 'criteria' | 'product_gaps_table' | 'haiku'
 }
 
 interface MatchResult {
@@ -392,7 +393,7 @@ export async function smartMatchDeal(
       const signals = typeof signalsRow.note_signals_json === 'string'
         ? JSON.parse(signalsRow.note_signals_json)
         : signalsRow.note_signals_json
-      const gaps = (signals?.product_gaps ?? []).filter((g: ProductGap) => g.gap?.trim())
+      const gaps = (signals?.product_gaps ?? []).filter((g: ProductGap) => g.gap?.trim()).map((g: ProductGap) => ({ ...g, source: 'signals' as const }))
       productGaps.push(...gaps)
     }
   } catch { /* non-fatal */ }
@@ -416,7 +417,7 @@ export async function smartMatchDeal(
       for (const line of lines.slice(0, 3)) { // max 3 from success criteria
         const isDupe = productGaps.some(g => g.gap.toLowerCase().includes(line.toLowerCase().slice(0, 30)))
         if (!isDupe) {
-          productGaps.push({ gap: line.slice(0, 100), severity: 'medium' })
+          productGaps.push({ gap: line.slice(0, 100), severity: 'medium', source: 'criteria' })
         }
       }
     }
@@ -442,7 +443,7 @@ export async function smartMatchDeal(
 
       const isDupe = productGaps.some(g => g.gap.toLowerCase().slice(0, 30) === pg.title!.toLowerCase().slice(0, 30))
       if (!isDupe) {
-        productGaps.push({ gap: pg.title, description: pg.description ?? '', severity: 'high' })
+        productGaps.push({ gap: pg.title, description: pg.description ?? '', severity: 'high', source: 'product_gaps_table' })
         added++
       }
     }
@@ -699,9 +700,12 @@ ${allText.slice(0, 4000)}`,
       }
     }
 
-    // Tier 1 (≥60) or Tier 2 (≥25, no conflict): LINK to existing issue
+    // For curated productGaps table entries: require ≥60 to link (otherwise create)
+    // For other sources: ≥25 is enough
+    const linkThreshold = gap.source === 'product_gaps_table' ? 60 : 25
+
     let didLink = false
-    if (bestMatch && bestScore >= 25 && !conflictDetected) {
+    if (bestMatch && bestScore >= linkThreshold && !conflictDetected) {
       const [existing] = await db
         .select({ id: dealLinearLinks.id })
         .from(dealLinearLinks)
