@@ -41,15 +41,13 @@ function cosineSimilarity(a: number[], b: number[]): number {
  * Linear states: Triage, Backlog, Todo, In Progress, In Review, In QA, RFQA, Done, Cancelled
  * Our states: identified, in_cycle, shipped
  */
-function linearStatusToLoopStatus(linearStatus: string | null, cycleId: string | null = null): string {
-  if (!linearStatus) return cycleId ? 'in_cycle' : 'identified'
+function linearStatusToLoopStatus(linearStatus: string | null): string {
+  if (!linearStatus) return 'identified'
   const s = linearStatus.toLowerCase()
   if (s === 'done' || s === 'completed' || s === 'cancelled' || s === 'canceled') return 'shipped'
-  if (s === 'in progress') return 'in_progress'
+  if (s === 'in progress' || s === 'in qa' || s === 'rfqa' || s === 'started') return 'in_progress'
   if (s === 'in review') return 'in_review'
-  if (s === 'in qa' || s === 'rfqa' || s === 'started') return 'in_progress' // actively being worked on
-  // In a cycle with Todo/Backlog/Triage → "in cycle" (planned for sprint)
-  if (cycleId) return 'in_cycle'
+  // Todo, Backlog, Triage = identified (not yet being worked on)
   return 'identified'
 }
 
@@ -545,7 +543,6 @@ ${allText.slice(0, 4000)}`,
       linearIssueUrl: linearIssuesCache.linearIssueUrl,
       status: linearIssuesCache.status,
       priority: linearIssuesCache.priority,
-      cycleId: linearIssuesCache.cycleId,
     })
     .from(linearIssuesCache)
     .where(eq(linearIssuesCache.workspaceId, workspaceId))
@@ -711,7 +708,7 @@ ${allText.slice(0, 4000)}`,
         .limit(1)
 
       if (!existing) {
-        const loopStatus = linearStatusToLoopStatus(bestMatch.status, bestMatch.cycleId ?? null)
+        const loopStatus = linearStatusToLoopStatus(bestMatch.status)
         await db.insert(dealLinearLinks).values({
           workspaceId,
           dealId,
@@ -830,7 +827,6 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
         WHEN lic.status = 'In Progress' THEN 'in_progress'
         WHEN lic.status = 'In Review' THEN 'in_review'
         WHEN lic.status IN ('In QA', 'RFQA', 'Started') THEN 'in_progress'
-        WHEN lic.cycle_id IS NOT NULL THEN 'in_cycle'
         ELSE dll.status
       END,
       updated_at = NOW()
@@ -864,7 +860,6 @@ export async function syncLoopStatuses(workspaceId: string): Promise<void> {
         WHEN lic.status = 'In Progress' THEN 'in_progress'
         WHEN lic.status = 'In Review' THEN 'in_review'
         WHEN lic.status IN ('In QA', 'RFQA', 'Started') THEN 'in_progress'
-        WHEN lic.cycle_id IS NOT NULL THEN 'in_cycle'
         ELSE dll.status
       END,
       updated_at = NOW()
