@@ -662,7 +662,9 @@ ${allText.slice(0, 4000)}`,
           : nlpScore
 
         topScores.push({ id: issue.linearIssueId, title: issue.title.slice(0, 40), score: combined, vecScore, nlpScore })
-        if (combined > bestScore && combined >= 40) {
+        // Threshold: 25 for NLP-only, 40 for hybrid (vectors are more reliable)
+        const threshold = (gapEmbedding && issue.embedding) ? 40 : 25
+        if (combined > bestScore && combined >= threshold) {
           bestScore = combined
           bestMatch = issue
           matchMethod = gapEmbedding ? 'hybrid' : 'nlp'
@@ -697,9 +699,9 @@ ${allText.slice(0, 4000)}`,
       }
     }
 
-    // Tier 1 (≥60) or Tier 2 (≥40, no conflict): LINK to existing issue
+    // Tier 1 (≥60) or Tier 2 (≥25, no conflict): LINK to existing issue
     let didLink = false
-    if (bestMatch && bestScore >= 40 && !conflictDetected) {
+    if (bestMatch && bestScore >= 25 && !conflictDetected) {
       const [existing] = await db
         .select({ id: dealLinearLinks.id })
         .from(dealLinearLinks)
@@ -777,8 +779,8 @@ ${allText.slice(0, 4000)}`,
       } else {
         console.log(`[smart-match] ${deal.prospectCompany}: no match for "${gapText.slice(0, 50)}" — skipped (not a clear feature)`)
       }
-    } else {
-      console.log(`[smart-match] ${deal.prospectCompany}: no match for "${gapText.slice(0, 50)}" — no Linear API key`)
+    } else if (!didLink) {
+      console.log(`[smart-match] ${deal.prospectCompany}: gap "${gapText.slice(0, 50)}" — no match (best=${Math.round(bestScore)}) and ${linearApiKey ? 'creation guard blocked' : 'no Linear API key'}`)
     }
   }
 
