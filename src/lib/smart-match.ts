@@ -40,6 +40,7 @@ function linearStatusToLoopStatus(linearStatus: string | null): string {
 
 interface ProductGap {
   gap: string
+  description?: string
   quote?: string
   severity?: string
 }
@@ -401,22 +402,75 @@ export async function smartMatchDeal(
     }
   } catch { /* non-fatal */ }
 
-  // If no extracted gaps, try to find product-related keywords in notes
+  // If no extracted gaps, use Haiku to extract them from raw meeting notes
+  // This costs ~$0.001 per deal and only runs once (result is stored)
   if (productGaps.length === 0) {
-    const allText = [deal.notes, deal.meetingNotes, deal.description].filter(Boolean).join(' ')
-    // Look for product-signal keywords
-    const productKeywords = ['integration', 'feature', 'api', 'dashboard', 'reporting', 'analytics',
-      'automation', 'workflow', 'sync', 'import', 'export', 'sso', 'security', 'compliance',
-      'booking', 'occupancy', 'sensor', 'space', 'allocation', 'scheduling', 'calendar']
-    const found = productKeywords.filter(kw => allText.toLowerCase().includes(kw))
-    if (found.length > 0) {
-      // Create synthetic gaps from keyword context
-      for (const kw of found.slice(0, 3)) {
-        // Find the sentence containing this keyword
-        const sentences = allText.split(/[.!?\n]+/).filter(s => s.toLowerCase().includes(kw))
-        if (sentences.length > 0) {
-          productGaps.push({ gap: sentences[0].trim().slice(0, 150), severity: 'medium' })
+    const allText = [deal.meetingNotes, deal.notes, deal.description].filter(Boolean).join('\n\n')
+    if (allText.length > 50) {
+      console.log(`[smart-match] ${deal.prospectCompany}: no pre-extracted gaps — running Haiku extraction on ${allText.length} chars of notes`)
+      try {
+        const Anthropic = (await import('@anthropic-ai/sdk')).default
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+        const msg = await anthropic.messages.create({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 400,
+          messages: [{
+            role: 'user',
+            content: `Extract product feature requests from these meeting notes that BLOCK the deal.
+
+RULES:
+- Each feature title MUST be a concise product feature (3-8 words), like a Linear issue title
+- Good: "Team co-location analytics", "SSO integration", "Real-time sensor dashboard"
+- Bad: "They want better reporting", "Need the ability to see teams"
+- ONLY features that BLOCK the deal — not nice-to-haves, not pricing, not procurement
+- If no blocking product features exist, return empty features array
+- Max 5 features
+
+Return ONLY valid JSON:
+{"features":[{"title":"string","description":"string","priority":"blocker"|"nice-to-have"}]}
+
+Notes (truncated):
+${allText.slice(0, 4000)}`,
+          }],
+        })
+        const raw = (msg.content[0] as { type: string; text: string }).text.trim()
+        const cleaned = raw.replace(/^```json?\n?/i, '').replace(/\n?```$/i, '').trim()
+        const parsed = JSON.parse(cleaned)
+        const features = Array.isArray(parsed.features) ? parsed.features : []
+
+        for (const f of features.slice(0, 5)) {
+          const title = String(f.title ?? '').trim()
+          if (title.length >= 10 && title.length <= 120) {
+            productGaps.push({
+              gap: title,
+              description: String(f.description ?? ''),
+              severity: f.priority === 'blocker' ? 'high' : 'medium',
+            })
+          }
         }
+
+        // Store the extracted gaps so we don't need to re-extract
+        if (productGaps.length > 0) {
+          try {
+            const existingSignals: Record<string, unknown> = {}
+            const [row] = await db.execute<{ note_signals_json: string | null }>(
+              sql`SELECT note_signals_json FROM deal_logs WHERE id = ${dealId}::uuid LIMIT 1`
+            )
+            if (row?.note_signals_json) {
+              try {
+                Object.assign(existingSignals, typeof row.note_signals_json === 'string'
+                  ? JSON.parse(row.note_signals_json) : row.note_signals_json)
+              } catch { /* start fresh */ }
+            }
+            existingSignals.product_gaps = productGaps.map(g => ({ gap: g.gap, description: g.description, severity: g.severity }))
+            await db.execute(
+              sql`UPDATE deal_logs SET note_signals_json = ${JSON.stringify(existingSignals)}::text WHERE id = ${dealId}::uuid`
+            )
+            console.log(`[smart-match] ${deal.prospectCompany}: stored ${productGaps.length} Haiku-extracted gaps`)
+          } catch { /* non-fatal */ }
+        }
+      } catch (e) {
+        console.warn(`[smart-match] Haiku extraction failed for ${deal.prospectCompany}:`, e)
       }
     }
   }
