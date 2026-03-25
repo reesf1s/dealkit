@@ -47,8 +47,8 @@ function linearStatusToLoopStatus(linearStatus: string | null, cycleId: string |
   if (s === 'done' || s === 'completed' || s === 'cancelled' || s === 'canceled') return 'shipped'
   if (s === 'in progress') return 'in_progress'
   if (s === 'in review') return 'in_review'
-  if (['in qa', 'rfqa', 'started'].includes(s)) return 'in_cycle'
-  // In a cycle but not yet started (Todo/Backlog/Triage) = "in cycle"
+  if (s === 'in qa' || s === 'rfqa' || s === 'started') return 'in_progress' // actively being worked on
+  // In a cycle with Todo/Backlog/Triage → "in cycle" (planned for sprint)
   if (cycleId) return 'in_cycle'
   return 'identified'
 }
@@ -657,7 +657,7 @@ ${allText.slice(0, 4000)}`,
           : nlpScore
 
         topScores.push({ id: issue.linearIssueId, title: issue.title.slice(0, 40), score: combined, vecScore, nlpScore })
-        if (combined > bestScore && combined >= 20) {
+        if (combined > bestScore && combined >= 40) {
           bestScore = combined
           bestMatch = issue
           matchMethod = gapEmbedding ? 'hybrid' : 'nlp'
@@ -670,7 +670,27 @@ ${allText.slice(0, 4000)}`,
       console.log(`[smart-match] ${deal.prospectCompany} gap "${gapText.slice(0, 50)}" → best=${Math.round(bestScore)} [${matchMethod}], top3=[${top3}]`)
     }
 
-    if (bestMatch && bestScore >= 20) {
+    // Product name conflict detection — if gap and issue mention different vendors, reject
+    if (bestMatch && bestScore < 60) {
+      const gapWords = gapText.toLowerCase().split(/\s+/)
+      const issueWords = bestMatch.title.toLowerCase().split(/\s+/)
+      for (const keyword of ['integration', 'connector', 'sync', 'plugin', 'api']) {
+        const gapIdx = gapWords.indexOf(keyword)
+        const issueIdx = issueWords.indexOf(keyword)
+        if (gapIdx > 0 && issueIdx > 0) {
+          const gapProduct = gapWords[gapIdx - 1]
+          const issueProduct = issueWords[issueIdx - 1]
+          if (gapProduct !== issueProduct && gapProduct.length > 3 && issueProduct.length > 3) {
+            console.log(`[smart-match] Product conflict: "${gapProduct} ${keyword}" vs "${issueProduct} ${keyword}" — rejecting (score ${Math.round(bestScore)})`)
+            bestMatch = null
+            bestScore = 0
+            break
+          }
+        }
+      }
+    }
+
+    if (bestMatch && bestScore >= 40) {
       // Link it — check for existing first
       const [existing] = await db
         .select({ id: dealLinearLinks.id })
@@ -792,7 +812,7 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
         WHEN lic.status IN ('Done', 'Completed') THEN 'shipped'
         WHEN lic.status = 'In Progress' THEN 'in_progress'
         WHEN lic.status = 'In Review' THEN 'in_review'
-        WHEN lic.status IN ('In QA', 'RFQA') THEN 'in_cycle'
+        WHEN lic.status IN ('In QA', 'RFQA', 'Started') THEN 'in_progress'
         WHEN lic.cycle_id IS NOT NULL THEN 'in_cycle'
         ELSE dll.status
       END,
