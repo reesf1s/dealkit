@@ -68,7 +68,7 @@ export async function GET() {
       .where(
         and(
           eq(dealLinearLinks.workspaceId, workspaceId),
-          inArray(dealLinearLinks.status, ['confirmed', 'in_cycle', 'deployed', 'shipped']),
+          inArray(dealLinearLinks.status, ['confirmed', 'in_cycle', 'in_progress', 'in_review', 'deployed', 'shipped']),
         ),
       )
 

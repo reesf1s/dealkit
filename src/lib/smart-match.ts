@@ -740,8 +740,9 @@ ${allText.slice(0, 4000)}`,
           : nlpScore
 
         topScores.push({ id: issue.linearIssueId, title: issue.title.slice(0, 40), score: combined, vecScore, nlpScore })
-        // Threshold: 40 for both NLP-only and hybrid — a score of 25 NLP-only is too weak
-        const threshold = 40
+        // Threshold: 25 for NLP-only (workspace-specific gaps rarely get 40+ without vectors),
+        // 40 for hybrid (vectors are more reliable so we can demand higher confidence)
+        const threshold = (gapEmbedding && issue.embedding) ? 40 : 25
         if (combined > bestScore && combined >= threshold) {
           bestScore = combined
           bestMatch = issue
@@ -778,8 +779,9 @@ ${allText.slice(0, 4000)}`,
     }
 
     // For curated productGaps table entries: require ≥60 to link (otherwise create)
-    // For signals/criteria/haiku sources: require ≥40 (NLP-only too weak below this)
-    const linkThreshold = gap.source === 'product_gaps_table' ? 60 : 40
+    // For signals/criteria/haiku sources: ≥25 is enough — NLP-only can reliably detect
+    // keyword overlap at 25+, and false positives are better than zero links
+    const linkThreshold = gap.source === 'product_gaps_table' ? 60 : 25
 
     let didLink = false
     if (bestMatch && bestScore >= linkThreshold && !conflictDetected) {
