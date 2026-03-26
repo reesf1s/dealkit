@@ -467,6 +467,7 @@ export async function smartMatchDeal(
       productGaps.push(...gaps)
     }
   } catch { /* non-fatal */ }
+  console.log(`[smart-match DEBUG] ${deal.prospectCompany}: Source A (note_signals_json): ${productGaps.filter(g => g.source === 'signals').length} gaps`)
 
   // Source B: success_criteria — only use SHORT lines that look like feature titles
   try {
@@ -492,6 +493,7 @@ export async function smartMatchDeal(
       }
     }
   } catch { /* non-fatal */ }
+  console.log(`[smart-match DEBUG] ${deal.prospectCompany}: Source B (success_criteria): ${productGaps.filter(g => g.source === 'criteria').length} gaps`)
 
   // Source D: ALL open product gaps for this workspace (curated from analyze-notes)
   // Load workspace-wide, then filter to gaps relevant to this deal
@@ -517,9 +519,7 @@ export async function smartMatchDeal(
         added++
       }
     }
-    if (added > 0) {
-      console.log(`[smart-match] ${deal.prospectCompany}: added ${added} gaps from productGaps table (${pgRows.length} total in workspace)`)
-    }
+    console.log(`[smart-match DEBUG] ${deal.prospectCompany}: Source D (product_gaps_table): ${added} gaps added (${pgRows.length} total workspace gaps, ${pgRows.length - added} skipped as dupe or not for this deal)`)
   } catch { /* non-fatal */ }
 
   // If no extracted gaps, use Haiku to extract them from raw meeting notes
@@ -599,10 +599,16 @@ ${allText.slice(0, 4000)}`,
       } // end ANTHROPIC_API_KEY check
     }
   }
+  console.log(`[smart-match DEBUG] ${deal.prospectCompany}: Source C (haiku): ${productGaps.filter(g => g.source === 'haiku').length} gaps`)
+  console.log(`[smart-match DEBUG] ${deal.prospectCompany}: Total gaps after dedup (A+B+C+D): ${productGaps.length}`)
 
   // Filter out on_roadmap gaps — already planned, no need to create Linear issues
-  const onRoadmapCount = productGaps.filter(g => g.context === 'on_roadmap').length
+  const onRoadmapGaps = productGaps.filter(g => g.context === 'on_roadmap')
+  const onRoadmapCount = onRoadmapGaps.length
   if (onRoadmapCount > 0) {
+    for (const og of onRoadmapGaps) {
+      console.log(`[smart-match DEBUG] ${deal.prospectCompany}: FILTERED on_roadmap: "${og.gap.slice(0, 80)}"`)
+    }
     console.log(`[smart-match] ${deal.prospectCompany}: skipping ${onRoadmapCount} on_roadmap gap(s)`)
     productGaps = productGaps.filter(g => g.context !== 'on_roadmap')
   }
@@ -816,6 +822,9 @@ ${allText.slice(0, 4000)}`,
     }
 
     // Tier 3: No confident match → CREATE new Linear issue
+    if (!didLink) {
+      console.log(`[smart-match DEBUG] ${deal.prospectCompany}: creation gate for "${gapText.slice(0, 60)}" — linearApiKey=${!!linearApiKey}, integration=${!!integration}, isRealFeature=${checkIsRealFeature(gapText)}`)
+    }
     if (!didLink && linearApiKey && integration) {
       if (checkIsRealFeature(gapText)) {
         try {
@@ -871,6 +880,13 @@ ${allText.slice(0, 4000)}`,
         console.warn(`[smart-match] Failed to create issue for "${gapText}":`, e)
       }
       } else {
+        const _len = gapText.length
+        const _tooShort = _len < 10
+        const _tooLong = _len > 150
+        const _badPrefix = /^(page \d|what success|the poc|gospace lead|drew proposed|\[?\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))/i.test(gapText)
+        const _hasDots = gapText.includes('...')
+        const _needPrefix = /^(need the ability|need to|we need|they need|please let me)/i.test(gapText)
+        console.log(`[smart-match DEBUG] ${deal.prospectCompany}: isRealFeature FAILED "${gapText.slice(0, 60)}" — len=${_len}(tooShort=${_tooShort},tooLong=${_tooLong}), badPrefix=${_badPrefix}, hasDots=${_hasDots}, needPrefix=${_needPrefix}`)
         console.log(`[smart-match] ${deal.prospectCompany}: no match for "${gapText.slice(0, 50)}" — skipped (not a clear feature)`)
       }
     } else if (!didLink) {
@@ -917,7 +933,8 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
   )
   const extractionIds = new Set(needsExtraction.map(d => d.id))
 
-  console.log(`[smart-match] ${openDealsRaw.length} open deals — ${needsExtraction.length} need extraction, ${openDealsRaw.length - needsExtraction.length} have existing gaps`)
+  const phase2Count = openDealsRaw.length - needsExtraction.length
+  console.log(`[smart-match] ${openDealsRaw.length} open deals found — ${needsExtraction.length} need Haiku extraction (phase 1), ${phase2Count} have existing gaps (phase 2)`)
 
   let totalLinked = 0
   let totalCreated = 0
@@ -941,6 +958,7 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
   }
 
   // Phase 2: Match-only for deals that already have gaps (skipHaiku: fast path)
+  console.log(`[smart-match] Phase 2: processing ${phase2Count} deals with existing gaps`)
   for (const deal of openDealsRaw) {
     if (extractionIds.has(deal.id)) continue // already processed in phase 1
     try {
