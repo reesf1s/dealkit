@@ -68,14 +68,15 @@ const CONTEXT_PRIORITY: Record<string, number> = {
   deal_blocker: 1,         // Urgent
   competitor_advantage: 2, // High
   nice_to_have: 3,         // Medium
+  on_roadmap: 4,           // Low — "on roadmap" per sales rep ≠ actually tracked in Linear
   mentioned: 4,            // Low
-  // on_roadmap → gaps are skipped before reaching creation
 }
 
 interface MatchResult {
   linked: number
   created: number
   dealName: string
+  linearErrors?: string[]
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -602,17 +603,6 @@ ${allText.slice(0, 4000)}`,
   console.log(`[smart-match DEBUG] ${deal.prospectCompany}: Source C (haiku): ${productGaps.filter(g => g.source === 'haiku').length} gaps`)
   console.log(`[smart-match DEBUG] ${deal.prospectCompany}: Total gaps after dedup (A+B+C+D): ${productGaps.length}`)
 
-  // Filter out on_roadmap gaps — already planned, no need to create Linear issues
-  const onRoadmapGaps = productGaps.filter(g => g.context === 'on_roadmap')
-  const onRoadmapCount = onRoadmapGaps.length
-  if (onRoadmapCount > 0) {
-    for (const og of onRoadmapGaps) {
-      console.log(`[smart-match DEBUG] ${deal.prospectCompany}: FILTERED on_roadmap: "${og.gap.slice(0, 80)}"`)
-    }
-    console.log(`[smart-match] ${deal.prospectCompany}: skipping ${onRoadmapCount} on_roadmap gap(s)`)
-    productGaps = productGaps.filter(g => g.context !== 'on_roadmap')
-  }
-
   if (productGaps.length === 0) {
     console.log(`[smart-match] ${deal.prospectCompany}: no product gaps found — skipping`)
     return { linked: 0, created: 0, dealName: deal.dealName }
@@ -695,6 +685,7 @@ ${allText.slice(0, 4000)}`,
   // 6. Match each gap to Linear issues using vector + keyword hybrid
   let linked = 0
   let created = 0
+  const linearErrors: string[] = []
 
   for (const gap of productGaps.slice(0, MAX_LINKS_PER_DEAL)) {
     const gapText = gap.gap
@@ -877,7 +868,9 @@ ${allText.slice(0, 4000)}`,
         created++
         console.log(`[smart-match] ${deal.prospectCompany}: created ${newIssue.identifier} — "${gapText}"`)
       } catch (e) {
-        console.warn(`[smart-match] Failed to create issue for "${gapText}":`, e)
+        const errMsg = e instanceof Error ? e.message : String(e)
+        console.error(`[smart-match] LINEAR API ERROR: ${errMsg}`)
+        linearErrors.push(errMsg)
       }
       } else {
         const _len = gapText.length
@@ -894,7 +887,7 @@ ${allText.slice(0, 4000)}`,
     }
   }
 
-  return { linked, created, dealName: deal.dealName }
+  return { linked, created, dealName: deal.dealName, linearErrors: linearErrors.length > 0 ? linearErrors : undefined }
 }
 
 // ─── Batch match all open deals ──────────────────────────────────────────────
@@ -903,9 +896,32 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
   totalLinked: number
   totalCreated: number
   results: MatchResult[]
+  linearErrors?: string[]
 }> {
   // NON-DESTRUCTIVE: match all deals first, THEN clean up orphaned auto-links.
   // This prevents data loss if the function times out halfway.
+
+  // Early check: verify Linear API key is valid before processing all deals
+  const [integrationCheck] = await db
+    .select({ apiKeyEnc: linearIntegrations.apiKeyEnc })
+    .from(linearIntegrations)
+    .where(eq(linearIntegrations.workspaceId, workspaceId))
+    .limit(1)
+  if (integrationCheck) {
+    let keyOk = false
+    try {
+      const key = decrypt(integrationCheck.apiKeyEnc, getEncryptionKey())
+      keyOk = !!key
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error(`[smart-match] LINEAR API KEY DECRYPT FAILED: ${msg}`)
+      return { totalLinked: 0, totalCreated: 0, results: [], linearErrors: [`Linear API key decryption failed: ${msg}`] }
+    }
+    if (!keyOk) {
+      console.error(`[smart-match] LINEAR API KEY IS NULL after decryption`)
+      return { totalLinked: 0, totalCreated: 0, results: [], linearErrors: ['Linear API key is null after decryption'] }
+    }
+  }
 
   // Load deals with meetingNotes + note_signals_json so we know which need extraction
   const openDealsRaw = await db.execute<{
@@ -939,6 +955,7 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
   let totalLinked = 0
   let totalCreated = 0
   const results: MatchResult[] = []
+  const allLinearErrors: string[] = []
 
   // Phase 1: Extract + match for deals without gaps (parallel batches of 5)
   for (let i = 0; i < needsExtraction.length; i += 5) {
@@ -951,6 +968,7 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
         totalLinked += r.value.linked
         totalCreated += r.value.created
         results.push(r.value)
+        if (r.value.linearErrors) allLinearErrors.push(...r.value.linearErrors)
       } else {
         console.warn('[smart-match] Batch extraction deal failed:', r.reason instanceof Error ? r.reason.message : r.reason)
       }
@@ -966,6 +984,7 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
       totalLinked += result.linked
       totalCreated += result.created
       results.push(result)
+      if (result.linearErrors) allLinearErrors.push(...result.linearErrors)
     } catch (e) {
       console.warn(`[smart-match] Deal ${deal.id} failed:`, e instanceof Error ? e.message : e)
     }
@@ -994,8 +1013,11 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
     console.warn('[smart-match] Status sync failed:', e)
   }
 
+  if (allLinearErrors.length > 0) {
+    console.error(`[smart-match] LINEAR API ERRORS (${allLinearErrors.length}): ${allLinearErrors.join(' | ')}`)
+  }
   console.log(`[smart-match] Complete: ${totalLinked} linked, ${totalCreated} created across ${openDealsRaw.length} deals`)
-  return { totalLinked, totalCreated, results }
+  return { totalLinked, totalCreated, results, linearErrors: allLinearErrors.length > 0 ? allLinearErrors : undefined }
 }
 
 // ─── Lightweight status sync (safe for background/webhook/cron) ─────────────

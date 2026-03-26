@@ -31,6 +31,7 @@ export async function POST() {
         details: result.results
           .filter(r => r.linked > 0 || r.created > 0)
           .map(r => `${r.dealName}: ${r.linked} linked, ${r.created} created`),
+        ...(result.linearErrors && result.linearErrors.length > 0 && { linearErrors: result.linearErrors }),
       },
     })
   } catch (e: unknown) {
