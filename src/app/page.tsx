@@ -413,7 +413,7 @@ export default async function LandingPage() {
             Start using shared revenue context today
           </h2>
           <p style={{ fontSize: '15px', color: 'rgba(241,245,249,0.50)', marginBottom: '28px' }}>
-            Connect Slack, Linear, and Claude MCP to see the full Halvex workflow in action.
+            Connect Slack, your CRM, and Claude MCP to see the full Halvex workflow in action.
           </p>
           <Link href="/sign-up"
             className="cta-primary"

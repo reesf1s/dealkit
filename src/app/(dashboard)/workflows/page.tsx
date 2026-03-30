@@ -403,7 +403,7 @@ function LinkedIssueTable({
                     No {activeFilter === 'all' ? '' : FILTER_TABS.find(t => t.id === activeFilter)?.label + ' '}linked issues yet
                   </p>
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>
-                    Claude-saved Linear issue links will appear here once product context has been reviewed.
+                    Claude-saved issue links will appear here once product context has been reviewed.
                   </p>
                 </td>
               </tr>
@@ -475,7 +475,7 @@ function LinkedIssueTable({
                             {loop.linearTitle}
                           </span>
                         )}
-                        {/* Cycle + Linear status badges */}
+                        {/* Cycle + external status badges */}
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '3px' }}>
                           {loop.isInCurrentCycle && loop.cycleName && (
                             <span style={{
@@ -519,7 +519,7 @@ function LinkedIssueTable({
                             onClick={e => e.stopPropagation()}
                             style={{ fontSize: '9px', color: 'rgba(255,255,255,0.3)', textDecoration: 'none' }}
                           >
-                            Open in Linear ↗
+                            Open issue ↗
                           </a>
                         )}
                       </div>
@@ -639,7 +639,7 @@ function LinkedIssueTable({
                               fontWeight: 600,
                             }}
                           >
-                            Linear <ExternalLink size={10} />
+                            Issue <ExternalLink size={10} />
                           </a>
                         )}
                         {loop.loopStatus === 'shipped' && (

@@ -492,7 +492,7 @@ function ActiveLoopsTable({ currency }: { currency: string }) {
         <thead>
           <tr>
             <th style={thStyle}>Deal</th>
-            <th style={thStyle}>Linear issue</th>
+            <th style={thStyle}>Linked issue</th>
             <th style={thStyle}>Status</th>
             <th style={{ ...thStyle, textAlign: 'right' }}>Revenue</th>
             <th style={{ ...thStyle, textAlign: 'right' }}>Days</th>
@@ -835,7 +835,7 @@ function DealsAtRiskCard({ currency }: { currency: string }) {
   )
 }
 
-// ─── Card 4: Top 3 Linear Issues to Unlock Revenue ─────────────────────────
+// ─── Card 4: Top linked issues to unlock revenue ───────────────────────────
 
 function IssuesUnlockRevenueCard({ currency }: { currency: string }) {
   const { data: loopsRes } = useSWR<{ data: LoopEntry[] }>(

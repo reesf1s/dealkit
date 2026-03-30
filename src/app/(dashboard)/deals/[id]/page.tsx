@@ -3975,7 +3975,7 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
   )
 }
 
-// ─── Linear Intelligence Column ──────────────────────────────────────────────
+// ─── Linked issue column ─────────────────────────────────────────────────────
 
 function LinearColumn({ dealId }: { dealId: string }) {
   const [preparingReview, setPreparingReview] = useState(false)
@@ -4385,7 +4385,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
         <AiActivitySection dealId={dealId} />
       </div>
 
-      {/* ── RIGHT: Linear Intelligence ──────────────────────────── */}
+      {/* ── RIGHT: Linked issues ──────────────────────────── */}
       <LinearColumn dealId={dealId} />
     </div>
   )
@@ -4395,7 +4395,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
 // ─── AI Activity Section ─────────────────────────────────────────────────────
 
 const ACTION_TYPE_LABELS: Record<string, string> = {
-  scope_issue: 'Scoped Linear issue',
+  scope_issue: 'Scoped product issue',
   draft_email: 'Drafted email',
   slack_notify: 'Sent Slack alert',
   link_created: 'Linked issue',

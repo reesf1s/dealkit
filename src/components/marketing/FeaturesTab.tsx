@@ -41,7 +41,7 @@ const TABS = [
       items: [
         { label: 'Acme Corp', value: '£32k · Negotiation · Score: 82', color: '#EF4444' },
         { label: 'Stripe', value: '£18k · Discovery · Score: 61', color: '#8B5CF6' },
-        { label: 'Linear', value: '£12k · Proposal · Score: 55', color: '#F59E0B' },
+        { label: 'Issue link', value: '£12k · Proposal · Score: 55', color: '#F59E0B' },
         { label: 'Vercel', value: '£9k · Qualification · Score: 40', color: '#3B82F6' },
       ],
     },

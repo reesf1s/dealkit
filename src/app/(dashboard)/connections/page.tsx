@@ -8,6 +8,7 @@ import {
   ArrowUpRight,
   CheckCircle2,
   Copy,
+  Database,
   Eye,
   EyeOff,
   Loader2,
@@ -15,9 +16,11 @@ import {
   RefreshCw,
   Sparkles,
   Workflow,
-  Database,
 } from 'lucide-react'
 import { useToast } from '@/components/shared/Toast'
+
+const DAILY_PROMPT =
+  'Check my Halvex pipeline, review my product work, and save any relevant issue links back into the right deals.'
 
 async function fetcher(url: string) {
   const res = await fetch(url)
@@ -28,32 +31,44 @@ async function fetcher(url: string) {
   return json
 }
 
-const panel: React.CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(255,255,255,0.74) 0%, rgba(247,248,255,0.62) 100%)',
-  border: '1px solid rgba(255,255,255,0.7)',
+const card: React.CSSProperties = {
+  background: 'linear-gradient(180deg, rgba(11,10,28,0.92) 0%, rgba(9,8,24,0.86) 100%)',
+  border: '1px solid rgba(255,255,255,0.06)',
   borderRadius: '28px',
   padding: '26px',
-  backdropFilter: 'blur(24px)',
-  WebkitBackdropFilter: 'blur(24px)',
-  boxShadow: '0 18px 60px rgba(15,23,42,0.10), inset 0 1px 0 rgba(255,255,255,0.75)',
+  boxShadow: '0 24px 60px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.04)',
 }
 
-function StatusPill({ label, tone }: { label: string; tone: 'ready' | 'partial' | 'idle' }) {
+const mutedText = 'rgba(255,255,255,0.52)'
+const faintText = 'rgba(255,255,255,0.34)'
+
+function StatusPill({
+  label,
+  tone,
+}: {
+  label: string
+  tone: 'ready' | 'partial' | 'idle' | 'loading'
+}) {
   const styles = {
     ready: {
-      background: 'rgba(16,185,129,0.10)',
+      background: 'rgba(16,185,129,0.12)',
       border: '1px solid rgba(16,185,129,0.18)',
-      color: '#047857',
+      color: '#86efac',
     },
     partial: {
-      background: 'rgba(245,158,11,0.10)',
-      border: '1px solid rgba(245,158,11,0.20)',
-      color: '#b45309',
+      background: 'rgba(245,158,11,0.12)',
+      border: '1px solid rgba(245,158,11,0.18)',
+      color: '#fde68a',
     },
     idle: {
-      background: 'rgba(148,163,184,0.12)',
-      border: '1px solid rgba(148,163,184,0.18)',
-      color: '#475569',
+      background: 'rgba(255,255,255,0.06)',
+      border: '1px solid rgba(255,255,255,0.08)',
+      color: 'rgba(255,255,255,0.66)',
+    },
+    loading: {
+      background: 'rgba(59,130,246,0.12)',
+      border: '1px solid rgba(59,130,246,0.18)',
+      color: '#bfdbfe',
     },
   }[tone]
 
@@ -67,8 +82,8 @@ function StatusPill({ label, tone }: { label: string; tone: 'ready' | 'partial' 
         fontSize: '11px',
         fontWeight: 700,
         borderRadius: '999px',
-        padding: '5px 10px',
-        letterSpacing: '0.01em',
+        padding: '6px 10px',
+        letterSpacing: '0.02em',
       }}
     >
       <span
@@ -77,7 +92,7 @@ function StatusPill({ label, tone }: { label: string; tone: 'ready' | 'partial' 
           height: '6px',
           borderRadius: '999px',
           background: 'currentColor',
-          opacity: 0.8,
+          opacity: 0.9,
         }}
       />
       {label}
@@ -85,7 +100,7 @@ function StatusPill({ label, tone }: { label: string; tone: 'ready' | 'partial' 
   )
 }
 
-function SetupItem({
+function StepItem({
   step,
   title,
   body,
@@ -98,11 +113,12 @@ function SetupItem({
     <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
       <div
         style={{
-          width: '28px',
-          height: '28px',
+          width: '30px',
+          height: '30px',
           borderRadius: '999px',
-          background: 'rgba(15,23,42,0.86)',
-          color: '#fff',
+          background: 'rgba(139,92,246,0.14)',
+          border: '1px solid rgba(139,92,246,0.22)',
+          color: 'rgba(255,255,255,0.90)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -114,10 +130,10 @@ function SetupItem({
         {step}
       </div>
       <div>
-        <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>
+        <div style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.92)', marginBottom: '4px' }}>
           {title}
         </div>
-        <div style={{ fontSize: '13px', color: '#475569', lineHeight: 1.65 }}>
+        <div style={{ fontSize: '13px', color: mutedText, lineHeight: 1.7 }}>
           {body}
         </div>
       </div>
@@ -125,207 +141,145 @@ function SetupItem({
   )
 }
 
-function McpSection({
-  mcpApiKey,
-  showMcpKey,
-  setShowMcpKey,
-  regenerating,
-  regenerateMcpKey,
-  copyToClipboard,
+function SecretField({
+  label,
+  value,
+  hidden,
+  loading,
+  onToggle,
+  onCopy,
 }: {
-  mcpApiKey: string | null
-  showMcpKey: boolean
-  setShowMcpKey: (v: (prev: boolean) => boolean) => void
-  regenerating: boolean
-  regenerateMcpKey: () => void
-  copyToClipboard: (text: string) => void
+  label: string
+  value: string | null
+  hidden?: boolean
+  loading?: boolean
+  onToggle?: () => void
+  onCopy?: () => void
 }) {
-  const endpoint = 'https://halvex.ai/api/mcp'
-
   return (
-    <div style={{ ...panel, padding: '28px' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '18px', marginBottom: '18px' }}>
-        <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-          <div
+    <div
+      style={{
+        padding: '16px',
+        borderRadius: '20px',
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.06)',
+      }}
+    >
+      <div style={{ fontSize: '11px', fontWeight: 800, color: faintText, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
+        {label}
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          minHeight: '44px',
+          borderRadius: '16px',
+          padding: '12px 14px',
+          background: 'rgba(255,255,255,0.03)',
+          border: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            fontSize: '12px',
+            color: 'rgba(255,255,255,0.78)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {loading
+            ? 'Loading…'
+            : value
+              ? hidden
+                ? '••••••••••••••••••••••••••••••••'
+                : value
+              : 'Not available yet'}
+        </div>
+        {onToggle && value && (
+          <button
+            onClick={onToggle}
             style={{
-              width: '42px',
-              height: '42px',
-              borderRadius: '16px',
-              background: 'linear-gradient(135deg, rgba(15,23,42,0.92), rgba(30,41,59,0.76))',
+              width: '34px',
+              height: '34px',
+              borderRadius: '12px',
+              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.04)',
+              color: 'rgba(255,255,255,0.70)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#fff',
+              cursor: 'pointer',
               flexShrink: 0,
-              boxShadow: '0 14px 24px rgba(15,23,42,0.16)',
             }}
           >
-            <Sparkles size={18} />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>
-              <h2 style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', letterSpacing: '-0.03em', margin: 0 }}>
-                Claude MCP
-              </h2>
-              <StatusPill label={mcpApiKey ? 'Workspace ready' : 'Needs setup'} tone={mcpApiKey ? 'ready' : 'idle'} />
-            </div>
-            <p style={{ fontSize: '14px', color: '#475569', lineHeight: 1.7, margin: 0, maxWidth: '620px' }}>
-              Halvex exposes deal intelligence through MCP. Claude already handles Linear on your side. Once this endpoint and key are in Claude, the daily workflow is just one prompt.
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={regenerateMcpKey}
-          disabled={regenerating}
+            {hidden ? <Eye size={13} /> : <EyeOff size={13} />}
+          </button>
+        )}
+        {onCopy && value && (
+          <button
+            onClick={onCopy}
+            style={{
+              width: '34px',
+              height: '34px',
+              borderRadius: '12px',
+              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.04)',
+              color: 'rgba(255,255,255,0.70)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            <Copy size={13} />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function IntegrationCard({
+  icon,
+  title,
+  eyebrow,
+  children,
+}: {
+  icon: React.ReactNode
+  title: string
+  eyebrow: string
+  children: React.ReactNode
+}) {
+  return (
+    <div style={{ ...card, padding: '24px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+        <div
           style={{
-            height: '38px',
-            padding: '0 14px',
-            borderRadius: '999px',
-            border: '1px solid rgba(15,23,42,0.12)',
-            background: '#fff',
-            color: '#0f172a',
-            fontSize: '12px',
-            fontWeight: 700,
-            display: 'inline-flex',
+            width: '42px',
+            height: '42px',
+            borderRadius: '14px',
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            display: 'flex',
             alignItems: 'center',
-            gap: '7px',
-            cursor: regenerating ? 'not-allowed' : 'pointer',
-            opacity: regenerating ? 0.7 : 1,
+            justifyContent: 'center',
             flexShrink: 0,
           }}
         >
-          <RefreshCw size={13} style={{ animation: regenerating ? 'spin 1s linear infinite' : 'none' }} />
-          {mcpApiKey ? 'Regenerate key' : 'Generate key'}
-        </button>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1.15fr 0.85fr', gap: '16px' }}>
-        <div
-          style={{
-            padding: '18px',
-            borderRadius: '22px',
-            background: 'rgba(255,255,255,0.68)',
-            border: '1px solid rgba(255,255,255,0.78)',
-          }}
-        >
-          <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>
-            MCP endpoint
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              borderRadius: '16px',
-              padding: '14px 16px',
-              background: '#f8fafc',
-              border: '1px solid rgba(148,163,184,0.16)',
-              marginBottom: '14px',
-            }}
-          >
-            <div style={{ flex: 1, minWidth: 0, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '12px', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {endpoint}
-            </div>
-            <button
-              onClick={() => copyToClipboard(endpoint)}
-              style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '12px',
-                border: '1px solid rgba(148,163,184,0.18)',
-                background: '#fff',
-                color: '#334155',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                flexShrink: 0,
-              }}
-            >
-              <Copy size={13} />
-            </button>
-          </div>
-
-          <div style={{ fontSize: '11px', fontWeight: 800, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>
-            API key
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              borderRadius: '16px',
-              padding: '14px 16px',
-              background: '#f8fafc',
-              border: '1px solid rgba(148,163,184,0.16)',
-            }}
-          >
-            <div style={{ flex: 1, minWidth: 0, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '12px', color: '#334155', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {mcpApiKey ? (showMcpKey ? mcpApiKey : '••••••••••••••••••••••••••••••••') : 'Generate a workspace key to finish setup'}
-            </div>
-            {mcpApiKey && (
-              <>
-                <button
-                  onClick={() => setShowMcpKey(v => !v)}
-                  style={{
-                    width: '34px',
-                    height: '34px',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(148,163,184,0.18)',
-                    background: '#fff',
-                    color: '#334155',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                  }}
-                >
-                  {showMcpKey ? <EyeOff size={13} /> : <Eye size={13} />}
-                </button>
-                <button
-                  onClick={() => copyToClipboard(mcpApiKey)}
-                  style={{
-                    width: '34px',
-                    height: '34px',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(148,163,184,0.18)',
-                    background: '#fff',
-                    color: '#334155',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                  }}
-                >
-                  <Copy size={13} />
-                </button>
-              </>
-            )}
-          </div>
+          {icon}
         </div>
-
-        <div
-          style={{
-            padding: '18px',
-            borderRadius: '22px',
-            background: 'linear-gradient(180deg, rgba(15,23,42,0.96) 0%, rgba(30,41,59,0.90) 100%)',
-            color: '#e2e8f0',
-            boxShadow: '0 18px 30px rgba(15,23,42,0.14)',
-          }}
-        >
-          <div style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(191,219,254,0.88)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
-            Daily Claude prompt
-          </div>
-          <div style={{ fontSize: '14px', lineHeight: 1.8, color: 'rgba(226,232,240,0.88)' }}>
-            “Check my Halvex pipeline, use your Linear access to identify blockers, and save any relevant issue links back to the right deals.”
-          </div>
-          <div style={{ marginTop: '14px', fontSize: '12px', lineHeight: 1.7, color: 'rgba(203,213,225,0.72)' }}>
-            Halvex does not sync or match Linear itself anymore. Claude does the cross-system review. Halvex stores the linked issues, deal intelligence, and shipped outcomes.
-          </div>
+        <div>
+          <div style={{ fontSize: '17px', fontWeight: 800, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.02em' }}>{title}</div>
+          <div style={{ fontSize: '12px', color: faintText }}>{eyebrow}</div>
         </div>
       </div>
+      {children}
     </div>
   )
 }
@@ -333,23 +287,31 @@ function McpSection({
 export default function ConnectionsPage() {
   const { toast } = useToast()
 
-  const { data: hubspotRes, error: hubspotError, mutate: mutateHubspot } = useSWR('/api/integrations/hubspot/status', fetcher, { revalidateOnFocus: false })
-  const { data: slackRes, error: slackError, mutate: mutateSlack } = useSWR('/api/integrations/slack/status', fetcher, { revalidateOnFocus: false })
-  const { data: mcpKeyRes, error: mcpError, mutate: mutateMcpKey } = useSWR('/api/workspace/mcp-api-key', fetcher, { revalidateOnFocus: false })
+  const { data: hubspotRes, error: hubspotError, mutate: mutateHubspot } = useSWR('/api/integrations/hubspot/status', fetcher, {
+    revalidateOnFocus: false,
+  })
+  const { data: slackRes, error: slackError, mutate: mutateSlack } = useSWR('/api/integrations/slack/status', fetcher, {
+    revalidateOnFocus: false,
+  })
+  const { data: mcpKeyRes, error: mcpError, mutate: mutateMcpKey } = useSWR('/api/workspace/mcp-api-key', fetcher, {
+    revalidateOnFocus: false,
+  })
 
-  const slackConnected: boolean | null = slackRes ? (slackRes?.data?.connected === true) : null
-  const hubspotConnected: boolean | null = hubspotRes ? (hubspotRes?.data?.connected === true) : null
+  const slackConnected: boolean | null = slackRes ? slackRes?.data?.connected === true : null
+  const hubspotConnected: boolean | null = hubspotRes ? hubspotRes?.data?.connected === true : null
   const slackData = slackRes?.data
   const hubspotData = hubspotRes?.data
   const mcpApiKey: string | null = mcpKeyRes?.data?.mcpApiKey ?? null
 
-  const connectionErrors = useMemo(() => (
-    [
-      slackError ? 'Slack status is unavailable.' : null,
-      hubspotError ? 'CRM status is unavailable.' : null,
-      mcpError ? 'Claude MCP setup is unavailable.' : null,
-    ].filter(Boolean) as string[]
-  ), [hubspotError, mcpError, slackError])
+  const connectionErrors = useMemo(
+    () =>
+      [
+        slackError ? 'Slack status is unavailable.' : null,
+        hubspotError ? 'CRM status is unavailable.' : null,
+        mcpError ? 'MCP credentials are unavailable.' : null,
+      ].filter(Boolean) as string[],
+    [hubspotError, mcpError, slackError],
+  )
 
   const [hubspotToken, setHubspotToken] = useState('')
   const [hubspotConnecting, setHubspotConnecting] = useState(false)
@@ -359,10 +321,10 @@ export default function ConnectionsPage() {
   const [showMcpKey, setShowMcpKey] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
 
-  async function copyToClipboard(text: string) {
+  async function copyToClipboard(text: string, label = 'Copied to clipboard') {
     try {
       await navigator.clipboard.writeText(text)
-      toast('Copied to clipboard', 'success')
+      toast(label, 'success')
     } catch {
       toast('Failed to copy', 'error')
     }
@@ -445,16 +407,18 @@ export default function ConnectionsPage() {
     }
   }
 
-  const crmTone = hubspotConnected === null ? 'idle' : hubspotConnected ? 'ready' : 'partial'
-  const slackTone = slackConnected === null ? 'idle' : slackConnected ? 'ready' : 'partial'
+  const slackTone = slackConnected === null ? (slackError ? 'partial' : 'loading') : slackConnected ? 'ready' : 'idle'
+  const crmTone = hubspotConnected === null ? (hubspotError ? 'partial' : 'loading') : hubspotConnected ? 'ready' : 'idle'
+  const mcpTone = mcpError ? 'partial' : mcpApiKey ? 'ready' : mcpKeyRes ? 'idle' : 'loading'
 
   return (
-    <div style={{ maxWidth: '1120px', display: 'flex', flexDirection: 'column', gap: '22px' }}>
+    <div style={{ maxWidth: '1120px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @media (max-width: 960px) {
+          .connections-hero,
           .connections-grid,
-          .connections-grid-2 { grid-template-columns: 1fr !important; }
+          .connections-detail-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
 
@@ -462,20 +426,20 @@ export default function ConnectionsPage() {
         <div
           style={{
             padding: '15px 18px',
-            background: 'rgba(245,158,11,0.08)',
-            border: '1px solid rgba(245,158,11,0.18)',
             borderRadius: '18px',
-            color: '#fef3c7',
+            background: 'rgba(245,158,11,0.12)',
+            border: '1px solid rgba(245,158,11,0.18)',
+            color: '#fde68a',
             fontSize: '12px',
             lineHeight: 1.7,
           }}
         >
-          Some workspace health data could not be loaded right now. {connectionErrors.join(' ')}
+          Some workspace health data is degraded right now. {connectionErrors.join(' ')}
         </div>
       )}
 
-      <div className="connections-grid" style={{ display: 'grid', gridTemplateColumns: '1.08fr 0.92fr', gap: '18px' }}>
-        <div style={{ ...panel, padding: '30px' }}>
+      <div className="connections-hero" style={{ display: 'grid', gridTemplateColumns: '1.15fr 0.85fr', gap: '18px' }}>
+        <div style={{ ...card, padding: '30px' }}>
           <div
             style={{
               display: 'inline-flex',
@@ -483,71 +447,73 @@ export default function ConnectionsPage() {
               gap: '8px',
               padding: '8px 12px',
               borderRadius: '999px',
-              background: 'rgba(15,23,42,0.06)',
-              border: '1px solid rgba(15,23,42,0.08)',
+              background: 'rgba(139,92,246,0.10)',
+              border: '1px solid rgba(139,92,246,0.16)',
               fontSize: '11px',
               fontWeight: 800,
               letterSpacing: '0.08em',
-              color: '#475569',
+              color: 'rgba(196,181,253,0.88)',
               textTransform: 'uppercase',
               marginBottom: '18px',
             }}
           >
             <Sparkles size={12} />
-            Halvex setup
+            Workspace setup
           </div>
 
-          <h1 style={{ fontSize: '34px', lineHeight: 1.02, letterSpacing: '-0.05em', fontWeight: 800, color: '#0f172a', margin: '0 0 10px' }}>
-            Keep Halvex focused on deal intelligence, not issue matching.
+          <h1 style={{ fontSize: '36px', lineHeight: 1.02, letterSpacing: '-0.05em', fontWeight: 800, color: 'rgba(255,255,255,0.96)', margin: '0 0 12px' }}>
+            Keep Halvex focused on deal intelligence.
           </h1>
-          <p style={{ fontSize: '15px', color: '#475569', lineHeight: 1.8, margin: '0 0 20px', maxWidth: '680px' }}>
-            Claude already knows how to work across tools. Halvex should own the CRM layer: deal context, linked blockers, shipped outcomes, and the automation around what revenue teams do next.
+          <p style={{ fontSize: '15px', color: mutedText, lineHeight: 1.8, margin: '0 0 22px', maxWidth: '680px' }}>
+            Halvex should own revenue context, operating rhythm, and visibility. Claude does the cross-tool review outside the product, then writes confirmed issue context back into the right deals through Halvex MCP.
           </p>
 
           <div style={{ display: 'grid', gap: '14px' }}>
-            <SetupItem
+            <StepItem
               step="1"
-              title="Bring your deals into Halvex"
-              body="Connect Slack and your CRM so Halvex becomes the live source of truth for pipeline state, notes, and action history."
+              title="Bring your team conversations into Halvex"
+              body="Connect Slack so reps can stay close to alerts, follow-ups, and the questions they ask every day."
             />
-            <SetupItem
+            <StepItem
               step="2"
-              title="Add Halvex MCP to Claude once"
-              body="Claude uses Halvex MCP for deal intelligence, and its own Linear connection for backlog review. Halvex no longer needs a direct Linear integration in the user journey."
+              title="Keep CRM data current"
+              body="Sync your CRM so Halvex reflects the real pipeline, active notes, and current deal values instead of stale exports."
             />
-            <SetupItem
+            <StepItem
               step="3"
-              title="Run a daily Claude review"
-              body="Ask Claude to review your Halvex pipeline, inspect Linear externally, and save the high-confidence issue links back into the right deals."
+              title="Add Halvex MCP to Claude once"
+              body="Claude should already have the product context it needs on your side. Halvex only needs to expose the deal intelligence layer."
             />
-            <SetupItem
+            <StepItem
               step="4"
-              title="Work the outcomes inside Halvex"
-              body="Reps and leaders stay in Halvex to review linked blockers, confirm what matters, and track shipped revenue-impacting work."
+              title="Run the same Claude review every day"
+              body="Ask Claude to review the pipeline, inspect the product work externally, and save the blockers that matter back into the relevant deals."
             />
           </div>
         </div>
 
-        <div style={{ ...panel, padding: '30px', background: 'linear-gradient(180deg, rgba(15,23,42,0.90) 0%, rgba(30,41,59,0.88) 100%)', border: '1px solid rgba(255,255,255,0.12)' }}>
+        <div style={{ ...card, padding: '30px' }}>
           <div style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(191,219,254,0.84)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '12px' }}>
-            Workspace posture
+            Workspace readiness
           </div>
-          <div style={{ fontSize: '24px', lineHeight: 1.1, fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.04em', marginBottom: '12px' }}>
-            A calmer, clearer deal intelligence workflow
+          <div style={{ fontSize: '24px', lineHeight: 1.1, fontWeight: 800, color: 'rgba(255,255,255,0.96)', letterSpacing: '-0.04em', marginBottom: '12px' }}>
+            One clean operating rhythm
           </div>
-          <p style={{ fontSize: '14px', color: 'rgba(203,213,225,0.76)', lineHeight: 1.8, margin: '0 0 18px' }}>
-            This workspace is now oriented around daily operating rhythm instead of setup complexity. Halvex surfaces context and outcomes. Claude does the judgment-heavy review.
+          <p style={{ fontSize: '14px', color: mutedText, lineHeight: 1.8, margin: '0 0 18px' }}>
+            The product should feel calm: live CRM data, a working Slack surface, and a single Claude workflow that enriches deals instead of asking reps to babysit issue matching.
           </p>
+
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '18px' }}>
-            <StatusPill label={slackConnected ? 'Slack live' : 'Slack recommended'} tone={slackTone} />
-            <StatusPill label={hubspotConnected ? 'CRM live' : 'CRM optional'} tone={crmTone} />
-            <StatusPill label={mcpApiKey ? 'MCP ready' : 'MCP setup needed'} tone={mcpApiKey ? 'ready' : 'partial'} />
+            <StatusPill label={slackConnected ? 'Slack live' : slackConnected === null ? 'Slack loading' : 'Slack optional'} tone={slackTone} />
+            <StatusPill label={hubspotConnected ? 'CRM live' : hubspotConnected === null ? 'CRM loading' : 'CRM needed'} tone={crmTone} />
+            <StatusPill label={mcpApiKey ? 'MCP ready' : mcpKeyRes ? 'MCP setup needed' : 'MCP loading'} tone={mcpTone} />
           </div>
+
           <div style={{ display: 'grid', gap: '12px' }}>
             {[
-              'No Halvex-owned Linear sync or rematching in the primary flow',
-              'Claude reviews externally and writes back only the links that matter',
-              'Halvex stays responsible for CRM intelligence, automation, and visibility',
+              'No Halvex-owned issue matching in the primary workflow',
+              'Claude reviews externally and writes back only the deal-relevant context',
+              'Halvex stays responsible for revenue intelligence, workflow, and shipped outcomes',
             ].map(item => (
               <div
                 key={item}
@@ -557,9 +523,9 @@ export default function ConnectionsPage() {
                   alignItems: 'flex-start',
                   padding: '12px 14px',
                   borderRadius: '18px',
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  color: 'rgba(226,232,240,0.84)',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  color: 'rgba(255,255,255,0.80)',
                   fontSize: '13px',
                   lineHeight: 1.6,
                 }}
@@ -569,6 +535,7 @@ export default function ConnectionsPage() {
               </div>
             ))}
           </div>
+
           <Link
             href="/dashboard"
             style={{
@@ -576,7 +543,7 @@ export default function ConnectionsPage() {
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              color: '#fff',
+              color: 'rgba(255,255,255,0.92)',
               textDecoration: 'none',
               fontSize: '13px',
               fontWeight: 700,
@@ -588,32 +555,154 @@ export default function ConnectionsPage() {
         </div>
       </div>
 
-      <McpSection
-        mcpApiKey={mcpApiKey}
-        showMcpKey={showMcpKey}
-        setShowMcpKey={setShowMcpKey}
-        regenerating={regenerating}
-        regenerateMcpKey={regenerateMcpKey}
-        copyToClipboard={copyToClipboard}
-      />
-
-      <div className="connections-grid-2" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '18px' }}>
-        <div style={{ ...panel, padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '14px', background: 'rgba(74,144,226,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <MessageSquare size={18} color="#2563eb" />
+      <div style={{ ...card, padding: '28px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '18px', marginBottom: '18px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+            <div
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, rgba(139,92,246,0.24), rgba(99,102,241,0.18))',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'rgba(255,255,255,0.92)',
+                flexShrink: 0,
+                border: '1px solid rgba(139,92,246,0.22)',
+              }}
+            >
+              <Sparkles size={18} />
             </div>
             <div>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Slack</div>
-              <div style={{ fontSize: '12px', color: '#64748b' }}>Rep-facing workspace</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                <h2 style={{ fontSize: '22px', fontWeight: 800, color: 'rgba(255,255,255,0.96)', letterSpacing: '-0.03em', margin: 0 }}>
+                  Halvex MCP
+                </h2>
+                <StatusPill label={mcpApiKey ? 'Workspace ready' : 'Needs setup'} tone={mcpApiKey ? 'ready' : 'idle'} />
+              </div>
+              <p style={{ fontSize: '14px', color: mutedText, lineHeight: 1.7, margin: 0, maxWidth: '640px' }}>
+                Add this endpoint and workspace key to Claude once. After that, the whole workflow becomes a single daily prompt instead of another admin surface reps have to maintain.
+              </p>
             </div>
           </div>
-          <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.7, margin: '0 0 16px' }}>
-            Keep deal questions, alerts, and follow-ups in the place your team already works every day.
+          <button
+            onClick={regenerateMcpKey}
+            disabled={regenerating}
+            style={{
+              height: '40px',
+              padding: '0 14px',
+              borderRadius: '999px',
+              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.05)',
+              color: 'rgba(255,255,255,0.88)',
+              fontSize: '12px',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '7px',
+              cursor: regenerating ? 'not-allowed' : 'pointer',
+              opacity: regenerating ? 0.7 : 1,
+              flexShrink: 0,
+            }}
+          >
+            <RefreshCw size={13} style={{ animation: regenerating ? 'spin 1s linear infinite' : 'none' }} />
+            {mcpApiKey ? 'Regenerate key' : 'Generate key'}
+          </button>
+        </div>
+
+        <div className="connections-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '16px' }}>
+          <div style={{ display: 'grid', gap: '16px' }}>
+            <SecretField
+              label="MCP endpoint"
+              value="https://halvex.ai/api/mcp"
+              onCopy={() => copyToClipboard('https://halvex.ai/api/mcp', 'Endpoint copied')}
+            />
+            <SecretField
+              label="API key"
+              value={mcpApiKey}
+              hidden={!showMcpKey}
+              loading={!mcpKeyRes && !mcpError}
+              onToggle={mcpApiKey ? () => setShowMcpKey(v => !v) : undefined}
+              onCopy={mcpApiKey ? () => copyToClipboard(mcpApiKey, 'MCP key copied') : undefined}
+            />
+          </div>
+
+          <div
+            style={{
+              padding: '18px',
+              borderRadius: '22px',
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(139,92,246,0.06) 100%)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}
+          >
+            <div style={{ fontSize: '11px', fontWeight: 800, color: faintText, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
+              Daily Claude prompt
+            </div>
+            <div style={{ fontSize: '14px', lineHeight: 1.8, color: 'rgba(255,255,255,0.88)' }}>
+              “{DAILY_PROMPT}”
+            </div>
+            <div style={{ marginTop: '14px', fontSize: '12px', lineHeight: 1.7, color: mutedText }}>
+              Halvex stores the resulting deal context, linked blockers, and shipped outcomes. Claude remains the cross-tool reviewer.
+            </div>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '16px' }}>
+              <button
+                onClick={() => copyToClipboard(DAILY_PROMPT, 'Claude prompt copied')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  height: '40px',
+                  padding: '0 14px',
+                  borderRadius: '999px',
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: 'rgba(255,255,255,0.92)',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                <Copy size={13} />
+                Copy prompt
+              </button>
+              <Link
+                href="/dashboard"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  height: '40px',
+                  padding: '0 14px',
+                  borderRadius: '999px',
+                  background: 'rgba(139,92,246,0.16)',
+                  border: '1px solid rgba(139,92,246,0.22)',
+                  color: 'rgba(255,255,255,0.94)',
+                  textDecoration: 'none',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                }}
+              >
+                Open dashboard
+                <ArrowUpRight size={13} />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="connections-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '18px' }}>
+        <IntegrationCard
+          icon={<MessageSquare size={18} color="#93c5fd" />}
+          title="Slack"
+          eyebrow="Rep-facing workspace"
+        >
+          <p style={{ fontSize: '13px', color: mutedText, lineHeight: 1.7, margin: '0 0 16px' }}>
+            Keep alerts, prompts, and follow-ups where the team already works. Slack is optional, but it makes Halvex feel much more alive day to day.
           </p>
           {slackConnected ? (
-            <div style={{ display: 'grid', gap: '10px' }}>
-              <div style={{ fontSize: '12px', color: '#0f766e', lineHeight: 1.6 }}>
+            <div style={{ display: 'grid', gap: '12px' }}>
+              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.76)', lineHeight: 1.7 }}>
                 Connected to <strong>{slackData?.slackTeamName ?? 'your workspace'}</strong>
               </div>
               <button
@@ -623,57 +712,58 @@ export default function ConnectionsPage() {
                   height: '40px',
                   borderRadius: '14px',
                   border: '1px solid rgba(239,68,68,0.18)',
-                  background: 'rgba(239,68,68,0.08)',
-                  color: '#dc2626',
+                  background: 'rgba(239,68,68,0.10)',
+                  color: '#fecaca',
                   fontSize: '12px',
                   fontWeight: 700,
                   cursor: slackDisconnecting ? 'not-allowed' : 'pointer',
                   opacity: slackDisconnecting ? 0.7 : 1,
                 }}
               >
-                {slackDisconnecting ? 'Disconnecting...' : 'Disconnect Slack'}
+                {slackDisconnecting ? 'Disconnecting…' : 'Disconnect Slack'}
               </button>
             </div>
           ) : (
-            <a
-              href="/api/integrations/slack/install"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                height: '42px',
-                padding: '0 16px',
-                borderRadius: '14px',
-                background: '#0f172a',
-                color: '#fff',
-                textDecoration: 'none',
-                fontSize: '12px',
-                fontWeight: 700,
-              }}
-            >
-              <MessageSquare size={14} />
-              Connect Slack
-            </a>
+            <div style={{ display: 'grid', gap: '12px' }}>
+              <div style={{ fontSize: '12px', color: mutedText, lineHeight: 1.7 }}>
+                {slackError ? 'Slack status is unavailable right now.' : 'No Slack workspace connected yet.'}
+              </div>
+              <a
+                href="/api/integrations/slack/install"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  height: '42px',
+                  padding: '0 16px',
+                  borderRadius: '14px',
+                  background: 'rgba(139,92,246,0.18)',
+                  border: '1px solid rgba(139,92,246,0.22)',
+                  color: 'rgba(255,255,255,0.94)',
+                  textDecoration: 'none',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                }}
+              >
+                <MessageSquare size={14} />
+                Connect Slack
+              </a>
+            </div>
           )}
-        </div>
+        </IntegrationCard>
 
-        <div style={{ ...panel, padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '14px', background: 'rgba(251,146,60,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Database size={18} color="#ea580c" />
-            </div>
-            <div>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>CRM sync</div>
-              <div style={{ fontSize: '12px', color: '#64748b' }}>Pipeline source of truth</div>
-            </div>
-          </div>
-          <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.7, margin: '0 0 16px' }}>
-            Keep revenue context fresh so Claude reviews the real pipeline, not stale exports or one-off screenshots.
+        <IntegrationCard
+          icon={<Database size={18} color="#fdba74" />}
+          title="CRM sync"
+          eyebrow="Pipeline source of truth"
+        >
+          <p style={{ fontSize: '13px', color: mutedText, lineHeight: 1.7, margin: '0 0 16px' }}>
+            Keep revenue context fresh so Claude reviews the live pipeline, not screenshots or stale exports.
           </p>
           {hubspotConnected ? (
-            <div style={{ display: 'grid', gap: '10px' }}>
-              <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.7 }}>
+            <div style={{ display: 'grid', gap: '12px' }}>
+              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.76)', lineHeight: 1.7 }}>
                 {hubspotData?.syncCount != null ? `${hubspotData.syncCount} deals synced` : 'CRM connected'}
                 {hubspotData?.lastSync ? ` · Last sync ${new Date(hubspotData.lastSync).toLocaleString()}` : ''}
               </div>
@@ -685,9 +775,9 @@ export default function ConnectionsPage() {
                     height: '40px',
                     padding: '0 14px',
                     borderRadius: '14px',
-                    border: '1px solid rgba(15,23,42,0.12)',
-                    background: '#fff',
-                    color: '#0f172a',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    background: 'rgba(255,255,255,0.05)',
+                    color: 'rgba(255,255,255,0.88)',
                     fontSize: '12px',
                     fontWeight: 700,
                     display: 'inline-flex',
@@ -698,7 +788,7 @@ export default function ConnectionsPage() {
                   }}
                 >
                   <RefreshCw size={13} style={{ animation: hubspotSyncing ? 'spin 1s linear infinite' : 'none' }} />
-                  {hubspotSyncing ? 'Syncing...' : 'Sync deals'}
+                  {hubspotSyncing ? 'Syncing…' : 'Sync deals'}
                 </button>
                 <button
                   onClick={handleHubspotDisconnect}
@@ -708,15 +798,15 @@ export default function ConnectionsPage() {
                     padding: '0 14px',
                     borderRadius: '14px',
                     border: '1px solid rgba(239,68,68,0.18)',
-                    background: 'rgba(239,68,68,0.08)',
-                    color: '#dc2626',
+                    background: 'rgba(239,68,68,0.10)',
+                    color: '#fecaca',
                     fontSize: '12px',
                     fontWeight: 700,
                     cursor: hubspotDisconnecting ? 'not-allowed' : 'pointer',
                     opacity: hubspotDisconnecting ? 0.7 : 1,
                   }}
                 >
-                  {hubspotDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                  {hubspotDisconnecting ? 'Disconnecting…' : 'Disconnect'}
                 </button>
               </div>
             </div>
@@ -731,9 +821,9 @@ export default function ConnectionsPage() {
                   width: '100%',
                   height: '42px',
                   borderRadius: '14px',
-                  border: '1px solid rgba(148,163,184,0.18)',
-                  background: '#fff',
-                  color: '#0f172a',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  background: 'rgba(255,255,255,0.05)',
+                  color: 'rgba(255,255,255,0.92)',
                   padding: '0 14px',
                   fontSize: '12px',
                   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
@@ -746,9 +836,9 @@ export default function ConnectionsPage() {
                 style={{
                   height: '42px',
                   borderRadius: '14px',
-                  border: '1px solid rgba(15,23,42,0.12)',
-                  background: '#0f172a',
-                  color: '#fff',
+                  border: '1px solid rgba(139,92,246,0.22)',
+                  background: 'rgba(139,92,246,0.18)',
+                  color: 'rgba(255,255,255,0.94)',
                   fontSize: '12px',
                   fontWeight: 700,
                   display: 'inline-flex',
@@ -760,42 +850,79 @@ export default function ConnectionsPage() {
                 }}
               >
                 {hubspotConnecting && <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />}
-                {hubspotConnecting ? 'Connecting...' : 'Connect CRM'}
+                {hubspotConnecting ? 'Connecting…' : 'Connect CRM'}
               </button>
             </form>
           )}
-        </div>
+        </IntegrationCard>
 
-        <div style={{ ...panel, padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <div style={{ width: '40px', height: '40px', borderRadius: '14px', background: 'rgba(15,23,42,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Workflow size={18} color="#0f172a" />
-            </div>
-            <div>
-              <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Claude + Linear</div>
-              <div style={{ fontSize: '12px', color: '#64748b' }}>Runs outside Halvex</div>
-            </div>
-          </div>
-          <p style={{ fontSize: '13px', color: '#475569', lineHeight: 1.7, margin: '0 0 16px' }}>
-            Halvex no longer asks you to connect Linear here. Claude should already have access to Linear in your own account, then use Halvex MCP to write links back.
+        <IntegrationCard
+          icon={<Workflow size={18} color="#c4b5fd" />}
+          title="Claude review"
+          eyebrow="Daily operator workflow"
+        >
+          <p style={{ fontSize: '13px', color: mutedText, lineHeight: 1.7, margin: '0 0 16px' }}>
+            Claude already owns the cross-tool reasoning. Halvex only needs to make the pipeline legible and accept the linked issue context Claude saves back.
           </p>
           <div
             style={{
               padding: '14px',
               borderRadius: '18px',
-              background: 'rgba(15,23,42,0.04)',
-              border: '1px solid rgba(15,23,42,0.06)',
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.06)',
               fontSize: '12px',
-              color: '#475569',
+              color: mutedText,
               lineHeight: 1.7,
             }}
           >
-            Daily habit:
-            <div style={{ marginTop: '8px', color: '#0f172a', fontWeight: 600 }}>
-              Review Halvex pipeline in Claude, inspect Linear there, and save confirmed issue links back into Halvex.
+            Recommended daily prompt:
+            <div style={{ marginTop: '8px', color: 'rgba(255,255,255,0.92)', fontWeight: 600 }}>
+              {DAILY_PROMPT}
             </div>
           </div>
-        </div>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '14px' }}>
+            <button
+              onClick={() => copyToClipboard(DAILY_PROMPT, 'Claude prompt copied')}
+              style={{
+                height: '40px',
+                padding: '0 14px',
+                borderRadius: '14px',
+                border: '1px solid rgba(255,255,255,0.08)',
+                background: 'rgba(255,255,255,0.05)',
+                color: 'rgba(255,255,255,0.92)',
+                fontSize: '12px',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+              }}
+            >
+              <Copy size={13} />
+              Copy prompt
+            </button>
+            <Link
+              href="/workflows"
+              style={{
+                height: '40px',
+                padding: '0 14px',
+                borderRadius: '14px',
+                border: '1px solid rgba(255,255,255,0.08)',
+                background: 'rgba(255,255,255,0.03)',
+                color: 'rgba(255,255,255,0.82)',
+                fontSize: '12px',
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                textDecoration: 'none',
+              }}
+            >
+              Review outcomes
+              <ArrowUpRight size={13} />
+            </Link>
+          </div>
+        </IntegrationCard>
       </div>
     </div>
   )

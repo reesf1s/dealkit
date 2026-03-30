@@ -5,7 +5,7 @@ import { after } from 'next/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { and, eq } from 'drizzle-orm'
-import { streamText, tool, jsonSchema } from 'ai'
+import { streamText, tool, jsonSchema, convertToCoreMessages } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { z } from 'zod'
 
@@ -303,6 +303,62 @@ Every deal mutation triggers a brain rebuild. The brain powers ML scoring, deal 
 14. DECISIVENESS: "Update RELX with this note" = get_deal("RELX") then update_deal with addNote. One search, one update, done. No hedging, no "could you try again".`
 }
 
+function getMessageText(message: { content?: unknown }): string {
+  if (typeof message.content === 'string') return message.content
+  if (Array.isArray(message.content)) {
+    return message.content
+      .filter((part: any) => part?.type === 'text')
+      .map((part: any) => part?.text ?? '')
+      .join('\n')
+  }
+  return ''
+}
+
+function compactWhitespace(value: string): string {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
+function normaliseIncomingMessages(messages: any[]) {
+  const coreMessages = convertToCoreMessages(messages)
+  const deduped: any[] = []
+
+  for (const message of coreMessages) {
+    if (message.role !== 'user') {
+      deduped.push(message)
+      continue
+    }
+
+    const text = getMessageText(message).trim()
+    if (!text) continue
+
+    const previous = deduped[deduped.length - 1]
+    if (previous?.role === 'user') {
+      const previousText = getMessageText(previous).trim()
+
+      if (compactWhitespace(previousText) === compactWhitespace(text)) {
+        deduped[deduped.length - 1] = {
+          ...message,
+          content: [{ type: 'text', text }],
+        }
+        continue
+      }
+
+      deduped[deduped.length - 1] = {
+        role: 'user',
+        content: [{ type: 'text', text: `${previousText}\n\n${text}`.trim() }],
+      }
+      continue
+    }
+
+    deduped.push({
+      ...message,
+      content: [{ type: 'text', text }],
+    })
+  }
+
+  return deduped
+}
+
 // ── POST handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -341,13 +397,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'messages required' }, { status: 400 })
     }
 
+    const normalisedMessages = normaliseIncomingMessages(messages)
+    if (!normalisedMessages.length) {
+      return NextResponse.json({ error: 'No valid messages provided' }, { status: 400 })
+    }
+
     // ── Empty / whitespace-only message guard ────────────────────────────────
-    const lastUserMessage = [...messages].reverse().find((m: any) => m.role === 'user')
-    const lastUserText = typeof lastUserMessage?.content === 'string'
-      ? lastUserMessage.content
-      : Array.isArray(lastUserMessage?.content)
-        ? lastUserMessage.content.map((p: any) => p.text ?? '').join('')
-        : ''
+    const lastUserMessage = [...normalisedMessages].reverse().find((m: any) => m.role === 'user')
+    const lastUserText = getMessageText(lastUserMessage ?? {})
 
     if (!lastUserText?.trim()) {
       const emptyStream = new ReadableStream({
@@ -367,14 +424,14 @@ export async function POST(req: NextRequest) {
     await sendAgentGradeTranscript({
       conversationId,
       customerIdentifier: userId,
-      messages,
+      messages: normalisedMessages,
     })
 
     // ── Context window guard: trim to last 20 non-system messages ─────────────
-    let trimmedMessages = messages
-    if (messages.length > 40) {
-      const systemMessages = messages.filter((m: any) => m.role === 'system')
-      const nonSystemMessages = messages.filter((m: any) => m.role !== 'system')
+    let trimmedMessages = normalisedMessages
+    if (normalisedMessages.length > 40) {
+      const systemMessages = normalisedMessages.filter((m: any) => m.role === 'system')
+      const nonSystemMessages = normalisedMessages.filter((m: any) => m.role !== 'system')
       trimmedMessages = [...systemMessages, ...nonSystemMessages.slice(-20)]
     }
 
@@ -591,7 +648,7 @@ export async function POST(req: NextRequest) {
                 conversationId,
                 customerIdentifier: userId,
                 messages: [
-                  ...messages,
+                  ...normalisedMessages,
                   ...(text.trim() ? [{ role: 'assistant', content: text }] : []),
                 ],
               }),

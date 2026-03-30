@@ -415,7 +415,7 @@ function OnboardingInner() {
               Add Halvex to Claude
             </h1>
             <p style={{ fontSize: '15px', color: '#475569', lineHeight: 1.75, maxWidth: '500px', margin: '0 auto' }}>
-              Claude should already have Linear on your side. Halvex only needs to expose deal intelligence through MCP so Claude can review your pipeline and save linked blockers back into the CRM.
+              Claude should already have your product and issue context on its side. Halvex only needs to expose deal intelligence through MCP so Claude can review your pipeline and save linked blockers back into the CRM.
             </p>
           </div>
 
@@ -423,7 +423,7 @@ function OnboardingInner() {
             <FeatureList
               items={[
                 'Claude reads Halvex deal context through MCP',
-                'Claude reviews Linear externally from its own connected account',
+                'Claude reviews product work externally from its own connected tools',
                 'Halvex stores the links, revenue context, and shipped outcomes',
               ]}
             />
@@ -481,7 +481,7 @@ function OnboardingInner() {
                 Daily Claude prompt
               </div>
               <div style={{ fontSize: '13px', lineHeight: 1.8 }}>
-                “Check my Halvex pipeline, use your Linear access to identify blockers, and save any relevant issue links back into the right deals.”
+                “Check my Halvex pipeline, review my product work, and save any relevant issue links back into the right deals.”
               </div>
             </div>
 
