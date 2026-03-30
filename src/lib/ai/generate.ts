@@ -56,7 +56,7 @@ async function callMiniModel(
 ): Promise<string> {
   const attempt = async () => {
     const message = await anthropic.messages.create({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       max_tokens: 4096,
       temperature,
       // Pass system as a cached block so the large workspace context is reused

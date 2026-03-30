@@ -137,7 +137,7 @@ ${notes.slice(0, 4000)}`
 
   try {
     const msg = await anthropic.messages.create({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       max_tokens: 600,
       messages: [{ role: 'user', content: prompt }],
     })

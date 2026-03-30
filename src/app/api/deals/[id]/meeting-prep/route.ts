@@ -100,7 +100,7 @@ One sentence: how to leverage or build a champion at ${deal.prospectCompany} giv
 
 ## Next Step
 One concrete, time-bound action to advance or close this deal.`
-    const msg = await anthropic.messages.create({ model: 'gpt-4.1-mini', max_tokens: 1500, messages: [{ role: 'user', content: prompt }] })
+    const msg = await anthropic.messages.create({ model: 'gpt-5.4-mini', max_tokens: 1500, messages: [{ role: 'user', content: prompt }] })
     const prep = (msg.content[0] as any).text
     return NextResponse.json({ data: { prep } })
   } catch (e: unknown) { console.error('[meeting-prep] failed:', e instanceof Error ? e.message : e); return NextResponse.json({ error: 'Meeting prep failed' }, { status: 500 }) }

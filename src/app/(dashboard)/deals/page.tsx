@@ -11,16 +11,16 @@ import { useToast } from '@/components/shared/Toast'
 import SetupBanner from '@/components/shared/SetupBanner'
 import { fetcher, isDbNotConfigured } from '@/lib/fetcher'
 import type { DealLog } from '@/types'
-import type { LoopEntry, LoopStatus } from '@/app/api/loops/route'
+import type { LoopEntry } from '@/app/api/loops/route'
 
 /* ── Constants ── */
 
-const LOOP_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  identified:  { label: 'Identified',  color: '#f59e0b' },
-  in_progress: { label: 'In Progress', color: '#3b82f6' },
-  in_review:   { label: 'In Review',   color: '#8b5cf6' },
-  in_cycle:    { label: 'In Cycle',    color: '#3b82f6' },
-  shipped:     { label: 'Shipped',     color: '#22c55e' },
+const ISSUE_LINK_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  identified:  { label: 'Needs review', color: '#f59e0b' },
+  in_progress: { label: 'In progress',  color: '#3b82f6' },
+  in_review:   { label: 'In review',    color: '#8b5cf6' },
+  in_cycle:    { label: 'In product',   color: '#3b82f6' },
+  shipped:     { label: 'Shipped',      color: '#22c55e' },
 }
 
 type Mode = 'intelligence' | 'kanban'
@@ -142,7 +142,6 @@ export default function DealsPage() {
   const { data, isLoading, error, mutate } = useSWR<{ data: DealLog[] }>('/api/deals', fetcher)
   const { data: configData } = useSWR('/api/pipeline-config', fetcher, { revalidateOnFocus: false })
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
-  const { data: loopSignalsRes } = useSWR('/api/dashboard/loop-signals', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
   const { data: loopsRes } = useSWR<{ data: LoopEntry[] }>('/api/loops', fetcher, { revalidateOnFocus: false, dedupingInterval: 30000 })
 
   const deals = data?.data ?? []
@@ -182,7 +181,7 @@ export default function DealsPage() {
   const activeDeals = deals.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
   const totalPipelineValue = activeDeals.reduce((sum: number, d: any) => sum + (Number(d.dealValue) || 0), 0)
   const winRatePct: number | null = brain?.winRate ?? null
-  const activeLoopCount: number = loopSignalsRes?.data?.inFlight?.length ?? 0
+  const linkedIssueCount: number = loopsRes?.data?.length ?? 0
   const atRiskCount = activeDeals.filter(d => (d.conversionScore ?? 0) > 0 && (d.conversionScore ?? 0) < 40).length
 
   /* ── Closing soon: deals with closeDate in next 7 days ── */
@@ -295,18 +294,17 @@ export default function DealsPage() {
     return null
   }
 
-  /* ── Get loop summary for a deal ── */
-  function getLoopSummary(dealId: string): { count: number; label: string; color: string } | null {
+  /* ── Get issue-link summary for a deal ── */
+  function getIssueLinkSummary(dealId: string): { count: number; label: string; color: string } | null {
     const loops = loopMap.get(dealId)
     if (!loops || loops.length === 0) return null
     const activeCount = loops.filter(l => l.loopStatus !== 'shipped').length
-    // Worst status: awaiting_approval > in_cycle > shipped
     const worst = loops.find(l => l.loopStatus === 'identified')
       ?? loops.find(l => l.loopStatus === 'in_cycle')
       ?? loops[0]
-    const cfg = LOOP_STATUS_CONFIG[worst.loopStatus]
+    const cfg = ISSUE_LINK_STATUS_CONFIG[worst.loopStatus]
     if (activeCount > 0) {
-      return { count: activeCount, label: `${activeCount} active`, color: cfg.color }
+      return { count: activeCount, label: `${activeCount} linked`, color: cfg.color }
     }
     return { count: loops.length, label: `${loops.length} shipped`, color: cfg.color }
   }
@@ -405,7 +403,7 @@ export default function DealsPage() {
         <StatCard label="Pipeline Value" value={isLoading ? '\u2014' : fmtPipeline(totalPipelineValue, currencySymbol)} />
         <StatCard label="At Risk" value={isLoading ? '\u2014' : `${atRiskCount} deal${atRiskCount !== 1 ? 's' : ''}`} accent={!isLoading && atRiskCount > 0 ? 'amber' : undefined} />
         <StatCard label="Win Rate" value={winRatePct != null ? `${winRatePct}%` : '\u2014'} accent={winRatePct != null && winRatePct >= 50 ? 'green' : winRatePct != null ? 'amber' : undefined} />
-        <StatCard label="Active Loops" value={activeLoopCount > 0 ? activeLoopCount : '\u2014'} />
+        <StatCard label="Linked Issues" value={linkedIssueCount > 0 ? linkedIssueCount : '\u2014'} />
       </div>
 
       {/* ════════════════ INTELLIGENCE TABLE ════════════════ */}
@@ -471,7 +469,7 @@ export default function DealsPage() {
               <SortHeader label="Value" sortKey="value" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} align="right" />
               <SortHeader label="Score" sortKey="score" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} align="right" />
               <SortHeader label="Stage" sortKey="stage" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-              <div style={{ fontSize: '10px', fontWeight: 600, color: GLASS.text.tertiary, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Loops</div>
+              <div style={{ fontSize: '10px', fontWeight: 600, color: GLASS.text.tertiary, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Product Context</div>
               <div style={{ fontSize: '10px', fontWeight: 600, color: GLASS.text.tertiary, letterSpacing: '0.04em', textTransform: 'uppercase' }}>Top Risk</div>
             </div>
 
@@ -488,7 +486,7 @@ export default function DealsPage() {
               filteredDeals.map((deal: any) => {
                 const score = deal.conversionScore ?? 0
                 const trend = getScoreTrend(deal.id)
-                const loopSummary = getLoopSummary(deal.id)
+                const loopSummary = getIssueLinkSummary(deal.id)
                 const topRisk = getTopRisk(deal.id)
                 const isStale = staleDealIds.has(deal.id)
 
@@ -558,7 +556,7 @@ export default function DealsPage() {
                         {stageLabel(deal.stage)}
                       </div>
 
-                      {/* Loops */}
+                      {/* Product context */}
                       <div>
                         {loopSummary ? (
                           <span style={{
@@ -631,7 +629,7 @@ export default function DealsPage() {
                       const worstLoop = loops?.find(l => l.loopStatus === 'identified')
                         ?? loops?.find(l => l.loopStatus === 'in_cycle')
                         ?? loops?.[0]
-                      const loopCfg = worstLoop ? LOOP_STATUS_CONFIG[worstLoop.loopStatus] : null
+                      const loopCfg = worstLoop ? ISSUE_LINK_STATUS_CONFIG[worstLoop.loopStatus] : null
 
                       return (
                         <Link key={deal.id} href={`/deals/${deal.id}`} style={{ textDecoration: 'none', display: 'block' }}>
@@ -683,7 +681,7 @@ export default function DealsPage() {
                               </div>
                             )}
 
-                            {/* Row 3: Loop badge */}
+                            {/* Row 3: product status */}
                             {loopCfg && (
                               <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px', paddingLeft: '10px' }}>
                                 <span style={{

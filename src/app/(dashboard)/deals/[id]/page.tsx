@@ -4079,8 +4079,8 @@ function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal
 // ─── Linear Intelligence Column ──────────────────────────────────────────────
 
 function LinearColumn({ dealId }: { dealId: string }) {
-  const [discovering, setDiscovering] = useState(false)
-  const [discoverStatus, setDiscoverStatus] = useState<'done' | 'error' | null>(null)
+  const [preparingReview, setPreparingReview] = useState(false)
+  const [reviewStatus, setReviewStatus] = useState<'copied' | 'error' | null>(null)
 
   const { data: statusData } = useSWR<{ data: { connected: boolean; teamName?: string | null } }>(
     '/api/integrations/linear/status', fetcher, { revalidateOnFocus: false }
@@ -4090,17 +4090,20 @@ function LinearColumn({ dealId }: { dealId: string }) {
     fetcher,
   )
 
-  const handleDiscover = async () => {
-    setDiscovering(true)
-    setDiscoverStatus(null)
+  const handlePrepareReview = async () => {
+    setPreparingReview(true)
+    setReviewStatus(null)
     try {
-      await fetch(`/api/deals/${dealId}/discover-issues`, { method: 'POST' })
+      const res = await fetch(`/api/deals/${dealId}/discover-issues`, { method: 'POST' })
+      const json = await res.json()
+      if (!res.ok || !json?.data?.reviewPrompt) throw new Error('Missing review prompt')
+      await navigator.clipboard.writeText(json.data.reviewPrompt)
       await mutateLinks()
-      setDiscoverStatus('done')
+      setReviewStatus('copied')
     } catch {
-      setDiscoverStatus('error')
+      setReviewStatus('error')
     } finally {
-      setDiscovering(false)
+      setPreparingReview(false)
     }
   }
 
@@ -4140,7 +4143,7 @@ function LinearColumn({ dealId }: { dealId: string }) {
       ) : visibleLinks.length === 0 ? (
         <div style={{ padding: '20px 0', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
           <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.30)' }}>No issues linked yet</div>
-          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.20)' }}>Run Discover Issues to find matches</div>
+          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.20)' }}>Review this deal in Claude, then saved issue links will appear here.</div>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -4203,33 +4206,33 @@ function LinearColumn({ dealId }: { dealId: string }) {
         </div>
       )}
 
-      {/* Discover button */}
+      {/* Claude review button */}
       <button
-        onClick={handleDiscover}
-        disabled={discovering}
+        onClick={handlePrepareReview}
+        disabled={preparingReview}
         style={{
           width: '100%', padding: '10px', borderRadius: '8px',
-          background: discovering ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.08)',
+          background: preparingReview ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.08)',
           border: '1px solid rgba(255,255,255,0.12)',
           color: 'rgba(255,255,255,0.70)', fontSize: '12px', fontWeight: 600,
-          cursor: discovering ? 'not-allowed' : 'pointer',
+          cursor: preparingReview ? 'not-allowed' : 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
           transition: 'all 0.15s',
         }}
-        onMouseEnter={e => { if (!discovering) { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)' } }}
-        onMouseLeave={e => { if (!discovering) { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)' } }}
+        onMouseEnter={e => { if (!preparingReview) { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)' } }}
+        onMouseLeave={e => { if (!preparingReview) { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)' } }}
       >
-        {discovering
-          ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Discovering…</>
-          : <><Zap size={12} /> Discover Issues</>
+        {preparingReview
+          ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Preparing…</>
+          : <><Zap size={12} /> Copy Claude Review Prompt</>
         }
       </button>
 
-      {discoverStatus === 'done' && (
-        <div style={{ fontSize: '11px', color: '#34d399', textAlign: 'center' }}>Issues discovered — list refreshed</div>
+      {reviewStatus === 'copied' && (
+        <div style={{ fontSize: '11px', color: '#34d399', textAlign: 'center' }}>Claude review prompt copied</div>
       )}
-      {discoverStatus === 'error' && (
-        <div style={{ fontSize: '11px', color: '#f87171', textAlign: 'center' }}>Discovery failed — check Linear connection</div>
+      {reviewStatus === 'error' && (
+        <div style={{ fontSize: '11px', color: '#f87171', textAlign: 'center' }}>Could not prepare the Claude review prompt</div>
       )}
     </div>
   )
@@ -4734,7 +4737,6 @@ export default function DealDetailPage() {
   const [editOpen, setEditOpen] = useState(false)
   const [winStoryOpen, setWinStoryOpen] = useState(false)
   const [wonDeal, setWonDeal] = useState<any>(null)
-  const [discoveringIssues, setDiscoveringIssues] = useState(false)
   const [logMeetingOpen, setLogMeetingOpen] = useState(false)
   const [meetingNotesDraft, setMeetingNotesDraft] = useState('')
   const [meetingLogging, setMeetingLogging] = useState(false)
@@ -4972,28 +4974,6 @@ export default function DealDetailPage() {
                   <Link2 size={13} />
                   {shareLoading ? 'Working…' : shareCopied ? 'Copied!' : isShared ? 'Shared' : 'Share'}
                 </button>
-                <button
-                  onClick={async () => {
-                    setDiscoveringIssues(true)
-                    try { await fetch(`/api/deals/${id}/discover-issues`, { method: 'POST' }) }
-                    finally { setDiscoveringIssues(false) }
-                  }}
-                  disabled={discoveringIssues}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-                    background: 'rgba(255,255,255,0.90)',
-                    border: '1px solid rgba(255,255,255,0.14)',
-                    borderRadius: '8px', color: '#0a0b0f', fontSize: '13px', fontWeight: 600,
-                    cursor: discoveringIssues ? 'not-allowed' : 'pointer',
-                    boxShadow: '0 0 18px rgba(0,0,0,0.25)',
-                    opacity: discoveringIssues ? 0.75 : 1,
-                  }}
-                >
-                  {discoveringIssues
-                    ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Discovering…</>
-                    : <><Zap size={13} /> Discover Issues</>
-                  }
-                </button>
               </div>
             </div>
           </div>
@@ -5001,9 +4981,6 @@ export default function DealDetailPage() {
       ) : (
         <div style={{ height: '148px', background: 'rgba(255,255,255,0.06)', borderRadius: '1.25rem', border: '1px solid rgba(255,255,255,0.08)' }} />
       )}
-
-      {/* ── Loop state banner ──────────────────────────────────────────── */}
-      {id && <LoopStateBanner dealId={id} />}
 
       {/* ── Tab pills ──────────────────────────────────────────────────── */}
       <div style={{
@@ -5164,4 +5141,3 @@ export default function DealDetailPage() {
     </div>
   )
 }
-

@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
         if (!notes.trim()) { results.skipped++; continue }
 
         const msg = await anthropic.messages.create({
-          model: 'gpt-4.1-mini',
+          model: 'gpt-5.4-mini',
           max_tokens: 1024,
           messages: [{
             role: 'user',
@@ -100,7 +100,7 @@ Objection themes: budget=price/cost/ROI, timing=not now/too early, authority=dec
         if (!parsed.success) {
           // Retry with correction
           const correctionMsg = await anthropic.messages.create({
-            model: 'gpt-4.1-mini',
+            model: 'gpt-5.4-mini',
             max_tokens: 512,
             messages: [{
               role: 'user',

@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
                 if (mapping) {
                   const dmChannel = await slackOpenDm(botToken, mapping.slackUserId)
                   if (dmChannel) {
-                    const msg = `🚀 Great news! *${issueTitle}* for *${deal.prospectCompany}* has shipped in Linear (${stateName}). Time to follow up with your champion and close the loop.`
+                    const msg = `🚀 Great news! *${issueTitle}* for *${deal.prospectCompany}* has shipped in Linear (${stateName}). Time to follow up with your champion while the context is fresh.`
                     await slackPostMessage(
                       botToken,
                       dmChannel,

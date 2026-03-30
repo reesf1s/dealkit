@@ -21,6 +21,7 @@ import { PLAN_LIMITS } from '@/lib/stripe/plans'
 import { allTools } from '@/lib/ai/tools'
 import { normaliseParams } from '@/lib/ai/tool-wrapper'
 import { sendAgentGradeTranscript } from '@/lib/agentgrade'
+import { MINI } from '@/lib/ai/models'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -576,11 +577,11 @@ export async function POST(req: NextRequest) {
     let result: ReturnType<typeof streamText>
     try {
       const streamPromise = streamText({
-        model: openai('gpt-4.1-mini'),
+        model: openai(MINI),
         system: systemPrompt,
         messages: trimmedMessages,
         tools: sdkTools,
-        maxSteps: 5,
+        maxSteps: 8,
         maxTokens: 4096,
         onFinish: async ({ text }) => {
           after(async () => {

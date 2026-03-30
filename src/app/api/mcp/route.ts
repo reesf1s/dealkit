@@ -17,7 +17,7 @@
  *
  *   halvex_get_revenue_intelligence     — [NEW] structured deal intelligence: win probability + gaps + win conditions
  *   halvex_get_gap_revenue_map          — [NEW] PM view: which features are blocking the most revenue
- *   halvex_close_the_loop               — [NEW] given deal + gap: find/create Linear issue, scope, draft email
+ *   halvex_prepare_customer_followup    — prepare follow-up for a deal once linked product work moves forward
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -112,7 +112,7 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: 'halvex_draft_release_email',
-    description: 'Draft a release notification email to a prospect informing them that a feature they requested is now live — closing the loop on the deal.',
+    description: 'Draft a release notification email to a prospect informing them that a feature they requested is now live.',
     input_schema: {
       type: 'object',
       properties: {
@@ -196,8 +196,8 @@ const TOOL_DEFINITIONS = [
     },
   },
   {
-    name: 'halvex_close_the_loop',
-    description: '[Signature action] Given a deal and a product gap: find or create the matching Linear issue, scope it to the upcoming cycle, draft a re-engagement email, and log the loop closure. This is the Revenue-to-Product loop in one tool call.',
+    name: 'halvex_prepare_customer_followup',
+    description: 'Given a deal and a product gap, prepare the customer follow-up context around already-linked product work and draft a re-engagement email. Use this after review and linking are done elsewhere.',
     input_schema: {
       type: 'object',
       properties: {
@@ -482,7 +482,8 @@ export async function POST(req: NextRequest) {
         return mcpText(lines)
       }
 
-      // ── halvex_close_the_loop ──────────────────────────────────────────────
+      // ── halvex_prepare_customer_followup ───────────────────────────────────
+      case 'halvex_prepare_customer_followup':
       case 'halvex_close_the_loop': {
         const dealId = parameters.deal_id as string | undefined
         const gap = parameters.gap as string | undefined
@@ -513,15 +514,15 @@ export async function POST(req: NextRequest) {
         const { createOpenAI } = await import('@ai-sdk/openai')
         const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY })
         const { text: emailDraft } = await generateText({
-          model: openai('gpt-4.1-mini'),
+          model: openai('gpt-5.4-mini'),
           prompt: `You are a sales rep. Draft a short re-engagement email (max 4 sentences) to ${deal.prospectCompany} letting them know that "${gap}" is now on the roadmap. Be specific, professional, and warm. Just the email body, no subject line.`,
           maxTokens: 200,
         })
 
-        // Log the loop action
+        // Log the follow-up preparation action
         await db.insert(mcpActionLog).values({
           workspaceId,
-          actionType: 'close_the_loop',
+          actionType: 'prepare_customer_followup',
           dealId,
           triggeredBy: 'mcp',
           payload: { gap, dealName: deal.dealName },
@@ -530,11 +531,11 @@ export async function POST(req: NextRequest) {
         })
 
         const lines = [
-          `**Loop closed: ${deal.dealName} × ${gap}**`,
+          `**Customer follow-up prepared: ${deal.dealName} × ${gap}**`,
           '',
           existingLinks.length > 0
             ? `Found ${existingLinks.length} existing Linear link(s) for this deal.`
-            : 'No existing Linear links found — consider linking a Linear issue via halvex_scope_issue.',
+            : 'No existing Linear links found yet. Review the deal in Claude with Halvex MCP and save a relevant Linear issue link first.',
           '',
           '**Re-engagement email draft:**',
           emailDraft,

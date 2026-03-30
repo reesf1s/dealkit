@@ -6,7 +6,7 @@ import useSWR from 'swr'
 import Link from 'next/link'
 import {
   ExternalLink, Clock, AlertTriangle, ChevronRight, ArrowUpRight,
-  Zap, Settings2, Sparkles, Check, Circle, Timer, Truck,
+  Zap, Check, Circle, Timer, Truck,
 } from 'lucide-react'
 import type { LoopEntry, LoopStatus } from '@/app/api/loops/route'
 
@@ -14,7 +14,6 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type PageTab = 'core' | 'custom'
 type FilterTab = 'all' | 'identified' | 'in_progress' | 'in_cycle' | 'shipped'
 
 interface BrainData {
@@ -79,7 +78,7 @@ const STATUS_CONFIG: Record<LoopStatus, {
   textColor: string
 }> = {
   identified: {
-    label: 'Identified',
+    label: 'Needs Review',
     dotColor: '#f59e0b',
     textColor: '#f59e0b',
   },
@@ -94,7 +93,7 @@ const STATUS_CONFIG: Record<LoopStatus, {
     textColor: '#8b5cf6',
   },
   in_cycle: {
-    label: 'In Cycle',
+    label: 'In Product',
     dotColor: '#3b82f6',
     textColor: '#3b82f6',
   },
@@ -107,13 +106,13 @@ const STATUS_CONFIG: Record<LoopStatus, {
 
 const FILTER_TABS: { id: FilterTab; label: string }[] = [
   { id: 'all', label: 'All' },
-  { id: 'identified', label: 'Identified' },
+  { id: 'identified', label: 'Needs Review' },
   { id: 'in_progress', label: 'In Progress' },
-  { id: 'in_cycle', label: 'In Cycle' },
+  { id: 'in_cycle', label: 'In Product' },
   { id: 'shipped', label: 'Shipped' },
 ]
 
-const FLOW_STEPS = ['Identified', 'In Progress', 'In Review', 'Shipped']
+const FLOW_STEPS = ['Needs Review', 'In Progress', 'In Product', 'Shipped']
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
 
@@ -147,10 +146,10 @@ function SummaryStrip({ loops }: { loops: LoopEntry[] }) {
   const shipped = loops.filter(l => l.loopStatus === 'shipped').length
 
   const items: { label: string; value: string; icon: React.ReactNode; color?: string }[] = [
-    { label: 'Total Loops', value: String(loops.length), icon: <Zap size={13} /> },
+    { label: 'Linked issues', value: String(loops.length), icon: <Zap size={13} /> },
     { label: 'Revenue at risk', value: fmtFull(totalRevenue), icon: <AlertTriangle size={13} />, color: totalRevenue > 0 ? '#f59e0b' : undefined },
-    { label: 'Identified', value: String(identified), icon: <Timer size={13} />, color: identified > 0 ? '#f59e0b' : undefined },
-    { label: 'In Progress', value: String(inProgress), icon: <Circle size={13} />, color: inProgress > 0 ? '#3b82f6' : undefined },
+    { label: 'Needs review', value: String(identified), icon: <Timer size={13} />, color: identified > 0 ? '#f59e0b' : undefined },
+    { label: 'In progress', value: String(inProgress), icon: <Circle size={13} />, color: inProgress > 0 ? '#3b82f6' : undefined },
     { label: 'Shipped', value: String(shipped), icon: <Truck size={13} />, color: shipped > 0 ? '#22c55e' : undefined },
   ]
 
@@ -264,9 +263,9 @@ function StatusDot({ status }: { status: LoopStatus }) {
   )
 }
 
-// ─── Core Loop Table ─────────────────────────────────────────────────────────
+// ─── Linked Issue Table ─────────────────────────────────────────────────────
 
-function CoreLoopTable({
+function LinkedIssueTable({
   loops,
   brain,
   activeFilter,
@@ -401,10 +400,10 @@ function CoreLoopTable({
                 <td colSpan={8} style={{ padding: '48px 24px', textAlign: 'center' }}>
                   <Zap size={20} color="rgba(255,255,255,0.2)" style={{ marginBottom: '10px' }} />
                   <p style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', margin: '0 0 6px' }}>
-                    No {activeFilter === 'all' ? '' : FILTER_TABS.find(t => t.id === activeFilter)?.label + ' '}loops yet
+                    No {activeFilter === 'all' ? '' : FILTER_TABS.find(t => t.id === activeFilter)?.label + ' '}linked issues yet
                   </p>
                   <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>
-                    Loops start when a deal&apos;s feature request gets linked to a Linear issue.
+                    Claude-saved Linear issue links will appear here once product context has been reviewed.
                   </p>
                 </td>
               </tr>
@@ -616,7 +615,7 @@ function CoreLoopTable({
                                 whiteSpace: 'nowrap',
                               }}
                             >
-                              Nudge PM
+                              Review
                             </button>
                           </>
                         )}
@@ -693,85 +692,9 @@ function CoreLoopTable({
   )
 }
 
-// ─── Custom Loops Placeholder ────────────────────────────────────────────────
-
-function CustomLoopsPlaceholder() {
-  const examples = [
-    { name: 'Linear activity digest', desc: 'Check issues worked on in the last 24h and notify Slack', icon: <Sparkles size={14} /> },
-    { name: 'Daily deal score alerts', desc: 'Flag deals where score drops below threshold', icon: <AlertTriangle size={14} /> },
-    { name: 'Stale deal nudge', desc: 'Auto-nudge reps when a deal has no update for 7 days', icon: <Timer size={14} /> },
-    { name: 'Shipped feature broadcaster', desc: 'Notify all blocked reps when a Linear issue ships', icon: <Truck size={14} /> },
-  ]
-
-  return (
-    <div style={{
-      background: 'rgba(255,255,255,0.03)',
-      backdropFilter: 'blur(20px)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: '14px',
-      padding: '32px',
-    }}>
-      <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-        <Settings2 size={24} color="rgba(255,255,255,0.2)" style={{ marginBottom: '12px' }} />
-        <h3 style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', margin: '0 0 6px' }}>
-          Custom Loops
-        </h3>
-        <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', margin: 0, maxWidth: '400px', marginInline: 'auto', lineHeight: 1.5 }}>
-          Automate recurring checks and notifications. Custom loops run on a schedule and trigger actions based on your deal and engineering data.
-        </p>
-      </div>
-
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: '10px',
-      }}>
-        {examples.map(ex => (
-          <div key={ex.name} style={{
-            padding: '16px',
-            borderRadius: '10px',
-            border: '1px solid rgba(255,255,255,0.06)',
-            background: 'rgba(255,255,255,0.02)',
-            transition: 'all 0.15s',
-            cursor: 'default',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-              <span style={{ color: 'rgba(255,255,255,0.3)' }}>{ex.icon}</span>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.75)' }}>
-                {ex.name}
-              </span>
-            </div>
-            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', margin: 0, lineHeight: 1.45 }}>
-              {ex.desc}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ textAlign: 'center', marginTop: '24px' }}>
-        <span style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '8px 16px',
-          borderRadius: '8px',
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          color: 'rgba(255,255,255,0.4)',
-          fontSize: '12px',
-          fontWeight: 500,
-        }}>
-          Coming soon
-        </span>
-      </div>
-    </div>
-  )
-}
-
 // ─── Page ────────────────────────────────────────────────────────────────────
 
-export default function LoopsPage() {
-  const [pageTab, setPageTab] = useState<PageTab>('core')
+export default function AutomationPage() {
   const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
 
   const { data: loopsRes, isLoading: loopsLoading } = useSWR<{ data: LoopEntry[] }>(
@@ -808,44 +731,11 @@ export default function LoopsPage() {
             margin: '0 0 3px',
             letterSpacing: '-0.02em',
           }}>
-            Loops
+            Automation
           </h1>
           <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', margin: 0 }}>
-            Deal risk &rarr; Issue discovery &rarr; PM scoping &rarr; Ship &rarr; Deal unblocked
+            Live product-delivery signals tied back to revenue-critical deals
           </p>
-        </div>
-
-        {/* Core / Custom tab toggle */}
-        <div style={{
-          display: 'flex',
-          gap: '2px',
-          padding: '3px',
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.06)',
-          borderRadius: '8px',
-        }}>
-          {([
-            { id: 'core' as PageTab, label: 'Core Loops' },
-            { id: 'custom' as PageTab, label: 'Custom Loops' },
-          ]).map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setPageTab(tab.id)}
-              style={{
-                padding: '5px 12px',
-                borderRadius: '6px',
-                fontSize: '11px',
-                fontWeight: pageTab === tab.id ? 600 : 400,
-                color: pageTab === tab.id ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.35)',
-                background: pageTab === tab.id ? 'rgba(255,255,255,0.08)' : 'transparent',
-                border: `1px solid ${pageTab === tab.id ? 'rgba(255,255,255,0.1)' : 'transparent'}`,
-                cursor: 'pointer',
-                transition: 'all 0.12s',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -855,18 +745,13 @@ export default function LoopsPage() {
       {/* Revenue blocked banner */}
       <RevenueBlockedBanner loops={loops} />
 
-      {/* Content based on tab */}
-      {pageTab === 'core' ? (
-        <CoreLoopTable
-          loops={loops}
-          brain={brain}
-          activeFilter={activeFilter}
-          setActiveFilter={setActiveFilter}
-          isLoading={loopsLoading}
-        />
-      ) : (
-        <CustomLoopsPlaceholder />
-      )}
+      <LinkedIssueTable
+        loops={loops}
+        brain={brain}
+        activeFilter={activeFilter}
+        setActiveFilter={setActiveFilter}
+        isLoading={loopsLoading}
+      />
     </div>
   )
 }

@@ -485,7 +485,7 @@ async function _runExtractionBackfill(workspaceId: string): Promise<{ processed:
 
         // Run the extraction block only (no full analyze-notes prompt — lighter call)
         const msg = await anthropic.messages.create({
-          model: 'gpt-4.1-mini',
+          model: 'gpt-5.4-mini',
           max_tokens: 1024,
           messages: [{
             role: 'user',
@@ -2418,7 +2418,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown')
       const winPatterns = (objectionWinMap ?? []).slice(0, 3).map(p => `"${p.theme}" → ${Math.round(p.winRateWithTheme * 100)}% win rate`).join(', ') || 'No patterns yet'
 
       const resp = await anthropicClient.messages.create({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-5.4-mini',
         max_tokens: 800,
         messages: [{
           role: 'user',
@@ -2482,7 +2482,7 @@ Only return the JSON array, nothing else.`
       ].filter(Boolean).join('. ')
 
       const resp = await anthropicClient.messages.create({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-5.4-mini',
         max_tokens: 150,
         messages: [{
           role: 'user',

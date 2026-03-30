@@ -85,7 +85,7 @@ export async function POST() {
     const { anthropic } = await import('@/lib/ai/client')
 
     const resp = await anthropic.messages.create({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       max_tokens: 600,
       messages: [{
         role: 'user',

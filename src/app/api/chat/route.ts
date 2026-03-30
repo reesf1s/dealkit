@@ -131,7 +131,7 @@ async function classifyIntent(text: string): Promise<Intent> {
 
   try {
     const msg = await anthropic.messages.create({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       max_tokens: 20,
       messages: [{
         role: 'user',
@@ -186,7 +186,7 @@ async function handleCompetitorBattlecard(
   const hasCompanyProfile = !!profileRow
 
   const extractMsg = await anthropic.messages.create({
-    model: 'gpt-4.1-mini', max_tokens: 600,
+    model: 'gpt-5.4-mini', max_tokens: 600,
     messages: [{
       role: 'user',
       content: `Extract competitor names from this text. Return ONLY a JSON array of objects.\n\nEach object: { "name": "required", "description": "1-2 sentences or null", "strengths": [], "weaknesses": [], "keyFeatures": [], "notes": null }\n\nReturn [] ONLY if absolutely no company/product names are present.\n\nText: ${text.slice(0, 3000)}`,
@@ -293,7 +293,7 @@ async function handleMeetingNotes(
   ).join('\n')
 
   const analysisMsg = await anthropic.messages.create({
-    model: 'gpt-4.1-mini', max_tokens: 1200,
+    model: 'gpt-5.4-mini', max_tokens: 1200,
     messages: [{
       role: 'user',
       content: `Analyze these B2B sales meeting notes. Return ONLY valid JSON.
@@ -359,7 +359,7 @@ matchedDealId must be one of the IDs above (or null). Stage values: prospecting|
       if (pendingTodos.length > 0 && parsed.todos.length > 0) {
         try {
           const todoMsg = await anthropic.messages.create({
-            model: 'gpt-4.1-mini', max_tokens: 512,
+            model: 'gpt-5.4-mini', max_tokens: 512,
             messages: [{
               role: 'user',
               content: `You are reviewing a CRM deal's todos after a sales meeting.
@@ -504,7 +504,7 @@ Rules: only mark "complete" if explicitly mentioned as done. Only "remove" if tr
   after(async () => {
     try {
       const qaMsg = await anthropic.messages.create({
-        model: 'gpt-4.1-mini', max_tokens: 512,
+        model: 'gpt-5.4-mini', max_tokens: 512,
         messages: [{ role: 'user', content: `Extract prospect questions + ideal answers from these sales meeting notes. Return ONLY a JSON array of strings: ["Q: [question] | A: [answer]"]. Max 6. Return [] if none.\n\n${text.slice(0, 4000)}` }],
       })
       const newQAs: string[] = JSON.parse(stripJson((qaMsg.content[0] as { type: string; text: string }).text))
@@ -528,7 +528,7 @@ async function handleProductGapCreate(
   workspaceId: string, userId: string, text: string,
 ): Promise<{ reply: string; actions: ActionCard[] }> {
   const extractMsg = await anthropic.messages.create({
-    model: 'gpt-4.1-mini', max_tokens: 600,
+    model: 'gpt-5.4-mini', max_tokens: 600,
     messages: [{
       role: 'user',
       content: `Extract product/feature gap details from this text. Return ONLY JSON.
@@ -614,7 +614,7 @@ async function handleCompanyUpdate(
   workspaceId: string, userId: string, text: string,
 ): Promise<{ reply: string; actions: ActionCard[] }> {
   const extractMsg = await anthropic.messages.create({
-    model: 'gpt-4.1-mini', max_tokens: 1024,
+    model: 'gpt-5.4-mini', max_tokens: 1024,
     messages: [{
       role: 'user',
       content: `Extract company profile information from this text. Return ONLY JSON. Only include fields clearly mentioned — use null for anything not mentioned.
@@ -740,7 +740,7 @@ async function handleCollateral(
 
   // Use Haiku to extract what the user wants to generate
   const extractMsg = await anthropic.messages.create({
-    model: 'gpt-4.1-mini', max_tokens: 400,
+    model: 'gpt-5.4-mini', max_tokens: 400,
     messages: [{
       role: 'user',
       content: `Extract document generation request details. Return ONLY JSON:
@@ -898,7 +898,7 @@ async function handleProjectPlan(
   if (!matchedDeal && dealRows.length > 0) {
     const dealList = dealRows.map(d => `${d.dealName} (${d.prospectCompany})`).join(', ')
     const matchMsg = await anthropic.messages.create({
-      model: 'gpt-4.1-mini', max_tokens: 100,
+      model: 'gpt-5.4-mini', max_tokens: 100,
       messages: [{
         role: 'user',
         content: `Which of these deals does this project plan relate to? Return ONLY the exact deal name, or "none" if unclear.\nDeals: ${dealList}\nText: ${text.slice(0, 500)}`,
@@ -925,7 +925,7 @@ async function handleProjectPlan(
     : ''
 
   const extractMsg = await anthropic.messages.create({
-    model: 'gpt-4.1-mini', max_tokens: 4000,
+    model: 'gpt-5.4-mini', max_tokens: 4000,
     system: `You are a project plan extractor for a sales deal management tool. Convert ANY format of input into structured project plan JSON. Respond with ONLY a valid JSON object — no explanation, no preamble, no markdown fences.`,
     messages: [{
       role: 'user',
@@ -1025,7 +1025,7 @@ async function handleDealCreate(
   workspaceId: string, userId: string, text: string,
 ): Promise<{ reply: string; actions: ActionCard[] }> {
   const extractMsg = await anthropic.messages.create({
-    model: 'gpt-4.1-mini', max_tokens: 512,
+    model: 'gpt-5.4-mini', max_tokens: 512,
     messages: [{
       role: 'user',
       content: `Extract deal/prospect information from this text. Return ONLY JSON:
@@ -1084,7 +1084,7 @@ async function handleCaseStudyCreate(
   workspaceId: string, userId: string, text: string,
 ): Promise<{ reply: string; actions: ActionCard[] }> {
   const extractMsg = await anthropic.messages.create({
-    model: 'gpt-4.1-mini', max_tokens: 768,
+    model: 'gpt-5.4-mini', max_tokens: 768,
     messages: [{
       role: 'user',
       content: `Extract case study information from this text. Return ONLY JSON:
@@ -1158,7 +1158,7 @@ async function handleDealAction(
     : ''
 
   const identifyMsg = await anthropic.messages.create({
-    model: 'gpt-4.1-mini', max_tokens: 350,
+    model: 'gpt-5.4-mini', max_tokens: 350,
     messages: [{
       role: 'user',
       content: `User request: "${text}"
@@ -1316,7 +1316,7 @@ Return ONLY JSON:
   })()
 
   const decideMsg = await anthropic.messages.create({
-    model: 'gpt-4.1-mini', max_tokens: 1000,
+    model: 'gpt-5.4-mini', max_tokens: 1000,
     messages: [{
       role: 'user',
       content: `User request: "${text}"
@@ -1484,7 +1484,7 @@ async function handleCompetitorUpdate(
   const compList = allCompetitors.map(c => `id:${c.id} | "${c.name}"`).join('\n')
 
   const extractMsg = await anthropic.messages.create({
-    model: 'gpt-4.1-mini', max_tokens: 800,
+    model: 'gpt-5.4-mini', max_tokens: 800,
     messages: [{
       role: 'user',
       content: `Extract competitor update details from this request. Return ONLY JSON.
@@ -1584,7 +1584,7 @@ async function handleGapManage(
   const gapList = allGaps.map(g => `id:${g.id} | "${g.title}" [${g.priority}] [${g.status}]`).join('\n')
 
   const extractMsg = await anthropic.messages.create({
-    model: 'gpt-4.1-mini', max_tokens: 400,
+    model: 'gpt-5.4-mini', max_tokens: 400,
     messages: [{
       role: 'user',
       content: `Extract gap management action. Return ONLY JSON.
@@ -1816,7 +1816,7 @@ async function handlePipelineQuery(
     : ''
 
   const summaryMsg = await anthropic.messages.create({
-    model: 'gpt-4.1-mini', max_tokens: 1200,
+    model: 'gpt-5.4-mini', max_tokens: 1200,
     messages: [{
       role: 'user',
       content: `You are a B2B sales AI assistant. Produce a concise, direct pipeline summary for the CEO/sales leader.
@@ -2165,7 +2165,7 @@ When user says "this deal", "this company", "here", "this prospect" → they mea
 
     // Route to cheaper model for simple lookups
     const queryComplexity = classifyComplexity(lastText)
-    const qaModel = 'gpt-4.1-mini'
+    const qaModel = 'gpt-5.4-mini'
 
     const systemPrompt = `You are Halvex AI — the autonomous intelligence layer for this sales operation. You have COMPLETE, real-time knowledge of everything in this workspace and can act on any of it.${pageContext}
 

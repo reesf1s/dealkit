@@ -317,7 +317,7 @@ async function processMeetingNotesHelper(
 
   // LLM extraction
   const extractionMsg = await anthropic.messages.create({
-    model: 'gpt-4.1-mini',
+    model: 'gpt-5.4-mini',
     max_tokens: 2000,
     messages: [{
       role: 'user',
@@ -387,7 +387,7 @@ Rules:
       parsed = result.data
     } else {
       const retryMsg = await anthropic.messages.create({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-5.4-mini',
         max_tokens: 2000,
         messages: [{
           role: 'user',
@@ -562,7 +562,7 @@ Rules:
       meetingNotes: appendedNotes,
     }, signals)
     const narrationMsg = await anthropic.messages.create({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       max_tokens: 400,
       messages: [{ role: 'user', content: scoreNarrationPrompt(briefing) }],
     })
@@ -1431,7 +1431,7 @@ export const generate_content = {
       )
 
       const msg = await anthropic.messages.create({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-5.4-mini',
         max_tokens: 1500,
         messages: [{ role: 'user', content: promptParts.join('\n') }],
       })
@@ -1555,7 +1555,7 @@ export const answer_question = {
 
     // Use LLM to answer the question with brain context
     const msg = await anthropic.messages.create({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       max_tokens: 2000,
       messages: [{
         role: 'user',

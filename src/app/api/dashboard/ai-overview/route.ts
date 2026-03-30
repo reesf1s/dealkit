@@ -349,7 +349,7 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
         .join('\n')
 
       const focusMsg = await anthropic.messages.create({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-5.4-mini',
         max_tokens: 150,
         system: 'Convert these pre-analysed deal alerts into ≤4 action bullets. Each bullet: ≤12 words, starts with an action verb, is specific. Respond with a plain list (one bullet per line, no numbers, no dash prefix). No preamble.',
         messages: [{ role: 'user', content: dealLines }],
@@ -375,7 +375,7 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
   let aiParsed: Record<string, unknown> | null = null
   try {
     const msg = await anthropic.messages.create({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       max_tokens: 1500,
       system: `You are a senior sales strategist reviewing a sales team's pipeline. Analyse the data and respond with ONLY a JSON object — no markdown, no explanation — with these exact keys:
 - "summary": string — 2–3 sentences summarising pipeline health and outlook, using specific numbers (deals, values, win rate). Be direct and honest.

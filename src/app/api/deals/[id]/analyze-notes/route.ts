@@ -200,7 +200,7 @@ For objections, classify each into EXACTLY one theme and assign a severity:
 - "integration": specific integration requirements (Salesforce, HubSpot, etc.)
 - "other": anything that doesn't fit the above
 Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/easily addressed.` }],
-      model: 'gpt-4.1-mini', max_tokens: 2500,
+      model: 'gpt-5.4-mini', max_tokens: 2500,
     })
     // Strip markdown fences and any leading/trailing text before the JSON object
     function stripToJson(raw: string): string {
@@ -222,7 +222,7 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
         if (attempt === 1) {
           const issues = result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')
           const retryMsg = await anthropic.messages.create({
-            model: 'gpt-4.1-mini', max_tokens: 2000,
+            model: 'gpt-5.4-mini', max_tokens: 2000,
             messages: [
               { role: 'user', content: `Return ONLY valid JSON matching the exact schema. No markdown, no explanation.\n\nOriginal output:\n${rawText}\n\nValidation errors: ${issues}\n\nFix the JSON and return only the corrected object.` },
             ],
@@ -238,7 +238,7 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
         if (attempt === 1) {
           // JSON parse error — retry with explicit correction prompt
           const retryMsg = await anthropic.messages.create({
-            model: 'gpt-4.1-mini', max_tokens: 2000,
+            model: 'gpt-5.4-mini', max_tokens: 2000,
             messages: [
               { role: 'user', content: `The following response is not valid JSON. Return ONLY the corrected JSON object with no markdown fences, no explanation:\n\n${rawText}` },
             ],
@@ -269,7 +269,7 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
         // Validation failed — retry with correction prompt
         const correctionPrompt = buildCorrectionPrompt(jsonStr, JSON.stringify(result.error.issues))
         const retryMsg = await anthropic.messages.create({
-          model: 'gpt-4.1-mini', max_tokens: 1024,
+          model: 'gpt-5.4-mini', max_tokens: 1024,
           messages: [{ role: 'user', content: correctionPrompt }],
         })
         const retryText = (retryMsg.content[0] as any).type === 'text' ? (retryMsg.content[0] as any).text : ''
@@ -424,7 +424,7 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
       }
 
       const narrationMsg = await anthropic.messages.create({
-        model: 'gpt-4.1-mini', max_tokens: 400,
+        model: 'gpt-5.4-mini', max_tokens: 400,
         messages: [{ role: 'user', content: scoreNarrationPrompt(briefing, extra) }],
       })
       const narration = (narrationMsg.content[0] as any)?.text?.trim() ?? ''

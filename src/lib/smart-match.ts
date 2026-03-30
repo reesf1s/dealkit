@@ -536,7 +536,7 @@ export async function smartMatchDeal(
       try {
         const { anthropic } = await import('@/lib/ai/client')
         const msg = await anthropic.messages.create({
-          model: 'gpt-4.1-mini',
+          model: 'gpt-5.4-mini',
           max_tokens: 400,
           messages: [{
             role: 'user',

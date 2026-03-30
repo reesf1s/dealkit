@@ -1,14 +1,14 @@
 /**
  * OpenAI model name constants.
  *
- * All generation uses GPT-4.1 mini unless a specific override is needed.
+ * All generation uses GPT-5.4 mini unless a specific override is needed.
  * Routing policy:
  *   MINI   — everything: intent classification, extraction, analysis, generation
- *            GPT-4.1 mini is fast, cost-efficient, and strong enough for the
+ *            GPT-5.4 mini is fast, tool-capable, and strong enough for the
  *            assistant and extraction workloads in Halvex.
  */
 
-export const MINI = 'gpt-4.1-mini' as const
+export const MINI = 'gpt-5.4-mini' as const
 
 /** Aliases kept so existing callers that import HAIKU/SONNET still compile */
 export const HAIKU = MINI

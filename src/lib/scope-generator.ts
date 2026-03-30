@@ -82,7 +82,7 @@ Linear issue: ${input.issueTitle}${issueDescContext}
 Generate the scoped user story and acceptance criteria for this issue.`
 
   const response = await anthropic.messages.create({
-    model: 'gpt-4.1-mini',
+    model: 'gpt-5.4-mini',
     max_tokens: 512,
     system: SYSTEM_PROMPT,
     messages: [

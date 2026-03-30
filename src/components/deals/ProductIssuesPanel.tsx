@@ -305,7 +305,7 @@ export function ProductIssuesPanel({ dealId }: Props) {
             }}
           >
             <Plus size={12} />
-            Link
+            Add known issue
           </button>
         </div>
       </div>

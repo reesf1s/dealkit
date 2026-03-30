@@ -223,9 +223,9 @@ function RevenueImpactStrip({ currency }: { currency: string }) {
   )
 }
 
-// ─── Core Loop Status ───────────────────────────────────────────────────────
+// ─── Linked Issue Status ────────────────────────────────────────────────────
 
-function CoreLoopCard({ currency }: { currency: string }) {
+function CoreIssueCard({ currency }: { currency: string }) {
   const { data: loopsRes, isLoading } = useSWR<{ data: LoopEntry[] }>(
     '/api/loops', fetcher,
     { revalidateOnFocus: false, dedupingInterval: 300000 },
@@ -244,10 +244,10 @@ function CoreLoopCard({ currency }: { currency: string }) {
     return (
       <div style={{ ...glass.card, padding: '24px', textAlign: 'center' }}>
         <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', margin: '0 0 4px' }}>
-          No active loops yet
+          No linked issues yet
         </p>
         <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>
-          Log a deal and Halvex will match it to Linear issues automatically.
+          Review a deal in Claude with Halvex MCP, then saved issue links will appear here.
         </p>
       </div>
     )
@@ -267,8 +267,8 @@ function CoreLoopCard({ currency }: { currency: string }) {
   }
 
   const statuses = [
-    { label: 'Identified', count: identified.length, revenue: revenueByStatus(identified), color: '#f59e0b', dotPulse: true },
-    { label: 'In Cycle', count: inCycle.length, revenue: revenueByStatus(inCycle), color: '#3b82f6', dotPulse: false },
+    { label: 'Needs review', count: identified.length, revenue: revenueByStatus(identified), color: '#f59e0b', dotPulse: true },
+    { label: 'In product', count: inCycle.length, revenue: revenueByStatus(inCycle), color: '#3b82f6', dotPulse: false },
     { label: 'Shipped', count: shipped.length, revenue: revenueByStatus(shipped), color: '#22c55e', dotPulse: false },
   ]
 
@@ -329,9 +329,9 @@ function CoreLoopCard({ currency }: { currency: string }) {
         </div>
       )}
 
-      {/* Flow diagram: Deal → Issue → Ship → Close */}
+      {/* Flow diagram: Deal → Review → Build → Follow up */}
       <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-        {['Deal logged', 'Issues matched', 'PM prioritizes', 'Issue shipped', 'Deal closes'].map((step, i) => (
+        {['Deal logged', 'Claude reviews', 'Issue linked', 'Issue shipped', 'Rep follows up'].map((step, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{
               fontSize: '9px', fontWeight: 500, color: 'rgba(255,255,255,0.45)',
@@ -462,7 +462,7 @@ function ActiveLoopsTable({ currency }: { currency: string }) {
   if (loops.length === 0) {
     return (
       <div style={{ ...glass.card, padding: '14px', textAlign: 'center' }}>
-        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', margin: 0 }}>No active loops yet.</p>
+        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', margin: 0 }}>No linked issues yet.</p>
       </div>
     )
   }
@@ -503,9 +503,9 @@ function ActiveLoopsTable({ currency }: { currency: string }) {
             const statusColor = loop.loopStatus === 'in_cycle' ? '#3b82f6'
               : loop.loopStatus === 'shipped' ? '#22c55e'
               : '#f59e0b' // identified
-            const statusLabel = loop.loopStatus === 'in_cycle' ? 'In Cycle'
+            const statusLabel = loop.loopStatus === 'in_cycle' ? 'In product'
               : loop.loopStatus === 'shipped' ? 'Shipped'
-              : 'Identified'
+              : 'Needs review'
 
             const days = loop.daysInStatus
             const warn = days !== null && days > 5
@@ -911,13 +911,13 @@ function IssuesUnlockRevenueCard({ currency }: { currency: string }) {
       <div style={{ ...cardHeader }}>🔧 PM — ship these to unlock revenue</div>
       {scored.length === 0 ? (
         <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>
-          Rematch deals to Linear issues to see which features unlock the most revenue.
+          Save issue links from Claude review to see which features unlock the most revenue.
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {scored.map((issue) => {
             const statusColor = issue.status === 'in_cycle' ? '#3b82f6' : '#f59e0b'
-            const statusLabel = issue.status === 'in_cycle' ? 'In Cycle' : 'Identified'
+            const statusLabel = issue.status === 'in_cycle' ? 'In product' : 'Needs review'
             const daysUntilClose = issue.closestCloseDate
               ? Math.ceil((issue.closestCloseDate.getTime() - Date.now()) / 86400000)
               : null
@@ -1103,8 +1103,8 @@ export default function TodayPage() {
         <IssuesUnlockRevenueCard currency={currency} />
       </div>
 
-      {/* Active Loops — detail view below the fold */}
-      <SectionLabel label="Active loops" />
+      {/* Linked issues — detail view below the fold */}
+      <SectionLabel label="Linked issues" />
       <ActiveLoopsTable currency={currency} />
     </div>
   )

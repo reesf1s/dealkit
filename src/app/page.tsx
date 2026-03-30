@@ -4,10 +4,10 @@ import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Halvex — Revenue-to-Product Intelligence',
-  description: 'Halvex connects sales context, product work, and AI review so teams can understand which features are blocking revenue and track the issues that matter.',
+  title: 'Halvex — Deal Intelligence CRM',
+  description: 'Halvex is a deal intelligence CRM that connects sales context, product work, and AI review so teams can understand which features are blocking revenue and act faster.',
   openGraph: {
-    title: 'Halvex — Revenue-to-Product Intelligence',
+    title: 'Halvex — Deal Intelligence CRM',
     description: 'Stop losing deals to product blockers. Halvex gives your team shared deal intelligence, Linear context, and AI-assisted issue review.',
     type: 'website',
     url: 'https://halvex.ai',
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Halvex — Revenue-to-Product Intelligence',
+    title: 'Halvex — Deal Intelligence CRM',
     description: 'Stop losing deals to product blockers.',
   },
 }
@@ -121,7 +121,7 @@ export default async function LandingPage() {
           textTransform: 'uppercase', marginBottom: '28px',
         }}>
           <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'rgba(255,255,255,0.70)', animation: 'pulse-slow 2s infinite' }} />
-          Revenue-to-Product Intelligence
+          Deal Intelligence CRM
         </div>
 
         <h1 className="hero-h1" style={{
@@ -205,15 +205,15 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* ── The Loop Section ──────────────────────────────────────────────────── */}
+      {/* ── Product Intelligence Section ─────────────────────────────────────── */}
       <section style={{ padding: '80px 24px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ maxWidth: '960px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '48px' }}>
             <h2 style={{ fontSize: '32px', fontWeight: 800, letterSpacing: '-0.02em', color: '#f1f5f9', marginBottom: '12px' }}>
-              The Revenue-to-Product loop, automated
+              Deal intelligence that keeps sales and product aligned
             </h2>
             <p style={{ fontSize: '16px', color: 'rgba(241,245,249,0.55)', maxWidth: '480px', margin: '0 auto' }}>
-              Four steps that turn sales context into product decisions your team can trust.
+              Four live steps that turn deal context into prioritised product visibility your team can act on.
             </p>
           </div>
 
@@ -224,7 +224,7 @@ export default async function LandingPage() {
                 color: '#10b981', bg: 'rgba(16,185,129,0.06)', border: 'rgba(16,185,129,0.14)',
               },
               {
-                step: '02', title: 'Halvex detects blockers', body: 'Halvex ranks product blockers by revenue at stake. If SSO is putting £240k at risk, your team sees it fast.',
+                step: '02', title: 'Halvex surfaces blockers', body: 'Halvex ranks product blockers by revenue at stake. If SSO is putting £240k at risk, your team sees it fast.',
                 color: 'rgba(255,255,255,0.80)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.06)',
               },
               {
@@ -275,7 +275,7 @@ export default async function LandingPage() {
                   'See which features are blocking the most ARR',
                   'Every saved issue link carries deal context back into Halvex',
                   'Prioritise by revenue impact, not gut feel',
-                  'Close the loop: ship it → reps get notified',
+                  'When work ships, reps can follow up with live product context',
                   'Win/loss data feeds directly into your roadmap',
                 ],
               },
@@ -386,7 +386,7 @@ export default async function LandingPage() {
                 )}
                 <div style={{ fontSize: '15px', fontWeight: 700, color: '#f1f5f9', marginBottom: '10px' }}>{tier.name}</div>
                 <div style={{ marginBottom: '20px', fontSize: '13px', color: 'rgba(241,245,249,0.55)', lineHeight: 1.7 }}>
-                  {tier.featured ? 'Where Halvex makes the judgment loop trustworthy.' : 'A live part of the current product experience.'}
+                  {tier.featured ? 'Where Halvex makes product review trustworthy with shared context.' : 'A live part of the current product experience.'}
                 </div>
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
                   {tier.features.map((f, i) => (
@@ -437,7 +437,7 @@ export default async function LandingPage() {
         maxWidth: '960px', margin: '0 auto',
       }}>
         <div style={{ fontSize: '12px', color: 'rgba(241,245,249,0.35)' }}>
-          Halvex — The Revenue-to-Product Intelligence platform
+          Halvex — The deal intelligence CRM
         </div>
         <div style={{ display: 'flex', gap: '20px' }}>
           {[

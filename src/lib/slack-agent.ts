@@ -370,7 +370,7 @@ export async function handleSlackMessage(
   let responseText: string
   try {
     const result = await generateText({
-      model: getAnthropicClient()('gpt-4.1-mini'),
+      model: getAnthropicClient()('gpt-5.4-mini'),
       messages: [
         {
           role: 'user',

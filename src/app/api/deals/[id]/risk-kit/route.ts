@@ -89,7 +89,7 @@ COLLATERAL_SUGGESTION: [One specific piece of content or proof point to share â€
 URGENCY_REASON: [One honest, deal-specific reason to act now â€” without manufactured urgency. E.g. upcoming budget freeze, competitor evaluation window, their stated timeline.]`
 
     const msg = await anthropic.messages.create({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       max_tokens: 1000,
       messages: [{ role: 'user', content: prompt }],
     })

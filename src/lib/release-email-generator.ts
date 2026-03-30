@@ -223,7 +223,7 @@ export async function generateReleaseEmail(
   ].filter(Boolean).join('\n')
 
   const { text } = await generateText({
-    model: anthropic('gpt-4.1-mini'),
+    model: anthropic('gpt-5.4-mini'),
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],
     maxTokens: 700,
@@ -332,7 +332,7 @@ export async function generateBatchReleaseEmail(
   ].filter(Boolean).join('\n')
 
   const { text } = await generateText({
-    model: anthropic('gpt-4.1-mini'),
+    model: anthropic('gpt-5.4-mini'),
     system: BATCH_SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],
     maxTokens: 900,

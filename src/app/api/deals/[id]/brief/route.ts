@@ -65,7 +65,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     }
 
     const response = await anthropic.messages.create({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       max_tokens: 280,
       messages: [
         {

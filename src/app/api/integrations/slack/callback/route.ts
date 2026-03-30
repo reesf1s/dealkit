@@ -138,12 +138,12 @@ async function sendIntroDm(botToken: string, slackUserId: string): Promise<void>
   const dmChannel = await slackOpenDm(botToken, slackUserId)
   if (!dmChannel) return
 
-  const msg = `👋 Hi! I'm *Halvex* — your revenue-to-product loop bot.\n\nOnce you've added a deal, ask me about it here:\n\n• _"latest on Acme"_ → I'll show you deal health + matching Linear issues\n• _"yes"_ → I'll request prioritisation from your product team\n• When issues ship, I'll draft a follow-up email for you automatically\n\nLet's get started → add your first deal in the onboarding flow.`
+  const msg = `👋 Hi! I'm *Halvex* — your deal intelligence copilot.\n\nOnce you've added a deal, ask me about it here:\n\n• _"latest on Acme"_ → I'll show you deal health + linked Linear issues\n• _"what's at risk this week?"_ → I'll surface pipeline risk and blockers\n• When issues ship, I'll help draft the follow-up email\n\nLet's get started → add your first deal in the onboarding flow.`
 
   await slackPostMessage(
     botToken,
     dmChannel,
     markdownToBlocks(msg),
-    "Hi! I'm Halvex — your revenue-to-product loop bot.",
+    "Hi! I'm Halvex — your deal intelligence copilot.",
   )
 }

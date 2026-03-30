@@ -52,7 +52,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     ].filter(Boolean).join('\n')
 
     const msg = await anthropic.messages.create({
-      model: 'gpt-4.1-mini', max_tokens: 900,
+      model: 'gpt-5.4-mini', max_tokens: 900,
       system: 'You are a JSON-only API. You never use markdown fences, prose, or explanation. Every response is a raw JSON array starting with [ and ending with ].',
       messages: [{ role: 'user', content: `Extract success criteria from this proposal text for the following deal.
 

@@ -93,7 +93,7 @@ export async function executeWorkflow(
   const systemPrompt = `You are a sales intelligence assistant. Summarize the data below into 1-2 concise sentences (max 30 words total) for a ${wf.outputTarget === 'slack' ? 'Slack notification' : 'daily briefing'}. Start with the most important insight. No preamble.`
 
   const msg = await anthropic.messages.create({
-    model: 'gpt-4.1-mini',
+    model: 'gpt-5.4-mini',
     max_tokens: 80,
     system: systemPrompt,
     messages: [

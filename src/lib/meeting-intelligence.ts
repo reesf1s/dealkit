@@ -41,7 +41,7 @@ const VALID_CONTEXTS = ['deal_blocker', 'nice_to_have', 'on_roadmap', 'competito
 export async function extractFeaturesFromNotes(notes: string): Promise<ExtractionResult> {
   try {
     const msg = await anthropic.messages.create({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       max_tokens: 400,
       messages: [{
         role: 'user',

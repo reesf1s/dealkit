@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     if (!text?.trim()) return NextResponse.json({ error: 'No text provided' }, { status: 400 })
 
     const msg = await anthropic.messages.create({
-      model: 'gpt-4.1-mini',
+      model: 'gpt-5.4-mini',
       max_tokens: 1024,
       messages: [{
         role: 'user',
