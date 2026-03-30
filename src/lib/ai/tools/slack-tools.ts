@@ -378,7 +378,7 @@ export const halvex_scope_issue_to_cycle = {
       .limit(1)
 
     if (!integration) {
-      return { result: 'Linear is not connected. Please connect Linear in Settings.' }
+      return { result: 'Linear is not available inside Halvex for this workspace. Use Claude with your own Linear access, then save confirmed links back into Halvex.' }
     }
 
     const apiKey = decrypt(integration.apiKeyEnc, getEncryptionKey())
@@ -595,7 +595,7 @@ export const halvex_get_upcoming_cycle = {
       .limit(1)
 
     if (!integration) {
-      return { result: 'Linear is not connected. Please connect Linear in Settings.' }
+      return { result: 'Linear is not available inside Halvex for this workspace. Use Claude with your own Linear access if you need live cycle data.' }
     }
 
     const apiKey = decrypt(integration.apiKeyEnc, getEncryptionKey())
@@ -725,7 +725,7 @@ export const halvex_get_linear_issue = {
     // Fall back to live Linear API
     const apiKey = await getLinearApiKey(ctx.workspaceId)
     if (!apiKey) {
-      return { result: `Issue ${issueId} not found in cache. Connect Linear in Settings to sync issues.` }
+      return { result: `Issue ${issueId} is not in Halvex cache yet. Review it from Claude using your own Linear connection, then save the right links back into Halvex.` }
     }
 
     try {
@@ -1280,7 +1280,7 @@ export const halvex_bulk_scope_to_cycle = {
       .limit(1)
 
     if (!integration) {
-      return { result: 'Linear is not connected. Please connect Linear in Settings.' }
+      return { result: 'Linear is not available inside Halvex for this workspace. Use Claude with your own Linear access if you need to inspect cycles directly.' }
     }
 
     const apiKey = decrypt(integration.apiKeyEnc, getEncryptionKey())

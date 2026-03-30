@@ -5,10 +5,10 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Halvex — Deal Intelligence CRM',
-  description: 'Halvex is a deal intelligence CRM that connects sales context, product work, and AI review so teams can understand which features are blocking revenue and act faster.',
+  description: 'Halvex is a deal intelligence CRM that connects sales context, product outcomes, and AI review so teams can understand what is blocking revenue and act faster.',
   openGraph: {
     title: 'Halvex — Deal Intelligence CRM',
-    description: 'Stop losing deals to product blockers. Halvex gives your team shared deal intelligence, Linear context, and AI-assisted issue review.',
+    description: 'Stop losing deals to product blockers. Halvex gives your team shared deal intelligence, CRM context, and AI-assisted issue review.',
     type: 'website',
     url: 'https://halvex.ai',
     siteName: 'Halvex',
@@ -228,7 +228,7 @@ export default async function LandingPage() {
                 color: 'rgba(255,255,255,0.80)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.06)',
               },
               {
-                step: '03', title: 'AI reviews the backlog', body: 'Claude reviews the deal against synced Linear context and saves only the genuinely relevant issue links back into Halvex.',
+                step: '03', title: 'Claude reviews externally', body: 'Claude uses Halvex MCP plus its own tool access to review the deal and save only the genuinely relevant issue links back into Halvex.',
                 color: '#3b82f6', bg: 'rgba(59,130,246,0.06)', border: 'rgba(59,130,246,0.14)',
               },
               {
@@ -263,7 +263,7 @@ export default async function LandingPage() {
                   'Deal health ring shows win probability at a glance',
                   'Competitive battlecards built from your actual wins',
                   'Ask anything in Slack: "What\'s blocking Acme?"',
-                  'Review saved Linear issue links on the deal itself',
+                  'Review saved issue links on the deal itself',
                   'Use Ask AI or Claude MCP to inspect blockers quickly',
                 ],
               },
@@ -321,7 +321,7 @@ export default async function LandingPage() {
           <div className="int-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', maxWidth: '720px', margin: '0 auto' }}>
             {[
               { name: 'HubSpot', color: '#ff7a59' },
-              { name: 'Linear', color: '#5e6ad2' },
+              { name: 'Claude', color: '#5e6ad2' },
               { name: 'Slack', color: '#4a154b' },
               { name: 'Claude MCP', color: 'rgba(255,255,255,0.80)' },
             ].map(int => (
@@ -362,7 +362,7 @@ export default async function LandingPage() {
               },
               {
                 name: 'Product review', featured: true,
-                features: ['Sync Linear into Halvex', 'Review backlog relevance with Claude MCP', 'Save high-confidence issue links back into the deal'],
+                features: ['Use Claude MCP to review deal blockers', 'Save high-confidence issue links back into the deal', 'Keep issue visibility inside the CRM, not in side workflows'],
               },
               {
                 name: 'Shared execution', featured: false,

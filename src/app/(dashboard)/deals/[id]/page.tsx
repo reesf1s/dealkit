@@ -99,107 +99,6 @@ function highlightSignals(text: string, competitors: string[]): string {
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
-// ─── Loop state banner ───────────────────────────────────────────────────────
-
-function LoopStateBanner({ dealId }: { dealId: string }) {
-  const { data, isLoading, mutate } = useSWR(`/api/deals/${dealId}/loop-status`, fetcher, {
-    revalidateOnFocus: false, refreshInterval: 30000,
-  })
-  const [starting, setStarting] = useState(false)
-  const loop = data?.data
-
-  if (isLoading || !loop) return null
-
-  async function handleStartLoop() {
-    setStarting(true)
-    try {
-      await fetch(`/api/deals/${dealId}/start-loop`, { method: 'POST' })
-      await mutate()
-    } finally { setStarting(false) }
-  }
-
-  const baseStyle: React.CSSProperties = {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    gap: '12px', padding: '12px 16px', borderRadius: '10px',
-    fontSize: '13px', flexWrap: 'wrap' as const,
-  }
-
-  if (loop.state === 'none') {
-    return (
-      <div style={{ ...baseStyle, border: '1px dashed rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.03)' }}>
-        <span style={{ color: 'var(--text-tertiary)' }}>No loop active for this deal</span>
-        <button
-          onClick={handleStartLoop}
-          disabled={starting}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '5px',
-            padding: '6px 14px', borderRadius: '7px',
-            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
-            color: 'var(--accent-primary)', fontSize: '12px', fontWeight: 600,
-            cursor: starting ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
-            opacity: starting ? 0.6 : 1,
-          }}
-        >
-          <Zap size={11} /> {starting ? 'Starting…' : 'Start Loop'}
-        </button>
-      </div>
-    )
-  }
-
-  if (loop.state === 'awaiting_approval') {
-    const minsAgo = loop.requestedAt
-      ? Math.floor((Date.now() - new Date(loop.requestedAt).getTime()) / 60000)
-      : null
-    return (
-      <div style={{ ...baseStyle, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f59e0b', fontWeight: 500 }}>
-          <span>⏳</span> Awaiting product team approval
-          {minsAgo !== null && (
-            <span style={{ fontSize: '11px', fontWeight: 400, color: 'rgba(245,158,11,0.7)' }}>
-              · Requested {minsAgo < 60 ? `${minsAgo}m ago` : `${Math.floor(minsAgo / 60)}h ago`}
-            </span>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  if (loop.state === 'in_cycle') {
-    return (
-      <div style={{ ...baseStyle, background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.25)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#60a5fa', fontWeight: 500 }}>
-          <span>🔄</span> {loop.issueCount} issue{loop.issueCount !== 1 ? 's' : ''} in the product cycle
-        </div>
-        {loop.issues?.length > 0 && (
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' as const }}>
-            {loop.issues.slice(0, 3).map((issue: any) => (
-              <span key={issue.linearIssueId} style={{
-                fontSize: '11px', padding: '2px 8px', borderRadius: '100px',
-                background: 'rgba(96,165,250,0.12)', color: '#93c5fd',
-              }}>
-                {issue.linearIssueId}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  if (loop.state === 'shipped') {
-    const deployedDate = loop.deployedAt ? new Date(loop.deployedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : null
-    return (
-      <div style={{ ...baseStyle, background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.25)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-success)', fontWeight: 500 }}>
-          <span>✅</span> Loop closed — {loop.deployedCount} feature{loop.deployedCount !== 1 ? 's' : ''} shipped{deployedDate ? ` ${deployedDate}` : ''}
-        </div>
-      </div>
-    )
-  }
-
-  return null
-}
-
 // ─── Workspace members hook ─────────────────────────────────────────────────
 
 interface WorkspaceMember {
@@ -4082,11 +3981,8 @@ function LinearColumn({ dealId }: { dealId: string }) {
   const [preparingReview, setPreparingReview] = useState(false)
   const [reviewStatus, setReviewStatus] = useState<'copied' | 'error' | null>(null)
 
-  const { data: statusData } = useSWR<{ data: { connected: boolean; teamName?: string | null } }>(
-    '/api/integrations/linear/status', fetcher, { revalidateOnFocus: false }
-  )
   const { data: linksData, mutate: mutateLinks } = useSWR<{ data: any[] }>(
-    statusData?.data?.connected ? `/api/deals/${dealId}/linear-links` : null,
+    `/api/deals/${dealId}/linear-links`,
     fetcher,
   )
 
@@ -4105,17 +4001,6 @@ function LinearColumn({ dealId }: { dealId: string }) {
     } finally {
       setPreparingReview(false)
     }
-  }
-
-  if (!statusData?.data?.connected) {
-    return (
-      <div className="glass-card" style={{ padding: '16px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.40)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>Linked Issues</div>
-        <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.30)', textAlign: 'center', padding: '20px 0', lineHeight: 1.5 }}>
-          Connect Linear in Settings to see linked issues
-        </div>
-      </div>
-    )
   }
 
   const allLinks = linksData?.data ?? []

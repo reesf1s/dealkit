@@ -1,6 +1,6 @@
 /**
  * POST /api/deals/[id]/linear-links/[linkId]/confirm
- * Confirm a suggested link and write deal context to Linear.
+ * Confirm a suggested link inside Halvex.
  */
 export const dynamic = 'force-dynamic'
 
@@ -10,7 +10,6 @@ import { getWorkspaceContext } from '@/lib/workspace'
 import { db } from '@/lib/db'
 import { eq, and } from 'drizzle-orm'
 import { dealLinearLinks, dealLogs, mcpActionLog } from '@/lib/db/schema'
-import { writeHalvexSectionToLinear } from '@/lib/linear-signal-match'
 
 type Params = { params: Promise<{ id: string; linkId: string }> }
 
@@ -45,11 +44,6 @@ export async function POST(_req: NextRequest, { params }: Params) {
       .returning()
 
     if (!updated) return NextResponse.json({ error: 'Link not found' }, { status: 404 })
-
-    // Write deal context to Linear issue (fire-and-forget — don't block response)
-    writeHalvexSectionToLinear(workspaceId, updated.linearIssueId).catch(err =>
-      console.error('[confirm-link] writeHalvexSectionToLinear failed:', err),
-    )
 
     // Log the action
     await db.insert(mcpActionLog).values({
