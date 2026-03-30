@@ -473,9 +473,8 @@ async function _runExtractionBackfill(workspaceId: string): Promise<{ processed:
     const dealsToProcess = Array.isArray(rows) ? rows : (rows as any).rows ?? []
     if (dealsToProcess.length === 0) return stats
 
-    const Anthropic = (await import('@anthropic-ai/sdk')).default
+    const { anthropic } = await import('@/lib/ai/client')
     const { NoteExtractionSchema } = await import('@/lib/extraction-schema')
-    const anthropic = new Anthropic()
 
     for (const deal of dealsToProcess) {
       try {
@@ -486,7 +485,7 @@ async function _runExtractionBackfill(workspaceId: string): Promise<{ processed:
 
         // Run the extraction block only (no full analyze-notes prompt — lighter call)
         const msg = await anthropic.messages.create({
-          model: 'claude-haiku-4-5-20251001',
+          model: 'gpt-4.1-mini',
           max_tokens: 1024,
           messages: [{
             role: 'user',
@@ -2398,8 +2397,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown')
   // Generate dealActions via Claude Haiku for at-risk/stale deals
   let dealActions: WorkspaceBrain['dealActions'] | undefined
   try {
-    const Anthropic = (await import('@anthropic-ai/sdk')).default
-    const anthropicClient = new Anthropic()
+    const { anthropic: anthropicClient } = await import('@/lib/ai/client')
 
     const dealsForActions = [
       ...(urgentDeals ?? []).slice(0, 2).map(d => {
@@ -2420,7 +2418,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown')
       const winPatterns = (objectionWinMap ?? []).slice(0, 3).map(p => `"${p.theme}" → ${Math.round(p.winRateWithTheme * 100)}% win rate`).join(', ') || 'No patterns yet'
 
       const resp = await anthropicClient.messages.create({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'gpt-4.1-mini',
         max_tokens: 800,
         messages: [{
           role: 'user',
@@ -2470,8 +2468,7 @@ Only return the JSON array, nothing else.`
       (Date.now() - new Date(previousBrain.dailyBriefingGeneratedAt).getTime()) > 6 * 60 * 60 * 1000 // 6 hours
 
     if (shouldRegenerate && (dealActions?.length || staleDeals?.length)) {
-      const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const anthropicClient = new Anthropic()
+      const { anthropic: anthropicClient } = await import('@/lib/ai/client')
 
       const topAction = dealActions?.[0]
       const loopStats = loopSummary
@@ -2485,7 +2482,7 @@ Only return the JSON array, nothing else.`
       ].filter(Boolean).join('. ')
 
       const resp = await anthropicClient.messages.create({
-        model: 'claude-haiku-4-5-20251001',
+        model: 'gpt-4.1-mini',
         max_tokens: 150,
         messages: [{
           role: 'user',

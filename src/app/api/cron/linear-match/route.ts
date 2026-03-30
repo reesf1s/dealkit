@@ -1,7 +1,7 @@
 /**
  * GET /api/cron/linear-match
- * Nightly cron (4 AM) — sync all Linear integrations and run signal matching
- * for all open deals across all connected workspaces.
+ * Nightly cron (4 AM) — sync all Linear integrations and refresh loop statuses
+ * for all connected workspaces.
  *
  * Authenticated by CRON_SECRET header (set in Vercel env vars).
  */
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
       totalSynced += syncResult.synced
 
       await syncLoopStatuses(workspaceId)
-      // Note: full rematch (smartMatchAllDeals) is only triggered by user via /rematch button
+      // Deal-to-issue review is Claude-assisted; this cron only keeps sync data fresh.
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       errors.push(`workspace=${workspaceId.slice(0, 8)}: ${msg}`)

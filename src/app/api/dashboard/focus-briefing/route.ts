@@ -82,11 +82,10 @@ export async function POST() {
     const staleDeals = brain?.staleDeals?.slice(0, 5).map(s => `${s.company}: ${s.daysSinceUpdate}d stale`).join(', ') || 'none'
     const urgentDeals = brain?.urgentDeals?.slice(0, 5).map(u => `${u.company}: ${u.reason}`).join(', ') || 'none'
 
-    const Anthropic = (await import('@anthropic-ai/sdk')).default
-    const client = new Anthropic()
+    const { anthropic } = await import('@/lib/ai/client')
 
-    const resp = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+    const resp = await anthropic.messages.create({
+      model: 'gpt-4.1-mini',
       max_tokens: 600,
       messages: [{
         role: 'user',

@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { and, eq } from 'drizzle-orm'
 import { streamText, tool, jsonSchema } from 'ai'
-import { createAnthropic } from '@ai-sdk/anthropic'
+import { createOpenAI } from '@ai-sdk/openai'
 import { z } from 'zod'
 
 import { db } from '@/lib/db'
@@ -20,6 +20,7 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { PLAN_LIMITS } from '@/lib/stripe/plans'
 import { allTools } from '@/lib/ai/tools'
 import { normaliseParams } from '@/lib/ai/tool-wrapper'
+import { sendAgentGradeTranscript } from '@/lib/agentgrade'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,9 +55,15 @@ export interface PendingAction {
   completedTexts: string[]
 }
 
-// ── Anthropic client ─────────────────────────────────────────────────────────
+// ── OpenAI client ────────────────────────────────────────────────────────────
 
-const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+function getOpenAIClient() {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    return null
+  }
+  return createOpenAI({ apiKey })
+}
 
 // ── Active deal context builder ──────────────────────────────────────────────
 
@@ -299,6 +306,14 @@ Every deal mutation triggers a brain rebuild. The brain powers ML scoring, deal 
 
 export async function POST(req: NextRequest) {
   try {
+    const openai = getOpenAIClient()
+    if (!openai) {
+      return NextResponse.json(
+        { error: 'Ask AI is unavailable because OPENAI_API_KEY is not configured.' },
+        { status: 503 },
+      )
+    }
+
     const { userId } = await auth()
     if (!userId) return new Response('Unauthorized', { status: 401 })
 
@@ -309,7 +324,7 @@ export async function POST(req: NextRequest) {
     if (!rl.allowed) return rateLimitResponse(rl.resetAt)
 
     const body = await req.json()
-    const { messages, activeDealId, currentPage, confirmAction } = body
+    const { messages, activeDealId, currentPage, confirmAction, conversationId } = body
 
     // ── Confirmed action (legacy confirmation flow) ──────────────────────────
     if (confirmAction) {
@@ -347,6 +362,12 @@ export async function POST(req: NextRequest) {
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       })
     }
+
+    await sendAgentGradeTranscript({
+      conversationId,
+      customerIdentifier: userId,
+      messages,
+    })
 
     // ── Context window guard: trim to last 20 non-system messages ─────────────
     let trimmedMessages = messages
@@ -555,14 +576,26 @@ export async function POST(req: NextRequest) {
     let result: ReturnType<typeof streamText>
     try {
       const streamPromise = streamText({
-        model: anthropic('claude-sonnet-4-6'),
+        model: openai('gpt-4.1-mini'),
         system: systemPrompt,
         messages: trimmedMessages,
         tools: sdkTools,
         maxSteps: 5,
         maxTokens: 4096,
-        onFinish: async () => {
-          after(async () => { await requestBrainRebuild(wsCtx.workspaceId, 'agent_tool_call') })
+        onFinish: async ({ text }) => {
+          after(async () => {
+            await Promise.allSettled([
+              requestBrainRebuild(wsCtx.workspaceId, 'agent_tool_call'),
+              sendAgentGradeTranscript({
+                conversationId,
+                customerIdentifier: userId,
+                messages: [
+                  ...messages,
+                  ...(text.trim() ? [{ role: 'assistant', content: text }] : []),
+                ],
+              }),
+            ])
+          })
         },
       })
 

@@ -1,15 +1,18 @@
 /**
  * POST /api/integrations/linear/rematch
- * Runs smart matching for all open deals — product gaps to Linear issues.
- * Quality over quantity: max 5 links per deal, only genuine product blockers.
+ * Legacy endpoint retained for UI compatibility.
+ * Internal rematching has been replaced by Claude-assisted issue review.
  */
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { count, eq } from 'drizzle-orm'
+import { db } from '@/lib/db'
+import { dealLinearLinks } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { smartMatchAllDeals } from '@/lib/smart-match'
+import { ISSUE_LINKING_MODE } from '@/lib/issue-linking'
 
 export async function POST() {
   try {
@@ -17,21 +20,20 @@ export async function POST() {
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { workspaceId } = await getWorkspaceContext(userId)
-
-    console.log(`[rematch] Starting smart rematch for workspace ${workspaceId}`)
-    const result = await smartMatchAllDeals(workspaceId)
-    console.log(`[rematch] Complete: ${result.totalLinked} linked, ${result.totalCreated} created`)
+    const [{ totalLinks }] = await db
+      .select({ totalLinks: count() })
+      .from(dealLinearLinks)
+      .where(eq(dealLinearLinks.workspaceId, workspaceId))
 
     return NextResponse.json({
       data: {
-        matched: result.totalLinked + result.totalCreated,
-        linked: result.totalLinked,
-        created: result.totalCreated,
-        deals: result.results.length,
-        details: result.results
-          .filter(r => r.linked > 0 || r.created > 0)
-          .map(r => `${r.dealName}: ${r.linked} linked, ${r.created} created`),
-        ...(result.linearErrors && result.linearErrors.length > 0 && { linearErrors: result.linearErrors }),
+        mode: ISSUE_LINKING_MODE,
+        matched: Number(totalLinks),
+        linked: Number(totalLinks),
+        created: 0,
+        deals: 0,
+        details: [],
+        message: 'Internal rematching is disabled. Review deals in Claude using your Halvex MCP connection and save links back into Halvex.',
       },
     })
   } catch (e: unknown) {

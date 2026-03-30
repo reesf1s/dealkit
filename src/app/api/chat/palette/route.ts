@@ -2,12 +2,13 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { streamText } from 'ai'
+import { createOpenAI } from '@ai-sdk/openai'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { getWorkspaceBrain } from '@/lib/workspace-brain'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
-const anthropic = new Anthropic()
+const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
 // Lightweight streaming endpoint for the command palette.
 // Unlike /api/chat (which loads all deals/competitors/case studies for full CRUD support),
@@ -78,16 +79,15 @@ export async function POST(req: NextRequest) {
 
     const context = contextLines.join('\n')
 
-    // Stream response — same SSE format as /api/chat: `data: { t: "..." }`
+    // Stream response — SSE format: `data: { t: "..." }`
     const encoder = new TextEncoder()
 
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          const aiStream = await anthropic.messages.create({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 500,
-            stream: true,
+          const result = streamText({
+            model: openai('gpt-4.1-mini'),
+            maxTokens: 500,
             system: `You are a concise B2B sales intelligence assistant. Answer in 2-4 sentences maximum. Be specific and direct — use actual numbers and deal names from the context. Never make up data. If the context doesn't cover what was asked, say so honestly in one sentence.`,
             messages: [{
               role: 'user',
@@ -95,10 +95,8 @@ export async function POST(req: NextRequest) {
             }],
           })
 
-          for await (const event of aiStream) {
-            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ t: event.delta.text })}\n\n`))
-            }
+          for await (const delta of (await result).textStream) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ t: delta })}\n\n`))
           }
 
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`))

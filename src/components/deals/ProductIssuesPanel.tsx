@@ -15,9 +15,10 @@
  * └─────────────────────────────────────────────────────┘
  */
 
+import Link from 'next/link'
 import { useState, useCallback } from 'react'
 import useSWR from 'swr'
-import { ExternalLink, Plus, Check, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
+import { ExternalLink, Plus, Check, X, Loader2, ChevronDown, ChevronUp, Copy, Sparkles } from 'lucide-react'
 import { useToast } from '@/components/shared/Toast'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,7 +43,20 @@ interface DealLinearLink {
 
 interface LinearStatus {
   connected: boolean
+  degraded?: boolean
+  syncError?: string | null
+  issueCount?: number
   teamName?: string | null
+  matchingMode?: string
+  matchingSummary?: string
+}
+
+interface DealLinksResponse {
+  data: DealLinearLink[]
+  meta?: {
+    mode?: string
+    reviewPrompt?: string
+  }
 }
 
 const fetcher = (url: string) =>
@@ -75,10 +89,9 @@ export function ProductIssuesPanel({ dealId }: Props) {
   const [showLinkInput, setShowLinkInput] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null) // linkId being acted on
   const [expandedStory, setExpandedStory] = useState<string | null>(null) // linkId with expanded user story
-  const [discovering, setDiscovering] = useState(false)
 
   // Check if Linear is connected for this workspace
-  const { data: statusData } = useSWR<{ data: LinearStatus }>(
+  const { data: statusData, error: statusError } = useSWR<{ data: LinearStatus }>(
     '/api/integrations/linear/status',
     fetcher,
     { revalidateOnFocus: false },
@@ -87,8 +100,9 @@ export function ProductIssuesPanel({ dealId }: Props) {
   // Fetch links for this deal
   const {
     data: linksData,
+    error: linksError,
     mutate: mutateLinks,
-  } = useSWR<{ data: DealLinearLink[] }>(
+  } = useSWR<DealLinksResponse>(
     statusData?.data?.connected ? `/api/deals/${dealId}/linear-links` : null,
     fetcher,
   )
@@ -146,38 +160,107 @@ export function ProductIssuesPanel({ dealId }: Props) {
     }
   }, [dealId, linkInput, mutateLinks, toast])
 
-  const handleDiscover = useCallback(async () => {
-    setDiscovering(true)
+  const handleCopyReviewPrompt = useCallback(async () => {
+    const prompt = linksData?.meta?.reviewPrompt
+    if (!prompt) return
     try {
-      const res = await fetch(`/api/deals/${dealId}/discover-issues`, { method: 'POST' })
-      if (!res.ok) throw new Error('Discover failed')
-      await mutateLinks()
-      toast('Issues re-matched to this deal', 'success')
+      await navigator.clipboard.writeText(prompt)
+      toast('Claude review prompt copied', 'success')
     } catch {
-      toast('Could not discover issues', 'error')
-    } finally {
-      setDiscovering(false)
+      toast('Could not copy prompt', 'error')
     }
-  }, [dealId, mutateLinks, toast])
+  }, [linksData?.meta?.reviewPrompt, toast])
 
-  // Don't render if Linear isn't connected
-  if (!statusData?.data?.connected) return null
+  const loadingStatus = !statusData && !statusError
+
+  if (loadingStatus) {
+    return (
+      <div style={{
+        background: 'var(--card-bg)',
+        border: '1px solid var(--card-border)',
+        borderRadius: '12px',
+        padding: '16px',
+        marginBottom: '16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        color: 'var(--text-tertiary)',
+        fontSize: '12px',
+      }}>
+        <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+        Checking Linear and MCP issue-linking status...
+      </div>
+    )
+  }
+
+  if (statusError) {
+    return (
+      <div style={{
+        background: 'rgba(239,68,68,0.05)',
+        border: '1px solid rgba(239,68,68,0.18)',
+        borderRadius: '12px',
+        padding: '16px',
+        marginBottom: '16px',
+      }}>
+        <div style={{ fontSize: '12px', fontWeight: 600, color: '#fca5a5', marginBottom: '4px' }}>
+          Product issue linking is unavailable right now
+        </div>
+        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.6 }}>
+          Halvex could not verify your Linear connection status. Retry in a moment or check the Integrations page.
+        </div>
+      </div>
+    )
+  }
+
+  if (!statusData?.data?.connected) {
+    return (
+      <div style={{
+        background: 'var(--card-bg)',
+        border: '1px solid var(--card-border)',
+        borderRadius: '12px',
+        padding: '16px',
+        marginBottom: '16px',
+      }}>
+        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+          Connect Linear to unlock product issue review
+        </div>
+        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.7, marginBottom: '12px' }}>
+          Halvex needs a live Linear sync before Claude can review the deal against your product backlog and save relevant issue links back here.
+        </div>
+        <Link
+          href="/connections"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '11px',
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            textDecoration: 'none',
+            padding: '8px 10px',
+            borderRadius: '8px',
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}
+        >
+          Open Integrations
+        </Link>
+      </div>
+    )
+  }
 
   const allLinks = linksData?.data ?? []
   const visibleLinks = allLinks.filter(l => l.status !== 'dismissed')
   const confirmed = visibleLinks.filter(l => l.status === 'confirmed' || l.status === 'in_cycle' || l.status === 'deployed')
   const suggested = visibleLinks.filter(l => l.status === 'suggested')
-
-  if (visibleLinks.length === 0 && !showLinkInput) {
-    // Show empty state only if we've loaded
-    if (!linksData) return null
-  }
+  const reviewPrompt = linksData?.meta?.reviewPrompt
+  const loadingLinks = !linksData && !linksError
 
   return (
     <div style={{
       background: 'var(--card-bg)',
       border: '1px solid var(--card-border)',
-      borderRadius: '8px',
+      borderRadius: '12px',
       overflow: 'hidden',
       marginBottom: '16px',
     }}>
@@ -187,27 +270,32 @@ export function ProductIssuesPanel({ dealId }: Props) {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '10px 14px',
-        borderBottom: visibleLinks.length > 0 || showLinkInput ? '1px solid var(--border)' : undefined,
+        borderBottom: visibleLinks.length > 0 || showLinkInput || loadingLinks || !!linksError ? '1px solid var(--border)' : undefined,
         background: 'var(--surface)',
       }}>
-        <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
-          Product Issues
-        </span>
+        <div>
+          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+            Product Issues
+          </div>
+          <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+            Claude reviews and saves issue links back into Halvex
+          </div>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
-          <button
-            onClick={handleDiscover}
-            disabled={discovering}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '4px',
-              fontSize: '11px', color: 'rgba(255,255,255,0.70)', background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px',
-              cursor: discovering ? 'not-allowed' : 'pointer', padding: '3px 8px',
-              opacity: discovering ? 0.6 : 1,
-            }}
-          >
-            {discovering ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : null}
-            Discover
-          </button>
+          {reviewPrompt && (
+            <button
+              onClick={handleCopyReviewPrompt}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '4px',
+                fontSize: '11px', color: 'rgba(255,255,255,0.78)', background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px',
+                cursor: 'pointer', padding: '4px 9px',
+              }}
+            >
+              <Copy size={11} />
+              Copy Claude prompt
+            </button>
+          )}
           <button
             onClick={() => setShowLinkInput(v => !v)}
             style={{
@@ -221,6 +309,48 @@ export function ProductIssuesPanel({ dealId }: Props) {
           </button>
         </div>
       </div>
+
+      {linksError && (
+        <div style={{
+          padding: '12px 14px',
+          borderBottom: '1px solid var(--border)',
+          background: 'rgba(239,68,68,0.04)',
+          color: '#fca5a5',
+          fontSize: '11px',
+          lineHeight: 1.6,
+        }}>
+          Halvex could not load saved issue links for this deal. You can still open Integrations to verify the Claude MCP setup or add a known issue manually below.
+        </div>
+      )}
+
+      {statusData?.data?.degraded && (
+        <div style={{
+          padding: '12px 14px',
+          borderBottom: '1px solid var(--border)',
+          background: 'rgba(245,158,11,0.05)',
+          color: '#fcd34d',
+          fontSize: '11px',
+          lineHeight: 1.6,
+        }}>
+          Linear is connected, but the latest sync reported a problem. Saved links are still available, but backlog context may be stale.
+          {statusData.data.syncError ? ` ${statusData.data.syncError}` : ''}
+        </div>
+      )}
+
+      {loadingLinks && (
+        <div style={{
+          padding: '14px',
+          borderBottom: '1px solid var(--border)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '11px',
+          color: 'var(--text-tertiary)',
+        }}>
+          <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+          Loading linked issues...
+        </div>
+      )}
 
       {/* Manual link input */}
       {showLinkInput && (
@@ -252,9 +382,81 @@ export function ProductIssuesPanel({ dealId }: Props) {
       )}
 
       {/* Issue rows */}
-      {visibleLinks.length === 0 && !showLinkInput ? (
-        <div style={{ padding: '10px 14px', fontSize: '11px', color: 'var(--text-tertiary)' }}>
-          No linked issues yet
+      {visibleLinks.length === 0 && !showLinkInput && !loadingLinks && !linksError ? (
+        <div style={{ padding: '16px 14px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '10px',
+            padding: '12px',
+            background: 'rgba(99,102,241,0.06)',
+            border: '1px solid rgba(99,102,241,0.14)',
+            borderRadius: '10px',
+            marginBottom: '10px',
+          }}>
+            <div style={{
+              width: '26px',
+              height: '26px',
+              borderRadius: '8px',
+              background: 'rgba(99,102,241,0.10)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <Sparkles size={13} color="var(--accent)" />
+            </div>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                No issue links saved yet
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', lineHeight: 1.7 }}>
+                Review this deal in Claude with your Halvex MCP connection, then save the relevant Linear issues back here. You can still link an issue manually if you already know the ID.
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <Link
+              href="/connections"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                textDecoration: 'none',
+                padding: '8px 10px',
+                borderRadius: '8px',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.08)',
+              }}
+            >
+              Connect Claude MCP
+            </Link>
+            {reviewPrompt && (
+              <button
+                onClick={handleCopyReviewPrompt}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: 'var(--accent)',
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  background: 'rgba(99,102,241,0.08)',
+                  border: '1px solid rgba(99,102,241,0.16)',
+                  cursor: 'pointer',
+                }}
+              >
+                <Copy size={11} />
+                Copy review prompt
+              </button>
+            )}
+          </div>
         </div>
       ) : (
         <>
@@ -484,7 +686,7 @@ export function ProductIssuesPanel({ dealId }: Props) {
           {/* Footer note for suggested links */}
           {suggested.length > 0 && (
             <div style={{ padding: '6px 14px', fontSize: '10px', color: 'var(--text-tertiary)' }}>
-              Suggested by Halvex based on deal signals
+              Suggested links were saved for review. Confirm the ones Claude has validated.
             </div>
           )}
         </>

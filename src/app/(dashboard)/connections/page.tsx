@@ -1,15 +1,23 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import useSWR from 'swr'
 import {
   Plug, CheckCircle2, Copy, RefreshCw, Eye, EyeOff, ChevronDown, ChevronUp, Loader2,
-  Zap, Database,
+  Zap, Database, Sparkles, ArrowUpRight,
 } from 'lucide-react'
 import { useToast } from '@/components/shared/Toast'
 
-const fetcher = (url: string) => fetch(url).then(r => r.json())
+async function fetcher(url: string) {
+  const res = await fetch(url)
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(typeof json?.error === 'string' ? json.error : 'Request failed')
+  }
+  return json
+}
 
 const card: React.CSSProperties = {
   background: 'var(--bg-surface)',
@@ -135,10 +143,10 @@ function McpSection({ mcpApiKey, showMcpKey, setShowMcpKey, regenerating, regene
 
 export default function ConnectionsPage() {
   const { toast } = useToast()
-  const { data: hubspotRes, mutate: mutateHubspot } = useSWR('/api/integrations/hubspot/status', fetcher, { revalidateOnFocus: false })
-  const { data: linearRes, mutate: mutateLinear } = useSWR('/api/integrations/linear/status', fetcher, { revalidateOnFocus: false })
-  const { data: slackRes, mutate: mutateSlack } = useSWR('/api/integrations/slack/status', fetcher, { revalidateOnFocus: false })
-  const { data: mcpKeyRes, mutate: mutateMcpKey } = useSWR('/api/workspace/mcp-api-key', fetcher, { revalidateOnFocus: false })
+  const { data: hubspotRes, error: hubspotError, mutate: mutateHubspot } = useSWR('/api/integrations/hubspot/status', fetcher, { revalidateOnFocus: false })
+  const { data: linearRes, error: linearError, mutate: mutateLinear } = useSWR('/api/integrations/linear/status', fetcher, { revalidateOnFocus: false })
+  const { data: slackRes, error: slackError, mutate: mutateSlack } = useSWR('/api/integrations/slack/status', fetcher, { revalidateOnFocus: false })
+  const { data: mcpKeyRes, error: mcpError, mutate: mutateMcpKey } = useSWR('/api/workspace/mcp-api-key', fetcher, { revalidateOnFocus: false })
 
   const hubspotConnected: boolean | null = hubspotRes ? (hubspotRes?.data?.connected === true) : null
   const linearConnected: boolean | null = linearRes ? (linearRes?.data?.connected === true) : null
@@ -148,6 +156,12 @@ export default function ConnectionsPage() {
   const linearData = linearRes?.data
   const slackData = slackRes?.data
   const mcpApiKey: string | null = mcpKeyRes?.data?.mcpApiKey ?? null
+  const connectionErrors = [
+    slackError ? 'Slack status is unavailable.' : null,
+    linearError ? 'Linear status is unavailable.' : null,
+    hubspotError ? 'HubSpot status is unavailable.' : null,
+    mcpError ? 'Claude MCP status is unavailable.' : null,
+  ].filter(Boolean) as string[]
 
   const [hubspotToken, setHubspotToken] = useState('')
   const [hubspotConnecting, setHubspotConnecting] = useState(false)
@@ -155,7 +169,6 @@ export default function ConnectionsPage() {
   const [hubspotDisconnecting, setHubspotDisconnecting] = useState(false)
   const [linearDisconnecting, setLinearDisconnecting] = useState(false)
   const [linearSyncing, setLinearSyncing] = useState(false)
-  const [linearRematching, setLinearRematching] = useState(false)
   const [slackDisconnecting, setSlackDisconnecting] = useState(false)
   const [showMcpKey, setShowMcpKey] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
@@ -224,18 +237,6 @@ export default function ConnectionsPage() {
     finally { setLinearSyncing(false) }
   }
 
-  async function handleLinearRematch() {
-    setLinearRematching(true)
-    try {
-      const res = await fetch('/api/integrations/linear/rematch', { method: 'POST' })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Rematch failed')
-      const { matched = 0, deals = 0 } = json.data ?? {}
-      toast(`Rematched ${matched} issues across ${deals} open deals`, 'success')
-    } catch (e: unknown) { toast(e instanceof Error ? e.message : 'Rematch failed', 'error') }
-    finally { setLinearRematching(false) }
-  }
-
   async function handleSlackDisconnect() {
     setSlackDisconnecting(true)
     try {
@@ -266,17 +267,102 @@ export default function ConnectionsPage() {
   })
 
   return (
-    <div style={{ maxWidth: '720px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ maxWidth: '860px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <div style={{ width: '36px', height: '36px', borderRadius: '10px', flexShrink: 0, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Plug size={18} color="rgba(255,255,255,0.70)" />
+      {connectionErrors.length > 0 && (
+        <div style={{
+          padding: '14px 16px',
+          background: 'rgba(245,158,11,0.06)',
+          border: '1px solid rgba(245,158,11,0.18)',
+          borderRadius: '12px',
+          color: '#fde68a',
+          fontSize: '12px',
+          lineHeight: 1.7,
+        }}>
+          Some connection health data could not be loaded right now. {connectionErrors.join(' ')}
         </div>
-        <div>
-          <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.02em', margin: 0 }}>Your Loop</h1>
-          <p style={{ fontSize: '13px', color: '#475569', margin: 0 }}>Connect the tools your team already uses. Halvex handles the handoff between them.</p>
+      )}
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+        <div style={{ width: '40px', height: '40px', borderRadius: '12px', flexShrink: 0, background: 'linear-gradient(135deg, rgba(99,102,241,0.20), rgba(59,130,246,0.10))', border: '1px solid rgba(99,102,241,0.24)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Sparkles size={18} color="rgba(255,255,255,0.85)" />
+        </div>
+        <div style={{ flex: 1 }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.03em', margin: '0 0 6px' }}>
+            Connected issue intelligence
+          </h1>
+          <p style={{ fontSize: '14px', color: '#64748b', margin: 0, lineHeight: 1.7, maxWidth: '720px' }}>
+            Halvex syncs your product and revenue data, then Claude reviews the context through Halvex MCP and saves only the issue links that matter back into the workspace.
+          </p>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '14px' }}>
+        <div style={{
+          ...card,
+          background: 'linear-gradient(135deg, rgba(99,102,241,0.10), rgba(15,23,42,0.9))',
+          borderColor: 'rgba(99,102,241,0.18)',
+        }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(191,219,254,0.92)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
+            Recommended flow
+          </div>
+          <div style={{ display: 'grid', gap: '10px' }}>
+            {[
+              'Sync Linear so Halvex has live issue context and status.',
+              'Connect Claude to Halvex MCP once per workspace.',
+              'Ask Claude to review a deal and save the relevant issue links back into Halvex.',
+              'Track confirmed links and shipped outcomes inside Halvex.',
+            ].map((step, index) => (
+              <div key={step} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                <div style={{
+                  width: '22px',
+                  height: '22px',
+                  borderRadius: '999px',
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.10)',
+                  color: '#e2e8f0',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  {index + 1}
+                </div>
+                <div style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: 1.6 }}>{step}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={card}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
+            Current mode
+          </div>
+          <div style={{ fontSize: '18px', fontWeight: 700, color: '#e2e8f0', marginBottom: '8px' }}>
+            Claude-assisted issue linking
+          </div>
+          <p style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.7, margin: '0 0 14px' }}>
+            Halvex owns the deal intelligence layer. Claude owns the judgment call on which Linear issues are genuinely relevant, then saves those links back into Halvex for the team.
+          </p>
+          <Link
+            href="/chat"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              color: '#e2e8f0',
+              textDecoration: 'none',
+              fontSize: '12px',
+              fontWeight: 600,
+            }}
+          >
+            Open Ask AI
+            <ArrowUpRight size={12} />
+          </Link>
         </div>
       </div>
 
@@ -309,7 +395,7 @@ export default function ConnectionsPage() {
             <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Your Revenue Interface — rep-facing</p>
           </div>
         </div>
-        <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 0' }}>Ask about deals, get notified when issues ship, and close loops — without leaving your workflow.</p>
+        <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 0' }}>Ask about deals, review linked product work, and get notified when customer blockers ship without leaving your workflow.</p>
 
         {slackConnected ? (
           <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -354,21 +440,47 @@ export default function ConnectionsPage() {
             <p style={{ fontSize: '12px', color: '#64748b', margin: 0 }}>Your Product Interface — PM-facing</p>
           </div>
         </div>
-        <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 0' }}>Halvex matches your deals to open Linear issues. Sales gaps become product priorities automatically.</p>
+        <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 0' }}>
+          Linear stays synced in Halvex. Claude reviews deal context against your Linear workspace and saves the chosen issue links back into Halvex.
+        </p>
 
         {linearConnected ? (
           <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {linearData?.teamName && <div style={{ fontSize: '12px', color: '#475569' }}>Team: <span style={{ color: '#94a3b8', fontWeight: 600 }}>{linearData.teamName}</span></div>}
             {linearData?.workspaceName && <div style={{ fontSize: '12px', color: '#475569' }}>Workspace: <span style={{ color: '#94a3b8', fontWeight: 600 }}>{linearData.workspaceName}</span></div>}
+            {typeof linearData?.issueCount === 'number' && <div style={{ fontSize: '12px', color: '#475569' }}>Issues synced: <span style={{ color: '#94a3b8' }}>{linearData.issueCount}</span></div>}
             {linearData?.lastSyncAt && <div style={{ fontSize: '12px', color: '#475569' }}>Last sync: <span style={{ color: '#94a3b8' }}>{new Date(linearData.lastSyncAt).toLocaleString()}</span></div>}
+            {linearData?.syncError && (
+              <div style={{
+                padding: '10px 12px',
+                borderRadius: '10px',
+                background: 'rgba(245,158,11,0.06)',
+                border: '1px solid rgba(245,158,11,0.16)',
+                fontSize: '12px',
+                color: '#fde68a',
+                lineHeight: 1.6,
+              }}>
+                Linear is connected, but the latest sync reported a problem. Saved links may still work while some backlog data is stale.
+              </div>
+            )}
+            {linearData?.matchingSummary && (
+              <div style={{
+                marginTop: '4px',
+                padding: '10px 12px',
+                borderRadius: '10px',
+                background: 'rgba(99,102,241,0.06)',
+                border: '1px solid rgba(99,102,241,0.14)',
+                fontSize: '12px',
+                color: '#cbd5e1',
+                lineHeight: 1.6,
+              }}>
+                {linearData.matchingSummary}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
               <button onClick={handleLinearSync} disabled={linearSyncing} style={{ ...actionBtn('255,255,255', '255,255,255'), cursor: linearSyncing ? 'not-allowed' : 'pointer', opacity: linearSyncing ? 0.6 : 1 }}>
                 <RefreshCw size={11} style={{ animation: linearSyncing ? 'spin 1s linear infinite' : 'none' }} />
                 {linearSyncing ? 'Syncing…' : 'Sync issues'}
-              </button>
-              <button onClick={handleLinearRematch} disabled={linearRematching} style={{ ...actionBtn('255,255,255', '255,255,255'), cursor: linearRematching ? 'not-allowed' : 'pointer', opacity: linearRematching ? 0.6 : 1 }}>
-                {linearRematching ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : null}
-                {linearRematching ? 'Rematching…' : 'Rematch to deals'}
               </button>
               <button onClick={handleLinearDisconnect} disabled={linearDisconnecting} style={{ ...actionBtn('248,113,113', '248,113,113'), cursor: linearDisconnecting ? 'not-allowed' : 'pointer', opacity: linearDisconnecting ? 0.6 : 1 }}>
                 {linearDisconnecting ? 'Disconnecting…' : 'Disconnect'}

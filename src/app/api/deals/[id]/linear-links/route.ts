@@ -10,7 +10,7 @@ import { getWorkspaceContext } from '@/lib/workspace'
 import { db } from '@/lib/db'
 import { eq, and, inArray } from 'drizzle-orm'
 import { dealLinearLinks, dealLogs, linearIssuesCache, mcpActionLog } from '@/lib/db/schema'
-import { matchDealToIssues } from '@/lib/linear-signal-match'
+import { buildClaudeIssueReviewPrompt, ISSUE_LINKING_MODE } from '@/lib/issue-linking'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -24,7 +24,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
     // Verify deal belongs to workspace
     const [deal] = await db
-      .select({ id: dealLogs.id })
+      .select({
+        id: dealLogs.id,
+        dealName: dealLogs.dealName,
+        prospectCompany: dealLogs.prospectCompany,
+      })
       .from(dealLogs)
       .where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId)))
       .limit(1)
@@ -70,7 +74,17 @@ export async function GET(_req: NextRequest, { params }: Params) {
       hasReleaseEmail: emailedIssueIds.has(l.linearIssueId),
     }))
 
-    return NextResponse.json({ data: enriched })
+    return NextResponse.json({
+      data: enriched,
+      meta: {
+        mode: ISSUE_LINKING_MODE,
+        reviewPrompt: buildClaudeIssueReviewPrompt({
+          dealId: id,
+          dealName: deal.dealName,
+          company: deal.prospectCompany ?? deal.dealName ?? 'this deal',
+        }),
+      },
+    })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error'
     return NextResponse.json({ error: msg }, { status: 500 })

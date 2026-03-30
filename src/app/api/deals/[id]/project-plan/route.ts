@@ -6,11 +6,10 @@ import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { requestBrainRebuild } from '@/lib/brain-rebuild'
-import Anthropic from '@anthropic-ai/sdk'
+import { anthropic } from '@/lib/ai/client'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { ensureLinksColumn } from '@/lib/api-helpers'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 interface Params { params: Promise<{ id: string }> }
 
@@ -60,7 +59,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       : ''
 
     const extractMsg = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'gpt-4.1-mini',
       max_tokens: 4000,
       system: `You are a project plan extractor for a sales deal management tool.
 Your job is to convert ANY format of input (tables, emails, meeting notes, spreadsheet data, free text) into a structured project plan JSON.

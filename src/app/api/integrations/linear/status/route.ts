@@ -8,8 +8,9 @@ import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { db } from '@/lib/db'
-import { eq } from 'drizzle-orm'
-import { linearIntegrations } from '@/lib/db/schema'
+import { eq, sql } from 'drizzle-orm'
+import { linearIntegrations, linearIssuesCache } from '@/lib/db/schema'
+import { ISSUE_LINKING_MODE } from '@/lib/issue-linking'
 
 export async function GET() {
   try {
@@ -30,16 +31,32 @@ export async function GET() {
       .limit(1)
 
     if (!integration) {
-      return NextResponse.json({ data: { connected: false } })
+      return NextResponse.json({
+        data: {
+          connected: false,
+          degraded: false,
+          issueCount: 0,
+          matchingMode: ISSUE_LINKING_MODE,
+        },
+      })
     }
+
+    const [{ count: issueCount }] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(linearIssuesCache)
+      .where(eq(linearIssuesCache.workspaceId, workspaceId))
 
     return NextResponse.json({
       data: {
         connected: true,
+        degraded: Boolean(integration.syncError),
+        matchingMode: ISSUE_LINKING_MODE,
         teamName: integration.teamName,
         workspaceName: integration.workspaceName,
         lastSyncAt: integration.lastSyncAt,
         syncError: integration.syncError,
+        issueCount: Number(issueCount ?? 0),
+        matchingSummary: 'Linear stays synced in Halvex, while Claude + Halvex MCP handles issue review and saves the chosen links back.',
       },
     })
   } catch (e: unknown) {

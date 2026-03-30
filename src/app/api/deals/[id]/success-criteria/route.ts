@@ -3,7 +3,7 @@ import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
-import Anthropic from '@anthropic-ai/sdk'
+import { anthropic } from '@/lib/ai/client'
 import { db } from '@/lib/db'
 import { dealLogs, companyProfiles } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
@@ -12,7 +12,6 @@ import { getWorkspaceBrain, formatBrainContext } from '@/lib/workspace-brain'
 import { requestBrainRebuild } from '@/lib/brain-rebuild'
 import { ensureLinksColumn } from '@/lib/api-helpers'
 
-const anthropic = new Anthropic()
 
 // POST — parse raw success criteria text into structured items
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -53,7 +52,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     ].filter(Boolean).join('\n')
 
     const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001', max_tokens: 900,
+      model: 'gpt-4.1-mini', max_tokens: 900,
       system: 'You are a JSON-only API. You never use markdown fences, prose, or explanation. Every response is a raw JSON array starting with [ and ending with ].',
       messages: [{ role: 'user', content: `Extract success criteria from this proposal text for the following deal.
 

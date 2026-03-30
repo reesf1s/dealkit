@@ -1,20 +1,20 @@
 /**
- * Anthropic model name constants.
+ * OpenAI model name constants.
  *
- * Using constants prevents typos and makes it easy to upgrade model versions
- * across the codebase in one place.
- *
+ * All generation uses GPT-4.1 mini unless a specific override is needed.
  * Routing policy:
- *   HAIKU  — intent classification, short-form formatting, simple extraction,
- *             workflow summaries, anything with max_tokens ≤ 1024
- *   SONNET — complex analysis, multi-step reasoning, structured extractions
- *             with many fields, anything that must be accurate over fast
+ *   MINI   — everything: intent classification, extraction, analysis, generation
+ *            GPT-4.1 mini is fast, cost-efficient, and strong enough for the
+ *            assistant and extraction workloads in Halvex.
  */
 
-export const HAIKU = 'claude-haiku-4-5-20251001' as const
-export const SONNET = 'claude-sonnet-4-6' as const
+export const MINI = 'gpt-4.1-mini' as const
 
-/** Max tokens budget by model and use case — prevents over-spending on output */
+/** Aliases kept so existing callers that import HAIKU/SONNET still compile */
+export const HAIKU = MINI
+export const SONNET = MINI
+
+/** Max tokens budget by use case */
 export const TOKEN_BUDGET = {
   /** Intent classification / routing */
   INTENT: 60,

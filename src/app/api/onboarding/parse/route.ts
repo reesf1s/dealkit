@@ -1,9 +1,8 @@
 export const dynamic = 'force-dynamic'
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { anthropic } from '@/lib/ai/client'
 
-const anthropic = new Anthropic()
 
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
@@ -17,7 +16,7 @@ export async function POST(req: NextRequest) {
     if (!text?.trim()) return NextResponse.json({ error: 'No text provided' }, { status: 400 })
 
     const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'gpt-4.1-mini',
       max_tokens: 1024,
       messages: [{
         role: 'user',

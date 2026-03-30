@@ -3,7 +3,7 @@ export const maxDuration = 60
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
-import Anthropic from '@anthropic-ai/sdk'
+import { anthropic } from '@/lib/ai/client'
 import { db } from '@/lib/db'
 import { dealLogs, companyProfiles, competitors, collateral } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
@@ -11,7 +11,6 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getWorkspaceBrain, formatBrainContext } from '@/lib/workspace-brain'
 import { ensureLinksColumn } from '@/lib/api-helpers'
 
-const anthropic = new Anthropic()
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -101,7 +100,7 @@ One sentence: how to leverage or build a champion at ${deal.prospectCompany} giv
 
 ## Next Step
 One concrete, time-bound action to advance or close this deal.`
-    const msg = await anthropic.messages.create({ model: 'claude-sonnet-4-6', max_tokens: 1500, messages: [{ role: 'user', content: prompt }] })
+    const msg = await anthropic.messages.create({ model: 'gpt-4.1-mini', max_tokens: 1500, messages: [{ role: 'user', content: prompt }] })
     const prep = (msg.content[0] as any).text
     return NextResponse.json({ data: { prep } })
   } catch (e: unknown) { console.error('[meeting-prep] failed:', e instanceof Error ? e.message : e); return NextResponse.json({ error: 'Meeting prep failed' }, { status: 500 }) }

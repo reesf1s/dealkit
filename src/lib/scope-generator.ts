@@ -8,7 +8,7 @@
  * for the same issue+deal combination unless explicitly requested.
  */
 
-import Anthropic from '@anthropic-ai/sdk'
+import { anthropic } from '@/lib/ai/client'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -60,10 +60,8 @@ Rules:
 export async function generateScopedIssue(
   input: ScopeGeneratorInput,
 ): Promise<ScopedIssue> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY env var is not set')
-
-  const client = new Anthropic({ apiKey })
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error('OPENAI_API_KEY env var is not set')
 
   const riskContext = input.dealRisks.length > 0
     ? `\nDeal risks this should address: ${input.dealRisks.slice(0, 3).join('; ')}`
@@ -83,16 +81,10 @@ Linear issue: ${input.issueTitle}${issueDescContext}
 
 Generate the scoped user story and acceptance criteria for this issue.`
 
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+  const response = await anthropic.messages.create({
+    model: 'gpt-4.1-mini',
     max_tokens: 512,
-    system: [
-      {
-        type: 'text',
-        text: SYSTEM_PROMPT,
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
+    system: SYSTEM_PROMPT,
     messages: [
       { role: 'user', content: userMessage },
     ],

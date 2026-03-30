@@ -8,7 +8,7 @@
  * Results are cached in mcp_action_log to avoid re-generating for the same combo.
  */
 
-import { createAnthropic } from '@ai-sdk/anthropic'
+import { createOpenAI } from '@ai-sdk/openai'
 import { generateText } from 'ai'
 import { db } from '@/lib/db'
 import { mcpActionLog, dealLinearLinks, dealLogs, linearIssuesCache } from '@/lib/db/schema'
@@ -198,10 +198,10 @@ export async function generateReleaseEmail(
   deal: DealContext,
   issue: IssueContext,
 ): Promise<ReleaseEmail> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set')
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error('OPENAI_API_KEY not set')
 
-  const anthropic = createAnthropic({ apiKey })
+  const anthropic = createOpenAI({ apiKey })
 
   // Build primary contact info
   const primaryContact = deal.contacts?.[0]
@@ -223,9 +223,7 @@ export async function generateReleaseEmail(
   ].filter(Boolean).join('\n')
 
   const { text } = await generateText({
-    model: anthropic('claude-haiku-4-5-20251001', {
-      cacheControl: true,
-    }),
+    model: anthropic('gpt-4.1-mini'),
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],
     maxTokens: 700,
@@ -307,10 +305,10 @@ export async function generateBatchReleaseEmail(
   deal: DealContext,
   issues: IssueContext[],
 ): Promise<BatchReleaseEmail | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return null
 
-  const anthropic = createAnthropic({ apiKey })
+  const anthropic = createOpenAI({ apiKey })
 
   const primaryContact = deal.contacts?.[0]
   const contactName = deal.contactName ?? primaryContact?.name ?? null
@@ -334,7 +332,7 @@ export async function generateBatchReleaseEmail(
   ].filter(Boolean).join('\n')
 
   const { text } = await generateText({
-    model: anthropic('claude-haiku-4-5-20251001', { cacheControl: true }),
+    model: anthropic('gpt-4.1-mini'),
     system: BATCH_SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],
     maxTokens: 900,

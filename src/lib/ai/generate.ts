@@ -49,14 +49,14 @@ interface GenerateResult {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function callClaude(
+async function callMiniModel(
   system: string,
   messages: Array<{ role: 'user'; content: string }>,
   temperature: number,
 ): Promise<string> {
   const attempt = async () => {
     const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'gpt-4.1-mini',
       max_tokens: 4096,
       temperature,
       // Pass system as a cached block so the large workspace context is reused
@@ -65,7 +65,7 @@ async function callClaude(
       messages,
     })
     const block = message.content.find((b) => b.type === 'text')
-    if (!block || block.type !== 'text') throw new Error('No text content in Claude response')
+    if (!block || block.type !== 'text') throw new Error('No text content in model response')
     return block.text
   }
 
@@ -131,13 +131,13 @@ async function generateAndValidate<T>(
   schema: ZodSchema<T>,
   temperature: number,
 ): Promise<{ validated: T; raw: string }> {
-  const raw = await callClaude(system, messages, temperature)
+  const raw = await callMiniModel(system, messages, temperature)
 
   let parsed: unknown
   try {
     parsed = extractJson(raw)
   } catch {
-    throw new Error(`Claude returned non-JSON response: ${raw.slice(0, 200)}`)
+    throw new Error(`Model returned non-JSON response: ${raw.slice(0, 200)}`)
   }
 
   const result = schema.safeParse(parsed)
@@ -152,7 +152,7 @@ async function generateAndValidate<T>(
     { role: 'user' as const, content: `Previous attempt had validation errors: ${result.error.message}\n\nPlease fix the JSON and return ONLY valid JSON with no additional text or markdown.` },
   ]
 
-  const retryRaw = await callClaude(system, correctionMessages, temperature)
+  const retryRaw = await callMiniModel(system, correctionMessages, temperature)
 
   let retryParsed: unknown
   try {
@@ -557,15 +557,15 @@ Rules:
     { role: 'user', content: userContent },
   ]
 
-  // 5. Call Claude
-  const raw = await callClaude(system, messages, 0.5)
+  // 5. Call the mini model
+  const raw = await callMiniModel(system, messages, 0.5)
 
   // 6. Parse response
   let parsed: { title: string; sections: { heading: string; content: string }[] }
   try {
     parsed = extractJson(raw) as typeof parsed
   } catch {
-    throw new Error(`Claude returned non-JSON response: ${raw.slice(0, 200)}`)
+    throw new Error(`Model returned non-JSON response: ${raw.slice(0, 200)}`)
   }
 
   if (!parsed.sections || !Array.isArray(parsed.sections)) {

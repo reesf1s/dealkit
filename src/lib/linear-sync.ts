@@ -1,14 +1,13 @@
 /**
  * Linear issue sync — fetches all team issues from Linear and caches them in
- * linear_issues_cache, then re-embeds them for signal matching.
+ * linear_issues_cache, then re-embeds them for downstream review workflows.
  *
  * Called by:
  *  - POST /api/integrations/linear/sync (manual trigger)
- *  - GET /api/cron/linear-match (nightly, after match run)
+ *  - GET /api/cron/linear-match (nightly sync/status refresh)
  *  - POST /api/webhooks/linear (on issue create/update)
  */
 
-import { after } from 'next/server'
 import { db } from '@/lib/db'
 import { eq, sql } from 'drizzle-orm'
 import { linearIntegrations, linearIssuesCache } from '@/lib/db/schema'
@@ -16,7 +15,6 @@ import { decrypt, getEncryptionKey } from '@/lib/encrypt'
 import { fetchTeamIssues, type LinearIssue } from '@/lib/linear-client'
 import { embedLinearIssues } from '@/lib/semantic-search'
 import { embedNullLinearIssues } from '@/lib/deal-embeddings'
-import { smartMatchAllDeals } from '@/lib/smart-match'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -183,17 +181,6 @@ export async function syncLinearIssues(workspaceId: string, forceFullSync = fals
   console.log(
     `[linear-sync] workspace=${workspaceId.slice(0, 8)} synced=${synced} pages=${pagesFetched} embedded=${embedded} incremental=${!!since}`,
   )
-
-  // After every sync, re-run signal matching for all open deals in the background.
-  // This ensures all deals (not just the one in the current Slack conversation) get
-  // their links updated when new issues are pulled from Linear.
-  after(async () => {
-    try {
-      await smartMatchAllDeals(workspaceId)
-    } catch (err) {
-      console.error('[linear-sync] smartMatchAllDeals failed:', err)
-    }
-  })
 
   return { synced, embedded, pagesFetched }
 }

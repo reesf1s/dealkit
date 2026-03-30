@@ -21,7 +21,7 @@ const NAV_ITEMS = [
   { href: '/dashboard',    icon: LayoutDashboard, label: 'Today',        matchPaths: ['/dashboard'] },
   { href: '/deals',        icon: GitBranch,       label: 'Deals',        matchPaths: ['/deals', '/pipeline'] },
   { href: '/intelligence', icon: Brain,           label: 'Intelligence', matchPaths: ['/intelligence', '/competitors', '/case-studies', '/product-gaps', '/models', '/collateral', '/playbook'] },
-  { href: '/workflows',    icon: Zap,             label: 'Loops',        matchPaths: ['/workflows'] },
+  { href: '/workflows',    icon: Zap,             label: 'Automation',   matchPaths: ['/workflows'] },
   { href: '/connections',  icon: Plug,            label: 'Integrations', matchPaths: ['/connections'] },
   { href: '/settings',     icon: Settings,        label: 'Settings',     matchPaths: ['/settings', '/company', '/onboarding'] },
 ]
@@ -90,9 +90,9 @@ export default function Sidebar() {
           fontSize: '12.5px',
           fontWeight: active ? 500 : 400,
           letterSpacing: '-0.01em',
-          color: active ? 'rgba(255,255,255,0.92)' : 'rgba(226,232,240,0.35)',
-          background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
-          borderLeft: active && !collapsed ? '2px solid rgba(255,255,255,0.60)' : '2px solid transparent',
+          color: active ? 'rgba(255,255,255,0.95)' : 'rgba(226,232,240,0.32)',
+          background: active ? 'rgba(139,92,246,0.12)' : 'transparent',
+          borderLeft: active && !collapsed ? '2px solid rgba(139,92,246,0.80)' : '2px solid transparent',
           transition: 'all 0.12s ease',
           position: 'relative',
           flexShrink: 0,
@@ -118,7 +118,7 @@ export default function Sidebar() {
           <Icon
             size={14}
             style={{
-              color: active ? 'rgba(255,255,255,0.92)' : 'rgba(226,232,240,0.25)',
+              color: active ? 'rgba(167,139,250,0.90)' : 'rgba(226,232,240,0.25)',
               display: 'block',
               transition: 'color 0.12s ease',
             }}
@@ -153,13 +153,14 @@ export default function Sidebar() {
   const SidebarContent = (
     <aside style={{
       position: 'fixed', left: 0, top: 0, bottom: 0, width: w,
-      background: 'rgba(12, 10, 24, 0.72)',
-      backdropFilter: 'blur(28px)',
-      WebkitBackdropFilter: 'blur(28px)',
-      borderRight: '1px solid rgba(255,255,255,0.06)',
+      background: 'rgba(9, 8, 20, 0.88)',
+      backdropFilter: 'blur(32px)',
+      WebkitBackdropFilter: 'blur(32px)',
+      borderRight: '1px solid rgba(255,255,255,0.055)',
       display: 'flex', flexDirection: 'column', zIndex: 40,
       transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)',
       overflow: 'hidden',
+      boxShadow: '1px 0 0 0 rgba(255,255,255,0.03), 4px 0 24px 0 rgba(0,0,0,0.4)',
     }}>
 
       {/* ── Logo row ── */}
@@ -176,32 +177,37 @@ export default function Sidebar() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
             <div style={{
               width: '26px', height: '26px',
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.10)',
+              background: 'linear-gradient(135deg, rgba(139,92,246,0.30) 0%, rgba(99,102,241,0.20) 100%)',
+              border: '1px solid rgba(139,92,246,0.30)',
               borderRadius: '7px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0,
+              boxShadow: '0 0 12px rgba(139,92,246,0.20)',
             }}>
-              <Brain size={13} color="rgba(255,255,255,0.70)" strokeWidth={1.8} />
+              <Brain size={13} color="rgba(196,181,253,0.90)" strokeWidth={1.8} />
             </div>
             <span style={{
-              color: 'rgba(255,255,255,0.92)',
+              color: 'rgba(255,255,255,0.88)',
               letterSpacing: '3px',
               fontSize: '10.5px',
-              fontWeight: 600,
+              fontWeight: 700,
               textTransform: 'uppercase',
+              background: 'linear-gradient(90deg, rgba(255,255,255,0.88) 0%, rgba(196,181,253,0.80) 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
             }}>HALVEX</span>
           </div>
         )}
         {collapsed && (
           <div style={{
             width: '26px', height: '26px',
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.10)',
+            background: 'linear-gradient(135deg, rgba(139,92,246,0.30) 0%, rgba(99,102,241,0.20) 100%)',
+            border: '1px solid rgba(139,92,246,0.30)',
             borderRadius: '7px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 12px rgba(139,92,246,0.20)',
           }}>
-            <Brain size={13} color="rgba(255,255,255,0.70)" strokeWidth={1.8} />
+            <Brain size={13} color="rgba(196,181,253,0.90)" strokeWidth={1.8} />
           </div>
         )}
 
@@ -278,28 +284,31 @@ export default function Sidebar() {
           <button
             onClick={toggleCopilot}
             style={{
-              width: '100%', height: '28px', borderRadius: '6px',
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', padding: '0 9px',
-              transition: 'all 0.12s ease',
+              width: '100%', height: '28px', borderRadius: '20px',
+              background: 'linear-gradient(135deg, rgba(139,92,246,0.20) 0%, rgba(99,102,241,0.16) 100%)',
+              border: '1px solid rgba(139,92,246,0.28)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', padding: '0 10px',
+              transition: 'all 0.15s ease',
+              boxShadow: '0 1px 6px rgba(139,92,246,0.10)',
             }}
             onMouseEnter={e => {
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.09)'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.14)'
+              const el = e.currentTarget as HTMLElement
+              el.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.30) 0%, rgba(99,102,241,0.26) 100%)'
+              el.style.borderColor = 'rgba(139,92,246,0.42)'
             }}
             onMouseLeave={e => {
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'
+              const el = e.currentTarget as HTMLElement
+              el.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.20) 0%, rgba(99,102,241,0.16) 100%)'
+              el.style.borderColor = 'rgba(139,92,246,0.28)'
             }}
           >
-            <MessageSquare size={11} style={{ color: 'rgba(255,255,255,0.70)', flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: '11.5px', fontWeight: 500, color: 'rgba(255,255,255,0.70)', textAlign: 'left', letterSpacing: '-0.01em' }}>
+            <MessageSquare size={11} style={{ color: 'rgba(196,181,253,0.85)', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: '11.5px', fontWeight: 500, color: 'rgba(196,181,253,0.85)', textAlign: 'left', letterSpacing: '-0.01em' }}>
               Ask AI
             </span>
             <span style={{
-              fontSize: '10px', color: 'rgba(255,255,255,0.22)',
-              background: 'rgba(255,255,255,0.04)', padding: '1px 5px',
+              fontSize: '10px', color: 'rgba(196,181,253,0.35)',
+              background: 'rgba(139,92,246,0.12)', padding: '1px 5px',
               borderRadius: '4px',
             }}>⌘K</span>
           </button>
@@ -308,14 +317,24 @@ export default function Sidebar() {
             onClick={toggleCopilot}
             title="Ask AI (⌘K)"
             style={{
-              width: '32px', height: '28px', borderRadius: '6px',
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              width: '32px', height: '28px', borderRadius: '8px',
+              background: 'rgba(139,92,246,0.16)',
+              border: '1px solid rgba(139,92,246,0.26)',
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.12s ease',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={e => {
+              const el = e.currentTarget as HTMLElement
+              el.style.background = 'rgba(139,92,246,0.26)'
+              el.style.borderColor = 'rgba(139,92,246,0.40)'
+            }}
+            onMouseLeave={e => {
+              const el = e.currentTarget as HTMLElement
+              el.style.background = 'rgba(139,92,246,0.16)'
+              el.style.borderColor = 'rgba(139,92,246,0.26)'
             }}
           >
-            <MessageSquare size={11} style={{ color: 'rgba(255,255,255,0.70)' }} />
+            <MessageSquare size={11} style={{ color: 'rgba(196,181,253,0.85)' }} />
           </button>
         )}
       </div>
@@ -348,18 +367,22 @@ export default function Sidebar() {
         {!collapsed && brainAgeInfo && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: '7px',
-            padding: '5px 9px', marginBottom: '6px', borderRadius: '6px',
-            background: 'rgba(255,255,255,0.02)',
-            border: '1px solid rgba(255,255,255,0.04)',
+            padding: '6px 9px', marginBottom: '6px', borderRadius: '8px',
+            background: urgentCount > 0 ? 'rgba(248,113,113,0.06)' : 'rgba(139,92,246,0.06)',
+            border: `1px solid ${urgentCount > 0 ? 'rgba(248,113,113,0.14)' : 'rgba(139,92,246,0.14)'}`,
           }}>
             <div style={{
               width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0,
-              background: brainAgeInfo.color,
+              background: urgentCount > 0 ? '#f87171' : '#a78bfa',
+              boxShadow: urgentCount > 0 ? '0 0 6px rgba(248,113,113,0.60)' : '0 0 6px rgba(167,139,250,0.60)',
               animation: brainAgeInfo.mins < 2 ? 'pulse-dot 2s ease-in-out infinite' : 'none',
             }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '11px', fontWeight: 500, color: 'rgba(255,255,255,0.45)' }}>
-                {urgentCount > 0 ? `${urgentCount} deals flagged` : 'Intelligence ready'}
+              <div style={{
+                fontSize: '11px', fontWeight: 500,
+                color: urgentCount > 0 ? 'rgba(248,113,113,0.80)' : 'rgba(196,181,253,0.70)',
+              }}>
+                {urgentCount > 0 ? `${urgentCount} deals flagged` : 'Intelligence live'}
               </div>
               <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.22)', marginTop: '1px' }}>
                 Updated {brainAgeInfo.label}
@@ -479,14 +502,15 @@ export default function Sidebar() {
       {/* Mobile bottom tab bar */}
       <nav className="mobile-bottom-nav" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
-        height: '56px',
-        background: 'rgba(12, 10, 24, 0.80)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderTop: '1px solid rgba(255,255,255,0.06)',
+        height: '58px',
+        background: 'rgba(9, 8, 20, 0.92)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        borderTop: '1px solid rgba(139,92,246,0.12)',
         display: 'none',
         alignItems: 'center', justifyContent: 'space-around',
         zIndex: 1000, padding: '0 8px',
+        boxShadow: '0 -4px 20px rgba(0,0,0,0.40)',
       }}>
         {MOBILE_TABS.map(tab => {
           const active = isActive(tab.href)

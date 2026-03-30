@@ -7,10 +7,9 @@ import { getWorkspaceContext } from '@/lib/workspace'
 import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { eq, and, sql } from 'drizzle-orm'
-import Anthropic from '@anthropic-ai/sdk'
+import { anthropic } from '@/lib/ai/client'
 import { NoteExtractionSchema } from '@/lib/extraction-schema'
 
-const anthropic = new Anthropic()
 
 /**
  * POST /api/admin/backfill-extractions
@@ -59,7 +58,7 @@ export async function POST(req: NextRequest) {
         if (!notes.trim()) { results.skipped++; continue }
 
         const msg = await anthropic.messages.create({
-          model: 'claude-haiku-4-5-20251001',
+          model: 'gpt-4.1-mini',
           max_tokens: 1024,
           messages: [{
             role: 'user',
@@ -101,7 +100,7 @@ Objection themes: budget=price/cost/ROI, timing=not now/too early, authority=dec
         if (!parsed.success) {
           // Retry with correction
           const correctionMsg = await anthropic.messages.create({
-            model: 'claude-haiku-4-5-20251001',
+            model: 'gpt-4.1-mini',
             max_tokens: 512,
             messages: [{
               role: 'user',

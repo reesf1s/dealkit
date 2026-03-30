@@ -141,9 +141,9 @@ export async function GET() {
       focusBullets = cached.bullets
     } else if (topDeals.length > 0) {
       try {
-        const { createAnthropic } = await import('@ai-sdk/anthropic')
+        const { createOpenAI } = await import('@ai-sdk/openai')
         const { generateText } = await import('ai')
-        const anthropic = createAnthropic()
+        const anthropic = createOpenAI()
         const context = topDeals
           .slice(0, 4)
           .map(
@@ -152,7 +152,7 @@ export async function GET() {
           )
           .join('\n')
         const { text } = await generateText({
-          model: anthropic('claude-haiku-4-5-20251001'),
+          model: anthropic('gpt-4.1-mini'),
           prompt: `You are a sales intelligence assistant. Given these top at-risk deals, write exactly 4 concise action bullets (max 12 words each, start with a verb). Return just the 4 bullets, one per line, no numbering.\n\n${context}`,
           maxTokens: 150,
         })

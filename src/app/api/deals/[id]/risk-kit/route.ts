@@ -3,7 +3,7 @@ export const maxDuration = 60
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
-import Anthropic from '@anthropic-ai/sdk'
+import { anthropic } from '@/lib/ai/client'
 import { db } from '@/lib/db'
 import { dealLogs, companyProfiles, competitors } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
@@ -12,7 +12,6 @@ import { getWorkspaceBrain } from '@/lib/workspace-brain'
 import { buildDealBriefing } from '@/lib/brain-narrator'
 import { ensureLinksColumn } from '@/lib/api-helpers'
 
-const anthropic = new Anthropic()
 
 export type RiskKit = {
   emailSubject: string
@@ -90,7 +89,7 @@ COLLATERAL_SUGGESTION: [One specific piece of content or proof point to share â€
 URGENCY_REASON: [One honest, deal-specific reason to act now â€” without manufactured urgency. E.g. upcoming budget freeze, competitor evaluation window, their stated timeline.]`
 
     const msg = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'gpt-4.1-mini',
       max_tokens: 1000,
       messages: [{ role: 'user', content: prompt }],
     })

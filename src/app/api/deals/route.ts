@@ -3,9 +3,7 @@ import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { and, eq, count, gte, lte, sql } from 'drizzle-orm' // sql kept for inline queries below
 import { db } from '@/lib/db'
-import { dealLogs, dealLinearLinks, collateral, events, linearIntegrations } from '@/lib/db/schema'
-import { matchDealToIssues } from '@/lib/linear-signal-match'
-import { sendGapAnalysisResults, type GapIssue } from '@/lib/slack-proactive'
+import { dealLogs, collateral, events } from '@/lib/db/schema'
 import { PLAN_LIMITS, isWithinLimit } from '@/lib/stripe/plans'
 import { dbErrResponse, ensureIndexes } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
@@ -104,46 +102,6 @@ export async function POST(req: NextRequest) {
     after(async () => {
       console.log(`[brain] Rebuild triggered by: deal_created (deal: ${deal.dealName}) at ${new Date().toISOString()}`)
       await requestBrainRebuild(workspaceId, 'deal_created')
-
-      // Trigger Linear loop discovery if Linear is connected
-      try {
-        const [linearInt] = await db.select({ id: linearIntegrations.id }).from(linearIntegrations).where(eq(linearIntegrations.workspaceId, workspaceId)).limit(1)
-        if (linearInt) {
-          console.log(`[loops] Auto-discovering Linear issues for deal: ${deal.dealName}`)
-          const matchResult = await matchDealToIssues(workspaceId, deal.id, 'webhook')
-
-          // Proactive Slack DM if matches were found
-          if (matchResult.linked > 0 || matchResult.suggested > 0) {
-            try {
-              const linkedIssues = await db
-                .select({
-                  linearIssueId: dealLinearLinks.linearIssueId,
-                  linearTitle: dealLinearLinks.linearTitle,
-                  relevanceScore: dealLinearLinks.relevanceScore,
-                })
-                .from(dealLinearLinks)
-                .where(and(
-                  eq(dealLinearLinks.workspaceId, workspaceId),
-                  eq(dealLinearLinks.dealId, deal.id),
-                ))
-
-              const gapIssues: GapIssue[] = linkedIssues.map(i => ({
-                issueId: i.linearIssueId,
-                title: i.linearTitle ?? i.linearIssueId,
-                relevanceScore: i.relevanceScore ? i.relevanceScore / 100 : undefined,
-              }))
-
-              if (gapIssues.length > 0) {
-                await sendGapAnalysisResults(workspaceId, deal.id, gapIssues)
-              }
-            } catch (slackErr) {
-              console.error(`[slack-proactive] Failed to send gap analysis DM for deal ${deal.id}:`, slackErr)
-            }
-          }
-        }
-      } catch (err) {
-        console.error(`[loops] Auto-discovery failed for deal ${deal.id}:`, err)
-      }
     })
     return NextResponse.json({ data: deal }, { status: 201 })
   } catch (err) { return dbErrResponse(err) }

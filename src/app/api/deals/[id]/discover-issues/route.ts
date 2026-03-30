@@ -1,11 +1,8 @@
 /**
  * POST /api/deals/[id]/discover-issues
  *
- * Runs the halvex issue-discovery pipeline for a specific deal:
- * calls matchDealToIssues() which scores all cached Linear issues against
- * the deal's signals and upserts deal_linear_links rows.
- *
- * Returns the refreshed list of links for the deal plus match counts.
+ * Returns the current issue links for a deal and guidance for the
+ * Claude-assisted review flow.
  */
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -16,7 +13,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { dealLogs, dealLinearLinks } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { matchDealToIssues } from '@/lib/linear-signal-match'
+import { buildClaudeIssueReviewPrompt, ISSUE_LINKING_MODE } from '@/lib/issue-linking'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -30,15 +27,12 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
     // Verify deal belongs to workspace
     const [deal] = await db
-      .select({ id: dealLogs.id })
+      .select({ id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany })
       .from(dealLogs)
       .where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId)))
       .limit(1)
 
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-
-    // Run discovery and return match counts + refreshed links
-    const result = await matchDealToIssues(workspaceId, id, 'user')
 
     const links = await db
       .select()
@@ -52,10 +46,17 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
     return NextResponse.json({
       data: {
-        linked: result.linked,
-        suggested: result.suggested,
-        total: result.linked + result.suggested,
+        mode: ISSUE_LINKING_MODE,
+        linked: links.filter(link => link.status !== 'dismissed').length,
+        suggested: links.filter(link => link.status === 'suggested').length,
+        total: links.filter(link => link.status !== 'dismissed').length,
         links,
+        message: 'Issue review now happens through your Claude + Halvex MCP connection rather than Halvex-owned rematching.',
+        reviewPrompt: buildClaudeIssueReviewPrompt({
+          dealId: id,
+          dealName: deal.dealName,
+          company: deal.prospectCompany ?? deal.dealName ?? 'this deal',
+        }),
       },
     })
   } catch (err) {

@@ -19,9 +19,8 @@ import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { requestBrainRebuild } from '@/lib/brain-rebuild'
 import { extractAndLinkFeatures } from '@/lib/meeting-intelligence'
-import Anthropic from '@anthropic-ai/sdk'
+import { anthropic } from '@/lib/ai/client'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 export interface MeetingNotesExtraction {
   objections: string[]
@@ -138,7 +137,7 @@ ${notes.slice(0, 4000)}`
 
   try {
     const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'gpt-4.1-mini',
       max_tokens: 600,
       messages: [{ role: 'user', content: prompt }],
     })

@@ -11,7 +11,7 @@
  * Called inside next/after() from the meeting-notes endpoint.
  */
 
-import Anthropic from '@anthropic-ai/sdk'
+import { anthropic } from '@/lib/ai/client'
 import { db } from '@/lib/db'
 import { dealLogs, dealLinearLinks, slackUserMappings } from '@/lib/db/schema'
 import { and, eq, sql } from 'drizzle-orm'
@@ -19,7 +19,6 @@ import { smartMatchDeal } from '@/lib/smart-match'
 import { getSlackBotToken, slackOpenDm, slackPostMessage } from '@/lib/slack-client'
 import { markdownToBlocks } from '@/lib/slack-blocks'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -42,7 +41,7 @@ const VALID_CONTEXTS = ['deal_blocker', 'nice_to_have', 'on_roadmap', 'competito
 export async function extractFeaturesFromNotes(notes: string): Promise<ExtractionResult> {
   try {
     const msg = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'gpt-4.1-mini',
       max_tokens: 400,
       messages: [{
         role: 'user',

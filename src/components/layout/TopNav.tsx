@@ -19,7 +19,7 @@ const PAGE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
   '/collateral':   { label: 'Collateral',        Icon: FileText },
   '/product-gaps': { label: 'Product Gaps',      Icon: AlertTriangle },
   '/company':      { label: 'Integrations',      Icon: Plug },
-  '/workflows':    { label: 'Loops',              Icon: Sparkles },
+  '/workflows':    { label: 'Automation',          Icon: Sparkles },
   '/intelligence': { label: 'Intelligence',      Icon: Brain  },
   '/competitors':  { label: 'Competitors',       Icon: Swords },
   '/case-studies': { label: 'Case Studies',      Icon: BookOpen },
@@ -67,18 +67,19 @@ export default function TopNav() {
       top: 0,
       left: `${sidebarWidth}px`,
       right: 0,
-      height: '52px',
+      height: '50px',
       zIndex: 30,
-      background: 'rgba(6, 4, 18, 0.60)',
-      backdropFilter: 'blur(20px) saturate(180%)',
-      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
-      borderBottom: '1px solid rgba(255,255,255,0.07)',
+      background: 'rgba(7, 5, 18, 0.75)',
+      backdropFilter: 'blur(24px) saturate(200%)',
+      WebkitBackdropFilter: 'blur(24px) saturate(200%)',
+      borderBottom: '1px solid rgba(255,255,255,0.055)',
       display: 'flex',
       alignItems: 'center',
       padding: '0 20px',
       gap: '12px',
       justifyContent: 'space-between',
       transition: 'left 0.18s cubic-bezier(0.4,0,0.2,1)',
+      boxShadow: '0 1px 0 rgba(255,255,255,0.02)',
     }}>
 
       {/* Left: mobile hamburger + page breadcrumb */}
@@ -97,13 +98,13 @@ export default function TopNav() {
 
         {/* Breadcrumb */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.20)', fontWeight: 400, letterSpacing: '-0.01em' }}>
+          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.18)', fontWeight: 400, letterSpacing: '-0.01em' }}>
             Halvex
           </span>
-          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.12)' }}>/</span>
+          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.10)' }}>/</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <Icon size={12} style={{ color: 'rgba(255,255,255,0.70)', flexShrink: 0 }} />
-            <span style={{ fontSize: '13px', fontWeight: 500, color: 'rgba(255,255,255,0.75)', letterSpacing: '-0.02em' }}>
+            <Icon size={12} style={{ color: 'rgba(167,139,250,0.75)', flexShrink: 0 }} />
+            <span style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.80)', letterSpacing: '-0.025em' }}>
               {label}
             </span>
           </div>
@@ -122,34 +123,38 @@ export default function TopNav() {
         style={{
           width: '260px',
           height: '30px',
-          background: 'rgba(255,255,255,0.04)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: '8px',
+          background: 'rgba(255,255,255,0.035)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: '20px',
           display: 'flex',
           alignItems: 'center',
           gap: '7px',
-          padding: '0 10px',
+          padding: '0 12px',
           cursor: 'pointer',
-          transition: 'border-color 0.12s, background 0.12s',
+          transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s',
           flexShrink: 0,
         }}
         onMouseEnter={e => {
-          ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
-          ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.12)'
+          const el = e.currentTarget as HTMLElement
+          el.style.background = 'rgba(255,255,255,0.055)'
+          el.style.borderColor = 'rgba(255,255,255,0.11)'
+          el.style.boxShadow = '0 2px 10px rgba(0,0,0,0.20)'
         }}
         onMouseLeave={e => {
-          ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'
-          ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'
+          const el = e.currentTarget as HTMLElement
+          el.style.background = 'rgba(255,255,255,0.035)'
+          el.style.borderColor = 'rgba(255,255,255,0.07)'
+          el.style.boxShadow = 'none'
         }}
       >
-        <Search size={12} style={{ color: 'rgba(255,255,255,0.25)', flexShrink: 0 }} />
-        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.25)', flex: 1, textAlign: 'left', letterSpacing: '-0.01em' }}>
+        <Search size={11} style={{ color: 'rgba(255,255,255,0.22)', flexShrink: 0 }} />
+        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.22)', flex: 1, textAlign: 'left', letterSpacing: '-0.01em' }}>
           Search anything...
         </span>
         <span style={{
-          fontSize: '10px', color: 'rgba(255,255,255,0.18)',
-          background: 'rgba(255,255,255,0.06)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          fontSize: '10px', color: 'rgba(255,255,255,0.16)',
+          background: 'rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.07)',
           padding: '1px 5px', borderRadius: '4px',
           letterSpacing: '0.02em', flexShrink: 0,
         }}>⌘P</span>
@@ -162,21 +167,23 @@ export default function TopNav() {
         {brainAge && (
           <div style={{
             display: 'flex', alignItems: 'center', gap: '5px',
-            padding: '4px 10px', borderRadius: '7px',
-            background: urgentCount > 0 ? 'rgba(248,113,113,0.08)' : 'rgba(52,211,153,0.08)',
-            border: `1px solid ${urgentCount > 0 ? 'rgba(248,113,113,0.16)' : 'rgba(52,211,153,0.16)'}`,
+            padding: '4px 10px', borderRadius: '20px',
+            background: urgentCount > 0
+              ? 'rgba(248,113,113,0.08)'
+              : 'linear-gradient(90deg, rgba(139,92,246,0.10) 0%, rgba(52,211,153,0.08) 100%)',
+            border: `1px solid ${urgentCount > 0 ? 'rgba(248,113,113,0.18)' : 'rgba(139,92,246,0.20)'}`,
           }}>
             <div style={{
               width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0,
-              background: urgentCount > 0 ? '#f87171' : '#34d399',
-              boxShadow: urgentCount > 0 ? '0 0 6px rgba(248,113,113,0.50)' : '0 0 6px rgba(52,211,153,0.50)',
+              background: urgentCount > 0 ? '#f87171' : '#a78bfa',
+              boxShadow: urgentCount > 0 ? '0 0 8px rgba(248,113,113,0.60)' : '0 0 8px rgba(167,139,250,0.70)',
             }} />
             <span style={{
               fontSize: '11px', fontWeight: 500, letterSpacing: '-0.01em',
-              color: urgentCount > 0 ? '#f87171' : '#34d399',
+              color: urgentCount > 0 ? '#f87171' : 'rgba(167,139,250,0.90)',
               whiteSpace: 'nowrap',
             }}>
-              {urgentCount > 0 ? `${urgentCount} flagged` : `AI · ${brainAge}`}
+              {urgentCount > 0 ? `${urgentCount} need attention` : `Intelligence live · ${brainAge}`}
             </span>
           </div>
         )}
@@ -185,30 +192,35 @@ export default function TopNav() {
         <button
           onClick={toggleCopilot}
           style={{
-            height: '30px', padding: '0 10px',
+            height: '30px', padding: '0 12px',
             display: 'flex', alignItems: 'center', gap: '6px',
-            borderRadius: '7px', fontSize: '12px', fontWeight: 500,
+            borderRadius: '20px', fontSize: '12px', fontWeight: 500,
             letterSpacing: '-0.01em', cursor: 'pointer',
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            color: 'rgba(255,255,255,0.70)',
-            transition: 'all 0.12s', flexShrink: 0,
+            background: 'linear-gradient(135deg, rgba(139,92,246,0.22) 0%, rgba(99,102,241,0.18) 100%)',
+            border: '1px solid rgba(139,92,246,0.30)',
+            color: 'rgba(196,181,253,0.95)',
+            transition: 'all 0.15s', flexShrink: 0,
+            boxShadow: '0 1px 8px rgba(139,92,246,0.12)',
           }}
           onMouseEnter={e => {
-            ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'
-            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.12)'
+            const el = e.currentTarget as HTMLElement
+            el.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.32) 0%, rgba(99,102,241,0.28) 100%)'
+            el.style.borderColor = 'rgba(139,92,246,0.45)'
+            el.style.boxShadow = '0 2px 12px rgba(139,92,246,0.22)'
           }}
           onMouseLeave={e => {
-            ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
-            ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)'
+            const el = e.currentTarget as HTMLElement
+            el.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.22) 0%, rgba(99,102,241,0.18) 100%)'
+            el.style.borderColor = 'rgba(139,92,246,0.30)'
+            el.style.boxShadow = '0 1px 8px rgba(139,92,246,0.12)'
           }}
         >
-          <MessageSquare size={11} style={{ color: 'rgba(255,255,255,0.70)', flexShrink: 0 }} />
+          <MessageSquare size={11} style={{ color: 'rgba(196,181,253,0.90)', flexShrink: 0 }} />
           Ask AI
           <span style={{
-            fontSize: '10px', color: 'rgba(255,255,255,0.25)',
-            background: 'rgba(255,255,255,0.06)', padding: '1px 4px',
-            borderRadius: '3px',
+            fontSize: '10px', color: 'rgba(196,181,253,0.40)',
+            background: 'rgba(139,92,246,0.15)', padding: '1px 4px',
+            borderRadius: '4px',
           }}>⌘K</span>
         </button>
 

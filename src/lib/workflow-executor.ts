@@ -7,14 +7,13 @@
  * For Slack output targets, also sends the output as a channel/DM message.
  */
 
-import Anthropic from '@anthropic-ai/sdk'
+import { anthropic } from '@/lib/ai/client'
 import { db } from '@/lib/db'
 import { eq, and } from 'drizzle-orm'
 import { workflows } from '@/lib/db/schema'
 import { findAtRiskDeals } from '@/lib/mcp-tools'
 import { getWinLossSignals } from '@/lib/mcp-tools'
 
-const client = new Anthropic()
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -93,8 +92,8 @@ export async function executeWorkflow(
   // 3. Use Haiku to generate a brief 1-2 sentence output
   const systemPrompt = `You are a sales intelligence assistant. Summarize the data below into 1-2 concise sentences (max 30 words total) for a ${wf.outputTarget === 'slack' ? 'Slack notification' : 'daily briefing'}. Start with the most important insight. No preamble.`
 
-  const msg = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
+  const msg = await anthropic.messages.create({
+    model: 'gpt-4.1-mini',
     max_tokens: 80,
     system: systemPrompt,
     messages: [

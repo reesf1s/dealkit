@@ -5,18 +5,18 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Halvex — Revenue-to-Product Intelligence',
-  description: 'Halvex connects your sales outcomes to your product roadmap — automatically. See which features are blocking revenue, link them to your backlog, and close the loop when they ship.',
+  description: 'Halvex connects sales context, product work, and AI review so teams can understand which features are blocking revenue and track the issues that matter.',
   openGraph: {
     title: 'Halvex — Revenue-to-Product Intelligence',
-    description: 'Stop losing deals to features you haven\'t built yet. Halvex closes the loop between sales outcomes and product decisions, automatically.',
+    description: 'Stop losing deals to product blockers. Halvex gives your team shared deal intelligence, Linear context, and AI-assisted issue review.',
     type: 'website',
-    url: 'https://halvex.com',
+    url: 'https://halvex.ai',
     siteName: 'Halvex',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Halvex — Revenue-to-Product Intelligence',
-    description: 'Stop losing deals to features you haven\'t built yet.',
+    description: 'Stop losing deals to product blockers.',
   },
 }
 
@@ -86,7 +86,7 @@ export default async function LandingPage() {
             <span style={{ fontSize: '14px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#f1f5f9' }}>HALVEX</span>
           </Link>
           <div className="nav-links" style={{ display: 'flex', gap: '24px' }}>
-            {['Product', 'Integrations', 'Pricing', 'Docs'].map(item => (
+            {['Product', 'Integrations'].map(item => (
               <a key={item} href={`#${item.toLowerCase()}`} className="nav-link"
                 style={{ fontSize: '13px', color: 'rgba(241,245,249,0.55)', transition: 'color 0.15s' }}>
                 {item}
@@ -102,7 +102,7 @@ export default async function LandingPage() {
           <Link href="/sign-up"
             className="cta-primary"
             style={{
-              fontSize: '13px', fontWeight: 600, color: '#fff',
+              fontSize: '13px', fontWeight: 600, color: '#0a0b0f',
               background: 'rgba(255,255,255,0.80)', padding: '7px 16px', borderRadius: '8px',
               transition: 'background 0.15s',
             }}>
@@ -141,7 +141,7 @@ export default async function LandingPage() {
           fontSize: '17px', lineHeight: 1.7,
           color: 'rgba(241,245,249,0.60)', maxWidth: '580px', margin: '0 auto 36px',
         }}>
-          Halvex connects your sales outcomes to your product roadmap — automatically. See which features are blocking revenue, link them to your backlog, and close the loop when they ship.
+          Halvex gives sales and product one shared source of truth. Sync your revenue context, review relevant product work with AI, and track which issues are actually blocking deals.
         </p>
 
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -150,7 +150,7 @@ export default async function LandingPage() {
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '8px',
               padding: '12px 28px', borderRadius: '10px', fontWeight: 700,
-              fontSize: '15px', color: '#fff', background: 'rgba(255,255,255,0.80)',
+              fontSize: '15px', color: '#0a0b0f', background: 'rgba(255,255,255,0.80)',
               transition: 'background 0.15s',
             }}>
             Start for free
@@ -173,7 +173,7 @@ export default async function LandingPage() {
           {[
             { label: 'Deal logged', sub: 'Win/loss patterns', color: '#10b981', icon: '📊' },
             { label: 'Gap detected', sub: 'Ranked by revenue', color: 'rgba(255,255,255,0.80)', icon: '🎯' },
-            { label: 'Linear linked', sub: 'Engineers see context', color: '#3b82f6', icon: '🔗' },
+            { label: 'AI-reviewed links', sub: 'High-confidence issues only', color: '#3b82f6', icon: '🔗' },
             { label: 'Rep notified', sub: 'Re-engagement email', color: '#f59e0b', icon: '✉️' },
           ].map((node, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
@@ -213,7 +213,7 @@ export default async function LandingPage() {
               The Revenue-to-Product loop, automated
             </h2>
             <p style={{ fontSize: '16px', color: 'rgba(241,245,249,0.55)', maxWidth: '480px', margin: '0 auto' }}>
-              Four steps that turn sales conversations into shipped features — automatically.
+              Four steps that turn sales context into product decisions your team can trust.
             </p>
           </div>
 
@@ -224,15 +224,15 @@ export default async function LandingPage() {
                 color: '#10b981', bg: 'rgba(16,185,129,0.06)', border: 'rgba(16,185,129,0.14)',
               },
               {
-                step: '02', title: 'Halvex detects gaps', body: 'ML ranks product gaps by revenue at stake. SSO blocking £240k? You\'ll know.',
+                step: '02', title: 'Halvex detects blockers', body: 'Halvex ranks product blockers by revenue at stake. If SSO is putting £240k at risk, your team sees it fast.',
                 color: 'rgba(255,255,255,0.80)', bg: 'rgba(255,255,255,0.06)', border: 'rgba(255,255,255,0.06)',
               },
               {
-                step: '03', title: 'Auto-links to Linear', body: 'Issues are linked to your backlog. Engineers see the business context behind every ticket.',
+                step: '03', title: 'AI reviews the backlog', body: 'Claude reviews the deal against synced Linear context and saves only the genuinely relevant issue links back into Halvex.',
                 color: '#3b82f6', bg: 'rgba(59,130,246,0.06)', border: 'rgba(59,130,246,0.14)',
               },
               {
-                step: '04', title: 'Reps get notified', body: 'When it ships, sales gets a re-engagement email drafted. Close the loop.',
+                step: '04', title: 'Teams act with context', body: 'Sales sees what is blocked, product sees why it matters, and everyone can follow progress from deal to shipped work.',
                 color: '#f59e0b', bg: 'rgba(245,158,11,0.06)', border: 'rgba(245,158,11,0.14)',
               },
             ].map(card => (
@@ -263,8 +263,8 @@ export default async function LandingPage() {
                   'Deal health ring shows win probability at a glance',
                   'Competitive battlecards built from your actual wins',
                   'Ask anything in Slack: "What\'s blocking Acme?"',
-                  'Get notified when a requested feature ships',
-                  'MCP tools for Claude Desktop',
+                  'Review saved Linear issue links on the deal itself',
+                  'Use Ask AI or Claude MCP to inspect blockers quickly',
                 ],
               },
               {
@@ -273,7 +273,7 @@ export default async function LandingPage() {
                 headline: 'Build what actually moves revenue',
                 points: [
                   'See which features are blocking the most ARR',
-                  'Every Linear ticket shows the business context',
+                  'Every saved issue link carries deal context back into Halvex',
                   'Prioritise by revenue impact, not gut feel',
                   'Close the loop: ship it → reps get notified',
                   'Win/loss data feeds directly into your roadmap',
@@ -316,21 +316,19 @@ export default async function LandingPage() {
             Integrations
           </h2>
           <p style={{ fontSize: '14px', color: 'rgba(241,245,249,0.45)', marginBottom: '40px' }}>
-            Halvex connects your sales stack to your engineering stack.
+            Live integrations available in the product today.
           </p>
-          <div className="int-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px', maxWidth: '720px', margin: '0 auto' }}>
+          <div className="int-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', maxWidth: '720px', margin: '0 auto' }}>
             {[
-              { name: 'HubSpot', color: '#ff7a59', available: true },
-              { name: 'Linear', color: '#5e6ad2', available: true },
-              { name: 'Slack', color: '#4a154b', available: true },
-              { name: 'Claude MCP', color: 'rgba(255,255,255,0.80)', available: true },
-              { name: 'GitHub', color: '#6e7681', available: false },
-              { name: 'Salesforce', color: '#00a1e0', available: false },
+              { name: 'HubSpot', color: '#ff7a59' },
+              { name: 'Linear', color: '#5e6ad2' },
+              { name: 'Slack', color: '#4a154b' },
+              { name: 'Claude MCP', color: 'rgba(255,255,255,0.80)' },
             ].map(int => (
               <div key={int.name} style={{
                 padding: '14px 10px', borderRadius: '10px',
                 background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
-                textAlign: 'center', opacity: int.available ? 1 : 0.4,
+                textAlign: 'center',
               }}>
                 <div style={{
                   width: '32px', height: '32px', borderRadius: '8px',
@@ -342,34 +340,33 @@ export default async function LandingPage() {
                   {int.name[0]}
                 </div>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(241,245,249,0.65)' }}>{int.name}</div>
-                {!int.available && <div style={{ fontSize: '9px', color: 'rgba(241,245,249,0.28)', marginTop: '2px' }}>Soon</div>}
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Pricing ──────────────────────────────────────────────────────────── */}
-      <section id="pricing" style={{ padding: '80px 24px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      {/* ── Product Focus ─────────────────────────────────────────────────────── */}
+      <section style={{ padding: '80px 24px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ maxWidth: '860px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-            <h2 style={{ fontSize: '32px', fontWeight: 800, letterSpacing: '-0.02em', color: '#f1f5f9', marginBottom: '10px' }}>Pricing</h2>
-            <p style={{ fontSize: '15px', color: 'rgba(241,245,249,0.50)' }}>Start free. Upgrade when you need more.</p>
+            <h2 style={{ fontSize: '32px', fontWeight: 800, letterSpacing: '-0.02em', color: '#f1f5f9', marginBottom: '10px' }}>Built for the real operating workflow</h2>
+            <p style={{ fontSize: '15px', color: 'rgba(241,245,249,0.50)' }}>Halvex is strongest when revenue context, product context, and AI review all stay in sync.</p>
           </div>
 
           <div className="pricing-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '14px', alignItems: 'start' }}>
             {[
               {
-                name: 'Free', price: 0, featured: false,
-                features: ['Up to 5 deals', 'MCP access', 'Basic intelligence', 'Community support'],
+                name: 'Revenue context', featured: false,
+                features: ['Log deals, notes, and blockers', 'Keep sales context tied to every account', 'Use Ask AI to inspect risk and momentum'],
               },
               {
-                name: 'Growth', price: 69, featured: true,
-                features: ['Unlimited deals', 'Slack + Linear + HubSpot', 'Full MCP access', 'Win playbook & battlecards', 'Revenue-to-Product loop', '1 workspace'],
+                name: 'Product review', featured: true,
+                features: ['Sync Linear into Halvex', 'Review backlog relevance with Claude MCP', 'Save high-confidence issue links back into the deal'],
               },
               {
-                name: 'Scale', price: 149, featured: false,
-                features: ['Everything in Growth', 'Multi-workspace', 'Priority support', 'Custom brain refresh', 'Advanced ML models', 'Early access'],
+                name: 'Shared execution', featured: false,
+                features: ['Track confirmed links over time', 'Give sales and product one shared view', 'Follow blocker progress from deal to shipped work'],
               },
             ].map(tier => (
               <div key={tier.name} className="pricing-card" style={{
@@ -383,16 +380,13 @@ export default async function LandingPage() {
                   <div style={{
                     position: 'absolute', top: '-11px', left: '50%', transform: 'translateX(-50%)',
                     padding: '2px 16px', borderRadius: '100px',
-                    background: 'rgba(255,255,255,0.80)', fontSize: '11px', fontWeight: 700, color: '#fff',
+                    background: 'rgba(255,255,255,0.80)', fontSize: '11px', fontWeight: 700, color: '#0a0b0f',
                     letterSpacing: '0.04em',
-                  }}>Most popular</div>
+                  }}>Core workflow</div>
                 )}
                 <div style={{ fontSize: '15px', fontWeight: 700, color: '#f1f5f9', marginBottom: '10px' }}>{tier.name}</div>
-                <div style={{ marginBottom: '20px' }}>
-                  <span style={{ fontSize: '32px', fontWeight: 800, color: '#f1f5f9', letterSpacing: '-0.03em' }}>
-                    {tier.price === 0 ? 'Free' : `$${tier.price}`}
-                  </span>
-                  {tier.price > 0 && <span style={{ fontSize: '13px', color: 'rgba(241,245,249,0.40)', marginLeft: '4px' }}>/mo</span>}
+                <div style={{ marginBottom: '20px', fontSize: '13px', color: 'rgba(241,245,249,0.55)', lineHeight: 1.7 }}>
+                  {tier.featured ? 'Where Halvex makes the judgment loop trustworthy.' : 'A live part of the current product experience.'}
                 </div>
                 <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
                   {tier.features.map((f, i) => (
@@ -402,22 +396,12 @@ export default async function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link href="/sign-up" style={{
-                  display: 'block', textAlign: 'center',
-                  padding: '10px', borderRadius: '8px', fontWeight: 600, fontSize: '13px',
-                  background: tier.featured ? 'rgba(255,255,255,0.80)' : 'rgba(255,255,255,0.05)',
-                  border: tier.featured ? 'none' : '1px solid rgba(255,255,255,0.10)',
-                  color: tier.featured ? '#fff' : 'rgba(241,245,249,0.75)',
-                  transition: 'opacity 0.15s',
-                }}>
-                  {tier.price === 0 ? 'Get started free' : 'Start free trial'}
-                </Link>
               </div>
             ))}
           </div>
 
           <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '13px', color: 'rgba(241,245,249,0.40)' }}>
-            Need more? <a href="mailto:hello@halvex.io" style={{ color: 'rgba(255,255,255,0.70)' }}>Contact us for Enterprise pricing</a>
+            Want access? <a href="mailto:hello@halvex.io" style={{ color: 'rgba(255,255,255,0.70)' }}>Contact the team</a>
           </div>
         </div>
       </section>
@@ -426,17 +410,17 @@ export default async function LandingPage() {
       <section style={{ padding: '80px 24px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
         <div style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
           <h2 style={{ fontSize: '32px', fontWeight: 800, letterSpacing: '-0.02em', color: '#f1f5f9', marginBottom: '12px' }}>
-            Start closing the loop today
+            Start using shared revenue context today
           </h2>
           <p style={{ fontSize: '15px', color: 'rgba(241,245,249,0.50)', marginBottom: '28px' }}>
-            Free to start. Add your first 3 deals and watch intelligence unlock.
+            Connect Slack, Linear, and Claude MCP to see the full Halvex workflow in action.
           </p>
           <Link href="/sign-up"
             className="cta-primary"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '8px',
               padding: '13px 32px', borderRadius: '10px', fontWeight: 700,
-              fontSize: '15px', color: '#fff', background: 'rgba(255,255,255,0.80)',
+              fontSize: '15px', color: '#0a0b0f', background: 'rgba(255,255,255,0.80)',
               transition: 'background 0.15s',
             }}>
             Get started free →

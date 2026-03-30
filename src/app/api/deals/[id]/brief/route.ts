@@ -12,12 +12,11 @@ export const maxDuration = 30
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
-import Anthropic from '@anthropic-ai/sdk'
+import { anthropic } from '@/lib/ai/client'
 import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 
-const anthropic = new Anthropic()
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -66,7 +65,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     }
 
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'gpt-4.1-mini',
       max_tokens: 280,
       messages: [
         {

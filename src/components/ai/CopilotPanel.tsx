@@ -143,6 +143,7 @@ export default function CopilotPanel() {
   const { copilotOpen, toggleCopilot, setCopilotOpen, activeDeal, copilotPrefill, clearCopilotPrefill, copilotAutoSend, clearCopilotAutoSend } = useSidebar()
 
   const [chatError, setChatError] = useState<string | null>(null)
+  const [conversationId, setConversationId] = useState(() => crypto.randomUUID())
 
   const {
     messages,
@@ -157,7 +158,7 @@ export default function CopilotPanel() {
     error,
   } = useChat({
     api: '/api/agent',
-    body: { activeDealId: activeDeal?.id ?? null, currentPage: pathname },
+    body: { activeDealId: activeDeal?.id ?? null, currentPage: pathname, conversationId },
     onError: (err) => {
       console.error('[CopilotPanel] Chat error:', err)
       setChatError(err.message || 'Something went wrong. Please try again.')
@@ -232,6 +233,7 @@ export default function CopilotPanel() {
   const clearChat = () => {
     setMessages([])
     setInput('')
+    setConversationId(crypto.randomUUID())
   }
 
   const quickActions = getQuickActions(activeDeal?.company, pathname || '/')
@@ -724,7 +726,7 @@ export default function CopilotPanel() {
               fontSize: '12px',
               lineHeight: '1.5',
             }}>
-              Something went wrong with that request. Try again, or rephrase if the issue persists.
+              {chatError || 'Something went wrong with that request. Try again, or rephrase if the issue persists.'}
             </div>
           )}
 

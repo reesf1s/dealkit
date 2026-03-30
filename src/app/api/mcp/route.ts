@@ -151,6 +151,50 @@ const TOOL_DEFINITIONS = [
       required: [],
     },
   },
+  // ── Claude-powered matching tools ───────────────────────────────────────────
+  {
+    name: 'halvex_list_deals_for_matching',
+    description: 'Returns all open deals with their requirements, pain points, and product gaps — structured for Claude to analyse against a list of Linear issues and identify matches. Call this before halvex_save_issue_link.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'halvex_save_issue_link',
+    description: 'Save a deal ↔ Linear issue link that Claude has identified as relevant. Claude should call this after reviewing deals (via halvex_list_deals_for_matching) and Linear issues. The link is stored as a suggested match — users can confirm or dismiss it in the Halvex UI.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        deal_id: {
+          type: 'string',
+          description: 'Halvex deal UUID (from halvex_list_deals_for_matching)',
+        },
+        linear_issue_id: {
+          type: 'string',
+          description: 'Linear issue identifier, e.g. "ENG-42"',
+        },
+        linear_issue_url: {
+          type: 'string',
+          description: 'Full URL to the Linear issue',
+        },
+        linear_issue_title: {
+          type: 'string',
+          description: 'Title of the Linear issue',
+        },
+        relevance_reason: {
+          type: 'string',
+          description: 'Brief explanation of why this issue is relevant to the deal (1-2 sentences)',
+        },
+        relevance_score: {
+          type: 'number',
+          description: 'How relevant this issue is to the deal, 0-100',
+        },
+      },
+      required: ['deal_id', 'linear_issue_id', 'linear_issue_title', 'relevance_reason'],
+    },
+  },
   {
     name: 'halvex_close_the_loop',
     description: '[Signature action] Given a deal and a product gap: find or create the matching Linear issue, scope it to the upcoming cycle, draft a re-engagement email, and log the loop closure. This is the Revenue-to-Product loop in one tool call.',
@@ -466,10 +510,10 @@ export async function POST(req: NextRequest) {
 
         // Scope the gap as a user story using Haiku
         const { generateText } = await import('ai')
-        const { createAnthropic } = await import('@ai-sdk/anthropic')
-        const anthropic = createAnthropic()
+        const { createOpenAI } = await import('@ai-sdk/openai')
+        const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY })
         const { text: emailDraft } = await generateText({
-          model: anthropic('claude-haiku-4-5-20251001'),
+          model: openai('gpt-4.1-mini'),
           prompt: `You are a sales rep. Draft a short re-engagement email (max 4 sentences) to ${deal.prospectCompany} letting them know that "${gap}" is now on the roadmap. Be specific, professional, and warm. Just the email body, no subject line.`,
           maxTokens: 200,
         })
@@ -502,6 +546,123 @@ export async function POST(req: NextRequest) {
         ].join('\n')
 
         return mcpText(lines)
+      }
+
+      // ── halvex_list_deals_for_matching ──────────────────────────────────────
+      case 'halvex_list_deals_for_matching': {
+        const deals = await db
+          .select({
+            id: dealLogs.id,
+            dealName: dealLogs.dealName,
+            prospectCompany: dealLogs.prospectCompany,
+            stage: dealLogs.stage,
+            dealValue: dealLogs.dealValue,
+            dealRisks: dealLogs.dealRisks,
+            nextSteps: dealLogs.nextSteps,
+          })
+          .from(dealLogs)
+          .where(
+            and(
+              eq(dealLogs.workspaceId, workspaceId),
+              not(inArray(dealLogs.stage, ['closed_won', 'closed_lost'])),
+            )
+          )
+
+        if (deals.length === 0) {
+          return mcpText('No open deals found in this workspace.')
+        }
+
+        // Fetch product gaps — sourceDeals is a JSONB array of deal IDs
+        const gaps = await db
+          .select({ title: productGaps.title, sourceDeals: productGaps.sourceDeals })
+          .from(productGaps)
+          .where(eq(productGaps.workspaceId, workspaceId))
+
+        const gapsByDeal: Record<string, string[]> = {}
+        for (const g of gaps) {
+          const dealIds = (g.sourceDeals as string[]) ?? []
+          for (const dId of dealIds) {
+            if (!gapsByDeal[dId]) gapsByDeal[dId] = []
+            gapsByDeal[dId].push(g.title)
+          }
+        }
+
+        const lines = [
+          `**${deals.length} open deals** — structured for Linear issue matching:`,
+          '',
+          ...deals.map(d => {
+            const value = d.dealValue ? `£${Math.round(d.dealValue).toLocaleString()}` : '—'
+            const risks = (d.dealRisks as string[])?.join(', ') || 'none'
+            const dealGaps = gapsByDeal[d.id]?.join(', ') || 'none logged'
+            return [
+              `**${d.dealName}** (${d.prospectCompany}) | ${d.stage} | ${value}`,
+              `  deal_id: ${d.id}`,
+              `  Risks: ${risks}`,
+              `  Product gaps needed: ${dealGaps}`,
+              `  Next steps: ${d.nextSteps || 'not set'}`,
+            ].join('\n')
+          }),
+          '',
+          'To save a match: call halvex_save_issue_link with deal_id + linear_issue_id + relevance_reason.',
+        ].join('\n')
+
+        return mcpText(lines)
+      }
+
+      // ── halvex_save_issue_link ───────────────────────────────────────────────
+      case 'halvex_save_issue_link': {
+        const dealId = parameters.deal_id as string | undefined
+        const linearIssueId = parameters.linear_issue_id as string | undefined
+        const linearIssueUrl = parameters.linear_issue_url as string | undefined
+        const linearIssueTitle = parameters.linear_issue_title as string | undefined
+        const relevanceReason = parameters.relevance_reason as string | undefined
+        const relevanceScore = (parameters.relevance_score as number | undefined) ?? 60
+
+        if (!dealId) return mcpError('Missing parameter: deal_id')
+        if (!linearIssueId) return mcpError('Missing parameter: linear_issue_id')
+        if (!linearIssueTitle) return mcpError('Missing parameter: linear_issue_title')
+        if (!relevanceReason) return mcpError('Missing parameter: relevance_reason')
+
+        // Verify deal belongs to workspace
+        const [deal] = await db
+          .select({ id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany })
+          .from(dealLogs)
+          .where(and(eq(dealLogs.id, dealId), eq(dealLogs.workspaceId, workspaceId)))
+          .limit(1)
+
+        if (!deal) return mcpError(`Deal not found: ${dealId}`)
+
+        // Upsert the link (status = identified — user must confirm in UI)
+        await db
+          .insert(dealLinearLinks)
+          .values({
+            workspaceId,
+            dealId,
+            linearIssueId,
+            linearIssueUrl: linearIssueUrl ?? null,
+            title: linearIssueTitle,
+            relevanceScore: Math.round(relevanceScore),
+            status: 'identified',
+            matchSource: 'claude_mcp',
+          } as any)
+          .onConflictDoNothing()
+
+        // Log action
+        await db.insert(mcpActionLog).values({
+          workspaceId,
+          actionType: 'save_issue_link',
+          dealId,
+          triggeredBy: 'mcp',
+          payload: { linearIssueId, linearIssueTitle, relevanceReason, relevanceScore },
+          result: { saved: true },
+          status: 'complete',
+        })
+
+        return mcpText(
+          `Saved link: **${deal.dealName}** ↔ **${linearIssueId}** (${linearIssueTitle})\n` +
+          `Relevance: ${Math.round(relevanceScore)}% — "${relevanceReason}"\n` +
+          `Status: suggested (user will confirm or dismiss in Halvex)`
+        )
       }
 
       default:

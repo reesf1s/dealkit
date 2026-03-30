@@ -16,7 +16,7 @@
  */
 
 import { generateText, tool, jsonSchema } from 'ai'
-import { createAnthropic } from '@ai-sdk/anthropic'
+import { createOpenAI } from '@ai-sdk/openai'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { workspaces, mcpActionLog, slackUserMappings } from '@/lib/db/schema'
@@ -42,9 +42,9 @@ export interface SlackAgentResult {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getAnthropicClient() {
-  const key = process.env.ANTHROPIC_API_KEY
-  if (!key) throw new Error('ANTHROPIC_API_KEY env var is not set')
-  return createAnthropic({ apiKey: key })
+  const key = process.env.OPENAI_API_KEY
+  if (!key) throw new Error('OPENAI_API_KEY env var is not set')
+  return createOpenAI({ apiKey: key })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -370,7 +370,7 @@ export async function handleSlackMessage(
   let responseText: string
   try {
     const result = await generateText({
-      model: getAnthropicClient()('claude-sonnet-4-6'),
+      model: getAnthropicClient()('gpt-4.1-mini'),
       messages: [
         {
           role: 'user',

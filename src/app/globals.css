@@ -36,7 +36,16 @@
   --text-muted:     rgba(255, 255, 255, 0.18);
   --text-inverse:   #0a0b0f;
 
-  /* Status colors — the ONLY colors in the UI */
+  /* Brand accent — violet/indigo for interactive elements */
+  --brand:           #8b5cf6;
+  --brand-light:     #a78bfa;
+  --brand-lighter:   #c4b5fd;
+  --brand-bg:        rgba(139, 92, 246, 0.12);
+  --brand-bg-hover:  rgba(139, 92, 246, 0.20);
+  --brand-border:    rgba(139, 92, 246, 0.28);
+  --brand-glow:      0 0 20px rgba(139, 92, 246, 0.25);
+
+  /* Status colors */
   --color-green:     #34d399;
   --color-green-bg:  rgba(52, 211, 153, 0.12);
   --color-amber:     #fbbf24;
@@ -218,25 +227,21 @@
 }
 
 html {
-  background: linear-gradient(145deg,
-    #0c0a1a 0%,
-    #0d1030 30%,
-    #080e24 55%,
-    #0f0820 80%,
-    #0a0c20 100%
-  ) fixed;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(139,92,246,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(99,102,241,0.06) 0%, transparent 60%),
+    linear-gradient(160deg, #08061a 0%, #0c0a22 25%, #080d22 55%, #0d081e 80%, #090b1e 100%)
+    fixed;
 }
 
 html, body {
   height: 100%;
   min-height: 100%;
-  background: linear-gradient(145deg,
-    #0c0a1a 0%,
-    #0d1030 30%,
-    #080e24 55%,
-    #0f0820 80%,
-    #0a0c20 100%
-  ) fixed;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(139,92,246,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(99,102,241,0.06) 0%, transparent 60%),
+    linear-gradient(160deg, #08061a 0%, #0c0a22 25%, #080d22 55%, #0d081e 80%, #090b1e 100%)
+    fixed;
   color: var(--text-primary);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
   font-size: 14px;
@@ -345,9 +350,9 @@ html, body {
   color: rgba(255, 255, 255, 0.95);
 }
 
-/* Focus ring — white, no color */
+/* Focus ring — brand violet */
 :focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.30);
+  outline: 2px solid rgba(139, 92, 246, 0.55);
   outline-offset: 2px;
 }
 
@@ -451,7 +456,7 @@ select.glass-input:focus {
   border-color: rgba(255, 255, 255, 0.18);
 }
 
-/* Primary button — white on dark, not colored */
+/* Primary button — white on dark */
 .btn-primary {
   background: rgba(255, 255, 255, 0.90);
   border: 1px solid rgba(255, 255, 255, 0.95);
@@ -463,6 +468,38 @@ select.glass-input:focus {
 
 .btn-primary:hover {
   background: rgba(255, 255, 255, 1);
+}
+
+/* Brand button — violet accent */
+.btn-brand {
+  background: linear-gradient(135deg, rgba(139,92,246,0.24) 0%, rgba(99,102,241,0.20) 100%);
+  border: 1px solid var(--brand-border);
+  color: var(--brand-lighter);
+  border-radius: var(--radius-full);
+  font-weight: 500;
+  transition: all var(--transition-fast);
+  box-shadow: 0 1px 8px rgba(139,92,246,0.14);
+}
+
+.btn-brand:hover {
+  background: linear-gradient(135deg, rgba(139,92,246,0.34) 0%, rgba(99,102,241,0.30) 100%);
+  border-color: rgba(139,92,246,0.44);
+  box-shadow: 0 2px 14px rgba(139,92,246,0.24);
+}
+
+/* Brand-accented card */
+.glass-card-brand {
+  background: linear-gradient(135deg, rgba(139,92,246,0.07) 0%, rgba(255,255,255,0.03) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(139,92,246,0.16);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.glass-card-brand:hover {
+  border-color: rgba(139,92,246,0.28);
+  box-shadow: 0 4px 20px rgba(139,92,246,0.10);
 }
 
 /* Dropdown / popover panels */

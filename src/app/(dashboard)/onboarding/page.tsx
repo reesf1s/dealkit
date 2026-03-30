@@ -23,6 +23,15 @@ interface DiscoveredIssue {
   addressesRisk: string | null
 }
 
+async function fetchJson(url: string, init?: RequestInit) {
+  const res = await fetch(url, init)
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(typeof json?.error === 'string' ? json.error : 'Request failed')
+  }
+  return json
+}
+
 function OnboardingInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -58,6 +67,9 @@ function OnboardingInner() {
   const [discoveredIssues, setDiscoveredIssues] = useState<DiscoveredIssue[]>([])
   const [discoverLoading, setDiscoverLoading] = useState(false)
   const [savedDealId, setSavedDealId] = useState<string | null>(null)
+  const [dealError, setDealError] = useState<string | null>(null)
+  const [resultWarnings, setResultWarnings] = useState<string[]>([])
+  const [reviewPrompt, setReviewPrompt] = useState<string | null>(null)
 
   // Single init effect -- handles OAuth redirects and status pre-checks
   useEffect(() => {
@@ -80,8 +92,8 @@ function OnboardingInner() {
         setLinearConnected(true)
         setLinearSyncing(true)
         Promise.all([
-          fetch('/api/integrations/slack/status').then(r => r.json()).catch(() => null),
-          fetch('/api/integrations/linear/status').then(r => r.json()).catch(() => null),
+          fetchJson('/api/integrations/slack/status').catch(() => null),
+          fetchJson('/api/integrations/linear/status').catch(() => null),
         ]).then(([slackData, linearData]) => {
           if (slackData?.data?.connected) {
             setSlackConnected(true)
@@ -97,8 +109,8 @@ function OnboardingInner() {
 
       // No OAuth params -- check existing connections (resuming onboarding)
       const [slackRes, linearRes] = await Promise.allSettled([
-        fetch('/api/integrations/slack/status').then(r => r.json()),
-        fetch('/api/integrations/linear/status').then(r => r.json()),
+        fetchJson('/api/integrations/slack/status'),
+        fetchJson('/api/integrations/linear/status'),
       ])
 
       let hasSlack = false
@@ -149,9 +161,12 @@ function OnboardingInner() {
 
   async function handleDealSave() {
     if (!company.trim() || dealSaving) return
+    setDealError(null)
+    setResultWarnings([])
+    setReviewPrompt(null)
     setDealSaving(true)
     try {
-      const res = await fetch('/api/deals', {
+      const data = await fetchJson('/api/deals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -161,8 +176,6 @@ function OnboardingInner() {
           stage,
         }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Failed to save deal')
 
       const dealId = data.data?.id
       setSavedDealId(dealId)
@@ -175,41 +188,39 @@ function OnboardingInner() {
       setStep('results')
       setDiscoverLoading(true)
 
-      // Fire both requests in parallel
-      const promises: Promise<unknown>[] = []
+      const warnings: string[] = []
 
-      // 1. Meeting notes (gap analysis + Slack DM trigger)
       if (dealId && waitingFor.trim()) {
-        promises.push(
-          fetch(`/api/deals/${dealId}/meeting-notes`, {
+        try {
+          await fetchJson(`/api/deals/${dealId}/meeting-notes`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ notes: waitingFor.trim() }),
-          }).catch(() => {})
-        )
+          })
+        } catch (err) {
+          warnings.push(err instanceof Error ? `Deal notes could not be processed yet: ${err.message}` : 'Deal notes could not be processed yet.')
+        }
       }
 
-      // 2. Discover matching Linear issues
       if (dealId) {
-        promises.push(
-          fetch(`/api/deals/${dealId}/discover-issues`, {
+        try {
+          const result = await fetchJson(`/api/deals/${dealId}/discover-issues`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
           })
-            .then(r => r.json())
-            .then(result => {
-              if (result.data?.links) {
-                setDiscoveredIssues(result.data.links)
-              }
-            })
-            .catch(() => {})
-        )
+          setDiscoveredIssues(Array.isArray(result.data?.links) ? result.data.links : [])
+          setReviewPrompt(typeof result.data?.reviewPrompt === 'string' ? result.data.reviewPrompt : null)
+        } catch (err) {
+          warnings.push(err instanceof Error ? `Issue review context could not be prepared yet: ${err.message}` : 'Issue review context could not be prepared yet.')
+        }
       }
 
-      await Promise.allSettled(promises)
-      setDiscoverLoading(false)
-    } catch {
+      setResultWarnings(warnings)
+    } catch (err) {
+      setDealError(err instanceof Error ? err.message : 'Could not save the deal.')
+    } finally {
       setDealSaving(false)
+      setDiscoverLoading(false)
     }
   }
 
@@ -361,7 +372,7 @@ function OnboardingInner() {
               Connect Slack
             </h1>
             <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '340px', margin: '0 auto' }}>
-              Halvex works in Slack. Ask about deals, get notified when issues ship, and close loops without leaving your workflow.
+              Halvex works in Slack. Ask about deals, review linked product work, and get notified when customer blockers ship without leaving your workflow.
             </p>
           </div>
 
@@ -415,7 +426,7 @@ function OnboardingInner() {
               Connect Linear
             </h1>
             <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '340px', margin: '0 auto' }}>
-              Halvex matches your deals to open Linear issues so sales gaps become product priorities automatically.
+              Halvex keeps Linear synced as live product context. Claude uses that context through Halvex MCP to review the deal and save the right issue links back into your workspace.
             </p>
           </div>
 
@@ -444,9 +455,9 @@ function OnboardingInner() {
             ) : (
               <>
                 <FeatureList items={[
-                  'Halvex syncs your Linear backlog automatically',
-                  'Deals matched to relevant issues by AI similarity',
-                  'Sales can request prioritization without pestering eng',
+                  'Keep your current backlog available inside Halvex',
+                  'Let Claude review deal context against real Linear issues',
+                  'Save high-confidence issue links back into the deal record',
                 ]} />
                 <button
                   onClick={handleLinearConnect}
@@ -494,11 +505,24 @@ function OnboardingInner() {
               Add your first deal
             </h1>
             <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '360px', margin: '0 auto' }}>
-              Halvex will run a gap analysis and message you in Slack with matching Linear issues.
+              Add a real deal, capture what the buyer is waiting for, and prepare the context Claude will use to review relevant product issues.
             </p>
           </div>
 
           <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {dealError && (
+              <div style={{
+                padding: '10px 14px',
+                background: 'rgba(239,68,68,0.06)',
+                border: '1px solid rgba(239,68,68,0.20)',
+                borderRadius: '8px',
+                fontSize: '12px',
+                color: 'var(--accent-danger)',
+                lineHeight: 1.5,
+              }}>
+                {dealError}
+              </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                 Company name *
@@ -574,7 +598,7 @@ function OnboardingInner() {
                 onBlur={e => (e.target.style.borderColor = 'rgba(255,255,255,0.10)')}
               />
               <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-                Halvex uses this to find matching Linear issues and kick off your first loop.
+                Halvex uses this to prepare the deal context Claude will review when saving issue links back into Halvex.
               </div>
             </div>
 
@@ -588,8 +612,8 @@ function OnboardingInner() {
               }}
             >
               {dealSaving
-                ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Analyzing...</>
-                : <>Save deal and discover issues <ArrowRight size={14} /></>}
+                ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Saving deal...</>
+                : <>Save deal and prep AI review <ArrowRight size={14} /></>}
             </button>
           </div>
         </div>
@@ -601,16 +625,20 @@ function OnboardingInner() {
           <div style={{ textAlign: 'center' }}>
             <h1 style={{ fontSize: '22px', fontWeight: 600, letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '8px' }}>
               {discoverLoading
-                ? 'Running gap analysis...'
+                ? 'Preparing your first AI review...'
                 : discoveredIssues.length > 0
-                  ? `Found ${discoveredIssues.length} issue${discoveredIssues.length === 1 ? '' : 's'} that could help close ${company}`
+                  ? `Found ${discoveredIssues.length} saved issue link${discoveredIssues.length === 1 ? '' : 's'} for ${company}`
+                  : resultWarnings.length > 0
+                    ? `Deal saved with follow-up needed for ${company}`
                   : `Deal saved — ${company}`}
             </h1>
             {!discoverLoading && (
               <p style={{ fontSize: '14px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '360px', margin: '0 auto' }}>
                 {discoveredIssues.length > 0
-                  ? 'These Linear issues match the blockers on this deal. Scope them to close the loop.'
-                  : 'No matching issues found yet. You can discover issues later from the deal page.'}
+                  ? 'These issue links were already saved in Halvex. You can confirm and work them from the deal page.'
+                  : resultWarnings.length > 0
+                    ? 'The deal itself is saved, but part of the setup still needs attention before the first issue review is fully ready.'
+                    : 'No issue links are saved yet. Connect Claude MCP from Integrations, review the deal in Claude, and the saved links will appear here.'}
               </p>
             )}
           </div>
@@ -658,7 +686,23 @@ function OnboardingInner() {
               fontSize: '13px',
             }}>
               <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-              Matching deal signals to Linear issues...
+              Preparing synced issue review context...
+            </div>
+          )}
+
+          {!discoverLoading && resultWarnings.length > 0 && (
+            <div style={{
+              ...card,
+              padding: '14px 16px',
+              background: 'rgba(245,158,11,0.06)',
+              border: '1px solid rgba(245,158,11,0.18)',
+              color: '#fde68a',
+              fontSize: '12px',
+              lineHeight: 1.7,
+            }}>
+              {resultWarnings.map((warning, index) => (
+                <div key={`${warning}-${index}`}>{warning}</div>
+              ))}
             </div>
           )}
 
@@ -671,7 +715,7 @@ function OnboardingInner() {
                 fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)',
                 textTransform: 'uppercase', letterSpacing: '0.08em',
               }}>
-                Matching Linear issues
+                Saved issue links
               </div>
               {discoveredIssues.slice(0, 5).map((issue, i) => (
                 <div
@@ -716,6 +760,36 @@ function OnboardingInner() {
             </div>
           )}
 
+          {!discoverLoading && discoveredIssues.length === 0 && (
+            <div style={{
+              ...card,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              padding: '18px 20px',
+            }}>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                No issue links are saved yet
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.7 }}>
+                The deal is ready in Halvex. Your next step is to open the deal, review it with Ask AI or Claude MCP, and save the relevant Linear issues back into the workspace.
+              </div>
+              {reviewPrompt && (
+                <div style={{
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  fontSize: '11px',
+                  color: 'rgba(255,255,255,0.70)',
+                  lineHeight: 1.6,
+                }}>
+                  Suggested Claude prompt: {reviewPrompt}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Scope CTA */}
           {!discoverLoading && discoveredIssues.length > 0 && savedDealId && (
             <button
@@ -731,6 +805,35 @@ function OnboardingInner() {
             </button>
           )}
 
+          {!discoverLoading && discoveredIssues.length === 0 && savedDealId && (
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => router.push(`/deals/${savedDealId}`)}
+                style={{
+                  ...primaryBtn,
+                  flex: '1 1 220px',
+                  background: 'rgba(255,255,255,0.08)',
+                  color: 'rgba(255,255,255,0.85)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                }}
+              >
+                <ExternalLink size={14} /> Open deal
+              </button>
+              <button
+                onClick={() => router.push('/connections')}
+                style={{
+                  ...primaryBtn,
+                  flex: '1 1 220px',
+                  background: 'rgba(255,255,255,0.04)',
+                  color: 'rgba(255,255,255,0.80)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                }}
+              >
+                Connect Claude MCP
+              </button>
+            </div>
+          )}
+
           {/* Slack nudge */}
           {!discoverLoading && (
             <div style={{
@@ -742,7 +845,7 @@ function OnboardingInner() {
               fontSize: '13px', color: 'var(--text-tertiary)',
             }}>
               <MessageSquare size={16} style={{ flexShrink: 0, color: 'rgba(255,255,255,0.40)' }} />
-              Check Slack -- you should have a message from Halvex
+              Slack updates arrive when the relevant workflow has enough data to send them
             </div>
           )}
 

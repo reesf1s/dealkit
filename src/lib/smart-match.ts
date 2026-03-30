@@ -529,15 +529,14 @@ export async function smartMatchDeal(
   if (productGaps.length === 0 && !options.skipHaiku) {
     const allText = [deal.meetingNotes, deal.notes, deal.description].filter(Boolean).join('\n\n')
     if (allText.length > 50) {
-      if (!process.env.ANTHROPIC_API_KEY) {
-        console.error(`[smart-match] ${deal.prospectCompany}: ANTHROPIC_API_KEY not set — cannot extract gaps from ${allText.length} chars of notes`)
+      if (!process.env.OPENAI_API_KEY) {
+        console.error(`[smart-match] ${deal.prospectCompany}: OPENAI_API_KEY not set — cannot extract gaps from ${allText.length} chars of notes`)
       } else {
-      console.log(`[smart-match] ${deal.prospectCompany}: no pre-extracted gaps — running Haiku extraction on ${allText.length} chars of notes`)
+      console.log(`[smart-match] ${deal.prospectCompany}: no pre-extracted gaps — running extraction on ${allText.length} chars of notes`)
       try {
-        const Anthropic = (await import('@anthropic-ai/sdk')).default
-        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+        const { anthropic } = await import('@/lib/ai/client')
         const msg = await anthropic.messages.create({
-          model: 'claude-haiku-4-5-20251001',
+          model: 'gpt-4.1-mini',
           max_tokens: 400,
           messages: [{
             role: 'user',

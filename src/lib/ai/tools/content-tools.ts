@@ -183,7 +183,7 @@ export const draft_email = {
     )
 
     const msg = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'gpt-4.1-mini',
       max_tokens: 1500,
       messages: [{ role: 'user', content: promptParts.join('\n') }],
     })
