@@ -6135,30 +6135,6 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
 }
 
 
-// ─── AI Activity Section ─────────────────────────────────────────────────────
-
-const ACTION_TYPE_LABELS: Record<string, string> = {
-  scope_issue: 'Scoped product issue',
-  draft_email: 'Drafted email',
-  slack_notify: 'Sent Slack alert',
-  link_created: 'Linked issue',
-  link_confirmed: 'Confirmed link',
-  link_dismissed: 'Dismissed link',
-  risk_alert: 'Risk alert fired',
-  deal_scored: 'Deal scored',
-}
-
-const ACTION_TYPE_ICONS: Record<string, string> = {
-  scope_issue: '🔗',
-  draft_email: '✉️',
-  slack_notify: '💬',
-  link_created: '🔗',
-  link_confirmed: '✅',
-  link_dismissed: '✖️',
-  risk_alert: '⚠️',
-  deal_scored: '🎯',
-}
-
 function timeAgoShort(isoStr: string): string {
   const diff = Date.now() - new Date(isoStr).getTime()
   const m = Math.floor(diff / 60000)
@@ -6168,84 +6144,6 @@ function timeAgoShort(isoStr: string): string {
   if (h < 24) return `${h}h ago`
   const d = Math.floor(h / 24)
   return `${d}d ago`
-}
-
-function AiActivitySection({ dealId }: { dealId: string }) {
-  const { data, isLoading } = useSWR<{ data: any[] }>(`/api/deals/${dealId}/ai-activity`, fetcher, { revalidateOnFocus: false })
-  const actions = data?.data ?? []
-
-  return (
-    <div style={{
-      background: 'var(--surface-1)',
-      border: '1px solid var(--border-default)',
-      borderRadius: '10px',
-      padding: '20px 24px',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-        <Zap size={14} color="#787774" />
-        <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>AI Activity</span>
-        {actions.length > 0 && (
-          <span style={{
-            fontSize: '10px', fontWeight: 700, padding: '1px 7px', borderRadius: '100px',
-            background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border-default)',
-          }}>{actions.length}</span>
-        )}
-      </div>
-
-      {isLoading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {[1, 2, 3].map(i => (
-            <div key={i} style={{ height: '40px', borderRadius: '8px', background: 'var(--surface-2)' }} className="skeleton" />
-          ))}
-        </div>
-      ) : actions.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-tertiary)', fontSize: '13px' }}>
-          No AI actions recorded yet for this deal.
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {actions.map((action: any) => {
-            const label = ACTION_TYPE_LABELS[action.actionType] ?? action.actionType
-            const icon = ACTION_TYPE_ICONS[action.actionType] ?? '⚡'
-            const isError = action.status === 'error'
-            const isPending = action.status === 'pending' || action.status === 'awaiting_confirmation'
-            const statusColor = isError ? 'var(--color-red)' : isPending ? 'var(--color-amber)' : 'var(--brand)'
-            const desc = action.result?.summary ?? action.result?.message ?? action.payload?.title ?? action.payload?.subject ?? null
-
-            return (
-              <div key={action.id} style={{
-                display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px',
-                borderRadius: '8px', background: 'var(--surface-2)',
-                border: '1px solid var(--border-default)',
-              }}>
-                <span style={{ fontSize: '14px', flexShrink: 0, marginTop: '1px' }}>{icon}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>{label}</span>
-                    <span style={{
-                      fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '100px',
-                      background: `${statusColor}18`, color: statusColor, border: `1px solid ${statusColor}30`,
-                    }}>{action.status}</span>
-                    {action.triggeredBy && (
-                      <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>via {action.triggeredBy}</span>
-                    )}
-                  </div>
-                  {desc && (
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {desc}
-                    </div>
-                  )}
-                </div>
-                <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', flexShrink: 0, marginTop: '2px' }}>
-                  {timeAgoShort(action.createdAt)}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
 }
 
 // ─── Team Tab ─────────────────────────────────────────────────────────────────
@@ -6490,19 +6388,33 @@ export default function DealDetailPage() {
             alignItems: isMobile ? 'stretch' : 'center',
           }}>
 
-            {/* LEFT: Company + deal name + stage */}
+            {/* LEFT: Company + deal name + stage + contact */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <h1 style={{ fontSize: isMobile ? '22px' : '28px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', margin: '0 0 6px 0', lineHeight: 1.2 }}>
+              <h1 style={{ fontSize: isMobile ? '22px' : '26px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', margin: '0 0 4px 0', lineHeight: 1.2 }}>
                 {deal.prospectCompany ?? deal.dealName ?? 'Unnamed Deal'}
               </h1>
               {deal.dealName && deal.prospectCompany && (
-                <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '12px', letterSpacing: '-0.01em' }}>
+                <div style={{ fontSize: '13px', color: 'var(--text-tertiary)', marginBottom: '10px', letterSpacing: '-0.005em' }}>
                   {deal.dealName}
                 </div>
               )}
+              {/* Primary contact */}
+              {(deal.contacts as any[])?.[0] && (() => {
+                const c = (deal.contacts as any[])[0]
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                    <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--surface-3)', border: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'var(--text-secondary)', flexShrink: 0 }}>
+                      {(c.name ?? '?')[0]?.toUpperCase()}
+                    </div>
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>{c.name}</span>
+                    {c.title && <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>· {c.title}</span>}
+                    {c.email && <a href={`mailto:${c.email}`} onClick={e => e.stopPropagation()} style={{ fontSize: '11px', color: 'var(--brand)', textDecoration: 'none' }}>{c.email}</a>}
+                  </div>
+                )
+              })()}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 <span style={{
-                  fontSize: '12px', padding: '4px 12px', borderRadius: '100px', fontWeight: 600,
+                  fontSize: '11px', padding: '3px 10px', borderRadius: '100px', fontWeight: 600,
                   background: stageBadge.bg, color: stageBadge.color,
                   border: `1px solid color-mix(in srgb, ${stageBadge.color} 28%, transparent)`,
                   letterSpacing: '0.02em',
@@ -6510,7 +6422,7 @@ export default function DealDetailPage() {
                   {deal.stage?.replace(/_/g, ' ') ?? ''}
                 </span>
                 {deal.engagementType && (
-                  <span style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '100px', fontWeight: 500, background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border-default)' }}>
+                  <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', fontWeight: 500, background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border-default)' }}>
                     {deal.engagementType}
                   </span>
                 )}
@@ -6609,6 +6521,21 @@ export default function DealDetailPage() {
         </div>
       ) : (
         <div style={{ height: '148px', background: 'var(--surface-2)', borderRadius: '1.25rem', border: '1px solid var(--border-default)' }} />
+      )}
+
+      {/* ── Next Steps banner ─────────────────────────────────────────── */}
+      {deal?.nextSteps && !['closed_won', 'closed_lost'].includes(deal.stage) && (
+        <div style={{
+          background: 'rgba(29,184,106,0.06)', border: '1px solid rgba(29,184,106,0.20)',
+          borderRadius: '10px', padding: '12px 18px',
+          display: 'flex', alignItems: 'flex-start', gap: 10,
+        }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#1DB86A', flexShrink: 0, marginTop: 5 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: '#1DB86A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Next steps</div>
+            <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{deal.nextSteps}</div>
+          </div>
+        </div>
       )}
 
       {/* ── AI Insight Strip ───────────────────────────────────────────── */}
