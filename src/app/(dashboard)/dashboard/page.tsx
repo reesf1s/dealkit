@@ -146,7 +146,7 @@ function DealMonitorMini() {
     return (
       <div style={{
         background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-        borderRadius: 10, marginBottom: 14, padding: '14px 18px',
+        borderRadius: 12, marginBottom: 16, padding: '18px 22px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
           <div style={{ width: 11, height: 11, borderRadius: '50%', background: 'var(--surface-2)' }} />
@@ -173,12 +173,12 @@ function DealMonitorMini() {
   return (
     <div style={{
       background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-      borderRadius: 10, marginBottom: 14, padding: '14px 18px',
+      borderRadius: 12, marginBottom: 16, padding: '18px 22px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Activity size={11} style={{ color: atRisk > 0 ? '#ef4444' : '#1DB86A' }} />
-          <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Deal Monitor
           </span>
           {atRisk > 0 && (
@@ -300,12 +300,12 @@ function FocusBriefing() {
     return (
       <div style={{
         background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-        borderRadius: 10, marginBottom: 14, padding: '16px 18px',
+        borderRadius: 12, marginBottom: 16, padding: '20px 24px',
         borderLeft: '3px solid #8b5cf6',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
           <Sparkles size={11} style={{ color: '#8b5cf6' }} />
-          <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Daily Focus
           </span>
         </div>
@@ -323,13 +323,13 @@ function FocusBriefing() {
   return (
     <div style={{
       background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-      borderRadius: 10, marginBottom: 14, padding: '16px 18px',
+      borderRadius: 12, marginBottom: 16, padding: '16px 18px',
       borderLeft: '3px solid #8b5cf6',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: hasText ? 10 : 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Sparkles size={11} style={{ color: '#8b5cf6' }} />
-          <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Daily Focus
           </span>
           {data.generatedAt && !refreshing && (
@@ -383,7 +383,7 @@ function FocusBriefing() {
 
       {/* Briefing text */}
       {hasText && !refreshing && (
-        <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>
+        <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
           {data.text}
         </div>
       )}
@@ -505,19 +505,19 @@ function TodayActionCard({ item, index }: { item: TodayAction; index: number }) 
     <Link href={`/deals/${item.dealId}`} style={{ textDecoration: 'none' }}>
       <div
         style={{
-          padding: '11px 14px', borderRadius: 8,
+          padding: '14px 16px', borderRadius: 10,
           border: `1px solid ${priorityBdr}`, background: priorityBg,
           cursor: 'pointer', transition: 'box-shadow 100ms',
-          display: 'flex', gap: 10, alignItems: 'flex-start',
+          display: 'flex', gap: 12, alignItems: 'flex-start',
         }}
         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)' }}
         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
       >
         {/* Number badge */}
         <div style={{
-          width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+          width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
           background: priorityColor, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 10, fontWeight: 800, color: '#fff', marginTop: 1,
+          fontSize: 11, fontWeight: 800, color: '#fff', marginTop: 1,
         }}>
           {index + 1}
         </div>
@@ -525,7 +525,7 @@ function TodayActionCard({ item, index }: { item: TodayAction; index: number }) 
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Deal name */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
               {item.dealName}
             </span>
             {item.value != null && item.value > 0 && (
@@ -540,11 +540,11 @@ function TodayActionCard({ item, index }: { item: TodayAction; index: number }) 
             )}
           </div>
           {/* Action */}
-          <div style={{ fontSize: 12.5, fontWeight: 600, color: priorityColor, marginTop: 3, lineHeight: 1.35 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 600, color: priorityColor, marginTop: 4, lineHeight: 1.4 }}>
             {item.action}
           </div>
           {/* Context */}
-          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2, lineHeight: 1.35 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3, lineHeight: 1.45 }}>
             {item.context}
           </div>
         </div>
@@ -559,17 +559,17 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
   const dot = eventDotColor(event.type)
   const label = eventLabel(event.type, event.metadata, event.dealName)
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
       <div style={{
-        width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
-        background: dot, boxShadow: `0 0 0 2px ${dot}20`,
+        width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+        background: dot, boxShadow: `0 0 0 3px ${dot}20`,
       }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {label}
         </div>
       </div>
-      <div style={{ fontSize: 10.5, color: 'var(--text-muted)', flexShrink: 0 }}>{relativeTime(event.createdAt)}</div>
+      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', flexShrink: 0 }}>{relativeTime(event.createdAt)}</div>
     </div>
   )
 }
@@ -663,10 +663,10 @@ export default function DashboardPage() {
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
         <div>
-          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 3 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>
             {todayLabel()}
           </div>
-          <h1 style={{ fontSize: 21, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', margin: 0 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', margin: 0 }}>
             {user?.firstName ? `Good ${greeting}, ${user.firstName}` : 'Today'}
           </h1>
         </div>
@@ -705,10 +705,10 @@ export default function DashboardPage() {
       {/* ── TODAY'S 5 ACTIONS ── */}
       <div style={{
         background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-        borderRadius: 10, marginBottom: 14, overflow: 'hidden',
+        borderRadius: 12, marginBottom: 16, overflow: 'hidden',
       }}>
         <div style={{
-          padding: '11px 18px', borderBottom: '1px solid var(--border-subtle)',
+          padding: '14px 22px', borderBottom: '1px solid var(--border-subtle)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -719,7 +719,7 @@ export default function DashboardPage() {
             }}>
               <Zap size={10} style={{ color: todayActions.length > 0 ? '#ef4444' : '#1DB86A' }} />
             </div>
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               5 Things To Do Today
             </span>
             {todayActions.length > 0 && (
@@ -736,7 +736,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div style={{ padding: '14px 18px' }}>
+        <div style={{ padding: '16px 22px' }}>
           {brainLoading ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <Skeleton h={66} /><Skeleton h={66} /><Skeleton h={66} />
@@ -766,12 +766,12 @@ export default function DashboardPage() {
       {/* ── Pipeline Health Strip ── */}
       <div style={{
         background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-        borderRadius: 10, marginBottom: 14,
-        padding: '12px 18px', display: 'flex', alignItems: 'center',
+        borderRadius: 12, marginBottom: 16,
+        padding: '16px 22px', display: 'flex', alignItems: 'center',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 22, flexShrink: 0 }}>
           <Activity size={11} style={{ color: '#1DB86A' }} />
-          <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Pipeline
           </span>
         </div>
@@ -788,10 +788,10 @@ export default function DashboardPage() {
               borderRight: i < 3 ? '1px solid var(--border-subtle)' : 'none',
               display: 'flex', flexDirection: 'column', gap: 1, justifyContent: 'center',
             }}>
-              <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>
                 {item.value}
               </div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{item.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{item.label}</div>
             </div>
           ))}
 
@@ -816,12 +816,12 @@ export default function DashboardPage() {
       {/* ── Revenue Forecast ── */}
       <div style={{
         background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-        borderRadius: 10, marginBottom: 14, padding: '14px 18px',
+        borderRadius: 12, marginBottom: 16, padding: '18px 22px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <TrendingUp size={11} style={{ color: '#3b82f6' }} />
-            <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               Revenue Forecast
             </span>
           </div>
@@ -838,27 +838,27 @@ export default function DashboardPage() {
           <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
             {/* Commit */}
             <div style={{ flex: 1, paddingRight: 20, borderRight: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: 10, color: '#1DB86A', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Commit</div>
-              <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>{fmtCurrency(commitValue)}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 2 }}>{commitDeals.length} deal{commitDeals.length !== 1 ? 's' : ''} · 90% confidence</div>
+              <div style={{ fontSize: 10, color: '#1DB86A', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Commit</div>
+              <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>{fmtCurrency(commitValue)}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{commitDeals.length} deal{commitDeals.length !== 1 ? 's' : ''} · 90% confidence</div>
             </div>
             {/* Upside */}
             <div style={{ flex: 1, padding: '0 20px', borderRight: '1px solid var(--border-subtle)' }}>
               <div style={{ fontSize: 10, color: '#3b82f6', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Upside</div>
-              <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>{fmtCurrency(upsideValue)}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 2 }}>{upsideDeals.length} deal{upsideDeals.length !== 1 ? 's' : ''} · 50% confidence</div>
+              <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>{fmtCurrency(upsideValue)}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{upsideDeals.length} deal{upsideDeals.length !== 1 ? 's' : ''} · 50% confidence</div>
             </div>
             {/* Best case */}
             <div style={{ flex: 1, padding: '0 20px', borderRight: '1px solid var(--border-subtle)' }}>
               <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Best Case</div>
-              <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>{fmtCurrency(bestCase)}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 2 }}>Commit + Upside</div>
+              <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>{fmtCurrency(bestCase)}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>Commit + Upside</div>
             </div>
             {/* Weighted */}
             <div style={{ flex: 1, paddingLeft: 20 }}>
               <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Weighted</div>
-              <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>{fmtCurrency(weightedForecast)}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 2 }}>Probability-adjusted</div>
+              <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>{fmtCurrency(weightedForecast)}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>Probability-adjusted</div>
             </div>
           </div>
         )}
@@ -871,18 +871,18 @@ export default function DashboardPage() {
       <FocusBriefing />
 
       {/* ── Bottom: Intelligence + Activity ── */}
-      <div className="dash-bottom-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 14 }}>
+      <div className="dash-bottom-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16 }}>
         <style>{`@media (max-width: 900px) { .dash-bottom-grid { grid-template-columns: 1fr !important; } }`}</style>
 
         {/* Intelligence / Patterns */}
         <div style={{
           background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-          borderRadius: 10, padding: '16px 18px',
+          borderRadius: 12, padding: '20px 24px',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <TrendingUp size={11} style={{ color: '#1DB86A' }} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Intelligence
               </span>
             </div>
@@ -917,13 +917,13 @@ export default function DashboardPage() {
                 {(brain.keyPatterns ?? []).slice(0, 5).map((p, i) => (
                   <div key={i} style={{
                     display: 'flex', alignItems: 'flex-start', gap: 8,
-                    padding: '9px 12px', borderRadius: 7,
+                    padding: '11px 14px', borderRadius: 8,
                     background: 'var(--surface-2)', border: '1px solid var(--border-subtle)',
                   }}>
                     <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#1DB86A', marginTop: 5, flexShrink: 0 }} />
                     <div>
-                      <div style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 500 }}>{p.label}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 1 }}>
+                      <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}>{p.label}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>
                         {p.dealIds.length} deal{p.dealIds.length !== 1 ? 's' : ''}
                         {(p.dealNames ?? []).length > 0 && ` · ${p.dealNames!.slice(0, 2).join(', ')}`}
                       </div>
@@ -938,10 +938,10 @@ export default function DashboardPage() {
         {/* Activity Feed */}
         <div style={{
           background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-          borderRadius: 10, padding: '16px 18px', alignSelf: 'start',
+          borderRadius: 12, padding: '20px 24px', alignSelf: 'start',
         }}>
           <div style={{ marginBottom: 10 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               Activity
             </span>
           </div>

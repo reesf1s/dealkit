@@ -77,23 +77,23 @@ function highlightSignals(text: string, competitors: string[]): string {
 
   for (const word of NEGATIVE_SIGNALS) {
     const pattern = new RegExp(`(${escapeRegex(word)})`, 'gi')
-    result = result.replace(pattern, `<mark style="background:#fee2e2;color:#991b1b;border-radius:2px;padding:0 2px">$1</mark>`)
+    result = result.replace(pattern, `<mark style="background:rgba(239,68,68,0.18);color:#f87171;border-radius:2px;padding:0 2px">$1</mark>`)
   }
 
   for (const word of URGENCY_SIGNALS) {
     const pattern = new RegExp(`(${escapeRegex(word)})`, 'gi')
-    result = result.replace(pattern, `<mark style="background:#fef3c7;color:#92400e;border-radius:2px;padding:0 2px">$1</mark>`)
+    result = result.replace(pattern, `<mark style="background:rgba(251,191,36,0.18);color:#fbbf24;border-radius:2px;padding:0 2px">$1</mark>`)
   }
 
   for (const competitor of competitors) {
     if (!competitor.trim()) continue
     const pattern = new RegExp(`(${escapeRegex(competitor.trim())})`, 'gi')
-    result = result.replace(pattern, `<mark style="background:#dbeafe;color:#1e40af;border-radius:2px;padding:0 2px">$1</mark>`)
+    result = result.replace(pattern, `<mark style="background:rgba(96,165,250,0.18);color:#60a5fa;border-radius:2px;padding:0 2px">$1</mark>`)
   }
 
   for (const word of PRODUCT_GAP_KEYWORDS) {
     const pattern = new RegExp(`(${escapeRegex(word)})`, 'gi')
-    result = result.replace(pattern, `<mark style="background:#fef3c7;color:#92400e;border-radius:2px;padding:0 2px">$1</mark>`)
+    result = result.replace(pattern, `<mark style="background:rgba(251,191,36,0.15);color:#fbbf24;border-radius:2px;padding:0 2px">$1</mark>`)
   }
 
   return result
@@ -2261,7 +2261,7 @@ function WinStoryPromptModal({ wonDeal, open, onOpenChange, currencySymbol = '£
                     disabled={saving || !form.customerName || !form.challenge || !form.solution || !form.results}
                     style={{
                       height: '34px', padding: '0 18px', borderRadius: '7px', fontSize: '13px', fontWeight: 600,
-                      color: '#fff', background: saving ? 'var(--surface)' : '#0f7b6c',
+                      color: '#fff', background: saving ? 'var(--surface)' : 'var(--brand)',
                       border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
                     }}
                   >
@@ -2469,7 +2469,7 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate, members }: { dealId: strin
             </span>
           </div>
           <div style={{ height: '6px', background: 'var(--surface-hover)', borderRadius: '3px', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${criteria.length ? (achieved / criteria.length) * 100 : 0}%`, background: '#0f7b6c', borderRadius: '3px', transition: 'width 0.1s ease' }} />
+            <div style={{ height: '100%', width: `${criteria.length ? (achieved / criteria.length) * 100 : 0}%`, background: 'var(--brand)', borderRadius: '3px', transition: 'width 0.1s ease' }} />
           </div>
         </div>
       )}
@@ -2659,7 +2659,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate, members }: { dealId: string; d
   const statusColors: Record<string, { bg: string; border: string; text: string; label: string }> = {
     not_started: { bg: 'var(--surface-2)', border: 'var(--border-default)', text: 'var(--text-secondary)', label: 'Not Started' },
     in_progress: { bg: 'rgba(29, 184, 106, 0.08)', border: 'rgba(29, 184, 106, 0.25)', text: '#1DB86A', label: 'In Progress' },
-    complete: { bg: 'rgba(15,123,108,0.08)', border: 'rgba(15,123,108,0.25)', text: '#0f7b6c', label: 'Complete' },
+    complete: { bg: 'rgba(29,184,106,0.08)', border: 'rgba(29,184,106,0.25)', text: '#1DB86A', label: 'Complete' },
   }
 
   const cycleStatus = (current: string) => {
@@ -2684,7 +2684,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate, members }: { dealId: string; d
             </div>
           </div>
           <div style={{ height: '6px', background: 'var(--surface-hover)', borderRadius: '3px', overflow: 'hidden', display: 'flex' }}>
-            <div style={{ height: '100%', width: `${totalTasks ? (completeTasks / totalTasks) * 100 : 0}%`, background: '#0f7b6c', borderRadius: '3px 0 0 3px', transition: 'width 0.1s ease' }} />
+            <div style={{ height: '100%', width: `${totalTasks ? (completeTasks / totalTasks) * 100 : 0}%`, background: 'var(--brand)', borderRadius: '3px 0 0 3px', transition: 'width 0.1s ease' }} />
             <div style={{ height: '100%', width: `${totalTasks ? (inProgressTasks / totalTasks) * 100 : 0}%`, background: 'var(--accent)', transition: 'width 0.1s ease' }} />
           </div>
         </div>
@@ -3352,7 +3352,7 @@ function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
 
 function ScoreRing({ score, size = 64 }: { score: number | null; size?: number }) {
   const pct = score == null ? 0 : Math.min(100, Math.max(0, score))
-  const color = score == null ? '#9b9a97' : pct >= 70 ? '#0f7b6c' : pct >= 40 ? '#cb6c2c' : '#e03e3e'
+  const color = score == null ? 'var(--text-muted)' : pct >= 70 ? '#1DB86A' : pct >= 40 ? '#f59e0b' : '#ef4444'
   const circumference = 2 * Math.PI * 34
   return (
     <div style={{ position: 'relative', width: `${size}px`, height: `${size}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -4923,7 +4923,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
   ].filter(Boolean) as { label: string; value: string }[]
 
   const expansionColors: Record<string, string> = {
-    upsell: '#1DB86A', cross_sell: '#2e78c6', renewal: '#0f7b6c', expansion: '#cb6c2c',
+    upsell: '#1DB86A', cross_sell: '#3b82f6', renewal: '#1DB86A', expansion: '#f59e0b',
   }
 
   return (
@@ -5564,7 +5564,7 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
                 }}>
                   <div style={{
                     width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, marginTop: '5px',
-                    background: action.priority === 'red' ? '#e03e3e' : '#0f7b6c',
+                    background: action.priority === 'red' ? 'var(--color-red)' : 'var(--brand)',
                   }} />
                   <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.55, flex: 1 }}>{action.text}</div>
                 </div>
@@ -6091,8 +6091,8 @@ function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', 
         {deal.stage === 'closed_won' && (
           <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <TrendingUp size={14} color="#0f7b6c" />
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f7b6c' }}>Grow This Account</span>
+              <TrendingUp size={14} color="var(--brand)" />
+              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--brand)' }}>Grow This Account</span>
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 12px 0', lineHeight: 1.5 }}>
               Create an expansion opportunity to grow this customer relationship.
@@ -6210,7 +6210,7 @@ function AiActivitySection({ dealId }: { dealId: string }) {
             const icon = ACTION_TYPE_ICONS[action.actionType] ?? '⚡'
             const isError = action.status === 'error'
             const isPending = action.status === 'pending' || action.status === 'awaiting_confirmation'
-            const statusColor = isError ? '#e03e3e' : isPending ? '#cb6c2c' : '#0f7b6c'
+            const statusColor = isError ? 'var(--color-red)' : isPending ? 'var(--color-amber)' : 'var(--brand)'
             const desc = action.result?.summary ?? action.result?.message ?? action.payload?.title ?? action.payload?.subject ?? null
 
             return (
@@ -6412,7 +6412,7 @@ export default function DealDetailPage() {
 
   const score = deal?.conversionScore ?? null
   const scoreColor = score != null
-    ? (score > 70 ? '#0f7b6c' : score >= 40 ? '#cb6c2c' : '#e03e3e')
+    ? (score > 70 ? '#1DB86A' : score >= 40 ? '#f59e0b' : '#ef4444')
     : null
 
   const STAGE_BADGE: Record<string, { bg: string; color: string }> = {
@@ -6422,13 +6422,13 @@ export default function DealDetailPage() {
     demo:         { bg: 'rgba(29, 184, 106, 0.12)',  color: '#1DB86A' },
     proposal:     { bg: 'rgba(203,108,44,0.12)',  color: '#cb6c2c' },
     negotiation:  { bg: 'rgba(203,108,44,0.12)',  color: '#cb6c2c' },
-    closed_won:   { bg: 'rgba(15,123,108,0.12)',  color: '#0f7b6c' },
-    closed_lost:  { bg: 'rgba(224,62,62,0.12)',   color: '#e03e3e' },
+    closed_won:   { bg: 'rgba(29,184,106,0.12)',   color: '#1DB86A' },
+    closed_lost:  { bg: 'rgba(239,68,68,0.12)',    color: '#ef4444' },
   }
   const stageBadge = STAGE_BADGE[deal?.stage ?? ''] ?? { bg: 'rgba(155,154,151,0.12)', color: 'var(--text-tertiary)' }
 
   const expansionTypeColors: Record<string, string> = {
-    upsell: '#1DB86A', cross_sell: '#2e78c6', renewal: '#0f7b6c', expansion: '#cb6c2c',
+    upsell: '#1DB86A', cross_sell: '#3b82f6', renewal: '#1DB86A', expansion: '#f59e0b',
   }
   const expansionTypeLabels: Record<string, string> = {
     upsell: 'Upsell', cross_sell: 'Cross-sell', renewal: 'Renewal', expansion: 'Expansion',
@@ -6445,8 +6445,8 @@ export default function DealDetailPage() {
       <Link
         href="/deals"
         style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--text-tertiary)', fontSize: '13px', textDecoration: 'none', width: 'fit-content' }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#1a1a1a'}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#9b9a97'}
+        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'}
+        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
       >
         <ArrowLeft size={13} /> Back to deals
       </Link>
@@ -6531,7 +6531,7 @@ export default function DealDetailPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: isMobile ? 'flex-start' : 'flex-end', flexShrink: 0 }}>
               {deal.dealValue && (
                 <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
-                  <div style={{ fontSize: '26px', fontWeight: 700, color: '#0f7b6c', letterSpacing: '-0.02em', lineHeight: 1 }}>
+                  <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--brand)', letterSpacing: '-0.02em', lineHeight: 1 }}>
                     {currencySymbol}{Number(deal.dealValue).toLocaleString()}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '3px' }}>
@@ -6562,11 +6562,11 @@ export default function DealDetailPage() {
                   onClick={() => setLogMeetingOpen(true)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-                    background: 'rgba(15,123,108,0.08)', border: '1px solid rgba(15,123,108,0.20)',
-                    borderRadius: '8px', color: '#0f7b6c', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                    background: 'var(--brand-bg)', border: '1px solid var(--brand-border)',
+                    borderRadius: '8px', color: 'var(--brand)', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(15,123,108,0.14)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(15,123,108,0.08)' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--brand-bg-hover)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--brand-bg)' }}
                 >
                   <MessageSquare size={13} /> Log meeting
                 </button>

@@ -127,10 +127,10 @@ export default function TopNav() {
             flexShrink: 0,
             transition: 'background 80ms',
           }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#eeeeee'}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-3)'}
           onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'}
         >
-          <Menu size={14} style={{ color: '#666666' }} />
+          <Menu size={14} style={{ color: 'var(--text-secondary)' }} />
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0 }}>
@@ -185,7 +185,7 @@ export default function TopNav() {
         }}
         onMouseEnter={e => {
           const el = e.currentTarget as HTMLElement
-          el.style.background = 'rgba(26,26,26,0.08)'
+          el.style.background = 'var(--surface-hover)'
           el.style.borderColor = 'var(--border-default)'
         }}
         onMouseLeave={e => {

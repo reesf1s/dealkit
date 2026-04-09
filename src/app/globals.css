@@ -236,29 +236,29 @@
   color-scheme: dark;
 
   /* ── Page & Surface ─────────────────────────────────────────────────── */
-  --page-bg:          #09090b;
-  --sidebar-bg:       #0d0d10;
-  --surface-1:        #111117;
-  --surface-2:        #18181e;
-  --surface-3:        #1f1f27;
-  --surface-hover:    #1c1c24;
-  --surface-active:   #242430;
-  --surface-selected: #242430;
+  --page-bg:          #0c0e14;
+  --sidebar-bg:       #0c0e14;
+  --surface-1:        #131620;
+  --surface-2:        #191c28;
+  --surface-3:        #20243280;
+  --surface-hover:    #181b27;
+  --surface-active:   #1e2132;
+  --surface-selected: #1e2132;
 
   /* ── Borders ────────────────────────────────────────────────────────── */
-  --border-subtle:  #1c1c24;
-  --border-default: #27272f;
-  --border-strong:  #363640;
+  --border-subtle:  #191c28;
+  --border-default: #252a38;
+  --border-strong:  #363d50;
 
   /* ── Text Hierarchy ─────────────────────────────────────────────────── */
-  --text-primary:   #f4f4f6;
-  --text-secondary: #9090a0;
-  --text-tertiary:  #5a5a6a;
-  --text-muted:     #3a3a4a;
-  --text-faint:     #484858;
-  --text-inverse:   #09090b;
+  --text-primary:   #e8ecf2;
+  --text-secondary: #8892a4;
+  --text-tertiary:  #566070;
+  --text-muted:     #38404f;
+  --text-faint:     #454e60;
+  --text-inverse:   #0c0e14;
   --text-link:      #1DB86A;
-  --text-placeholder: #3a3a4a;
+  --text-placeholder: #38404f;
 
   /* ── Brand (unchanged) ───────────────────────────────────────────────── */
   --brand:           #1DB86A;
@@ -288,8 +288,8 @@
   --shadow-modal:      0 8px 40px rgba(0, 0, 0, 0.70), 0 2px 12px rgba(0, 0, 0, 0.50);
 
   /* ── Skeleton ────────────────────────────────────────────────────────── */
-  --skeleton-from: #18181e;
-  --skeleton-to:   #242430;
+  --skeleton-from: #191c28;
+  --skeleton-to:   #232840;
 
   /* ── Tailwind/shadcn compat ─────────────────────────────────────────── */
   --background:         240 10% 4%;
@@ -544,7 +544,7 @@ html, body {
 .glass-card {
   background: var(--surface-1);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   box-shadow: var(--shadow-card);
 }
 

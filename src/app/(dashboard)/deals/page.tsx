@@ -142,7 +142,7 @@ function StatCell({
     <div style={{
       flex: 1,
       padding: '20px 24px',
-      borderRight: last ? 'none' : '1px solid #eeeeee',
+      borderRight: last ? 'none' : '1px solid var(--border-default)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -158,7 +158,7 @@ function StatCell({
               ↗ {trend}
             </span>
           )}
-          <span style={{ fontSize: 12.5, color: '#999999' }}>{trendLabel ?? label}</span>
+          <span style={{ fontSize: 12.5, color: 'var(--text-tertiary)' }}>{trendLabel ?? label}</span>
         </div>
       </div>
       {chartValues && (
@@ -798,7 +798,7 @@ function DealsPageInner() {
           }}>
             Active Opportunities
           </h1>
-          <p style={{ fontSize: 14, color: '#999999', margin: 0 }}>
+          <p style={{ fontSize: 14, color: 'var(--text-tertiary)', margin: 0 }}>
             Real-time signals shaping your revenue pipeline
           </p>
         </div>
@@ -995,19 +995,19 @@ function DealsPageInner() {
           alignItems: 'center',
           gap: 8,
           padding: '8px 16px',
-          background: '#f0fdf4',
+          background: 'var(--color-green-bg)',
           border: '1px solid rgba(29,184,106,0.24)',
           borderRadius: 8,
           marginBottom: 8,
         }}>
-          <span style={{ fontSize: 13, color: '#15803d', fontWeight: 500 }}>
+          <span style={{ fontSize: 13, color: 'var(--color-green)', fontWeight: 500 }}>
             {selectedIds.size} selected
           </span>
           <div style={{ width: 1, height: 16, background: 'rgba(29,184,106,0.30)' }} />
           {['Change Stage', 'Archive', 'Delete'].map(action => (
             <button key={action} style={{
               fontSize: 12.5,
-              color: '#15803d',
+              color: 'var(--color-green)',
               background: 'none',
               border: 'none',
               cursor: 'pointer',
@@ -1050,9 +1050,9 @@ function DealsPageInner() {
           {/* Table header */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '36px 1fr minmax(100px,180px) minmax(80px,110px) minmax(80px,120px) 72px minmax(120px,200px)',
+            gridTemplateColumns: '36px 1fr minmax(110px,190px) minmax(80px,110px) minmax(90px,130px) 72px minmax(130px,220px)',
             gap: 8,
-            padding: '10px 16px',
+            padding: '11px 18px',
             borderBottom: '1px solid var(--border-default)',
             background: 'var(--surface-2)',
           }}>
@@ -1103,9 +1103,9 @@ function DealsPageInner() {
                   key={deal.id}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '36px 1fr minmax(100px,180px) minmax(80px,110px) minmax(80px,120px) 72px minmax(120px,200px)',
+                    gridTemplateColumns: '36px 1fr minmax(110px,190px) minmax(80px,110px) minmax(90px,130px) 72px minmax(130px,220px)',
                     gap: 8,
-                    padding: '13px 16px',
+                    padding: '14px 18px',
                     borderBottom: '1px solid var(--border-subtle)',
                     alignItems: 'center',
                     background: selected ? 'var(--color-green-bg)' : 'transparent',
@@ -1161,8 +1161,8 @@ function DealsPageInner() {
                       ) : snapshot ? (
                         <div style={{
                           fontSize: 11,
-                          color: healthStatus === 'at_risk' ? '#b45309'
-                            : healthStatus === 'improving' ? '#15803d'
+                          color: healthStatus === 'at_risk' ? 'var(--color-amber)'
+                            : healthStatus === 'improving' ? 'var(--color-green)'
                             : 'var(--text-secondary)',
                           marginTop: 2,
                           overflow: 'hidden',
@@ -1247,9 +1247,9 @@ function DealsPageInner() {
                     ) : snapshot ? (
                       <div style={{
                         fontSize: 12,
-                        color: healthStatus === 'at_risk' ? '#b45309'
-                          : healthStatus === 'improving' ? '#166534'
-                          : urgentReason ? '#ef4444'
+                        color: healthStatus === 'at_risk' ? 'var(--color-amber)'
+                          : healthStatus === 'improving' ? 'var(--color-green)'
+                          : urgentReason ? 'var(--color-red)'
                           : stale ? '#f59e0b'
                           : 'var(--text-secondary)',
                         fontWeight: healthStatus === 'at_risk' || urgentReason ? 500 : 400,
@@ -1264,7 +1264,7 @@ function DealsPageInner() {
                     ) : (
                       <span style={{
                         fontSize: 12,
-                        color: urgentReason ? '#ef4444' : stale ? '#f59e0b' : 'var(--text-tertiary)',
+                        color: urgentReason ? 'var(--color-red)' : stale ? 'var(--color-amber)' : 'var(--text-tertiary)',
                         fontWeight: (urgentReason || stale) ? 500 : 400,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         display: 'block',

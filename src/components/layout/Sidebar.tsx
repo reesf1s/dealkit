@@ -517,7 +517,7 @@ export default function Sidebar() {
               animation: brainAgeInfo && brainAgeInfo.mins < 2 ? 'pulse-dot 2s ease-in-out infinite' : 'none',
             }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 11, fontWeight: 500, color: hasDegradedFeeds ? '#92400e' : '#15803d' }}>
+              <div style={{ fontSize: 11, fontWeight: 500, color: hasDegradedFeeds ? 'var(--color-amber)' : 'var(--brand)' }}>
                 {hasDegradedFeeds ? 'Intelligence degraded' : urgentCount > 0 ? `${urgentCount} deals flagged` : 'Intelligence live'}
               </div>
               <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 1 }}>

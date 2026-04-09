@@ -93,9 +93,9 @@ function SignalCard({ signal, onDismiss }: { signal: Signal; onDismiss: (id: str
   const c = signalColors(signal.type)
   return (
     <div style={{
-      padding: '12px 14px', borderRadius: 8,
+      padding: '14px 18px', borderRadius: 10,
       border: `1px solid ${c.border}`, background: c.bg,
-      display: 'flex', flexDirection: 'column', gap: 5,
+      display: 'flex', flexDirection: 'column', gap: 6,
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ marginTop: 1 }}>{signalIcon(signal.type)}</div>
@@ -125,11 +125,11 @@ function SignalCard({ signal, onDismiss }: { signal: Signal; onDismiss: (id: str
           <X size={11} />
         </button>
       </div>
-      <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5, paddingLeft: 20 }}>
+      <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.55, paddingLeft: 20 }}>
         {signal.body}
       </p>
       {signal.action && (
-        <div style={{ fontSize: 11.5, color: c.dot, fontWeight: 500, paddingLeft: 20 }}>
+        <div style={{ fontSize: 12, color: c.dot, fontWeight: 500, paddingLeft: 20 }}>
           → {signal.action}
         </div>
       )}
@@ -280,10 +280,10 @@ export default function IntelligencePage() {
 
       {/* Header */}
       <div style={{ marginBottom: 18 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', margin: '0 0 3px' }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', margin: '0 0 4px' }}>
           Signals
         </h1>
-        <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: 0 }}>
+        <p style={{ fontSize: 14, color: 'var(--text-tertiary)', margin: 0 }}>
           AI-detected patterns, risks, and opportunities from your pipeline.
         </p>
       </div>
@@ -292,8 +292,8 @@ export default function IntelligencePage() {
       {!isLoading && (brain.winLossIntel || (brain.pipeline?.activeDeals ?? 0) > 0) && (
         <div style={{
           display: 'flex', gap: 0,
-          background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 10,
-          overflow: 'hidden', marginBottom: 18,
+          background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 12,
+          overflow: 'hidden', marginBottom: 20,
         }}>
           {[
             { label: 'Win Rate', value: winRate != null ? `${winRate}%` : '—', sub: `${totalClosed} closed` },
@@ -302,10 +302,10 @@ export default function IntelligencePage() {
             { label: 'Patterns', value: String(brain.keyPatterns?.length ?? 0), sub: 'detected' },
           ].map((item, i) => (
             <div key={i} style={{
-              flex: 1, padding: '12px 18px',
+              flex: 1, padding: '16px 20px',
               borderRight: i < 3 ? '1px solid var(--border-subtle)' : 'none',
             }}>
-              <div style={{ fontSize: 10.5, color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 3 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>
                 {item.label}
               </div>
               <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1 }}>
@@ -377,14 +377,14 @@ export default function IntelligencePage() {
 
           {/* Competitor Leaderboard */}
           <div style={{
-            background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 10, overflow: 'hidden',
+            background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 12, overflow: 'hidden',
           }}>
             <div style={{
-              padding: '11px 16px', borderBottom: '1px solid var(--border-subtle)',
+              padding: '13px 18px', borderBottom: '1px solid var(--border-subtle)',
               display: 'flex', alignItems: 'center', gap: 8,
             }}>
               <Swords size={11} style={{ color: '#8b5cf6' }} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 vs Competitors
               </span>
             </div>
@@ -434,11 +434,11 @@ export default function IntelligencePage() {
               borderRadius: 10, overflow: 'hidden',
             }}>
               <div style={{
-                padding: '11px 16px', borderBottom: '1px solid var(--border-subtle)',
+                padding: '13px 18px', borderBottom: '1px solid var(--border-subtle)',
                 display: 'flex', alignItems: 'center', gap: 8,
               }}>
                 <Timer size={11} style={{ color: '#f59e0b' }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                   Velocity
                 </span>
               </div>
@@ -483,14 +483,14 @@ export default function IntelligencePage() {
           )}
           {/* ── AI Theme Spotter ── */}
           <div style={{
-            background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 10, overflow: 'hidden',
+            background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 12, overflow: 'hidden',
           }}>
             <div style={{
-              padding: '11px 16px', borderBottom: '1px solid var(--border-subtle)',
+              padding: '13px 18px', borderBottom: '1px solid var(--border-subtle)',
               display: 'flex', alignItems: 'center', gap: 8,
             }}>
               <MessageSquareWarning size={11} style={{ color: '#6366f1' }} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Theme Spotter
               </span>
               {themeSpotter.totalDeals > 0 && (
@@ -612,14 +612,14 @@ export default function IntelligencePage() {
 
             return (
               <div style={{
-                background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 10, overflow: 'hidden',
+                background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 12, overflow: 'hidden',
               }}>
                 <div style={{
-                  padding: '11px 16px', borderBottom: '1px solid var(--border-subtle)',
+                  padding: '13px 18px', borderBottom: '1px solid var(--border-subtle)',
                   display: 'flex', alignItems: 'center', gap: 8,
                 }}>
                   <TrendingUp size={11} style={{ color: '#3b82f6' }} />
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     Market Insights
                   </span>
                 </div>
