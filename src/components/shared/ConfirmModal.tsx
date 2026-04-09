@@ -35,7 +35,7 @@ export function ConfirmModal({
           style={{
             position: 'fixed',
             inset: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            backgroundColor: 'var(--border-default)',
             backdropFilter: 'blur(4px)',
             WebkitBackdropFilter: 'blur(4px)',
             zIndex: 500,
@@ -53,13 +53,11 @@ export function ConfirmModal({
             zIndex: 501,
             width: '100%',
             maxWidth: '400px',
-            background: 'rgba(14, 10, 35, 0.80)',
-            backdropFilter: 'blur(28px)',
-            WebkitBackdropFilter: 'blur(28px)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            borderRadius: '8px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border-default)',
+            borderRadius: '10px',
             padding: '24px',
-            boxShadow: '0 16px 48px rgba(0, 0, 0, 0.8)',
+            boxShadow: '0 8px 32px #dddddd',
             animation: 'scale-in 0.15s ease-out',
             outline: 'none',
           }}
@@ -70,7 +68,7 @@ export function ConfirmModal({
               style={{
                 fontSize: '15px',
                 fontWeight: 600,
-                color: '#EBEBEB',
+                color: 'var(--text-primary)',
                 letterSpacing: '-0.01em',
                 margin: 0,
               }}
@@ -90,18 +88,18 @@ export function ConfirmModal({
                   backgroundColor: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#888888',
+                  color: 'var(--text-tertiary)',
                   flexShrink: 0,
                   marginTop: '-2px',
                   transition: 'background-color 100ms ease, color 100ms ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.06)'
-                  e.currentTarget.style.color = '#EBEBEB'
+                  e.currentTarget.style.backgroundColor = 'var(--surface-2)'
+                  e.currentTarget.style.color = '#1a1a1a'
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent'
-                  e.currentTarget.style.color = '#888888'
+                  e.currentTarget.style.color = '#9b9a97'
                 }}
                 aria-label="Close"
               >
@@ -114,7 +112,7 @@ export function ConfirmModal({
           <Dialog.Description
             style={{
               fontSize: '13px',
-              color: '#888888',
+              color: 'var(--text-secondary)',
               lineHeight: 1.6,
               margin: '0 0 24px',
             }}
@@ -132,19 +130,19 @@ export function ConfirmModal({
                   borderRadius: '6px',
                   fontSize: '13px',
                   fontWeight: 500,
-                  color: '#888888',
-                  backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  color: 'var(--text-secondary)',
+                  backgroundColor: 'var(--surface-2)',
+                  border: '1px solid var(--border-default)',
                   cursor: 'pointer',
                   transition: 'background-color 100ms ease, color 100ms ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)'
-                  e.currentTarget.style.color = '#EBEBEB'
+                  e.currentTarget.style.backgroundColor = '#eeeeee'
+                  e.currentTarget.style.color = '#1a1a1a'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.06)'
-                  e.currentTarget.style.color = '#888888'
+                  e.currentTarget.style.backgroundColor = 'var(--surface-2)'
+                  e.currentTarget.style.color = '#787774'
                 }}
               >
                 Cancel
@@ -160,16 +158,16 @@ export function ConfirmModal({
                 fontSize: '13px',
                 fontWeight: 500,
                 color: '#fff',
-                backgroundColor: destructive ? '#EF4444' : '#6366F1',
+                backgroundColor: destructive ? '#e03e3e' : '#1a1a1a',
                 border: 'none',
                 cursor: 'pointer',
                 transition: 'background-color 150ms ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = destructive ? '#DC2626' : '#4F46E5'
+                e.currentTarget.style.backgroundColor = destructive ? '#c73232' : '#2d2b28'
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = destructive ? '#EF4444' : '#6366F1'
+                e.currentTarget.style.backgroundColor = destructive ? '#e03e3e' : '#1a1a1a'
               }}
             >
               {confirmLabel}

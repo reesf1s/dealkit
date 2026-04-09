@@ -26,9 +26,13 @@ export async function PATCH(req: NextRequest) {
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { workspaceId, role } = await getWorkspaceContext(userId)
     if (role !== 'owner' && role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    const { name } = await req.json()
-    if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 })
-    const [updated] = await db.update(workspaces).set({ name, updatedAt: new Date() }).where(eq(workspaces.id, workspaceId)).returning()
+    const body = await req.json()
+    const { name, emailDigestEnabled } = body
+    if (name === undefined && emailDigestEnabled === undefined) return NextResponse.json({ error: 'name or emailDigestEnabled required' }, { status: 400 })
+    const updates: Record<string, unknown> = { updatedAt: new Date() }
+    if (name !== undefined) updates.name = name
+    if (emailDigestEnabled !== undefined) updates.emailDigestEnabled = emailDigestEnabled
+    const [updated] = await db.update(workspaces).set(updates).where(eq(workspaces.id, workspaceId)).returning()
     return NextResponse.json({ data: updated })
   } catch (err) {
     console.error('[PATCH /api/workspaces]', err)

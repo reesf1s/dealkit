@@ -56,6 +56,21 @@ export interface PendingAction {
   completedTexts: string[]
 }
 
+const AgentIncomingMessageSchema = z.object({
+  role: z.enum(['system', 'user', 'assistant', 'tool', 'data']),
+  content: z.unknown().optional(),
+  parts: z.unknown().optional(),
+  id: z.string().optional(),
+}).passthrough()
+
+const AgentRequestSchema = z.object({
+  messages: z.array(AgentIncomingMessageSchema).min(1),
+  activeDealId: z.string().nullable().optional(),
+  currentPage: z.string().optional(),
+  confirmAction: z.unknown().optional(),
+  conversationId: z.string().trim().min(1).max(120).optional(),
+}).passthrough()
+
 // ── OpenAI client ────────────────────────────────────────────────────────────
 
 function getOpenAIClient() {
@@ -319,7 +334,8 @@ function compactWhitespace(value: string): string {
 }
 
 function normaliseIncomingMessages(messages: any[]) {
-  const coreMessages = convertToCoreMessages(messages)
+  const supportedMessages = messages.filter((message) => message?.role !== 'data')
+  const coreMessages = convertToCoreMessages(supportedMessages)
   const deduped: any[] = []
 
   for (const message of coreMessages) {
@@ -380,8 +396,13 @@ export async function POST(req: NextRequest) {
     const rl = await checkRateLimit(userId, 'agent', 30, 60) // 30 per minute
     if (!rl.allowed) return rateLimitResponse(rl.resetAt)
 
-    const body = await req.json()
-    const { messages, activeDealId, currentPage, confirmAction, conversationId } = body
+    const rawBody = await req.json().catch(() => null)
+    const parsedBody = AgentRequestSchema.safeParse(rawBody)
+    if (!parsedBody.success) {
+      return NextResponse.json({ error: 'Invalid request payload' }, { status: 400 })
+    }
+
+    const { messages, activeDealId, confirmAction, conversationId } = parsedBody.data
 
     // ── Confirmed action (legacy confirmation flow) ──────────────────────────
     if (confirmAction) {
@@ -421,11 +442,16 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    await sendAgentGradeTranscript({
-      conversationId,
-      customerIdentifier: userId,
-      messages: normalisedMessages,
-    })
+    const latestCustomerMessage = [...normalisedMessages].reverse().find((m: any) => m.role === 'user')
+    if (latestCustomerMessage && conversationId) {
+      after(async () => {
+        await sendAgentGradeTranscript({
+          conversationId,
+          customerIdentifier: userId,
+          messages: [latestCustomerMessage],
+        })
+      })
+    }
 
     // ── Context window guard: trim to last 20 non-system messages ─────────────
     let trimmedMessages = normalisedMessages
@@ -639,7 +665,11 @@ export async function POST(req: NextRequest) {
         messages: trimmedMessages,
         tools: sdkTools,
         maxSteps: 8,
-        maxTokens: 4096,
+        providerOptions: {
+          openai: {
+            maxCompletionTokens: 4096,
+          },
+        },
         onFinish: async ({ text }) => {
           after(async () => {
             await Promise.allSettled([
@@ -647,10 +677,7 @@ export async function POST(req: NextRequest) {
               sendAgentGradeTranscript({
                 conversationId,
                 customerIdentifier: userId,
-                messages: [
-                  ...normalisedMessages,
-                  ...(text.trim() ? [{ role: 'assistant', content: text }] : []),
-                ],
+                messages: text.trim() ? [{ role: 'assistant', content: text }] : [],
               }),
             ])
           })

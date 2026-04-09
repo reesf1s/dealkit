@@ -79,6 +79,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       updatedAt: dealLogs.updatedAt,
       conversionScorePinned: dealLogs.conversionScorePinned,
       scheduledEvents: dealLogs.scheduledEvents,
+      scoreHistory: dealLogs.scoreHistory,
     }).from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -461,9 +462,16 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
 
       // Only update score if not pinned by user — user-set scores are authoritative
       if (!deal.conversionScorePinned) {
-        updateFields.conversionScore = Math.max(0, Math.min(100, Math.round(finalScore)))
+        const roundedScore = Math.max(0, Math.min(100, Math.round(finalScore)))
+        updateFields.conversionScore = roundedScore
         if (narratedInsights.length > 0) updateFields.conversionInsights = narratedInsights
         if (scoreBreakdown) updateFields.score_breakdown = JSON.stringify(scoreBreakdown)
+        // Append to per-deal score history for sparkline visualisation
+        const existingHistory: Array<{ score: number; date: string }> =
+          Array.isArray(deal.scoreHistory) ? (deal.scoreHistory as Array<{ score: number; date: string }>) : []
+        const newPoint = { score: roundedScore, date: new Date().toISOString() }
+        // Keep last 20 points
+        updateFields.scoreHistory = [...existingHistory, newPoint].slice(-20)
       }
     } catch { /* non-fatal — deal saves without score if brain fails */ }
 

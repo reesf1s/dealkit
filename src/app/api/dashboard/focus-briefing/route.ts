@@ -21,6 +21,17 @@ interface CachedBriefing {
   generatedAt: string
 }
 
+/** Extract the most recent meeting note entry (last section after --- or last [date] block) */
+function extractLatestNote(notes: string | null): string | null {
+  if (!notes) return null
+  // Split by --- separators and take the last non-empty section
+  const sections = notes.split(/\n---\n/).filter(s => s.trim())
+  if (sections.length === 0) return null
+  const last = sections[sections.length - 1].trim()
+  // Truncate to keep prompt size reasonable
+  return last.length > 500 ? last.slice(0, 500) + '…' : last
+}
+
 // ─── GET: return cached briefing (zero API cost) ────────────────────────────
 
 export async function GET() {
@@ -30,16 +41,23 @@ export async function GET() {
     const { workspaceId } = await getWorkspaceContext(userId)
 
     const [ws] = await db
-      .select({ cache: sql<CachedBriefing | null>`focus_briefing_cache` })
+      .select({
+        cache: sql<CachedBriefing | null>`focus_briefing_cache`,
+        brainUpdatedAt: sql<string | null>`(workspace_brain->>'updatedAt')`,
+      })
       .from(workspaces)
       .where(eq(workspaces.id, workspaceId))
       .limit(1)
 
     const cached = ws?.cache as CachedBriefing | null
     if (cached?.text) {
-      return NextResponse.json({ text: cached.text, generatedAt: cached.generatedAt, cached: true })
+      // Signal staleness if brain was rebuilt after the briefing was generated
+      const stale = ws?.brainUpdatedAt && cached.generatedAt
+        ? new Date(ws.brainUpdatedAt).getTime() > new Date(cached.generatedAt).getTime()
+        : false
+      return NextResponse.json({ text: cached.text, generatedAt: cached.generatedAt, cached: true, stale })
     }
-    return NextResponse.json({ text: null, cached: false })
+    return NextResponse.json({ text: null, cached: false, stale: false })
   } catch (e) {
     console.error('[focus-briefing] GET error:', e)
     return NextResponse.json({ text: null, cached: false })
@@ -74,8 +92,20 @@ export async function POST() {
         const stage = (d.stage ?? '').replace(/_/g, ' ')
         const risks = Array.isArray(d.dealRisks) ? (d.dealRisks as Array<string | { risk: string }>).slice(0, 2).map(r => typeof r === 'string' ? r : r.risk).join('; ') : ''
         const nextSteps = d.nextSteps ?? ''
-        const contacts = Array.isArray(d.contacts) ? (d.contacts as Array<{ name: string }>).map(c => c.name).join(', ') : ''
-        return `- ${d.prospectCompany} (${value}, score ${score}%, ${stage}): ${risks || 'No risks flagged'}. Next: ${nextSteps || 'None set'}. Contacts: ${contacts || 'None'}`
+        const contacts = Array.isArray(d.contacts) ? (d.contacts as Array<{ name: string; title?: string }>).slice(0, 3).map(c => c.title ? `${c.name} (${c.title})` : c.name).join(', ') : ''
+        const latestNote = extractLatestNote(d.meetingNotes as string | null)
+        const noteLine = latestNote ? ` Latest update: ${latestNote}` : ''
+        // Score trend — compare last 2 history entries if available
+        const history = Array.isArray(d.scoreHistory) ? d.scoreHistory as Array<{ score: number; date: string }> : []
+        const scoreTrend = history.length >= 2
+          ? (() => {
+              const prev = history[history.length - 2].score
+              const curr = history[history.length - 1].score
+              const delta = curr - prev
+              return delta > 0 ? ` (↑+${delta}pts)` : delta < 0 ? ` (↓${delta}pts)` : ''
+            })()
+          : ''
+        return `- ${d.prospectCompany} (${value}, score ${score}%${scoreTrend}, ${stage}): Risks: ${risks || 'none'}. Next: ${nextSteps || 'none'}. Contacts: ${contacts || 'none'}.${noteLine}`
       })
       .join('\n')
 
@@ -86,33 +116,36 @@ export async function POST() {
 
     const resp = await anthropic.messages.create({
       model: 'gpt-5.4-mini',
-      max_tokens: 600,
+      max_tokens: 700,
       messages: [{
         role: 'user',
-        content: `You are a sales intelligence assistant. Write a structured daily focus briefing.
+        content: `You are an expert sales coach giving a tight morning briefing. Your job: tell the rep exactly what to do today, in priority order, with enough context to act immediately without looking anything up.
 
-FORMAT EXACTLY LIKE THIS:
-🔴 **Urgent — Unblock These Now**
-1. [Company] ([value]) — [specific action with contact name]
+FORMAT EXACTLY:
+🔴 **Act Now** _(deals that will slip without action today)_
+1. [Company] (£[value], [score]%) — [what happened + what to do NOW + who to contact]
 2. ...
 
-🟡 **High Value — Push Forward**
-3. [Company] ([value]) — [specific next step]
+🟡 **Move Forward** _(high-value deals with clear next steps)_
+3. [Company] (£[value]) — [specific next action + why it matters]
 4. ...
 
-🟢 **Quick Checks**
-► [Company] — [one-line check]
+🟢 **Keep Warm** _(healthy deals that just need a touch)_
+► [Company] — [1-line action]
 ► ...
 
-End with: "The big [N] = ~£[X] with solvable blockers."
+---
+💡 _[1 sentence synthesis: total pipeline value, main blocker theme]_
 
 RULES:
-- Use REAL deal names, contact names, £ values from the data below
-- Be specific — "Chase Tom on SOC 2 review" not "Follow up with stakeholder"
-- Urgent = deals with passed deadlines, declining scores, or stalled decisions
-- High value = large deals with clear next steps
-- Quick checks = high-score deals needing a status confirmation
-- Max 7-8 items total
+- Use REAL company names, contact names (first + last), and £ values from the data
+- CRITICAL: "Latest update" is the ground truth — it OVERRIDES "Next steps" if both exist
+- Act Now = stale >10 days, competitor mentioned, passed deadline, or score below 45
+- Move Forward = score ≥55%, notes in last 7 days, clear path to close
+- Keep Warm = score ≥65%, low urgency, needs a nudge
+- Be SPECIFIC: "Send revised MSA to Sarah Chen by EOD" not "Follow up on contract"
+- Max 7–8 items total. Skip low-value deals with no notes.
+- If fewer than 3 deals, omit empty sections gracefully.
 
 PIPELINE DATA:
 ${dealLines}
@@ -121,7 +154,7 @@ BRAIN SIGNALS:
 Stale: ${staleDeals}
 Urgent: ${urgentDeals}
 
-Write ONLY the briefing. No preamble.`
+Write ONLY the briefing. No intro or sign-off.`
       }]
     })
 

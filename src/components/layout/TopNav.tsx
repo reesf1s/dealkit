@@ -4,23 +4,25 @@ import { usePathname } from 'next/navigation'
 import { useUser } from '@clerk/nextjs'
 import useSWR from 'swr'
 import {
-  LayoutDashboard, Kanban, ClipboardList, FileText,
-  AlertTriangle, Building2, Swords, BookOpen, Settings,
-  Search, Sparkles, Menu, MessageSquare, Brain, GitBranch, Plug,
+  LayoutDashboard, ClipboardList, FileText, BarChart2,
+  AlertTriangle, Swords, BookOpen, Settings,
+  Search, Sparkles, Menu, MessageSquare, Brain, GitBranch, Plug, Zap, Users,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
-
-const fetcher = (url: string) => fetch(url).then(r => r.json())
+import { fetcher } from '@/lib/fetcher'
 
 const PAGE_MAP: Record<string, { label: string; Icon: React.ElementType }> = {
-  '/dashboard':    { label: 'Today',             Icon: LayoutDashboard },
-  '/pipeline':     { label: 'Pipeline',          Icon: GitBranch },
-  '/deals':        { label: 'Deal Intelligence', Icon: ClipboardList },
+  '/dashboard':    { label: 'Overview',          Icon: LayoutDashboard },
+  '/pipeline':     { label: 'Pipeline Map',      Icon: GitBranch },
+  '/deals':        { label: 'Opportunities',     Icon: GitBranch },
   '/collateral':   { label: 'Collateral',        Icon: FileText },
   '/product-gaps': { label: 'Product Gaps',      Icon: AlertTriangle },
   '/company':      { label: 'Integrations',      Icon: Plug },
-  '/workflows':    { label: 'Automation',          Icon: Sparkles },
-  '/intelligence': { label: 'Intelligence',      Icon: Brain  },
+  '/contacts':     { label: 'Contacts',           Icon: Users },
+  '/connections':  { label: 'Conversations',     Icon: MessageSquare },
+  '/workflows':    { label: 'Sequences',         Icon: Zap },
+  '/intelligence': { label: 'Signals',           Icon: Brain },
+  '/analytics':    { label: 'Analytics',          Icon: BarChart2 },
   '/competitors':  { label: 'Competitors',       Icon: Swords },
   '/case-studies': { label: 'Case Studies',      Icon: BookOpen },
   '/settings':     { label: 'Settings',          Icon: Settings },
@@ -43,7 +45,10 @@ export default function TopNav() {
   const { user } = useUser()
   const { sidebarWidth, openMobile, toggleCopilot } = useSidebar()
 
-  const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
+  const { data: brainRes, error: brainError } = useSWR('/api/brain', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60000,
+  })
   const brain = brainRes?.data
   const urgentCount = (brain?.urgentDeals?.length ?? 0) + (brain?.staleDeals?.length ?? 0)
   const brainAge = brain?.updatedAt
@@ -61,48 +66,94 @@ export default function TopNav() {
     user?.emailAddresses?.[0]?.emailAddress?.[0]?.toUpperCase() ??
     '?'
 
+  const showIntelligenceChip = Boolean(brainAge) || Boolean(brainError)
+  const intelligenceText = brainError
+    ? 'Intelligence degraded'
+    : urgentCount > 0
+      ? `${urgentCount} need attention`
+      : `Intelligence live · ${brainAge}`
+
+  const intelligenceColor = brainError
+    ? '#f59e0b'
+    : urgentCount > 0
+      ? '#ef4444'
+      : '#1DB86A'
+
+  const intelligenceBg = brainError
+    ? 'var(--color-amber-bg)'
+    : urgentCount > 0
+      ? 'var(--color-red-bg)'
+      : 'var(--color-green-bg)'
+
+  const intelligenceBorder = brainError
+    ? 'rgba(251,191,36,0.30)'
+    : urgentCount > 0
+      ? 'rgba(248,113,113,0.30)'
+      : 'rgba(29,184,106,0.24)'
+
   return (
     <header style={{
       position: 'fixed',
       top: 0,
       left: `${sidebarWidth}px`,
       right: 0,
-      height: '50px',
+      height: '45px',
       zIndex: 30,
-      background: 'rgba(7, 5, 18, 0.75)',
-      backdropFilter: 'blur(24px) saturate(200%)',
-      WebkitBackdropFilter: 'blur(24px) saturate(200%)',
-      borderBottom: '1px solid rgba(255,255,255,0.055)',
+      background: 'var(--surface-1)',
+      borderBottom: '1px solid var(--border-default)',
       display: 'flex',
       alignItems: 'center',
-      padding: '0 20px',
-      gap: '12px',
+      padding: '0 16px',
+      gap: '10px',
       justifyContent: 'space-between',
-      transition: 'left 0.18s cubic-bezier(0.4,0,0.2,1)',
-      boxShadow: '0 1px 0 rgba(255,255,255,0.02)',
+      transition: 'left 0.15s cubic-bezier(0.4,0,0.2,1)',
     }}>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+      {/* ── Left: Mobile menu + breadcrumb ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
         <button
           onClick={openMobile}
           className="mobile-menu-btn"
           style={{
-            display: 'none', width: '30px', height: '30px', borderRadius: '8px',
-            background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-            alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0,
+            display: 'none',
+            width: '28px',
+            height: '28px',
+            borderRadius: '5px',
+            background: 'var(--surface-2)',
+            border: 'none',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            flexShrink: 0,
+            transition: 'background 80ms',
           }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = '#eeeeee'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'}
         >
-          <Menu size={14} style={{ color: 'rgba(255,255,255,0.45)' }} />
+          <Menu size={14} style={{ color: '#666666' }} />
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.18)', fontWeight: 400, letterSpacing: '-0.01em' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0 }}>
+          <span style={{
+            fontSize: '12px',
+            color: 'var(--text-tertiary)',
+            fontWeight: 400,
+            flexShrink: 0,
+          }}>
             Halvex
           </span>
-          <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.10)' }}>/</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <Icon size={12} style={{ color: 'rgba(167,139,250,0.75)', flexShrink: 0 }} />
-            <span style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.80)', letterSpacing: '-0.025em' }}>
+          <span style={{ fontSize: '12px', color: 'var(--border-default)', flexShrink: 0 }}>/</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0 }}>
+            <Icon size={12} style={{ color: '#1DB86A', flexShrink: 0 }} />
+            <span style={{
+              fontSize: '13px',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              letterSpacing: '-0.02em',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}>
               {label}
             </span>
           </div>
@@ -115,69 +166,82 @@ export default function TopNav() {
         }
       `}</style>
 
+      {/* ── Center: Search ── */}
       <button
         onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
         style={{
-          width: '260px',
-          height: '30px',
-          background: 'rgba(255,255,255,0.035)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          borderRadius: '20px',
+          flex: '0 1 300px',
+          height: '28px',
+          background: 'var(--surface-2)',
+          border: '1px solid transparent',
+          borderRadius: '6px',
           display: 'flex',
           alignItems: 'center',
           gap: '7px',
-          padding: '0 12px',
+          padding: '0 10px',
           cursor: 'pointer',
-          transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s',
-          flexShrink: 0,
+          transition: 'background 80ms, border-color 80ms',
+          flexShrink: 1,
         }}
         onMouseEnter={e => {
           const el = e.currentTarget as HTMLElement
-          el.style.background = 'rgba(255,255,255,0.055)'
-          el.style.borderColor = 'rgba(255,255,255,0.11)'
-          el.style.boxShadow = '0 2px 10px rgba(0,0,0,0.20)'
+          el.style.background = 'rgba(26,26,26,0.08)'
+          el.style.borderColor = 'var(--border-default)'
         }}
         onMouseLeave={e => {
           const el = e.currentTarget as HTMLElement
-          el.style.background = 'rgba(255,255,255,0.035)'
-          el.style.borderColor = 'rgba(255,255,255,0.07)'
-          el.style.boxShadow = 'none'
+          el.style.background = 'var(--surface-2)'
+          el.style.borderColor = 'transparent'
         }}
       >
-        <Search size={11} style={{ color: 'rgba(255,255,255,0.22)', flexShrink: 0 }} />
-        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.22)', flex: 1, textAlign: 'left', letterSpacing: '-0.01em' }}>
-          Search anything...
+        <Search size={11} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+        <span style={{
+          fontSize: '12px',
+          color: 'var(--text-tertiary)',
+          flex: 1,
+          textAlign: 'left',
+          letterSpacing: '-0.005em',
+        }}>
+          Search or ask anything…
         </span>
         <span style={{
-          fontSize: '10px', color: 'rgba(255,255,255,0.16)',
-          background: 'rgba(255,255,255,0.05)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          padding: '1px 5px', borderRadius: '4px',
-          letterSpacing: '0.02em', flexShrink: 0,
+          fontSize: '10px',
+          color: 'var(--text-muted)',
+          background: 'var(--surface-2)',
+          border: '1px solid var(--border-default)',
+          padding: '1px 4px',
+          borderRadius: '3px',
+          flexShrink: 0,
         }}>⌘P</span>
       </button>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-        {brainAge && (
+      {/* ── Right: chips + avatar ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+        {showIntelligenceChip && (
           <div style={{
-            display: 'flex', alignItems: 'center', gap: '5px',
-            padding: '4px 10px', borderRadius: '20px',
-            background: urgentCount > 0
-              ? 'rgba(248,113,113,0.08)'
-              : 'linear-gradient(90deg, rgba(139,92,246,0.10) 0%, rgba(52,211,153,0.08) 100%)',
-            border: `1px solid ${urgentCount > 0 ? 'rgba(248,113,113,0.18)' : 'rgba(139,92,246,0.20)'}`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            padding: '3px 9px',
+            borderRadius: '100px',
+            background: intelligenceBg,
+            border: `1px solid ${intelligenceBorder}`,
           }}>
             <div style={{
-              width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0,
-              background: urgentCount > 0 ? '#f87171' : '#a78bfa',
-              boxShadow: urgentCount > 0 ? '0 0 8px rgba(248,113,113,0.60)' : '0 0 8px rgba(167,139,250,0.70)',
+              width: '5px',
+              height: '5px',
+              borderRadius: '50%',
+              flexShrink: 0,
+              background: intelligenceColor,
             }} />
             <span style={{
-              fontSize: '11px', fontWeight: 500, letterSpacing: '-0.01em',
-              color: urgentCount > 0 ? '#f87171' : 'rgba(167,139,250,0.90)',
+              fontSize: '11.5px',
+              fontWeight: 500,
+              letterSpacing: '-0.01em',
+              color: intelligenceColor,
               whiteSpace: 'nowrap',
             }}>
-              {urgentCount > 0 ? `${urgentCount} need attention` : `Intelligence live · ${brainAge}`}
+              {intelligenceText}
             </span>
           </div>
         )}
@@ -185,45 +249,58 @@ export default function TopNav() {
         <button
           onClick={toggleCopilot}
           style={{
-            height: '30px', padding: '0 12px',
-            display: 'flex', alignItems: 'center', gap: '6px',
-            borderRadius: '20px', fontSize: '12px', fontWeight: 500,
-            letterSpacing: '-0.01em', cursor: 'pointer',
-            background: 'linear-gradient(135deg, rgba(139,92,246,0.22) 0%, rgba(99,102,241,0.18) 100%)',
-            border: '1px solid rgba(139,92,246,0.30)',
-            color: 'rgba(196,181,253,0.95)',
-            transition: 'all 0.15s', flexShrink: 0,
-            boxShadow: '0 1px 8px rgba(139,92,246,0.12)',
+            height: '28px',
+            padding: '0 11px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: 500,
+            letterSpacing: '-0.01em',
+            cursor: 'pointer',
+            background: 'rgba(29, 184, 106, 0.09)',
+            border: '1px solid rgba(29, 184, 106, 0.20)',
+            color: '#1DB86A',
+            transition: 'background 80ms, border-color 80ms',
+            flexShrink: 0,
           }}
           onMouseEnter={e => {
             const el = e.currentTarget as HTMLElement
-            el.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.32) 0%, rgba(99,102,241,0.28) 100%)'
-            el.style.borderColor = 'rgba(139,92,246,0.45)'
-            el.style.boxShadow = '0 2px 12px rgba(139,92,246,0.22)'
+            el.style.background = 'rgba(29, 184, 106, 0.14)'
+            el.style.borderColor = 'rgba(29, 184, 106, 0.32)'
           }}
           onMouseLeave={e => {
             const el = e.currentTarget as HTMLElement
-            el.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.22) 0%, rgba(99,102,241,0.18) 100%)'
-            el.style.borderColor = 'rgba(139,92,246,0.30)'
-            el.style.boxShadow = '0 1px 8px rgba(139,92,246,0.12)'
+            el.style.background = 'rgba(29, 184, 106, 0.09)'
+            el.style.borderColor = 'rgba(29, 184, 106, 0.20)'
           }}
         >
-          <MessageSquare size={11} style={{ color: 'rgba(196,181,253,0.90)', flexShrink: 0 }} />
+          <MessageSquare size={11} style={{ color: '#1DB86A', flexShrink: 0 }} />
           Ask AI
           <span style={{
-            fontSize: '10px', color: 'rgba(196,181,253,0.40)',
-            background: 'rgba(139,92,246,0.15)', padding: '1px 4px',
-            borderRadius: '4px',
+            fontSize: '10px',
+            color: 'rgba(29, 184, 106, 0.50)',
+            background: 'rgba(29, 184, 106, 0.10)',
+            padding: '1px 4px',
+            borderRadius: '3px',
           }}>⌘K</span>
         </button>
 
         <div style={{
-          width: '30px', height: '30px', borderRadius: '50%',
-          background: 'rgba(255,255,255,0.14)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.90)',
-          boxShadow: '0 0 0 1px rgba(255,255,255,0.10)',
-          cursor: 'default', flexShrink: 0, letterSpacing: '-0.01em',
+          width: '26px',
+          height: '26px',
+          borderRadius: '5px',
+          background: '#1DB86A',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '11px',
+          fontWeight: 700,
+          color: '#ffffff',
+          cursor: 'default',
+          flexShrink: 0,
+          letterSpacing: '-0.01em',
         }}>
           {avatarLetter}
         </div>

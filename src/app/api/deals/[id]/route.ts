@@ -51,7 +51,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     const body = await req.json()
     const updateData: Record<string, unknown> = { updatedAt: new Date() }
-    const fields = ['dealName','prospectCompany','prospectName','prospectTitle','contacts','description','dealValue','stage','competitors','notes','meetingNotes','aiSummary','conversionScore','conversionInsights','dealRisks','todos','nextSteps','closeDate','wonDate','lostDate','lostReason','dealType','recurringInterval','engagementType','kanbanOrder','projectPlan','links','parentDealId','expansionType','contractStartDate','contractEndDate','successCriteria','successCriteriaTodos','conversionScorePinned','note_signals_json','assignedRepId']
+    const fields = ['dealName','prospectCompany','prospectName','prospectTitle','contacts','description','dealValue','stage','competitors','notes','meetingNotes','aiSummary','conversionScore','conversionInsights','dealRisks','todos','nextSteps','closeDate','wonDate','lostDate','lostReason','dealType','recurringInterval','engagementType','kanbanOrder','projectPlan','links','parentDealId','expansionType','contractStartDate','contractEndDate','successCriteria','successCriteriaTodos','conversionScorePinned','note_signals_json','assignedRepId','forecastCategory','scoreHistory','meddic','dealReview']
     // Date fields need explicit conversion — Drizzle expects Date objects for timestamptz
     // Fix 2-digit year issue: new Date("0026-...") produces year 26 AD instead of 2026
     const fixDateYear = (d: Date): Date => {

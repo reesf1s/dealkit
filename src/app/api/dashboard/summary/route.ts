@@ -154,7 +154,11 @@ export async function GET() {
         const { text } = await generateText({
           model: anthropic('gpt-5.4-mini'),
           prompt: `You are a sales intelligence assistant. Given these top at-risk deals, write exactly 4 concise action bullets (max 12 words each, start with a verb). Return just the 4 bullets, one per line, no numbering.\n\n${context}`,
-          maxTokens: 150,
+          providerOptions: {
+            openai: {
+              maxCompletionTokens: 150,
+            },
+          },
         })
         focusBullets = text
           .split('\n')

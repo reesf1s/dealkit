@@ -36,17 +36,17 @@ type Member = {
   createdAt: string
 }
 
-const PLAN_DETAILS: Record<Plan, { name: string; price: string; color: string; bg: string; features: string[] }> = {
+const PLAN_DETAILS: Record<Plan, { name: string; price: string; color: string; bg: string; border: string; features: string[] }> = {
   free: {
-    name: 'Free', price: '$0/mo', color: '#888', bg: 'rgba(136,136,136,0.08)',
+    name: 'Free', price: '$0/mo', color: 'var(--text-secondary)', bg: 'rgba(55,53,47,0.06)', border: 'rgba(55,53,47,0.16)',
     features: ['1 product', '1 competitor', '2 case studies', '5 deal logs', '3 AI collateral pieces'],
   },
   starter: {
-    name: 'Starter', price: '$79/mo', color: 'rgba(255,255,255,0.80)', bg: 'var(--accent-subtle)',
+    name: 'Starter', price: '$79/mo', color: '#5e6ad2', bg: 'rgba(94,106,210,0.08)', border: 'rgba(94,106,210,0.25)',
     features: ['5 products', '15 competitors', 'Unlimited case studies', 'Unlimited deals', 'Unlimited collateral', 'AI meeting prep', '.docx export'],
   },
   pro: {
-    name: 'Pro', price: '$149/mo', color: '#22C55E', bg: 'rgba(34,197,94,0.08)',
+    name: 'Pro', price: '$149/mo', color: '#0f7b6c', bg: 'rgba(15,123,108,0.08)', border: 'rgba(15,123,108,0.20)',
     features: ['Everything in Starter', 'Unlimited everything', 'AI deal scoring', 'PDF export', 'Priority support', 'Early access'],
   },
 }
@@ -54,22 +54,25 @@ const PLAN_DETAILS: Record<Plan, { name: string; price: string; color: string; b
 function SectionCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <div style={{
-      background: 'var(--bg-surface)',
-      border: '1px solid var(--border-subtle)', borderRadius: '1rem', overflow: 'hidden',
+      background: 'var(--surface-1)',
+      border: '1px solid rgba(55,53,47,0.12)',
+      borderRadius: '8px',
+      overflow: 'hidden',
+      boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
     }}>
-      <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
-        <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0', margin: 0, marginBottom: description ? '3px' : 0 }}>{title}</h2>
-        {description && <p style={{ fontSize: '11px', color: '#475569', margin: 0 }}>{description}</p>}
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(55,53,47,0.09)', background: '#f7f6f3' }}>
+        <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: description ? '3px' : 0 }}>{title}</h2>
+        {description && <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: 0 }}>{description}</p>}
       </div>
       <div style={{ padding: '16px 18px' }}>{children}</div>
     </div>
   )
 }
 
-const APP_ROLE_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  sales:   { label: 'Sales',   color: 'rgba(255,255,255,0.70)', bg: 'rgba(255,255,255,0.06)' },
-  product: { label: 'Product', color: '#34d399', bg: 'rgba(52,211,153,0.10)' },
-  admin:   { label: 'Admin',   color: '#f59e0b', bg: 'rgba(245,158,11,0.10)' },
+const APP_ROLE_LABELS: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  sales:   { label: 'Sales',   color: 'var(--text-secondary)', bg: 'rgba(55,53,47,0.06)', border: 'rgba(55,53,47,0.16)' },
+  product: { label: 'Product', color: '#0f7b6c', bg: 'rgba(15,123,108,0.08)', border: 'rgba(15,123,108,0.20)' },
+  admin:   { label: 'Admin',   color: '#cb6c2c', bg: 'rgba(203,108,44,0.08)', border: 'rgba(203,108,44,0.20)' },
 }
 
 function MembersList({
@@ -108,15 +111,15 @@ function MembersList({
           <div key={m.id} style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '8px 10px', borderRadius: '8px',
-            background: 'var(--surface)', border: '1px solid var(--border)',
+            background: '#f7f6f3', border: '1px solid rgba(55,53,47,0.09)',
             gap: '8px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
               <div style={{
                 width: '28px', height: '28px', borderRadius: '50%', flexShrink: 0,
-                background: 'rgba(255,255,255,0.12)',
+                background: 'rgba(94,106,210,0.10)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '11px', fontWeight: 700, color: 'var(--accent)',
+                fontSize: '11px', fontWeight: 700, color: '#5e6ad2',
               }}>
                 {m.email[0].toUpperCase()}
               </div>
@@ -134,7 +137,7 @@ function MembersList({
                   style={{
                     padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
                     background: roleInfo.bg, color: roleInfo.color,
-                    border: `1px solid ${roleInfo.color}33`,
+                    border: `1px solid ${roleInfo.border}`,
                     cursor: 'pointer', outline: 'none', fontFamily: 'inherit',
                     opacity: updatingRole === m.userId ? 0.6 : 1,
                   }}
@@ -144,21 +147,21 @@ function MembersList({
                   <option value="admin">Admin</option>
                 </select>
               ) : (
-                <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '6px', background: roleInfo.bg, color: roleInfo.color, border: `1px solid ${roleInfo.color}33` }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '6px', background: roleInfo.bg, color: roleInfo.color, border: `1px solid ${roleInfo.border}` }}>
                   {roleInfo.label}
                 </span>
               )}
               {isAdmin && !isMe && (
                 <button onClick={() => onRemove(m.userId, m.email)}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '4px', borderRadius: '5px', display: 'flex', alignItems: 'center' }}
-                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--danger)')}
-                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#e03e3e')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#9b9a97')}
                 >
                   <Trash2 size={12} />
                 </button>
               )}
               {isMe && (
-                <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--surface)', padding: '2px 7px', borderRadius: '4px' }}>you</span>
+                <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--surface-2)', border: '1px solid rgba(55,53,47,0.12)', padding: '2px 7px', borderRadius: '4px' }}>you</span>
               )}
             </div>
           </div>
@@ -170,7 +173,7 @@ function MembersList({
 
 function FieldRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(55,53,47,0.09)' }}>
       <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{label}</span>
       <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 500 }}>{value}</span>
     </div>
@@ -188,17 +191,27 @@ export default function SettingsPage() {
   const [globalConsent, setGlobalConsent] = useState<boolean | null>(null)
   const [consentLoading, setConsentLoading] = useState(false)
   const [eraseLoading, setEraseLoading] = useState(false)
+  const [emailDigest, setEmailDigest] = useState<boolean | null>(null)
+  const [digestLoading, setDigestLoading] = useState(false)
 
   const { data: userRes, isLoading: loadingUser } = useSWR<{ data: DbUser }>('/api/user', fetcher)
   const { data: membersRes, isLoading: loadingMembers, mutate: mutateMembers } = useSWR<{ data: Member[] }>('/api/workspaces/members', fetcher)
   const { data: configData, mutate: mutateConfig } = useSWR('/api/pipeline-config', fetcher, { revalidateOnFocus: false })
   const { data: consentRes } = useSWR<{ consented: boolean }>('/api/global/consent', fetcher, { revalidateOnFocus: false })
+  const { data: workspaceRes, mutate: mutateWorkspace } = useSWR<{ data: { emailDigestEnabled: boolean } }>('/api/workspaces', fetcher, { revalidateOnFocus: false })
   const dbUser = userRes?.data
 
   // Sync consent state from server
   useEffect(() => {
     if (consentRes && globalConsent === null) setGlobalConsent(consentRes.consented ?? false)
   }, [consentRes, globalConsent])
+
+  // Sync email digest state from server
+  useEffect(() => {
+    if (workspaceRes?.data && emailDigest === null) {
+      setEmailDigest(workspaceRes.data.emailDigestEnabled ?? true)
+    }
+  }, [workspaceRes, emailDigest])
 
   const handleConsentToggle = async (value: boolean) => {
     if (!dbUser?.workspaceId) return
@@ -244,7 +257,7 @@ export default function SettingsPage() {
   const members = membersRes?.data ?? []
   const [savingCurrency, setSavingCurrency] = useState(false)
   const [savingDisplay, setSavingDisplay] = useState(false)
-  const currentCurrency: string = configData?.data?.currency ?? '$'
+  const currentCurrency: string = configData?.data?.currency ?? '£'
   const currentDisplay: string = configData?.data?.valueDisplay ?? 'arr'
 
 
@@ -295,7 +308,6 @@ export default function SettingsPage() {
       if (!res.ok) { toast(json.error ?? 'Sync failed', 'error'); return }
       if (json.synced) {
         toast(`Plan updated to ${json.plan}`, 'success')
-        // Reload to show new plan
         window.location.reload()
       } else {
         toast(`Plan is already ${json.plan} — no change needed`, 'success')
@@ -343,6 +355,22 @@ export default function SettingsPage() {
     } catch { toast('Failed to delete account. Please contact support.', 'error') }
   }
 
+  async function handleDigestToggle(value: boolean) {
+    setDigestLoading(true)
+    try {
+      const res = await fetch('/api/workspaces', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emailDigestEnabled: value }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      setEmailDigest(value)
+      await mutateWorkspace()
+      toast(value ? 'Weekly email digest enabled' : 'Email digest disabled', 'success')
+    } catch { toast('Failed to update notification preference', 'error') }
+    finally { setDigestLoading(false) }
+  }
+
   async function handleLeaveWorkspace() {
     try {
       const res = await fetch('/api/workspaces/leave', { method: 'POST' })
@@ -377,17 +405,20 @@ export default function SettingsPage() {
   const isOwner = dbUser?.role === 'owner'
 
   return (
-    <div style={{ padding: '24px', maxWidth: '700px', margin: '0 auto' }}>
+    <div style={{ padding: '24px', maxWidth: '700px', margin: '0 auto', background: 'var(--surface-1)', minHeight: '100%' }}>
       <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{
-          fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', margin: 0, marginBottom: '4px',
-          color: '#e2e8f0',
+          fontSize: '22px', fontWeight: 700, margin: 0, marginBottom: '4px',
+          color: 'var(--text-primary)',
         }}>Settings</h1>
-        <p style={{ fontSize: '13px', color: '#475569', margin: 0 }}>Manage your workspace, team, and billing</p>
+        <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', margin: 0 }}>Manage your workspace, team, and billing</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+        {/* Unmatched emails banner */}
+        <UnmatchedEmailsBanner />
 
         {/* Account */}
         <SectionCard title="Account" description="Your Clerk account details">
@@ -401,8 +432,8 @@ export default function SettingsPage() {
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '5px',
                     height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
-                    color: 'var(--text-primary)', backgroundColor: 'var(--surface-hover)',
-                    border: '1px solid var(--border-strong)', textDecoration: 'none',
+                    color: 'var(--text-primary)', backgroundColor: 'rgba(55,53,47,0.06)',
+                    border: '1px solid rgba(55,53,47,0.12)', textDecoration: 'none',
                   }}>
                   <ExternalLink size={11} strokeWidth={2} />
                   Manage on Clerk
@@ -425,9 +456,9 @@ export default function SettingsPage() {
                   <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: 0 }}>Join code</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <code style={{
-                      fontSize: '12px', fontWeight: 600, color: 'var(--accent)',
-                      background: 'var(--accent-subtle)', padding: '3px 8px', borderRadius: '6px',
-                      border: '1px solid rgba(255,255,255,0.10)', fontFamily: 'monospace',
+                      fontSize: '12px', fontWeight: 600, color: '#5e6ad2',
+                      background: 'rgba(94,106,210,0.08)', padding: '3px 8px', borderRadius: '6px',
+                      border: '1px solid rgba(94,106,210,0.20)', fontFamily: 'monospace',
                     }}>
                       {dbUser?.workspaceSlug ?? '—'}
                     </code>
@@ -436,7 +467,7 @@ export default function SettingsPage() {
                       style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         width: '26px', height: '26px', borderRadius: '6px',
-                        background: 'var(--surface-hover)', border: '1px solid var(--border-strong)',
+                        background: 'var(--surface-2)', border: '1px solid rgba(55,53,47,0.12)',
                         cursor: 'pointer', color: 'var(--text-secondary)',
                       }}>
                       <Copy size={11} />
@@ -459,7 +490,7 @@ export default function SettingsPage() {
               />
 
               {/* Join another workspace */}
-              <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border)' }}>
+              <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid rgba(55,53,47,0.09)' }}>
                 <JoinWorkspaceForm onJoined={() => window.location.reload()} />
               </div>
 
@@ -468,7 +499,7 @@ export default function SettingsPage() {
                   style={{
                     marginTop: '12px', display: 'inline-flex', alignItems: 'center', gap: '5px',
                     padding: '6px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
-                    color: 'var(--danger)', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)',
+                    color: '#e03e3e', background: 'rgba(224,62,62,0.08)', border: '1px solid rgba(224,62,62,0.20)',
                     cursor: 'pointer',
                   }}>
                   <LogOut size={12} />
@@ -507,9 +538,9 @@ export default function SettingsPage() {
                       disabled={savingCurrency}
                       style={{
                         height: '32px', padding: '0 14px', borderRadius: '7px', fontSize: '12px', fontWeight: isActive ? '600' : '400',
-                        background: isActive ? 'var(--accent-subtle)' : 'var(--surface)',
-                        border: isActive ? '1px solid rgba(255,255,255,0.14)' : '1px solid var(--border)',
-                        color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
+                        background: isActive ? 'rgba(94,106,210,0.08)' : '#f7f6f3',
+                        border: isActive ? '1px solid rgba(94,106,210,0.25)' : '1px solid rgba(55,53,47,0.12)',
+                        color: isActive ? '#5e6ad2' : '#787774',
                         cursor: savingCurrency ? 'not-allowed' : 'pointer',
                         transition: 'all 0.1s',
                       }}
@@ -543,15 +574,15 @@ export default function SettingsPage() {
                       style={{
                         height: '48px', padding: '0 16px', borderRadius: '7px', fontSize: '12px',
                         fontWeight: isActive ? '600' : '400', textAlign: 'left',
-                        background: isActive ? 'var(--accent-subtle)' : 'var(--surface)',
-                        border: isActive ? '1px solid rgba(255,255,255,0.14)' : '1px solid var(--border)',
-                        color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
+                        background: isActive ? 'rgba(94,106,210,0.08)' : '#f7f6f3',
+                        border: isActive ? '1px solid rgba(94,106,210,0.25)' : '1px solid rgba(55,53,47,0.12)',
+                        color: isActive ? '#5e6ad2' : '#787774',
                         cursor: savingDisplay ? 'not-allowed' : 'pointer',
                         transition: 'all 0.1s', display: 'flex', flexDirection: 'column', gap: '2px',
                       }}
                     >
                       <span>{label}</span>
-                      <span style={{ fontSize: '10px', color: isActive ? 'var(--accent)' : 'var(--text-tertiary)', fontWeight: 400 }}>{desc}</span>
+                      <span style={{ fontSize: '10px', color: isActive ? '#5e6ad2' : '#9b9a97', fontWeight: 400 }}>{desc}</span>
                     </button>
                   )
                 })}
@@ -567,8 +598,8 @@ export default function SettingsPage() {
             <div>
               <div style={{
                 display: 'flex', alignItems: 'center', gap: '10px', padding: '12px',
-                borderRadius: '10px', background: planDetail.bg, border: `1px solid ${planDetail.color}33`,
-                marginBottom: '16px', boxShadow: `0 0 20px ${planDetail.color}15`,
+                borderRadius: '8px', background: planDetail.bg, border: `1px solid ${planDetail.border}`,
+                marginBottom: '16px',
               }}>
                 <CheckCircle size={16} strokeWidth={2} style={{ color: planDetail.color, flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
@@ -584,12 +615,12 @@ export default function SettingsPage() {
                   const isUpgrade = ['free', 'starter', 'pro'].indexOf(plan) > ['free', 'starter', 'pro'].indexOf(currentPlan)
                   return (
                     <div key={plan} style={{
-                      padding: '12px', borderRadius: '10px',
-                      background: isCurrent ? detail.bg : 'var(--surface)',
-                      border: `1px solid ${isCurrent ? `${detail.color}44` : 'var(--card-border)'}`,
+                      padding: '12px', borderRadius: '8px',
+                      background: isCurrent ? detail.bg : '#f7f6f3',
+                      border: `1px solid ${isCurrent ? detail.border : 'rgba(55,53,47,0.12)'}`,
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 700, color: isCurrent ? detail.color : 'var(--text-primary)' }}>{detail.name}</span>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: isCurrent ? detail.color : '#37352f' }}>{detail.name}</span>
                         <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{detail.price}</span>
                       </div>
                       <ul style={{ margin: '0 0 10px', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '3px' }}>
@@ -600,14 +631,14 @@ export default function SettingsPage() {
                         ))}
                       </ul>
                       {isCurrent ? (
-                        <span style={{ display: 'block', textAlign: 'center', fontSize: '10px', fontWeight: 600, color: detail.color, padding: '4px 0', background: `${detail.color}15`, borderRadius: '5px', border: `1px solid ${detail.color}30` }}>Current</span>
+                        <span style={{ display: 'block', textAlign: 'center', fontSize: '10px', fontWeight: 600, color: detail.color, padding: '4px 0', background: detail.bg, borderRadius: '5px', border: `1px solid ${detail.border}` }}>Current</span>
                       ) : (
                         <button disabled={billingLoading === plan} onClick={() => plan === 'free' ? handleBillingPortal() : handleUpgrade(plan as 'starter' | 'pro')}
                           style={{
                             width: '100%', height: '28px', borderRadius: '7px', fontSize: '11px', fontWeight: 600,
-                            color: isUpgrade ? '#fff' : 'var(--text-secondary)',
-                            background: isUpgrade ? `linear-gradient(135deg, ${detail.color}, ${detail.color}cc)` : 'var(--surface)',
-                            border: isUpgrade ? 'none' : '1px solid var(--border)',
+                            color: isUpgrade ? '#fff' : '#787774',
+                            background: isUpgrade ? '#37352f' : 'rgba(55,53,47,0.06)',
+                            border: isUpgrade ? 'none' : '1px solid rgba(55,53,47,0.12)',
                             cursor: billingLoading === plan ? 'not-allowed' : 'pointer',
                             opacity: billingLoading === plan ? 0.6 : 1,
                           }}>
@@ -623,7 +654,7 @@ export default function SettingsPage() {
                 <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: 0 }}>
                   Manage invoices via the{' '}
                   <button onClick={handleBillingPortal} disabled={billingLoading === 'portal'}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: '11px', padding: 0 }}>
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5e6ad2', fontSize: '11px', padding: 0 }}>
                     {billingLoading === 'portal' ? 'Redirecting…' : 'Stripe billing portal'}
                   </button>.
                 </p>
@@ -631,7 +662,7 @@ export default function SettingsPage() {
               <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '8px 0 0' }}>
                 Plan not reflecting a recent change?{' '}
                 <button onClick={handleSyncPlan} disabled={billingLoading === 'sync'}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: '11px', padding: 0 }}>
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#5e6ad2', fontSize: '11px', padding: 0 }}>
                   {billingLoading === 'sync' ? 'Syncing…' : 'Sync from Stripe'}
                 </button>
               </p>
@@ -639,15 +670,40 @@ export default function SettingsPage() {
           )}
         </SectionCard>
 
+        {/* Notifications */}
+        <SectionCard title="Notifications" description="Control how and when Halvex contacts you">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '8px', background: 'var(--surface-2, #f7f6f3)', border: '1px solid var(--border-default, rgba(55,53,47,0.12))' }}>
+            <div>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary, #37352f)', margin: 0 }}>Weekly email digest</p>
+              <p style={{ fontSize: '11px', color: 'var(--text-muted, #9b9a97)', margin: 0, marginTop: '2px' }}>
+                Receive a weekly summary of deal activity, stale deals, and win/loss trends
+              </p>
+            </div>
+            <button
+              onClick={() => handleDigestToggle(!(emailDigest ?? true))}
+              disabled={digestLoading}
+              style={{
+                position: 'relative', width: '42px', height: '24px', borderRadius: '12px', border: 'none',
+                cursor: digestLoading ? 'default' : 'pointer', flexShrink: 0, marginLeft: '16px',
+                background: (emailDigest ?? true) ? '#0f7b6c' : 'rgba(55,53,47,0.20)',
+                opacity: digestLoading ? 0.7 : 1, transition: 'background 0.15s ease',
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: '3px', width: '18px', height: '18px', borderRadius: '50%',
+                background: 'var(--surface-1)', transition: 'left 0.1s ease',
+                left: (emailDigest ?? true) ? '21px' : '3px',
+              }} />
+            </button>
+          </div>
+        </SectionCard>
 
-
-        {/* Data */}
-        {/* ── Industry Intelligence ─────────────────────────────────────────── */}
+        {/* Industry Intelligence */}
         <SectionCard title="Industry Intelligence" description="Cross-workspace learning — powered by anonymised benchmarks">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
             {/* Explainer */}
-            <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'var(--accent-subtle)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ padding: '12px 14px', borderRadius: '8px', background: 'rgba(94,106,210,0.08)', border: '1px solid rgba(94,106,210,0.20)' }}>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.7 }}>
                 When enabled, Halvex contributes <strong style={{ color: 'var(--text-primary)' }}>10 anonymised behavioural signals</strong> per closed deal to a shared learning pool.
                 In return, your predictions are benchmarked against industry data and new workspaces start with a pre-calibrated model instead of a 50/50 coin flip.
@@ -663,7 +719,7 @@ export default function SettingsPage() {
                   { ok: false, label: 'Exact deal values' },
                   { ok: false, label: 'Contact info or loss reasons' },
                 ].map(({ ok, label }) => (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: ok ? '#6EE7B7' : 'var(--text-tertiary)' }}>
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: ok ? '#0f7b6c' : '#9b9a97' }}>
                     <span style={{ fontSize: '10px', flexShrink: 0 }}>{ok ? '✓ shared' : '✗ never'}</span>
                     <span>{label}</span>
                   </div>
@@ -672,7 +728,7 @@ export default function SettingsPage() {
             </div>
 
             {/* Consent toggle */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '10px', background: 'var(--surface)', border: `1px solid ${globalConsent ? 'rgba(34,197,94,0.25)' : 'var(--border)'}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '8px', background: '#f7f6f3', border: `1px solid ${globalConsent ? 'rgba(15,123,108,0.20)' : 'rgba(55,53,47,0.12)'}` }}>
               <div>
                 <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Contribute to Industry Intelligence</p>
                 <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '3px 0 0' }}>
@@ -686,7 +742,7 @@ export default function SettingsPage() {
                 disabled={consentLoading || (dbUser?.role !== 'owner' && dbUser?.role !== 'admin')}
                 style={{
                   position: 'relative', width: '44px', height: '24px', borderRadius: '12px',
-                  background: globalConsent ? 'var(--success)' : 'var(--border-strong)',
+                  background: globalConsent ? '#0f7b6c' : 'rgba(55,53,47,0.20)',
                   border: 'none', cursor: (consentLoading || (dbUser?.role !== 'owner' && dbUser?.role !== 'admin')) ? 'not-allowed' : 'pointer',
                   opacity: consentLoading ? 0.6 : 1, transition: 'background 0.1s ease', flexShrink: 0,
                 }}
@@ -694,21 +750,21 @@ export default function SettingsPage() {
               >
                 <span style={{
                   position: 'absolute', top: '3px', width: '18px', height: '18px', borderRadius: '50%',
-                  background: '#fff', transition: 'left 0.1s ease', left: globalConsent ? '23px' : '3px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                  background: 'var(--surface-1)', transition: 'left 0.1s ease', left: globalConsent ? '23px' : '3px',
+                  boxShadow: '0 1px 3px rgba(55,53,47,0.20)',
                 }} />
               </button>
             </div>
 
             {/* Erasure */}
             {dbUser?.role === 'owner' && (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '10px', background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.14)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '8px', background: 'rgba(224,62,62,0.06)', border: '1px solid rgba(224,62,62,0.16)' }}>
                 <div>
-                  <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--danger)', margin: 0 }}>Remove from global pool</p>
+                  <p style={{ fontSize: '12px', fontWeight: 500, color: '#e03e3e', margin: 0 }}>Remove from global pool</p>
                   <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '2px 0 0' }}>GDPR Article 17 — erase all contributed records within 30 days</p>
                 </div>
                 <button onClick={handleGlobalErase} disabled={eraseLoading}
-                  style={{ height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--danger)', background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.22)', cursor: eraseLoading ? 'not-allowed' : 'pointer', opacity: eraseLoading ? 0.6 : 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  style={{ height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#e03e3e', background: 'rgba(224,62,62,0.08)', border: '1px solid rgba(224,62,62,0.20)', cursor: eraseLoading ? 'not-allowed' : 'pointer', opacity: eraseLoading ? 0.6 : 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
                   {eraseLoading ? 'Erasing…' : 'Erase my data'}
                 </button>
               </div>
@@ -729,7 +785,7 @@ export default function SettingsPage() {
                 { icon: '✅', label: 'SOC 2 auth provider', sub: 'Clerk (SOC 2 Type II)' },
                 { icon: '🌍', label: 'GDPR & CCPA ready', sub: 'EU/UK/California rights supported' },
               ].map(({ icon, label, sub }) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderRadius: '9px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', borderRadius: '8px', background: '#f7f6f3', border: '1px solid rgba(55,53,47,0.09)' }}>
                   <span style={{ fontSize: '14px', flexShrink: 0, marginTop: '1px' }}>{icon}</span>
                   <div>
                     <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{label}</p>
@@ -740,7 +796,7 @@ export default function SettingsPage() {
             </div>
 
             {/* Sub-processors */}
-            <div style={{ padding: '12px 14px', borderRadius: '9px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <div style={{ padding: '12px 14px', borderRadius: '8px', background: '#f7f6f3', border: '1px solid rgba(55,53,47,0.09)' }}>
               <p style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 10px' }}>Sub-processors</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {[
@@ -760,22 +816,22 @@ export default function SettingsPage() {
             </div>
 
             {/* Rights */}
-            <div style={{ padding: '10px 14px', borderRadius: '9px', background: 'var(--accent-subtle)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <p style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600, margin: '0 0 6px' }}>Your rights (GDPR / CCPA)</p>
+            <div style={{ padding: '10px 14px', borderRadius: '8px', background: 'rgba(94,106,210,0.08)', border: '1px solid rgba(94,106,210,0.20)' }}>
+              <p style={{ fontSize: '11px', color: '#5e6ad2', fontWeight: 600, margin: '0 0 6px' }}>Your rights (GDPR / CCPA)</p>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>
-                Access, correct, export, or delete your data at any time using the buttons below, or email <a href="mailto:privacy@halvex.ai" style={{ color: 'var(--accent)' }}>privacy@halvex.ai</a>. We respond within 30 days.
+                Access, correct, export, or delete your data at any time using the buttons below, or email <a href="mailto:privacy@halvex.ai" style={{ color: '#5e6ad2' }}>privacy@halvex.ai</a>. We respond within 30 days.
               </p>
             </div>
 
             {/* Links */}
             <div style={{ display: 'flex', gap: '8px' }}>
               <a href="/privacy" target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--accent)', backgroundColor: 'var(--accent-subtle)', border: '1px solid rgba(255,255,255,0.08)', textDecoration: 'none' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#5e6ad2', backgroundColor: 'rgba(94,106,210,0.08)', border: '1px solid rgba(94,106,210,0.20)', textDecoration: 'none' }}>
                 <ExternalLink size={11} />
                 Privacy Policy
               </a>
               <a href="/terms" target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', backgroundColor: 'var(--surface)', border: '1px solid var(--border)', textDecoration: 'none' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', backgroundColor: 'rgba(55,53,47,0.06)', border: '1px solid rgba(55,53,47,0.12)', textDecoration: 'none' }}>
                 <ExternalLink size={11} />
                 Terms of Service
               </a>
@@ -788,25 +844,25 @@ export default function SettingsPage() {
 
         <SectionCard title="Your data" description="Export or delete all workspace data">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '10px', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '8px', background: '#f7f6f3', border: '1px solid rgba(55,53,47,0.09)' }}>
               <div>
                 <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>Export all data</p>
                 <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '2px 0 0' }}>Download as JSON</p>
               </div>
               <button onClick={handleExportData} disabled={exportLoading}
-                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)', backgroundColor: 'var(--surface-hover)', border: '1px solid var(--border-strong)', cursor: exportLoading ? 'not-allowed' : 'pointer', opacity: exportLoading ? 0.6 : 1 }}>
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)', backgroundColor: 'rgba(55,53,47,0.06)', border: '1px solid rgba(55,53,47,0.12)', cursor: exportLoading ? 'not-allowed' : 'pointer', opacity: exportLoading ? 0.6 : 1 }}>
                 <Download size={12} strokeWidth={2} />
                 {exportLoading ? 'Exporting…' : 'Export'}
               </button>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '10px', background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.18)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderRadius: '8px', background: 'rgba(224,62,62,0.06)', border: '1px solid rgba(224,62,62,0.16)' }}>
               <div>
-                <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--danger)', margin: 0 }}>Delete account</p>
+                <p style={{ fontSize: '12px', fontWeight: 500, color: '#e03e3e', margin: 0 }}>Delete account</p>
                 <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: '2px 0 0' }}>Permanently delete everything. Cannot be undone.</p>
               </div>
               <button onClick={() => setDeleteOpen(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: 'var(--danger)', backgroundColor: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.22)', cursor: 'pointer' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: '5px', height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500, color: '#e03e3e', backgroundColor: 'rgba(224,62,62,0.08)', border: '1px solid rgba(224,62,62,0.20)', cursor: 'pointer' }}>
                 <Trash2 size={12} strokeWidth={2} />
                 Delete
               </button>
@@ -814,8 +870,8 @@ export default function SettingsPage() {
           </div>
         </SectionCard>
 
-        <div style={{ display: 'flex', gap: '8px', padding: '10px 12px', borderRadius: '10px', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)' }}>
-          <AlertTriangle size={13} strokeWidth={2} style={{ color: '#F59E0B', flexShrink: 0, marginTop: '1px' }} />
+        <div style={{ display: 'flex', gap: '8px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(203,108,44,0.06)', border: '1px solid rgba(203,108,44,0.16)' }}>
+          <AlertTriangle size={13} strokeWidth={2} style={{ color: '#cb6c2c', flexShrink: 0, marginTop: '1px' }} />
           <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
             Account deletion removes your account, cancels subscriptions, and deletes all workspace data. Only the workspace owner can delete the workspace.
           </p>
@@ -880,9 +936,9 @@ function CompanyBrainSection() {
   }
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '8px 12px', borderRadius: '8px',
-    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-    color: '#e2e8f0', fontSize: '13px', outline: 'none',
+    width: '100%', padding: '8px 12px', borderRadius: '6px',
+    background: '#f7f6f3', border: '1px solid rgba(55,53,47,0.16)',
+    color: 'var(--text-primary)', fontSize: '13px', outline: 'none',
     boxSizing: 'border-box',
   }
 
@@ -892,21 +948,24 @@ function CompanyBrainSection() {
 
   return (
     <div style={{
-      background: 'var(--bg-surface)',
-      border: '1px solid var(--border-subtle)', borderRadius: '1rem', overflow: 'hidden',
+      background: 'var(--surface-1)',
+      border: '1px solid rgba(55,53,47,0.12)',
+      borderRadius: '8px',
+      overflow: 'hidden',
+      boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
     }}>
-      <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(55,53,47,0.09)', background: '#f7f6f3', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0', margin: 0, marginBottom: '3px' }}>Company Brain</h2>
-          <p style={{ fontSize: '11px', color: '#475569', margin: 0 }}>Your company&apos;s knowledge base — used to power AI briefings, battlecards, and deal intelligence</p>
+          <h2 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, marginBottom: '3px' }}>Company Brain</h2>
+          <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: 0 }}>Your company&apos;s knowledge base — used to power AI briefings, battlecards, and deal intelligence</p>
         </div>
         {!editing && (
           <button
             onClick={() => setEditing(true)}
             style={{
               padding: '6px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
-              color: 'rgba(255,255,255,0.70)', cursor: 'pointer',
+              background: 'var(--surface-2)', border: '1px solid rgba(55,53,47,0.12)',
+              color: 'var(--text-secondary)', cursor: 'pointer',
             }}
           >
             Edit
@@ -931,7 +990,7 @@ function CompanyBrainSection() {
               { key: 'commonObjections', label: 'Common objections (one per line)', type: 'textarea' },
             ].map(({ key, label, type }) => (
               <div key={key}>
-                <label style={{ fontSize: '11px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '5px' }}>
+                <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: '5px' }}>
                   {label}
                 </label>
                 {type === 'input' ? (
@@ -939,16 +998,16 @@ function CompanyBrainSection() {
                     value={form[key as keyof typeof form]}
                     onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
                     style={inputStyle}
-                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)')}
-                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(94,106,210,0.40)')}
+                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(55,53,47,0.16)')}
                   />
                 ) : (
                   <textarea
                     value={form[key as keyof typeof form]}
                     onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
                     style={taStyle}
-                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)')}
-                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(94,106,210,0.40)')}
+                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(55,53,47,0.16)')}
                   />
                 )}
               </div>
@@ -959,9 +1018,9 @@ function CompanyBrainSection() {
                 disabled={saving}
                 style={{
                   padding: '8px 16px', borderRadius: '8px',
-                  background: 'rgba(255,255,255,0.90)',
-                  border: '1px solid rgba(255,255,255,0.14)',
-                  color: '#0a0b0f', fontSize: '13px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer',
+                  background: '#37352f',
+                  border: 'none',
+                  color: '#ffffff', fontSize: '13px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer',
                   opacity: saving ? 0.6 : 1,
                 }}
               >
@@ -971,8 +1030,8 @@ function CompanyBrainSection() {
                 onClick={() => setEditing(false)}
                 style={{
                   padding: '8px 14px', borderRadius: '8px',
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                  color: '#64748b', fontSize: '13px', cursor: 'pointer',
+                  background: 'var(--surface-2)', border: '1px solid rgba(55,53,47,0.12)',
+                  color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer',
                 }}
               >
                 Cancel
@@ -982,24 +1041,24 @@ function CompanyBrainSection() {
         ) : company ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {company.companyName && (
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#e2e8f0' }}>{company.companyName}</div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{company.companyName}</div>
             )}
             {company.description && (
-              <div style={{ fontSize: '13px', color: '#94a3b8', lineHeight: 1.6 }}>{company.description}</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{company.description}</div>
             )}
             {company.targetMarket && (
-              <div style={{ fontSize: '12px', color: '#64748b' }}>
-                Target: <span style={{ color: '#94a3b8' }}>{company.targetMarket}</span>
+              <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
+                Target: <span style={{ color: 'var(--text-secondary)' }}>{company.targetMarket}</span>
               </div>
             )}
             {!company.description && (
-              <p style={{ fontSize: '13px', color: '#475569', margin: 0 }}>
+              <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', margin: 0 }}>
                 Add your company&apos;s context to improve AI deal intelligence.
               </p>
             )}
           </div>
         ) : (
-          <p style={{ fontSize: '13px', color: '#475569', margin: 0 }}>
+          <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', margin: 0 }}>
             Add your company&apos;s knowledge base to power AI briefings and battlecards.
           </p>
         )}
@@ -1039,14 +1098,14 @@ function JoinWorkspaceForm({ onJoined }: { onJoined: () => void }) {
         placeholder="Enter join code (e.g. crane-47)"
         style={{
           flex: 1, height: '30px', padding: '0 10px', borderRadius: '7px', fontSize: '12px',
-          background: 'var(--surface)', border: '1px solid var(--border-strong)',
+          background: '#f7f6f3', border: '1px solid rgba(55,53,47,0.16)',
           color: 'var(--text-primary)', outline: 'none', fontFamily: 'inherit',
         }}
       />
       <button type="submit" disabled={loading || !slug.trim()}
         style={{
           height: '30px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 600,
-          color: '#fff', background: 'linear-gradient(135deg, var(--accent), rgba(255,255,255,0.80))',
+          color: '#fff', background: '#37352f',
           border: 'none', cursor: loading || !slug.trim() ? 'not-allowed' : 'pointer',
           opacity: loading || !slug.trim() ? 0.6 : 1, whiteSpace: 'nowrap',
         }}>
@@ -1065,11 +1124,11 @@ function UnmatchedEmailsBanner() {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '10px 14px', borderRadius: '10px',
-      background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.20)',
+      padding: '10px 14px', borderRadius: '8px',
+      background: 'rgba(203,108,44,0.08)', border: '1px solid rgba(203,108,44,0.20)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <Inbox size={14} style={{ color: '#F59E0B', flexShrink: 0 }} />
+        <Inbox size={14} style={{ color: '#cb6c2c', flexShrink: 0 }} />
         <div>
           <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)', margin: 0 }}>
             {count} unmatched email{count !== 1 ? 's' : ''} pending review
@@ -1084,7 +1143,7 @@ function UnmatchedEmailsBanner() {
         style={{
           display: 'flex', alignItems: 'center', gap: '5px',
           height: '28px', padding: '0 12px', borderRadius: '7px', fontSize: '12px', fontWeight: 500,
-          color: '#F59E0B', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)',
+          color: '#cb6c2c', background: 'rgba(203,108,44,0.08)', border: '1px solid rgba(203,108,44,0.20)',
           textDecoration: 'none', whiteSpace: 'nowrap', cursor: 'pointer',
         }}
       >

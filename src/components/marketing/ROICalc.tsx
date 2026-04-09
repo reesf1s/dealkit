@@ -36,9 +36,9 @@ export default function ROICalc() {
   const inputStyle: React.CSSProperties = {
     height: '36px',
     borderRadius: '6px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    color: '#EBEBEB',
+    background: 'rgba(55,53,47,0.04)',
+    border: '1px solid rgba(55,53,47,0.12)',
+    color: '#37352f',
     fontSize: '14px',
     padding: '0 12px',
     width: '120px',
@@ -48,7 +48,7 @@ export default function ROICalc() {
 
   const labelStyle: React.CSSProperties = {
     fontSize: '14px',
-    color: '#888',
+    color: '#787774',
   }
 
   const rowStyle: React.CSSProperties = {
@@ -59,12 +59,13 @@ export default function ROICalc() {
   }
 
   const outputCardStyle: React.CSSProperties = {
-    background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: '#ffffff',
+    border: '1px solid rgba(55,53,47,0.09)',
     borderRadius: '8px',
     padding: '20px',
     flex: 1,
     minWidth: 0,
+    boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
   }
 
   return (
@@ -76,11 +77,11 @@ export default function ROICalc() {
           alignItems: 'center',
           gap: '6px',
           padding: '4px 12px',
-          background: 'rgba(255,255,255,0.06)',
-          border: '1px solid rgba(255,255,255,0.10)',
+          background: 'rgba(55,53,47,0.04)',
+          border: '1px solid rgba(55,53,47,0.12)',
           borderRadius: '100px',
           fontSize: '12px',
-          color: 'rgba(255,255,255,0.70)',
+          color: '#787774',
           fontWeight: 500,
           marginBottom: '20px',
         }}>
@@ -90,23 +91,24 @@ export default function ROICalc() {
           fontSize: '32px',
           fontWeight: 700,
           letterSpacing: '-0.03em',
-          color: '#EBEBEB',
+          color: '#37352f',
           marginBottom: '12px',
         }}>
           See your return before you sign up
         </h2>
-        <p style={{ fontSize: '15px', color: '#888', lineHeight: 1.6 }}>
+        <p style={{ fontSize: '15px', color: '#787774', lineHeight: 1.6 }}>
           Enter your deal metrics and see how Halvex pays for itself
         </p>
       </div>
 
       {/* Calculator card */}
       <div style={{
-        background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255,255,255,0.06)',
+        background: '#ffffff',
+        border: '1px solid rgba(55,53,47,0.09)',
         borderRadius: '12px',
         padding: '28px',
         marginBottom: '20px',
+        boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
       }}>
         {/* Inputs */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '28px' }}>
@@ -130,7 +132,7 @@ export default function ROICalc() {
               <span style={{
                 position: 'absolute',
                 left: '10px',
-                color: '#555',
+                color: '#9b9a97',
                 fontSize: '14px',
                 pointerEvents: 'none',
                 lineHeight: 1,
@@ -164,7 +166,7 @@ export default function ROICalc() {
               <span style={{
                 position: 'absolute',
                 right: '10px',
-                color: '#555',
+                color: '#9b9a97',
                 fontSize: '14px',
                 pointerEvents: 'none',
                 lineHeight: 1,
@@ -176,25 +178,25 @@ export default function ROICalc() {
         </div>
 
         {/* Divider */}
-        <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', marginBottom: '20px' }} />
+        <div style={{ height: '1px', background: 'rgba(55,53,47,0.09)', marginBottom: '20px' }} />
 
         {/* Current snapshot */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '8px' }}>
-          <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '6px', padding: '12px' }}>
-            <div style={{ fontSize: '11px', color: '#555', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Deals won/mo</div>
-            <div style={{ fontSize: '20px', fontWeight: 700, letterSpacing: '-0.03em', color: '#EBEBEB' }}>
+          <div style={{ background: '#f7f6f3', borderRadius: '6px', padding: '12px' }}>
+            <div style={{ fontSize: '11px', color: '#9b9a97', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Deals won/mo</div>
+            <div style={{ fontSize: '20px', fontWeight: 700, letterSpacing: '-0.03em', color: '#37352f' }}>
               {dealsWonPerMonth.toFixed(1)}
             </div>
           </div>
-          <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '6px', padding: '12px' }}>
-            <div style={{ fontSize: '11px', color: '#555', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Revenue won/mo</div>
-            <div style={{ fontSize: '20px', fontWeight: 700, letterSpacing: '-0.03em', color: '#EBEBEB' }}>
+          <div style={{ background: '#f7f6f3', borderRadius: '6px', padding: '12px' }}>
+            <div style={{ fontSize: '11px', color: '#9b9a97', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Revenue won/mo</div>
+            <div style={{ fontSize: '20px', fontWeight: 700, letterSpacing: '-0.03em', color: '#37352f' }}>
               {formatCurrency(revenueWonPerMonth)}
             </div>
           </div>
         </div>
 
-        <div style={{ fontSize: '12px', color: '#555', textAlign: 'center' }}>
+        <div style={{ fontSize: '12px', color: '#9b9a97', textAlign: 'center' }}>
           With Halvex targeting a +10% win rate improvement
         </div>
       </div>
@@ -207,13 +209,13 @@ export default function ROICalc() {
             fontSize: '32px',
             fontWeight: 700,
             letterSpacing: '-0.04em',
-            color: '#22C55E',
+            color: '#0f7b6c',
             marginBottom: '6px',
             lineHeight: 1,
           }}>
             {formatCurrency(extraRevenuePerMonth)}
           </div>
-          <div style={{ fontSize: '12px', color: '#888' }}>Extra Revenue/mo</div>
+          <div style={{ fontSize: '12px', color: '#787774' }}>Extra Revenue/mo</div>
         </div>
 
         {/* ROI */}
@@ -222,13 +224,13 @@ export default function ROICalc() {
             fontSize: '32px',
             fontWeight: 700,
             letterSpacing: '-0.04em',
-            color: 'rgba(255,255,255,0.80)',
+            color: '#37352f',
             marginBottom: '6px',
             lineHeight: 1,
           }}>
             {roi > 0 ? `${roi}x` : '—'}
           </div>
-          <div style={{ fontSize: '12px', color: '#888' }}>ROI</div>
+          <div style={{ fontSize: '12px', color: '#787774' }}>ROI</div>
         </div>
 
         {/* Payback */}
@@ -237,13 +239,13 @@ export default function ROICalc() {
             fontSize: '32px',
             fontWeight: 700,
             letterSpacing: '-0.04em',
-            color: '#EBEBEB',
+            color: '#37352f',
             marginBottom: '6px',
             lineHeight: 1,
           }}>
             {paybackDays > 0 ? `${paybackDays}d` : '—'}
           </div>
-          <div style={{ fontSize: '12px', color: '#888' }}>Pays for itself in</div>
+          <div style={{ fontSize: '12px', color: '#787774' }}>Pays for itself in</div>
         </div>
       </div>
 
@@ -252,7 +254,7 @@ export default function ROICalc() {
         marginTop: '16px',
         textAlign: 'center',
         fontSize: '12px',
-        color: '#444',
+        color: '#9b9a97',
         lineHeight: 1.5,
       }}>
         {`Based on Halvex Starter at £${HALVEX_COST}/mo. Assumes a 10% win rate improvement from better collateral.`}

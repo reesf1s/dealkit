@@ -6,12 +6,11 @@
  */
 export const dynamic = 'force-dynamic'
 
-import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { dealLinearLinks, dealLogs, slackPendingActions, linearIntegrations, linearIssuesCache } from '@/lib/db/schema'
-import { eq, and, sql, inArray } from 'drizzle-orm'
+import { dealLinearLinks, dealLogs, linearIssuesCache } from '@/lib/db/schema'
+import { eq, and, inArray } from 'drizzle-orm'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { dbErrResponse } from '@/lib/api-helpers'
 
@@ -39,9 +38,6 @@ export interface LoopEntry {
   createdAt: Date
   updatedAt: Date
 }
-
-// How long to skip a background sync after the last one completed (15 min)
-const SYNC_THROTTLE_MS = 15 * 60 * 1000
 
 export async function GET() {
   try {
@@ -89,19 +85,6 @@ export async function GET() {
       .where(eq(dealLogs.workspaceId, workspaceId))
 
     const dealMap = new Map(deals.map(d => [d.id, d]))
-
-    // Fetch pending Slack approvals for these deals
-    const dealIds = [...new Set(links.map(l => l.dealId))]
-    const pendingActions =
-      dealIds.length > 0
-        ? await db
-            .select({ dealId: slackPendingActions.dealId, createdAt: slackPendingActions.createdAt })
-            .from(slackPendingActions)
-            .where(and(inArray(slackPendingActions.dealId, dealIds), sql`expires_at > now()`))
-        : []
-
-    const pendingMap = new Map(pendingActions.map(p => [p.dealId, p.createdAt]))
-    void pendingMap // reserved for future use (Slack pending indicator)
 
     // 3C: Fetch Linear issue cache entries for cycle info and raw status
     const issueIds = [...new Set(links.map(l => l.linearIssueId))]
@@ -192,28 +175,6 @@ export async function GET() {
         })
       }  // end for link
     }  // end for dealId
-
-    // 3B: Throttle background sync — only trigger if last sync was >15 min ago
-    const [integration] = await db
-      .select({ lastSyncAt: linearIntegrations.lastSyncAt })
-      .from(linearIntegrations)
-      .where(eq(linearIntegrations.workspaceId, workspaceId))
-      .limit(1)
-
-    const lastSyncMs = integration?.lastSyncAt ? new Date(integration.lastSyncAt).getTime() : 0
-    const shouldSync = (now - lastSyncMs) > SYNC_THROTTLE_MS
-
-    if (shouldSync) {
-      after(async () => {
-        try {
-          const { syncLinearIssues } = await import('@/lib/linear-sync')
-          if (syncLinearIssues) await syncLinearIssues(workspaceId)
-        } catch (e) {
-          // Non-fatal background task failure
-          console.error('[loops] background sync error:', e)
-        }
-      })
-    }
 
     return NextResponse.json({ data: loops })
   } catch (err) {

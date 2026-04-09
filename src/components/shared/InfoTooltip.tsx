@@ -16,7 +16,7 @@ export function InfoTooltip({ text, size = 14 }: InfoTooltipProps) {
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
     >
-      <Info size={size} style={{ color: '#52525B', cursor: 'help' }} />
+      <Info size={size} style={{ color: '#9b9a97', cursor: 'help' }} />
       {show && (
         <div style={{
           position: 'absolute',
@@ -26,14 +26,14 @@ export function InfoTooltip({ text, size = 14 }: InfoTooltipProps) {
           marginBottom: '8px',
           zIndex: 9999,
           width: '240px',
-          background: '#18181B',
-          border: '1px solid #3F3F46',
+          background: '#1a1a1a',
+          border: '1px solid #dddddd',
           borderRadius: '8px',
           padding: '8px 12px',
           fontSize: '12px',
-          color: '#D4D4D8',
+          color: 'rgba(255,255,255,0.88)',
           lineHeight: 1.5,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+          boxShadow: '0 4px 16px #dddddd',
           pointerEvents: 'none'
         }}>
           {text}

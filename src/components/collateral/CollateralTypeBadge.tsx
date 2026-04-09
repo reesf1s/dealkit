@@ -10,40 +10,40 @@ interface CollateralTypeBadgeProps {
 const TYPE_CONFIG: Partial<Record<CollateralType, { label: string; color: string; bg: string }>> = {
   battlecard: {
     label: 'Battlecard',
-    color: '#F59E0B',
-    bg: 'rgba(245, 158, 11, 0.12)',
+    color: '#cb6c2c',
+    bg: 'rgba(203, 108, 44, 0.08)',
   },
   case_study_doc: {
     label: 'Case Study',
-    color: '#22C55E',
-    bg: 'rgba(34, 197, 94, 0.12)',
+    color: '#0f7b6c',
+    bg: 'rgba(15, 123, 108, 0.08)',
   },
   one_pager: {
     label: 'One-Pager',
-    color: '#6366F1',
-    bg: 'rgba(99, 102, 241, 0.12)',
+    color: '#5e6ad2',
+    bg: 'rgba(94, 106, 210, 0.08)',
   },
   objection_handler: {
     label: 'Objection Handler',
-    color: '#EF4444',
-    bg: 'rgba(239, 68, 68, 0.12)',
+    color: '#e03e3e',
+    bg: 'rgba(224, 62, 62, 0.08)',
   },
   talk_track: {
     label: 'Talk Track',
-    color: '#06B6D4',
-    bg: 'rgba(6, 182, 212, 0.12)',
+    color: '#2e78c6',
+    bg: 'rgba(46, 120, 198, 0.08)',
   },
   email_sequence: {
     label: 'Email Sequence',
-    color: '#8B5CF6',
-    bg: 'rgba(139, 92, 246, 0.12)',
+    color: '#5e6ad2',
+    bg: 'rgba(94, 106, 210, 0.08)',
   },
 }
 
 export function CollateralTypeBadge({ type, customTypeName }: CollateralTypeBadgeProps) {
   const config = type === 'custom'
-    ? { label: customTypeName || 'Custom', color: '#C4B5FD', bg: 'rgba(196, 181, 253, 0.12)' }
-    : (TYPE_CONFIG[type] ?? { label: type, color: '#888888', bg: 'rgba(136, 136, 136, 0.12)' })
+    ? { label: customTypeName || 'Custom', color: '#787774', bg: 'rgba(55, 53, 47, 0.06)' }
+    : (TYPE_CONFIG[type] ?? { label: type, color: '#787774', bg: 'rgba(55, 53, 47, 0.06)' })
 
   return (
     <span

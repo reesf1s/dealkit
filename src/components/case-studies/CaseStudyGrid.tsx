@@ -20,11 +20,10 @@ function CaseStudyCard({ caseStudy }: { caseStudy: CaseStudy }) {
     >
       <div
         style={{
-          background: 'rgba(255,255,255,0.03)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          border: '1px solid rgba(255,255,255,0.07)',
+          background: 'var(--surface-1)',
+          border: '1px solid rgba(55,53,47,0.12)',
           borderRadius: '8px',
+          boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
           padding: '16px',
           display: 'flex',
           flexDirection: 'column',
@@ -34,12 +33,12 @@ function CaseStudyCard({ caseStudy }: { caseStudy: CaseStudy }) {
           height: '100%',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
-          e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
+          e.currentTarget.style.borderColor = 'rgba(55,53,47,0.20)'
+          e.currentTarget.style.background = '#f7f6f3'
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'
-          e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
+          e.currentTarget.style.borderColor = 'rgba(55,53,47,0.12)'
+          e.currentTarget.style.background = 'var(--surface-1)'
         }}
       >
         {/* Icon + generated badge */}
@@ -49,13 +48,13 @@ function CaseStudyCard({ caseStudy }: { caseStudy: CaseStudy }) {
               width: '36px',
               height: '36px',
               borderRadius: '8px',
-              backgroundColor: 'rgba(34,197,94,0.12)',
+              backgroundColor: 'rgba(15,123,108,0.08)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <BookOpen size={16} strokeWidth={1.5} style={{ color: '#22C55E' }} />
+            <BookOpen size={16} strokeWidth={1.5} style={{ color: '#0f7b6c' }} />
           </div>
 
           {hasGenerated && (
@@ -69,8 +68,9 @@ function CaseStudyCard({ caseStudy }: { caseStudy: CaseStudy }) {
                 borderRadius: '9999px',
                 fontSize: '11px',
                 fontWeight: 500,
-                color: 'rgba(255,255,255,0.80)',
-                backgroundColor: 'rgba(255,255,255,0.06)',
+                color: '#5e6ad2',
+                backgroundColor: 'rgba(94,106,210,0.08)',
+                border: '1px solid rgba(94,106,210,0.20)',
               }}
             >
               <Sparkles size={10} strokeWidth={2} />
@@ -85,7 +85,7 @@ function CaseStudyCard({ caseStudy }: { caseStudy: CaseStudy }) {
             style={{
               fontSize: '14px',
               fontWeight: 600,
-              color: '#EBEBEB',
+              color: '#37352f',
               margin: 0,
               marginBottom: '4px',
               letterSpacing: '-0.01em',
@@ -97,13 +97,13 @@ function CaseStudyCard({ caseStudy }: { caseStudy: CaseStudy }) {
           {/* Meta */}
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             {caseStudy.customerIndustry && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#555' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#787774' }}>
                 <Building2 size={11} />
                 {caseStudy.customerIndustry}
               </span>
             )}
             {caseStudy.customerSize && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#555' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#787774' }}>
                 <Users size={11} />
                 {caseStudy.customerSize}
               </span>
@@ -115,7 +115,7 @@ function CaseStudyCard({ caseStudy }: { caseStudy: CaseStudy }) {
         <p
           style={{
             fontSize: '12px',
-            color: '#888',
+            color: '#787774',
             margin: 0,
             lineHeight: 1.5,
             overflow: 'hidden',
@@ -141,8 +141,8 @@ function CaseStudyCard({ caseStudy }: { caseStudy: CaseStudy }) {
                   borderRadius: '4px',
                   fontSize: '11px',
                   fontWeight: 600,
-                  color: '#22C55E',
-                  backgroundColor: 'rgba(34,197,94,0.1)',
+                  color: '#0f7b6c',
+                  backgroundColor: 'rgba(15,123,108,0.08)',
                 }}
               >
                 {metric.value}{metric.unit ?? ''} {metric.label}

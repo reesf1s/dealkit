@@ -1,757 +1,664 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
 import {
-  ExternalLink, Clock, AlertTriangle, ChevronRight, ArrowUpRight,
-  Zap, Check, Circle, Timer, Truck,
+  Zap, Mail, GitBranch, Brain, RefreshCw, Shield,
+  Check, AlertTriangle, Clock, ArrowRight, ChevronRight,
+  Target, Eye, TrendingDown, Swords, Calendar, Users,
+  ToggleLeft, ToggleRight, Activity, Bell,
 } from 'lucide-react'
-import type { LoopEntry, LoopStatus } from '@/app/api/loops/route'
+import { fetcher } from '@/lib/fetcher'
 
-const fetcher = (url: string) => fetch(url).then(r => r.json())
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-type FilterTab = 'all' | 'identified' | 'in_progress' | 'in_cycle' | 'shipped'
+interface HubSpotStatus {
+  connected: boolean
+  lastSync?: string
+  dealCount?: number
+}
 
 interface BrainData {
   data?: {
-    staleDeals?: Array<{
-      dealId: string
-      company: string
-      dealValue?: number | null
-      daysSinceUpdate: number
-      score?: number | null
-    }>
-    productGapPriority?: Array<{
-      gapId: string
-      title: string
-      priority: string
-      status: string
-      revenueAtRisk: number
-      dealsBlocked: number
-    }>
-    keyPatterns?: Array<{
-      label: string
-      dealIds: string[]
-      companies: string[]
-      dealNames: string[]
-    }>
+    staleDeals?: Array<{ dealId: string; company: string; daysSinceUpdate: number }>
+    urgentDeals?: Array<{ dealId: string; company: string; reason: string }>
+    updatedAt?: string
   }
+  meta?: { lastRebuilt: string | null; isStale: boolean }
+}
+
+interface UnmatchedRes {
+  pendingCount: number
+  emails?: Array<{ id: string; subject: string; from: string; receivedAt: string }>
+}
+
+interface MonitorAlert {
+  dealId: string
+  dealName: string
+  company: string
+  type: string
+  severity: 'critical' | 'warning' | 'info'
+  message: string
+  suggestedAction: string
+}
+
+interface MonitorData {
+  data: {
+    alerts: MonitorAlert[]
+    summary: {
+      totalActive: number
+      criticalCount: number
+      warningCount: number
+      healthyCount: number
+    }
+    generatedAt: string
+  }
+}
+
+interface Automation {
+  id: string
+  name: string
+  description: string
+  category: string
+  enabled: boolean
+  alwaysOn: boolean
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function fmt(n: number | null | undefined): string {
-  if (!n) return ''
-  if (n >= 1_000_000) return `\u00a3${(n / 1_000_000).toFixed(1)}m`
-  if (n >= 1_000) return `\u00a3${Math.round(n / 1_000)}k`
-  return `\u00a3${Math.round(n)}`
+function fmtTime(dateStr: string): string {
+  const d = new Date(dateStr)
+  const mins = Math.floor((Date.now() - d.getTime()) / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  if (mins < 1440) return `${Math.floor(mins / 60)}h ago`
+  return `${Math.floor(mins / 1440)}d ago`
 }
 
-function fmtFull(n: number): string {
-  if (n >= 1_000_000) return `\u00a3${(n / 1_000_000).toFixed(1)}m`
-  if (n >= 1_000) return `\u00a3${Math.round(n / 1_000)}k`
-  return `\u00a3${Math.round(n)}`
+const card: React.CSSProperties = {
+  background: 'var(--surface-1)',
+  border: '1px solid var(--border-default)',
+  borderRadius: '10px',
 }
 
-function getRiskScore(dealId: string, brain: BrainData['data']): number {
-  const stale = brain?.staleDeals?.find(d => d.dealId === dealId)
-  if (!stale) return 0
-  const score = stale.score ?? 0
-  if (score <= 0) return 80
-  if (score < 40) return 70
-  if (score < 70) return 40
-  return 10
+const sectionLabel: React.CSSProperties = {
+  fontSize: '10.5px',
+  fontWeight: 600,
+  letterSpacing: '0.07em',
+  textTransform: 'uppercase',
+  color: 'var(--text-tertiary)',
+  marginBottom: '10px',
 }
 
-function daysSuffix(d: number | null): string {
-  if (d === null || d === 0) return ''
-  return `${d}d`
+const AUTOMATION_ICONS: Record<string, { icon: React.ElementType; color: string }> = {
+  deal_scoring:           { icon: Brain, color: '#1DB86A' },
+  stale_alerts:           { icon: Clock, color: '#f59e0b' },
+  risk_detection:         { icon: AlertTriangle, color: '#ef4444' },
+  email_ingestion:        { icon: Mail, color: '#3b82f6' },
+  follow_up_reminders:    { icon: Bell, color: '#8b5cf6' },
+  auto_stage_suggestions: { icon: TrendingDown, color: '#0ea5e9' },
+  champion_tracking:      { icon: Users, color: '#ec4899' },
+  deal_decay_alerts:      { icon: Activity, color: '#f97316' },
+  competitor_alerts:      { icon: Swords, color: '#6366f1' },
+  close_date_monitoring:  { icon: Calendar, color: '#14b8a6' },
 }
 
-const STATUS_CONFIG: Record<LoopStatus, {
-  label: string
-  dotColor: string
-  textColor: string
-}> = {
-  identified: {
-    label: 'Needs Review',
-    dotColor: '#f59e0b',
-    textColor: '#f59e0b',
-  },
-  in_progress: {
-    label: 'In Progress',
-    dotColor: '#3b82f6',
-    textColor: '#3b82f6',
-  },
-  in_review: {
-    label: 'In Review',
-    dotColor: '#8b5cf6',
-    textColor: '#8b5cf6',
-  },
-  in_cycle: {
-    label: 'In Product',
-    dotColor: '#3b82f6',
-    textColor: '#3b82f6',
-  },
-  shipped: {
-    label: 'Shipped',
-    dotColor: '#22c55e',
-    textColor: '#22c55e',
-  },
+const ALERT_SEVERITY_STYLES: Record<string, { bg: string; border: string; color: string; label: string }> = {
+  critical: { bg: 'var(--color-red-bg)', border: 'rgba(239,68,68,0.30)', color: 'var(--color-red)', label: 'Critical' },
+  warning:  { bg: 'var(--color-amber-bg)', border: 'rgba(245,158,11,0.30)', color: 'var(--color-amber)', label: 'Warning' },
+  info:     { bg: 'var(--color-blue-bg)', border: 'rgba(59,130,246,0.30)', color: '#3b82f6', label: 'Info' },
 }
 
-const FILTER_TABS: { id: FilterTab; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'identified', label: 'Needs Review' },
-  { id: 'in_progress', label: 'In Progress' },
-  { id: 'in_cycle', label: 'In Product' },
-  { id: 'shipped', label: 'Shipped' },
-]
+// ─── Integration Card ─────────────────────────────────────────────────────────
 
-const FLOW_STEPS = ['Needs Review', 'In Progress', 'In Product', 'Shipped']
-
-// ─── Skeleton ────────────────────────────────────────────────────────────────
-
-function SkeletonRow() {
+function IntegrationCard({
+  icon: Icon, iconColor, name, description, connected, meta, href,
+}: {
+  icon: React.ElementType; iconColor: string; name: string
+  description: string; connected: boolean; meta?: string; href: string
+}) {
   return (
-    <tr>
-      {Array.from({ length: 8 }).map((_, i) => (
-        <td key={i} style={{ padding: '14px 12px' }}>
-          <div style={{
-            height: '12px',
-            borderRadius: '4px',
-            background: 'rgba(255,255,255,0.06)',
-            animation: 'pulse 2s ease-in-out infinite',
-            width: i === 0 ? '12px' : i === 7 ? '70px' : '80px',
-          }} />
-        </td>
-      ))}
-    </tr>
-  )
-}
-
-// ─── Summary Strip ───────────────────────────────────────────────────────────
-
-function SummaryStrip({ loops }: { loops: LoopEntry[] }) {
-  // Deduplicate revenue by deal (don't count same deal multiple times)
-  const uniqueDealRevenue = new Map<string, number>()
-  for (const l of loops) { if (!uniqueDealRevenue.has(l.dealId)) uniqueDealRevenue.set(l.dealId, l.dealValue ?? 0) }
-  const totalRevenue = Array.from(uniqueDealRevenue.values()).reduce((sum, v) => sum + v, 0)
-  const identified = loops.filter(l => l.loopStatus === 'identified').length
-  const inProgress = loops.filter(l => l.loopStatus === 'in_progress' || l.loopStatus === 'in_review' || l.loopStatus === 'in_cycle').length
-  const shipped = loops.filter(l => l.loopStatus === 'shipped').length
-
-  const items: { label: string; value: string; icon: React.ReactNode; color?: string }[] = [
-    { label: 'Linked issues', value: String(loops.length), icon: <Zap size={13} /> },
-    { label: 'Revenue at risk', value: fmtFull(totalRevenue), icon: <AlertTriangle size={13} />, color: totalRevenue > 0 ? '#f59e0b' : undefined },
-    { label: 'Needs review', value: String(identified), icon: <Timer size={13} />, color: identified > 0 ? '#f59e0b' : undefined },
-    { label: 'In progress', value: String(inProgress), icon: <Circle size={13} />, color: inProgress > 0 ? '#3b82f6' : undefined },
-    { label: 'Shipped', value: String(shipped), icon: <Truck size={13} />, color: shipped > 0 ? '#22c55e' : undefined },
-  ]
-
-  return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: `repeat(${items.length}, 1fr)`,
-      gap: '1px',
-      background: 'rgba(255,255,255,0.06)',
-      borderRadius: '12px',
-      border: '1px solid rgba(255,255,255,0.08)',
-      overflow: 'hidden',
-    }}>
-      {items.map((item, i) => (
-        <div key={i} style={{
-          background: 'rgba(255,255,255,0.03)',
-          backdropFilter: 'blur(20px)',
-          padding: '14px 16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '6px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ color: item.color ?? 'rgba(255,255,255,0.35)' }}>{item.icon}</span>
-            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)', fontWeight: 500 }}>{item.label}</span>
-          </div>
-          <span style={{
-            fontSize: '18px',
-            fontWeight: 700,
-            color: item.color ?? 'rgba(255,255,255,0.9)',
-            letterSpacing: '-0.02em',
-          }}>
-            {item.value}
-          </span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ─── Revenue Blocked Banner ──────────────────────────────────────────────────
-
-function RevenueBlockedBanner({ loops }: { loops: LoopEntry[] }) {
-  const nonShipped = loops.filter(l => l.loopStatus !== 'shipped')
-  // Deduplicate revenue by deal — don't count same deal multiple times
-  const uniqueDeals = new Map<string, number>()
-  for (const l of nonShipped) {
-    if (!uniqueDeals.has(l.dealId)) uniqueDeals.set(l.dealId, l.dealValue ?? 0)
-  }
-  const blockedRevenue = Array.from(uniqueDeals.values()).reduce((sum, v) => sum + v, 0)
-  const issueCount = nonShipped.length
-
-  if (blockedRevenue === 0) return null
-
-  return (
-    <div style={{
-      background: 'rgba(255,255,255,0.04)',
-      backdropFilter: 'blur(20px)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: '12px',
-      padding: '16px 20px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    }}>
-      <div>
-        <span style={{
-          fontSize: '16px',
-          fontWeight: 700,
-          color: 'rgba(255,255,255,0.92)',
-          letterSpacing: '-0.02em',
-        }}>
-          {fmtFull(blockedRevenue)}
-        </span>
-        <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginLeft: '8px' }}>
-          revenue blocked by {issueCount} issue{issueCount !== 1 ? 's' : ''}
-        </span>
-      </div>
+    <Link href={href} style={{ textDecoration: 'none', display: 'block' }}>
       <div style={{
-        fontSize: '11px',
-        color: 'rgba(255,255,255,0.35)',
+        ...card,
+        padding: '14px 16px',
         display: 'flex',
         alignItems: 'center',
-        gap: '16px',
+        gap: '12px',
+        transition: 'border-color 80ms',
+        cursor: 'pointer',
+      }}
+        onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'}
+        onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-default)'}
+      >
+        <div style={{
+          width: '36px', height: '36px', borderRadius: '8px',
+          background: `${iconColor}14`,
+          border: `1px solid ${iconColor}22`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}>
+          <Icon size={17} style={{ color: iconColor }} />
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px' }}>
+            {name}
+          </div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
+            {meta ?? description}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '4px',
+            padding: '3px 8px', borderRadius: '100px',
+            background: connected ? 'rgba(29,184,106,0.08)' : 'var(--surface-2)',
+            border: `1px solid ${connected ? 'rgba(29,184,106,0.20)' : 'var(--border-default)'}`,
+          }}>
+            <div style={{
+              width: '5px', height: '5px', borderRadius: '50%',
+              background: connected ? '#1DB86A' : 'var(--text-muted)',
+            }} />
+            <span style={{ fontSize: '11px', fontWeight: 500, color: connected ? '#1DB86A' : 'var(--text-muted)' }}>
+              {connected ? 'Connected' : 'Not connected'}
+            </span>
+          </div>
+          <ChevronRight size={14} style={{ color: 'var(--text-muted)' }} />
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+// ─── Automation Toggle Row ───────────────────────────────────────────────────
+
+function AutomationToggleRow({
+  automation, onToggle, toggling,
+}: {
+  automation: Automation; onToggle: (id: string, enabled: boolean) => void; toggling: string | null
+}) {
+  const iconInfo = AUTOMATION_ICONS[automation.id] ?? { icon: Zap, color: '#1DB86A' }
+  const Icon = iconInfo.icon
+  const isToggling = toggling === automation.id
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      padding: '12px 16px',
+      borderBottom: '1px solid var(--border-subtle)',
+      transition: 'background 80ms',
+    }}
+      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'}
+      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+    >
+      <div style={{
+        width: '32px', height: '32px', borderRadius: '7px',
+        background: `color-mix(in srgb, ${iconInfo.color} 10%, transparent)`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0,
       }}>
-        {FLOW_STEPS.map((step, i) => (
-          <span key={step} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {step}
-            {i < FLOW_STEPS.length - 1 && <ChevronRight size={10} style={{ opacity: 0.4 }} />}
-          </span>
+        <Icon size={14} style={{ color: iconInfo.color }} />
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '2px' }}>{automation.name}</div>
+        <div style={{ fontSize: '11.5px', color: 'var(--text-tertiary)', lineHeight: 1.4 }}>{automation.description}</div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+        {automation.alwaysOn && (
+          <span style={{
+            fontSize: '10px', fontWeight: 600,
+            padding: '2px 7px', borderRadius: '100px',
+            background: 'rgba(29,184,106,0.08)',
+            color: '#1DB86A',
+            border: '1px solid rgba(29,184,106,0.20)',
+          }}>Always on</span>
+        )}
+        <button
+          onClick={() => !automation.alwaysOn && onToggle(automation.id, !automation.enabled)}
+          disabled={automation.alwaysOn || isToggling}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: automation.alwaysOn ? 'default' : 'pointer',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+            opacity: isToggling ? 0.5 : 1,
+          }}
+        >
+          {automation.enabled ? (
+            <ToggleRight size={28} style={{ color: '#1DB86A' }} />
+          ) : (
+            <ToggleLeft size={28} style={{ color: 'var(--text-muted)' }} />
+          )}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Deal Monitor Card ───────────────────────────────────────────────────────
+
+function DealMonitorCard() {
+  const { data: monitorData, isLoading } = useSWR<MonitorData>('/api/deals/monitor', fetcher, {
+    revalidateOnFocus: false, dedupingInterval: 30000,
+  })
+
+  const alerts = monitorData?.data?.alerts ?? []
+  const summary = monitorData?.data?.summary
+  const topAlerts = alerts.slice(0, 8)
+
+  return (
+    <div style={{ ...card, overflow: 'hidden' }}>
+      <div style={{
+        padding: '14px 18px',
+        borderBottom: '1px solid var(--border-default)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Shield size={14} style={{ color: '#1DB86A' }} />
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Deal Monitor</span>
+          {summary && alerts.length > 0 && (
+            <span style={{
+              fontSize: '10.5px', fontWeight: 600,
+              padding: '1px 7px', borderRadius: '100px',
+              background: summary.criticalCount > 0 ? 'var(--color-red-bg)' : 'var(--color-amber-bg)',
+              color: summary.criticalCount > 0 ? 'var(--color-red)' : 'var(--color-amber)',
+              border: `1px solid ${summary.criticalCount > 0 ? 'rgba(239,68,68,0.30)' : 'rgba(245,158,11,0.30)'}`,
+            }}>{alerts.length} alert{alerts.length !== 1 ? 's' : ''}</span>
+          )}
+        </div>
+        {summary && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {[
+              { label: 'Active', value: summary.totalActive, color: 'var(--text-primary)' },
+              { label: 'Healthy', value: summary.healthyCount, color: '#1DB86A' },
+              { label: 'At risk', value: summary.criticalCount + summary.warningCount, color: summary.criticalCount > 0 ? 'var(--color-red)' : 'var(--color-amber)' },
+            ].map((s, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '15px', fontWeight: 700, color: s.color, letterSpacing: '-0.02em' }}>{s.value}</span>
+                <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontWeight: 500 }}>{s.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} style={{ height: '44px', borderRadius: '6px', background: 'var(--surface-2)' }} />
+          ))}
+        </div>
+      ) : topAlerts.length === 0 ? (
+        <div style={{ padding: '28px 18px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
+          <Check size={18} style={{ color: '#1DB86A' }} />
+          <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>All deals healthy</span>
+          <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>No alerts at the moment</span>
+        </div>
+      ) : (
+        <div>
+          {topAlerts.map((alert, i) => {
+            const sev = ALERT_SEVERITY_STYLES[alert.severity] ?? ALERT_SEVERITY_STYLES.info
+            return (
+              <Link key={`${alert.dealId}-${alert.type}-${i}`} href={`/deals/${alert.dealId}`} style={{ textDecoration: 'none', display: 'block' }}>
+                <div style={{
+                  padding: '10px 18px',
+                  borderBottom: i < topAlerts.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                  display: 'flex', alignItems: 'flex-start', gap: '10px',
+                  transition: 'background 80ms',
+                  cursor: 'pointer',
+                }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                >
+                  <div style={{
+                    width: '6px', height: '6px', borderRadius: '50%',
+                    background: sev.color,
+                    flexShrink: 0,
+                    marginTop: '5px',
+                  }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                      <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {alert.dealName || alert.company}
+                      </span>
+                      <span style={{
+                        fontSize: '9.5px', fontWeight: 600,
+                        padding: '1px 6px', borderRadius: '100px',
+                        background: sev.bg,
+                        color: sev.color,
+                        border: `1px solid ${sev.border}`,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                      }}>{sev.label}</span>
+                    </div>
+                    <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                      {alert.message}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px', fontStyle: 'italic' }}>
+                      {alert.suggestedAction}
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            )
+          })}
+          {alerts.length > 8 && (
+            <div style={{ padding: '8px 18px', textAlign: 'center' }}>
+              <span style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
+                +{alerts.length - 8} more alerts
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Intelligence Health Card ─────────────────────────────────────────────────
+
+function IntelligenceHealthCard() {
+  const { data: brainData, error, isLoading, mutate } = useSWR<BrainData>('/api/brain', fetcher, {
+    revalidateOnFocus: false, dedupingInterval: 30000,
+  })
+  const [rebuilding, setRebuilding] = useState(false)
+
+  const brain = brainData?.data
+  const meta = brainData?.meta
+  const isStale = meta?.isStale ?? true
+  const lastRebuilt = meta?.lastRebuilt
+  const urgentCount = brain?.urgentDeals?.length ?? 0
+  const staleCount = brain?.staleDeals?.length ?? 0
+
+  async function rebuildBrain() {
+    setRebuilding(true)
+    try {
+      await fetch('/api/brain', { method: 'POST' })
+      await mutate()
+    } finally {
+      setRebuilding(false)
+    }
+  }
+
+  const statusColor = error ? '#f59e0b' : isStale ? '#f59e0b' : '#1DB86A'
+  const statusText = error ? 'Degraded' : isStale ? 'Stale' : 'Live'
+
+  return (
+    <div style={{ ...card, padding: '16px 18px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Brain size={14} style={{ color: '#1DB86A' }} />
+          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>AI Intelligence Engine</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{
+            fontSize: '10.5px', fontWeight: 500,
+            padding: '2px 8px', borderRadius: '100px',
+            background: `color-mix(in srgb, ${statusColor} 12%, transparent)`,
+            color: statusColor,
+            border: `1px solid color-mix(in srgb, ${statusColor} 22%, transparent)`,
+          }}>{statusText}</span>
+          <button
+            onClick={rebuildBrain}
+            disabled={rebuilding}
+            style={{
+              background: 'transparent', border: '1px solid var(--border-default)',
+              borderRadius: '5px', padding: '3px 9px',
+              cursor: rebuilding ? 'not-allowed' : 'pointer',
+              fontSize: '11px', color: 'var(--text-tertiary)',
+              fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: '5px',
+              opacity: rebuilding ? 0.5 : 1,
+            }}
+          >
+            <RefreshCw size={11} style={{ animation: rebuilding ? 'spin 1s linear infinite' : 'none' }} />
+            Rebuild
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+        {[
+          { label: 'Last rebuilt', value: lastRebuilt ? fmtTime(lastRebuilt) : '—' },
+          { label: 'Urgent deals', value: `${urgentCount}`, color: urgentCount > 0 ? '#ef4444' : undefined },
+          { label: 'Stale deals', value: `${staleCount}`, color: staleCount > 0 ? '#f59e0b' : undefined },
+        ].map((stat, i) => (
+          <div key={i} style={{
+            padding: '10px 12px',
+            background: 'var(--surface-2)',
+            borderRadius: '6px',
+            border: '1px solid var(--border-subtle)',
+          }}>
+            <div style={{ fontSize: '9.5px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-tertiary)', marginBottom: '4px' }}>
+              {stat.label}
+            </div>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: stat.color ?? 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+              {stat.value}
+            </div>
+          </div>
         ))}
       </div>
     </div>
   )
 }
 
-// ─── Status Dot ──────────────────────────────────────────────────────────────
+// ─── Unmatched Emails Card ────────────────────────────────────────────────────
 
-function StatusDot({ status }: { status: LoopStatus }) {
-  const cfg = STATUS_CONFIG[status]
-  return (
-    <span style={{
-      width: '8px',
-      height: '8px',
-      borderRadius: '50%',
-      background: cfg.dotColor,
-      display: 'inline-block',
-      flexShrink: 0,
-      boxShadow: `0 0 6px ${cfg.dotColor}40`,
-    }} />
-  )
-}
-
-// ─── Linked Issue Table ─────────────────────────────────────────────────────
-
-function LinkedIssueTable({
-  loops,
-  brain,
-  activeFilter,
-  setActiveFilter,
-  isLoading,
-}: {
-  loops: LoopEntry[]
-  brain: BrainData['data'] | undefined
-  activeFilter: FilterTab
-  setActiveFilter: (f: FilterTab) => void
-  isLoading: boolean
-}) {
-  const filtered = loops.filter(l =>
-    activeFilter === 'all' ? true : l.loopStatus === activeFilter,
-  )
-
-  const sorted = [...filtered].sort((a, b) => {
-    const aRisk = getRiskScore(a.dealId, brain)
-    const bRisk = getRiskScore(b.dealId, brain)
-    const aVal = (a.dealValue ?? 0) * (aRisk / 100 + 0.1)
-    const bVal = (b.dealValue ?? 0) * (bRisk / 100 + 0.1)
-    return bVal - aVal
+function UnmatchedEmailsCard() {
+  const { data } = useSWR<UnmatchedRes>('/api/ingest/email/unmatched', fetcher, {
+    revalidateOnFocus: false, dedupingInterval: 30000,
   })
-
-  const counts: Record<FilterTab, number> = {
-    all: loops.length,
-    identified: loops.filter(l => l.loopStatus === 'identified').length,
-    in_progress: loops.filter(l => l.loopStatus === 'in_progress' || l.loopStatus === 'in_review').length,
-    in_cycle: loops.filter(l => l.loopStatus === 'in_cycle').length,
-    shipped: loops.filter(l => l.loopStatus === 'shipped').length,
-  }
-
-  const thStyle: React.CSSProperties = {
-    padding: '10px 12px',
-    fontSize: '10px',
-    fontWeight: 600,
-    color: 'rgba(255,255,255,0.35)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    textAlign: 'left',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-    whiteSpace: 'nowrap',
-  }
-
-  const tdStyle: React.CSSProperties = {
-    padding: '13px 12px',
-    fontSize: '12px',
-    color: 'rgba(255,255,255,0.7)',
-    borderBottom: '1px solid rgba(255,255,255,0.04)',
-    verticalAlign: 'middle',
-  }
+  const count = data?.pendingCount ?? 0
+  const emails = data?.emails?.slice(0, 4) ?? []
 
   return (
-    <>
-      {/* Filter bar */}
+    <div style={{ ...card, overflow: 'hidden' }}>
       <div style={{
-        display: 'flex',
-        gap: '4px',
-        padding: '3px',
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: '10px',
-        width: 'fit-content',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '12px 16px',
+        borderBottom: count > 0 ? '1px solid var(--border-subtle)' : 'none',
+        background: 'var(--surface-2)',
       }}>
-        {FILTER_TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveFilter(tab.id)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '7px',
-              fontSize: '12px',
-              fontWeight: activeFilter === tab.id ? 600 : 400,
-              color: activeFilter === tab.id ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)',
-              background: activeFilter === tab.id ? 'rgba(255,255,255,0.08)' : 'transparent',
-              border: `1px solid ${activeFilter === tab.id ? 'rgba(255,255,255,0.1)' : 'transparent'}`,
-              cursor: 'pointer',
-              transition: 'all 0.12s',
-            }}
-          >
-            {tab.label}
-            {counts[tab.id] > 0 && (
-              <span style={{
-                fontSize: '10px',
-                padding: '1px 6px',
-                borderRadius: '100px',
-                background: activeFilter === tab.id ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.06)',
-                color: activeFilter === tab.id ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.3)',
-                fontWeight: 700,
-              }}>
-                {counts[tab.id]}
-              </span>
-            )}
-          </button>
-        ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Mail size={13} style={{ color: '#1DB86A' }} />
+          <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>Unmatched emails</span>
+          {count > 0 && (
+            <span style={{
+              fontSize: '10.5px', fontWeight: 600,
+              padding: '1px 7px', borderRadius: '100px',
+              background: 'var(--color-amber-bg)', color: 'var(--color-amber)',
+              border: '1px solid rgba(245,158,11,0.30)',
+            }}>{count}</span>
+          )}
+        </div>
+        {count > 0 && (
+          <Link href="/settings/unmatched-emails" style={{ textDecoration: 'none' }}>
+            <span style={{ fontSize: '11.5px', color: '#1DB86A', fontWeight: 500 }}>Review all</span>
+          </Link>
+        )}
       </div>
 
-      {/* Table */}
-      <div style={{
-        background: 'rgba(255,255,255,0.03)',
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: '14px',
-        overflow: 'hidden',
-      }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr>
-              <th style={{ ...thStyle, width: '32px', paddingRight: '0' }}></th>
-              <th style={thStyle}>Deal</th>
-              <th style={thStyle}>Revenue</th>
-              <th style={thStyle}>Issue</th>
-              <th style={thStyle}>Why matched</th>
-              <th style={thStyle}>Status</th>
-              <th style={{ ...thStyle, textAlign: 'right' }}>Days</th>
-              <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <>
-                <SkeletonRow />
-                <SkeletonRow />
-                <SkeletonRow />
-                <SkeletonRow />
-              </>
-            ) : sorted.length === 0 ? (
-              <tr>
-                <td colSpan={8} style={{ padding: '48px 24px', textAlign: 'center' }}>
-                  <Zap size={20} color="rgba(255,255,255,0.2)" style={{ marginBottom: '10px' }} />
-                  <p style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', margin: '0 0 6px' }}>
-                    No {activeFilter === 'all' ? '' : FILTER_TABS.find(t => t.id === activeFilter)?.label + ' '}linked issues yet
-                  </p>
-                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>
-                    Claude-saved issue links will appear here once product context has been reviewed.
-                  </p>
-                </td>
-              </tr>
-            ) : (
-              sorted.map(loop => {
-                const cfg = STATUS_CONFIG[loop.loopStatus]
-                return (
-                  <tr
-                    key={`${loop.dealId}-${loop.linearIssueId}`}
-                    style={{ cursor: 'pointer', transition: 'background 0.15s' }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLTableRowElement).style.background = 'rgba(255,255,255,0.04)'
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLTableRowElement).style.background = 'transparent'
-                    }}
-                  >
-                    {/* Status dot */}
-                    <td style={{ ...tdStyle, paddingRight: '0', width: '32px' }}>
-                      <StatusDot status={loop.loopStatus} />
-                    </td>
-
-                    {/* Deal */}
-                    <td style={tdStyle}>
-                      <Link
-                        href={`/deals/${loop.dealId}`}
-                        style={{ textDecoration: 'none', color: 'inherit' }}
-                      >
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                          <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.9)', fontSize: '12px' }}>
-                            {loop.company}
-                          </span>
-                          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>
-                            {loop.dealName}
-                          </span>
-                        </div>
-                      </Link>
-                    </td>
-
-                    {/* Revenue */}
-                    <td style={{ ...tdStyle, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
-                      {loop.dealValue ? (
-                        <span style={{ color: 'rgba(255,255,255,0.85)' }}>{fmt(loop.dealValue)}</span>
-                      ) : (
-                        <span style={{ color: 'rgba(255,255,255,0.2)' }}>&mdash;</span>
-                      )}
-                    </td>
-
-                    {/* Issue */}
-                    <td style={tdStyle}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        {loop.linearIssueId && (
-                          <span style={{
-                            fontFamily: 'monospace',
-                            fontSize: '11px',
-                            color: 'rgba(255,255,255,0.5)',
-                            fontWeight: 500,
-                          }}>
-                            {loop.linearIssueId}
-                          </span>
-                        )}
-                        {loop.linearTitle && (
-                          <span style={{
-                            fontSize: '11px',
-                            color: 'rgba(255,255,255,0.6)',
-                            lineHeight: '1.4',
-                            display: 'block',
-                          }}>
-                            {loop.linearTitle}
-                          </span>
-                        )}
-                        {/* Cycle + external status badges */}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '3px' }}>
-                          {loop.isInCurrentCycle && loop.cycleName && (
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '3px',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              background: 'rgba(139,92,246,0.15)',
-                              border: '1px solid rgba(139,92,246,0.3)',
-                              fontSize: '10px',
-                              fontWeight: 600,
-                              color: '#a78bfa',
-                              whiteSpace: 'nowrap',
-                            }}>
-                              ◎ {loop.cycleName}
-                            </span>
-                          )}
-                          {loop.linearStatus && (
-                            <span style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              background: 'rgba(255,255,255,0.06)',
-                              border: '1px solid rgba(255,255,255,0.1)',
-                              fontSize: '10px',
-                              fontWeight: 500,
-                              color: 'rgba(255,255,255,0.45)',
-                              whiteSpace: 'nowrap',
-                            }}>
-                              {loop.linearStatus}
-                            </span>
-                          )}
-                        </div>
-                        {loop.linearIssueUrl && (
-                          <a
-                            href={loop.linearIssueUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={e => e.stopPropagation()}
-                            style={{ fontSize: '9px', color: 'rgba(255,255,255,0.3)', textDecoration: 'none' }}
-                          >
-                            Open issue ↗
-                          </a>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Why matched */}
-                    <td style={tdStyle}>
-                      {loop.addressesRisk ? (
-                        <span style={{
-                          fontSize: '11px',
-                          color: 'rgba(255,255,255,0.55)',
-                          lineHeight: '1.4',
-                          display: 'block',
-                        }}>
-                          {loop.addressesRisk}
-                        </span>
-                      ) : (
-                        <span style={{ color: 'rgba(255,255,255,0.15)' }}>&mdash;</span>
-                      )}
-                    </td>
-
-                    {/* Status */}
-                    <td style={tdStyle}>
-                      <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        padding: '3px 8px',
-                        borderRadius: '6px',
-                        background: `${cfg.dotColor}15`,
-                        border: `1px solid ${cfg.dotColor}25`,
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        color: cfg.textColor,
-                        whiteSpace: 'nowrap',
-                      }}>
-                        {cfg.label}
-                      </span>
-                    </td>
-
-                    {/* Days */}
-                    <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                      {loop.daysInStatus !== null && loop.daysInStatus > 0 ? (
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          fontSize: '11px',
-                          color: loop.daysInStatus > 14 ? '#f59e0b' : 'rgba(255,255,255,0.4)',
-                        }}>
-                          <Clock size={10} />
-                          {daysSuffix(loop.daysInStatus)}
-                        </span>
-                      ) : (
-                        <span style={{ color: 'rgba(255,255,255,0.15)' }}>&mdash;</span>
-                      )}
-                    </td>
-
-                    {/* Actions */}
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
-                        {loop.loopStatus === 'identified' && (
-                          <>
-                            <button
-                              onClick={e => { e.stopPropagation() }}
-                              style={{
-                                padding: '4px 10px',
-                                borderRadius: '6px',
-                                background: 'rgba(255,255,255,0.06)',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                color: 'rgba(255,255,255,0.7)',
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                              }}
-                            >
-                              <Check size={10} /> Approve
-                            </button>
-                            <button
-                              onClick={e => { e.stopPropagation() }}
-                              style={{
-                                padding: '4px 10px',
-                                borderRadius: '6px',
-                                background: `${STATUS_CONFIG.identified.dotColor}12`,
-                                border: `1px solid ${STATUS_CONFIG.identified.dotColor}25`,
-                                color: STATUS_CONFIG.identified.textColor,
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
-                              Review
-                            </button>
-                          </>
-                        )}
-                        {loop.loopStatus === 'in_cycle' && loop.linearIssueUrl && (
-                          <a
-                            href={loop.linearIssueUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={e => e.stopPropagation()}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              background: `${STATUS_CONFIG.in_cycle.dotColor}12`,
-                              border: `1px solid ${STATUS_CONFIG.in_cycle.dotColor}25`,
-                              color: STATUS_CONFIG.in_cycle.textColor,
-                              textDecoration: 'none',
-                              fontSize: '11px',
-                              fontWeight: 600,
-                            }}
-                          >
-                            Issue <ExternalLink size={10} />
-                          </a>
-                        )}
-                        {loop.loopStatus === 'shipped' && (
-                          <button
-                            onClick={e => { e.stopPropagation() }}
-                            style={{
-                              padding: '4px 10px',
-                              borderRadius: '6px',
-                              background: `${STATUS_CONFIG.shipped.dotColor}12`,
-                              border: `1px solid ${STATUS_CONFIG.shipped.dotColor}25`,
-                              color: STATUS_CONFIG.shipped.textColor,
-                              fontSize: '11px',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            Follow up
-                          </button>
-                        )}
-                        <Link
-                          href={`/deals/${loop.dealId}`}
-                          onClick={e => e.stopPropagation()}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            padding: '4px 8px',
-                            borderRadius: '6px',
-                            background: 'rgba(255,255,255,0.04)',
-                            border: '1px solid rgba(255,255,255,0.06)',
-                            color: 'rgba(255,255,255,0.45)',
-                            textDecoration: 'none',
-                            fontSize: '11px',
-                            fontWeight: 500,
-                          }}
-                        >
-                          <ArrowUpRight size={10} />
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-    </>
+      {count === 0 ? (
+        <div style={{ padding: '20px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Check size={14} style={{ color: '#1DB86A' }} />
+          <span style={{ fontSize: '12.5px', color: 'var(--text-tertiary)' }}>All emails matched to deals</span>
+        </div>
+      ) : (
+        <div>
+          {emails.map((email, i) => (
+            <div key={email.id} style={{
+              padding: '10px 16px',
+              borderBottom: i < emails.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+            }}>
+              <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {email.subject}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{email.from}</span>
+                <span style={{ fontSize: '10px', color: 'var(--border-default)' }}>·</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{fmtTime(email.receivedAt)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
-// ─── Page ────────────────────────────────────────────────────────────────────
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
-export default function AutomationPage() {
-  const [activeFilter, setActiveFilter] = useState<FilterTab>('all')
+export default function WorkflowsPage() {
+  const { data: hubspotRes } = useSWR('/api/integrations/hubspot/status', fetcher, {
+    revalidateOnFocus: false, dedupingInterval: 60000,
+  })
+  const hubspot: HubSpotStatus = hubspotRes?.data ?? { connected: false }
 
-  const { data: loopsRes, isLoading: loopsLoading } = useSWR<{ data: LoopEntry[] }>(
-    '/api/loops',
-    fetcher,
-    { revalidateOnFocus: false, dedupingInterval: 30000 },
-  )
+  const { data: automationsRes, mutate: mutateAutomations } = useSWR<{ data: Automation[] }>('/api/automations', fetcher, {
+    revalidateOnFocus: false, dedupingInterval: 30000,
+  })
+  const automations = automationsRes?.data ?? []
+  const [toggling, setToggling] = useState<string | null>(null)
 
-  const { data: brainRes } = useSWR<BrainData>(
-    '/api/brain',
-    fetcher,
-    { revalidateOnFocus: false },
-  )
+  const grouped = useMemo(() => {
+    const intelligence = automations.filter(a => a.category === 'intelligence')
+    const alerts = automations.filter(a => a.category === 'alerts')
+    const automation = automations.filter(a => a.category === 'automation')
+    return { intelligence, alerts, automation }
+  }, [automations])
 
-  const loops: LoopEntry[] = loopsRes?.data ?? []
-  const brain = brainRes?.data
+  async function handleToggle(id: string, enabled: boolean) {
+    setToggling(id)
+    try {
+      await fetch('/api/automations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ automationId: id, enabled }),
+      })
+      await mutateAutomations()
+    } finally {
+      setToggling(null)
+    }
+  }
+
+  const enabledCount = automations.filter(a => a.enabled).length
 
   return (
-    <div style={{ maxWidth: '1000px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 0.6; }
-          50% { opacity: 0.3; }
-        }
-      `}</style>
+    <div style={{ maxWidth: '960px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '16px' }}>
-        <div>
-          <h1 style={{
-            fontSize: '20px',
-            fontWeight: 700,
-            color: 'rgba(255,255,255,0.95)',
-            margin: '0 0 3px',
-            letterSpacing: '-0.02em',
-          }}>
-            Automation
-          </h1>
-          <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', margin: 0 }}>
-            Live product-delivery signals tied back to revenue-critical deals
-          </p>
+      {/* ── Page header ── */}
+      <div>
+        <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 4px', letterSpacing: '-0.04em' }}>
+          Sequences & Automations
+        </h1>
+        <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', margin: 0, lineHeight: 1.5 }}>
+          Your CRM intelligence layer — deals are scored, signals are detected, and actions are surfaced automatically.
+          {enabledCount > 0 && (
+            <span style={{ color: '#1DB86A', fontWeight: 500 }}> {enabledCount} automations active.</span>
+          )}
+        </p>
+      </div>
+
+      {/* ── Deal Monitor ── */}
+      <div>
+        <div style={sectionLabel}>Deal Monitor</div>
+        <DealMonitorCard />
+      </div>
+
+      {/* ── Intelligence engine status ── */}
+      <IntelligenceHealthCard />
+
+      {/* ── Automations ── */}
+      <div>
+        <div style={sectionLabel}>Intelligence automations</div>
+        <div style={{ ...card, overflow: 'hidden' }}>
+          {grouped.intelligence.map(a => (
+            <AutomationToggleRow key={a.id} automation={a} onToggle={handleToggle} toggling={toggling} />
+          ))}
         </div>
       </div>
 
-      {/* Summary strip */}
-      <SummaryStrip loops={loops} />
+      <div>
+        <div style={sectionLabel}>Alert automations</div>
+        <div style={{ ...card, overflow: 'hidden' }}>
+          {grouped.alerts.map(a => (
+            <AutomationToggleRow key={a.id} automation={a} onToggle={handleToggle} toggling={toggling} />
+          ))}
+        </div>
+      </div>
 
-      {/* Revenue blocked banner */}
-      <RevenueBlockedBanner loops={loops} />
+      <div>
+        <div style={sectionLabel}>Workflow automations</div>
+        <div style={{ ...card, overflow: 'hidden' }}>
+          {grouped.automation.map(a => (
+            <AutomationToggleRow key={a.id} automation={a} onToggle={handleToggle} toggling={toggling} />
+          ))}
+        </div>
+      </div>
 
-      <LinkedIssueTable
-        loops={loops}
-        brain={brain}
-        activeFilter={activeFilter}
-        setActiveFilter={setActiveFilter}
-        isLoading={loopsLoading}
-      />
+      {/* ── Integrations ── */}
+      <div>
+        <div style={sectionLabel}>Integrations</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <IntegrationCard
+            icon={GitBranch}
+            iconColor="#2563eb"
+            name="HubSpot"
+            description="Sync deals, contacts, and activities from your CRM"
+            connected={Boolean(hubspot?.connected)}
+            meta={hubspot?.connected ? `${hubspot.dealCount ?? 0} deals synced${hubspot.lastSync ? ' · ' + fmtTime(hubspot.lastSync) : ''}` : 'Connect to import your deal pipeline'}
+            href="/company"
+          />
+        </div>
+      </div>
+
+      {/* ── Unmatched emails ── */}
+      <div>
+        <div style={sectionLabel}>Email intelligence</div>
+        <UnmatchedEmailsCard />
+      </div>
+
+      {/* ── How it works ── */}
+      <div>
+        <div style={sectionLabel}>How the intelligence layer works</div>
+        <div style={{
+          ...card,
+          padding: '16px 20px',
+          background: 'var(--surface-2)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0', flexWrap: 'wrap' }}>
+            {[
+              { step: '1', label: 'Deal logged', sub: 'Via HubSpot sync, email, or manual entry' },
+              { step: '2', label: 'AI scores deal', sub: 'ML pipeline assigns conversion probability' },
+              { step: '3', label: 'Signals detected', sub: 'Risks, blockers, and patterns extracted' },
+              { step: '4', label: 'Actions surfaced', sub: 'Prioritised in your daily briefing' },
+            ].map((item, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
+                <div style={{ padding: '8px 12px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '9px', fontWeight: 700, color: '#1DB86A', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>
+                    Step {item.step}
+                  </div>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px' }}>{item.label}</div>
+                  <div style={{ fontSize: '10.5px', color: 'var(--text-tertiary)', maxWidth: '130px' }}>{item.sub}</div>
+                </div>
+                {i < 3 && (
+                  <ArrowRight size={14} style={{ color: 'var(--border-default)', flexShrink: 0 }} />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

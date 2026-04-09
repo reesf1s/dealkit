@@ -13,28 +13,28 @@ const COMPANY_JURISDICTION = 'England & Wales'
 
 export default function PrivacyPage() {
   return (
-    <div style={{ minHeight: '100vh', background: '#07050F', color: '#E5E7EB', fontFamily: '-apple-system, BlinkMacSystemFont, "Inter", sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#ffffff', color: '#37352f', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
 
       {/* Nav */}
-      <nav style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 32px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <nav style={{ borderBottom: '1px solid rgba(55,53,47,0.09)', padding: '0 32px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '9px', textDecoration: 'none' }}>
-          <div style={{ width: '28px', height: '28px', background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: '28px', height: '28px', background: '#37352f', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileText size={13} color="#fff" />
           </div>
-          <span style={{ fontWeight: '700', fontSize: '14px', color: '#F0EEFF' }}>Halvex</span>
+          <span style={{ fontWeight: '700', fontSize: '14px', color: '#37352f' }}>Halvex</span>
         </Link>
-        <Link href="/" style={{ fontSize: '13px', color: '#9CA3AF', textDecoration: 'none' }}>← Back to home</Link>
+        <Link href="/" style={{ fontSize: '13px', color: '#9b9a97', textDecoration: 'none' }}>← Back to home</Link>
       </nav>
 
       <div style={{ maxWidth: '760px', margin: '0 auto', padding: '60px 32px 80px' }}>
         <div style={{ marginBottom: '40px' }}>
-          <h1 style={{ fontSize: '32px', fontWeight: '800', letterSpacing: '-0.04em', color: '#F0EEFF', marginBottom: '10px' }}>Privacy Policy</h1>
-          <p style={{ fontSize: '14px', color: '#6B7280' }}>Effective date: {EFFECTIVE_DATE} · Last updated: {EFFECTIVE_DATE}</p>
+          <h1 style={{ fontSize: '32px', fontWeight: '800', letterSpacing: '-0.04em', color: '#37352f', marginBottom: '10px' }}>Privacy Policy</h1>
+          <p style={{ fontSize: '14px', color: '#9b9a97' }}>Effective date: {EFFECTIVE_DATE} · Last updated: {EFFECTIVE_DATE}</p>
         </div>
 
         <Section title="1. Who we are">
           <P>{COMPANY_NAME} (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) operates the Halvex sales intelligence platform at halvex.ai. We are registered in {COMPANY_JURISDICTION}.</P>
-          <P>We act as the <strong>data controller</strong> for personal data processed through our platform. For questions about this policy or to exercise your rights, contact us at <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: '#818CF8' }}>{COMPANY_EMAIL}</a>.</P>
+          <P>We act as the <strong>data controller</strong> for personal data processed through our platform. For questions about this policy or to exercise your rights, contact us at <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: '#5e6ad2' }}>{COMPANY_EMAIL}</a>.</P>
         </Section>
 
         <Section title="2. What data we collect">
@@ -47,16 +47,16 @@ export default function PrivacyPage() {
 
         <Section title="3. Legal basis for processing (GDPR — EU/EEA users)">
           <P>We process your personal data under the following legal bases:</P>
-          <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px', color: '#9CA3AF', fontSize: '14px', lineHeight: '1.7' }}>
-            <li><strong style={{ color: '#E5E7EB' }}>Contract performance</strong> — processing your account and sales data to provide the service you signed up for.</li>
-            <li><strong style={{ color: '#E5E7EB' }}>Legitimate interests</strong> — security monitoring, fraud prevention, and product analytics (where not overridden by your rights).</li>
-            <li><strong style={{ color: '#E5E7EB' }}>Consent</strong> — optional cookies and marketing communications where you have opted in.</li>
-            <li><strong style={{ color: '#E5E7EB' }}>Legal obligation</strong> — retaining billing records as required by applicable law.</li>
+          <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px', color: '#787774', fontSize: '14px', lineHeight: '1.7' }}>
+            <li><strong style={{ color: '#37352f' }}>Contract performance</strong> — processing your account and sales data to provide the service you signed up for.</li>
+            <li><strong style={{ color: '#37352f' }}>Legitimate interests</strong> — security monitoring, fraud prevention, and product analytics (where not overridden by your rights).</li>
+            <li><strong style={{ color: '#37352f' }}>Consent</strong> — optional cookies and marketing communications where you have opted in.</li>
+            <li><strong style={{ color: '#37352f' }}>Legal obligation</strong> — retaining billing records as required by applicable law.</li>
           </ul>
         </Section>
 
         <Section title="4. How we use your data">
-          <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', color: '#9CA3AF', fontSize: '14px', lineHeight: '1.7' }}>
+          <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', color: '#787774', fontSize: '14px', lineHeight: '1.7' }}>
             <li>Provide and operate the Halvex platform</li>
             <li>Generate AI-powered sales collateral, meeting prep, and deal scoring</li>
             <li>Process subscription payments and manage your billing</li>
@@ -74,7 +74,7 @@ export default function PrivacyPage() {
             <thead>
               <tr>
                 {['Sub-processor', 'Purpose', 'Location', 'Privacy policy'].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '10px 12px', background: 'rgba(255,255,255,0.04)', color: '#9CA3AF', fontWeight: '600', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>{h}</th>
+                  <th key={h} style={{ textAlign: 'left', padding: '10px 12px', background: '#f7f6f3', color: '#787774', fontWeight: '600', borderBottom: '1px solid rgba(55,53,47,0.09)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -88,10 +88,10 @@ export default function PrivacyPage() {
               ].map(([sp, purpose, loc, link]) => (
                 <tr key={sp}>
                   {[sp, purpose, loc].map((val, i) => (
-                    <td key={i} style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', color: '#9CA3AF' }}>{val}</td>
+                    <td key={i} style={{ padding: '10px 12px', borderBottom: '1px solid rgba(55,53,47,0.06)', color: '#787774' }}>{val}</td>
                   ))}
-                  <td style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <a href={`https://${link}`} target="_blank" rel="noopener noreferrer" style={{ color: '#818CF8', fontSize: '12px' }}>{link}</a>
+                  <td style={{ padding: '10px 12px', borderBottom: '1px solid rgba(55,53,47,0.06)' }}>
+                    <a href={`https://${link}`} target="_blank" rel="noopener noreferrer" style={{ color: '#5e6ad2', fontSize: '12px' }}>{link}</a>
                   </td>
                 </tr>
               ))}
@@ -101,7 +101,7 @@ export default function PrivacyPage() {
 
         <Section title="6. International data transfers">
           <P>Our primary infrastructure is located in the United States. If you are located in the EU/EEA or UK, your data is transferred to the US under the following safeguards:</P>
-          <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', color: '#9CA3AF', fontSize: '14px', lineHeight: '1.7' }}>
+          <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', color: '#787774', fontSize: '14px', lineHeight: '1.7' }}>
             <li>Clerk and Stripe are certified under the EU–US Data Privacy Framework</li>
             <li>Vercel and Supabase use Standard Contractual Clauses (SCCs) approved by the European Commission</li>
             <li>Anthropic processes data under SCCs and their Data Processing Addendum</li>
@@ -114,7 +114,7 @@ export default function PrivacyPage() {
             <thead>
               <tr>
                 {['Right', 'GDPR (EU/EEA/UK)', 'CCPA (California)'].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '10px 12px', background: 'rgba(255,255,255,0.04)', color: '#9CA3AF', fontWeight: '600', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>{h}</th>
+                  <th key={h} style={{ textAlign: 'left', padding: '10px 12px', background: '#f7f6f3', color: '#787774', fontWeight: '600', borderBottom: '1px solid rgba(55,53,47,0.09)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -131,33 +131,33 @@ export default function PrivacyPage() {
               ].map(([right, gdpr, ccpa]) => (
                 <tr key={right}>
                   {[right, gdpr, ccpa].map((val, i) => (
-                    <td key={i} style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', color: i === 0 ? '#E5E7EB' : '#9CA3AF' }}>{val}</td>
+                    <td key={i} style={{ padding: '10px 12px', borderBottom: '1px solid rgba(55,53,47,0.06)', color: i === 0 ? '#E5E7EB' : '#9CA3AF' }}>{val}</td>
                   ))}
                 </tr>
               ))}
             </tbody>
           </table>
           <P>To exercise any of these rights, you can:</P>
-          <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', color: '#9CA3AF', fontSize: '14px', lineHeight: '1.7' }}>
-            <li>Use the <strong style={{ color: '#E5E7EB' }}>Delete Account</strong> or <strong style={{ color: '#E5E7EB' }}>Export My Data</strong> buttons in your account settings</li>
-            <li>Email us at <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: '#818CF8' }}>{COMPANY_EMAIL}</a></li>
+          <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', color: '#787774', fontSize: '14px', lineHeight: '1.7' }}>
+            <li>Use the <strong style={{ color: '#37352f' }}>Delete Account</strong> or <strong style={{ color: '#37352f' }}>Export My Data</strong> buttons in your account settings</li>
+            <li>Email us at <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: '#5e6ad2' }}>{COMPANY_EMAIL}</a></li>
           </ul>
           <P>We will respond to verified requests within <strong>30 days</strong> (GDPR) or <strong>45 days</strong> (CCPA).</P>
         </Section>
 
         <Section title="8. Cookies">
           <P>We use the following categories of cookies:</P>
-          <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px', color: '#9CA3AF', fontSize: '14px', lineHeight: '1.7' }}>
-            <li><strong style={{ color: '#E5E7EB' }}>Strictly necessary</strong> — authentication session cookies set by Clerk. These are essential for the service to function and do not require consent.</li>
-            <li><strong style={{ color: '#E5E7EB' }}>Functional</strong> — preferences such as sidebar collapsed state, stored in localStorage. No consent required.</li>
-            <li><strong style={{ color: '#E5E7EB' }}>Analytics</strong> — we may add analytics in future. If we do, we will update this policy and request consent.</li>
+          <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px', color: '#787774', fontSize: '14px', lineHeight: '1.7' }}>
+            <li><strong style={{ color: '#37352f' }}>Strictly necessary</strong> — authentication session cookies set by Clerk. These are essential for the service to function and do not require consent.</li>
+            <li><strong style={{ color: '#37352f' }}>Functional</strong> — preferences such as sidebar collapsed state, stored in localStorage. No consent required.</li>
+            <li><strong style={{ color: '#37352f' }}>Analytics</strong> — we may add analytics in future. If we do, we will update this policy and request consent.</li>
           </ul>
           <P>You can control cookies via your browser settings. Blocking strictly necessary cookies will prevent you from signing in.</P>
         </Section>
 
         <Section title="9. Data retention">
           <P>We retain your personal data for as long as your account is active. If you delete your account:</P>
-          <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', color: '#9CA3AF', fontSize: '14px', lineHeight: '1.7' }}>
+          <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', color: '#787774', fontSize: '14px', lineHeight: '1.7' }}>
             <li>Account and sales data is deleted immediately from our database</li>
             <li>Billing records are retained for 7 years as required by financial regulations</li>
             <li>Anonymised, aggregated analytics data may be retained indefinitely</li>
@@ -178,10 +178,10 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="13. Contact & supervisory authority">
-          <P>For privacy enquiries: <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: '#818CF8' }}>{COMPANY_EMAIL}</a></P>
-          <P><strong>EU/EEA users</strong> may lodge a complaint with their local data protection authority. A list is available at <a href="https://edpb.europa.eu/about-edpb/about-edpb/members_en" target="_blank" rel="noopener noreferrer" style={{ color: '#818CF8' }}>edpb.europa.eu</a>.</P>
-          <P><strong>UK users</strong> may complain to the Information Commissioner&apos;s Office (ICO) at <a href="https://ico.org.uk" target="_blank" rel="noopener noreferrer" style={{ color: '#818CF8' }}>ico.org.uk</a>.</P>
-          <P><strong>California residents</strong> may contact the California Privacy Protection Agency at <a href="https://cppa.ca.gov" target="_blank" rel="noopener noreferrer" style={{ color: '#818CF8' }}>cppa.ca.gov</a>.</P>
+          <P>For privacy enquiries: <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: '#5e6ad2' }}>{COMPANY_EMAIL}</a></P>
+          <P><strong>EU/EEA users</strong> may lodge a complaint with their local data protection authority. A list is available at <a href="https://edpb.europa.eu/about-edpb/about-edpb/members_en" target="_blank" rel="noopener noreferrer" style={{ color: '#5e6ad2' }}>edpb.europa.eu</a>.</P>
+          <P><strong>UK users</strong> may complain to the Information Commissioner&apos;s Office (ICO) at <a href="https://ico.org.uk" target="_blank" rel="noopener noreferrer" style={{ color: '#5e6ad2' }}>ico.org.uk</a>.</P>
+          <P><strong>California residents</strong> may contact the California Privacy Protection Agency at <a href="https://cppa.ca.gov" target="_blank" rel="noopener noreferrer" style={{ color: '#5e6ad2' }}>cppa.ca.gov</a>.</P>
         </Section>
       </div>
     </div>
@@ -191,12 +191,12 @@ export default function PrivacyPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: '40px' }}>
-      <h2 style={{ fontSize: '17px', fontWeight: '700', color: '#F0EEFF', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>{title}</h2>
+      <h2 style={{ fontSize: '17px', fontWeight: '700', color: '#37352f', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid rgba(55,53,47,0.09)' }}>{title}</h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>{children}</div>
     </div>
   )
 }
 
 function P({ children }: { children: React.ReactNode }) {
-  return <p style={{ fontSize: '14px', color: '#9CA3AF', lineHeight: '1.8' }}>{children}</p>
+  return <p style={{ fontSize: '14px', color: '#787774', lineHeight: '1.8', margin: 0 }}>{children}</p>
 }

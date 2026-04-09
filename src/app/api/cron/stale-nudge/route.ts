@@ -1,9 +1,9 @@
 /**
  * GET /api/cron/stale-nudge
- * Daily at 9 AM UTC — sends Slack DMs to reps with stale deals (14+ days no activity).
+ * Daily at 9 AM UTC — logs stale deals (14+ days no activity).
  *
  * Reads `staleDeals` from each workspace brain (populated by brain-refresh at 3 AM)
- * so this cron is cheap: no DB scans, no AI calls — just brain reads + Slack DMs.
+ * so this cron is cheap: no DB scans, no AI calls — just brain reads.
  *
  * Secured by CRON_SECRET.
  */
@@ -14,7 +14,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { workspaces } from '@/lib/db/schema'
 import { getWorkspaceBrain } from '@/lib/workspace-brain'
-import { notifyStaleDeals } from '@/lib/slack-notify'
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET
@@ -43,7 +42,7 @@ export async function GET(req: NextRequest) {
           score: d.score ?? null,
         }))
 
-        await notifyStaleDeals(ws.id, staleList)
+        console.log(`[cron/stale-nudge] workspace=${ws.id} stale_deals=${staleList.length}`)
         notified++
       } catch (err) {
         console.error(`[cron/stale-nudge] workspace=${ws.id}`, err)

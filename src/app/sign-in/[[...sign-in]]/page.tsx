@@ -4,13 +4,11 @@ import { FileText } from 'lucide-react'
 export default function SignInPage() {
   return (
     <main style={{ minHeight: '100dvh', backgroundColor: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      {/* Ambient glow */}
-      <div style={{ position: 'fixed', top: '20%', left: '50%', transform: 'translateX(-50%)', width: '600px', height: '400px', background: 'radial-gradient(ellipse, var(--accent-subtle) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
       <div style={{ width: '100%', maxWidth: '400px', padding: '24px' }}>
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '32px' }}>
-          <div style={{ width: '32px', height: '32px', background: 'linear-gradient(135deg, var(--accent), #7C3AED)', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 16px var(--accent-subtle)' }}>
+          <div style={{ width: '32px', height: '32px', background: '#37352f', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileText size={15} color="#fff" strokeWidth={2.5} />
           </div>
           <span style={{ fontWeight: '700', fontSize: '17px', letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>Halvex</span>
@@ -55,12 +53,11 @@ export default function SignInPage() {
                 fontSize: '13px',
               },
               formButtonPrimary: {
-                background: 'linear-gradient(135deg, var(--accent), #7C3AED)',
+                background: '#37352f',
                 borderRadius: '8px',
                 height: '42px',
                 fontSize: '13px',
                 fontWeight: '600',
-                boxShadow: '0 0 20px var(--accent-subtle)',
               },
               footerActionLink: { color: 'var(--accent)' },
               formFieldLabel: { color: 'var(--text-tertiary)', fontSize: '12px' },
@@ -73,8 +70,8 @@ export default function SignInPage() {
               colorInputBackground: 'var(--input-bg)',
               colorInputText: 'var(--text-primary)',
               borderRadius: '8px',
-              colorPrimary: '#6366F1',
-              colorDanger: '#EF4444',
+              colorPrimary: '#5e6ad2',
+              colorDanger: '#e03e3e',
             },
           }}
         />

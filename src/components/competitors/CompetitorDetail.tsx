@@ -58,8 +58,8 @@ export function CompetitorDetail({ competitor, collateral, linkedDeals, onSave, 
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: '24px', alignItems: 'start' }}>
       {/* Left: form */}
       <div>
-        <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '20px' }}>
-          <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#EBEBEB', margin: '0 0 16px' }}>
+        <div style={{ background: 'var(--surface-1)', border: '1px solid rgba(55,53,47,0.12)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(55,53,47,0.06)', padding: '20px' }}>
+          <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#37352f', margin: '0 0 16px' }}>
             Competitor details
           </h2>
           <CompetitorForm
@@ -74,9 +74,9 @@ export function CompetitorDetail({ competitor, collateral, linkedDeals, onSave, 
       {/* Right: battlecard + linked deals */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {/* Battlecard card */}
-        <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '16px' }}>
+        <div style={{ background: 'var(--surface-1)', border: '1px solid rgba(55,53,47,0.12)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(55,53,47,0.06)', padding: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB' }}>Battlecard</span>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#37352f' }}>Battlecard</span>
             {latestBattlecard && (
               <StatusBadge status={latestBattlecard.status as 'ready' | 'stale' | 'generating' | 'archived'} />
             )}
@@ -84,13 +84,13 @@ export function CompetitorDetail({ competitor, collateral, linkedDeals, onSave, 
 
           {latestBattlecard ? (
             <div style={{ marginBottom: '12px' }}>
-              <p style={{ fontSize: '12px', color: '#555', margin: '0 0 4px' }}>Last generated</p>
-              <p style={{ fontSize: '13px', color: '#EBEBEB', margin: 0 }}>
+              <p style={{ fontSize: '12px', color: '#787774', margin: '0 0 4px' }}>Last generated</p>
+              <p style={{ fontSize: '13px', color: '#37352f', margin: 0 }}>
                 {latestBattlecard.generatedAt ? formatDate(latestBattlecard.generatedAt) : 'Never'}
               </p>
             </div>
           ) : (
-            <p style={{ fontSize: '12px', color: '#555', margin: '0 0 12px' }}>
+            <p style={{ fontSize: '12px', color: '#787774', margin: '0 0 12px' }}>
               No battlecard generated yet. Click below to create one using AI.
             </p>
           )}
@@ -99,9 +99,9 @@ export function CompetitorDetail({ competitor, collateral, linkedDeals, onSave, 
             <button
               onClick={handleGenerate}
               disabled={generating}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', height: '32px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#fff', backgroundColor: generating ? '#333' : '#6366F1', border: 'none', cursor: generating ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
-              onMouseEnter={(e) => { if (!generating) e.currentTarget.style.backgroundColor = '#4F46E5' }}
-              onMouseLeave={(e) => { if (!generating) e.currentTarget.style.backgroundColor = '#6366F1' }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', height: '32px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#ffffff', backgroundColor: generating ? 'rgba(55,53,47,0.25)' : '#5e6ad2', border: 'none', cursor: generating ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
+              onMouseEnter={(e) => { if (!generating) e.currentTarget.style.backgroundColor = '#4f5ab8' }}
+              onMouseLeave={(e) => { if (!generating) e.currentTarget.style.backgroundColor = '#5e6ad2' }}
             >
               {generating ? (
                 <><RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>
@@ -113,9 +113,9 @@ export function CompetitorDetail({ competitor, collateral, linkedDeals, onSave, 
             {latestBattlecard && latestBattlecard.status === 'ready' && (
               <a
                 href={`/collateral/${latestBattlecard.id}`}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', height: '32px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, color: '#EBEBEB', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', textDecoration: 'none' }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', height: '32px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, color: '#37352f', backgroundColor: 'rgba(55,53,47,0.06)', border: '1px solid rgba(55,53,47,0.12)', textDecoration: 'none' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(55,53,47,0.10)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(55,53,47,0.06)' }}
               >
                 <ExternalLink size={12} /> View battlecard
               </a>
@@ -124,30 +124,30 @@ export function CompetitorDetail({ competitor, collateral, linkedDeals, onSave, 
         </div>
 
         {/* Linked deals */}
-        <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '16px' }}>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB', display: 'block', marginBottom: '10px' }}>
+        <div style={{ background: 'var(--surface-1)', border: '1px solid rgba(55,53,47,0.12)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(55,53,47,0.06)', padding: '16px' }}>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: '#37352f', display: 'block', marginBottom: '10px' }}>
             Linked deals ({linkedDeals.length})
           </span>
 
           {linkedDeals.length === 0 ? (
-            <p style={{ fontSize: '12px', color: '#555', margin: 0 }}>
+            <p style={{ fontSize: '12px', color: '#787774', margin: 0 }}>
               No deals logged against this competitor yet.
             </p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {linkedDeals.slice(0, 5).map((deal) => (
-                <div key={deal.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div key={deal.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', borderRadius: '6px', background: '#f7f6f3', border: '1px solid rgba(55,53,47,0.09)' }}>
                   <div>
-                    <p style={{ fontSize: '12px', fontWeight: 500, color: '#EBEBEB', margin: 0 }}>{deal.dealName}</p>
-                    <p style={{ fontSize: '11px', color: '#555', margin: '2px 0 0' }}>{deal.prospectCompany}</p>
+                    <p style={{ fontSize: '12px', fontWeight: 500, color: '#37352f', margin: 0 }}>{deal.dealName}</p>
+                    <p style={{ fontSize: '11px', color: '#787774', margin: '2px 0 0' }}>{deal.prospectCompany}</p>
                   </div>
                   <span style={{
                     fontSize: '11px',
                     fontWeight: 500,
                     padding: '2px 8px',
                     borderRadius: '9999px',
-                    color: deal.stage === 'closed_won' ? '#22C55E' : '#EF4444',
-                    backgroundColor: deal.stage === 'closed_won' ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)',
+                    color: deal.stage === 'closed_won' ? '#0f7b6c' : '#e03e3e',
+                    backgroundColor: deal.stage === 'closed_won' ? 'rgba(15,123,108,0.08)' : 'rgba(224,62,62,0.08)',
                   }}>
                     {deal.stage === 'closed_won' ? 'Won' : 'Lost'}
                   </span>

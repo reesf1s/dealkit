@@ -8,9 +8,9 @@ interface ScoreBadgeProps {
 
 export function ScoreBadge({ score, size = 'md', showLabel = false }: ScoreBadgeProps) {
   const getColors = (s: number) => {
-    if (s >= 70) return { bg: 'rgba(34,197,94,0.15)', text: '#22C55E', border: 'rgba(34,197,94,0.3)' }
-    if (s >= 40) return { bg: 'rgba(234,179,8,0.15)', text: '#EAB308', border: 'rgba(234,179,8,0.3)' }
-    return { bg: 'rgba(239,68,68,0.15)', text: '#EF4444', border: 'rgba(239,68,68,0.3)' }
+    if (s >= 70) return { bg: 'rgba(15,123,108,0.08)', text: '#0f7b6c', border: 'rgba(15,123,108,0.20)' }
+    if (s >= 40) return { bg: 'rgba(203,108,44,0.08)', text: '#cb6c2c', border: 'rgba(203,108,44,0.20)' }
+    return { bg: 'rgba(224,62,62,0.08)', text: '#e03e3e', border: 'rgba(224,62,62,0.20)' }
   }
 
   const colors = getColors(score)

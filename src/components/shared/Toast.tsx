@@ -35,23 +35,23 @@ const TOAST_CONFIG: Record<
   { color: string; bg: string; Icon: React.ComponentType<{ size?: number; strokeWidth?: number; color?: string }> }
 > = {
   success: {
-    color: '#22C55E',
-    bg: 'rgba(34, 197, 94, 0.12)',
+    color: '#0f7b6c',
+    bg: 'rgba(15, 123, 108, 0.08)',
     Icon: CheckCircle,
   },
   error: {
-    color: '#EF4444',
-    bg: 'rgba(239, 68, 68, 0.12)',
+    color: '#e03e3e',
+    bg: 'rgba(224, 62, 62, 0.08)',
     Icon: AlertCircle,
   },
   warning: {
-    color: '#F59E0B',
-    bg: 'rgba(245, 158, 11, 0.12)',
+    color: '#cb6c2c',
+    bg: 'rgba(203, 108, 44, 0.08)',
     Icon: AlertTriangle,
   },
   info: {
-    color: '#6366F1',
-    bg: 'rgba(99, 102, 241, 0.12)',
+    color: '#1DB86A',
+    bg: 'rgba(29, 184, 106, 0.08)',
     Icon: Info,
   },
 }
@@ -76,11 +76,9 @@ function ToastItem({ item, onRemove }: { item: ToastItem; onRemove: (id: string)
         gap: '10px',
         padding: '12px 14px',
         borderRadius: '8px',
-        background: 'rgba(14, 10, 35, 0.82)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.7)',
+        background: 'var(--surface-1)',
+        border: '1px solid var(--border-default)',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
         minWidth: '280px',
         maxWidth: '380px',
         animation: 'slide-in-up 0.2s ease-out',
@@ -107,7 +105,7 @@ function ToastItem({ item, onRemove }: { item: ToastItem; onRemove: (id: string)
         style={{
           flex: 1,
           fontSize: '13px',
-          color: '#EBEBEB',
+          color: 'var(--text-primary)',
           lineHeight: 1.5,
           paddingTop: '7px',
           margin: 0,
@@ -129,18 +127,18 @@ function ToastItem({ item, onRemove }: { item: ToastItem; onRemove: (id: string)
             backgroundColor: 'transparent',
             border: 'none',
             cursor: 'pointer',
-            color: '#555555',
+            color: 'var(--text-tertiary)',
             flexShrink: 0,
             marginTop: '6px',
             transition: 'background-color 100ms ease, color 100ms ease',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.06)'
-            e.currentTarget.style.color = '#EBEBEB'
+            e.currentTarget.style.backgroundColor = 'var(--surface-2)'
+            e.currentTarget.style.color = '#1a1a1a'
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'transparent'
-            e.currentTarget.style.color = '#555555'
+            e.currentTarget.style.color = '#9b9a97'
           }}
           aria-label="Dismiss"
         >

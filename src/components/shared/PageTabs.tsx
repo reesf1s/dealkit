@@ -25,12 +25,10 @@ export function PageTabs({ tabs }: { tabs: PageTab[] }) {
       gap: '2px',
       marginBottom: '24px',
       padding: '3px',
-      background: 'rgba(255,255,255,0.04)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      borderRadius: '10px',
+      background: 'var(--surface-2)',
+      border: '1px solid var(--border-default)',
+      borderRadius: '8px',
       width: 'fit-content',
-      backdropFilter: 'blur(12px)',
-      WebkitBackdropFilter: 'blur(12px)',
     }}>
       {tabs.map(tab => {
         const active = isTabActive(tab)
@@ -43,31 +41,32 @@ export function PageTabs({ tabs }: { tabs: PageTab[] }) {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '6px 16px',
-              borderRadius: '7px',
+              padding: '6px 14px',
+              borderRadius: '6px',
               fontSize: '12px',
               fontWeight: active ? '600' : '500',
-              color: active ? 'rgba(255,255,255,0.80)' : 'rgba(255,255,255,0.45)',
-              background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
+              color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+              background: active ? 'var(--surface-1)' : 'transparent',
               textDecoration: 'none',
-              border: active ? '1px solid rgba(255,255,255,0.10)' : '1px solid transparent',
+              border: active ? '1px solid #eeeeee' : '1px solid transparent',
+              boxShadow: active ? '0 1px 3px #f5f5f5' : 'none',
               transition: 'all 0.12s ease',
               whiteSpace: 'nowrap',
             }}
             onMouseEnter={e => {
               if (!active) {
-                (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.80)'
-                ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
+                (e.currentTarget as HTMLElement).style.color = '#1a1a1a'
+                ;(e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'
               }
             }}
             onMouseLeave={e => {
               if (!active) {
-                (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.45)'
+                (e.currentTarget as HTMLElement).style.color = '#787774'
                 ;(e.currentTarget as HTMLElement).style.background = 'transparent'
               }
             }}
           >
-            {Icon && <Icon size={12} color={active ? 'rgba(255,255,255,0.80)' : 'currentColor'} strokeWidth={2} />}
+            {Icon && <Icon size={12} color={active ? 'var(--text-primary)' : 'currentColor'} strokeWidth={2} />}
             {tab.label}
           </Link>
         )

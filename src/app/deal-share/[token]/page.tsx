@@ -55,11 +55,18 @@ export default async function DealSharePage({ params }: Props) {
 
   if (!deal || !deal.dealIsShared) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0A0A0A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#ffffff',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}>
         <div style={{ textAlign: 'center' }}>
-          <p style={{ fontSize: '48px', margin: '0 0 16px', color: '#334155' }}>404</p>
-          <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#e2e8f0', margin: '0 0 8px' }}>This link is not available</h1>
-          <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>This deal overview may have been unshared or does not exist.</p>
+          <p style={{ fontSize: '48px', margin: '0 0 16px', color: 'rgba(55,53,47,0.20)' }}>404</p>
+          <h1 style={{ fontSize: '20px', fontWeight: 700, color: '#37352f', margin: '0 0 8px' }}>This link is not available</h1>
+          <p style={{ fontSize: '13px', color: '#9b9a97', margin: 0 }}>This deal overview may have been unshared or does not exist.</p>
         </div>
       </div>
     )
@@ -68,13 +75,22 @@ export default async function DealSharePage({ params }: Props) {
   const stageLabel = STAGE_LABELS[deal.stage] ?? deal.stage
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0A0A0A', color: '#e2e8f0', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#ffffff',
+      color: '#37352f',
+      fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    }}>
       <div style={{ maxWidth: '780px', margin: '0 auto', padding: '56px 24px' }}>
 
         {/* Header bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '56px' }}>
-          <span style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '-0.03em', color: '#e2e8f0' }}>Halvex</span>
-          <span style={{ fontSize: '11px', fontWeight: 600, color: '#475569', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '2px 10px' }}>
+          <span style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '-0.03em', color: '#37352f' }}>Halvex</span>
+          <span style={{
+            fontSize: '11px', fontWeight: 600, color: '#9b9a97',
+            background: 'rgba(55,53,47,0.05)', border: '1px solid rgba(55,53,47,0.10)',
+            borderRadius: '4px', padding: '2px 10px',
+          }}>
             Shared overview
           </span>
         </div>
@@ -83,20 +99,20 @@ export default async function DealSharePage({ params }: Props) {
         <div style={{ marginBottom: '40px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
             <span style={{
-              fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.70)',
-              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)',
+              fontSize: '11px', fontWeight: 600, color: '#787774',
+              background: 'rgba(55,53,47,0.05)', border: '1px solid rgba(55,53,47,0.10)',
               borderRadius: '4px', padding: '2px 8px',
             }}>
               {stageLabel}
             </span>
             {fmt(deal.dealValue) && (
-              <span style={{ fontSize: '12px', color: '#64748b' }}>{fmt(deal.dealValue)}</span>
+              <span style={{ fontSize: '12px', color: '#9b9a97' }}>{fmt(deal.dealValue)}</span>
             )}
           </div>
-          <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#f1f5f9', margin: '0 0 6px', letterSpacing: '-0.04em', lineHeight: 1.15 }}>
+          <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#37352f', margin: '0 0 6px', letterSpacing: '-0.04em', lineHeight: 1.15 }}>
             {deal.dealName}
           </h1>
-          <p style={{ fontSize: '14px', color: '#64748b', margin: 0 }}>
+          <p style={{ fontSize: '14px', color: '#9b9a97', margin: 0 }}>
             {deal.prospectCompany}
             {deal.prospectName ? ` · ${deal.prospectName}` : ''}
             {deal.prospectTitle ? `, ${deal.prospectTitle}` : ''}
@@ -104,36 +120,51 @@ export default async function DealSharePage({ params }: Props) {
         </div>
 
         {/* Divider */}
-        <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', marginBottom: '40px' }} />
+        <div style={{ height: '1px', background: 'rgba(55,53,47,0.09)', marginBottom: '40px' }} />
 
         {/* Details grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '40px' }}>
           {fmtDate(deal.closeDate) && (
-            <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '16px 20px' }}>
-              <p style={{ fontSize: '11px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>Target close</p>
-              <p style={{ fontSize: '15px', fontWeight: 600, color: '#e2e8f0', margin: 0 }}>{fmtDate(deal.closeDate)}</p>
+            <div style={{
+              background: '#ffffff',
+              border: '1px solid rgba(55,53,47,0.09)',
+              borderRadius: '10px',
+              padding: '16px 20px',
+            }}>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>Target close</p>
+              <p style={{ fontSize: '15px', fontWeight: 600, color: '#37352f', margin: 0 }}>{fmtDate(deal.closeDate)}</p>
             </div>
           )}
-          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '16px 20px' }}>
-            <p style={{ fontSize: '11px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>Stage</p>
-            <p style={{ fontSize: '15px', fontWeight: 600, color: '#e2e8f0', margin: 0 }}>{stageLabel}</p>
+          <div style={{
+            background: '#ffffff',
+            border: '1px solid rgba(55,53,47,0.09)',
+            borderRadius: '10px',
+            padding: '16px 20px',
+          }}>
+            <p style={{ fontSize: '11px', fontWeight: 600, color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 6px' }}>Stage</p>
+            <p style={{ fontSize: '15px', fontWeight: 600, color: '#37352f', margin: 0 }}>{stageLabel}</p>
           </div>
         </div>
 
         {/* Description */}
         {deal.description && (
           <div style={{ marginBottom: '32px' }}>
-            <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 12px' }}>About this engagement</h2>
-            <p style={{ fontSize: '14px', color: '#94a3b8', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{deal.description}</p>
+            <h2 style={{ fontSize: '11px', fontWeight: 600, color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 12px' }}>About this engagement</h2>
+            <p style={{ fontSize: '14px', color: '#787774', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{deal.description}</p>
           </div>
         )}
 
         {/* Success criteria */}
         {deal.successCriteria && (
           <div style={{ marginBottom: '32px' }}>
-            <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 12px' }}>Success criteria</h2>
-            <div style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '16px 20px' }}>
-              <p style={{ fontSize: '14px', color: '#c7d2fe', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{deal.successCriteria}</p>
+            <h2 style={{ fontSize: '11px', fontWeight: 600, color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 12px' }}>Success criteria</h2>
+            <div style={{
+              background: 'rgba(94,106,210,0.04)',
+              border: '1px solid rgba(94,106,210,0.14)',
+              borderRadius: '10px',
+              padding: '16px 20px',
+            }}>
+              <p style={{ fontSize: '14px', color: '#37352f', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{deal.successCriteria}</p>
             </div>
           </div>
         )}
@@ -141,18 +172,30 @@ export default async function DealSharePage({ params }: Props) {
         {/* Next steps */}
         {deal.nextSteps && (
           <div style={{ marginBottom: '32px' }}>
-            <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 12px' }}>Next steps</h2>
-            <div style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)', borderRadius: '10px', padding: '16px 20px' }}>
-              <p style={{ fontSize: '14px', color: '#6ee7b7', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{deal.nextSteps}</p>
+            <h2 style={{ fontSize: '11px', fontWeight: 600, color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 12px' }}>Next steps</h2>
+            <div style={{
+              background: 'rgba(15,123,108,0.04)',
+              border: '1px solid rgba(15,123,108,0.16)',
+              borderRadius: '10px',
+              padding: '16px 20px',
+            }}>
+              <p style={{ fontSize: '14px', color: '#0f7b6c', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{deal.nextSteps}</p>
             </div>
           </div>
         )}
 
         {/* Footer */}
-        <div style={{ marginTop: '64px', paddingTop: '24px', borderTop: '1px solid rgba(255,255,255,0.06)', textAlign: 'center' }}>
-          <p style={{ fontSize: '12px', color: '#334155', margin: 0 }}>
+        <div style={{ marginTop: '64px', paddingTop: '24px', borderTop: '1px solid rgba(55,53,47,0.09)', textAlign: 'center' }}>
+          <p style={{ fontSize: '12px', color: '#9b9a97', margin: 0 }}>
             Powered by{' '}
-            <span style={{ color: 'rgba(255,255,255,0.80)', fontWeight: 600 }}>Halvex</span>
+            <a
+              href="https://halvex.ai"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#5e6ad2', textDecoration: 'none', fontWeight: 600 }}
+            >
+              Halvex
+            </a>
             {' '}· AI-powered sales intelligence
           </p>
         </div>

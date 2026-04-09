@@ -10,8 +10,7 @@ import {
   Sparkles, FileText, RefreshCw, Flag,
 } from 'lucide-react'
 import { getCalendarEvents, type CalendarEvent } from '@/lib/calendar-events'
-
-const fetcher = (url: string) => fetch(url).then(r => r.json())
+import { fetcher } from '@/lib/fetcher'
 
 // ── CalEvent type (matches pipeline CalendarView) ────────────────────────────
 
@@ -40,20 +39,20 @@ type CalEvent = {
 const EVENT_CONFIG: Record<string, {
   label: string; color: string; borderStyle?: string; icon: React.ElementType
 }> = {
-  meeting:         { label: 'Meeting',          color: 'rgba(255,255,255,0.80)', icon: Users },
-  follow_up:       { label: 'Follow-up',        color: '#FBBF24', icon: Clock },
-  demo:            { label: 'Demo',             color: '#34D399', icon: Zap },
-  deadline:        { label: 'Deadline',         color: '#F87171', icon: AlertCircle },
-  review:          { label: 'Review',           color: '#22D3EE', icon: CheckSquare },
-  decision:        { label: 'Decision',         color: '#A855F7', icon: Target },
-  predicted_close: { label: 'Predicted Close',  color: '#A855F7', borderStyle: 'dashed', icon: Target },
-  close:           { label: 'Expected Close',   color: '#A855F7', borderStyle: 'dashed', icon: Target },
-  contract_start:  { label: 'Contract Start',   color: '#14B8A6', icon: FileText },
-  contract_end:    { label: 'Contract Renewal',  color: '#14B8A6', icon: RefreshCw },
-  task:            { label: 'Task Due',          color: '#F59E0B', icon: CheckSquare },
-  phase:           { label: 'Phase Target',      color: '#06B6D4', icon: Flag },
-  urgent:          { label: 'Urgent',            color: '#F87171', icon: AlertCircle },
-  stale_followup:  { label: 'Stale Follow-up',   color: '#9CA3AF', icon: Clock },
+  meeting:         { label: 'Meeting',          color: '#2e78c6', icon: Users },
+  follow_up:       { label: 'Follow-up',        color: '#cb6c2c', icon: Clock },
+  demo:            { label: 'Demo',             color: '#0f7b6c', icon: Zap },
+  deadline:        { label: 'Deadline',         color: '#e03e3e', icon: AlertCircle },
+  review:          { label: 'Review',           color: '#2e78c6', icon: CheckSquare },
+  decision:        { label: 'Decision',         color: '#5e6ad2', icon: Target },
+  predicted_close: { label: 'Predicted Close',  color: '#5e6ad2', borderStyle: 'dashed', icon: Target },
+  close:           { label: 'Expected Close',   color: '#5e6ad2', borderStyle: 'dashed', icon: Target },
+  contract_start:  { label: 'Contract Start',   color: '#0f7b6c', icon: FileText },
+  contract_end:    { label: 'Contract Renewal',  color: '#0f7b6c', icon: RefreshCw },
+  task:            { label: 'Task Due',          color: '#cb6c2c', icon: CheckSquare },
+  phase:           { label: 'Phase Target',      color: '#2e78c6', icon: Flag },
+  urgent:          { label: 'Urgent',            color: '#e03e3e', icon: AlertCircle },
+  stale_followup:  { label: 'Stale Follow-up',   color: 'var(--text-tertiary)', icon: Clock },
 }
 
 function getConfig(type: string) {
@@ -311,7 +310,7 @@ function EventChip({
         alignItems: 'center',
         gap: '3px',
         width: '100%',
-        background: cfg.color + (isPast ? '18' : '22'),
+        background: cfg.color + '18',
         color: cfg.color,
         border: `1.5px ${cfg.borderStyle ?? 'solid'} ${cfg.color}${isPast ? '55' : '88'}`,
         borderLeft: isToday ? `3px solid ${cfg.color}` : `1.5px ${cfg.borderStyle ?? 'solid'} ${cfg.color}${isPast ? '55' : '88'}`,
@@ -321,7 +320,7 @@ function EventChip({
         fontWeight: 500,
         cursor: 'pointer',
         textAlign: 'left',
-        opacity: isPast ? 0.4 : 1,
+        opacity: isPast ? 0.45 : 1,
         transition: 'opacity 0.15s, filter 0.15s',
         overflow: 'hidden',
       }}
@@ -363,7 +362,7 @@ function EventPopover({
         onClick={onClose}
         style={{
           position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)',
+          background: 'rgba(55,53,47,0.25)',
           zIndex: 999,
         }}
       />
@@ -374,16 +373,14 @@ function EventPopover({
           top: '50%', left: '50%',
           transform: 'translate(-50%, -50%)',
           zIndex: 1000,
-          background: 'var(--glass-card-bg)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid var(--glass-card-border)',
-          borderRadius: '12px',
+          background: 'var(--surface-1)',
+          border: '1px solid rgba(55,53,47,0.12)',
+          borderRadius: '8px',
           padding: '20px',
           minWidth: '320px',
           maxWidth: '420px',
           width: '90vw',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          boxShadow: '0 8px 32px rgba(55,53,47,0.12)',
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -395,7 +392,7 @@ function EventPopover({
             </div>
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: '4px',
-              background: cfg.color + '22', color: cfg.color,
+              background: cfg.color + '18', color: cfg.color,
               borderRadius: '6px', padding: '3px 8px', fontSize: '11px', fontWeight: 600,
               border: `1px ${cfg.borderStyle ?? 'solid'} ${cfg.color}44`,
             }}>
@@ -425,7 +422,7 @@ function EventPopover({
         {event.source && (
           <div style={{
             fontSize: '11px', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '14px',
-            padding: '8px 10px', background: 'var(--bg)', borderRadius: '6px',
+            padding: '8px 10px', background: '#f7f6f3', borderRadius: '6px',
             borderLeft: `3px solid ${cfg.color}`,
           }}>
             &ldquo;{event.source}&rdquo;
@@ -433,13 +430,13 @@ function EventPopover({
         )}
 
         {/* Actions */}
-        <div style={{ borderTop: '1px solid var(--card-border)', paddingTop: '12px', display: 'flex', gap: '8px' }}>
+        <div style={{ borderTop: '1px solid rgba(55,53,47,0.09)', paddingTop: '12px', display: 'flex', gap: '8px' }}>
           <Link
             href={`/deals/${event.dealId}`}
             style={{
               flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
               padding: '8px 12px', borderRadius: '8px', textDecoration: 'none',
-              background: 'var(--accent)', color: '#fff',
+              background: 'var(--surface-3)', color: '#ffffff',
               fontSize: '12px', fontWeight: 600,
             }}
             onClick={onClose}
@@ -456,9 +453,9 @@ function EventPopover({
             style={{
               flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
               padding: '8px 12px', borderRadius: '8px',
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              color: 'var(--accent)', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+              background: 'var(--surface-2)',
+              border: '1px solid rgba(55,53,47,0.12)',
+              color: '#5e6ad2', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
             }}
           >
             <Sparkles size={11} />
@@ -560,11 +557,10 @@ export default function CalendarPage() {
   const totalCells = Math.ceil((firstDay + numDays) / 7) * 7
 
   const cardStyle: React.CSSProperties = {
-    background: 'var(--glass-card-bg)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid var(--glass-card-border)',
-    borderRadius: '12px',
+    background: 'var(--surface-1)',
+    border: '1px solid rgba(55,53,47,0.12)',
+    borderRadius: '8px',
+    boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
   }
 
   return (
@@ -572,8 +568,8 @@ export default function CalendarPage() {
       {/* Header */}
       <div style={{ marginBottom: '24px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: '12px' }}>
         <div>
-          <h1 className="font-brand" style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: 500, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '10px', letterSpacing: '0.01em' }}>
-            <Calendar size={isMobile ? 20 : 24} style={{ color: 'var(--accent)' }} />
+          <h1 className="font-brand" style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Calendar size={isMobile ? 20 : 22} style={{ color: '#5e6ad2' }} />
             Calendar
           </h1>
           {!isMobile && (
@@ -585,18 +581,18 @@ export default function CalendarPage() {
 
         {/* Month navigation */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: isMobile ? 'space-between' : undefined }}>
-          <button onClick={prevMonth} style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-primary)', minHeight: isMobile ? '44px' : undefined }}>
+          <button onClick={prevMonth} style={{ background: '#f7f6f3', border: '1px solid rgba(55,53,47,0.12)', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-primary)', minHeight: isMobile ? '44px' : undefined }}>
             <ChevronLeft size={16} />
           </button>
           <span style={{ fontSize: isMobile ? '15px' : '16px', fontWeight: 600, color: 'var(--text-primary)', minWidth: isMobile ? undefined : '160px', textAlign: 'center', flex: isMobile ? 1 : undefined }}>
             {MONTH_NAMES[month]} {year}
           </span>
-          <button onClick={nextMonth} style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-primary)', minHeight: isMobile ? '44px' : undefined }}>
+          <button onClick={nextMonth} style={{ background: '#f7f6f3', border: '1px solid rgba(55,53,47,0.12)', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', color: 'var(--text-primary)', minHeight: isMobile ? '44px' : undefined }}>
             <ChevronRight size={16} />
           </button>
           <button
             onClick={() => { setYear(today.getFullYear()); setMonth(today.getMonth()) }}
-            style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', minHeight: isMobile ? '44px' : undefined }}
+            style={{ background: '#f7f6f3', border: '1px solid rgba(55,53,47,0.12)', borderRadius: '8px', padding: isMobile ? '10px 12px' : '6px 12px', cursor: 'pointer', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', minHeight: isMobile ? '44px' : undefined }}
           >
             Today
           </button>
@@ -604,16 +600,15 @@ export default function CalendarPage() {
       </div>
 
       {/* Type filter chips */}
-      <div style={{ display: 'flex', gap: '8px', flexWrap: isMobile ? 'nowrap' : 'wrap', marginBottom: '20px', overflowX: isMobile ? 'auto' : undefined, WebkitOverflowScrolling: 'touch' as any, scrollbarWidth: 'none' as any, msOverflowStyle: 'none' as any, paddingBottom: isMobile ? '4px' : undefined }}>
+      <div style={{ display: 'flex', gap: '6px', flexWrap: isMobile ? 'nowrap' : 'wrap', marginBottom: '20px', overflowX: isMobile ? 'auto' : undefined, WebkitOverflowScrolling: 'touch' as any, scrollbarWidth: 'none' as any, msOverflowStyle: 'none' as any, paddingBottom: isMobile ? '4px' : undefined }}>
         <button
           onClick={() => setTypeFilter('all')}
           style={{
             display: 'flex', alignItems: 'center', gap: '5px',
             padding: '5px 12px', borderRadius: '20px', flexShrink: 0,
-            border: `1.5px solid ${typeFilter === 'all' ? 'var(--accent)' : 'var(--glass-card-border)'}`,
-            background: typeFilter === 'all' ? 'rgba(91,91,214,0.12)' : 'var(--glass-card-bg)',
-            backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-            color: typeFilter === 'all' ? 'var(--accent)' : 'var(--text-secondary)',
+            border: `1.5px solid ${typeFilter === 'all' ? '#5e6ad2' : 'rgba(55,53,47,0.16)'}`,
+            background: typeFilter === 'all' ? 'rgba(94,106,210,0.08)' : '#ffffff',
+            color: typeFilter === 'all' ? '#5e6ad2' : '#787774',
             fontSize: '12px', fontWeight: 500, cursor: 'pointer',
             transition: 'all 0.15s',
           }}
@@ -621,8 +616,8 @@ export default function CalendarPage() {
           All
           {monthEvents.length > 0 && (
             <span style={{
-              background: typeFilter === 'all' ? 'var(--accent)' : 'var(--card-border)',
-              color: typeFilter === 'all' ? '#fff' : 'var(--text-secondary)',
+              background: typeFilter === 'all' ? '#5e6ad2' : 'rgba(55,53,47,0.09)',
+              color: typeFilter === 'all' ? '#fff' : '#787774',
               borderRadius: '8px', padding: '0 6px', fontSize: '11px', fontWeight: 600,
             }}>
               {monthEvents.length}
@@ -640,10 +635,9 @@ export default function CalendarPage() {
               style={{
                 display: 'flex', alignItems: 'center', gap: '5px',
                 padding: '5px 12px', borderRadius: '20px', flexShrink: 0,
-                border: `1.5px solid ${typeFilter === type ? cfg.color : 'var(--glass-card-border)'}`,
-                background: typeFilter === type ? cfg.color + '18' : 'var(--glass-card-bg)',
-                backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
-                color: typeFilter === type ? cfg.color : 'var(--text-secondary)',
+                border: `1.5px solid ${typeFilter === type ? cfg.color : 'rgba(55,53,47,0.16)'}`,
+                background: typeFilter === type ? cfg.color + '18' : '#ffffff',
+                color: typeFilter === type ? cfg.color : '#787774',
                 fontSize: '12px', fontWeight: 500, cursor: 'pointer',
                 transition: 'all 0.15s',
               }}
@@ -651,8 +645,8 @@ export default function CalendarPage() {
               <cfg.icon size={12} />
               {cfg.label}
               <span style={{
-                background: typeFilter === type ? cfg.color : 'var(--card-border)',
-                color: typeFilter === type ? '#fff' : 'var(--text-secondary)',
+                background: typeFilter === type ? cfg.color : 'rgba(55,53,47,0.09)',
+                color: typeFilter === type ? '#fff' : '#787774',
                 borderRadius: '8px', padding: '0 6px', fontSize: '11px', fontWeight: 600,
               }}>
                 {count}
@@ -665,9 +659,9 @@ export default function CalendarPage() {
       {/* Calendar grid */}
       <div style={{ ...cardStyle, overflow: 'hidden' }}>
         {/* Day headers */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid var(--glass-card-border)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid rgba(55,53,47,0.09)' }}>
           {DAY_NAMES.map(d => (
-            <div key={d} style={{ padding: isMobile ? '8px 2px' : '10px 8px', textAlign: 'center', fontSize: isMobile ? '10px' : '12px', fontWeight: 600, color: 'var(--text-secondary)', background: 'var(--glass-card-bg)' }}>
+            <div key={d} style={{ padding: isMobile ? '8px 2px' : '10px 8px', textAlign: 'center', fontSize: isMobile ? '10px' : '12px', fontWeight: 600, color: 'var(--text-secondary)', background: '#f7f6f3' }}>
               {isMobile ? d.charAt(0) : d}
             </div>
           ))}
@@ -696,15 +690,14 @@ export default function CalendarPage() {
                   onClick={isMobile && dayEvents.length > 0 ? () => setSelectedEvent(dayEvents[0]) : undefined}
                   style={{
                     minHeight: isMobile ? '52px' : '110px',
-                    borderRight: (idx + 1) % 7 === 0 ? 'none' : '1px solid var(--glass-card-border)',
-                    borderBottom: idx < totalCells - 7 ? '1px solid var(--glass-card-border)' : 'none',
+                    borderRight: (idx + 1) % 7 === 0 ? 'none' : '1px solid rgba(55,53,47,0.09)',
+                    borderBottom: idx < totalCells - 7 ? '1px solid rgba(55,53,47,0.09)' : 'none',
                     padding: isMobile ? '4px 3px' : '8px 6px',
                     background: isToday
-                      ? 'rgba(91,91,214,0.06)'
+                      ? 'rgba(94,106,210,0.05)'
                       : !isCurrentMonth
-                        ? 'var(--bg)'
-                        : 'var(--glass-card-bg)',
-                    boxShadow: isToday ? 'inset 0 0 20px rgba(91,91,214,0.08)' : undefined,
+                        ? '#f7f6f3'
+                        : '#ffffff',
                     position: 'relative',
                     cursor: isMobile && dayEvents.length > 0 ? 'pointer' : undefined,
                   }}
@@ -715,8 +708,8 @@ export default function CalendarPage() {
                       width: isMobile ? '20px' : '26px', height: isMobile ? '20px' : '26px',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       borderRadius: '50%',
-                      background: isToday ? 'var(--accent)' : 'transparent',
-                      color: isToday ? '#fff' : isPastDay ? 'var(--text-secondary)' : 'var(--text-primary)',
+                      background: isToday ? '#5e6ad2' : 'transparent',
+                      color: isToday ? '#fff' : isPastDay ? '#9b9a97' : '#37352f',
                       fontSize: isMobile ? '11px' : '13px', fontWeight: isToday ? 700 : 400,
                       marginBottom: isMobile ? '2px' : '4px',
                       flexShrink: 0,
@@ -752,7 +745,7 @@ export default function CalendarPage() {
       {/* Events list for this month (below grid) */}
       {!isLoading && filteredEvents.length > 0 && (
         <div style={{ marginTop: '24px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '12px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '12px' }}>
             Events this month ({filteredEvents.length})
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -769,11 +762,12 @@ export default function CalendarPage() {
                     display: 'flex', alignItems: 'center', gap: isMobile ? '10px' : '12px',
                     padding: isMobile ? '12px 12px' : '10px 14px',
                     minHeight: isMobile ? '44px' : undefined,
-                    background: 'var(--card-bg)',
-                    border: 'none',
-                    borderLeft: evIsToday ? `3px solid ${cfg.color}` : '1px solid var(--card-border)',
+                    background: 'var(--surface-1)',
+                    border: evIsToday ? `1px solid ${cfg.color}` : '1px solid rgba(55,53,47,0.12)',
+                    borderLeft: evIsToday ? `3px solid ${cfg.color}` : '1px solid rgba(55,53,47,0.12)',
                     borderRadius: '8px',
-                    opacity: evIsPast ? 0.4 : 1,
+                    boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
+                    opacity: evIsPast ? 0.45 : 1,
                     transition: 'opacity 0.1s',
                     cursor: 'pointer',
                   }}
@@ -787,13 +781,13 @@ export default function CalendarPage() {
                         </span>
                         <span style={{
                           fontSize: '9px', fontWeight: 600, padding: '1px 5px', borderRadius: '8px',
-                          background: cfg.color + '22', color: cfg.color,
+                          background: cfg.color + '18', color: cfg.color,
                           border: `1px ${cfg.borderStyle ?? 'solid'} ${cfg.color}44`, flexShrink: 0,
                           textTransform: 'uppercase', letterSpacing: '0.04em',
                         }}>
                           {cfg.label}
                         </span>
-                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)', flexShrink: 0 }}>{dateStr}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', flexShrink: 0 }}>{dateStr}</span>
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {subtitle}
@@ -809,9 +803,9 @@ export default function CalendarPage() {
                       style={{
                         flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
                         padding: '5px 10px', borderRadius: '6px',
-                        background: 'rgba(255,255,255,0.06)',
-                        border: '1px solid rgba(255,255,255,0.10)',
-                        color: 'var(--accent)', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                        background: 'var(--surface-2)',
+                        border: '1px solid rgba(55,53,47,0.12)',
+                        color: '#5e6ad2', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
                       }}
                     >
                       <Sparkles size={10} />
@@ -827,8 +821,8 @@ export default function CalendarPage() {
       {/* Empty state */}
       {!isLoading && monthEvents.length === 0 && (
         <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-secondary)' }}>
-          <Calendar size={40} style={{ opacity: 0.3, marginBottom: '12px' }} />
-          <div style={{ fontSize: '15px', fontWeight: 500, marginBottom: '6px' }}>No events this month</div>
+          <Calendar size={40} style={{ opacity: 0.25, marginBottom: '12px', color: 'var(--text-tertiary)' }} />
+          <div style={{ fontSize: '15px', fontWeight: 500, marginBottom: '6px', color: 'var(--text-primary)' }}>No events this month</div>
           <div style={{ fontSize: '13px' }}>
             Events are built from scheduled events, close dates, contracts, project plans, action items, and AI signals.
             Add deals with dates to populate your calendar.

@@ -24,6 +24,11 @@ interface CreateParams {
   [key: string]: unknown
 }
 
+function buildOpenAIProviderOptions(maxTokens: number | undefined) {
+  if (!maxTokens || !Number.isFinite(maxTokens) || maxTokens <= 0) return undefined
+  return { openai: { maxCompletionTokens: Math.round(maxTokens) } } as const
+}
+
 /**
  * Drop-in shim matching the Anthropic SDK subset used throughout the codebase:
  *   anthropic.messages.create({ model, max_tokens, system?, messages })
@@ -37,11 +42,12 @@ export const anthropic = {
   messages: {
     async create(params: CreateParams) {
       const openaiProvider = getOpenAIProvider()
+      const providerOptions = buildOpenAIProviderOptions(params.max_tokens)
       const { text } = await generateText({
         model: openaiProvider(MINI),
-        maxTokens: params.max_tokens,
         system: params.system,
         messages: params.messages as any,
+        ...(providerOptions ? { providerOptions } : {}),
       })
       return {
         content: [{ type: 'text' as const, text }],
@@ -50,14 +56,15 @@ export const anthropic = {
 
     stream(params: CreateParams) {
       const openaiProvider = getOpenAIProvider()
+      const providerOptions = buildOpenAIProviderOptions(params.max_tokens)
       // Returns an async iterable that yields Anthropic-compatible SSE events
       // so existing `for await (const event of stream)` loops work unchanged.
       return (async function* () {
         const result = streamText({
           model: openaiProvider(MINI),
-          maxTokens: params.max_tokens,
           system: params.system,
           messages: params.messages as any,
+          ...(providerOptions ? { providerOptions } : {}),
         })
 
         for await (const delta of (await result).textStream) {

@@ -36,7 +36,7 @@ export default function CompanyPage() {
   }, [brainState])
 
   return (
-    <div style={{ maxWidth: '760px' }}>
+    <div style={{ maxWidth: '760px', background: '#ffffff', minHeight: '100%' }}>
       {/* Company / AI Import tabs */}
       <PageTabs tabs={[
         { label: 'Company Profile', href: '/company',    icon: Building2 },
@@ -46,10 +46,10 @@ export default function CompanyPage() {
       <div style={{ marginBottom: '28px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '32px', height: '32px', background: 'var(--accent-subtle)', border: 'none', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Building2 size={15} color="var(--accent)" />
+            <div style={{ width: '32px', height: '32px', background: 'rgba(94,106,210,0.08)', border: '1px solid rgba(94,106,210,0.20)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Building2 size={15} color="#5e6ad2" />
             </div>
-            <h1 className="font-brand" style={{ fontSize: '20px', fontWeight: '500', color: 'var(--text-primary)', letterSpacing: '0.01em', margin: 0 }}>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
               Company Profile
             </h1>
           </div>
@@ -58,9 +58,10 @@ export default function CompanyPage() {
             disabled={brainState === 'rebuilding'}
             style={{
               display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '7px 14px', borderRadius: '8px', border: 'none',
-              background: brainState === 'done' ? 'rgba(34,197,94,0.1)' : brainState === 'error' ? 'rgba(239,68,68,0.1)' : 'var(--accent-subtle)',
-              color: brainState === 'done' ? 'var(--success)' : brainState === 'error' ? 'var(--danger)' : 'var(--accent)',
+              padding: '7px 14px', borderRadius: '8px',
+              border: '1px solid rgba(55,53,47,0.12)',
+              background: brainState === 'done' ? 'rgba(15,123,108,0.08)' : brainState === 'error' ? 'rgba(224,62,62,0.08)' : 'rgba(55,53,47,0.06)',
+              color: brainState === 'done' ? '#0f7b6c' : brainState === 'error' ? '#e03e3e' : '#37352f',
               fontSize: '12px', fontWeight: 600, cursor: brainState === 'rebuilding' ? 'wait' : 'pointer',
               transition: 'all 0.1s ease', opacity: brainState === 'rebuilding' ? 0.7 : 1,
             }}
@@ -76,15 +77,15 @@ export default function CompanyPage() {
             )}
           </button>
         </div>
-        <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', margin: 0, paddingLeft: '42px', lineHeight: '1.6' }}>
+        <p style={{ fontSize: '13px', color: '#9b9a97', margin: 0, paddingLeft: '42px', lineHeight: '1.6' }}>
           This is how the brain learns your business. The more detail you add, the smarter it gets.
         </p>
       </div>
 
       {/* AI tip */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 16px', background: 'var(--accent-subtle)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', marginBottom: '24px' }}>
-        <Sparkles size={14} color="var(--accent)" style={{ marginTop: '1px', flexShrink: 0 }} />
-        <p style={{ fontSize: '12px', color: 'var(--accent)', margin: 0, lineHeight: '1.6' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 16px', background: 'rgba(94,106,210,0.08)', border: '1px solid rgba(94,106,210,0.20)', borderRadius: '8px', marginBottom: '24px' }}>
+        <Sparkles size={14} color="#5e6ad2" style={{ marginTop: '1px', flexShrink: 0 }} />
+        <p style={{ fontSize: '12px', color: '#5e6ad2', margin: 0, lineHeight: '1.6' }}>
           <strong>Brain tip:</strong> Fill in your value propositions, differentiators, and common objections. The brain uses every field here to autonomously generate collateral and identify deal risks.
         </p>
       </div>
@@ -102,7 +103,7 @@ export default function CompanyPage() {
       )}
 
       {error && !dbError && (
-        <div style={{ padding: '14px 18px', borderRadius: '10px', background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.2)', color: 'var(--danger)', fontSize: '13px' }}>
+        <div style={{ padding: '14px 18px', borderRadius: '8px', background: 'rgba(224,62,62,0.08)', border: '1px solid rgba(224,62,62,0.20)', color: '#e03e3e', fontSize: '13px' }}>
           Failed to load company profile. Please refresh the page.
         </div>
       )}

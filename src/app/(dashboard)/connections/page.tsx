@@ -1,929 +1,285 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import useSWR from 'swr'
+import Link from 'next/link'
 import {
-  ArrowUpRight,
-  CheckCircle2,
-  Copy,
-  Database,
-  Eye,
-  EyeOff,
-  Loader2,
-  MessageSquare,
-  RefreshCw,
-  Sparkles,
-  Workflow,
+  MessageSquare, Search, FileText, ChevronRight, ArrowUpRight,
+  Mail, Pencil,
 } from 'lucide-react'
-import { useToast } from '@/components/shared/Toast'
+import { fetcher } from '@/lib/fetcher'
 
-const DAILY_PROMPT =
-  'Check my Halvex pipeline, review my product work, and save any relevant issue links back into the right deals.'
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-async function fetcher(url: string) {
-  const res = await fetch(url)
-  const json = await res.json().catch(() => ({}))
-  if (!res.ok) {
-    throw new Error(typeof json?.error === 'string' ? json.error : 'Request failed')
+interface Note {
+  id: string
+  dealId: string
+  dealName: string
+  prospectCompany: string
+  stage: string
+  date: string
+  content: string
+  source: string
+}
+
+type SourceFilter = 'all' | 'manual' | 'email'
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmtDate(iso: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function stageFmt(s: string): string {
+  return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+function stageColor(stage: string): string {
+  switch (stage) {
+    case 'negotiation': case 'closed_won': return '#1DB86A'
+    case 'proposal': return '#f59e0b'
+    case 'closed_lost': return '#ef4444'
+    case 'discovery': return '#8b5cf6'
+    case 'qualified': case 'qualification': return '#3b82f6'
+    default: return '#aaa'
   }
-  return json
 }
 
-const card: React.CSSProperties = {
-  background: 'linear-gradient(180deg, rgba(11,10,28,0.92) 0%, rgba(9,8,24,0.86) 100%)',
-  border: '1px solid rgba(255,255,255,0.06)',
-  borderRadius: '28px',
-  padding: '26px',
-  boxShadow: '0 24px 60px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.04)',
+function sourceIcon(source: string) {
+  if (source === 'email') return <Mail size={11} style={{ color: 'var(--text-tertiary)' }} />
+  return <Pencil size={11} style={{ color: 'var(--text-tertiary)' }} />
 }
 
-const mutedText = 'rgba(255,255,255,0.52)'
-const faintText = 'rgba(255,255,255,0.34)'
+function Skeleton() {
+  return <div style={{ height: 90, borderRadius: 8 }} className="skeleton" />
+}
 
-function StatusPill({
-  label,
-  tone,
-}: {
-  label: string
-  tone: 'ready' | 'partial' | 'idle' | 'loading'
-}) {
-  const styles = {
-    ready: {
-      background: 'rgba(16,185,129,0.12)',
-      border: '1px solid rgba(16,185,129,0.18)',
-      color: '#86efac',
-    },
-    partial: {
-      background: 'rgba(245,158,11,0.12)',
-      border: '1px solid rgba(245,158,11,0.18)',
-      color: '#fde68a',
-    },
-    idle: {
-      background: 'rgba(255,255,255,0.06)',
-      border: '1px solid rgba(255,255,255,0.08)',
-      color: 'rgba(255,255,255,0.66)',
-    },
-    loading: {
-      background: 'rgba(59,130,246,0.12)',
-      border: '1px solid rgba(59,130,246,0.18)',
-      color: '#bfdbfe',
-    },
-  }[tone]
+// ─── Note Card ────────────────────────────────────────────────────────────────
+
+function NoteCard({ note }: { note: Note }) {
+  const [expanded, setExpanded] = useState(false)
+  const preview = note.content.length > 180 && !expanded
+    ? note.content.slice(0, 180).trim() + '…'
+    : note.content
 
   return (
-    <span
-      style={{
-        ...styles,
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '6px',
-        fontSize: '11px',
-        fontWeight: 700,
-        borderRadius: '999px',
-        padding: '6px 10px',
-        letterSpacing: '0.02em',
-      }}
+    <div style={{
+      background: 'var(--surface-1)',
+      border: '1px solid var(--border-default)',
+      borderRadius: 8,
+      padding: '14px 16px',
+      transition: 'border-color 80ms',
+    }}
+      onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'}
+      onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-default)'}
     >
-      <span
-        style={{
-          width: '6px',
-          height: '6px',
-          borderRadius: '999px',
-          background: 'currentColor',
-          opacity: 0.9,
-        }}
-      />
-      {label}
-    </span>
-  )
-}
-
-function StepItem({
-  step,
-  title,
-  body,
-}: {
-  step: string
-  title: string
-  body: string
-}) {
-  return (
-    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-      <div
-        style={{
-          width: '30px',
-          height: '30px',
-          borderRadius: '999px',
-          background: 'rgba(139,92,246,0.14)',
-          border: '1px solid rgba(139,92,246,0.22)',
-          color: 'rgba(255,255,255,0.90)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '12px',
-          fontWeight: 700,
-          flexShrink: 0,
-        }}
-      >
-        {step}
-      </div>
-      <div>
-        <div style={{ fontSize: '14px', fontWeight: 700, color: 'rgba(255,255,255,0.92)', marginBottom: '4px' }}>
-          {title}
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+            <span style={{
+              fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {note.dealName}
+            </span>
+            <span style={{
+              fontSize: 10.5, fontWeight: 500,
+              color: stageColor(note.stage),
+              background: `${stageColor(note.stage)}15`,
+              borderRadius: 99, padding: '1px 6px',
+              flexShrink: 0,
+            }}>
+              {stageFmt(note.stage)}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{note.prospectCompany}</span>
+            {note.date && (
+              <>
+                <span style={{ fontSize: 11, color: 'var(--border-default)' }}>·</span>
+                <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{fmtDate(note.date)}</span>
+              </>
+            )}
+            <span style={{ fontSize: 11, color: 'var(--border-default)' }}>·</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              {sourceIcon(note.source)}
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{note.source}</span>
+            </span>
+          </div>
         </div>
-        <div style={{ fontSize: '13px', color: mutedText, lineHeight: 1.7 }}>
-          {body}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function SecretField({
-  label,
-  value,
-  hidden,
-  loading,
-  onToggle,
-  onCopy,
-}: {
-  label: string
-  value: string | null
-  hidden?: boolean
-  loading?: boolean
-  onToggle?: () => void
-  onCopy?: () => void
-}) {
-  return (
-    <div
-      style={{
-        padding: '16px',
-        borderRadius: '20px',
-        background: 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(255,255,255,0.06)',
-      }}
-    >
-      <div style={{ fontSize: '11px', fontWeight: 800, color: faintText, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
-        {label}
-      </div>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          minHeight: '44px',
-          borderRadius: '16px',
-          padding: '12px 14px',
-          background: 'rgba(255,255,255,0.03)',
-          border: '1px solid rgba(255,255,255,0.06)',
-        }}
-      >
-        <div
+        <Link
+          href={`/deals/${note.dealId}`}
           style={{
-            flex: 1,
-            minWidth: 0,
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-            fontSize: '12px',
-            color: 'rgba(255,255,255,0.78)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            display: 'flex', alignItems: 'center', gap: 4,
+            fontSize: 11, color: '#1DB86A', textDecoration: 'none',
+            padding: '3px 8px', borderRadius: 5,
+            background: 'rgba(29,184,106,0.07)', border: '1px solid rgba(29,184,106,0.16)',
+            flexShrink: 0, marginLeft: 8,
           }}
         >
-          {loading
-            ? 'Loading…'
-            : value
-              ? hidden
-                ? '••••••••••••••••••••••••••••••••'
-                : value
-              : 'Not available yet'}
-        </div>
-        {onToggle && value && (
-          <button
-            onClick={onToggle}
-            style={{
-              width: '34px',
-              height: '34px',
-              borderRadius: '12px',
-              border: '1px solid rgba(255,255,255,0.08)',
-              background: 'rgba(255,255,255,0.04)',
-              color: 'rgba(255,255,255,0.70)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
-          >
-            {hidden ? <Eye size={13} /> : <EyeOff size={13} />}
-          </button>
-        )}
-        {onCopy && value && (
-          <button
-            onClick={onCopy}
-            style={{
-              width: '34px',
-              height: '34px',
-              borderRadius: '12px',
-              border: '1px solid rgba(255,255,255,0.08)',
-              background: 'rgba(255,255,255,0.04)',
-              color: 'rgba(255,255,255,0.70)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              flexShrink: 0,
-            }}
-          >
-            <Copy size={13} />
-          </button>
-        )}
+          Open <ArrowUpRight size={10} />
+        </Link>
       </div>
+
+      {/* Content */}
+      <p style={{
+        fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.6,
+        margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+      }}>
+        {preview}
+      </p>
+      {note.content.length > 180 && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          style={{
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            fontSize: 11.5, color: '#1DB86A', padding: '4px 0 0', fontWeight: 500,
+          }}
+        >
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
     </div>
   )
 }
 
-function IntegrationCard({
-  icon,
-  title,
-  eyebrow,
-  children,
-}: {
-  icon: React.ReactNode
-  title: string
-  eyebrow: string
-  children: React.ReactNode
-}) {
-  return (
-    <div style={{ ...card, padding: '24px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
-        <div
-          style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '14px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          {icon}
-        </div>
-        <div>
-          <div style={{ fontSize: '17px', fontWeight: 800, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.02em' }}>{title}</div>
-          <div style={{ fontSize: '12px', color: faintText }}>{eyebrow}</div>
-        </div>
-      </div>
-      {children}
-    </div>
-  )
-}
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ConnectionsPage() {
-  const { toast } = useToast()
+  const [search, setSearch] = useState('')
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
 
-  const { data: hubspotRes, error: hubspotError, mutate: mutateHubspot } = useSWR('/api/integrations/hubspot/status', fetcher, {
+  const { data, isLoading } = useSWR('/api/notes', fetcher, {
     revalidateOnFocus: false,
+    dedupingInterval: 30000,
   })
-  const { data: slackRes, error: slackError, mutate: mutateSlack } = useSWR('/api/integrations/slack/status', fetcher, {
-    revalidateOnFocus: false,
+  const notes: Note[] = data?.data ?? []
+
+  const filtered = notes.filter(n => {
+    if (sourceFilter !== 'all' && n.source !== sourceFilter) return false
+    if (search) {
+      const q = search.toLowerCase()
+      return (
+        n.dealName.toLowerCase().includes(q) ||
+        n.prospectCompany.toLowerCase().includes(q) ||
+        n.content.toLowerCase().includes(q)
+      )
+    }
+    return true
   })
-  const { data: mcpKeyRes, error: mcpError, mutate: mutateMcpKey } = useSWR('/api/workspace/mcp-api-key', fetcher, {
-    revalidateOnFocus: false,
-  })
 
-  const slackConnected: boolean | null = slackRes ? slackRes?.data?.connected === true : null
-  const hubspotConnected: boolean | null = hubspotRes ? hubspotRes?.data?.connected === true : null
-  const slackData = slackRes?.data
-  const hubspotData = hubspotRes?.data
-  const mcpApiKey: string | null = mcpKeyRes?.data?.mcpApiKey ?? null
-
-  const connectionErrors = useMemo(
-    () =>
-      [
-        slackError ? 'Slack status is unavailable.' : null,
-        hubspotError ? 'CRM status is unavailable.' : null,
-        mcpError ? 'MCP credentials are unavailable.' : null,
-      ].filter(Boolean) as string[],
-    [hubspotError, mcpError, slackError],
-  )
-
-  const [hubspotToken, setHubspotToken] = useState('')
-  const [hubspotConnecting, setHubspotConnecting] = useState(false)
-  const [hubspotSyncing, setHubspotSyncing] = useState(false)
-  const [hubspotDisconnecting, setHubspotDisconnecting] = useState(false)
-  const [slackDisconnecting, setSlackDisconnecting] = useState(false)
-  const [showMcpKey, setShowMcpKey] = useState(false)
-  const [regenerating, setRegenerating] = useState(false)
-
-  async function copyToClipboard(text: string, label = 'Copied to clipboard') {
-    try {
-      await navigator.clipboard.writeText(text)
-      toast(label, 'success')
-    } catch {
-      toast('Failed to copy', 'error')
-    }
-  }
-
-  async function handleHubspotConnect(e: React.FormEvent) {
-    e.preventDefault()
-    if (!hubspotToken.trim()) return
-    setHubspotConnecting(true)
-    try {
-      const res = await fetch('/api/integrations/hubspot/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: hubspotToken.trim() }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Connection failed')
-      toast('CRM connected', 'success')
-      setHubspotToken('')
-      mutateHubspot()
-    } catch (e: unknown) {
-      toast(e instanceof Error ? e.message : 'Connection failed', 'error')
-    } finally {
-      setHubspotConnecting(false)
-    }
-  }
-
-  async function handleHubspotSync() {
-    setHubspotSyncing(true)
-    try {
-      const res = await fetch('/api/integrations/hubspot/sync', { method: 'POST' })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Sync failed')
-      toast(`Synced ${json.data?.dealsImported ?? 0} deals from HubSpot`, 'success')
-      mutateHubspot()
-    } catch (e: unknown) {
-      toast(e instanceof Error ? e.message : 'Sync failed', 'error')
-    } finally {
-      setHubspotSyncing(false)
-    }
-  }
-
-  async function handleHubspotDisconnect() {
-    setHubspotDisconnecting(true)
-    try {
-      await fetch('/api/integrations/hubspot/disconnect', { method: 'DELETE' })
-      toast('CRM disconnected', 'success')
-      mutateHubspot()
-    } catch {
-      toast('Failed to disconnect', 'error')
-    } finally {
-      setHubspotDisconnecting(false)
-    }
-  }
-
-  async function handleSlackDisconnect() {
-    setSlackDisconnecting(true)
-    try {
-      await fetch('/api/integrations/slack/disconnect', { method: 'POST' })
-      toast('Slack disconnected', 'success')
-      mutateSlack()
-    } catch {
-      toast('Failed to disconnect', 'error')
-    } finally {
-      setSlackDisconnecting(false)
-    }
-  }
-
-  async function regenerateMcpKey() {
-    setRegenerating(true)
-    try {
-      const res = await fetch('/api/workspace/mcp-api-key', { method: 'POST' })
-      if (!res.ok) throw new Error('Failed to regenerate key')
-      await mutateMcpKey()
-      toast('MCP API key regenerated', 'success')
-    } catch {
-      toast('Failed to regenerate key', 'error')
-    } finally {
-      setRegenerating(false)
-    }
-  }
-
-  const slackTone = slackConnected === null ? (slackError ? 'partial' : 'loading') : slackConnected ? 'ready' : 'idle'
-  const crmTone = hubspotConnected === null ? (hubspotError ? 'partial' : 'loading') : hubspotConnected ? 'ready' : 'idle'
-  const mcpTone = mcpError ? 'partial' : mcpApiKey ? 'ready' : mcpKeyRes ? 'idle' : 'loading'
+  const tabs: Array<{ key: SourceFilter; label: string }> = [
+    { key: 'all', label: 'All' },
+    { key: 'manual', label: 'Manual' },
+    { key: 'email', label: 'Email' },
+  ]
 
   return (
-    <div style={{ maxWidth: '1120px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ paddingTop: 8 }}>
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @media (max-width: 960px) {
-          .connections-hero,
-          .connections-grid,
-          .connections-detail-grid { grid-template-columns: 1fr !important; }
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
         }
       `}</style>
 
-      {connectionErrors.length > 0 && (
-        <div
-          style={{
-            padding: '15px 18px',
-            borderRadius: '18px',
-            background: 'rgba(245,158,11,0.12)',
-            border: '1px solid rgba(245,158,11,0.18)',
-            color: '#fde68a',
-            fontSize: '12px',
-            lineHeight: 1.7,
-          }}
-        >
-          Some workspace health data is degraded right now. {connectionErrors.join(' ')}
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', margin: 0 }}>
+            Conversations
+          </h1>
+          <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: '3px 0 0', letterSpacing: '-0.01em' }}>
+            Meeting notes and conversations across all your deals.
+          </p>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+          {filtered.length} note{filtered.length !== 1 ? 's' : ''}
+        </div>
+      </div>
+
+      {/* Search + Filter Row */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center', gap: 8,
+          background: 'var(--surface-2)', border: '1px solid var(--border-default)', borderRadius: 7,
+          padding: '0 12px', height: 34,
+        }}>
+          <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search notes, deals, companies…"
+            style={{
+              flex: 1, border: 'none', background: 'transparent', outline: 'none',
+              fontSize: 13, color: '#1a1a1a',
+            }}
+          />
+        </div>
+        <div style={{ display: 'flex', gap: 3 }}>
+          {tabs.map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setSourceFilter(tab.key)}
+              style={{
+                padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500,
+                cursor: 'pointer',
+                border: sourceFilter === tab.key ? '1px solid var(--border-default)' : '1px solid transparent',
+                background: sourceFilter === tab.key ? 'var(--surface-1)' : 'transparent',
+                color: sourceFilter === tab.key ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                transition: 'all 80ms',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Notes List */}
+      {isLoading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[...Array(5)].map((_, i) => <Skeleton key={i} />)}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{
+          textAlign: 'center', padding: '64px 0',
+          border: '1px solid var(--border-subtle)', borderRadius: 10,
+          background: 'var(--surface-2)',
+        }}>
+          <MessageSquare size={24} style={{ color: 'var(--text-muted)', display: 'block', margin: '0 auto 10px' }} />
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)' }}>
+            {search ? 'No matching notes' : 'No notes yet'}
+          </div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-tertiary)', marginTop: 4, marginBottom: 16 }}>
+            {search
+              ? 'Try a different search term'
+              : 'Add meeting notes to your deals to see them here'}
+          </div>
+          {!search && (
+            <Link href="/deals" style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              fontSize: 12.5, fontWeight: 500, color: '#1DB86A', textDecoration: 'none',
+              padding: '7px 16px', background: 'rgba(29,184,106,0.08)',
+              border: '1px solid rgba(29,184,106,0.2)', borderRadius: 7,
+            }}>
+              <FileText size={12} />
+              Go to Deals
+              <ChevronRight size={11} />
+            </Link>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {filtered.map(note => (
+            <NoteCard key={note.id} note={note} />
+          ))}
         </div>
       )}
-
-      <div className="connections-hero" style={{ display: 'grid', gridTemplateColumns: '1.15fr 0.85fr', gap: '18px' }}>
-        <div style={{ ...card, padding: '30px' }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '8px 12px',
-              borderRadius: '999px',
-              background: 'rgba(139,92,246,0.10)',
-              border: '1px solid rgba(139,92,246,0.16)',
-              fontSize: '11px',
-              fontWeight: 800,
-              letterSpacing: '0.08em',
-              color: 'rgba(196,181,253,0.88)',
-              textTransform: 'uppercase',
-              marginBottom: '18px',
-            }}
-          >
-            <Sparkles size={12} />
-            Workspace setup
-          </div>
-
-          <h1 style={{ fontSize: '36px', lineHeight: 1.02, letterSpacing: '-0.05em', fontWeight: 800, color: 'rgba(255,255,255,0.96)', margin: '0 0 12px' }}>
-            Keep Halvex focused on deal intelligence.
-          </h1>
-          <p style={{ fontSize: '15px', color: mutedText, lineHeight: 1.8, margin: '0 0 22px', maxWidth: '680px' }}>
-            Halvex should own revenue context, operating rhythm, and visibility. Claude does the cross-tool review outside the product, then writes confirmed issue context back into the right deals through Halvex MCP.
-          </p>
-
-          <div style={{ display: 'grid', gap: '14px' }}>
-            <StepItem
-              step="1"
-              title="Bring your team conversations into Halvex"
-              body="Connect Slack so reps can stay close to alerts, follow-ups, and the questions they ask every day."
-            />
-            <StepItem
-              step="2"
-              title="Keep CRM data current"
-              body="Sync your CRM so Halvex reflects the real pipeline, active notes, and current deal values instead of stale exports."
-            />
-            <StepItem
-              step="3"
-              title="Add Halvex MCP to Claude once"
-              body="Claude should already have the product context it needs on your side. Halvex only needs to expose the deal intelligence layer."
-            />
-            <StepItem
-              step="4"
-              title="Run the same Claude review every day"
-              body="Ask Claude to review the pipeline, inspect the product work externally, and save the blockers that matter back into the relevant deals."
-            />
-          </div>
-        </div>
-
-        <div style={{ ...card, padding: '30px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 800, color: 'rgba(191,219,254,0.84)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '12px' }}>
-            Workspace readiness
-          </div>
-          <div style={{ fontSize: '24px', lineHeight: 1.1, fontWeight: 800, color: 'rgba(255,255,255,0.96)', letterSpacing: '-0.04em', marginBottom: '12px' }}>
-            One clean operating rhythm
-          </div>
-          <p style={{ fontSize: '14px', color: mutedText, lineHeight: 1.8, margin: '0 0 18px' }}>
-            The product should feel calm: live CRM data, a working Slack surface, and a single Claude workflow that enriches deals instead of asking reps to babysit issue matching.
-          </p>
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '18px' }}>
-            <StatusPill label={slackConnected ? 'Slack live' : slackConnected === null ? 'Slack loading' : 'Slack optional'} tone={slackTone} />
-            <StatusPill label={hubspotConnected ? 'CRM live' : hubspotConnected === null ? 'CRM loading' : 'CRM needed'} tone={crmTone} />
-            <StatusPill label={mcpApiKey ? 'MCP ready' : mcpKeyRes ? 'MCP setup needed' : 'MCP loading'} tone={mcpTone} />
-          </div>
-
-          <div style={{ display: 'grid', gap: '12px' }}>
-            {[
-              'No Halvex-owned issue matching in the primary workflow',
-              'Claude reviews externally and writes back only the deal-relevant context',
-              'Halvex stays responsible for revenue intelligence, workflow, and shipped outcomes',
-            ].map(item => (
-              <div
-                key={item}
-                style={{
-                  display: 'flex',
-                  gap: '10px',
-                  alignItems: 'flex-start',
-                  padding: '12px 14px',
-                  borderRadius: '18px',
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                  color: 'rgba(255,255,255,0.80)',
-                  fontSize: '13px',
-                  lineHeight: 1.6,
-                }}
-              >
-                <CheckCircle2 size={14} style={{ marginTop: '2px', flexShrink: 0, color: '#93c5fd' }} />
-                {item}
-              </div>
-            ))}
-          </div>
-
-          <Link
-            href="/dashboard"
-            style={{
-              marginTop: '20px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              color: 'rgba(255,255,255,0.92)',
-              textDecoration: 'none',
-              fontSize: '13px',
-              fontWeight: 700,
-            }}
-          >
-            Open dashboard
-            <ArrowUpRight size={14} />
-          </Link>
-        </div>
-      </div>
-
-      <div style={{ ...card, padding: '28px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '18px', marginBottom: '18px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-            <div
-              style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '16px',
-                background: 'linear-gradient(135deg, rgba(139,92,246,0.24), rgba(99,102,241,0.18))',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'rgba(255,255,255,0.92)',
-                flexShrink: 0,
-                border: '1px solid rgba(139,92,246,0.22)',
-              }}
-            >
-              <Sparkles size={18} />
-            </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>
-                <h2 style={{ fontSize: '22px', fontWeight: 800, color: 'rgba(255,255,255,0.96)', letterSpacing: '-0.03em', margin: 0 }}>
-                  Halvex MCP
-                </h2>
-                <StatusPill label={mcpApiKey ? 'Workspace ready' : 'Needs setup'} tone={mcpApiKey ? 'ready' : 'idle'} />
-              </div>
-              <p style={{ fontSize: '14px', color: mutedText, lineHeight: 1.7, margin: 0, maxWidth: '640px' }}>
-                Add this endpoint and workspace key to Claude once. After that, the whole workflow becomes a single daily prompt instead of another admin surface reps have to maintain.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={regenerateMcpKey}
-            disabled={regenerating}
-            style={{
-              height: '40px',
-              padding: '0 14px',
-              borderRadius: '999px',
-              border: '1px solid rgba(255,255,255,0.08)',
-              background: 'rgba(255,255,255,0.05)',
-              color: 'rgba(255,255,255,0.88)',
-              fontSize: '12px',
-              fontWeight: 700,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '7px',
-              cursor: regenerating ? 'not-allowed' : 'pointer',
-              opacity: regenerating ? 0.7 : 1,
-              flexShrink: 0,
-            }}
-          >
-            <RefreshCw size={13} style={{ animation: regenerating ? 'spin 1s linear infinite' : 'none' }} />
-            {mcpApiKey ? 'Regenerate key' : 'Generate key'}
-          </button>
-        </div>
-
-        <div className="connections-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '16px' }}>
-          <div style={{ display: 'grid', gap: '16px' }}>
-            <SecretField
-              label="MCP endpoint"
-              value="https://halvex.ai/api/mcp"
-              onCopy={() => copyToClipboard('https://halvex.ai/api/mcp', 'Endpoint copied')}
-            />
-            <SecretField
-              label="API key"
-              value={mcpApiKey}
-              hidden={!showMcpKey}
-              loading={!mcpKeyRes && !mcpError}
-              onToggle={mcpApiKey ? () => setShowMcpKey(v => !v) : undefined}
-              onCopy={mcpApiKey ? () => copyToClipboard(mcpApiKey, 'MCP key copied') : undefined}
-            />
-          </div>
-
-          <div
-            style={{
-              padding: '18px',
-              borderRadius: '22px',
-              background: 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(139,92,246,0.06) 100%)',
-              border: '1px solid rgba(255,255,255,0.06)',
-            }}
-          >
-            <div style={{ fontSize: '11px', fontWeight: 800, color: faintText, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
-              Daily Claude prompt
-            </div>
-            <div style={{ fontSize: '14px', lineHeight: 1.8, color: 'rgba(255,255,255,0.88)' }}>
-              “{DAILY_PROMPT}”
-            </div>
-            <div style={{ marginTop: '14px', fontSize: '12px', lineHeight: 1.7, color: mutedText }}>
-              Halvex stores the resulting deal context, linked blockers, and shipped outcomes. Claude remains the cross-tool reviewer.
-            </div>
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '16px' }}>
-              <button
-                onClick={() => copyToClipboard(DAILY_PROMPT, 'Claude prompt copied')}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  height: '40px',
-                  padding: '0 14px',
-                  borderRadius: '999px',
-                  background: 'rgba(255,255,255,0.08)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  color: 'rgba(255,255,255,0.92)',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
-                <Copy size={13} />
-                Copy prompt
-              </button>
-              <Link
-                href="/dashboard"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  height: '40px',
-                  padding: '0 14px',
-                  borderRadius: '999px',
-                  background: 'rgba(139,92,246,0.16)',
-                  border: '1px solid rgba(139,92,246,0.22)',
-                  color: 'rgba(255,255,255,0.94)',
-                  textDecoration: 'none',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                }}
-              >
-                Open dashboard
-                <ArrowUpRight size={13} />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="connections-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '18px' }}>
-        <IntegrationCard
-          icon={<MessageSquare size={18} color="#93c5fd" />}
-          title="Slack"
-          eyebrow="Rep-facing workspace"
-        >
-          <p style={{ fontSize: '13px', color: mutedText, lineHeight: 1.7, margin: '0 0 16px' }}>
-            Keep alerts, prompts, and follow-ups where the team already works. Slack is optional, but it makes Halvex feel much more alive day to day.
-          </p>
-          {slackConnected ? (
-            <div style={{ display: 'grid', gap: '12px' }}>
-              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.76)', lineHeight: 1.7 }}>
-                Connected to <strong>{slackData?.slackTeamName ?? 'your workspace'}</strong>
-              </div>
-              <button
-                onClick={handleSlackDisconnect}
-                disabled={slackDisconnecting}
-                style={{
-                  height: '40px',
-                  borderRadius: '14px',
-                  border: '1px solid rgba(239,68,68,0.18)',
-                  background: 'rgba(239,68,68,0.10)',
-                  color: '#fecaca',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  cursor: slackDisconnecting ? 'not-allowed' : 'pointer',
-                  opacity: slackDisconnecting ? 0.7 : 1,
-                }}
-              >
-                {slackDisconnecting ? 'Disconnecting…' : 'Disconnect Slack'}
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gap: '12px' }}>
-              <div style={{ fontSize: '12px', color: mutedText, lineHeight: 1.7 }}>
-                {slackError ? 'Slack status is unavailable right now.' : 'No Slack workspace connected yet.'}
-              </div>
-              <a
-                href="/api/integrations/slack/install"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  height: '42px',
-                  padding: '0 16px',
-                  borderRadius: '14px',
-                  background: 'rgba(139,92,246,0.18)',
-                  border: '1px solid rgba(139,92,246,0.22)',
-                  color: 'rgba(255,255,255,0.94)',
-                  textDecoration: 'none',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                }}
-              >
-                <MessageSquare size={14} />
-                Connect Slack
-              </a>
-            </div>
-          )}
-        </IntegrationCard>
-
-        <IntegrationCard
-          icon={<Database size={18} color="#fdba74" />}
-          title="CRM sync"
-          eyebrow="Pipeline source of truth"
-        >
-          <p style={{ fontSize: '13px', color: mutedText, lineHeight: 1.7, margin: '0 0 16px' }}>
-            Keep revenue context fresh so Claude reviews the live pipeline, not screenshots or stale exports.
-          </p>
-          {hubspotConnected ? (
-            <div style={{ display: 'grid', gap: '12px' }}>
-              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.76)', lineHeight: 1.7 }}>
-                {hubspotData?.syncCount != null ? `${hubspotData.syncCount} deals synced` : 'CRM connected'}
-                {hubspotData?.lastSync ? ` · Last sync ${new Date(hubspotData.lastSync).toLocaleString()}` : ''}
-              </div>
-              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                <button
-                  onClick={handleHubspotSync}
-                  disabled={hubspotSyncing}
-                  style={{
-                    height: '40px',
-                    padding: '0 14px',
-                    borderRadius: '14px',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    background: 'rgba(255,255,255,0.05)',
-                    color: 'rgba(255,255,255,0.88)',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    cursor: hubspotSyncing ? 'not-allowed' : 'pointer',
-                    opacity: hubspotSyncing ? 0.7 : 1,
-                  }}
-                >
-                  <RefreshCw size={13} style={{ animation: hubspotSyncing ? 'spin 1s linear infinite' : 'none' }} />
-                  {hubspotSyncing ? 'Syncing…' : 'Sync deals'}
-                </button>
-                <button
-                  onClick={handleHubspotDisconnect}
-                  disabled={hubspotDisconnecting}
-                  style={{
-                    height: '40px',
-                    padding: '0 14px',
-                    borderRadius: '14px',
-                    border: '1px solid rgba(239,68,68,0.18)',
-                    background: 'rgba(239,68,68,0.10)',
-                    color: '#fecaca',
-                    fontSize: '12px',
-                    fontWeight: 700,
-                    cursor: hubspotDisconnecting ? 'not-allowed' : 'pointer',
-                    opacity: hubspotDisconnecting ? 0.7 : 1,
-                  }}
-                >
-                  {hubspotDisconnecting ? 'Disconnecting…' : 'Disconnect'}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleHubspotConnect} style={{ display: 'grid', gap: '10px' }}>
-              <input
-                type="password"
-                value={hubspotToken}
-                onChange={e => setHubspotToken(e.target.value)}
-                placeholder="HubSpot private app token"
-                style={{
-                  width: '100%',
-                  height: '42px',
-                  borderRadius: '14px',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  background: 'rgba(255,255,255,0.05)',
-                  color: 'rgba(255,255,255,0.92)',
-                  padding: '0 14px',
-                  fontSize: '12px',
-                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                  outline: 'none',
-                }}
-              />
-              <button
-                type="submit"
-                disabled={hubspotConnecting || !hubspotToken.trim()}
-                style={{
-                  height: '42px',
-                  borderRadius: '14px',
-                  border: '1px solid rgba(139,92,246,0.22)',
-                  background: 'rgba(139,92,246,0.18)',
-                  color: 'rgba(255,255,255,0.94)',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  cursor: hubspotConnecting || !hubspotToken.trim() ? 'not-allowed' : 'pointer',
-                  opacity: hubspotConnecting || !hubspotToken.trim() ? 0.7 : 1,
-                }}
-              >
-                {hubspotConnecting && <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />}
-                {hubspotConnecting ? 'Connecting…' : 'Connect CRM'}
-              </button>
-            </form>
-          )}
-        </IntegrationCard>
-
-        <IntegrationCard
-          icon={<Workflow size={18} color="#c4b5fd" />}
-          title="Claude review"
-          eyebrow="Daily operator workflow"
-        >
-          <p style={{ fontSize: '13px', color: mutedText, lineHeight: 1.7, margin: '0 0 16px' }}>
-            Claude already owns the cross-tool reasoning. Halvex only needs to make the pipeline legible and accept the linked issue context Claude saves back.
-          </p>
-          <div
-            style={{
-              padding: '14px',
-              borderRadius: '18px',
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              fontSize: '12px',
-              color: mutedText,
-              lineHeight: 1.7,
-            }}
-          >
-            Recommended daily prompt:
-            <div style={{ marginTop: '8px', color: 'rgba(255,255,255,0.92)', fontWeight: 600 }}>
-              {DAILY_PROMPT}
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '14px' }}>
-            <button
-              onClick={() => copyToClipboard(DAILY_PROMPT, 'Claude prompt copied')}
-              style={{
-                height: '40px',
-                padding: '0 14px',
-                borderRadius: '14px',
-                border: '1px solid rgba(255,255,255,0.08)',
-                background: 'rgba(255,255,255,0.05)',
-                color: 'rgba(255,255,255,0.92)',
-                fontSize: '12px',
-                fontWeight: 700,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-              }}
-            >
-              <Copy size={13} />
-              Copy prompt
-            </button>
-            <Link
-              href="/workflows"
-              style={{
-                height: '40px',
-                padding: '0 14px',
-                borderRadius: '14px',
-                border: '1px solid rgba(255,255,255,0.08)',
-                background: 'rgba(255,255,255,0.03)',
-                color: 'rgba(255,255,255,0.82)',
-                fontSize: '12px',
-                fontWeight: 700,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                textDecoration: 'none',
-              }}
-            >
-              Review outcomes
-              <ArrowUpRight size={13} />
-            </Link>
-          </div>
-        </IntegrationCard>
-      </div>
     </div>
   )
 }

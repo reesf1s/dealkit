@@ -1,23 +1,20 @@
 /**
  * Meeting intelligence — extract feature requests from meeting notes
- * and trigger smart matching to Linear issues.
+ * and trigger smart matching to issue cache.
  *
  * Flow:
  *   1. Use Claude Haiku to extract features + pain points from notes
  *   2. Store extracted features in note_signals_json
- *   3. Trigger smartMatchDeal() which handles matching + creation
- *   4. Send a Slack DM to the rep summarising what was found
+ *   3. Trigger smartMatchDeal() which handles matching against cached issues
  *
  * Called inside next/after() from the meeting-notes endpoint.
  */
 
 import { anthropic } from '@/lib/ai/client'
 import { db } from '@/lib/db'
-import { dealLogs, dealLinearLinks, slackUserMappings } from '@/lib/db/schema'
+import { dealLogs } from '@/lib/db/schema'
 import { and, eq, sql } from 'drizzle-orm'
 import { smartMatchDeal } from '@/lib/smart-match'
-import { getSlackBotToken, slackOpenDm, slackPostMessage } from '@/lib/slack-client'
-import { markdownToBlocks } from '@/lib/slack-blocks'
 
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -104,7 +101,6 @@ export async function extractAndLinkFeatures(
   dealId: string,
   notes: string,
   workspaceId: string,
-  repClerkUserId?: string,
 ): Promise<void> {
   try {
     const [deal] = await db
@@ -174,95 +170,10 @@ export async function extractAndLinkFeatures(
       }
     }
 
-    // 3. Trigger smart matching for this deal (matches + creates Linear issues)
+    // 3. Trigger smart matching for this deal (matches against cached issues)
     const matchResult = await smartMatchDeal(workspaceId, dealId)
     console.log(`[meeting-intelligence] ${deal.prospectCompany}: smart match result — linked=${matchResult.linked}, created=${matchResult.created}`)
-
-    // 4. Send Slack DM to the rep
-    if (totalFeatures > 0 || extraction.painPoints.length > 0) {
-      // Count links for this deal
-      const links = await db
-        .select({ linearIssueId: dealLinearLinks.linearIssueId, linearTitle: dealLinearLinks.linearTitle })
-        .from(dealLinearLinks)
-        .where(and(
-          eq(dealLinearLinks.dealId, dealId),
-          eq(dealLinearLinks.workspaceId, workspaceId),
-        ))
-
-      await notifyRepAboutExtraction(
-        workspaceId,
-        repClerkUserId,
-        deal.dealName,
-        deal.prospectCompany,
-        matchResult.linked,
-        matchResult.created,
-        totalFeatures,
-        links.map(l => ({ id: l.linearIssueId, title: l.linearTitle ?? l.linearIssueId })),
-      )
-    }
   } catch (e) {
     console.error('[meeting-intelligence] extractAndLinkFeatures failed:', e)
-  }
-}
-
-// ─── Slack notification ──────────────────────────────────────────────────────
-
-async function notifyRepAboutExtraction(
-  workspaceId: string,
-  repClerkUserId: string | undefined,
-  dealName: string,
-  company: string,
-  linkedCount: number,
-  createdCount: number,
-  totalFeatures: number,
-  linkedIssues: { id: string; title: string }[],
-): Promise<void> {
-  try {
-    const botToken = await getSlackBotToken(workspaceId)
-    if (!botToken) return
-
-    let slackUserId: string | null = null
-    if (repClerkUserId) {
-      const [mapping] = await db
-        .select({ slackUserId: slackUserMappings.slackUserId })
-        .from(slackUserMappings)
-        .where(and(
-          eq(slackUserMappings.workspaceId, workspaceId),
-          eq(slackUserMappings.clerkUserId, repClerkUserId),
-        ))
-        .limit(1)
-      slackUserId = mapping?.slackUserId ?? null
-    }
-
-    if (!slackUserId) return
-
-    const parts: string[] = [`🔍 *Meeting notes analysed for ${company}*\n`]
-
-    if (linkedCount > 0) {
-      parts.push(`• Matched *${linkedCount}* existing Linear issue${linkedCount !== 1 ? 's' : ''}`)
-    }
-    if (createdCount > 0) {
-      parts.push(`• Created *${createdCount}* new Linear issue${createdCount !== 1 ? 's' : ''}`)
-    }
-    if (linkedCount === 0 && createdCount === 0 && totalFeatures > 0) {
-      parts.push(`• Found *${totalFeatures}* product gap${totalFeatures !== 1 ? 's' : ''} but no matching Linear issues yet`)
-    }
-
-    if (linkedIssues.length > 0) {
-      parts.push('')
-      for (const issue of linkedIssues.slice(0, 5)) {
-        parts.push(`  → *${issue.id}*: ${issue.title}`)
-      }
-    }
-
-    parts.push('', `_Ask me "latest on ${company}" to review._`)
-
-    const text = parts.join('\n')
-    const dmChannel = await slackOpenDm(botToken, slackUserId)
-    if (dmChannel) {
-      await slackPostMessage(botToken, dmChannel, markdownToBlocks(text), text)
-    }
-  } catch (e) {
-    console.warn('[meeting-intelligence] Slack notify failed:', e)
   }
 }

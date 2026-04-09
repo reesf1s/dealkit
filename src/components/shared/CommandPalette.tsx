@@ -6,6 +6,7 @@ import {
   LayoutDashboard, Swords, BookOpen, TrendingUp,
   FileText, Building2, Settings, Plus, Zap,
   Sparkles, CornerDownLeft, Loader2,
+  BarChart2, Users, Brain, AlertTriangle, GitBranch, MessageSquare, Plug,
 } from 'lucide-react'
 
 interface CommandItem {
@@ -18,17 +19,25 @@ interface CommandItem {
 }
 
 const ALL_ITEMS: CommandItem[] = [
-  { id: 'pipeline',       label: 'Today / Pipeline',     section: 'navigate', icon: LayoutDashboard, href: '/pipeline',     shortcut: '↩' },
+  { id: 'dashboard',      label: 'Dashboard',            section: 'navigate', icon: LayoutDashboard, href: '/dashboard' },
+  { id: 'pipeline',       label: 'Pipeline Map',         section: 'navigate', icon: GitBranch,       href: '/pipeline',     shortcut: '↩' },
+  { id: 'deals',          label: 'Opportunities',        section: 'navigate', icon: TrendingUp,      href: '/deals' },
+  { id: 'contacts',       label: 'Contacts',             section: 'navigate', icon: Users,           href: '/contacts' },
+  { id: 'analytics',      label: 'Analytics',            section: 'navigate', icon: BarChart2,       href: '/analytics' },
+  { id: 'intelligence',   label: 'Signals',              section: 'navigate', icon: Brain,           href: '/intelligence' },
   { id: 'competitors',    label: 'Competitors',          section: 'navigate', icon: Swords,          href: '/competitors' },
-  { id: 'case-studies',   label: 'Case Studies',         section: 'navigate', icon: BookOpen,         href: '/case-studies' },
-  { id: 'deals',          label: 'Deal Log',             section: 'navigate', icon: TrendingUp,       href: '/deals' },
-  { id: 'collateral',     label: 'Collateral',           section: 'navigate', icon: FileText,         href: '/collateral' },
-  { id: 'company',        label: 'Company Profile',      section: 'navigate', icon: Building2,        href: '/company' },
-  { id: 'settings',       label: 'Settings',             section: 'navigate', icon: Settings,         href: '/settings' },
-  { id: 'add-competitor', label: 'Add competitor',       section: 'actions',  icon: Plus,             href: '/competitors' },
-  { id: 'log-deal',       label: 'Log deal',             section: 'actions',  icon: Plus,             href: '/deals' },
-  { id: 'add-case-study', label: 'Add case study',       section: 'actions',  icon: Plus,             href: '/case-studies' },
-  { id: 'gen-collateral', label: 'Generate collateral',  section: 'actions',  icon: Zap,              href: '/collateral' },
+  { id: 'case-studies',   label: 'Case Studies',         section: 'navigate', icon: BookOpen,        href: '/case-studies' },
+  { id: 'collateral',     label: 'Collateral',           section: 'navigate', icon: FileText,        href: '/collateral' },
+  { id: 'product-gaps',   label: 'Product Gaps',         section: 'navigate', icon: AlertTriangle,   href: '/product-gaps' },
+  { id: 'workflows',      label: 'Sequences',            section: 'navigate', icon: Zap,             href: '/workflows' },
+  { id: 'playbook',       label: 'Win Playbook',         section: 'navigate', icon: BookOpen,        href: '/playbook' },
+  { id: 'models',         label: 'ML Models',            section: 'navigate', icon: Brain,           href: '/models' },
+  { id: 'company',        label: 'Integrations',         section: 'navigate', icon: Plug,            href: '/company' },
+  { id: 'settings',       label: 'Settings',             section: 'navigate', icon: Settings,        href: '/settings' },
+  { id: 'log-deal',       label: 'Log deal',             section: 'actions',  icon: Plus,            href: '/deals' },
+  { id: 'add-competitor', label: 'Add competitor',       section: 'actions',  icon: Plus,            href: '/competitors' },
+  { id: 'add-case-study', label: 'Add case study',       section: 'actions',  icon: Plus,            href: '/case-studies' },
+  { id: 'gen-collateral', label: 'Generate collateral',  section: 'actions',  icon: Zap,             href: '/collateral' },
 ]
 
 // ── Intent classifier ─────────────────────────────────────────────────────────
@@ -383,19 +392,19 @@ export default function CommandPalette() {
             display: 'flex', alignItems: 'center', gap: '10px',
             height: '44px', padding: '0 12px',
             cursor: 'pointer', borderRadius: '8px', margin: '0 6px',
-            backgroundColor: isActive ? 'var(--accent-subtle)' : 'transparent',
-            border: isActive ? '1px solid rgba(255,255,255,0.10)' : '1px solid transparent',
+            backgroundColor: isActive ? 'rgba(29, 184, 106, 0.08)' : 'transparent',
+            border: isActive ? '1px solid rgba(29, 184, 106, 0.18)' : '1px solid transparent',
             transition: 'all 0.05s',
           }}
         >
           <div style={{
             width: '26px', height: '26px', borderRadius: '7px',
-            background: 'rgba(255,255,255,0.08)',
-            border: '1px solid rgba(255,255,255,0.10)',
+            background: 'rgba(29, 184, 106, 0.10)',
+            border: '1px solid rgba(29, 184, 106, 0.18)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0,
           }}>
-            <Sparkles size={13} color="var(--accent)" />
+            <Sparkles size={13} color="#1DB86A" />
           </div>
           <span style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
             {atTop
@@ -417,9 +426,9 @@ export default function CommandPalette() {
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        backgroundColor: 'var(--border-default)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
       }}
     >
       <div
@@ -427,12 +436,10 @@ export default function CommandPalette() {
         style={{
           width: '600px',
           maxHeight: mode === 'ai' ? '580px' : '480px',
-          background: 'rgba(14, 10, 35, 0.85)',
-          backdropFilter: 'blur(28px)',
-          WebkitBackdropFilter: 'blur(28px)',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
-          borderRadius: '8px',
-          boxShadow: '0 40px 100px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.06)',
+          background: 'var(--surface-1)',
+          border: '1px solid var(--border-default)',
+          borderRadius: '10px',
+          boxShadow: '0 8px 40px #dddddd, 0 2px 8px #f0f0f0',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -610,7 +617,7 @@ export default function CommandPalette() {
       </div>
 
       <style>{`
-        input[data-cp-input]::placeholder { color: rgba(255,255,255,0.2); }
+        input[data-cp-input]::placeholder { color: #aaaaaa; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
       `}</style>

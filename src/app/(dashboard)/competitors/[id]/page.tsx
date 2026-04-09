@@ -79,13 +79,13 @@ export default function CompetitorDetailPage() {
   const isLoading = loadingComp || loadingColl || loadingDeals
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1100px', margin: '0 auto' }}>
+    <div style={{ padding: '32px', maxWidth: '1100px', margin: '0 auto', background: '#ffffff', minHeight: '100%' }}>
       {/* Back nav */}
       <Link
         href="/competitors"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-tertiary)', textDecoration: 'none', marginBottom: '20px' }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#9b9a97', textDecoration: 'none', marginBottom: '20px' }}
         onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)' }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = '#9b9a97' }}
       >
         <ArrowLeft size={14} strokeWidth={2} />
         Back to competitors
@@ -97,17 +97,17 @@ export default function CompetitorDetailPage() {
           <SkeletonCard lines={5} showHeader={false} />
         </div>
       ) : !competitor ? (
-        <div style={{ padding: '16px', borderRadius: '8px', backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--danger)', fontSize: '13px' }}>
+        <div style={{ padding: '16px', borderRadius: '8px', backgroundColor: 'rgba(224,62,62,0.08)', border: '1px solid rgba(224,62,62,0.20)', color: '#e03e3e', fontSize: '13px' }}>
           Competitor not found.
         </div>
       ) : (
         <>
           <div style={{ marginBottom: '24px' }}>
-            <h1 className="font-brand" style={{ fontSize: '22px', fontWeight: 500, color: 'var(--text-primary)', letterSpacing: '0.01em', margin: 0, marginBottom: '4px' }}>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, marginBottom: '4px' }}>
               {competitor.name}
             </h1>
             {competitor.website && (
-              <a href={competitor.website} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: 'var(--accent)', textDecoration: 'none' }}>
+              <a href={competitor.website} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: '#5e6ad2', textDecoration: 'none' }}>
                 {competitor.website}
               </a>
             )}

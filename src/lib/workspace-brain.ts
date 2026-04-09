@@ -756,6 +756,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown')
       intentSignals: dealLogs.intentSignals,
       outcome: dealLogs.outcome,
       scheduledEvents: dealLogs.scheduledEvents,
+      nextSteps: dealLogs.nextSteps,
     })
     .from(dealLogs)
     .where(eq(dealLogs.workspaceId, workspaceId))
@@ -2465,7 +2466,7 @@ Only return the JSON array, nothing else.`
   let dailyBriefingGeneratedAt: string | undefined
   try {
     const shouldRegenerate = !previousBrain?.dailyBriefingGeneratedAt ||
-      (Date.now() - new Date(previousBrain.dailyBriefingGeneratedAt).getTime()) > 6 * 60 * 60 * 1000 // 6 hours
+      (Date.now() - new Date(previousBrain.dailyBriefingGeneratedAt).getTime()) > 1 * 60 * 60 * 1000 // 1 hour
 
     if (shouldRegenerate && (dealActions?.length || staleDeals?.length)) {
       const { anthropic: anthropicClient } = await import('@/lib/ai/client')
@@ -2550,11 +2551,47 @@ Write only the briefing text, no quotes, no preamble.`
 
   await db.execute(sql`
     UPDATE workspaces
-    SET workspace_brain = ${JSON.stringify(brain)}::jsonb
+    SET workspace_brain = ${JSON.stringify(brain)}::jsonb,
+        focus_briefing_cache = NULL
     WHERE id = ${workspaceId}
   `)
   // Invalidate read cache so next getWorkspaceBrain call returns fresh data
   _invalidateBrainCache(workspaceId)
+
+  // ── Refresh deal next_steps from latest meeting notes ──────────────────────
+  // Prevents stale next_steps when meeting notes extraction fails or returns null
+  try {
+    for (const deal of activeDeals) {
+      const notes = deal.meetingNotes as string | null
+      if (!notes) continue
+      // Extract the latest note section (after last --- separator)
+      const sections = notes.split(/\n---\n/).filter(s => s.trim())
+      if (sections.length === 0) continue
+      const lastSection = sections[sections.length - 1].trim()
+      if (!lastSection) continue
+      // Check if latest note is newer than current next_steps by comparing content
+      const currentNext = (deal.nextSteps ?? '') as string
+      // Only update if the latest note contains information not in current next_steps
+      // Simple heuristic: if current next_steps text appears nowhere in the latest note section, it's likely stale
+      const latestLower = lastSection.toLowerCase()
+      const currentLower = currentNext.toLowerCase()
+      // Skip if next_steps already reflects latest note content
+      if (currentNext && latestLower.includes(currentLower.slice(0, 50))) continue
+      // Extract a concise next_steps from the latest note (take Actions line if present, else first 300 chars)
+      const actionsMatch = lastSection.match(/Actions?:\s*([\s\S]+)/i)
+      const freshNext = actionsMatch
+        ? actionsMatch[1].trim().slice(0, 300)
+        : lastSection.slice(0, 300)
+      if (freshNext && freshNext !== currentNext) {
+        await db.update(dealLogs).set({
+          nextSteps: freshNext,
+          updatedAt: new Date(),
+        }).where(eq(dealLogs.id, deal.id))
+      }
+    }
+  } catch (e) {
+    console.error('[brain] deal next_steps refresh error', e)
+  }
 
   // ── Rebuild log — record every rebuild for ML auditability ───────────────────
   try {
@@ -2716,18 +2753,6 @@ Write only the briefing text, no quotes, no preamble.`
       console.error('[brain] Embedding backfill failed:', err)
     )
   )
-
-  // Slack proactive notifications — fire for each score alert (non-blocking)
-  // Only fires when Slack is connected and users have opted in to notifications.
-  if (brain.scoreAlerts && brain.scoreAlerts.length > 0) {
-    import('./slack-notify').then(({ notifyHealthDrop }) => {
-      for (const alert of brain.scoreAlerts) {
-        notifyHealthDrop(workspaceId, alert).catch(err =>
-          console.error('[brain] Slack health-drop notification failed:', err)
-        )
-      }
-    }).catch(() => { /* non-fatal */ })
-  }
 
   return brain
 }

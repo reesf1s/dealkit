@@ -20,8 +20,7 @@ import {
 } from 'lucide-react'
 import WinLossModal, { type WinLossData } from '@/components/shared/WinLossModal'
 import { getScoreColor, getScoreDisplay, type DealContext } from '@/lib/deal-context'
-
-const fetcher = (url: string) => fetch(url).then(r => r.json())
+import { fetcher } from '@/lib/fetcher'
 
 // ── Brain-powered urgency/stale/ML lookup ──────────────────────────────────
 function useDealFlags(deals: any[]) {
@@ -99,7 +98,7 @@ function sortBoardDeals(deals: any[], sort: string): any[] {
 const STAGES = [
   { id: 'prospecting',   label: 'Prospecting',   color: '#6B7280' },
   { id: 'qualification', label: 'Qualification',  color: '#3B82F6' },
-  { id: 'discovery',     label: 'Discovery',      color: 'rgba(255,255,255,0.70)' },
+  { id: 'discovery',     label: 'Discovery',      color: '#6366f1' },
   { id: 'proposal',      label: 'Proposal',       color: '#F59E0B' },
   { id: 'negotiation',   label: 'Negotiation',    color: '#EF4444' },
   { id: 'closed_won',    label: 'Closed Won',     color: '#22C55E' },
@@ -109,8 +108,8 @@ const STAGES = [
 function ScoreBadge({ score, isClosed = false }: { score?: number | null; isClosed?: boolean }) {
   if (!score && score !== 0) return null
   const color = getScoreColor(score, isClosed)
-  const bg = `color-mix(in srgb, ${color} 10%, transparent)`
-  const border = `color-mix(in srgb, ${color} 25%, transparent)`
+  const bg = `color-mix(in srgb, ${color} 12%, #ffffff)`
+  const border = `color-mix(in srgb, ${color} 28%, #e5e4e0)`
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: '3px',
@@ -158,7 +157,7 @@ function DealCard({
   const outcome: 'won' | 'lost' | null = deal.stage === 'closed_won' ? 'won' : deal.stage === 'closed_lost' ? 'lost' : null
   const scoreDisplay = getScoreDisplay({ compositeScore: score, isClosed, outcome } as DealContext)
   const scColor = scoreDisplay.color
-  const scoreBg = score > 0 ? `color-mix(in srgb, ${scColor} 15%, transparent)` : 'rgba(255,255,255,0.05)'
+  const scoreBg = score > 0 ? `color-mix(in srgb, ${scColor} 12%, #ffffff)` : '#fafafa'
   const [scoreHover, setScoreHover] = useState(false)
 
   // Hover preview state
@@ -208,16 +207,14 @@ function DealCard({
       onDragEnd={() => { onDragEnd() }}
       onClick={() => { window.location.href = `/deals/${deal.id}` }}
       style={{
-        background: 'var(--glass-card-bg, rgba(255,255,255,0.04))',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        border: `1px solid ${isUrgent ? 'rgba(229,72,77,0.25)' : 'var(--glass-card-border, rgba(255,255,255,0.06))'}`,
-        borderRadius: '12px',
+        background: 'var(--surface-1)',
+        border: `1px solid ${isUrgent ? 'rgba(224,62,62,0.30)' : '#eeeeee'}`,
+        borderRadius: '10px',
         padding: '12px 13px',
         cursor: 'pointer',
         opacity: isDragging ? 0.4 : 1,
         transition: 'all 0.15s ease',
-        boxShadow: 'none',
+        boxShadow: '0 1px 3px #f5f5f5',
         userSelect: 'none',
         display: 'flex',
         flexDirection: 'column',
@@ -225,11 +222,11 @@ function DealCard({
         position: 'relative',
       }}
       onMouseEnter={e => {
-        ;(e.currentTarget as HTMLElement).style.background = 'var(--glass-card-hover-bg, rgba(255,255,255,0.07))'
-        ;(e.currentTarget as HTMLElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)'
+        ;(e.currentTarget as HTMLElement).style.background = '#fafafa'
+        ;(e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px #eeeeee'
         ;(e.currentTarget as HTMLElement).style.borderColor = isUrgent
-          ? 'rgba(229,72,77,0.35)'
-          : 'var(--glass-card-hover-border, rgba(255,255,255,0.12))'
+          ? 'rgba(224,62,62,0.40)'
+          : 'var(--border-default)'
         // Start hover preview timer
         if (previewTimer.current) clearTimeout(previewTimer.current)
         previewTimer.current = setTimeout(() => {
@@ -244,11 +241,11 @@ function DealCard({
         }, 200)
       }}
       onMouseLeave={e => {
-        ;(e.currentTarget as HTMLElement).style.background = 'var(--glass-card-bg, rgba(255,255,255,0.04))'
-        ;(e.currentTarget as HTMLElement).style.boxShadow = 'none'
+        ;(e.currentTarget as HTMLElement).style.background = '#ffffff'
+        ;(e.currentTarget as HTMLElement).style.boxShadow = '0 1px 3px #f5f5f5'
         ;(e.currentTarget as HTMLElement).style.borderColor = isUrgent
-          ? 'rgba(229,72,77,0.25)'
-          : 'var(--glass-card-border, rgba(255,255,255,0.06))'
+          ? 'rgba(224,62,62,0.30)'
+          : '#eeeeee'
         if (previewTimer.current) clearTimeout(previewTimer.current)
         setPreviewVisible(false)
       }}
@@ -268,8 +265,8 @@ function DealCard({
             <span style={{
               display: 'inline-block', marginTop: '3px',
               fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '100px',
-              background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)',
-              border: '1px solid rgba(255,255,255,0.10)',
+              background: 'var(--surface-2)', color: 'var(--text-secondary)',
+              border: '1px solid var(--border-default)',
             }}>
               {deal.engagementType}
             </span>
@@ -285,16 +282,16 @@ function DealCard({
             {isClosed ? (
               <div style={{
                 height: '28px', padding: '0 10px', borderRadius: '8px',
-                background: `color-mix(in srgb, ${scColor} 15%, transparent)`,
-                border: `1.5px solid color-mix(in srgb, ${scColor} 35%, transparent)`,
+                background: `color-mix(in srgb, ${scColor} 12%, #ffffff)`,
+                border: `1.5px solid color-mix(in srgb, ${scColor} 30%, #e5e4e0)`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default',
               }}>
                 <span style={{ fontSize: '11px', fontWeight: '700', color: scColor, lineHeight: 1 }}>{scoreDisplay.text}</span>
               </div>
             ) : (
-              <svg width="34" height="34" viewBox="0 0 34 34" style={{ cursor: 'default', flexShrink: 0, filter: `drop-shadow(0 0 6px ${scColor}40)` }}>
+              <svg width="34" height="34" viewBox="0 0 34 34" style={{ cursor: 'default', flexShrink: 0 }}>
                 {/* Background track */}
-                <circle cx="17" cy="17" r="14" fill={`color-mix(in srgb, ${scColor} 10%, transparent)`} stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
+                <circle cx="17" cy="17" r="14" fill={`color-mix(in srgb, ${scColor} 10%, #ffffff)`} stroke="#eeeeee" strokeWidth="3" />
                 {/* Progress arc */}
                 <circle cx="17" cy="17" r="14" fill="none" stroke={scColor} strokeWidth="3" strokeLinecap="round"
                   strokeDasharray={`${(score / 100) * 2 * Math.PI * 14} ${2 * Math.PI * 14}`}
@@ -307,9 +304,9 @@ function DealCard({
             {scoreHover && (
               <div style={{
                 position: 'absolute', top: '36px', right: 0, zIndex: 100,
-                background: 'var(--card-bg)', border: 'none',
+                background: 'var(--surface-1)', border: '1px solid var(--border-default)',
                 borderRadius: '8px', padding: '10px 12px', minWidth: '200px',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
                 pointerEvents: 'none',
               }}>
                 <div style={{ fontSize: '12px', fontWeight: '700', color: scColor, marginBottom: '8px' }}>
@@ -397,14 +394,12 @@ function DealCard({
             top: Math.min(previewPos.top, window.innerHeight - 220),
             left: Math.max(8, Math.min(previewPos.left, window.innerWidth - 260)),
             zIndex: 9999,
-            background: 'var(--glass-card-bg, rgba(255,255,255,0.06))',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            border: '1px solid var(--glass-card-border, rgba(255,255,255,0.1))',
-            borderRadius: '12px',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border-default)',
+            borderRadius: '10px',
             padding: '12px 14px',
             width: '240px',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.3), 0 0 20px var(--glass-glow-accent, rgba(91,91,214,0.08))',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
             pointerEvents: 'none',
             display: 'flex',
             flexDirection: 'column',
@@ -495,12 +490,11 @@ function IntelListView({
   }
 
   const cardStyle: React.CSSProperties = {
-    background: 'var(--glass-card-bg, rgba(255,255,255,0.04))',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid var(--glass-card-border, rgba(255,255,255,0.08))',
-    borderRadius: '12px',
+    background: 'var(--surface-1)',
+    border: '1px solid var(--border-default)',
+    borderRadius: '10px',
     overflow: 'hidden',
+    boxShadow: '0 1px 3px #f5f5f5',
   }
 
   return (
@@ -510,20 +504,20 @@ function IntelListView({
       <div style={{
         padding: '16px 20px',
         background: urgentCount > 0
-          ? 'linear-gradient(135deg, rgba(248,113,113,0.07) 0%, rgba(255,255,255,0.03) 100%)'
-          : 'rgba(255,255,255,0.04)',
+          ? 'linear-gradient(135deg, rgba(224,62,62,0.05) 0%, #ffffff 100%)'
+          : '#ffffff',
         ...cardStyle,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: '18px', fontWeight: 600, color: 'rgba(255,255,255,0.90)', letterSpacing: '-0.01em', marginBottom: '3px' }}>
+            <div style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em', marginBottom: '3px' }}>
               {isLoading ? '—' : urgentCount > 0
                 ? `${urgentCount} deal${urgentCount !== 1 ? 's' : ''} need your attention`
                 : atRiskCount > 0
                 ? `${atRiskCount} deal${atRiskCount !== 1 ? 's' : ''} at risk — low health score`
                 : `${activeDeals.length} active deals — looking healthy`}
             </div>
-            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.35)' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
               Sorted by health score · lowest first
             </div>
           </div>
@@ -533,9 +527,9 @@ function IntelListView({
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px',
                 padding: '7px 13px', borderRadius: '8px', cursor: 'pointer',
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                color: 'rgba(255,255,255,0.70)', fontSize: '12px', fontWeight: 500,
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border-default)',
+                color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 500,
               }}
             >
               <Brain size={12} /> Ask AI about pipeline
@@ -550,11 +544,11 @@ function IntelListView({
         {/* Header row */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: '1fr 80px 90px 100px 1fr',
+          gridTemplateColumns: '1fr minmax(60px,80px) minmax(70px,90px) minmax(80px,100px) 1fr',
           gap: '8px',
           padding: '10px 18px',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          fontSize: '10px', fontWeight: 700, color: 'rgba(255,255,255,0.25)',
+          borderBottom: '1px solid var(--border-default)',
+          fontSize: '10px', fontWeight: 700, color: 'var(--text-tertiary)',
           textTransform: 'uppercase', letterSpacing: '0.07em',
         }}>
           <span>Company</span>
@@ -568,35 +562,35 @@ function IntelListView({
           <div style={{ padding: '12px 0' }}>
             {[1, 2, 3, 4].map(i => (
               <div key={i} style={{
-                display: 'grid', gridTemplateColumns: '1fr 80px 90px 100px 1fr',
+                display: 'grid', gridTemplateColumns: '1fr minmax(60px,80px) minmax(70px,90px) minmax(80px,100px) 1fr',
                 gap: '8px', padding: '14px 18px',
-                borderBottom: '1px solid rgba(255,255,255,0.04)',
+                borderBottom: '1px solid #f5f5f5',
               }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  <div style={{ height: '13px', width: '55%', borderRadius: '4px', background: 'rgba(255,255,255,0.06)' }} />
-                  <div style={{ height: '11px', width: '35%', borderRadius: '4px', background: 'rgba(255,255,255,0.04)' }} />
+                  <div style={{ height: '13px', width: '55%', borderRadius: '4px', background: 'var(--surface-2)' }} />
+                  <div style={{ height: '11px', width: '35%', borderRadius: '4px', background: 'var(--surface-2)' }} />
                 </div>
-                <div style={{ height: '13px', width: '60px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', justifySelf: 'end' }} />
-                <div style={{ height: '28px', width: '50px', borderRadius: '100px', background: 'rgba(255,255,255,0.05)', justifySelf: 'center' }} />
-                <div style={{ height: '13px', width: '70px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)' }} />
-                <div style={{ height: '13px', width: '80%', borderRadius: '4px', background: 'rgba(255,255,255,0.04)' }} />
+                <div style={{ height: '13px', width: '60px', borderRadius: '4px', background: 'var(--surface-2)', justifySelf: 'end' }} />
+                <div style={{ height: '28px', width: '50px', borderRadius: '100px', background: 'var(--surface-2)', justifySelf: 'center' }} />
+                <div style={{ height: '13px', width: '70px', borderRadius: '4px', background: 'var(--surface-2)' }} />
+                <div style={{ height: '13px', width: '80%', borderRadius: '4px', background: 'var(--surface-2)' }} />
               </div>
             ))}
           </div>
         ) : sorted.length === 0 ? (
           <div style={{ padding: '48px 20px', textAlign: 'center' }}>
-            <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.45)', fontWeight: 500, marginBottom: '6px' }}>
+            <div style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 500, marginBottom: '6px' }}>
               No active deals yet
             </div>
-            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.25)', marginBottom: '16px' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '16px' }}>
               Add your first deal to start tracking health scores and AI risk signals
             </div>
             <Link href="/deals" style={{
               display: 'inline-flex', alignItems: 'center', gap: '5px',
               padding: '8px 16px', borderRadius: '8px',
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.10)',
-              color: 'rgba(255,255,255,0.70)', fontSize: '12px', fontWeight: 600, textDecoration: 'none',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border-default)',
+              color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 600, textDecoration: 'none',
             }}>
               <Plus size={12} /> Add first deal
             </Link>
@@ -618,34 +612,34 @@ function IntelListView({
                 href={`/deals/${deal.id}`}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 80px 90px 100px 1fr',
+                  gridTemplateColumns: '1fr minmax(60px,80px) minmax(70px,90px) minmax(80px,100px) 1fr',
                   gap: '8px',
                   padding: '14px 18px',
-                  borderBottom: idx < sorted.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                  borderBottom: idx < sorted.length - 1 ? '1px solid #f5f5f5' : 'none',
                   alignItems: 'center',
                   textDecoration: 'none',
-                  background: isUrgent ? 'rgba(248,113,113,0.03)' : 'transparent',
+                  background: isUrgent ? 'rgba(224,62,62,0.03)' : 'transparent',
                   transition: 'background 0.12s',
                 }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = isUrgent ? 'rgba(248,113,113,0.06)' : 'rgba(255,255,255,0.03)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = isUrgent ? 'rgba(248,113,113,0.03)' : 'transparent'}
+                onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = isUrgent ? 'rgba(224,62,62,0.06)' : 'rgba(26,26,26,0.03)'}
+                onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = isUrgent ? 'rgba(224,62,62,0.03)' : 'transparent'}
               >
                 {/* Company + deal name */}
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.88)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {deal.prospectCompany}
                     {momentum === 'hot' && <span title="Hot deal" style={{ marginLeft: '6px', color: '#059669', fontSize: '10px' }}>●</span>}
                     {momentum === 'cooling' && <span title="Cooling" style={{ marginLeft: '6px', color: '#D97706', fontSize: '10px' }}>●</span>}
                   </div>
                   {deal.dealName && deal.dealName !== deal.prospectCompany && (
-                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {deal.dealName}
                     </div>
                   )}
                 </div>
 
                 {/* Value */}
-                <div style={{ textAlign: 'right', fontSize: '12px', fontWeight: 600, color: value > 0 ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.20)' }}>
+                <div style={{ textAlign: 'right', fontSize: '12px', fontWeight: 600, color: value > 0 ? '#787774' : '#9b9a97' }}>
                   {value > 0 ? fmt(value) : '—'}
                 </div>
 
@@ -656,25 +650,25 @@ function IntelListView({
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       width: '52px', height: '28px',
                       borderRadius: '8px',
-                      background: `color-mix(in srgb, ${color} 12%, transparent)`,
-                      border: `1.5px solid color-mix(in srgb, ${color} 30%, transparent)`,
+                      background: `color-mix(in srgb, ${color} 10%, #ffffff)`,
+                      border: `1.5px solid color-mix(in srgb, ${color} 25%, #e5e4e0)`,
                     }}>
                       <span style={{ fontSize: '14px', fontWeight: 800, color, lineHeight: 1, letterSpacing: '-0.01em' }}>
                         {score}
                       </span>
                     </div>
                   ) : (
-                    <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.20)' }}>—</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>—</span>
                   )}
                 </div>
 
                 {/* Stage + days */}
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '11px', fontWeight: 500, color: 'rgba(255,255,255,0.55)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {stageLabel(deal.stage)}
                   </div>
                   {days > 0 && (
-                    <div style={{ fontSize: '10px', color: days > 14 ? '#fbbf24' : 'rgba(255,255,255,0.25)', marginTop: '2px' }}>
+                    <div style={{ fontSize: '10px', color: days > 14 ? '#cb6c2c' : '#9b9a97', marginTop: '2px' }}>
                       {days}d in stage
                     </div>
                   )}
@@ -685,7 +679,7 @@ function IntelListView({
                   {signal ? (
                     <div style={{
                       fontSize: '11px',
-                      color: isUrgent ? '#f87171' : 'rgba(255,255,255,0.45)',
+                      color: isUrgent ? '#e03e3e' : '#787774',
                       lineHeight: 1.4,
                       overflow: 'hidden', display: '-webkit-box',
                       WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
@@ -694,7 +688,7 @@ function IntelListView({
                       {signal}
                     </div>
                   ) : (
-                    <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.18)' }}>—</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>—</span>
                   )}
                 </div>
               </Link>
@@ -714,7 +708,7 @@ function PipelineSettings({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editLabel, setEditLabel] = useState('')
   const [newLabel, setNewLabel] = useState('')
-  const [newColor, setNewColor] = useState('rgba(255,255,255,0.70)')
+  const [newColor, setNewColor] = useState('#6366f1')
   const [editingColorId, setEditingColorId] = useState<string | null>(null)
 
   if (!open) return null
@@ -792,12 +786,12 @@ function PipelineSettings({
     onUpdate()
   }
 
-  const PRESET_COLORS = ['#6B7280', '#3B82F6', 'rgba(255,255,255,0.70)', '#F59E0B', '#EF4444', '#22C55E', '#EC4899', '#14B8A6', '#F97316']
+  const PRESET_COLORS = ['#6B7280', '#3B82F6', '#6366f1', '#F59E0B', '#EF4444', '#22C55E', '#EC4899', '#14B8A6', '#F97316']
 
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+      background: 'var(--border-default)',
     }} onClick={onClose}>
       <div
         onClick={e => e.stopPropagation()}
@@ -848,7 +842,7 @@ function PipelineSettings({
                   title="Click to change colour"
                   style={{
                     width: '14px', height: '14px', borderRadius: '4px', background: s.color, flexShrink: 0,
-                    border: editingColorId === s.id ? '2px solid #fff' : '2px solid transparent',
+                    border: editingColorId === s.id ? '2px solid #1a1a1a' : '2px solid transparent',
                     cursor: 'pointer', padding: 0, transition: 'transform 0.1s',
                   }}
                   onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.2)' }}
@@ -903,7 +897,7 @@ function PipelineSettings({
                   {PRESET_COLORS.map(c => (
                     <button key={c} onClick={() => updateColor(s.id, c)} style={{
                       width: '22px', height: '22px', borderRadius: '5px', background: c, padding: 0,
-                      border: s.color === c ? '2px solid #fff' : '2px solid transparent', cursor: 'pointer',
+                      border: s.color === c ? '2px solid #1a1a1a' : '2px solid transparent', cursor: 'pointer',
                       transform: 'scale(1)', transition: 'transform 0.1s',
                     }}
                       onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.15)' }}
@@ -924,7 +918,7 @@ function PipelineSettings({
             <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
               {PRESET_COLORS.map(c => (
                 <button key={c} type="button" onClick={() => setNewColor(c)} style={{
-                  width: '20px', height: '20px', borderRadius: '4px', background: c, border: newColor === c ? '2px solid #fff' : '2px solid transparent', cursor: 'pointer', padding: 0,
+                  width: '20px', height: '20px', borderRadius: '4px', background: c, border: newColor === c ? '2px solid #1a1a1a' : '2px solid transparent', cursor: 'pointer', padding: 0,
                 }} />
               ))}
             </div>
@@ -961,9 +955,9 @@ function InfoTooltip({ text }: { text: string }) {
       {show && (
         <div style={{
           position: 'absolute', bottom: '120%', left: '50%', transform: 'translateX(-50%)',
-          background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px',
-          padding: '8px 10px', fontSize: '11px', color: '#d1d5db', lineHeight: 1.5,
-          width: '220px', zIndex: 100, pointerEvents: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+          background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '8px',
+          padding: '8px 10px', fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.5,
+          width: '220px', zIndex: 100, pointerEvents: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
         }}>
           {text}
         </div>
@@ -1005,7 +999,7 @@ function AnimatedBar({ pct, color }: { pct: number; color: string }) {
 }
 
 // ── Mini SVG Sparkline ────────────────────────────────────────────────────────
-function Sparkline({ points, color = 'rgba(255,255,255,0.80)', w = 100, h = 28 }: { points: number[]; color?: string; w?: number; h?: number }) {
+function Sparkline({ points, color = '#9b9a97', w = 100, h = 28 }: { points: number[]; color?: string; w?: number; h?: number }) {
   if (points.length < 2) return null
   const min = Math.min(...points)
   const max = Math.max(...points)
@@ -1016,6 +1010,145 @@ function Sparkline({ points, color = 'rgba(255,255,255,0.80)', w = 100, h = 28 }
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display: 'block' }}>
       <polyline points={coords} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
+  )
+}
+
+// ── Funnel View ───────────────────────────────────────────────────────────────
+function FunnelView({ deals, configStages, brainData, currencySymbol }: {
+  deals: any[]; configStages: any[]; brainData: any; currencySymbol: string
+}) {
+  const fmtVal = (n: number) => {
+    if (n >= 1_000_000) return `${currencySymbol}${(n / 1_000_000).toFixed(1)}m`
+    if (n >= 1_000) return `${currencySymbol}${Math.round(n / 1_000)}k`
+    return `${currencySymbol}${Math.round(n)}`
+  }
+
+  // Build per-stage breakdown
+  const openStages = configStages.filter((s: any) => s.id !== 'closed_won' && s.id !== 'closed_lost' && !s.isHidden)
+  const stageRows = openStages.map((stage: any) => {
+    const stageDeals = deals.filter((d: any) => d.stage === stage.id)
+    const value = stageDeals.reduce((s: number, d: any) => s + (d.dealValue ?? 0), 0)
+    const avgScore = stageDeals.length
+      ? Math.round(stageDeals.reduce((s: number, d: any) => s + (d.conversionScore ?? 0), 0) / stageDeals.length)
+      : 0
+    return { ...stage, count: stageDeals.length, value, avgScore }
+  })
+
+  const maxCount = Math.max(...stageRows.map((s: any) => s.count), 1)
+
+  // Win/loss from brain
+  const wl = brainData?.winLossIntel
+  const wonDeals = deals.filter((d: any) => d.stage === 'closed_won')
+  const lostDeals = deals.filter((d: any) => d.stage === 'closed_lost')
+  const wonValue = wonDeals.reduce((s: number, d: any) => s + (d.dealValue ?? 0), 0)
+  const lostValue = lostDeals.reduce((s: number, d: any) => s + (d.dealValue ?? 0), 0)
+  const winRate = wl?.winRate != null ? Math.round(wl.winRate * 100) : null
+
+  const openDeals = deals.filter((d: any) => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
+  const totalPipelineValue = openDeals.reduce((s: number, d: any) => s + (d.dealValue ?? 0), 0)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Header */}
+      <div>
+        <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', margin: 0 }}>
+          Pipeline Funnel
+        </h1>
+        <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: '3px 0 0' }}>
+          Stage-by-stage breakdown · {openDeals.length} open deals · {fmtVal(totalPipelineValue)} total value
+        </p>
+      </div>
+
+      {/* Metrics Row */}
+      <div style={{ display: 'flex', gap: 12 }}>
+        {[
+          { label: 'Open Deals', value: String(openDeals.length), sub: fmtVal(totalPipelineValue) + ' pipeline' },
+          { label: 'Win Rate', value: winRate != null ? `${winRate}%` : '—', sub: `${wonDeals.length}W · ${lostDeals.length}L` },
+          { label: 'Closed Won', value: fmtVal(wonValue), sub: `${wonDeals.length} deals` },
+          { label: 'Closed Lost', value: fmtVal(lostValue), sub: `${lostDeals.length} deals`, accent: lostValue > 0 ? '#ef4444' : undefined },
+        ].map(m => (
+          <div key={m.label} style={{
+            flex: 1, padding: '14px 16px',
+            background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 10,
+          }}>
+            <div style={{ fontSize: 10.5, color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 3 }}>{m.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.04em', color: (m as any).accent ?? '#1a1a1a' }}>{m.value}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{m.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Funnel Bars */}
+      <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 10, padding: '18px 20px' }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 14 }}>
+          Stage Breakdown
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {stageRows.map((stage: any) => {
+            const pct = maxCount > 0 ? (stage.count / maxCount) * 100 : 0
+            return (
+              <div key={stage.id}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 2, background: stage.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-primary)' }}>{stage.label}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {stage.value > 0 && (
+                      <span style={{ fontSize: 11.5, color: '#777', fontVariantNumeric: 'tabular-nums' }}>
+                        {fmtVal(stage.value)}
+                      </span>
+                    )}
+                    <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-primary)', minWidth: 30, textAlign: 'right' }}>
+                      {stage.count}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ height: 6, borderRadius: 3, background: 'var(--surface-2)', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', width: `${pct}%`, background: stage.color,
+                    borderRadius: 3, transition: 'width 0.4s ease',
+                    opacity: stage.count === 0 ? 0.3 : 1,
+                  }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Conversion estimate */}
+      {openStages.length >= 2 && (
+        <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 10, padding: '18px 20px' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 12 }}>
+            Stage-to-Stage Conversion
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {stageRows.slice(1).map((stage: any, i: number) => {
+              const prev = stageRows[i]
+              const rate = prev.count > 0 ? Math.round((stage.count / prev.count) * 100) : null
+              return (
+                <div key={stage.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 11.5, color: '#777', width: 80, flexShrink: 0, textAlign: 'right' }}>{prev.label}</span>
+                  <span style={{ fontSize: 10, color: 'var(--border-default)' }}>→</span>
+                  <span style={{ fontSize: 11.5, color: '#777', width: 80, flexShrink: 0 }}>{stage.label}</span>
+                  <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'var(--surface-2)', overflow: 'hidden' }}>
+                    <div style={{
+                      height: '100%', width: `${rate ?? 0}%`,
+                      background: (rate ?? 0) >= 50 ? '#1DB86A' : (rate ?? 0) >= 25 ? '#f59e0b' : '#ef4444',
+                      borderRadius: 2, transition: 'width 0.4s ease',
+                    }} />
+                  </div>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-primary)', width: 40, textAlign: 'right', flexShrink: 0 }}>
+                    {rate != null ? `${rate}%` : '—'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -1067,9 +1200,10 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
   })()
 
   const cardStyle: React.CSSProperties = {
-    background: 'var(--glass-card-bg, rgba(255,255,255,0.04))', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid var(--glass-card-border, rgba(255,255,255,0.08))', borderRadius: '12px', padding: '18px 20px',
+    background: 'var(--surface-1)',
+    border: '1px solid var(--border-default)', borderRadius: '10px', padding: '18px 20px',
     display: 'flex', flexDirection: 'column', gap: '12px',
+    boxShadow: '0 1px 3px #f5f5f5',
     transition: 'border-color 0.15s, box-shadow 0.15s',
   }
   const labelStyle: React.CSSProperties = {
@@ -1378,7 +1512,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
           {competitivePatterns.length > 0 && (
             <button
               onClick={() => onAsk('Analyse our competitive win/loss patterns and give me specific recommendations for how to beat each competitor we face.')}
-              style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+              style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: '8px', background: 'var(--surface-2)', border: '1px solid var(--border-default)', color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
             >
               <Sparkles size={10} /> Competitive Strategy
             </button>
@@ -1462,7 +1596,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
                   )}
                   <button
                     onClick={() => onAsk(`The ${t.dealName} deal score is ${isDown ? 'declining' : 'improving'}: ${t.message ?? ''}. Review the deal and tell me what's driving this and what I should do now.`)}
-                    style={{ flexShrink: 0, padding: '4px 10px', borderRadius: '6px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--accent)', fontSize: '10px', fontWeight: '600', cursor: 'pointer' }}
+                    style={{ flexShrink: 0, padding: '4px 10px', borderRadius: '6px', background: 'var(--surface-2)', border: '1px solid var(--border-default)', color: 'var(--accent)', fontSize: '10px', fontWeight: '600', cursor: 'pointer' }}
                   >
                     Ask AI
                   </button>
@@ -1571,7 +1705,7 @@ function InsightsView({ brainData, deals, currencySymbol, onAsk }: {
           </div>
           <button
             onClick={() => onAsk("Analyse my pipeline trends and tell me what's changed, what the data says about where my revenue will come from this quarter, and what I should do differently.")}
-            style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 14px', borderRadius: '8px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
+            style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 14px', borderRadius: '8px', background: 'var(--surface-2)', border: '1px solid var(--border-default)', color: 'var(--accent)', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}
           >
             <Sparkles size={10} /> Deep Analysis
           </button>
@@ -1720,7 +1854,7 @@ export default function PipelinePage() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
 
-  const [view, setView] = useState<'intel' | 'board' | 'insights'>('intel')
+  const [view, setView] = useState<'intel' | 'board' | 'insights' | 'funnel'>('intel')
   const [aiInput, setAiInput] = useState('')
   const aiInputRef = useRef<HTMLInputElement>(null)
 
@@ -1838,12 +1972,11 @@ export default function PipelinePage() {
   const tabBarStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     gap: '8px',
-    background: 'var(--glass-card-bg, rgba(255,255,255,0.03))',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid var(--glass-card-border, rgba(255,255,255,0.06))',
-    borderRadius: '12px',
+    background: 'var(--surface-1)',
+    border: '1px solid var(--border-default)',
+    borderRadius: '10px',
     padding: '8px 12px',
+    boxShadow: '0 1px 3px #f5f5f5',
   }
   const tabGroupStyle: React.CSSProperties = {
     display: 'flex', gap: '4px',
@@ -1853,11 +1986,9 @@ export default function PipelinePage() {
     padding: '7px 14px', borderRadius: '8px',
     fontSize: '12px', fontWeight: '500',
     cursor: 'pointer', border: 'none', outline: 'none',
-    background: active ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
-    color: active ? '#fff' : 'var(--text-secondary)',
-    backdropFilter: active ? 'none' : 'blur(8px)',
-    WebkitBackdropFilter: active ? 'none' : 'blur(8px)',
-    boxShadow: active ? '0 2px 12px rgba(91,91,214,0.25)' : 'none',
+    background: active ? 'var(--surface-active)' : 'transparent',
+    color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+    boxShadow: 'none',
     transition: 'background 0.15s, color 0.15s, box-shadow 0.15s',
   })
 
@@ -1874,6 +2005,10 @@ export default function PipelinePage() {
           <button style={tabBtn(view === 'board')} onClick={() => setView('board')}>
             <Kanban size={13} />
             Kanban
+          </button>
+          <button style={tabBtn(view === 'funnel')} onClick={() => setView('funnel')}>
+            <BarChart3 size={13} />
+            Funnel
           </button>
           <button style={tabBtn(view === 'insights')} onClick={() => setView('insights')}>
             <Brain size={13} />
@@ -1976,9 +2111,9 @@ export default function PipelinePage() {
                   onClick={() => setEngagementFilter(engagementFilter === t ? '' : t)}
                   style={{
                     fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '100px', cursor: 'pointer',
-                    background: engagementFilter === t ? 'rgba(255,255,255,0.10)' : 'transparent',
+                    background: engagementFilter === t ? 'var(--surface-2)' : 'transparent',
                     color: engagementFilter === t ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                    border: `1px solid ${engagementFilter === t ? 'rgba(255,255,255,0.20)' : 'var(--border)'}`,
+                    border: `1px solid ${engagementFilter === t ? '#dddddd' : 'var(--border)'}`,
                   }}
                 >{t}</button>
               ))}
@@ -2090,17 +2225,15 @@ export default function PipelinePage() {
                     {/* Column header */}
                     <div style={{
                       padding: '10px 12px',
-                      background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.06)` : 'var(--glass-card-bg, rgba(255,255,255,0.04))',
-                      backdropFilter: 'blur(16px)',
-                      WebkitBackdropFilter: 'blur(16px)',
-                      border: isDropTarget ? `1px solid ${stage.color}33` : '1px solid var(--glass-card-border, rgba(255,255,255,0.08))',
-                      borderTop: `3px solid ${stage.color}66`,
-                      borderRadius: '12px',
+                      background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.06)` : '#fafafa',
+                      border: isDropTarget ? `1px solid ${stage.color}33` : '1px solid #eeeeee',
+                      borderTop: `3px solid ${stage.color}`,
+                      borderRadius: '10px',
                       transition: 'background 0.15s, border-color 0.15s',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>{stage.label}</span>
-                        <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.06)', border: 'none', padding: '1px 6px', borderRadius: '100px' }}>{stageDeals.length}</span>
+                        <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)', background: 'var(--surface-2)', padding: '1px 6px', borderRadius: '100px' }}>{stageDeals.length}</span>
                       </div>
                       {stageValue > 0 && (
                         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '3px' }}>
@@ -2206,17 +2339,15 @@ export default function PipelinePage() {
                     {/* Column header */}
                     <div style={{
                       padding: '10px 12px',
-                      background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.06)` : 'var(--glass-card-bg, rgba(255,255,255,0.04))',
-                      backdropFilter: 'blur(16px)',
-                      WebkitBackdropFilter: 'blur(16px)',
-                      border: isDropTarget ? `1px solid ${stage.color}33` : '1px solid var(--glass-card-border, rgba(255,255,255,0.08))',
-                      borderTop: `3px solid ${stage.color}66`,
-                      borderRadius: '12px',
+                      background: isDropTarget ? `rgba(${hexToRgb(stage.color)},0.06)` : '#fafafa',
+                      border: isDropTarget ? `1px solid ${stage.color}33` : '1px solid #eeeeee',
+                      borderTop: `3px solid ${stage.color}`,
+                      borderRadius: '10px',
                       transition: 'background 0.15s, border-color 0.15s',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', flex: 1 }}>{stage.label}</span>
-                        <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.06)', border: 'none', padding: '1px 6px', borderRadius: '100px' }}>{stageDeals.length}</span>
+                        <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)', background: 'var(--surface-2)', padding: '1px 6px', borderRadius: '100px' }}>{stageDeals.length}</span>
                       </div>
                       {stageValue > 0 && (
                         <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '3px' }}>
@@ -2264,6 +2395,11 @@ export default function PipelinePage() {
           </div>
           )}
         </div>
+      )}
+
+      {/* ── FUNNEL VIEW ─────────────────────────────────────────────────────── */}
+      {view === 'funnel' && (
+        <FunnelView deals={deals} configStages={configStages} brainData={brainData} currencySymbol={currencySymbol} />
       )}
 
       {/* ── INSIGHTS VIEW ───────────────────────────────────────────────────── */}

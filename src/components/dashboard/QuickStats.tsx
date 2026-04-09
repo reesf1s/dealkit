@@ -26,7 +26,7 @@ function StatCard({ label, value, icon: Icon, accentColor, accentRgb, sub, trend
   return (
     <div
       style={{
-        background: `linear-gradient(135deg, rgba(${accentRgb}, 0.06) 0%, rgba(255,255,255,0.02) 100%)`,
+        background: `linear-gradient(135deg, rgba(${accentRgb}, 0.06) 0%, var(--surface-1) 100%)`,
         border: `1px solid rgba(${accentRgb}, 0.14)`,
         borderRadius: '12px',
         padding: '18px',
@@ -42,7 +42,7 @@ function StatCard({ label, value, icon: Icon, accentColor, accentRgb, sub, trend
         const el = e.currentTarget as HTMLElement
         el.style.transform = 'translateY(-1px)'
         el.style.borderColor = `rgba(${accentRgb}, 0.28)`
-        el.style.boxShadow = `0 8px 24px rgba(${accentRgb}, 0.10), 0 1px 0 rgba(255,255,255,0.06)`
+        el.style.boxShadow = `0 4px 12px rgba(${accentRgb}, 0.12), 0 1px 3px rgba(55,53,47,0.06)`
       }}
       onMouseLeave={e => {
         const el = e.currentTarget as HTMLElement
@@ -75,7 +75,7 @@ function StatCard({ label, value, icon: Icon, accentColor, accentRgb, sub, trend
         <div style={{
           fontSize: '26px',
           fontWeight: 700,
-          color: 'rgba(255,255,255,0.94)',
+          color: '#37352f',
           letterSpacing: '-0.04em',
           lineHeight: 1,
           fontVariantNumeric: 'tabular-nums',
@@ -85,7 +85,7 @@ function StatCard({ label, value, icon: Icon, accentColor, accentRgb, sub, trend
         </div>
         <div style={{
           fontSize: '11.5px',
-          color: 'rgba(255,255,255,0.38)',
+          color: '#9b9a97',
           fontWeight: 400,
           letterSpacing: '-0.01em',
         }}>
@@ -122,37 +122,37 @@ export function QuickStats({ stats }: QuickStatsProps) {
         label="Competitors tracked"
         value={String(totalCompetitors)}
         icon={Users}
-        accentColor="#F59E0B"
-        accentRgb="245,158,11"
+        accentColor="#cb6c2c"
+        accentRgb="203,108,44"
       />
       <StatCard
         label="Case studies"
         value={String(totalCaseStudies)}
         icon={BookOpen}
-        accentColor="#34D399"
-        accentRgb="52,211,153"
+        accentColor="#0f7b6c"
+        accentRgb="15,123,108"
       />
       <StatCard
         label="Deals logged"
         value={String(totalDeals)}
         icon={FileText}
-        accentColor="#818CF8"
-        accentRgb="129,140,248"
+        accentColor="#5e6ad2"
+        accentRgb="94,106,210"
       />
       <StatCard
         label="Win rate"
         value={winRate !== null ? `${Math.round(winRate)}%` : '—'}
         icon={TrendingUp}
-        accentColor="#34D399"
-        accentRgb="52,211,153"
+        accentColor="#0f7b6c"
+        accentRgb="15,123,108"
         sub={totalDeals > 0 ? `${totalDeals} deals total` : undefined}
       />
       <StatCard
         label="Top objection"
         value={topObjection ? '1 flagged' : '—'}
         icon={MessageSquare}
-        accentColor="#F87171"
-        accentRgb="248,113,113"
+        accentColor="#e03e3e"
+        accentRgb="224,62,62"
         sub={topObjection ?? undefined}
       />
     </div>

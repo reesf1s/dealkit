@@ -54,16 +54,16 @@ export function KBHealthBar({
   const percentage = Math.round((completedCount / items.length) * 100)
 
   const barColor =
-    percentage === 100 ? '#22C55E' : percentage >= 50 ? '#6366F1' : '#F59E0B'
+    percentage === 100 ? '#0f7b6c' : percentage >= 50 ? '#5e6ad2' : '#cb6c2c'
 
   return (
     <div
       style={{
-        background: 'rgba(255,255,255,0.03)',
-        backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255,255,255,0.07)',
+        background: 'var(--surface-1)',
+        border: '1px solid rgba(55,53,47,0.09)',
         borderRadius: '10px',
         padding: '16px',
+        boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
       }}
     >
       {/* Header */}
@@ -75,7 +75,7 @@ export function KBHealthBar({
           marginBottom: '12px',
         }}
       >
-        <span style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB' }}>
+        <span style={{ fontSize: '13px', fontWeight: 600, color: '#37352f' }}>
           Knowledge base health
         </span>
         <span
@@ -95,7 +95,7 @@ export function KBHealthBar({
         style={{
           height: '4px',
           borderRadius: '9999px',
-          backgroundColor: 'rgba(255,255,255,0.06)',
+          backgroundColor: 'rgba(55,53,47,0.09)',
           marginBottom: '16px',
           overflow: 'hidden',
         }}
@@ -126,24 +126,24 @@ export function KBHealthBar({
               <CheckCircle
                 size={15}
                 strokeWidth={2}
-                style={{ color: '#22C55E', flexShrink: 0 }}
+                style={{ color: '#0f7b6c', flexShrink: 0 }}
               />
             ) : (
               <Circle
                 size={15}
                 strokeWidth={2}
-                style={{ color: '#444', flexShrink: 0 }}
+                style={{ color: '#9b9a97', flexShrink: 0 }}
               />
             )}
 
             {item.done ? (
-              <span style={{ fontSize: '13px', color: '#888888' }}>{item.label}</span>
+              <span style={{ fontSize: '13px', color: '#787774' }}>{item.label}</span>
             ) : (
               <Link
                 href={item.ctaHref}
                 style={{
                   fontSize: '13px',
-                  color: '#6366F1',
+                  color: '#5e6ad2',
                   textDecoration: 'none',
                   display: 'flex',
                   alignItems: 'center',
@@ -151,10 +151,10 @@ export function KBHealthBar({
                   transition: 'color 150ms ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.color = '#818CF8'
+                  e.currentTarget.style.color = '#37352f'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.color = '#6366F1'
+                  e.currentTarget.style.color = '#5e6ad2'
                 }}
               >
                 {item.ctaLabel}
@@ -169,7 +169,7 @@ export function KBHealthBar({
         <p
           style={{
             fontSize: '12px',
-            color: '#22C55E',
+            color: '#0f7b6c',
             marginTop: '12px',
             marginBottom: 0,
           }}

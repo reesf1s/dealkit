@@ -5,8 +5,7 @@ import Link from 'next/link'
 import useSWR from 'swr'
 import { ArrowLeft, Mail, Check, X, ChevronDown, Search } from 'lucide-react'
 import { useToast } from '@/components/shared/Toast'
-
-const fetcher = (url: string) => fetch(url).then(r => r.json())
+import { fetcher } from '@/lib/fetcher'
 
 type SuggestedDeal = {
   id: string
@@ -90,14 +89,14 @@ export default function UnmatchedEmailsPage() {
     : allDeals.slice(0, 10)
 
   return (
-    <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto' }}>
+    <div style={{ padding: '24px', maxWidth: '800px', margin: '0 auto', background: 'var(--surface-1)', minHeight: '100vh' }}>
       {/* Header */}
       <div style={{ marginBottom: '20px' }}>
         <Link
           href="/settings"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: '5px',
-            fontSize: '12px', color: 'var(--ds-text-3)', textDecoration: 'none',
+            fontSize: '12px', color: 'var(--text-tertiary)', textDecoration: 'none',
             marginBottom: '12px',
           }}
         >
@@ -105,26 +104,27 @@ export default function UnmatchedEmailsPage() {
           Back to Settings
         </Link>
         <h1 className="font-brand" style={{
-          fontSize: '20px', fontWeight: 500, letterSpacing: '0.01em', margin: 0, marginBottom: '4px',
+          fontSize: '22px', fontWeight: 700, margin: 0, marginBottom: '4px',
           color: 'var(--text-primary)',
         }}>Unmatched Emails</h1>
-        <p style={{ fontSize: '12px', color: 'var(--ds-text-2)', margin: 0 }}>
+        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
           Emails that could not be automatically matched to a deal. Assign them manually or dismiss.
         </p>
       </div>
 
       {isLoading ? (
-        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--ds-text-3)', fontSize: '13px' }}>
+        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '13px' }}>
           Loading...
         </div>
       ) : emails.length === 0 ? (
         <div style={{
-          padding: '40px', textAlign: 'center', borderRadius: '12px',
-          background: 'var(--ds-bg-card)', border: '1px solid var(--ds-border)',
+          padding: '40px', textAlign: 'center', borderRadius: '8px',
+          background: 'var(--surface-1)', border: '1px solid rgba(55,53,47,0.12)',
+          boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
         }}>
-          <Mail size={24} style={{ color: 'var(--ds-text-3)', marginBottom: '8px' }} />
-          <p style={{ fontSize: '13px', color: 'var(--ds-text-2)', margin: 0, marginBottom: '4px' }}>No unmatched emails</p>
-          <p style={{ fontSize: '11px', color: 'var(--ds-text-3)', margin: 0 }}>
+          <Mail size={24} style={{ color: 'var(--text-tertiary)', marginBottom: '8px' }} />
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, marginBottom: '4px' }}>No unmatched emails</p>
+          <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: 0 }}>
             All forwarded emails have been matched to deals or reviewed.
           </p>
         </div>
@@ -134,28 +134,29 @@ export default function UnmatchedEmailsPage() {
             <div
               key={email.id}
               style={{
-                padding: '14px 16px', borderRadius: '10px',
-                background: 'var(--ds-bg-card)', border: '1px solid var(--ds-border)',
+                padding: '14px 16px', borderRadius: '8px',
+                background: 'var(--surface-1)', border: '1px solid rgba(55,53,47,0.12)',
+                boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
               }}
             >
               {/* Email header */}
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--ds-text-1)' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
                       {email.fromName ?? email.fromEmail}
                     </span>
                     {email.fromName && (
-                      <span style={{ fontSize: '11px', color: 'var(--ds-text-3)' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
                         &lt;{email.fromEmail}&gt;
                       </span>
                     )}
                   </div>
-                  <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--ds-text-2)', margin: 0 }}>
+                  <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', margin: 0 }}>
                     {email.subject ?? '(no subject)'}
                   </p>
                 </div>
-                <span style={{ fontSize: '10px', color: 'var(--ds-text-3)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                   {new Date(email.receivedAt).toLocaleDateString('en-GB', {
                     day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
                   })}
@@ -165,7 +166,7 @@ export default function UnmatchedEmailsPage() {
               {/* Preview */}
               {email.body && (
                 <p style={{
-                  fontSize: '11px', color: 'var(--ds-text-3)', margin: '0 0 10px',
+                  fontSize: '11px', color: 'var(--text-tertiary)', margin: '0 0 10px',
                   lineHeight: 1.5, maxHeight: '42px', overflow: 'hidden',
                   textOverflow: 'ellipsis', display: '-webkit-box',
                   WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
@@ -177,7 +178,7 @@ export default function UnmatchedEmailsPage() {
               {/* Suggested deals */}
               {email.suggestedDeals.length > 0 && (
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
-                  <span style={{ fontSize: '10px', color: 'var(--ds-text-3)', lineHeight: '22px' }}>Suggested:</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', lineHeight: '22px' }}>Suggested:</span>
                   {email.suggestedDeals.map(deal => (
                     <button
                       key={deal.id}
@@ -185,8 +186,8 @@ export default function UnmatchedEmailsPage() {
                       disabled={assigningId === email.id}
                       style={{
                         height: '22px', padding: '0 8px', borderRadius: '5px', fontSize: '11px', fontWeight: 500,
-                        color: 'var(--ds-accent)', background: 'var(--ds-accent-soft)',
-                        border: '1px solid rgba(91,91,214,0.2)', cursor: 'pointer',
+                        color: '#5e6ad2', background: 'rgba(94,106,210,0.08)',
+                        border: '1px solid rgba(94,106,210,0.20)', cursor: 'pointer',
                         opacity: assigningId === email.id ? 0.6 : 1,
                       }}
                     >
@@ -209,8 +210,8 @@ export default function UnmatchedEmailsPage() {
                     style={{
                       display: 'flex', alignItems: 'center', gap: '5px',
                       height: '28px', padding: '0 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 500,
-                      color: 'var(--ds-text-1)', background: 'var(--ds-bg-active)',
-                      border: '1px solid var(--ds-border)', cursor: 'pointer',
+                      color: 'var(--text-primary)', background: 'var(--surface-2)',
+                      border: '1px solid rgba(55,53,47,0.12)', cursor: 'pointer',
                     }}
                   >
                     <Check size={11} />
@@ -222,13 +223,13 @@ export default function UnmatchedEmailsPage() {
                     <div style={{
                       position: 'absolute', top: '100%', left: 0, marginTop: '4px',
                       width: '280px', maxHeight: '240px',
-                      background: 'var(--ds-bg-card)', border: '1px solid var(--ds-border)',
-                      borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                      background: 'var(--surface-1)', border: '1px solid rgba(55,53,47,0.12)',
+                      borderRadius: '8px', boxShadow: '0 8px 24px rgba(55,53,47,0.12)',
                       zIndex: 50, overflow: 'hidden',
                     }}>
-                      <div style={{ padding: '6px', borderBottom: '1px solid var(--ds-border)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0 6px', height: '28px', borderRadius: '5px', background: 'var(--ds-bg-hover)' }}>
-                          <Search size={11} style={{ color: 'var(--ds-text-3)', flexShrink: 0 }} />
+                      <div style={{ padding: '6px', borderBottom: '1px solid rgba(55,53,47,0.09)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0 6px', height: '28px', borderRadius: '5px', background: '#f7f6f3' }}>
+                          <Search size={11} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
                           <input
                             autoFocus
                             value={dealSearch}
@@ -236,14 +237,14 @@ export default function UnmatchedEmailsPage() {
                             placeholder="Search deals..."
                             style={{
                               flex: 1, border: 'none', background: 'transparent', outline: 'none',
-                              fontSize: '11px', color: 'var(--ds-text-1)',
+                              fontSize: '11px', color: 'var(--text-primary)',
                             }}
                           />
                         </div>
                       </div>
                       <div style={{ maxHeight: '190px', overflowY: 'auto' }}>
                         {filteredDeals.length === 0 ? (
-                          <div style={{ padding: '12px', fontSize: '11px', color: 'var(--ds-text-3)', textAlign: 'center' }}>
+                          <div style={{ padding: '12px', fontSize: '11px', color: 'var(--text-tertiary)', textAlign: 'center' }}>
                             No deals found
                           </div>
                         ) : (
@@ -254,13 +255,13 @@ export default function UnmatchedEmailsPage() {
                               style={{
                                 display: 'block', width: '100%', textAlign: 'left',
                                 padding: '8px 10px', border: 'none', background: 'transparent',
-                                cursor: 'pointer', fontSize: '12px', color: 'var(--ds-text-1)',
+                                cursor: 'pointer', fontSize: '12px', color: 'var(--text-primary)',
                               }}
-                              onMouseEnter={e => (e.currentTarget.style.background = 'var(--ds-bg-hover)')}
+                              onMouseEnter={e => (e.currentTarget.style.background = '#f7f6f3')}
                               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                             >
                               <div style={{ fontWeight: 500 }}>{deal.dealName}</div>
-                              <div style={{ fontSize: '10px', color: 'var(--ds-text-3)' }}>{deal.prospectCompany}</div>
+                              <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{deal.prospectCompany}</div>
                             </button>
                           ))
                         )}
@@ -276,8 +277,8 @@ export default function UnmatchedEmailsPage() {
                   style={{
                     display: 'flex', alignItems: 'center', gap: '5px',
                     height: '28px', padding: '0 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 500,
-                    color: 'var(--ds-text-3)', background: 'transparent',
-                    border: '1px solid var(--ds-border)', cursor: 'pointer',
+                    color: 'var(--text-tertiary)', background: 'transparent',
+                    border: '1px solid rgba(55,53,47,0.16)', cursor: 'pointer',
                     opacity: dismissingId === email.id ? 0.6 : 1,
                   }}
                 >

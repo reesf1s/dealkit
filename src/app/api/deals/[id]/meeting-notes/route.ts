@@ -86,7 +86,14 @@ export async function POST(
     }
     if (mergedCompetitors.length > 0) patch.competitors = mergedCompetitors
     if (mergedRisks.length > 0) patch.dealRisks = mergedRisks
-    if (extraction.nextSteps) patch.nextSteps = extraction.nextSteps
+    // Always update next_steps — use extraction if available, otherwise synthesise from the raw notes
+    if (extraction.nextSteps) {
+      patch.nextSteps = extraction.nextSteps
+    } else {
+      // Fallback: use the raw notes as a brief summary so next_steps never goes stale
+      const fallback = notes.trim().slice(0, 300)
+      if (fallback) patch.nextSteps = fallback
+    }
 
     await db
       .update(dealLogs)
@@ -97,7 +104,7 @@ export async function POST(
     after(async () => {
       await Promise.allSettled([
         requestBrainRebuild(workspaceId, 'meeting_notes_logged'),
-        extractAndLinkFeatures(dealId, notes, workspaceId, userId),
+        extractAndLinkFeatures(dealId, notes, workspaceId),
       ])
     })
 

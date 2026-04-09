@@ -57,11 +57,10 @@ export function CompetitorTable({ competitors, collateral, onDelete, onGenerateB
     <>
       <div
         style={{
-          background: 'rgba(255,255,255,0.03)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          border: '1px solid rgba(255,255,255,0.07)',
+          background: 'var(--surface-1)',
+          border: '1px solid rgba(55,53,47,0.12)',
           borderRadius: '8px',
+          boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
           overflow: 'hidden',
         }}
       >
@@ -71,7 +70,8 @@ export function CompetitorTable({ competitors, collateral, onDelete, onGenerateB
             display: 'grid',
             gridTemplateColumns: '1fr 140px 140px 180px',
             padding: '10px 16px',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            background: '#f7f6f3',
+            borderBottom: '1px solid rgba(55,53,47,0.09)',
           }}
         >
           {['Name', 'Last updated', 'Battlecard', 'Actions'].map((h) => (
@@ -80,7 +80,7 @@ export function CompetitorTable({ competitors, collateral, onDelete, onGenerateB
               style={{
                 fontSize: '11px',
                 fontWeight: 600,
-                color: '#555',
+                color: '#787774',
                 letterSpacing: '0.05em',
                 textTransform: 'uppercase',
               }}
@@ -102,20 +102,20 @@ export function CompetitorTable({ competitors, collateral, onDelete, onGenerateB
                 display: 'grid',
                 gridTemplateColumns: '1fr 140px 140px 180px',
                 padding: '12px 16px',
-                borderBottom: '1px solid rgba(255,255,255,0.04)',
+                borderBottom: '1px solid rgba(55,53,47,0.09)',
                 alignItems: 'center',
                 transition: 'background-color 100ms ease',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.02)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f7f6f3' }}
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
             >
               {/* Name */}
               <div>
                 <Link
                   href={`/competitors/${competitor.id}`}
-                  style={{ fontSize: '13px', fontWeight: 500, color: '#EBEBEB', textDecoration: 'none' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.80)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#EBEBEB' }}
+                  style={{ fontSize: '13px', fontWeight: 500, color: '#37352f', textDecoration: 'none' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#5e6ad2' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#37352f' }}
                 >
                   {competitor.name}
                 </Link>
@@ -124,7 +124,7 @@ export function CompetitorTable({ competitors, collateral, onDelete, onGenerateB
                     href={competitor.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', color: '#555', textDecoration: 'none', marginLeft: '8px' }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '11px', color: '#9b9a97', textDecoration: 'none', marginLeft: '8px' }}
                   >
                     <ExternalLink size={10} />
                   </a>
@@ -132,7 +132,7 @@ export function CompetitorTable({ competitors, collateral, onDelete, onGenerateB
               </div>
 
               {/* Last updated */}
-              <span style={{ fontSize: '12px', color: '#555', fontVariantNumeric: 'tabular-nums' }}>
+              <span style={{ fontSize: '12px', color: '#787774', fontVariantNumeric: 'tabular-nums' }}>
                 {formatDate(competitor.updatedAt)}
               </span>
 
@@ -141,7 +141,7 @@ export function CompetitorTable({ competitors, collateral, onDelete, onGenerateB
                 {battlecard ? (
                   <StatusBadge status={battlecard.status as 'ready' | 'stale' | 'generating' | 'archived'} />
                 ) : (
-                  <span style={{ fontSize: '11px', color: '#444' }}>None</span>
+                  <span style={{ fontSize: '11px', color: '#9b9a97' }}>None</span>
                 )}
               </div>
 
@@ -149,9 +149,9 @@ export function CompetitorTable({ competitors, collateral, onDelete, onGenerateB
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <Link
                   href={`/competitors/${competitor.id}`}
-                  style={{ height: '28px', padding: '0 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, color: '#EBEBEB', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', textDecoration: 'none', display: 'flex', alignItems: 'center' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+                  style={{ height: '28px', padding: '0 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, color: '#37352f', backgroundColor: 'rgba(55,53,47,0.06)', border: '1px solid rgba(55,53,47,0.12)', textDecoration: 'none', display: 'flex', alignItems: 'center' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(55,53,47,0.10)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(55,53,47,0.06)' }}
                 >
                   View
                 </Link>
@@ -160,9 +160,9 @@ export function CompetitorTable({ competitors, collateral, onDelete, onGenerateB
                   onClick={() => handleGenerateBattlecard(competitor.id)}
                   disabled={isGenerating}
                   title={battlecard ? 'Regenerate battlecard' : 'Generate battlecard'}
-                  style={{ height: '28px', width: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', cursor: isGenerating ? 'not-allowed' : 'pointer', color: 'rgba(255,255,255,0.80)' }}
-                  onMouseEnter={(e) => { if (!isGenerating) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+                  style={{ height: '28px', width: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', backgroundColor: 'rgba(55,53,47,0.06)', border: '1px solid rgba(55,53,47,0.12)', cursor: isGenerating ? 'not-allowed' : 'pointer', color: '#787774' }}
+                  onMouseEnter={(e) => { if (!isGenerating) e.currentTarget.style.backgroundColor = 'rgba(55,53,47,0.10)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(55,53,47,0.06)' }}
                 >
                   <Sparkles size={12} strokeWidth={2} style={{ animation: isGenerating ? 'spin 1s linear infinite' : 'none' }} />
                 </button>
@@ -170,9 +170,9 @@ export function CompetitorTable({ competitors, collateral, onDelete, onGenerateB
                 <button
                   onClick={() => setDeleteId(competitor.id)}
                   title="Delete competitor"
-                  style={{ height: '28px', width: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', backgroundColor: 'transparent', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', color: '#555' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = '#EF4444'; e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.08)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#555'; e.currentTarget.style.backgroundColor = 'transparent' }}
+                  style={{ height: '28px', width: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', backgroundColor: 'transparent', border: '1px solid rgba(55,53,47,0.09)', cursor: 'pointer', color: '#9b9a97' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#e03e3e'; e.currentTarget.style.backgroundColor = 'rgba(224,62,62,0.08)'; e.currentTarget.style.borderColor = 'rgba(224,62,62,0.20)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#9b9a97'; e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = 'rgba(55,53,47,0.09)' }}
                 >
                   <Trash2 size={12} strokeWidth={2} />
                 </button>

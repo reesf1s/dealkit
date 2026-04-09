@@ -48,29 +48,38 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const insights = (deal.conversionInsights as string[] | null) ?? []
     const contacts = (deal.contacts as any[] | null) ?? []
 
+    // Extract latest meeting note entry
+    const meetingNotes = typeof deal.meetingNotes === 'string' ? deal.meetingNotes : null
+    const noteEntries = meetingNotes ? meetingNotes.split(/\n---\n/).filter(Boolean) : []
+    const latestNote = noteEntries.length > 0
+      ? noteEntries[noteEntries.length - 1].trim().slice(0, 600)
+      : null
+
     const lines = [
       `Company: ${deal.prospectCompany ?? 'Unknown'}`,
-      `Deal name: ${deal.dealName ?? 'Untitled'}`,
       `Stage: ${(deal.stage ?? 'unknown').replace(/_/g, ' ')}`,
       deal.dealValue ? `Value: £${Number(deal.dealValue).toLocaleString()}` : null,
-      contacts.length > 0 ? `Primary contact: ${contacts[0]?.name ?? ''}${contacts[0]?.title ? `, ${contacts[0].title}` : ''}` : null,
-      deal.description ? `Description: ${deal.description}` : null,
+      deal.conversionScore != null ? `Win probability: ${deal.conversionScore}%` : null,
+      contacts.length > 0
+        ? `Contacts: ${contacts.slice(0, 3).map((c: any) => c.title ? `${c.name} (${c.title})` : c.name).join(', ')}`
+        : null,
       deal.nextSteps ? `Next steps: ${deal.nextSteps}` : null,
       dealRisks.length > 0 ? `Known risks: ${dealRisks.slice(0, 3).join('; ')}` : null,
-      insights.length > 0 ? `Key insights: ${insights.slice(0, 2).join('; ')}` : null,
+      insights.length > 0 ? `AI signals: ${insights.slice(0, 2).join('; ')}` : null,
+      latestNote ? `Latest meeting note:\n${latestNote}` : null,
     ].filter(Boolean).join('\n')
 
-    if (!lines.trim() || (!deal.description && !deal.nextSteps && dealRisks.length === 0)) {
+    if (!lines.trim() || (!latestNote && !deal.nextSteps && dealRisks.length === 0)) {
       return NextResponse.json({ data: { brief: null, generatedAt: null } })
     }
 
     const response = await anthropic.messages.create({
       model: 'gpt-5.4-mini',
-      max_tokens: 280,
+      max_tokens: 300,
       messages: [
         {
           role: 'user',
-          content: `You are a sales intelligence assistant. Write a concise 2–3 sentence briefing for a sales rep going into this deal. Focus on: deal status, the main risk or opportunity, and what they should prioritise next. Be direct and specific — no generic filler.\n\n${lines}`,
+          content: `You are a sales intelligence assistant. Write a concise 2–3 sentence briefing for a sales rep. Use the data below — especially the latest meeting note if present. Focus on: current status, the main blocker or opportunity, and the single most important next action. Name specific people. Be direct — no filler.\n\n${lines}`,
         },
       ],
     })

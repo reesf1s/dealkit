@@ -15,9 +15,7 @@
 
 import { db } from '@/lib/db'
 import { eq, and, sql } from 'drizzle-orm'
-import { dealLogs, dealLinearLinks, linearIssuesCache, linearIntegrations, productGaps as productGapsTable } from '@/lib/db/schema'
-import { createIssue } from '@/lib/linear-client'
-import { decrypt, getEncryptionKey } from '@/lib/encrypt'
+import { dealLogs, dealLinearLinks, linearIssuesCache, productGaps as productGapsTable } from '@/lib/db/schema'
 import { generateEmbedding } from '@/lib/openai-embeddings'
 
 const MAX_LINKS_PER_DEAL = 5
@@ -636,19 +634,7 @@ ${allText.slice(0, 4000)}`,
 
   console.log(`[smart-match] ${deal.prospectCompany}: ${issues.length} issues in cache (${allIssues.length} total, ${allIssues.length - issues.length} filtered)`)
 
-  // 4. Load Linear integration for issue creation
-  const [integration] = await db
-    .select({ apiKeyEnc: linearIntegrations.apiKeyEnc, teamId: linearIntegrations.teamId })
-    .from(linearIntegrations)
-    .where(eq(linearIntegrations.workspaceId, workspaceId))
-    .limit(1)
-
-  let linearApiKey: string | null = null
-  if (integration) {
-    try { linearApiKey = decrypt(integration.apiKeyEnc, getEncryptionKey()) } catch { /* non-fatal */ }
-  }
-
-  // 5. Load issue embeddings for vector matching
+  // 4. Load issue embeddings for vector matching
   // CRITICAL: Read pgvector_embedding (1536-dim OpenAI), NOT embedding (336-dim TF-IDF).
   // Gap text is embedded with OpenAI (1536-dim). Dimensions must match for cosine similarity.
   type IssueWithEmbed = typeof issues[0] & { embedding: number[] | null }
@@ -811,78 +797,9 @@ ${allText.slice(0, 4000)}`,
       }
     }
 
-    // Tier 3: No confident match → CREATE new Linear issue
+    // No confident match found — log and skip
     if (!didLink) {
-      console.log(`[smart-match DEBUG] ${deal.prospectCompany}: creation gate for "${gapText.slice(0, 60)}" — linearApiKey=${!!linearApiKey}, integration=${!!integration}, isRealFeature=${checkIsRealFeature(gapText)}`)
-    }
-    if (!didLink && linearApiKey && integration) {
-      if (checkIsRealFeature(gapText)) {
-        try {
-          // Map context to Linear priority; fall back to severity-based priority
-          const linearPriority = gap.context && CONTEXT_PRIORITY[gap.context] !== undefined
-            ? CONTEXT_PRIORITY[gap.context]
-            : (gap.severity === 'high' ? 2 : 3)
-
-          // Build rich deal context block
-          const dealContextLines = [
-            `**Deal:** ${deal.dealName}`,
-            `**Company:** ${deal.prospectCompany}`,
-            deal.dealValue ? `**Deal value:** $${Number(deal.dealValue).toLocaleString()}` : null,
-            deal.stage ? `**Stage:** ${deal.stage}` : null,
-            `**Blocker:** ${gap.context === 'deal_blocker' ? 'Yes' : 'No'}`,
-          ].filter(Boolean).join('\n')
-
-          const issueDescription = `**Product gap from ${deal.prospectCompany} deal**\n\n` +
-            (gap.description ? `${gap.description}\n\n` : '') +
-            (gap.quote ? `> "${gap.quote}"\n\n` : '') +
-            `**Deal context:**\n${dealContextLines}\n\n` +
-            `---\n*Auto-created by DealKit — product gap from sales intelligence*`
-
-          const newIssue = await createIssue(linearApiKey, integration.teamId, {
-            title: gapText.slice(0, 120),
-            description: issueDescription,
-            priority: linearPriority,
-          })
-          await db.insert(linearIssuesCache).values({
-            workspaceId,
-            linearIssueId: newIssue.identifier,
-            linearIssueUrl: newIssue.url,
-            title: newIssue.title,
-            description: newIssue.description,
-            status: newIssue.state.name,
-            priority: newIssue.priority,
-          }).onConflictDoNothing()
-          await db.insert(dealLinearLinks).values({
-            workspaceId,
-            dealId,
-          linearIssueId: newIssue.identifier,
-          linearIssueUrl: newIssue.url,
-          linearTitle: newIssue.title,
-          relevanceScore: 100,
-          linkType: 'feature_gap',
-          status: 'identified',
-          addressesRisk: (gap.description ? gap.description.slice(0, 150) : `Product gap identified in ${deal.prospectCompany} deal`),
-        }).onConflictDoNothing()
-
-        created++
-        console.log(`[smart-match] ${deal.prospectCompany}: created ${newIssue.identifier} — "${gapText}"`)
-      } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e)
-        console.error(`[smart-match] LINEAR API ERROR: ${errMsg}`)
-        linearErrors.push(errMsg)
-      }
-      } else {
-        const _len = gapText.length
-        const _tooShort = _len < 10
-        const _tooLong = _len > 150
-        const _badPrefix = /^(page \d|what success|the poc|gospace lead|drew proposed|\[?\d{1,2}\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))/i.test(gapText)
-        const _hasDots = gapText.includes('...')
-        const _needPrefix = /^(need the ability|need to|we need|they need|please let me)/i.test(gapText)
-        console.log(`[smart-match DEBUG] ${deal.prospectCompany}: isRealFeature FAILED "${gapText.slice(0, 60)}" — len=${_len}(tooShort=${_tooShort},tooLong=${_tooLong}), badPrefix=${_badPrefix}, hasDots=${_hasDots}, needPrefix=${_needPrefix}`)
-        console.log(`[smart-match] ${deal.prospectCompany}: no match for "${gapText.slice(0, 50)}" — skipped (not a clear feature)`)
-      }
-    } else if (!didLink) {
-      console.log(`[smart-match] ${deal.prospectCompany}: gap "${gapText.slice(0, 50)}" — no match (best=${Math.round(bestScore)}) and ${linearApiKey ? 'creation guard blocked' : 'no Linear API key'}`)
+      console.log(`[smart-match] ${deal.prospectCompany}: gap "${gapText.slice(0, 50)}" — no match (best=${Math.round(bestScore)}) and no Linear integration`)
     }
   }
 
@@ -899,28 +816,6 @@ export async function smartMatchAllDeals(workspaceId: string): Promise<{
 }> {
   // NON-DESTRUCTIVE: match all deals first, THEN clean up orphaned auto-links.
   // This prevents data loss if the function times out halfway.
-
-  // Early check: verify Linear API key is valid before processing all deals
-  const [integrationCheck] = await db
-    .select({ apiKeyEnc: linearIntegrations.apiKeyEnc })
-    .from(linearIntegrations)
-    .where(eq(linearIntegrations.workspaceId, workspaceId))
-    .limit(1)
-  if (integrationCheck) {
-    let keyOk = false
-    try {
-      const key = decrypt(integrationCheck.apiKeyEnc, getEncryptionKey())
-      keyOk = !!key
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      console.error(`[smart-match] LINEAR API KEY DECRYPT FAILED: ${msg}`)
-      return { totalLinked: 0, totalCreated: 0, results: [], linearErrors: [`Linear API key decryption failed: ${msg}`] }
-    }
-    if (!keyOk) {
-      console.error(`[smart-match] LINEAR API KEY IS NULL after decryption`)
-      return { totalLinked: 0, totalCreated: 0, results: [], linearErrors: ['Linear API key is null after decryption'] }
-    }
-  }
 
   // Load deals with meetingNotes + note_signals_json so we know which need extraction
   const openDealsRaw = await db.execute<{

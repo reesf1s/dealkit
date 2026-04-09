@@ -1,48 +1,22 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+// Re-exports next-themes so the rest of the codebase can import from this
+// file without changes, while dark mode is powered by next-themes under the hood.
 
-type Theme = 'light' | 'dark'
+export { useTheme } from 'next-themes'
 
-interface ThemeCtx {
-  theme: Theme
-  toggleTheme: () => void
-}
-
-const ThemeContext = createContext<ThemeCtx>({
-  theme: 'light',
-  toggleTheme: () => {},
-})
+import { ThemeProvider as NextThemesProvider } from 'next-themes'
+import { ReactNode } from 'react'
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark')
-
-  useEffect(() => {
-    const stored = localStorage.getItem('halvex-theme') as Theme | null
-    if (stored === 'light' || stored === 'dark') {
-      setTheme(stored)
-      document.documentElement.classList.toggle('dark', stored === 'dark')
-    } else {
-      // Default to dark — Raycast aesthetic
-      setTheme('dark')
-      document.documentElement.classList.add('dark')
-    }
-  }, [])
-
-  const toggleTheme = () => {
-    setTheme(prev => {
-      const next = prev === 'light' ? 'dark' : 'light'
-      localStorage.setItem('halvex-theme', next)
-      document.documentElement.classList.toggle('dark', next === 'dark')
-      return next
-    })
-  }
-
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <NextThemesProvider
+      attribute="class"
+      defaultTheme="light"
+      enableSystem={false}
+      disableTransitionOnChange={false}
+    >
       {children}
-    </ThemeContext.Provider>
+    </NextThemesProvider>
   )
 }
-
-export const useTheme = () => useContext(ThemeContext)

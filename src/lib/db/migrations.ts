@@ -434,6 +434,95 @@ const MIGRATIONS: { version: number; name: string; sql: string }[] = [
     `,
   },
   {
+    version: 31,
+    name: 'deal_todos',
+    sql: `
+      CREATE TABLE IF NOT EXISTS deal_todos (
+        id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        workspace_id  TEXT NOT NULL,
+        deal_id       TEXT NOT NULL,
+        text          TEXT NOT NULL,
+        done          BOOLEAN NOT NULL DEFAULT false,
+        priority      TEXT NOT NULL DEFAULT 'normal',
+        due_date      TIMESTAMPTZ,
+        created_by    TEXT,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_deal_todos_deal ON deal_todos (deal_id);
+      CREATE INDEX IF NOT EXISTS idx_deal_todos_workspace ON deal_todos (workspace_id)
+    `,
+  },
+  {
+    version: 32,
+    name: 'deal_criteria',
+    sql: `
+      CREATE TABLE IF NOT EXISTS deal_criteria (
+        id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        workspace_id  TEXT NOT NULL,
+        deal_id       TEXT NOT NULL,
+        text          TEXT NOT NULL,
+        met           BOOLEAN NOT NULL DEFAULT false,
+        category      TEXT NOT NULL DEFAULT 'success',
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_deal_criteria_deal ON deal_criteria (deal_id)
+    `,
+  },
+  {
+    version: 33,
+    name: 'deal_milestones',
+    sql: `
+      CREATE TABLE IF NOT EXISTS deal_milestones (
+        id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        workspace_id  TEXT NOT NULL,
+        deal_id       TEXT NOT NULL,
+        title         TEXT NOT NULL,
+        description   TEXT,
+        status        TEXT NOT NULL DEFAULT 'pending',
+        due_date      TIMESTAMPTZ,
+        completed_at  TIMESTAMPTZ,
+        sort_order    INTEGER NOT NULL DEFAULT 0,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_deal_milestones_deal ON deal_milestones (deal_id)
+    `,
+  },
+  {
+    version: 34,
+    name: 'workspace_email_digest_enabled',
+    sql: `
+      ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS email_digest_enabled BOOLEAN NOT NULL DEFAULT TRUE
+    `,
+  },
+  {
+    version: 35,
+    name: 'deal_forecast_and_score_history',
+    sql: `
+      ALTER TABLE deal_logs
+        ADD COLUMN IF NOT EXISTS forecast_category  VARCHAR(20) DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS score_history      JSONB       NOT NULL DEFAULT '[]'::jsonb
+    `,
+  },
+  {
+    version: 36,
+    name: 'deal_meddic_score',
+    sql: `
+      ALTER TABLE deal_logs
+        ADD COLUMN IF NOT EXISTS meddic JSONB DEFAULT NULL
+    `,
+  },
+  {
+    version: 37,
+    name: 'deal_review',
+    sql: `
+      ALTER TABLE deal_logs
+        ADD COLUMN IF NOT EXISTS deal_review JSONB DEFAULT NULL
+    `,
+  },
+  {
     version: 28,
     name: 'ensure_embeddings_1536',
     sql: `

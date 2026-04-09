@@ -5,716 +5,643 @@ import { useState, useMemo } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
 import {
-  Brain, TrendingUp, BarChart2, ChevronRight, Target, Clock,
-  DollarSign, Shield, AlertTriangle, Layers, Cpu, BookOpen,
-  ArrowUpRight, ArrowDownRight, Minus,
+  AlertTriangle, Clock, TrendingUp, Zap,
+  CheckCircle2, Eye, X, Bell, Swords, Timer, MessageSquareWarning,
 } from 'lucide-react'
-import { formatCurrency, formatPct } from '@/lib/format'
+import { fetcher } from '@/lib/fetcher'
+import type { DealLog } from '@/types'
 
-const fetcher = (url: string) => fetch(url).then(r => r.json())
+// ─── Types ──────────────────────────────────────────────────────────────────
 
-type Tab = 'overview' | 'playbook' | 'models'
+type SignalType = 'risk' | 'stale' | 'pattern' | 'win' | 'loss'
+type FilterTab = 'all' | 'risk' | 'stale' | 'pattern'
 
-// ─── Shared styles ──────────────────────────────────────────────────────────
-const glass: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.05)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: '10px',
+interface Signal {
+  id: string
+  type: SignalType
+  title: string
+  body: string
+  dealId?: string
+  company?: string
+  action?: string
+  read: boolean
+  confidence?: 'high' | 'medium' | 'low'
+  supportCount?: number
 }
 
-const th: React.CSSProperties = {
-  fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.35)',
-  textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'left',
-  padding: '0 8px 6px 0', whiteSpace: 'nowrap',
+interface BrainData {
+  urgentDeals?: Array<{ dealId: string; dealName?: string; company: string; reason: string; topAction?: string }>
+  staleDeals?: Array<{ dealId: string; dealName?: string; company: string; daysSinceUpdate: number; stage?: string }>
+  keyPatterns?: Array<{ label: string; dealIds: string[]; companies: string[]; dealNames?: string[] }>
+  winLossIntel?: { winRate: number; winCount: number; lossCount: number; avgCloseTimeDays?: number }
+  competitivePatterns?: Array<{ competitor: string; winRate: number; dealCount: number }>
+  pipeline?: { totalValue: number; activeDeals: number }
+  updatedAt?: string
 }
 
-const td: React.CSSProperties = {
-  padding: '7px 8px 7px 0', fontSize: '12px', color: 'rgba(255,255,255,0.7)',
-  borderTop: '1px solid rgba(255,255,255,0.06)', fontVariantNumeric: 'tabular-nums',
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function signalIcon(type: SignalType) {
+  switch (type) {
+    case 'risk':    return <AlertTriangle size={12} style={{ color: '#ef4444' }} />
+    case 'stale':   return <Clock size={12} style={{ color: '#f59e0b' }} />
+    case 'pattern': return <TrendingUp size={12} style={{ color: '#1DB86A' }} />
+    case 'win':     return <CheckCircle2 size={12} style={{ color: '#1DB86A' }} />
+    default:        return <Zap size={12} style={{ color: 'var(--text-tertiary)' }} />
+  }
 }
 
-const mono: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' }
-
-function Skel({ w = '100%', h = '12px' }: { w?: string; h?: string }) {
-  return <div style={{ width: w, height: h, borderRadius: '4px' }} className="skeleton" />
+function signalColors(type: SignalType) {
+  switch (type) {
+    case 'risk':    return { border: 'rgba(248,113,113,0.30)',   bg: 'var(--color-red-bg)',   dot: '#ef4444' }
+    case 'stale':   return { border: 'rgba(251,191,36,0.30)',    bg: 'var(--color-amber-bg)', dot: '#f59e0b' }
+    case 'pattern': return { border: 'rgba(29,184,106,0.22)',    bg: 'var(--color-green-bg)', dot: '#1DB86A' }
+    default:        return { border: 'var(--border-default)',    bg: 'var(--surface-2)',      dot: 'var(--text-tertiary)' }
+  }
 }
 
-function EmptyState({ text }: { text: string }) {
+function fmtCurrency(n: number, sym = '£') {
+  if (n >= 1_000_000) return `${sym}${(n / 1_000_000).toFixed(1)}m`
+  if (n >= 1_000) return `${sym}${Math.round(n / 1_000)}k`
+  return `${sym}${Math.round(n)}`
+}
+
+function Skeleton({ h = 80 }: { h?: number }) {
+  return <div style={{ height: h, borderRadius: 8 }} className="skeleton" />
+}
+
+// ─── Signal Card ────────────────────────────────────────────────────────────
+
+function ConfidenceBadge({ level, count }: { level: 'high' | 'medium' | 'low'; count?: number }) {
+  const meta = {
+    high:   { color: '#1DB86A', bg: 'rgba(29,184,106,0.10)', label: 'High' },
+    medium: { color: '#f59e0b', bg: 'rgba(245,158,11,0.10)',  label: 'Med'  },
+    low:    { color: 'var(--text-tertiary)', bg: 'var(--surface-2)', label: 'Low'  },
+  }[level]
   return (
-    <div style={{ padding: '24px 0', textAlign: 'center' }}>
-      <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', margin: 0 }}>{text}</p>
-    </div>
+    <span style={{
+      fontSize: 9.5, fontWeight: 700, color: meta.color,
+      background: meta.bg, borderRadius: 4, padding: '1px 5px',
+      letterSpacing: '0.03em',
+    }}>
+      {count ? `${count}× signal` : meta.label}
+    </span>
   )
 }
 
-function SectionHeader({ icon, label, right }: { icon: React.ReactNode; label: string; right?: React.ReactNode }) {
+function SignalCard({ signal, onDismiss }: { signal: Signal; onDismiss: (id: string) => void }) {
+  const c = signalColors(signal.type)
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        {icon}
-        <span style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>{label}</span>
+    <div style={{
+      padding: '12px 14px', borderRadius: 8,
+      border: `1px solid ${c.border}`, background: c.bg,
+      display: 'flex', flexDirection: 'column', gap: 5,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <div style={{ marginTop: 1 }}>{signalIcon(signal.type)}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+              {signal.title}
+            </span>
+            {signal.confidence && (
+              <ConfidenceBadge level={signal.confidence} count={signal.supportCount} />
+            )}
+          </div>
+          {signal.company && (
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 1 }}>{signal.company}</div>
+          )}
+        </div>
+        <button
+          onClick={() => onDismiss(signal.id)}
+          style={{
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            color: 'var(--text-muted)', padding: 2, borderRadius: 4,
+            display: 'flex', alignItems: 'center', transition: 'color 80ms',
+          }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'}
+        >
+          <X size={11} />
+        </button>
       </div>
-      {right}
-    </div>
-  )
-}
-
-function wrColor(wr: number | null): string {
-  if (wr == null) return 'rgba(255,255,255,0.4)'
-  if (wr >= 60) return '#10b981'
-  if (wr >= 40) return '#f59e0b'
-  return '#ef4444'
-}
-
-// ─── Main ───────────────────────────────────────────────────────────────────
-export default function IntelligencePage() {
-  const [tab, setTab] = useState<Tab>('overview')
-  const { data: brainRes, isLoading: brainLoading } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
-  const { data: dealsRes, isLoading: dealsLoading } = useSWR('/api/deals', fetcher, { revalidateOnFocus: false })
-
-  const brain = brainRes?.brain ?? brainRes?.data
-  const deals: any[] = dealsRes?.data ?? []
-  const isLoading = brainLoading || dealsLoading
-
-  // ── Derived metrics ──
-  const computed = useMemo(() => {
-    const closed = deals.filter((d: any) => d.stage === 'closed_won' || d.stage === 'closed_lost')
-    const won = deals.filter((d: any) => d.stage === 'closed_won')
-    const open = deals.filter((d: any) => !['closed_won', 'closed_lost'].includes(d.stage))
-    const winRate = closed.length > 0 ? Math.round((won.length / closed.length) * 100) : null
-    const avgClose = brain?.winLossIntel?.avgDaysToClose ? Math.round(brain.winLossIntel.avgDaysToClose) : null
-    const totalPipeline = open.reduce((s: number, d: any) => s + (d.dealValue ?? 0), 0)
-    const forecast = brain?.dealVelocity?.weightedForecast ?? open.reduce((s: number, d: any) => {
-      const p = d.conversionScore ? d.conversionScore / 100 : 0.5
-      return s + p * (d.dealValue ?? 0)
-    }, 0)
-    return { closed, won, open, winRate, avgClose, totalPipeline, forecast }
-  }, [deals, brain])
-
-  // ── Tab bar ──
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'overview', label: 'Overview' },
-    { key: 'playbook', label: 'Playbook' },
-    { key: 'models', label: 'Models' },
-  ]
-
-  return (
-    <div style={{ maxWidth: '1100px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-      {/* Tab bar */}
-      <div style={{ display: 'flex', gap: '2px', ...glass, padding: '3px', borderRadius: '8px', width: 'fit-content' }}>
-        {tabs.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
+      <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5, paddingLeft: 20 }}>
+        {signal.body}
+      </p>
+      {signal.action && (
+        <div style={{ fontSize: 11.5, color: c.dot, fontWeight: 500, paddingLeft: 20 }}>
+          → {signal.action}
+        </div>
+      )}
+      {signal.dealId && (
+        <div style={{ paddingLeft: 20, marginTop: 2 }}>
+          <Link
+            href={`/deals/${signal.dealId}`}
             style={{
-              padding: '6px 16px', borderRadius: '6px', fontSize: '12px', fontWeight: 600,
-              border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-              background: tab === t.key ? 'rgba(255,255,255,0.1)' : 'transparent',
-              color: tab === t.key ? 'white' : 'rgba(255,255,255,0.4)',
-              transition: 'all 0.15s ease',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              fontSize: 11.5, fontWeight: 500, color: '#1DB86A',
+              textDecoration: 'none', padding: '3px 8px',
+              background: 'var(--brand-bg)', borderRadius: 5,
+              border: '1px solid var(--brand-border)',
             }}
           >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {tab === 'overview' && <OverviewTab brain={brain} computed={computed} deals={deals} isLoading={isLoading} />}
-      {tab === 'playbook' && <PlaybookTab brain={brain} computed={computed} isLoading={isLoading} />}
-      {tab === 'models' && <ModelsTab brain={brain} isLoading={isLoading} />}
+            <Eye size={10} /> View Deal
+          </Link>
+        </div>
+      )}
     </div>
   )
 }
 
+// ─── Page ───────────────────────────────────────────────────────────────────
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// TAB 1: OVERVIEW
-// ═══════════════════════════════════════════════════════════════════════════════
-function OverviewTab({ brain, computed, deals, isLoading }: { brain: any; computed: any; deals: any[]; isLoading: boolean }) {
-  const { winRate, avgClose, totalPipeline, forecast, won, closed, open } = computed
+export default function IntelligencePage() {
+  const [filter, setFilter] = useState<FilterTab>('all')
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set())
+  const [themeTab, setThemeTab] = useState<'objections' | 'insights' | 'competitors' | 'stages'>('objections')
 
-  const topRisks: any[] = (brain?.keyPatterns ?? [])
-    .map((p: any) => ({ label: typeof p === 'string' ? p : p.label, count: p.dealIds?.length ?? 0, companies: p.companies ?? [] }))
-    .slice(0, 8)
+  const { data: brainRes, isLoading } = useSWR('/api/brain', fetcher, {
+    revalidateOnFocus: false, dedupingInterval: 60000,
+  })
+  const brain: BrainData = brainRes?.data ?? {}
 
-  const competitorRecord: any[] = brain?.winLossIntel?.competitorRecord ?? []
-  const productGaps: any[] = (brain?.productGapPriority ?? []).slice(0, 8)
+  const { data: dealsRes } = useSWR<{ data: DealLog[] }>('/api/deals', fetcher, {
+    revalidateOnFocus: false, dedupingInterval: 60000,
+  })
 
-  return (
-    <>
-      {/* KPI strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-        {[
-          { label: 'Win Rate', value: winRate != null ? `${winRate}%` : '--', sub: `${won.length}W / ${closed.length - won.length}L`, color: wrColor(winRate) },
-          { label: 'Avg Close Time', value: avgClose != null ? `${avgClose}d` : '--', sub: 'Days to close (won)', color: 'rgba(255,255,255,0.85)' },
-          { label: 'Revenue Forecast', value: forecast > 0 ? formatCurrency(Math.round(forecast), true) : '--', sub: 'Probability-weighted', color: '#10b981' },
-          { label: 'Total Pipeline', value: totalPipeline > 0 ? formatCurrency(Math.round(totalPipeline), true) : '--', sub: `${open.length} active deals`, color: 'rgba(255,255,255,0.85)' },
-        ].map((s, i) => (
-          <div key={i} style={{ ...glass, padding: '14px 16px' }}>
-            <div style={{ fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '6px' }}>
-              {s.label}
-            </div>
-            <div style={{ fontSize: '22px', fontWeight: 700, color: s.color, letterSpacing: '-0.03em', lineHeight: 1, ...mono }}>
-              {isLoading ? <Skel w="60px" h="22px" /> : s.value}
-            </div>
-            <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginTop: '4px' }}>{s.sub}</div>
-          </div>
-        ))}
-      </div>
+  // ── AI Theme Spotter — extract categorised themes from all active deals ────
+  const themeSpotter = useMemo(() => {
+    const activeDeals = (dealsRes?.data ?? []).filter(
+      d => d.stage !== 'closed_won' && d.stage !== 'closed_lost'
+    )
 
-      {/* Two-column: Risk Patterns + Competitor Leaderboard */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+    // Helper to aggregate strings into frequency-sorted array
+    const aggregate = (strings: string[]) => {
+      const counts = new Map<string, number>()
+      for (const s of strings) {
+        const key = s.trim().toLowerCase()
+        if (key.length < 5) continue
+        const canonical = s.trim().replace(/^\w/, c => c.toUpperCase())
+        counts.set(canonical, (counts.get(canonical) ?? 0) + 1)
+      }
+      return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 7)
+    }
 
-        {/* Risk patterns */}
-        <div style={{ ...glass, padding: '16px' }}>
-          <SectionHeader
-            icon={<AlertTriangle size={13} style={{ color: '#ef4444' }} />}
-            label="Top Risk Patterns"
-          />
-          {isLoading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>{[1,2,3].map(i => <Skel key={i} h="28px" />)}</div>
-          ) : topRisks.length > 0 ? (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={th}>Pattern</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Deals</th>
-                  <th style={th}>Companies</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topRisks.map((r, i) => (
-                  <tr key={i}>
-                    <td style={{ ...td, fontWeight: 500, color: 'rgba(255,255,255,0.85)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {r.label}
-                    </td>
-                    <td style={{ ...td, textAlign: 'right', ...mono }}>{r.count}</td>
-                    <td style={{ ...td, fontSize: '11px', color: 'rgba(255,255,255,0.4)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {r.companies.slice(0, 3).join(', ') || '--'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : <EmptyState text="Risk patterns appear after logging deals with notes." />}
-        </div>
+    // Objections/Risks — from dealRisks
+    const allRisks: string[] = []
+    // Insights/Pain Points — from conversionInsights
+    const allInsights: string[] = []
+    // Competitors mentioned
+    const allCompetitors: string[] = []
+    // Stages — stage distribution
+    const stageCounts = new Map<string, number>()
 
-        {/* Competitor leaderboard */}
-        <div style={{ ...glass, padding: '16px' }}>
-          <SectionHeader
-            icon={<Shield size={13} style={{ color: '#f59e0b' }} />}
-            label="Competitor Leaderboard"
-          />
-          {isLoading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>{[1,2,3].map(i => <Skel key={i} h="28px" />)}</div>
-          ) : competitorRecord.length > 0 ? (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={th}>Competitor</th>
-                  <th style={{ ...th, textAlign: 'right' }}>W</th>
-                  <th style={{ ...th, textAlign: 'right' }}>L</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Win Rate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {competitorRecord.map((c: any, i: number) => (
-                  <tr key={i}>
-                    <td style={{ ...td, fontWeight: 500, color: 'rgba(255,255,255,0.85)' }}>
-                      {c.name}
-                    </td>
-                    <td style={{ ...td, textAlign: 'right', color: '#10b981', ...mono }}>{c.wins}</td>
-                    <td style={{ ...td, textAlign: 'right', color: '#ef4444', ...mono }}>{c.losses}</td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 600, color: wrColor(c.winRate), ...mono }}>
-                      {c.winRate}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : <EmptyState text="Competitor data appears from closed deals with named competitors." />}
-        </div>
-      </div>
+    for (const deal of activeDeals) {
+      for (const risk of (deal.dealRisks ?? [])) allRisks.push(risk)
+      for (const insight of ((deal.conversionInsights as string[]) ?? [])) allInsights.push(insight)
+      for (const comp of ((deal.competitors as string[]) ?? [])) allCompetitors.push(comp)
+      const stage = (deal.stage ?? 'unknown').replace(/_/g, ' ')
+      stageCounts.set(stage, (stageCounts.get(stage) ?? 0) + 1)
+    }
 
-      {/* Product gaps by revenue impact */}
-      <div style={{ ...glass, padding: '16px' }}>
-        <SectionHeader
-          icon={<DollarSign size={13} style={{ color: '#f59e0b' }} />}
-          label="Product Gaps by Revenue Impact"
-        />
-        {isLoading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>{[1,2,3].map(i => <Skel key={i} h="28px" />)}</div>
-        ) : productGaps.length > 0 ? (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={th}>Feature Gap</th>
-                <th style={{ ...th, textAlign: 'right' }}>Deals Blocked</th>
-                <th style={{ ...th, textAlign: 'right' }}>Revenue at Risk</th>
-                <th style={{ ...th, textAlign: 'right' }}>Win Rate Impact</th>
-                <th style={th}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {productGaps.map((g: any, i: number) => {
-                const delta = g.winRateDelta
-                return (
-                  <tr key={i}>
-                    <td style={{ ...td, fontWeight: 500, color: 'rgba(255,255,255,0.85)' }}>
-                      {g.title ?? g.feature ?? 'Gap'}
-                    </td>
-                    <td style={{ ...td, textAlign: 'right', ...mono }}>{g.dealsBlocked ?? '--'}</td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 600, color: '#ef4444', ...mono }}>
-                      {g.revenueAtRisk ? formatCurrency(Math.round(g.revenueAtRisk), true) : '--'}
-                    </td>
-                    <td style={{ ...td, textAlign: 'right', ...mono }}>
-                      {delta != null ? (
-                        <span style={{ color: delta < 0 ? '#ef4444' : '#10b981', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                          {delta < 0 ? <ArrowDownRight size={10} /> : <ArrowUpRight size={10} />}
-                          {Math.abs(Math.round(delta))}pp
-                        </span>
-                      ) : '--'}
-                    </td>
-                    <td style={td}>
-                      {g.status === 'on_roadmap' || g.status === 'shipped' || g.linkedIssues ? (
-                        <span style={{ fontSize: '10px', fontWeight: 600, color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                          <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981', display: 'inline-block' }} />
-                          Tracked
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}>Untracked</span>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        ) : <EmptyState text="Product gap signals appear from deal notes analysis." />}
-      </div>
-    </>
-  )
-}
+    return {
+      objections: aggregate(allRisks),
+      insights: aggregate(allInsights),
+      competitors: aggregate(allCompetitors),
+      stageDistribution: Array.from(stageCounts.entries()).sort((a, b) => b[1] - a[1]),
+      totalDeals: activeDeals.length,
+    }
+  }, [dealsRes?.data])
 
+  // Build signals
+  const allSignals: Signal[] = []
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// TAB 2: PLAYBOOK
-// ═══════════════════════════════════════════════════════════════════════════════
-function PlaybookTab({ brain, computed, isLoading }: { brain: any; computed: any; isLoading: boolean }) {
-  const objectionMap: any[] = (brain?.objectionWinMap ?? []).slice(0, 12)
-  const conditionalWins: any[] = (brain?.objectionConditionalWins ?? []).slice(0, 8)
-  const collateralEff: any[] = (brain?.collateralEffectiveness ?? []).slice(0, 8)
-  const winPlaybook = brain?.winPlaybook
-  const competitivePatterns: any[] = (brain?.competitivePatterns ?? []).slice(0, 8)
+  for (const d of brain.urgentDeals ?? []) {
+    allSignals.push({
+      id: `risk-${d.dealId}`, type: 'risk',
+      title: d.dealName ?? d.company,
+      body: d.reason ?? 'This deal requires immediate attention.',
+      dealId: d.dealId, company: d.company,
+      action: d.topAction ?? 'Review and take action on this deal',
+      read: false,
+      confidence: 'high',
+    })
+  }
+  for (const d of brain.staleDeals ?? []) {
+    const days = d.daysSinceUpdate
+    const stageFmt = d.stage ? d.stage.replace(/_/g, ' ') : null
+    allSignals.push({
+      id: `stale-${d.dealId}`, type: 'stale',
+      title: d.dealName ?? d.company,
+      body: `No activity for ${days} day${days !== 1 ? 's' : ''}${stageFmt ? ` · currently in ${stageFmt}` : ''}. Prospects disengage after 2 weeks of silence.`,
+      dealId: d.dealId, company: d.company,
+      action: `Send a follow-up to ${d.company ?? 'this prospect'} and re-establish momentum`,
+      read: false,
+      confidence: days > 14 ? 'high' : days > 7 ? 'medium' : 'low',
+    })
+  }
+  for (const p of brain.keyPatterns ?? []) {
+    const n = p.dealIds.length
+    const dealNameList = (p.dealNames ?? p.companies ?? []).slice(0, 3).join(', ')
+    allSignals.push({
+      id: `pattern-${p.label}`, type: 'pattern',
+      title: p.label,
+      body: `Seen across ${n} deal${n !== 1 ? 's' : ''}${dealNameList ? `: ${dealNameList}` : ''}. Deals matching this pattern have a higher close rate when acted on early.`,
+      action: `Apply this playbook to your active deals at the same stage`,
+      read: false,
+      confidence: n >= 4 ? 'high' : n >= 2 ? 'medium' : 'low',
+      supportCount: n,
+    })
+  }
+
+  const visibleSignals = allSignals
+    .filter(s => !dismissed.has(s.id))
+    .filter(s => filter === 'all' || s.type === filter)
+
+  const filterTabs: Array<{ key: FilterTab; label: string }> = [
+    { key: 'all',     label: `All (${visibleSignals.length})` },
+    { key: 'risk',    label: `Deal Risk (${visibleSignals.filter(s => s.type === 'risk').length})` },
+    { key: 'stale',   label: `Stale (${visibleSignals.filter(s => s.type === 'stale').length})` },
+    { key: 'pattern', label: `Patterns (${visibleSignals.filter(s => s.type === 'pattern').length})` },
+  ]
+
+  const competitors = (brain.competitivePatterns ?? []).slice(0, 6)
+  const winRate = brain.winLossIntel ? Math.round(brain.winLossIntel.winRate * 100) : null
+  const totalClosed = (brain.winLossIntel?.winCount ?? 0) + (brain.winLossIntel?.lossCount ?? 0)
 
   return (
-    <>
-      {/* Objection Win Map */}
-      <div style={{ ...glass, padding: '16px' }}>
-        <SectionHeader
-          icon={<Target size={13} style={{ color: '#10b981' }} />}
-          label="Objection Win Map"
-          right={<span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}>From closed-won deals</span>}
-        />
-        {isLoading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>{[1,2,3,4].map(i => <Skel key={i} h="28px" />)}</div>
-        ) : objectionMap.length > 0 ? (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={th}>Objection Theme</th>
-                <th style={{ ...th, textAlign: 'right' }}>Deals Faced</th>
-                <th style={{ ...th, textAlign: 'right' }}>Wins</th>
-                <th style={{ ...th, textAlign: 'right' }}>Win Rate</th>
-                <th style={{ ...th, textAlign: 'right' }}>Global Benchmark</th>
-              </tr>
-            </thead>
-            <tbody>
-              {objectionMap.map((o: any, i: number) => {
-                const wr = typeof o.winRateWithTheme === 'number' ? o.winRateWithTheme : (o.winRate ?? 0)
-                const globalWr = o.globalWinRate
-                return (
-                  <tr key={i}>
-                    <td style={{ ...td, fontWeight: 500, color: 'rgba(255,255,255,0.85)' }}>
-                      {o.theme}
-                    </td>
-                    <td style={{ ...td, textAlign: 'right', ...mono }}>{o.dealsWithTheme}</td>
-                    <td style={{ ...td, textAlign: 'right', color: '#10b981', ...mono }}>{o.winsWithTheme}</td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 600, color: wrColor(wr), ...mono }}>
-                      {Math.round(wr)}%
-                    </td>
-                    <td style={{ ...td, textAlign: 'right', color: 'rgba(255,255,255,0.35)', ...mono }}>
-                      {globalWr != null ? `${Math.round(globalWr)}%` : '--'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        ) : <EmptyState text="Objection win map builds as you close deals with noted objections." />}
+    <div style={{ paddingTop: 8 }}>
+      <style>{`
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+      `}</style>
+
+      {/* Header */}
+      <div style={{ marginBottom: 18 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', margin: '0 0 3px' }}>
+          Signals
+        </h1>
+        <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: 0 }}>
+          AI-detected patterns, risks, and opportunities from your pipeline.
+        </p>
       </div>
 
-      {/* Stage-Specific Guidance: Conditional wins (champion lift) */}
-      {conditionalWins.length > 0 && (
-        <div style={{ ...glass, padding: '16px' }}>
-          <SectionHeader
-            icon={<Layers size={13} style={{ color: '#3b82f6' }} />}
-            label="Stage-Specific Guidance (Champion Lift)"
-            right={<span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}>Win rate impact of champion engagement per stage</span>}
-          />
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={th}>Objection</th>
-                <th style={{ ...th, textAlign: 'right' }}>Deals</th>
-                <th style={{ ...th, textAlign: 'right' }}>Avg Champion Lift</th>
-                <th style={th}>Best Stage</th>
-              </tr>
-            </thead>
-            <tbody>
-              {conditionalWins.map((cw: any, i: number) => {
-                const best = (cw.stageBreakdown ?? [])
-                  .filter((sb: any) => sb.championLift != null)
-                  .sort((a: any, b: any) => (b.championLift ?? 0) - (a.championLift ?? 0))[0]
-                return (
-                  <tr key={i}>
-                    <td style={{ ...td, fontWeight: 500, color: 'rgba(255,255,255,0.85)' }}>{cw.theme}</td>
-                    <td style={{ ...td, textAlign: 'right', ...mono }}>{cw.dealsWithTheme}</td>
-                    <td style={{ ...td, textAlign: 'right', ...mono }}>
-                      {cw.championLiftAvg != null ? (
-                        <span style={{ color: cw.championLiftAvg > 0 ? '#10b981' : '#ef4444' }}>
-                          {cw.championLiftAvg > 0 ? '+' : ''}{Math.round(cw.championLiftAvg)}pp
-                        </span>
-                      ) : '--'}
-                    </td>
-                    <td style={{ ...td, fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>
-                      {best ? `${best.stage} (+${Math.round(best.championLift)}pp)` : '--'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+      {/* Stats strip */}
+      {!isLoading && (brain.winLossIntel || (brain.pipeline?.activeDeals ?? 0) > 0) && (
+        <div style={{
+          display: 'flex', gap: 0,
+          background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 10,
+          overflow: 'hidden', marginBottom: 18,
+        }}>
+          {[
+            { label: 'Win Rate', value: winRate != null ? `${winRate}%` : '—', sub: `${totalClosed} closed` },
+            { label: 'Active Deals', value: String(brain.pipeline?.activeDeals ?? 0), sub: 'in pipeline' },
+            { label: 'Signals', value: String(allSignals.length), sub: 'active signals' },
+            { label: 'Patterns', value: String(brain.keyPatterns?.length ?? 0), sub: 'detected' },
+          ].map((item, i) => (
+            <div key={i} style={{
+              flex: 1, padding: '12px 18px',
+              borderRight: i < 3 ? '1px solid var(--border-subtle)' : 'none',
+            }}>
+              <div style={{ fontSize: 10.5, color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 3 }}>
+                {item.label}
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1 }}>
+                {item.value}
+              </div>
+              <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 2 }}>{item.sub}</div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* Two-column: Competitive Intel + Collateral Effectiveness */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        {/* Competitive playbook */}
-        <div style={{ ...glass, padding: '16px' }}>
-          <SectionHeader
-            icon={<Shield size={13} style={{ color: '#f59e0b' }} />}
-            label="Competitive Playbook"
-            right={
-              <Link href="/competitors" style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
-                All <ChevronRight size={10} />
-              </Link>
-            }
-          />
-          {competitivePatterns.length > 0 ? (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={th}>Competitor</th>
-                  <th style={{ ...th, textAlign: 'right' }}>WR</th>
-                  <th style={th}>Win Condition</th>
-                </tr>
-              </thead>
-              <tbody>
-                {competitivePatterns.map((cp: any, i: number) => (
-                  <tr key={i}>
-                    <td style={{ ...td, fontWeight: 500, color: 'rgba(255,255,255,0.85)' }}>{cp.competitor}</td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 600, color: wrColor(cp.winRate), ...mono }}>{Math.round(cp.winRate)}%</td>
-                    <td style={{ ...td, fontSize: '11px', color: 'rgba(255,255,255,0.5)', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {cp.topWinCondition || '--'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : <EmptyState text="Competitive patterns emerge from closed deals with named competitors." />}
-        </div>
+      <div className="intel-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16, alignItems: 'start' }}>
+        <style>{`@media (max-width: 1100px) { .intel-grid { grid-template-columns: 1fr !important; } }`}</style>
 
-        {/* Collateral effectiveness */}
-        <div style={{ ...glass, padding: '16px' }}>
-          <SectionHeader
-            icon={<BookOpen size={13} style={{ color: '#3b82f6' }} />}
-            label="Collateral Effectiveness"
-            right={
-              <Link href="/case-studies" style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', display: 'inline-flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
-                Library <ChevronRight size={10} />
-              </Link>
-            }
-          />
-          {collateralEff.length > 0 ? (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={th}>Type</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Used</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Win Rate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {collateralEff.map((c: any, i: number) => (
-                  <tr key={i}>
-                    <td style={{ ...td, fontWeight: 500, color: 'rgba(255,255,255,0.85)', textTransform: 'capitalize' }}>
-                      {c.type.replace(/_/g, ' ')}
-                    </td>
-                    <td style={{ ...td, textAlign: 'right', ...mono }}>{c.totalUsed}</td>
-                    <td style={{ ...td, textAlign: 'right', fontWeight: 600, color: wrColor(c.winRate), ...mono }}>{c.winRate}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : <EmptyState text="Collateral stats appear after attaching collateral to deals." />}
-        </div>
-      </div>
-
-      {/* Fastest close pattern */}
-      {winPlaybook?.fastestClosePattern && (
-        <div style={{ ...glass, padding: '16px' }}>
-          <SectionHeader
-            icon={<Clock size={13} style={{ color: '#10b981' }} />}
-            label="Fastest Close Pattern"
-          />
-          <div style={{ display: 'flex', gap: '24px', alignItems: 'baseline' }}>
-            <div>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#10b981', ...mono }}>
-                {Math.round(winPlaybook.fastestClosePattern.avgDaysToClose)}d
-              </div>
-              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>
-                avg close ({winPlaybook.fastestClosePattern.sampleSize} deals)
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-              {(winPlaybook.fastestClosePattern.commonSignals ?? []).map((sig: string, i: number) => (
-                <span key={i} style={{
-                  padding: '3px 8px', borderRadius: '4px', fontSize: '11px',
-                  background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)',
-                  color: 'rgba(255,255,255,0.6)',
-                }}>
-                  {sig}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  )
-}
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// TAB 3: MODELS (power user)
-// ═══════════════════════════════════════════════════════════════════════════════
-function ModelsTab({ brain, isLoading }: { brain: any; isLoading: boolean }) {
-  const ml = brain?.mlModel
-  const archetypes: any[] = brain?.dealArchetypes ?? []
-  const calibration: any[] = brain?.calibrationTimeline ?? []
-  const featureImportance: any[] = ml?.featureImportance ?? []
-
-  return (
-    <>
-      {/* Model Health */}
-      <div style={{ ...glass, padding: '16px' }}>
-        <SectionHeader
-          icon={<Cpu size={13} style={{ color: 'rgba(255,255,255,0.6)' }} />}
-          label="ML Model Health"
-        />
-        {isLoading ? (
-          <div style={{ display: 'flex', gap: '12px' }}>{[1,2,3,4].map(i => <Skel key={i} w="120px" h="50px" />)}</div>
-        ) : ml ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
-            {[
-              { label: 'LOO Accuracy', value: `${Math.round(ml.looAccuracy * 100)}%`, color: ml.looAccuracy >= 0.7 ? '#10b981' : ml.looAccuracy >= 0.5 ? '#f59e0b' : '#ef4444' },
-              { label: 'Training Size', value: `${ml.trainingSize}`, color: 'rgba(255,255,255,0.85)' },
-              { label: 'Features', value: `${ml.featureNames?.length ?? 0}`, color: 'rgba(255,255,255,0.85)' },
-              { label: 'Global Prior', value: ml.usingGlobalPrior ? 'Active' : 'Off', color: ml.usingGlobalPrior ? '#10b981' : 'rgba(255,255,255,0.4)' },
-              { label: 'Last Trained', value: ml.lastTrained ? new Date(ml.lastTrained).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '--', color: 'rgba(255,255,255,0.6)' },
-            ].map((s, i) => (
-              <div key={i} style={{ padding: '10px 12px', borderRadius: '6px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>{s.label}</div>
-                <div style={{ fontSize: '18px', fontWeight: 700, color: s.color, ...mono }}>{s.value}</div>
-              </div>
+        {/* Signals feed */}
+        <div>
+          {/* Filter Tabs */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
+            {filterTabs.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setFilter(tab.key)}
+                style={{
+                  padding: '5px 11px', borderRadius: 6, fontSize: 12, fontWeight: 500,
+                  cursor: 'pointer',
+                  border: filter === tab.key ? '1px solid var(--border-default)' : '1px solid transparent',
+                  background: filter === tab.key ? 'var(--surface-1)' : 'transparent',
+                  color: filter === tab.key ? 'var(--text-primary)' : 'var(--text-tertiary)',
+                  transition: 'all 80ms',
+                }}
+              >
+                {tab.label}
+              </button>
             ))}
           </div>
-        ) : (
-          <EmptyState text="ML model trains after 5+ closed deals. Keep logging deals to activate predictive scoring." />
-        )}
-      </div>
 
-      {/* Feature Importance */}
-      {featureImportance.length > 0 && (
-        <div style={{ ...glass, padding: '16px' }}>
-          <SectionHeader
-            icon={<BarChart2 size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />}
-            label="Feature Importance"
-            right={<span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}>Logistic regression weights</span>}
-          />
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={th}>Feature</th>
-                <th style={{ ...th, textAlign: 'right' }}>Importance</th>
-                <th style={th}>Direction</th>
-                <th style={{ ...th, width: '40%' }}>Weight</th>
-              </tr>
-            </thead>
-            <tbody>
-              {featureImportance.slice(0, 15).map((f: any, i: number) => {
-                const maxImp = featureImportance[0]?.importance ?? 1
-                const pct = maxImp > 0 ? (f.importance / maxImp) * 100 : 0
+          {isLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[...Array(4)].map((_, i) => <Skeleton key={i} h={80} />)}
+            </div>
+          ) : visibleSignals.length === 0 ? (
+            <div style={{
+              textAlign: 'center', padding: '50px 0',
+              border: '1px solid var(--border-default)', borderRadius: 10, background: 'var(--surface-2)',
+            }}>
+              <Bell size={22} style={{ color: 'var(--border-default)', display: 'block', margin: '0 auto 10px' }} />
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>No signals</div>
+              <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4 }}>
+                {filter === 'all'
+                  ? 'Run AI analysis on deals to generate signals.'
+                  : `No ${filter} signals right now.`}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {visibleSignals.map(signal => (
+                <SignalCard
+                  key={signal.id}
+                  signal={signal}
+                  onDismiss={id => setDismissed(prev => new Set([...prev, id]))}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Right sidebar: Competitor Leaderboard */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* Competitor Leaderboard */}
+          <div style={{
+            background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 10, overflow: 'hidden',
+          }}>
+            <div style={{
+              padding: '11px 16px', borderBottom: '1px solid var(--border-subtle)',
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <Swords size={11} style={{ color: '#8b5cf6' }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                vs Competitors
+              </span>
+            </div>
+            {isLoading ? (
+              <div style={{ padding: 16 }}><Skeleton h={100} /></div>
+            ) : competitors.length === 0 ? (
+              <div style={{ padding: '18px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>No competitor data yet.</div>
+                <Link href="/competitors" style={{ fontSize: 12, color: '#1DB86A', textDecoration: 'none', fontWeight: 500, marginTop: 4, display: 'block' }}>
+                  Add competitors →
+                </Link>
+              </div>
+            ) : (
+              <div>
+                {competitors.map((c, i) => {
+                  const wr = Math.round(c.winRate * 100)
+                  const color = wr >= 60 ? '#1DB86A' : wr >= 40 ? '#f59e0b' : '#ef4444'
+                  return (
+                    <div key={i} style={{
+                      padding: '9px 16px',
+                      borderBottom: i < competitors.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                      display: 'flex', alignItems: 'center', gap: 10,
+                    }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {c.competitor}
+                        </div>
+                        <div style={{ fontSize: 10.5, color: 'var(--text-faint)', marginTop: 1 }}>{c.dealCount} deal{c.dealCount !== 1 ? 's' : ''}</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                        <div style={{ width: 48, height: 4, borderRadius: 2, background: 'var(--surface-3)', overflow: 'hidden' }}>
+                          <div style={{ width: `${wr}%`, height: '100%', background: color, borderRadius: 2 }} />
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 700, color, minWidth: 30, textAlign: 'right' }}>{wr}%</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Pipeline Velocity */}
+          {!isLoading && (brain.staleDeals ?? []).length > 0 && (
+            <div style={{
+              background: 'var(--surface-1)', border: '1px solid var(--border-default)',
+              borderRadius: 10, overflow: 'hidden',
+            }}>
+              <div style={{
+                padding: '11px 16px', borderBottom: '1px solid var(--border-subtle)',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <Timer size={11} style={{ color: '#f59e0b' }} />
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Velocity
+                </span>
+              </div>
+              <div>
+                {(brain.staleDeals ?? []).slice(0, 5).map((d, i, arr) => {
+                  const days = d.daysSinceUpdate
+                  const color = days > 14 ? '#ef4444' : days > 7 ? '#f59e0b' : '#aaa'
+                  return (
+                    <Link key={d.dealId} href={`/deals/${d.dealId}`} style={{ textDecoration: 'none' }}>
+                      <div style={{
+                        padding: '9px 16px',
+                        borderBottom: i < arr.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                        transition: 'background 80ms',
+                      }}
+                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'}
+                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {d.dealName ?? d.company}
+                          </div>
+                          {d.stage && (
+                            <div style={{ fontSize: 10.5, color: 'var(--text-tertiary)', marginTop: 1 }}>
+                              {d.stage.replace(/_/g, ' ')}
+                            </div>
+                          )}
+                        </div>
+                        <span style={{
+                          fontSize: 11, fontWeight: 700, color,
+                          background: `${color}14`, borderRadius: 4, padding: '1px 6px',
+                          flexShrink: 0,
+                        }}>
+                          {days}d
+                        </span>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+          {/* ── AI Theme Spotter ── */}
+          <div style={{
+            background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 10, overflow: 'hidden',
+          }}>
+            <div style={{
+              padding: '11px 16px', borderBottom: '1px solid var(--border-subtle)',
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <MessageSquareWarning size={11} style={{ color: '#6366f1' }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Theme Spotter
+              </span>
+              {themeSpotter.totalDeals > 0 && (
+                <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 500 }}>{themeSpotter.totalDeals} deals</span>
+              )}
+            </div>
+            {/* Theme tabs */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle)' }}>
+              {([
+                { id: 'objections',  label: 'Objections',  color: '#ef4444' },
+                { id: 'insights',    label: 'Insights',    color: '#3b82f6' },
+                { id: 'competitors', label: 'Competitors', color: '#8b5cf6' },
+                { id: 'stages',      label: 'Stages',      color: '#f59e0b' },
+              ] as const).map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setThemeTab(t.id)}
+                  style={{
+                    flex: 1, padding: '7px 4px', fontSize: 10, fontWeight: 600,
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: themeTab === t.id ? t.color : 'var(--text-muted)',
+                    borderBottom: themeTab === t.id ? `2px solid ${t.color}` : '2px solid transparent',
+                    transition: 'color 80ms',
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            {!dealsRes ? (
+              <div style={{ padding: 16 }}><Skeleton h={80} /></div>
+            ) : (() => {
+              const themeMeta: Record<string, { data: Array<[string, number]>; emptyText: string; barColor: (count: number) => string }> = {
+                objections: {
+                  data: themeSpotter.objections,
+                  emptyText: 'No objections detected yet. Run AI analysis on deals.',
+                  barColor: (c: number) => c >= 3 ? '#ef4444' : c >= 2 ? '#f59e0b' : '#9ca3af',
+                },
+                insights: {
+                  data: themeSpotter.insights,
+                  emptyText: 'No insights yet. Analyse deals to surface themes.',
+                  barColor: (c: number) => c >= 3 ? '#3b82f6' : c >= 2 ? '#6366f1' : '#9ca3af',
+                },
+                competitors: {
+                  data: themeSpotter.competitors,
+                  emptyText: 'No competitor patterns yet. Add competitors to deals.',
+                  barColor: (c: number) => c >= 3 ? '#8b5cf6' : c >= 2 ? '#a78bfa' : '#9ca3af',
+                },
+                stages: {
+                  data: themeSpotter.stageDistribution,
+                  emptyText: 'No stage data yet.',
+                  barColor: () => '#f59e0b',
+                },
+              }
+              const current = themeMeta[themeTab]
+              if (current.data.length === 0) {
                 return (
-                  <tr key={i}>
-                    <td style={{ ...td, fontWeight: 500, color: 'rgba(255,255,255,0.85)', fontSize: '11px' }}>
-                      {f.name.replace(/_/g, ' ')}
-                    </td>
-                    <td style={{ ...td, textAlign: 'right', ...mono, fontSize: '11px' }}>
-                      {f.importance.toFixed(3)}
-                    </td>
-                    <td style={td}>
-                      <span style={{
-                        fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '3px',
-                        background: f.direction === 'helps' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                        color: f.direction === 'helps' ? '#10b981' : '#ef4444',
-                        border: `1px solid ${f.direction === 'helps' ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                  <div style={{ padding: '18px 16px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)', lineHeight: 1.5 }}>{current.emptyText}</div>
+                  </div>
+                )
+              }
+              const maxCount = current.data[0][1]
+              return (
+                <div>
+                  {current.data.map(([label, count], i) => {
+                    const pct = Math.round((count / maxCount) * 100)
+                    const color = current.barColor(count)
+                    return (
+                      <div key={i} style={{
+                        padding: '8px 16px',
+                        borderBottom: i < current.data.length - 1 ? '1px solid var(--border-subtle)' : 'none',
                       }}>
-                        {f.direction === 'helps' ? 'Helps' : 'Hurts'}
-                      </span>
-                    </td>
-                    <td style={td}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div style={{ flex: 1, height: '4px', borderRadius: '2px', background: 'rgba(255,255,255,0.06)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                           <div style={{
-                            width: `${Math.min(pct, 100)}%`, height: '100%', borderRadius: '2px',
-                            background: f.direction === 'helps' ? 'rgba(16,185,129,0.5)' : 'rgba(239,68,68,0.5)',
-                          }} />
+                            fontSize: 11.5, fontWeight: 500, color: 'var(--text-primary)',
+                            flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>
+                            {label}
+                          </div>
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, color,
+                            background: `${color}18`, borderRadius: 4, padding: '1px 5px',
+                            marginLeft: 6, flexShrink: 0,
+                          }}>
+                            {count}×
+                          </span>
+                        </div>
+                        <div style={{ width: '100%', height: 3, background: 'var(--surface-3)', borderRadius: 2, overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 300ms ease' }} />
                         </div>
                       </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Deal Archetypes */}
-      {archetypes.length > 0 && (
-        <div style={{ ...glass, padding: '16px' }}>
-          <SectionHeader
-            icon={<Layers size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />}
-            label="Deal Archetypes"
-            right={<span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}>K-means clustering</span>}
-          />
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={th}>Archetype</th>
-                <th style={{ ...th, textAlign: 'right' }}>Deals</th>
-                <th style={{ ...th, textAlign: 'right' }}>Win Rate</th>
-                <th style={{ ...th, textAlign: 'right' }}>Avg Value</th>
-                <th style={{ ...th, textAlign: 'right' }}>Open</th>
-                <th style={th}>Winning Characteristic</th>
-              </tr>
-            </thead>
-            <tbody>
-              {archetypes.map((a: any, i: number) => (
-                <tr key={i}>
-                  <td style={{ ...td, fontWeight: 500, color: 'rgba(255,255,255,0.85)' }}>{a.label}</td>
-                  <td style={{ ...td, textAlign: 'right', ...mono }}>{a.dealCount}</td>
-                  <td style={{ ...td, textAlign: 'right', fontWeight: 600, color: wrColor(a.winRate), ...mono }}>{Math.round(a.winRate)}%</td>
-                  <td style={{ ...td, textAlign: 'right', ...mono }}>{formatCurrency(Math.round(a.avgDealValue), true)}</td>
-                  <td style={{ ...td, textAlign: 'right', ...mono }}>{a.openDealIds?.length ?? 0}</td>
-                  <td style={{ ...td, fontSize: '11px', color: 'rgba(255,255,255,0.5)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {a.winningCharacteristic || '--'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Calibration Timeline */}
-      {calibration.length > 0 && (
-        <div style={{ ...glass, padding: '16px' }}>
-          <SectionHeader
-            icon={<TrendingUp size={13} style={{ color: 'rgba(255,255,255,0.5)' }} />}
-            label="Score Calibration Timeline"
-            right={<span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)' }}>Monthly ML discrimination tracking</span>}
-          />
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={th}>Month</th>
-                <th style={{ ...th, textAlign: 'right' }}>Deals</th>
-                <th style={{ ...th, textAlign: 'right' }}>Actual WR</th>
-                <th style={{ ...th, textAlign: 'right' }}>Avg ML (Wins)</th>
-                <th style={{ ...th, textAlign: 'right' }}>Avg ML (Losses)</th>
-                <th style={{ ...th, textAlign: 'right' }}>Discrimination</th>
-              </tr>
-            </thead>
-            <tbody>
-              {calibration.map((c: any, i: number) => {
-                const disc = c.discrimination ?? (c.avgMlOnWins - c.avgMlOnLoss)
-                return (
-                  <tr key={i}>
-                    <td style={{ ...td, fontWeight: 500, color: 'rgba(255,255,255,0.85)', ...mono }}>{c.month}</td>
-                    <td style={{ ...td, textAlign: 'right', ...mono }}>{c.n}</td>
-                    <td style={{ ...td, textAlign: 'right', ...mono }}>{Math.round(c.actualWinRate)}%</td>
-                    <td style={{ ...td, textAlign: 'right', color: '#10b981', ...mono }}>{Math.round(c.avgMlOnWins)}%</td>
-                    <td style={{ ...td, textAlign: 'right', color: '#ef4444', ...mono }}>{Math.round(c.avgMlOnLoss)}%</td>
-                    <td style={{ ...td, textAlign: 'right', ...mono }}>
-                      <span style={{
-                        color: disc >= 20 ? '#10b981' : disc >= 10 ? '#f59e0b' : '#ef4444',
-                        fontWeight: 600,
-                      }}>
-                        {disc > 0 ? '+' : ''}{Math.round(disc)}pp
-                      </span>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Model weights raw (collapsible) */}
-      {ml && (
-        <details style={{ ...glass, padding: '16px' }}>
-          <summary style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', userSelect: 'none' }}>
-            Raw Model Weights ({ml.featureNames?.length ?? 0} features, bias: {ml.bias?.toFixed(4)})
-          </summary>
-          <div style={{ marginTop: '10px', overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={th}>Feature</th>
-                  <th style={{ ...th, textAlign: 'right' }}>Weight</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(ml.featureNames ?? []).map((name: string, i: number) => (
-                  <tr key={i}>
-                    <td style={{ ...td, fontSize: '11px', fontFamily: 'monospace', color: 'rgba(255,255,255,0.6)' }}>{name}</td>
-                    <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace', fontSize: '11px', color: (ml.weights?.[i] ?? 0) >= 0 ? '#10b981' : '#ef4444', ...mono }}>
-                      {(ml.weights?.[i] ?? 0).toFixed(4)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    )
+                  })}
+                </div>
+              )
+            })()}
           </div>
-        </details>
-      )}
-    </>
+
+          {/* ── Market Insights ── */}
+          {(() => {
+            const activeDeals = (dealsRes?.data ?? []).filter(
+              (d: DealLog) => d.stage !== 'closed_won' && d.stage !== 'closed_lost'
+            )
+            const wonDeals = (dealsRes?.data ?? []).filter((d: DealLog) => d.stage === 'closed_won')
+            const avgDealSize = activeDeals.length > 0
+              ? Math.round(activeDeals.reduce((s: number, d: DealLog) => s + (d.dealValue ?? 0), 0) / activeDeals.length)
+              : 0
+            const avgWonSize = wonDeals.length > 0
+              ? Math.round(wonDeals.reduce((s: number, d: DealLog) => s + (d.dealValue ?? 0), 0) / wonDeals.length)
+              : 0
+            const avgScore = activeDeals.length > 0
+              ? Math.round(activeDeals.reduce((s: number, d: DealLog) => s + (d.conversionScore ?? 50), 0) / activeDeals.length)
+              : 0
+            const highScoreDeals = activeDeals.filter((d: DealLog) => (d.conversionScore ?? 0) >= 70).length
+            const atRiskDeals = activeDeals.filter((d: DealLog) => (d.conversionScore ?? 100) < 40).length
+
+            if (!dealsRes || activeDeals.length === 0) return null
+
+            return (
+              <div style={{
+                background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: 10, overflow: 'hidden',
+              }}>
+                <div style={{
+                  padding: '11px 16px', borderBottom: '1px solid var(--border-subtle)',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}>
+                  <TrendingUp size={11} style={{ color: '#3b82f6' }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Market Insights
+                  </span>
+                </div>
+                <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[
+                    { label: 'Avg Deal Size', value: `£${avgDealSize >= 1000 ? `${Math.round(avgDealSize / 1000)}k` : avgDealSize}`, color: 'var(--text-primary)' },
+                    { label: 'Avg Won Size', value: wonDeals.length > 0 ? `£${avgWonSize >= 1000 ? `${Math.round(avgWonSize / 1000)}k` : avgWonSize}` : '—', color: '#1DB86A' },
+                    { label: 'Pipeline Health', value: `${avgScore}/100`, color: avgScore >= 60 ? '#1DB86A' : avgScore >= 40 ? '#f59e0b' : '#ef4444' },
+                    { label: 'High Confidence', value: `${highScoreDeals} deal${highScoreDeals !== 1 ? 's' : ''}`, color: '#1DB86A' },
+                    { label: 'At Risk', value: `${atRiskDeals} deal${atRiskDeals !== 1 ? 's' : ''}`, color: '#ef4444' },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 500 }}>{label}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color, letterSpacing: '-0.02em' }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+        </div>
+      </div>
+    </div>
   )
 }

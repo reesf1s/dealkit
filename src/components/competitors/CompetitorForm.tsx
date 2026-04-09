@@ -15,7 +15,7 @@ interface CompetitorFormProps {
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
+    <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#787774', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
       {children}
     </label>
   )
@@ -27,9 +27,9 @@ function Input({ value, onChange, placeholder }: { value: string; onChange: (v: 
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', boxSizing: 'border-box', transition: 'border-color 150ms ease' }}
-      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)' }}
-      onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
+      style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(55,53,47,0.04)', border: '1px solid rgba(55,53,47,0.12)', color: '#37352f', fontSize: '13px', outline: 'none', boxSizing: 'border-box', transition: 'border-color 150ms ease, box-shadow 150ms ease' }}
+      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(94,106,210,0.35)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(94,106,210,0.10)' }}
+      onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(55,53,47,0.12)'; e.currentTarget.style.boxShadow = 'none' }}
     />
   )
 }
@@ -41,9 +41,9 @@ function Textarea({ value, onChange, placeholder, rows = 3 }: { value: string; o
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       rows={rows}
-      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, transition: 'border-color 150ms ease', fontFamily: 'inherit' }}
-      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)' }}
-      onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
+      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(55,53,47,0.04)', border: '1px solid rgba(55,53,47,0.12)', color: '#37352f', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, transition: 'border-color 150ms ease, box-shadow 150ms ease', fontFamily: 'inherit' }}
+      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(94,106,210,0.35)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(94,106,210,0.10)' }}
+      onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(55,53,47,0.12)'; e.currentTarget.style.boxShadow = 'none' }}
     />
   )
 }
@@ -60,12 +60,12 @@ function TagListEditor({ items, onChange, placeholder }: { items: string[]; onCh
           <div style={{ flex: 1 }}>
             <Input value={item} onChange={(v) => update(i, v)} placeholder={placeholder} />
           </div>
-          <button onClick={() => remove(i)} style={{ width: '32px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', backgroundColor: 'transparent', border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer', color: '#555', flexShrink: 0 }} onMouseEnter={(e) => { e.currentTarget.style.color = '#EF4444' }} onMouseLeave={(e) => { e.currentTarget.style.color = '#555' }}>
+          <button onClick={() => remove(i)} style={{ width: '32px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', backgroundColor: 'transparent', border: '1px solid rgba(55,53,47,0.12)', cursor: 'pointer', color: '#9b9a97', flexShrink: 0 }} onMouseEnter={(e) => { e.currentTarget.style.color = '#e03e3e'; e.currentTarget.style.backgroundColor = 'rgba(224,62,62,0.08)'; e.currentTarget.style.borderColor = 'rgba(224,62,62,0.20)' }} onMouseLeave={(e) => { e.currentTarget.style.color = '#9b9a97'; e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.borderColor = 'rgba(55,53,47,0.12)' }}>
             <Trash2 size={12} strokeWidth={2} />
           </button>
         </div>
       ))}
-      <button onClick={add} style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '30px', padding: '0 10px', width: 'fit-content', borderRadius: '6px', backgroundColor: 'transparent', border: '1px dashed rgba(255,255,255,0.12)', cursor: 'pointer', color: '#888', fontSize: '12px' }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)'; e.currentTarget.style.color = 'rgba(255,255,255,0.80)' }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'; e.currentTarget.style.color = '#888' }}>
+      <button onClick={add} style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '30px', padding: '0 10px', width: 'fit-content', borderRadius: '6px', backgroundColor: 'transparent', border: '1px dashed rgba(55,53,47,0.16)', cursor: 'pointer', color: '#787774', fontSize: '12px' }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(55,53,47,0.30)'; e.currentTarget.style.color = '#37352f' }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(55,53,47,0.16)'; e.currentTarget.style.color = '#787774' }}>
         <Plus size={12} strokeWidth={2.5} />
         Add
       </button>
@@ -183,9 +183,9 @@ export function CompetitorForm({ initialData, onSubmit, submitLabel = 'Save comp
         <button
           type="submit"
           disabled={loading || !form.name.trim()}
-          style={{ height: '34px', padding: '0 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#0a0b0f', backgroundColor: loading || !form.name.trim() ? '#333' : 'rgba(255,255,255,0.90)', border: 'none', cursor: loading || !form.name.trim() ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
-          onMouseEnter={(e) => { if (!loading && form.name.trim()) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.80)' }}
-          onMouseLeave={(e) => { if (!loading && form.name.trim()) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.90)' }}
+          style={{ height: '34px', padding: '0 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#ffffff', backgroundColor: loading || !form.name.trim() ? 'rgba(55,53,47,0.25)' : '#37352f', border: 'none', cursor: loading || !form.name.trim() ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
+          onMouseEnter={(e) => { if (!loading && form.name.trim()) e.currentTarget.style.backgroundColor = '#2b2925' }}
+          onMouseLeave={(e) => { if (!loading && form.name.trim()) e.currentTarget.style.backgroundColor = '#37352f' }}
         >
           {loading ? 'Saving…' : submitLabel}
         </button>

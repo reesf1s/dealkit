@@ -17,12 +17,10 @@ export default function SignUpPage() {
         background: 'var(--bg)',
         position: 'relative', overflow: 'hidden',
       }}>
-        {/* Background glow */}
-        <div style={{ position: 'absolute', top: '-20%', left: '-10%', width: '500px', height: '500px', background: 'radial-gradient(circle, var(--accent-subtle) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '60px' }}>
-          <div style={{ width: '36px', height: '36px', background: 'linear-gradient(135deg, var(--accent), #7C3AED)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px var(--accent-subtle)' }}>
+          <div style={{ width: '36px', height: '36px', background: '#37352f', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileText size={17} color="#fff" strokeWidth={2.5} />
           </div>
           <span style={{ fontWeight: '700', fontSize: '18px', letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>Halvex</span>
@@ -57,7 +55,7 @@ export default function SignUpPage() {
             &ldquo;I built Halvex because we kept losing deals to competitors we couldn&apos;t track. Two hours of prep per call. I wanted that time back.&rdquo;
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent), #8B5CF6)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff' }}>R</div>
+            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#5e6ad2', border: '1px solid rgba(94,106,210,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff' }}>R</div>
             <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Rees Foulkes · Founder, Halvex</span>
           </div>
         </div>
@@ -104,12 +102,11 @@ export default function SignUpPage() {
                   fontSize: '13px',
                 },
                 formButtonPrimary: {
-                  background: 'linear-gradient(135deg, var(--accent), #7C3AED)',
+                  background: '#37352f',
                   borderRadius: '8px',
                   height: '42px',
                   fontSize: '13px',
                   fontWeight: '600',
-                  boxShadow: '0 0 20px var(--accent-subtle)',
                 },
                 footerActionLink: { color: 'var(--accent)' },
                 formFieldLabel: { color: 'var(--text-tertiary)', fontSize: '12px' },
@@ -123,8 +120,8 @@ export default function SignUpPage() {
                 colorInputBackground: 'var(--input-bg)',
                 colorInputText: 'var(--text-primary)',
                 borderRadius: '8px',
-                colorPrimary: '#6366F1',
-                colorDanger: '#EF4444',
+                colorPrimary: '#5e6ad2',
+                colorDanger: '#e03e3e',
               },
             }}
           />

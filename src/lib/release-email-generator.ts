@@ -226,7 +226,11 @@ export async function generateReleaseEmail(
     model: anthropic('gpt-5.4-mini'),
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],
-    maxTokens: 700,
+    providerOptions: {
+      openai: {
+        maxCompletionTokens: 700,
+      },
+    },
   })
 
   // Parse JSON response
@@ -335,7 +339,11 @@ export async function generateBatchReleaseEmail(
     model: anthropic('gpt-5.4-mini'),
     system: BATCH_SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],
-    maxTokens: 900,
+    providerOptions: {
+      openai: {
+        maxCompletionTokens: 900,
+      },
+    },
   })
 
   let parsed: { subject: string; body: string; callSchedulingMessage: string }

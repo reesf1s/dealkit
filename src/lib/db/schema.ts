@@ -8,6 +8,7 @@ import {
   timestamp,
   uuid,
   unique,
+  varchar,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { relations } from 'drizzle-orm'
@@ -87,6 +88,7 @@ export const workspaces = pgTable('workspaces', {
   inboundEmailToken: text('inbound_email_token'),              // 8-char hex token for email forwarding ingest
   mcpApiKey: text('mcp_api_key').unique(),                     // Bearer token for external MCP server access
   knowledgeBaseText: text('knowledge_base_text'),              // Company knowledge base fed into AI system prompt
+  emailDigestEnabled: boolean('email_digest_enabled').notNull().default(true), // weekly email digest opt-in
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
@@ -251,6 +253,10 @@ export const dealLogs = pgTable('deal_logs', {
   // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS note_source text DEFAULT 'manual';
   assignedRepId: text('assigned_rep_id'),  // Clerk userId of the assigned sales rep
   // Migration: ALTER TABLE deal_logs ADD COLUMN IF NOT EXISTS assigned_rep_id text;
+  forecastCategory: varchar('forecast_category', { length: 20 }),  // 'commit' | 'upside' | 'pipeline' | 'omit' | null (unset)
+  scoreHistory: jsonb('score_history').notNull().default([]),        // Array<{ score: number; date: string }>
+  meddic: jsonb('meddic'),       // MeddicScore — { metrics, economicBuyer, decisionCriteria, decisionProcess, identifyPain, champion }
+  dealReview: jsonb('deal_review'), // DealReview — { overall, grade, criteria[], crmUpdates[], coachingNote, generatedAt }
   noteEmbedding: text('note_embedding'),   // stored as text, cast to vector in SQL
   dealEmbedding: text('deal_embedding'),   // stored as text, cast to vector in SQL
   // Migration v25: actual column type is vector(1536) — Drizzle uses text since it lacks native vector support
@@ -887,3 +893,62 @@ export type NewWorkspaceMlModelRow = typeof workspaceMlModels.$inferInsert
 
 export type SlackPendingActionRow = typeof slackPendingActions.$inferSelect
 export type NewSlackPendingActionRow = typeof slackPendingActions.$inferInsert
+
+// ─────────────────────────────────────────────────────────────────────────────
+// deal_todos  (per-deal action items — Sprint 3 Manage tab)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const dealTodos = pgTable('deal_todos', {
+  id:          text('id').primaryKey().default(sql`gen_random_uuid()::text`),
+  workspaceId: text('workspace_id').notNull(),
+  dealId:      text('deal_id').notNull(),
+  text:        text('text').notNull(),
+  done:        boolean('done').notNull().default(false),
+  priority:    text('priority').notNull().default('normal'), // low | normal | high
+  dueDate:     timestamp('due_date', { withTimezone: true }),
+  createdBy:   text('created_by'),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export type DealTodoRow = typeof dealTodos.$inferSelect
+export type NewDealTodoRow = typeof dealTodos.$inferInsert
+
+// ─────────────────────────────────────────────────────────────────────────────
+// deal_criteria  (success criteria / MEDDIC qualification per deal)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const dealCriteria = pgTable('deal_criteria', {
+  id:          text('id').primaryKey().default(sql`gen_random_uuid()::text`),
+  workspaceId: text('workspace_id').notNull(),
+  dealId:      text('deal_id').notNull(),
+  text:        text('text').notNull(),
+  met:         boolean('met').notNull().default(false),
+  category:    text('category').notNull().default('success'), // success | risk | qualification
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export type DealCriteriaRow = typeof dealCriteria.$inferSelect
+export type NewDealCriteriaRow = typeof dealCriteria.$inferInsert
+
+// ─────────────────────────────────────────────────────────────────────────────
+// deal_milestones  (project plan milestones per deal)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const dealMilestones = pgTable('deal_milestones', {
+  id:          text('id').primaryKey().default(sql`gen_random_uuid()::text`),
+  workspaceId: text('workspace_id').notNull(),
+  dealId:      text('deal_id').notNull(),
+  title:       text('title').notNull(),
+  description: text('description'),
+  status:      text('status').notNull().default('pending'), // pending | in_progress | done | blocked
+  dueDate:     timestamp('due_date', { withTimezone: true }),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  sortOrder:   integer('sort_order').notNull().default(0),
+  createdAt:   timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export type DealMilestoneRow = typeof dealMilestones.$inferSelect
+export type NewDealMilestoneRow = typeof dealMilestones.$inferInsert

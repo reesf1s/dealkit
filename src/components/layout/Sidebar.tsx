@@ -4,37 +4,167 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useClerk, useUser } from '@clerk/nextjs'
+import { useTheme } from 'next-themes'
 import useSWR from 'swr'
 import {
-  LayoutDashboard, GitBranch, Brain, Zap,
-  Plug, Settings, LogOut, Search,
-  ChevronLeft, ChevronRight,
-  X, MessageSquare,
+  LayoutDashboard, Radio, MessageSquare, Target, Users, BarChart2, // Users/BarChart2 kept — may be used elsewhere
+  Settings, LogOut, Search, ChevronLeft, ChevronRight,
+  X, Handshake, UserCheck, Clock, Snowflake, Sun, Moon,
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 import { identify } from '@/lib/analytics'
+import { fetcher } from '@/lib/fetcher'
 
-const fetcher = (url: string) => fetch(url).then(r => r.json())
+/* ── Nav structure ─────────────────────────────────────────────────────── */
 
-const NAV_ITEMS = [
-  { href: '/dashboard',    icon: LayoutDashboard, label: 'Today',        matchPaths: ['/dashboard'] },
-  { href: '/deals',        icon: GitBranch,       label: 'Deals',        matchPaths: ['/deals', '/pipeline'] },
-  { href: '/intelligence', icon: Brain,           label: 'Intelligence', matchPaths: ['/intelligence', '/competitors', '/case-studies', '/product-gaps', '/models', '/collateral', '/playbook'] },
-  { href: '/workflows',    icon: Zap,             label: 'Automation',   matchPaths: ['/workflows'] },
-  { href: '/connections',  icon: Plug,            label: 'Integrations', matchPaths: ['/connections'] },
-  { href: '/settings',     icon: Settings,        label: 'Settings',     matchPaths: ['/settings', '/company', '/onboarding'] },
+const CORE_ITEMS = [
+  { href: '/dashboard',    icon: LayoutDashboard, label: 'Today',          matchPaths: ['/dashboard'] },
+  { href: '/deals',        icon: Target,          label: 'Deals',          matchPaths: ['/deals', '/pipeline'] },
+  { href: '/intelligence', icon: Radio,           label: 'Intelligence',   matchPaths: ['/intelligence', '/competitors', '/case-studies', '/models', '/collateral', '/playbook', '/analytics'] },
+  { href: '/connections',  icon: MessageSquare,   label: 'Integrations',   matchPaths: ['/connections', '/contacts'] },
 ]
+
+const FOCUS_ZONES = [
+  { id: 'ready_to_close',    icon: Handshake,  label: 'Ready to Close',    href: '/deals?focus=ready_to_close' },
+  { id: 'engaged_recently',  icon: UserCheck,  label: 'Engaged Recently',  href: '/deals?focus=engaged_recently' },
+  { id: 'waiting_on_reply',  icon: Clock,      label: 'Waiting on Reply',  href: '/deals?focus=waiting_on_reply' },
+  { id: 'cold',              icon: Snowflake,  label: 'Cold',              href: '/deals?focus=cold' },
+]
+
+/* ── Sub-components ────────────────────────────────────────────────────── */
+
+function SectionLabel({ label, collapsed }: { label: string; collapsed: boolean }) {
+  if (collapsed) return null
+  return (
+    <div style={{
+      fontSize: 10.5,
+      fontWeight: 600,
+      color: 'var(--text-tertiary)',
+      letterSpacing: '0.06em',
+      textTransform: 'uppercase',
+      padding: '20px 10px 6px',
+      userSelect: 'none',
+    }}>
+      {label}
+    </div>
+  )
+}
+
+function NavItem({
+  href, icon: Icon, label, badge, count, collapsed, onClick, active,
+}: {
+  href: string
+  icon: React.ElementType
+  label: string
+  badge?: boolean
+  count?: number
+  collapsed: boolean
+  onClick?: () => void
+  active: boolean
+}) {
+  return (
+    <Link
+      href={href}
+      onClick={onClick}
+      title={collapsed ? label : undefined}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 7,
+        padding: collapsed ? '0 10px' : '0 10px',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        height: 36,
+        borderRadius: 8,
+        marginBottom: 1,
+        textDecoration: 'none',
+        fontSize: 14,
+        fontWeight: active ? 600 : 400,
+        letterSpacing: '-0.005em',
+        color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+        background: active ? 'var(--surface-active)' : 'transparent',
+        transition: 'background 100ms ease, color 100ms ease',
+        position: 'relative',
+        flexShrink: 0,
+        width: collapsed ? 32 : undefined,
+        margin: collapsed ? '0 auto 1px' : '0 0 1px 0',
+      }}
+      onMouseEnter={e => {
+        if (!active) {
+          const el = e.currentTarget as HTMLElement
+          el.style.background = 'var(--surface-2)'
+          el.style.color = 'var(--text-primary)'
+        }
+      }}
+      onMouseLeave={e => {
+        if (!active) {
+          const el = e.currentTarget as HTMLElement
+          el.style.background = 'transparent'
+          el.style.color = 'var(--text-secondary)'
+        }
+      }}
+    >
+      <Icon
+        size={16}
+        style={{
+          color: active ? 'var(--text-primary)' : 'var(--text-tertiary)',
+          flexShrink: 0,
+          strokeWidth: active ? 2 : 1.4,
+          transition: 'color 100ms ease',
+        }}
+      />
+
+      {!collapsed && <span style={{ flex: 1, lineHeight: 1 }}>{label}</span>}
+
+      {!collapsed && count != null && count > 0 && (
+        <span style={{
+          fontFamily: "'Geist Mono', monospace",
+          fontSize: 12,
+          fontWeight: 500,
+          color: 'var(--text-muted)',
+        }}>
+          {count}
+        </span>
+      )}
+
+      {/* Urgent dot (collapsed only) */}
+      {badge && collapsed && (
+        <div style={{
+          position: 'absolute',
+          top: 6,
+          right: 6,
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          background: '#ef4444',
+          border: '1.5px solid var(--sidebar-bg)',
+        }} />
+      )}
+    </Link>
+  )
+}
+
+/* ── Main Sidebar ──────────────────────────────────────────────────────── */
 
 export default function Sidebar() {
   const pathname = usePathname()
   const { signOut } = useClerk()
   const { user } = useUser()
+  const { theme, setTheme } = useTheme()
   const { collapsed, mobileOpen, toggleCollapsed, closeMobile, toggleCopilot } = useSidebar()
-  const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false, dedupingInterval: 30000 })
+
+  const { data: brainRes, error: brainError } = useSWR('/api/brain', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 30000,
+  })
   const brain = brainRes?.data
   const urgentCount = brain?.urgentDeals?.length ?? 0
-  const { data: unmatchedRes } = useSWR('/api/ingest/email/unmatched', fetcher, { revalidateOnFocus: false, dedupingInterval: 60000 })
+
+  const { data: unmatchedRes, error: unmatchedError } = useSWR('/api/ingest/email/unmatched', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60000,
+  })
   const unmatchedEmailCount = unmatchedRes?.pendingCount ?? 0
+  const hasDegradedFeeds = Boolean(brainError || unmatchedError)
 
   useEffect(() => {
     if (user) {
@@ -51,206 +181,166 @@ export default function Sidebar() {
     return paths.some(p => pathname === p || pathname.startsWith(p + '/'))
   }
 
-  const w = collapsed ? '52px' : '216px'
+  const isFocusActive = (href: string) => {
+    try {
+      const url = new URL(href, 'http://x')
+      return pathname === url.pathname && typeof window !== 'undefined' && window.location.search === url.search
+    } catch {
+      return false
+    }
+  }
+
+  const w = collapsed ? '64px' : '240px'
 
   const brainAgeInfo = brain?.updatedAt
     ? (() => {
         const mins = Math.floor((Date.now() - new Date(brain.updatedAt).getTime()) / 60000)
         const label = mins < 1 ? 'live' : mins < 60 ? `${mins}m ago` : mins < 1440 ? `${Math.floor(mins / 60)}h ago` : `${Math.floor(mins / 1440)}d ago`
-        const color = mins < 60 ? '#34d399' : mins < 1440 ? '#fbbf24' : '#f87171'
+        const color = mins < 60 ? '#22c55e' : mins < 1440 ? '#f59e0b' : '#ef4444'
         return { label, color, mins }
       })()
     : null
 
-  function NavItem({
-    href, icon: Icon, label, badge, matchPaths
-  }: {
-    href: string; icon: React.ElementType; label: string
-    badge?: { count: number; color: string }; matchPaths?: string[]
-  }) {
-    const active = isActive(href, matchPaths)
-
-    return (
-      <Link
-        href={href}
-        onClick={() => closeMobile()}
-        title={collapsed ? label : undefined}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: collapsed ? '0' : '0 10px 0 11px',
-          justifyContent: collapsed ? 'center' : 'flex-start',
-          height: '30px',
-          borderRadius: '6px',
-          marginBottom: '1px',
-          textDecoration: 'none',
-          fontSize: '12.5px',
-          fontWeight: active ? 500 : 400,
-          letterSpacing: '-0.01em',
-          color: active ? 'rgba(255,255,255,0.95)' : 'rgba(226,232,240,0.32)',
-          background: active ? 'rgba(139,92,246,0.12)' : 'transparent',
-          borderLeft: active && !collapsed ? '2px solid rgba(139,92,246,0.80)' : '2px solid transparent',
-          transition: 'all 0.12s ease',
-          position: 'relative',
-          flexShrink: 0,
-          width: collapsed ? '36px' : undefined,
-          margin: collapsed ? '0 auto 1px' : undefined,
-        }}
-        onMouseEnter={e => {
-          if (!active) {
-            const el = e.currentTarget as HTMLElement
-            el.style.background = 'rgba(255,255,255,0.04)'
-            el.style.color = 'rgba(226,232,240,0.55)'
-          }
-        }}
-        onMouseLeave={e => {
-          if (!active) {
-            const el = e.currentTarget as HTMLElement
-            el.style.background = 'transparent'
-            el.style.color = 'rgba(226,232,240,0.35)'
-          }
-        }}
-      >
-        <div style={{ position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon
-            size={14}
-            style={{
-              color: active ? 'rgba(167,139,250,0.90)' : 'rgba(226,232,240,0.25)',
-              display: 'block',
-              transition: 'color 0.12s ease',
-            }}
-          />
-          {badge && badge.count > 0 && (
-            <div style={{
-              position: 'absolute', top: '-3px', right: '-4px',
-              width: '5px', height: '5px', borderRadius: '50%',
-              background: badge.color,
-            }} />
-          )}
-        </div>
-
-        {!collapsed && <span style={{ flex: 1, lineHeight: 1 }}>{label}</span>}
-
-        {!collapsed && badge && badge.count > 0 && (
-          <span style={{
-            fontSize: '10px', fontWeight: 600,
-            color: badge.color === '#f87171' ? '#f87171' : '#fbbf24',
-            background: badge.color === '#f87171' ? 'rgba(248,113,113,0.10)' : 'rgba(251,191,36,0.10)',
-            padding: '1px 5px', borderRadius: '100px',
-          }}>{badge.count}</span>
-        )}
-      </Link>
-    )
-  }
-
   const SidebarContent = (
     <aside style={{
-      position: 'fixed', left: 0, top: 0, bottom: 0, width: w,
-      background: 'rgba(9, 8, 20, 0.88)',
-      backdropFilter: 'blur(32px)',
-      WebkitBackdropFilter: 'blur(32px)',
-      borderRight: '1px solid rgba(255,255,255,0.055)',
-      display: 'flex', flexDirection: 'column', zIndex: 40,
-      transition: 'width 0.18s cubic-bezier(0.4,0,0.2,1)',
+      position: 'fixed',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: w,
+      background: 'var(--sidebar-bg)',
+      borderRight: '1px solid var(--border-default)',
+      display: 'flex',
+      flexDirection: 'column',
+      zIndex: 40,
+      transition: 'width 0.15s cubic-bezier(0.4,0,0.2,1)',
       overflow: 'hidden',
-      boxShadow: '1px 0 0 0 rgba(255,255,255,0.03), 4px 0 24px 0 rgba(0,0,0,0.4)',
     }}>
 
+      {/* ── Header ── */}
       <div style={{
-        padding: collapsed ? '14px 0 10px' : '14px 10px 10px',
+        padding: collapsed ? '12px 0 8px' : '12px 12px 8px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: collapsed ? 'center' : 'space-between',
         flexShrink: 0,
-        borderBottom: '1px solid rgba(255,255,255,0.04)',
-        marginBottom: '6px',
       }}>
         {!collapsed && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            flex: 1,
+            minWidth: 0,
+          }}>
+            {/* Logo */}
             <div style={{
-              width: '26px', height: '26px',
-              background: 'linear-gradient(135deg, rgba(139,92,246,0.30) 0%, rgba(99,102,241,0.20) 100%)',
-              border: '1px solid rgba(139,92,246,0.30)',
-              borderRadius: '7px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 30,
+              height: 30,
+              background: 'linear-gradient(135deg, #1DB86A, #15803d)',
+              borderRadius: 9,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               flexShrink: 0,
-              boxShadow: '0 0 12px rgba(139,92,246,0.20)',
             }}>
-              <Brain size={13} color="rgba(196,181,253,0.90)" strokeWidth={1.8} />
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#ffffff', letterSpacing: '-0.05em' }}>H</span>
             </div>
             <span style={{
-              color: 'rgba(255,255,255,0.88)',
-              letterSpacing: '3px',
-              fontSize: '10.5px',
+              fontSize: 15.5,
               fontWeight: 700,
-              textTransform: 'uppercase',
-              background: 'linear-gradient(90deg, rgba(255,255,255,0.88) 0%, rgba(196,181,253,0.80) 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}>HALVEX</span>
-          </div>
-        )}
-        {collapsed && (
-          <div style={{
-            width: '26px', height: '26px',
-            background: 'linear-gradient(135deg, rgba(139,92,246,0.30) 0%, rgba(99,102,241,0.20) 100%)',
-            border: '1px solid rgba(139,92,246,0.30)',
-            borderRadius: '7px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 12px rgba(139,92,246,0.20)',
-          }}>
-            <Brain size={13} color="rgba(196,181,253,0.90)" strokeWidth={1.8} />
+              color: 'var(--text-primary)',
+              letterSpacing: '-0.04em',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
+              Halvex
+            </span>
           </div>
         )}
 
+        {collapsed && (
+          <div style={{
+            width: 30,
+            height: 30,
+            background: 'linear-gradient(135deg, #1DB86A, #15803d)',
+            borderRadius: 9,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <span style={{ fontSize: 14, fontWeight: 800, color: '#ffffff' }}>H</span>
+          </div>
+        )}
+
+        {/* Collapse toggle */}
         <button
           onClick={() => { mobileOpen ? closeMobile() : toggleCollapsed() }}
           style={{
-            background: 'none', border: 'none',
-            color: 'rgba(255,255,255,0.20)', cursor: 'pointer',
-            padding: '4px', borderRadius: '5px', display: 'flex',
-            transition: 'color 0.12s, background 0.12s',
+            width: 22,
+            height: 22,
+            border: '1px solid var(--border-default)',
+            borderRadius: 5,
+            background: 'none',
+            color: 'var(--text-tertiary)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            transition: 'color 100ms, border-color 100ms',
           }}
           onMouseEnter={e => {
-            ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.50)'
-            ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'
+            const el = e.currentTarget as HTMLElement
+            el.style.color = 'var(--text-secondary)'
+            el.style.borderColor = 'var(--border-default)'
           }}
           onMouseLeave={e => {
-            ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.20)'
-            ;(e.currentTarget as HTMLElement).style.background = 'transparent'
+            const el = e.currentTarget as HTMLElement
+            el.style.color = 'var(--text-tertiary)'
+            el.style.borderColor = 'var(--border-default)'
           }}
         >
           {mobileOpen ? <X size={12} /> : collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
         </button>
       </div>
 
-      <div style={{ padding: collapsed ? '0 0 5px' : '0 8px 5px', display: 'flex', justifyContent: 'center' }}>
+      {/* ── Search ── */}
+      <div style={{ padding: collapsed ? '0 8px 8px' : '0 12px 8px' }}>
         {!collapsed ? (
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
             style={{
-              width: '100%', height: '28px', borderRadius: '6px',
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', padding: '0 9px',
-              transition: 'all 0.12s ease',
+              width: '100%',
+              height: 32,
+              borderRadius: 8,
+              background: 'transparent',
+              border: '1px solid var(--border-default)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '0 10px',
+              transition: 'border-color 100ms ease',
             }}
             onMouseEnter={e => {
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.10)'
+              (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-default)'
             }}
             onMouseLeave={e => {
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'
-              ;(e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.06)'
+              (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-default)'
             }}
           >
-            <Search size={11} style={{ color: 'rgba(255,255,255,0.32)', flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: '11.5px', color: 'rgba(255,255,255,0.32)', textAlign: 'left' }}>Search</span>
+            <Search size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: 13, color: 'var(--text-muted)', textAlign: 'left' }}>
+              Search...
+            </span>
             <span style={{
-              fontSize: '10px', color: 'rgba(255,255,255,0.20)',
-              background: 'rgba(255,255,255,0.04)', padding: '1px 5px',
-              borderRadius: '4px', letterSpacing: '0.02em',
+              fontSize: 10,
+              color: 'var(--text-muted)',
+              background: 'var(--surface-2)',
+              padding: '1px 5px',
+              borderRadius: 4,
             }}>⌘P</span>
           </button>
         ) : (
@@ -258,49 +348,124 @@ export default function Sidebar() {
             onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
             title="Search (⌘P)"
             style={{
-              width: '32px', height: '28px', borderRadius: '6px',
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.12s ease',
+              width: 36,
+              height: 32,
+              borderRadius: 8,
+              background: 'transparent',
+              border: '1px solid var(--border-default)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto',
+              transition: 'border-color 100ms ease',
             }}
           >
-            <Search size={11} style={{ color: 'rgba(255,255,255,0.32)' }} />
+            <Search size={14} style={{ color: 'var(--text-muted)' }} />
           </button>
         )}
       </div>
 
-      <div style={{ padding: collapsed ? '0 0 8px' : '0 8px 8px', display: 'flex', justifyContent: 'center' }}>
+      {/* ── Navigation ── */}
+      <nav style={{ flex: 1, padding: collapsed ? '0 8px' : '0 10px', overflowY: 'auto', overflowX: 'hidden' }}>
+
+        {CORE_ITEMS.map(item => (
+          <NavItem
+            key={item.href}
+            href={item.href}
+            icon={item.icon}
+            label={item.label}
+            badge={item.href === '/deals' && urgentCount > 0}
+            collapsed={collapsed}
+            onClick={closeMobile}
+            active={isActive(item.href, item.matchPaths)}
+          />
+        ))}
+
+        {/* FOCUS ZONES section */}
+        <SectionLabel label="Focus Zones" collapsed={collapsed} />
+        {FOCUS_ZONES.map(zone => {
+          // Map brain signals to focus zone counts
+          const urgentCount = brain?.urgentDeals?.length ?? 0
+          const staleCount = brain?.staleDeals?.length ?? 0
+          // ready_to_close = deals in negotiation or with high score (use urgentDeals as proxy)
+          // waiting_on_reply = stale deals
+          // cold = stale deals that have been silent a long time (use staleCount)
+          const count =
+            zone.id === 'ready_to_close' ? (urgentCount > 0 ? urgentCount : undefined)
+            : zone.id === 'waiting_on_reply' ? (staleCount > 0 ? staleCount : undefined)
+            : zone.id === 'cold' ? (staleCount > 0 ? staleCount : undefined)
+            : undefined
+
+          return (
+            <NavItem
+              key={zone.id}
+              href={zone.href}
+              icon={zone.icon}
+              label={zone.label}
+              count={count}
+              collapsed={collapsed}
+              onClick={closeMobile}
+              active={isFocusActive(zone.href)}
+            />
+          )
+        })}
+
+        {/* Settings — bottom of nav */}
+        <div style={{ marginTop: 8, borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
+          <NavItem
+            href="/settings"
+            icon={Settings}
+            label="Settings"
+            badge={unmatchedEmailCount > 0}
+            collapsed={collapsed}
+            onClick={closeMobile}
+            active={isActive('/settings', ['/settings', '/company', '/onboarding'])}
+          />
+        </div>
+      </nav>
+
+      {/* ── Ask AI ── */}
+      <div style={{ padding: collapsed ? '8px' : '8px 10px', borderTop: '1px solid var(--border-default)' }}>
         {!collapsed ? (
           <button
             onClick={toggleCopilot}
             style={{
-              width: '100%', height: '28px', borderRadius: '20px',
-              background: 'linear-gradient(135deg, rgba(139,92,246,0.20) 0%, rgba(99,102,241,0.16) 100%)',
-              border: '1px solid rgba(139,92,246,0.28)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', padding: '0 10px',
-              transition: 'all 0.15s ease',
-              boxShadow: '0 1px 6px rgba(139,92,246,0.10)',
+              width: '100%',
+              height: 32,
+              borderRadius: 8,
+              background: 'var(--brand-bg)',
+              border: '1px solid var(--brand-border)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '0 10px',
+              transition: 'background 100ms ease',
             }}
             onMouseEnter={e => {
-              const el = e.currentTarget as HTMLElement
-              el.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.30) 0%, rgba(99,102,241,0.26) 100%)'
-              el.style.borderColor = 'rgba(139,92,246,0.42)'
+              (e.currentTarget as HTMLElement).style.background = 'var(--brand-bg-hover)'
             }}
             onMouseLeave={e => {
-              const el = e.currentTarget as HTMLElement
-              el.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.20) 0%, rgba(99,102,241,0.16) 100%)'
-              el.style.borderColor = 'rgba(139,92,246,0.28)'
+              (e.currentTarget as HTMLElement).style.background = 'var(--brand-bg)'
             }}
           >
-            <MessageSquare size={11} style={{ color: 'rgba(196,181,253,0.85)', flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: '11.5px', fontWeight: 500, color: 'rgba(196,181,253,0.85)', textAlign: 'left', letterSpacing: '-0.01em' }}>
+            <MessageSquare size={13} style={{ color: '#1DB86A', flexShrink: 0 }} />
+            <span style={{
+              flex: 1,
+              fontSize: 13,
+              fontWeight: 500,
+              color: '#1DB86A',
+              textAlign: 'left',
+            }}>
               Ask AI
             </span>
             <span style={{
-              fontSize: '10px', color: 'rgba(196,181,253,0.35)',
-              background: 'rgba(139,92,246,0.12)', padding: '1px 5px',
-              borderRadius: '4px',
+              fontSize: 10,
+              color: 'rgba(29, 184, 106, 0.6)',
+              background: 'rgba(29, 184, 106, 0.12)',
+              padding: '1px 5px',
+              borderRadius: 4,
             }}>⌘K</span>
           </button>
         ) : (
@@ -308,143 +473,196 @@ export default function Sidebar() {
             onClick={toggleCopilot}
             title="Ask AI (⌘K)"
             style={{
-              width: '32px', height: '28px', borderRadius: '8px',
-              background: 'rgba(139,92,246,0.16)',
-              border: '1px solid rgba(139,92,246,0.26)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={e => {
-              const el = e.currentTarget as HTMLElement
-              el.style.background = 'rgba(139,92,246,0.26)'
-              el.style.borderColor = 'rgba(139,92,246,0.40)'
-            }}
-            onMouseLeave={e => {
-              const el = e.currentTarget as HTMLElement
-              el.style.background = 'rgba(139,92,246,0.16)'
-              el.style.borderColor = 'rgba(139,92,246,0.26)'
+              width: 36,
+              height: 32,
+              borderRadius: 8,
+              background: 'var(--brand-bg)',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto',
             }}
           >
-            <MessageSquare size={11} style={{ color: 'rgba(196,181,253,0.85)' }} />
+            <MessageSquare size={14} style={{ color: '#1DB86A' }} />
           </button>
         )}
       </div>
 
-      <nav style={{ flex: 1, padding: collapsed ? '0 4px' : '0 6px', overflowY: 'auto', overflowX: 'hidden' }}>
-        {NAV_ITEMS.map(item => (
-          <NavItem
-            key={item.href}
-            {...item}
-            badge={
-              item.href === '/deals' && urgentCount > 0
-                ? { count: urgentCount, color: '#f87171' }
-                : item.href === '/settings' && unmatchedEmailCount > 0
-                ? { count: unmatchedEmailCount, color: '#fbbf24' }
-                : undefined
-            }
-          />
-        ))}
-      </nav>
-
+      {/* ── User profile ── */}
       <div style={{
-        borderTop: '1px solid rgba(255,255,255,0.04)',
-        padding: collapsed ? '8px 4px' : '8px',
+        borderTop: '1px solid var(--border-default)',
+        padding: collapsed ? '8px' : '8px 10px',
         flexShrink: 0,
       }}>
-        {!collapsed && brainAgeInfo && (
+        {/* Brain status indicator */}
+        {!collapsed && (brainAgeInfo || hasDegradedFeeds) && (
           <div style={{
-            display: 'flex', alignItems: 'center', gap: '7px',
-            padding: '6px 9px', marginBottom: '6px', borderRadius: '8px',
-            background: urgentCount > 0 ? 'rgba(248,113,113,0.06)' : 'rgba(139,92,246,0.06)',
-            border: `1px solid ${urgentCount > 0 ? 'rgba(248,113,113,0.14)' : 'rgba(139,92,246,0.14)'}`,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '5px 8px',
+            marginBottom: 6,
+            borderRadius: 7,
+            background: hasDegradedFeeds ? 'var(--color-amber-bg)' : 'var(--brand-bg)',
+            border: `1px solid ${hasDegradedFeeds ? 'var(--color-amber)' : 'var(--brand-border)'}`,
           }}>
             <div style={{
-              width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0,
-              background: urgentCount > 0 ? '#f87171' : '#a78bfa',
-              boxShadow: urgentCount > 0 ? '0 0 6px rgba(248,113,113,0.60)' : '0 0 6px rgba(167,139,250,0.60)',
-              animation: brainAgeInfo.mins < 2 ? 'pulse-dot 2s ease-in-out infinite' : 'none',
+              width: 5,
+              height: 5,
+              borderRadius: '50%',
+              flexShrink: 0,
+              background: hasDegradedFeeds ? '#f59e0b' : brainAgeInfo?.color ?? '#22c55e',
+              animation: brainAgeInfo && brainAgeInfo.mins < 2 ? 'pulse-dot 2s ease-in-out infinite' : 'none',
             }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                fontSize: '11px', fontWeight: 500,
-                color: urgentCount > 0 ? 'rgba(248,113,113,0.80)' : 'rgba(196,181,253,0.70)',
-              }}>
-                {urgentCount > 0 ? `${urgentCount} deals flagged` : 'Intelligence live'}
+              <div style={{ fontSize: 11, fontWeight: 500, color: hasDegradedFeeds ? '#92400e' : '#15803d' }}>
+                {hasDegradedFeeds ? 'Intelligence degraded' : urgentCount > 0 ? `${urgentCount} deals flagged` : 'Intelligence live'}
               </div>
-              <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.22)', marginTop: '1px' }}>
-                Updated {brainAgeInfo.label}
+              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 1 }}>
+                {hasDegradedFeeds ? 'One or more feeds unavailable' : brainAgeInfo ? `Updated ${brainAgeInfo.label}` : 'Waiting for update'}
               </div>
             </div>
           </div>
         )}
 
         {collapsed ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+            {/* Dark mode toggle — collapsed */}
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+              style={{
+                width: 36, height: 28, borderRadius: 7, background: 'transparent', border: 'none',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: 'var(--text-tertiary)', margin: '0 auto', transition: 'background 100ms, color 100ms',
+              }}
+              onMouseEnter={e => { const el = e.currentTarget as HTMLElement; el.style.color = 'var(--text-secondary)'; el.style.background = 'var(--surface-2)' }}
+              onMouseLeave={e => { const el = e.currentTarget as HTMLElement; el.style.color = 'var(--text-tertiary)'; el.style.background = 'transparent' }}
+            >
+              {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
+            </button>
           <button
             onClick={() => signOut({ redirectUrl: '/' })}
             title="Sign out"
             style={{
-              width: '32px', height: '28px', borderRadius: '6px',
-              background: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.05)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: 'rgba(255,255,255,0.25)', margin: '0 auto',
-              transition: 'all 0.12s',
+              width: 36,
+              height: 32,
+              borderRadius: 7,
+              background: 'transparent',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: 'var(--text-tertiary)',
+              margin: '0 auto',
+              transition: 'background 100ms, color 100ms',
             }}
             onMouseEnter={e => {
-              ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.50)'
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'
+              const el = e.currentTarget as HTMLElement
+              el.style.color = 'var(--text-secondary)'
+              el.style.background = 'var(--surface-2)'
             }}
             onMouseLeave={e => {
-              ;(e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.25)'
-              ;(e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'
+              const el = e.currentTarget as HTMLElement
+              el.style.color = 'var(--text-tertiary)'
+              el.style.background = 'transparent'
             }}
           >
-            <LogOut size={11} />
+            <LogOut size={14} />
           </button>
+          </div>
         ) : (
           <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '6px 9px', borderRadius: '6px',
-            background: 'rgba(255,255,255,0.02)',
-            border: '1px solid rgba(255,255,255,0.04)',
-          }}>
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '5px 8px',
+            borderRadius: 7,
+            cursor: 'default',
+            transition: 'background 100ms',
+          }}
+          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'}
+          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
+          >
+            {/* User avatar */}
             <div style={{
-              width: '22px', height: '22px', borderRadius: '50%',
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.10)',
-              flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.70)',
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #1DB86A, #15803d)',
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 11,
+              fontWeight: 700,
+              color: '#ffffff',
             }}>
               {user?.firstName?.[0] ?? user?.emailAddresses?.[0]?.emailAddress?.[0]?.toUpperCase() ?? '?'}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
-                fontSize: '11.5px', fontWeight: 500, letterSpacing: '-0.01em',
-                color: 'rgba(255,255,255,0.65)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                fontSize: 12.5,
+                fontWeight: 500,
+                color: 'var(--text-primary)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
               }}>
                 {user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Account'}
               </div>
               <div style={{
-                fontSize: '10px', color: 'rgba(255,255,255,0.28)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '1px',
+                fontSize: 11,
+                color: 'var(--text-tertiary)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                marginTop: 1,
               }}>
                 {user?.emailAddresses?.[0]?.emailAddress ?? ''}
               </div>
             </div>
+            {/* Dark mode toggle */}
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 3,
+                color: 'var(--text-muted)',
+                borderRadius: 4,
+                display: 'flex',
+                alignItems: 'center',
+                cursor: 'pointer',
+                transition: 'color 100ms',
+              }}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#777777'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#cccccc'}
+            >
+              {theme === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
+            </button>
             <button
               onClick={() => signOut({ redirectUrl: '/' })}
               style={{
-                background: 'none', border: 'none', padding: '3px',
-                color: 'rgba(255,255,255,0.22)', borderRadius: '4px',
-                display: 'flex', alignItems: 'center', cursor: 'pointer',
-                transition: 'color 0.12s',
+                background: 'none',
+                border: 'none',
+                padding: 3,
+                color: 'var(--text-muted)',
+                borderRadius: 4,
+                display: 'flex',
+                alignItems: 'center',
+                cursor: 'pointer',
+                transition: 'color 100ms',
               }}
-              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.50)'}
-              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.22)'}
+              onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = '#777777'}
+              onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = '#cccccc'}
               title="Sign out"
             >
-              <LogOut size={11} />
+              <LogOut size={13} />
             </button>
           </div>
         )}
@@ -452,11 +670,12 @@ export default function Sidebar() {
     </aside>
   )
 
+  /* ── Mobile bottom nav ── */
   const MOBILE_TABS = [
-    { href: '/dashboard',   icon: LayoutDashboard, label: 'Today' },
-    { href: '/deals',       icon: GitBranch,        label: 'Deals' },
-    { href: '/intelligence', icon: Brain,           label: 'Intel' },
-    { href: '/workflows',   icon: Zap,             label: 'Flows' },
+    { href: '/dashboard',    icon: LayoutDashboard, label: 'Overview' },
+    { href: '/deals',        icon: Target,          label: 'Deals' },
+    { href: '/intelligence', icon: Radio,           label: 'Signals' },
+    { href: '/connections',  icon: MessageSquare,   label: 'Conversations' },
   ]
 
   return (
@@ -465,7 +684,7 @@ export default function Sidebar() {
 
       {mobileOpen && (
         <div
-          style={{ position: 'fixed', inset: 0, zIndex: 39, background: 'rgba(0,0,0,0.75)' }}
+          style={{ position: 'fixed', inset: 0, zIndex: 39, background: 'rgba(0, 0, 0, 0.25)' }}
           onClick={closeMobile}
         />
       )}
@@ -473,26 +692,33 @@ export default function Sidebar() {
       <div
         className="mobile-sidebar"
         style={{
-          position: 'fixed', left: 0, top: 0, bottom: 0, zIndex: 40,
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          zIndex: 40,
           transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)',
-          transition: 'transform 0.18s cubic-bezier(0.4,0,0.2,1)',
-          width: '216px',
+          transition: 'transform 0.15s cubic-bezier(0.4,0,0.2,1)',
+          width: '240px',
         }}
       >
         {SidebarContent}
       </div>
 
+      {/* Mobile bottom nav */}
       <nav className="mobile-bottom-nav" style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0,
-        height: '58px',
-        background: 'rgba(9, 8, 20, 0.92)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        borderTop: '1px solid rgba(139,92,246,0.12)',
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 56,
+        background: 'var(--surface-1)',
+        borderTop: '1px solid var(--border-default)',
         display: 'none',
-        alignItems: 'center', justifyContent: 'space-around',
-        zIndex: 1000, padding: '0 8px',
-        boxShadow: '0 -4px 20px rgba(0,0,0,0.40)',
+        alignItems: 'center',
+        justifyContent: 'space-around',
+        zIndex: 1000,
+        padding: '0 4px',
       }}>
         {MOBILE_TABS.map(tab => {
           const active = isActive(tab.href)
@@ -501,31 +727,52 @@ export default function Sidebar() {
               key={tab.href}
               href={tab.href}
               style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: '3px', textDecoration: 'none', padding: '6px 12px', borderRadius: '7px',
-                minWidth: '48px', minHeight: '44px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 3,
+                textDecoration: 'none',
+                padding: '6px 14px',
+                borderRadius: 6,
+                minWidth: 52,
+                minHeight: 44,
               }}
             >
-              <tab.icon size={20} style={{ color: active ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.25)' }} />
+              <tab.icon
+                size={20}
+                style={{ color: active ? 'var(--text-primary)' : 'var(--text-tertiary)', strokeWidth: active ? 2 : 1.5 }}
+              />
               <span style={{
-                fontSize: '10px', fontWeight: active ? 500 : 400,
-                color: active ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.25)',
+                fontSize: 10,
+                fontWeight: active ? 600 : 400,
+                color: active ? 'var(--text-primary)' : 'var(--text-tertiary)',
                 lineHeight: 1,
-              }}>{tab.label}</span>
+              }}>
+                {tab.label}
+              </span>
             </Link>
           )
         })}
         <button
           onClick={toggleCopilot}
           style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            gap: '3px', background: 'none', border: 'none', cursor: 'pointer',
-            padding: '6px 12px', borderRadius: '7px',
-            minWidth: '48px', minHeight: '44px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 3,
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '6px 14px',
+            borderRadius: 6,
+            minWidth: 52,
+            minHeight: 44,
           }}
         >
-          <MessageSquare size={20} style={{ color: 'rgba(255,255,255,0.70)' }} />
-          <span style={{ fontSize: '10px', fontWeight: 400, color: 'rgba(255,255,255,0.70)', lineHeight: 1 }}>Ask AI</span>
+          <MessageSquare size={20} style={{ color: '#1DB86A' }} />
+          <span style={{ fontSize: 10, fontWeight: 500, color: '#1DB86A', lineHeight: 1 }}>Ask AI</span>
         </button>
       </nav>
 

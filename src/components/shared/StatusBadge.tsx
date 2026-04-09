@@ -10,33 +10,33 @@ interface StatusConfig {
 const STATUS_CONFIG: Record<BadgeStatus, StatusConfig> = {
   ready: {
     label: 'Ready',
-    color: '#22C55E',
-    bg: 'rgba(34, 197, 94, 0.15)',
+    color: '#0f7b6c',
+    bg: 'rgba(15, 123, 108, 0.08)',
   },
   stale: {
     label: 'Stale',
-    color: '#F59E0B',
-    bg: 'rgba(245, 158, 11, 0.15)',
+    color: '#cb6c2c',
+    bg: 'rgba(203, 108, 44, 0.08)',
   },
   generating: {
     label: 'Generating',
-    color: '#6366F1',
-    bg: 'rgba(99, 102, 241, 0.15)',
+    color: '#1DB86A',
+    bg: 'rgba(29, 184, 106, 0.08)',
   },
   archived: {
     label: 'Archived',
-    color: '#888888',
-    bg: 'rgba(136, 136, 136, 0.15)',
+    color: '#787774',
+    bg: '#f5f5f5',
   },
   won: {
     label: 'Won',
-    color: '#22C55E',
-    bg: 'rgba(34, 197, 94, 0.15)',
+    color: '#0f7b6c',
+    bg: 'rgba(15, 123, 108, 0.08)',
   },
   lost: {
     label: 'Lost',
-    color: '#EF4444',
-    bg: 'rgba(239, 68, 68, 0.15)',
+    color: '#e03e3e',
+    bg: 'rgba(224, 62, 62, 0.08)',
   },
 }
 

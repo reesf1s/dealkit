@@ -23,7 +23,7 @@ interface CollateralViewerProps {
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
-    <h3 style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.80)', letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 10px' }}>
+    <h3 style={{ fontSize: '11px', fontWeight: 700, color: '#787774', letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 10px' }}>
       {children}
     </h3>
   )
@@ -31,18 +31,18 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '16px', ...style }}>
+    <div style={{ background: 'var(--surface-1)', border: '1px solid rgba(55,53,47,0.12)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(55,53,47,0.06)', padding: '16px', ...style }}>
       {children}
     </div>
   )
 }
 
-function BulletList({ items, color = '#EBEBEB' }: { items: string[]; color?: string }) {
+function BulletList({ items, color = '#37352f' }: { items: string[]; color?: string }) {
   return (
     <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '6px' }}>
       {items.map((item, i) => (
         <li key={i} style={{ display: 'flex', gap: '8px', fontSize: '13px', color, lineHeight: 1.5 }}>
-          <span style={{ color: 'rgba(255,255,255,0.80)', flexShrink: 0 }}>•</span>
+          <span style={{ color: '#9b9a97', flexShrink: 0 }}>•</span>
           {item}
         </li>
       ))}
@@ -52,12 +52,12 @@ function BulletList({ items, color = '#EBEBEB' }: { items: string[]; color?: str
 
 function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
   return (
-    <div style={{ overflowX: 'auto', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
+    <div style={{ overflowX: 'auto', borderRadius: '6px', border: '1px solid rgba(55,53,47,0.09)' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
-          <tr style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}>
+          <tr style={{ backgroundColor: '#f7f6f3' }}>
             {headers.map((h) => (
-              <th key={h} style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 700, color: '#555', letterSpacing: '0.04em', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <th key={h} style={{ padding: '8px 12px', fontSize: '11px', fontWeight: 700, color: '#787774', letterSpacing: '0.04em', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid rgba(55,53,47,0.09)' }}>
                 {h}
               </th>
             ))}
@@ -65,9 +65,9 @@ function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} style={{ borderBottom: i < rows.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+            <tr key={i} style={{ borderBottom: i < rows.length - 1 ? '1px solid rgba(55,53,47,0.09)' : 'none' }}>
               {row.map((cell, j) => (
-                <td key={j} style={{ padding: '10px 12px', fontSize: '13px', color: '#EBEBEB', lineHeight: 1.5 }}>
+                <td key={j} style={{ padding: '10px 12px', fontSize: '13px', color: '#37352f', lineHeight: 1.5 }}>
                   {cell}
                 </td>
               ))}
@@ -87,7 +87,7 @@ function BattlecardViewer({ content }: { content: BattlecardContent }) {
       {/* Summary */}
       <Card>
         <SectionHeading>Executive summary</SectionHeading>
-        <p style={{ fontSize: '14px', color: '#EBEBEB', lineHeight: 1.7, margin: 0 }}>{content.summary}</p>
+        <p style={{ fontSize: '14px', color: '#37352f', lineHeight: 1.7, margin: 0 }}>{content.summary}</p>
       </Card>
 
       {/* Strengths grid */}
@@ -97,8 +97,8 @@ function BattlecardViewer({ content }: { content: BattlecardContent }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {content.ourStrengths.map((p, i) => (
               <div key={i}>
-                <p style={{ fontSize: '13px', fontWeight: 600, color: '#22C55E', margin: '0 0 2px' }}>{p.point}</p>
-                <p style={{ fontSize: '12px', color: '#888', margin: 0 }}>{p.detail}</p>
+                <p style={{ fontSize: '13px', fontWeight: 600, color: '#0f7b6c', margin: '0 0 2px' }}>{p.point}</p>
+                <p style={{ fontSize: '12px', color: '#787774', margin: 0 }}>{p.detail}</p>
               </div>
             ))}
           </div>
@@ -108,8 +108,8 @@ function BattlecardViewer({ content }: { content: BattlecardContent }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {content.theirStrengths.map((p, i) => (
               <div key={i}>
-                <p style={{ fontSize: '13px', fontWeight: 600, color: '#F59E0B', margin: '0 0 2px' }}>{p.point}</p>
-                <p style={{ fontSize: '12px', color: '#888', margin: 0 }}>{p.detail}</p>
+                <p style={{ fontSize: '13px', fontWeight: 600, color: '#cb6c2c', margin: '0 0 2px' }}>{p.point}</p>
+                <p style={{ fontSize: '12px', color: '#787774', margin: 0 }}>{p.detail}</p>
               </div>
             ))}
           </div>
@@ -119,7 +119,7 @@ function BattlecardViewer({ content }: { content: BattlecardContent }) {
       {/* Win themes */}
       <Card>
         <SectionHeading>Win themes</SectionHeading>
-        <BulletList items={content.winThemes} color="#22C55E" />
+        <BulletList items={content.winThemes} color="#0f7b6c" />
       </Card>
 
       {/* Objection responses */}
@@ -136,7 +136,7 @@ function BattlecardViewer({ content }: { content: BattlecardContent }) {
         <SectionHeading>Landmines to plant</SectionHeading>
         <ol style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {content.landmines.map((l, i) => (
-            <li key={i} style={{ fontSize: '13px', color: '#EBEBEB', lineHeight: 1.5 }}>{l}</li>
+            <li key={i} style={{ fontSize: '13px', color: '#37352f', lineHeight: 1.5 }}>{l}</li>
           ))}
         </ol>
       </Card>
@@ -166,10 +166,10 @@ function CaseStudyDocViewer({ content }: { content: CaseStudyDocContent }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Hero */}
-      <Card style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.08)' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', margin: '0 0 6px' }}>{content.headline}</h1>
-        <p style={{ fontSize: '15px', color: '#888', margin: '0 0 12px', lineHeight: 1.5 }}>{content.subheadline}</p>
-        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.80)', margin: 0, fontWeight: 500 }}>{content.customerName} — {content.customerDescription}</p>
+      <Card style={{ backgroundColor: '#f7f6f3', borderColor: 'rgba(55,53,47,0.12)' }}>
+        <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#37352f', letterSpacing: '-0.03em', margin: '0 0 6px' }}>{content.headline}</h1>
+        <p style={{ fontSize: '15px', color: '#787774', margin: '0 0 12px', lineHeight: 1.5 }}>{content.subheadline}</p>
+        <p style={{ fontSize: '13px', color: '#37352f', margin: 0, fontWeight: 500 }}>{content.customerName} — {content.customerDescription}</p>
       </Card>
 
       {/* Metrics */}
@@ -177,9 +177,9 @@ function CaseStudyDocViewer({ content }: { content: CaseStudyDocContent }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
           {content.metrics.map((m, i) => (
             <Card key={i} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '28px', fontWeight: 700, color: '#22C55E', letterSpacing: '-0.04em' }}>{m.value}</div>
-              <div style={{ fontSize: '12px', color: '#888', marginTop: '4px' }}>{m.label}</div>
-              {m.description && <div style={{ fontSize: '11px', color: '#555', marginTop: '2px' }}>{m.description}</div>}
+              <div style={{ fontSize: '28px', fontWeight: 700, color: '#0f7b6c', letterSpacing: '-0.04em' }}>{m.value}</div>
+              <div style={{ fontSize: '12px', color: '#787774', marginTop: '4px' }}>{m.label}</div>
+              {m.description && <div style={{ fontSize: '11px', color: '#9b9a97', marginTop: '2px' }}>{m.description}</div>}
             </Card>
           ))}
         </div>
@@ -189,19 +189,19 @@ function CaseStudyDocViewer({ content }: { content: CaseStudyDocContent }) {
       {[content.challengeSection, content.solutionSection, content.resultsSection].map((section) => (
         <Card key={section.heading}>
           <SectionHeading>{section.heading}</SectionHeading>
-          <p style={{ fontSize: '14px', color: '#EBEBEB', lineHeight: 1.7, margin: 0 }}>{section.body}</p>
+          <p style={{ fontSize: '14px', color: '#37352f', lineHeight: 1.7, margin: 0 }}>{section.body}</p>
         </Card>
       ))}
 
       {/* Quote */}
       {content.quote && (
-        <Card style={{ backgroundColor: 'rgba(34,197,94,0.05)', borderColor: 'rgba(34,197,94,0.2)' }}>
+        <Card style={{ backgroundColor: 'rgba(15,123,108,0.05)', borderColor: 'rgba(15,123,108,0.20)' }}>
           <blockquote style={{ margin: 0 }}>
-            <p style={{ fontSize: '16px', color: '#EBEBEB', fontStyle: 'italic', lineHeight: 1.6, margin: '0 0 12px' }}>
-              "{content.quote.text}"
+            <p style={{ fontSize: '16px', color: '#37352f', fontStyle: 'italic', lineHeight: 1.6, margin: '0 0 12px' }}>
+              &ldquo;{content.quote.text}&rdquo;
             </p>
-            <footer style={{ fontSize: '12px', color: '#888' }}>
-              <strong style={{ color: '#EBEBEB' }}>{content.quote.author}</strong>
+            <footer style={{ fontSize: '12px', color: '#787774' }}>
+              <strong style={{ color: '#37352f' }}>{content.quote.author}</strong>
               {', '}{content.quote.title}{', '}{content.quote.company}
             </footer>
           </blockquote>
@@ -210,7 +210,7 @@ function CaseStudyDocViewer({ content }: { content: CaseStudyDocContent }) {
 
       {/* CTA */}
       <Card>
-        <p style={{ fontSize: '15px', fontWeight: 600, color: 'rgba(255,255,255,0.80)', margin: 0 }}>{content.callToAction}</p>
+        <p style={{ fontSize: '15px', fontWeight: 600, color: '#37352f', margin: 0 }}>{content.callToAction}</p>
       </Card>
     </div>
   )
@@ -221,19 +221,19 @@ function CaseStudyDocViewer({ content }: { content: CaseStudyDocContent }) {
 function OnePagerViewer({ content }: { content: OnePagerContent }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <Card style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.08)' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#EBEBEB', letterSpacing: '-0.03em', margin: '0 0 6px' }}>{content.headline}</h1>
-        <p style={{ fontSize: '15px', color: '#888', margin: 0 }}>{content.subheadline}</p>
+      <Card style={{ backgroundColor: '#f7f6f3', borderColor: 'rgba(55,53,47,0.12)' }}>
+        <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#37352f', letterSpacing: '-0.03em', margin: '0 0 6px' }}>{content.headline}</h1>
+        <p style={{ fontSize: '15px', color: '#787774', margin: 0 }}>{content.subheadline}</p>
       </Card>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         <Card>
           <SectionHeading>The problem</SectionHeading>
-          <p style={{ fontSize: '13px', color: '#EBEBEB', lineHeight: 1.6, margin: 0 }}>{content.problemStatement}</p>
+          <p style={{ fontSize: '13px', color: '#37352f', lineHeight: 1.6, margin: 0 }}>{content.problemStatement}</p>
         </Card>
         <Card>
           <SectionHeading>Our solution</SectionHeading>
-          <p style={{ fontSize: '13px', color: '#EBEBEB', lineHeight: 1.6, margin: 0 }}>{content.solution}</p>
+          <p style={{ fontSize: '13px', color: '#37352f', lineHeight: 1.6, margin: 0 }}>{content.solution}</p>
         </Card>
       </div>
 
@@ -241,10 +241,10 @@ function OnePagerViewer({ content }: { content: OnePagerContent }) {
         <SectionHeading>Key benefits</SectionHeading>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
           {content.keyBenefits.map((b, i) => (
-            <div key={i} style={{ padding: '12px', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div key={i} style={{ padding: '12px', backgroundColor: '#f7f6f3', borderRadius: '6px', border: '1px solid rgba(55,53,47,0.09)' }}>
               {b.icon && <span style={{ fontSize: '20px', display: 'block', marginBottom: '6px' }}>{b.icon}</span>}
-              <p style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB', margin: '0 0 4px' }}>{b.title}</p>
-              <p style={{ fontSize: '12px', color: '#888', margin: 0, lineHeight: 1.5 }}>{b.description}</p>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: '#37352f', margin: '0 0 4px' }}>{b.title}</p>
+              <p style={{ fontSize: '12px', color: '#787774', margin: 0, lineHeight: 1.5 }}>{b.description}</p>
             </div>
           ))}
         </div>
@@ -256,12 +256,12 @@ function OnePagerViewer({ content }: { content: OnePagerContent }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {content.howItWorks.map((step) => (
               <div key={step.step} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                <span style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.80)', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: 'rgba(55,53,47,0.08)', color: '#37352f', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   {step.step}
                 </span>
                 <div>
-                  <p style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB', margin: '0 0 2px' }}>{step.title}</p>
-                  <p style={{ fontSize: '12px', color: '#888', margin: 0 }}>{step.description}</p>
+                  <p style={{ fontSize: '13px', fontWeight: 600, color: '#37352f', margin: '0 0 2px' }}>{step.title}</p>
+                  <p style={{ fontSize: '12px', color: '#787774', margin: 0 }}>{step.description}</p>
                 </div>
               </div>
             ))}
@@ -274,18 +274,18 @@ function OnePagerViewer({ content }: { content: OnePagerContent }) {
           <SectionHeading>Social proof</SectionHeading>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {content.socialProof.map((item, i) => (
-              <div key={i} style={{ fontSize: '13px', color: '#888' }}>
+              <div key={i} style={{ fontSize: '13px', color: '#787774' }}>
                 {item.type === 'quote' ? `"${item.content}"` : item.content}
-                {item.attribution && <span style={{ color: '#555', fontSize: '12px' }}> — {item.attribution}</span>}
+                {item.attribution && <span style={{ color: '#9b9a97', fontSize: '12px' }}> — {item.attribution}</span>}
               </div>
             ))}
           </div>
         </Card>
       )}
 
-      <Card style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderColor: 'rgba(255,255,255,0.08)' }}>
-        <p style={{ fontSize: '15px', fontWeight: 600, color: 'rgba(255,255,255,0.80)', margin: 0 }}>{content.callToAction}</p>
-        {content.contactInfo && <p style={{ fontSize: '13px', color: '#888', margin: '6px 0 0' }}>{content.contactInfo}</p>}
+      <Card style={{ backgroundColor: '#f7f6f3', borderColor: 'rgba(55,53,47,0.12)' }}>
+        <p style={{ fontSize: '15px', fontWeight: 600, color: '#37352f', margin: 0 }}>{content.callToAction}</p>
+        {content.contactInfo && <p style={{ fontSize: '13px', color: '#787774', margin: '6px 0 0' }}>{content.contactInfo}</p>}
       </Card>
     </div>
   )
@@ -294,13 +294,13 @@ function OnePagerViewer({ content }: { content: OnePagerContent }) {
 // ─── Objection handler ─────────────────────────────────────────────────────────
 
 const CATEGORY_COLORS: Record<ObjectionCategory, { color: string; bg: string }> = {
-  price: { color: '#EF4444', bg: 'rgba(239,68,68,0.1)' },
-  competitor: { color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
-  timing: { color: '#06B6D4', bg: 'rgba(6,182,212,0.1)' },
-  authority: { color: '#8B5CF6', bg: 'rgba(139,92,246,0.1)' },
-  need: { color: '#22C55E', bg: 'rgba(34,197,94,0.1)' },
-  trust: { color: '#3B82F6', bg: 'rgba(59,130,246,0.1)' },
-  other: { color: '#888', bg: 'rgba(136,136,136,0.1)' },
+  price: { color: '#e03e3e', bg: 'rgba(224,62,62,0.08)' },
+  competitor: { color: '#cb6c2c', bg: 'rgba(203,108,44,0.08)' },
+  timing: { color: '#0f7b6c', bg: 'rgba(15,123,108,0.08)' },
+  authority: { color: '#5e6ad2', bg: 'rgba(94,106,210,0.08)' },
+  need: { color: '#0f7b6c', bg: 'rgba(15,123,108,0.08)' },
+  trust: { color: '#5e6ad2', bg: 'rgba(94,106,210,0.08)' },
+  other: { color: '#787774', bg: 'rgba(55,53,47,0.06)' },
 }
 
 function ObjectionHandlerViewer({ content }: { content: ObjectionHandlerContent }) {
@@ -309,7 +309,7 @@ function ObjectionHandlerViewer({ content }: { content: ObjectionHandlerContent 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       <Card>
-        <p style={{ fontSize: '14px', color: '#EBEBEB', lineHeight: 1.7, margin: 0 }}>{content.intro}</p>
+        <p style={{ fontSize: '14px', color: '#37352f', lineHeight: 1.7, margin: 0 }}>{content.intro}</p>
       </Card>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -317,7 +317,7 @@ function ObjectionHandlerViewer({ content }: { content: ObjectionHandlerContent 
           const catConfig = CATEGORY_COLORS[obj.category]
           const isOpen = openIdx === i
           return (
-            <div key={i} style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
+            <div key={i} style={{ background: 'var(--surface-1)', border: '1px solid rgba(55,53,47,0.12)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(55,53,47,0.06)', overflow: 'hidden' }}>
               <button
                 onClick={() => setOpenIdx(isOpen ? null : i)}
                 style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}
@@ -325,26 +325,26 @@ function ObjectionHandlerViewer({ content }: { content: ObjectionHandlerContent 
                 <span style={{ height: '20px', padding: '0 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: catConfig.color, backgroundColor: catConfig.bg, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
                   {obj.category}
                 </span>
-                <span style={{ flex: 1, fontSize: '13px', fontWeight: 500, color: '#EBEBEB' }}>{obj.objection}</span>
-                {isOpen ? <ChevronUp size={14} style={{ color: '#888', flexShrink: 0 }} /> : <ChevronDown size={14} style={{ color: '#888', flexShrink: 0 }} />}
+                <span style={{ flex: 1, fontSize: '13px', fontWeight: 500, color: '#37352f' }}>{obj.objection}</span>
+                {isOpen ? <ChevronUp size={14} style={{ color: '#787774', flexShrink: 0 }} /> : <ChevronDown size={14} style={{ color: '#787774', flexShrink: 0 }} />}
               </button>
 
               {isOpen && (
-                <div style={{ padding: '0 16px 16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ padding: '0 16px 16px', borderTop: '1px solid rgba(55,53,47,0.09)' }}>
                   <div style={{ paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <div>
-                      <p style={{ fontSize: '11px', fontWeight: 600, color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px' }}>Response</p>
-                      <p style={{ fontSize: '13px', color: '#EBEBEB', lineHeight: 1.6, margin: 0 }}>{obj.response}</p>
+                      <p style={{ fontSize: '11px', fontWeight: 600, color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px' }}>Response</p>
+                      <p style={{ fontSize: '13px', color: '#37352f', lineHeight: 1.6, margin: 0 }}>{obj.response}</p>
                     </div>
                     {obj.followUpQuestion && (
                       <div>
-                        <p style={{ fontSize: '11px', fontWeight: 600, color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px' }}>Follow-up question</p>
-                        <p style={{ fontSize: '13px', color: '#888', fontStyle: 'italic', lineHeight: 1.6, margin: 0 }}>&quot;{obj.followUpQuestion}&quot;</p>
+                        <p style={{ fontSize: '11px', fontWeight: 600, color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px' }}>Follow-up question</p>
+                        <p style={{ fontSize: '13px', color: '#787774', fontStyle: 'italic', lineHeight: 1.6, margin: 0 }}>&quot;{obj.followUpQuestion}&quot;</p>
                       </div>
                     )}
                     {obj.proofPoints.length > 0 && (
                       <div>
-                        <p style={{ fontSize: '11px', fontWeight: 600, color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px' }}>Proof points</p>
+                        <p style={{ fontSize: '11px', fontWeight: 600, color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px' }}>Proof points</p>
                         <BulletList items={obj.proofPoints} />
                       </div>
                     )}
@@ -372,31 +372,31 @@ function TalkTrackSectionCard({ section, title }: { section: TalkTrackSection; t
   const [open, setOpen] = useState(true)
 
   return (
-    <div style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
+    <div style={{ background: 'var(--surface-1)', border: '1px solid rgba(55,53,47,0.12)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(55,53,47,0.06)', overflow: 'hidden' }}>
       <button
         onClick={() => setOpen((o) => !o)}
         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }}
       >
-        <span style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB' }}>{title}: {section.title}</span>
-        {open ? <ChevronUp size={14} style={{ color: '#888' }} /> : <ChevronDown size={14} style={{ color: '#888' }} />}
+        <span style={{ fontSize: '13px', fontWeight: 600, color: '#37352f' }}>{title}: {section.title}</span>
+        {open ? <ChevronUp size={14} style={{ color: '#787774' }} /> : <ChevronDown size={14} style={{ color: '#787774' }} />}
       </button>
 
       {open && (
-        <div style={{ padding: '0 16px 16px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ padding: '0 16px 16px', borderTop: '1px solid rgba(55,53,47,0.09)' }}>
           <div style={{ paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <p style={{ fontSize: '11px', fontWeight: 600, color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px' }}>Script</p>
-              <p style={{ fontSize: '13px', color: '#EBEBEB', lineHeight: 1.7, margin: 0 }}>{section.script}</p>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px' }}>Script</p>
+              <p style={{ fontSize: '13px', color: '#37352f', lineHeight: 1.7, margin: 0 }}>{section.script}</p>
             </div>
             {section.keyPoints.length > 0 && (
               <div>
-                <p style={{ fontSize: '11px', fontWeight: 600, color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px' }}>Key points</p>
+                <p style={{ fontSize: '11px', fontWeight: 600, color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px' }}>Key points</p>
                 <BulletList items={section.keyPoints} />
               </div>
             )}
             <div>
-              <p style={{ fontSize: '11px', fontWeight: 600, color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>Transition</p>
-              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.70)', fontStyle: 'italic', margin: 0 }}>&quot;{section.transitionPhrase}&quot;</p>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>Transition</p>
+              <p style={{ fontSize: '13px', color: '#787774', fontStyle: 'italic', margin: 0 }}>&quot;{section.transitionPhrase}&quot;</p>
             </div>
           </div>
         </div>
@@ -411,12 +411,12 @@ function TalkTrackViewer({ content }: { content: TalkTrackContent }) {
       <Card>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <div>
-            <p style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>Purpose</p>
-            <p style={{ fontSize: '13px', color: '#EBEBEB', margin: 0 }}>{content.purpose}</p>
+            <p style={{ fontSize: '11px', color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>Purpose</p>
+            <p style={{ fontSize: '13px', color: '#37352f', margin: 0 }}>{content.purpose}</p>
           </div>
           <div>
-            <p style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>Target persona</p>
-            <p style={{ fontSize: '13px', color: '#EBEBEB', margin: 0 }}>{content.targetPersona}</p>
+            <p style={{ fontSize: '11px', color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>Target persona</p>
+            <p style={{ fontSize: '13px', color: '#37352f', margin: 0 }}>{content.targetPersona}</p>
           </div>
         </div>
       </Card>
@@ -434,7 +434,7 @@ function TalkTrackViewer({ content }: { content: TalkTrackContent }) {
       {content.tipsAndNotes.length > 0 && (
         <Card>
           <SectionHeading>Tips & notes</SectionHeading>
-          <BulletList items={content.tipsAndNotes} color="#888" />
+          <BulletList items={content.tipsAndNotes} color="#787774" />
         </Card>
       )}
     </div>
@@ -449,47 +449,47 @@ function EmailSequenceViewer({ content }: { content: EmailSequenceContent }) {
       <Card>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
           <div>
-            <p style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>Sequence</p>
-            <p style={{ fontSize: '13px', color: '#EBEBEB', margin: 0 }}>{content.sequenceName}</p>
+            <p style={{ fontSize: '11px', color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>Sequence</p>
+            <p style={{ fontSize: '13px', color: '#37352f', margin: 0 }}>{content.sequenceName}</p>
           </div>
           <div>
-            <p style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>Target persona</p>
-            <p style={{ fontSize: '13px', color: '#EBEBEB', margin: 0 }}>{content.targetPersona}</p>
+            <p style={{ fontSize: '11px', color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>Target persona</p>
+            <p style={{ fontSize: '13px', color: '#37352f', margin: 0 }}>{content.targetPersona}</p>
           </div>
           <div>
-            <p style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>Goal</p>
-            <p style={{ fontSize: '13px', color: '#EBEBEB', margin: 0 }}>{content.goal}</p>
+            <p style={{ fontSize: '11px', color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>Goal</p>
+            <p style={{ fontSize: '13px', color: '#37352f', margin: 0 }}>{content.goal}</p>
           </div>
         </div>
       </Card>
 
       {content.emails.map((email) => (
-        <div key={email.stepNumber} style={{ background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
-            <span style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: 'rgba(139,92,246,0.2)', color: '#8B5CF6', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div key={email.stepNumber} style={{ background: 'var(--surface-1)', border: '1px solid rgba(55,53,47,0.12)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(55,53,47,0.06)', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: '1px solid rgba(55,53,47,0.09)', backgroundColor: '#f7f6f3' }}>
+            <span style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: 'rgba(94,106,210,0.12)', color: '#5e6ad2', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               {email.stepNumber}
             </span>
             <div style={{ flex: 1 }}>
-              <p style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB', margin: 0 }}>Day {email.dayOffset}: {email.subject}</p>
-              <p style={{ fontSize: '11px', color: '#555', margin: '2px 0 0' }}>{email.previewText}</p>
+              <p style={{ fontSize: '13px', fontWeight: 600, color: '#37352f', margin: 0 }}>Day {email.dayOffset}: {email.subject}</p>
+              <p style={{ fontSize: '11px', color: '#787774', margin: '2px 0 0' }}>{email.previewText}</p>
             </div>
           </div>
 
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <p style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px' }}>Email body</p>
-              <p style={{ fontSize: '13px', color: '#EBEBEB', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{email.body}</p>
+              <p style={{ fontSize: '11px', color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 6px' }}>Email body</p>
+              <p style={{ fontSize: '13px', color: '#37352f', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{email.body}</p>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
-                <p style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>CTA</p>
-                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.80)', fontWeight: 500, margin: 0 }}>{email.callToAction}</p>
+                <p style={{ fontSize: '11px', color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>CTA</p>
+                <p style={{ fontSize: '13px', color: '#37352f', fontWeight: 500, margin: 0 }}>{email.callToAction}</p>
               </div>
               {email.sendingTips.length > 0 && (
                 <div>
-                  <p style={{ fontSize: '11px', color: '#555', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>Sending tips</p>
-                  <BulletList items={email.sendingTips} color="#888" />
+                  <p style={{ fontSize: '11px', color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 4px' }}>Sending tips</p>
+                  <BulletList items={email.sendingTips} color="#787774" />
                 </div>
               )}
             </div>
@@ -509,7 +509,7 @@ function FreeformViewer({ content }: { content: FreeformCollateralContent }) {
         <Card key={i}>
           <SectionHeading>{section.heading}</SectionHeading>
           <div
-            style={{ fontSize: '13px', color: '#EBEBEB', lineHeight: 1.7 }}
+            style={{ fontSize: '13px', color: '#37352f', lineHeight: 1.7 }}
             dangerouslySetInnerHTML={{ __html: markdownToHtml(section.content) }}
           />
         </Card>
@@ -521,11 +521,11 @@ function FreeformViewer({ content }: { content: FreeformCollateralContent }) {
 /** Lightweight markdown → HTML for section content (bold, italic, bullets, headings) */
 function markdownToHtml(md: string): string {
   return md
-    .replace(/^#### (.+)$/gm, '<h4 style="font-size:13px;font-weight:700;color:#C4B5FD;margin:12px 0 6px">$1</h4>')
-    .replace(/^### (.+)$/gm, '<h3 style="font-size:14px;font-weight:700;color:#A78BFA;margin:14px 0 6px">$1</h3>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#EBEBEB">$1</strong>')
+    .replace(/^#### (.+)$/gm, '<h4 style="font-size:13px;font-weight:700;color:#37352f;margin:12px 0 6px">$1</h4>')
+    .replace(/^### (.+)$/gm, '<h3 style="font-size:14px;font-weight:700;color:#37352f;margin:14px 0 6px">$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:#37352f">$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/^[-•] (.+)$/gm, '<div style="display:flex;gap:8px;margin:3px 0"><span style="color:rgba(255,255,255,0.80);flex-shrink:0">•</span><span>$1</span></div>')
+    .replace(/^[-•] (.+)$/gm, '<div style="display:flex;gap:8px;margin:3px 0"><span style="color:#9b9a97;flex-shrink:0">•</span><span>$1</span></div>')
     .replace(/\n{2,}/g, '<br/><br/>')
     .replace(/\n/g, '<br/>')
 }
@@ -555,7 +555,7 @@ export function CollateralViewer({ content }: CollateralViewerProps) {
       return <EmailSequenceViewer content={content as EmailSequenceContent} />
     default:
       return (
-        <div style={{ padding: '24px', textAlign: 'center', color: '#555', fontSize: '13px' }}>
+        <div style={{ padding: '24px', textAlign: 'center', color: '#787774', fontSize: '13px' }}>
           Unknown collateral type.
         </div>
       )

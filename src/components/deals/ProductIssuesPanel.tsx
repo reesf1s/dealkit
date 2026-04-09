@@ -46,9 +46,9 @@ const fetcher = async (url: string) => {
 }
 
 function scoreLabel(score: number): { label: string; color: string } {
-  if (score >= 90) return { label: 'High', color: '#dc2626' }
-  if (score >= 70) return { label: 'Med', color: '#d97706' }
-  return { label: 'Low', color: '#64748b' }
+  if (score >= 90) return { label: 'High', color: '#e03e3e' }
+  if (score >= 70) return { label: 'Med', color: '#cb6c2c' }
+  return { label: 'Low', color: 'var(--text-tertiary)' }
 }
 
 interface Props {
@@ -92,12 +92,12 @@ export function ProductIssuesPanel({ dealId }: Props) {
   return (
     <div
       style={{
-        background: 'linear-gradient(180deg, rgba(11,10,28,0.90) 0%, rgba(9,8,24,0.84) 100%)',
-        border: '1px solid rgba(255,255,255,0.06)',
-        borderRadius: '24px',
+        background: 'var(--surface-1)',
+        border: '1px solid rgba(55,53,47,0.09)',
+        borderRadius: '10px',
         overflow: 'hidden',
         marginBottom: '16px',
-        boxShadow: '0 24px 60px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.04)',
+        boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
       }}
     >
       <div
@@ -107,15 +107,15 @@ export function ProductIssuesPanel({ dealId }: Props) {
           justifyContent: 'space-between',
           gap: '12px',
           padding: '18px 18px 16px',
-          borderBottom: visibleLinks.length > 0 || loadingLinks || Boolean(linksError) ? '1px solid rgba(255,255,255,0.06)' : undefined,
-          background: 'rgba(255,255,255,0.02)',
+          borderBottom: visibleLinks.length > 0 || loadingLinks || Boolean(linksError) ? '1px solid rgba(55,53,47,0.09)' : undefined,
+          background: '#f7f6f3',
         }}
       >
         <div>
-          <div style={{ fontSize: '15px', fontWeight: 800, color: 'rgba(255,255,255,0.92)', letterSpacing: '-0.03em' }}>
+          <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
             Linked product issues
           </div>
-          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.46)', marginTop: '4px', lineHeight: 1.6 }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px', lineHeight: 1.6 }}>
             Halvex only visualises issue context Claude has already written back into this deal.
           </div>
         </div>
@@ -129,9 +129,9 @@ export function ProductIssuesPanel({ dealId }: Props) {
                 gap: '6px',
                 fontSize: '12px',
                 fontWeight: 700,
-                color: 'rgba(255,255,255,0.88)',
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.08)',
+                color: 'var(--text-primary)',
+                background: 'rgba(55,53,47,0.04)',
+                border: '1px solid rgba(55,53,47,0.12)',
                 borderRadius: '999px',
                 cursor: 'pointer',
                 padding: '8px 12px',
@@ -145,19 +145,19 @@ export function ProductIssuesPanel({ dealId }: Props) {
       </div>
 
       {mcpError && (
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(245,158,11,0.10)', color: '#fde68a', fontSize: '12px', lineHeight: 1.7 }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(55,53,47,0.09)', background: 'rgba(203,108,44,0.08)', color: '#cb6c2c', fontSize: '12px', lineHeight: 1.7 }}>
           Halvex could not verify MCP setup right now. Saved links still work, but you may need to revisit setup if Claude cannot write new links back.
         </div>
       )}
 
       {linksError && (
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(239,68,68,0.10)', color: '#fecaca', fontSize: '12px', lineHeight: 1.7 }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(55,53,47,0.09)', background: 'rgba(224,62,62,0.08)', color: '#e03e3e', fontSize: '12px', lineHeight: 1.7 }}>
           Halvex could not load saved issue links for this deal. Re-run the Claude review after setup is healthy, or try again in a moment.
         </div>
       )}
 
       {loadingLinks && (
-        <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.56)' }}>
+        <div style={{ padding: '16px 18px', borderBottom: '1px solid rgba(55,53,47,0.09)', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
           <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />
           Loading saved links...
         </div>
@@ -171,9 +171,9 @@ export function ProductIssuesPanel({ dealId }: Props) {
               alignItems: 'flex-start',
               gap: '12px',
               padding: '16px',
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              borderRadius: '22px',
+              background: '#f7f6f3',
+              border: '1px solid rgba(55,53,47,0.09)',
+              borderRadius: '10px',
               marginBottom: '12px',
             }}
           >
@@ -182,21 +182,21 @@ export function ProductIssuesPanel({ dealId }: Props) {
                 width: '34px',
                 height: '34px',
                 borderRadius: '14px',
-                background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(99,102,241,0.18))',
+                background: 'rgba(94,106,210,0.10)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                color: 'rgba(255,255,255,0.92)',
+                color: '#5e6ad2',
               }}
             >
               <Sparkles size={15} />
             </div>
             <div>
-              <div style={{ fontSize: '13px', fontWeight: 800, color: 'rgba(255,255,255,0.92)', marginBottom: '4px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '4px' }}>
                 No issue links saved yet
               </div>
-              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.52)', lineHeight: 1.75 }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.75 }}>
                 Ask Claude to review this deal with Halvex MCP and save the blockers that matter back here. Halvex does not create or match links on its own.
               </div>
             </div>
@@ -211,12 +211,12 @@ export function ProductIssuesPanel({ dealId }: Props) {
                 gap: '7px',
                 fontSize: '12px',
                 fontWeight: 700,
-                color: 'rgba(255,255,255,0.88)',
+                color: 'var(--text-primary)',
                 textDecoration: 'none',
                 padding: '10px 14px',
                 borderRadius: '999px',
-                background: 'rgba(255,255,255,0.06)',
-                border: '1px solid rgba(255,255,255,0.08)',
+                background: 'rgba(55,53,47,0.04)',
+                border: '1px solid rgba(55,53,47,0.12)',
               }}
             >
               {mcpReady ? 'Review MCP setup' : 'Set up Claude MCP'}
@@ -230,11 +230,11 @@ export function ProductIssuesPanel({ dealId }: Props) {
                   gap: '7px',
                   fontSize: '12px',
                   fontWeight: 700,
-                  color: 'rgba(255,255,255,0.94)',
+                  color: '#ffffff',
                   padding: '10px 14px',
                   borderRadius: '999px',
-                  background: 'linear-gradient(135deg, rgba(139,92,246,0.22), rgba(99,102,241,0.18))',
-                  border: '1px solid rgba(139,92,246,0.26)',
+                  background: '#5e6ad2',
+                  border: '1px solid rgba(94,106,210,0.30)',
                   cursor: 'pointer',
                 }}
               >
@@ -255,61 +255,61 @@ export function ProductIssuesPanel({ dealId }: Props) {
             const hasUserStory = Boolean(link.scopedUserStory)
 
             return (
-              <div key={link.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div key={link.id} style={{ borderBottom: '1px solid rgba(55,53,47,0.09)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 18px' }}>
-                  <span style={{ fontSize: '14px', color: isDeployed ? '#34d399' : isInCycle ? '#60a5fa' : isConfirmed ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.40)', flexShrink: 0, lineHeight: 1 }}>
+                  <span style={{ fontSize: '14px', color: isDeployed ? '#0f7b6c' : isInCycle ? '#2e78c6' : isConfirmed ? '#37352f' : '#9b9a97', flexShrink: 0, lineHeight: 1 }}>
                     {isDeployed ? '🚀' : isInCycle ? '↻' : isConfirmed ? '●' : '○'}
                   </span>
 
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       {link.linearIssueUrl ? (
-                        <a href={link.linearIssueUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '10px', fontWeight: 800, color: 'rgba(255,255,255,0.72)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '999px', padding: '4px 8px', textDecoration: 'none', letterSpacing: '0.02em' }}>
+                        <a href={link.linearIssueUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-secondary)', background: 'rgba(55,53,47,0.04)', border: '1px solid rgba(55,53,47,0.12)', borderRadius: '999px', padding: '4px 8px', textDecoration: 'none', letterSpacing: '0.02em' }}>
                           {link.linearIssueId}
                         </a>
                       ) : (
-                        <span style={{ fontSize: '10px', fontWeight: 800, color: 'rgba(255,255,255,0.72)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '999px', padding: '4px 8px', letterSpacing: '0.02em' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 800, color: 'var(--text-secondary)', background: 'rgba(55,53,47,0.04)', border: '1px solid rgba(55,53,47,0.12)', borderRadius: '999px', padding: '4px 8px', letterSpacing: '0.02em' }}>
                           {link.linearIssueId}
                         </span>
                       )}
 
                       {link.addressesRisk && (
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#fbbf24', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.16)', borderRadius: '999px', padding: '4px 8px', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={link.addressesRisk}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#cb6c2c', background: 'rgba(203,108,44,0.10)', border: '1px solid rgba(203,108,44,0.20)', borderRadius: '999px', padding: '4px 8px', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={link.addressesRisk}>
                           {link.addressesRisk}
                         </span>
                       )}
 
-                      <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.90)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {link.linearTitle ?? link.linearIssueId}
                       </span>
 
                       {isConfirmed && !isInCycle && !isDeployed && (
-                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '4px 8px', borderRadius: '999px', background: 'rgba(16,185,129,0.12)', color: '#86efac', letterSpacing: '0.02em' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '4px 8px', borderRadius: '999px', background: 'rgba(15,123,108,0.10)', color: '#0f7b6c', letterSpacing: '0.02em' }}>
                           CONFIRMED
                         </span>
                       )}
                       {isInCycle && (
-                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '4px 8px', borderRadius: '999px', background: 'rgba(59,130,246,0.12)', color: '#93c5fd', letterSpacing: '0.02em' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '4px 8px', borderRadius: '999px', background: 'rgba(46,120,198,0.10)', color: '#2e78c6', letterSpacing: '0.02em' }}>
                           IN CYCLE
                         </span>
                       )}
                       {isDeployed && (
-                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '4px 8px', borderRadius: '999px', background: 'rgba(16,185,129,0.12)', color: '#86efac', letterSpacing: '0.02em' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '4px 8px', borderRadius: '999px', background: 'rgba(15,123,108,0.10)', color: '#0f7b6c', letterSpacing: '0.02em' }}>
                           SHIPPED
                         </span>
                       )}
                       {isDeployed && link.hasReleaseEmail && (
-                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '4px 8px', borderRadius: '999px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.70)', letterSpacing: '0.02em' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '4px 8px', borderRadius: '999px', background: 'rgba(55,53,47,0.04)', color: 'var(--text-secondary)', letterSpacing: '0.02em' }}>
                           EMAIL READY
                         </span>
                       )}
                       {!isConfirmed && (
-                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '4px 8px', borderRadius: '999px', background: 'rgba(245,158,11,0.12)', color: '#fde68a', letterSpacing: '0.02em' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, padding: '4px 8px', borderRadius: '999px', background: 'rgba(203,108,44,0.10)', color: '#cb6c2c', letterSpacing: '0.02em' }}>
                           REVIEW PENDING
                         </span>
                       )}
                       {isInCycle && link.assigneeName && (
-                        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.42)', flexShrink: 0 }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', flexShrink: 0 }}>
                           {link.assigneeName}
                         </span>
                       )}
@@ -319,26 +319,26 @@ export function ProductIssuesPanel({ dealId }: Props) {
                   <span style={{ fontSize: '11px', color, flexShrink: 0, fontWeight: 700 }}>{label}</span>
 
                   {hasUserStory && (
-                    <button onClick={() => setExpandedStory(isExpanded ? null : link.id)} title={isExpanded ? 'Hide user story' : 'Show user story'} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.42)', flexShrink: 0, padding: '2px' }}>
+                    <button onClick={() => setExpandedStory(isExpanded ? null : link.id)} title={isExpanded ? 'Hide user story' : 'Show user story'} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', flexShrink: 0, padding: '2px' }}>
                       {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                     </button>
                   )}
 
                   {link.linearIssueUrl && (
-                    <a href={link.linearIssueUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.42)', flexShrink: 0 }}>
+                    <a href={link.linearIssueUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-tertiary)', flexShrink: 0 }}>
                       <ExternalLink size={12} />
                     </a>
                   )}
                 </div>
 
                 {isExpanded && link.scopedUserStory && (
-                  <div style={{ padding: '10px 18px 14px 44px', background: 'rgba(79,70,229,0.06)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ padding: '10px 18px 14px 44px', background: '#f7f6f3', borderTop: '1px solid rgba(55,53,47,0.09)' }}>
                     {link.addressesRisk && (
-                      <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.42)', marginBottom: '6px', lineHeight: 1.5, fontStyle: 'italic' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '6px', lineHeight: 1.5, fontStyle: 'italic' }}>
                         Addresses “{link.addressesRisk}”
                       </div>
                     )}
-                    <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.72)', lineHeight: 1.7 }}>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
                       {link.scopedUserStory}
                     </div>
                   </div>
@@ -348,7 +348,7 @@ export function ProductIssuesPanel({ dealId }: Props) {
           })}
 
           {suggested.length > 0 && (
-            <div style={{ padding: '10px 18px 14px', fontSize: '11px', color: 'rgba(255,255,255,0.42)', lineHeight: 1.7 }}>
+            <div style={{ padding: '10px 18px 14px', fontSize: '11px', color: 'var(--text-tertiary)', lineHeight: 1.7 }}>
               Claude has written review-state issue context into Halvex. Re-run the review in Claude if you want to tighten or refresh the set.
             </div>
           )}

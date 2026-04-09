@@ -28,9 +28,9 @@ function stageBadge(stage: string) {
   return (
     <span style={{
       fontSize: '11px',
-      color: 'rgba(255,255,255,0.80)',
-      backgroundColor: 'rgba(255,255,255,0.06)',
-      border: '1px solid rgba(255,255,255,0.10)',
+      color: 'var(--text-secondary)',
+      backgroundColor: 'rgba(55,53,47,0.05)',
+      border: '1px solid rgba(55,53,47,0.12)',
       padding: '2px 8px',
       borderRadius: '9999px',
       textTransform: 'capitalize',
@@ -41,10 +41,10 @@ function stageBadge(stage: string) {
 }
 
 function SortIcon({ field, active, direction }: { field: string; active: boolean; direction: 'asc' | 'desc' }) {
-  if (!active) return <ChevronUp size={12} style={{ color: '#d1d1d6' }} />
+  if (!active) return <ChevronUp size={12} style={{ color: 'var(--text-tertiary)' }} />
   return direction === 'asc'
-    ? <ChevronUp size={12} style={{ color: 'rgba(255,255,255,0.80)' }} />
-    : <ChevronDown size={12} style={{ color: 'rgba(255,255,255,0.80)' }} />
+    ? <ChevronUp size={12} style={{ color: 'var(--text-primary)' }} />
+    : <ChevronDown size={12} style={{ color: 'var(--text-primary)' }} />
 }
 
 export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: DealTableProps) {
@@ -120,21 +120,21 @@ export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: Dea
               borderRadius: '8px',
               fontSize: '12px',
               fontWeight: filter === tab.key ? 600 : 500,
-              color: filter === tab.key ? 'rgba(255,255,255,0.80)' : 'rgba(255,255,255,0.45)',
-              backgroundColor: filter === tab.key ? 'rgba(255,255,255,0.06)' : 'transparent',
-              border: filter === tab.key ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent',
+              color: filter === tab.key ? '#37352f' : '#787774',
+              backgroundColor: filter === tab.key ? 'var(--surface-1)' : 'transparent',
+              border: filter === tab.key ? '1px solid rgba(55,53,47,0.12)' : '1px solid transparent',
               cursor: 'pointer',
               transition: 'all 150ms ease',
             }}
             onMouseEnter={e => {
               if (filter !== tab.key) {
-                (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.80)'
-                ;(e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(255,255,255,0.06)'
+                (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'
+                ;(e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(55,53,47,0.04)'
               }
             }}
             onMouseLeave={e => {
               if (filter !== tab.key) {
-                (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.45)'
+                (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'
                 ;(e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
               }
             }}
@@ -142,23 +142,21 @@ export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: Dea
             {tab.label}
           </button>
         ))}
-        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.30)', lineHeight: '30px', marginLeft: '8px' }}>
+        <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: '30px', marginLeft: '8px' }}>
           {sorted.length} deal{sorted.length !== 1 ? 's' : ''}
         </span>
       </div>
 
       {/* Table */}
       <div style={{
-        background: 'rgba(255,255,255,0.06)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: '14px',
+        background: 'var(--surface-1)',
+        border: '1px solid rgba(55,53,47,0.09)',
+        borderRadius: '10px',
         overflow: 'hidden',
-        boxShadow: '0 2px 20px rgba(0,0,0,0.40)',
+        boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
       }}>
         {/* Header row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 110px 110px 120px 32px', padding: '12px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 110px 110px 120px 32px', padding: '12px 18px', borderBottom: '1px solid rgba(55,53,47,0.09)', background: '#f7f6f3' }}>
           {[
             { label: 'Deal / Prospect', field: 'dealName' as SortField },
             { label: 'Company', field: 'prospectCompany' as SortField },
@@ -174,7 +172,7 @@ export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: Dea
               onClick={() => field && toggleSort(field)}
               style={{
                 display: 'flex', alignItems: 'center', gap: '4px',
-                fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.30)',
+                fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)',
                 letterSpacing: '0.07em', textTransform: 'uppercase',
                 background: 'none', border: 'none',
                 cursor: field ? 'pointer' : 'default',
@@ -200,14 +198,14 @@ export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: Dea
               display: 'grid',
               gridTemplateColumns: '1.5fr 1fr 120px 1fr 120px 110px 110px 120px 32px',
               padding: '13px 18px',
-              borderBottom: i < sorted.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+              borderBottom: i < sorted.length - 1 ? '1px solid rgba(55,53,47,0.07)' : 'none',
               alignItems: 'center',
               transition: 'background 0.12s ease',
               cursor: 'pointer',
             }}
             onMouseEnter={(e) => {
               setHoveredId(deal.id)
-              e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'
+              e.currentTarget.style.backgroundColor = '#f7f6f3'
             }}
             onMouseLeave={(e) => {
               setHoveredId(null)
@@ -219,45 +217,45 @@ export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: Dea
             <div>
               <p style={{
                 fontSize: '13px', fontWeight: 600,
-                color: hoveredId === deal.id ? 'rgba(255,255,255,0.90)' : '#e2e8f0',
+                color: 'var(--text-primary)',
                 margin: 0, marginBottom: '1px',
                 transition: 'color 0.12s ease',
               }}>{deal.dealName}</p>
               {deal.prospectName && (
-                <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', margin: 0 }}>
+                <p style={{ fontSize: '11px', color: 'var(--text-tertiary)', margin: 0 }}>
                   {deal.prospectName}{deal.prospectTitle ? `, ${deal.prospectTitle}` : ''}
                 </p>
               )}
             </div>
 
             {/* Company */}
-            <span style={{ fontSize: '13px', color: 'rgba(255,255,255,0.55)' }}>{deal.prospectCompany}</span>
+            <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{deal.prospectCompany}</span>
 
             {/* Outcome */}
             <div>{stageBadge(deal.stage)}</div>
 
             {/* Competitor */}
-            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.40)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {deal.competitors.length > 0 ? deal.competitors.join(', ') : '—'}
             </span>
 
             {/* Value */}
-            <span style={{ fontSize: '13px', color: '#e2e8f0', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
+            <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
               {deal.dealValue != null ? `${currencySymbol}${deal.dealValue.toLocaleString()}` : '—'}
             </span>
 
             {/* Contract Start */}
-            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.40)', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
               {formatDate((deal as any).contractStartDate)}
             </span>
 
             {/* Contract End */}
-            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.40)', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
               {formatDate((deal as any).contractEndDate)}
             </span>
 
             {/* Date */}
-            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.40)', fontVariantNumeric: 'tabular-nums' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>
               {formatDate(deal.createdAt)}
             </span>
 
@@ -269,8 +267,8 @@ export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: Dea
                     onClick={() => { onDelete(deal.id); setConfirmId(null) }}
                     style={{
                       fontSize: '10px', fontWeight: 600, color: '#fff',
-                      backgroundColor: '#ef4444',
-                      border: '1px solid rgba(239,68,68,0.40)',
+                      backgroundColor: '#e03e3e',
+                      border: '1px solid rgba(224,62,62,0.40)',
                       borderRadius: '5px', padding: '2px 7px',
                       cursor: 'pointer', whiteSpace: 'nowrap',
                     }}
@@ -282,12 +280,12 @@ export function DealTable({ deals, onAdd, onDelete, currencySymbol = '£' }: Dea
                     onClick={() => setConfirmId(deal.id)}
                     style={{
                       background: 'none', border: 'none', cursor: 'pointer',
-                      color: 'rgba(255,255,255,0.30)', padding: '3px',
+                      color: 'var(--text-tertiary)', padding: '3px',
                       display: 'flex', alignItems: 'center', borderRadius: '5px',
                       transition: 'color 0.12s',
                     }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#f87171' }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.30)' }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = '#e03e3e' }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)' }}
                   >
                     <Trash2 size={13} />
                   </button>

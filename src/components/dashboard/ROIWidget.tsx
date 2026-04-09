@@ -65,9 +65,9 @@ export default function ROIWidget({ deals, collateralCount, currencySymbol = '£
       hint: !hasDeals ? 'No deals yet' : wonOneOff > 0
         ? `${wonDeals.filter(d => d.dealType !== 'recurring').length} deal${wonDeals.filter(d => d.dealType !== 'recurring').length !== 1 ? 's' : ''}`
         : 'No won one-off deals',
-      color: '#22C55E',
-      glow: 'rgba(34,197,94,0.12)',
-      border: 'rgba(34,197,94,0.15)',
+      color: '#0f7b6c',
+      glow: 'rgba(15,123,108,0.06)',
+      border: 'rgba(15,123,108,0.16)',
     },
     {
       label: 'Won ARR',
@@ -76,57 +76,56 @@ export default function ROIWidget({ deals, collateralCount, currencySymbol = '£
       hint: !hasDeals ? 'Log deals' : wonARR > 0
         ? `${wonDeals.filter(d => d.dealType === 'recurring').length} recurring deal${wonDeals.filter(d => d.dealType === 'recurring').length !== 1 ? 's' : ''}`
         : 'No recurring wins yet',
-      color: '#10B981',
-      glow: 'rgba(16,185,129,0.12)',
-      border: 'rgba(16,185,129,0.15)',
+      color: '#0f7b6c',
+      glow: 'rgba(15,123,108,0.06)',
+      border: 'rgba(15,123,108,0.16)',
     },
     {
       label: 'Pipeline',
       sublabel: 'annualised',
       value: !hasDeals ? '—' : openPipeline > 0 ? formatCurrency(openPipeline, currencySymbol) : '—',
       hint: !hasDeals ? 'Log a deal' : `${openDeals.length} open deal${openDeals.length !== 1 ? 's' : ''}`,
-      color: '#3B82F6',
-      glow: 'rgba(59,130,246,0.12)',
-      border: 'rgba(59,130,246,0.15)',
+      color: '#5e6ad2',
+      glow: 'rgba(94,106,210,0.06)',
+      border: 'rgba(94,106,210,0.16)',
     },
     {
       label: 'Avg Deal',
       sublabel: 'annualised',
       value: avgDealSize > 0 ? formatCurrency(avgDealSize, currencySymbol) : '—',
       hint: avgDealSize > 0 ? `${allWithValue.length} deal${allWithValue.length !== 1 ? 's' : ''}` : 'Add deal values',
-      color: '#F59E0B',
-      glow: 'rgba(245,158,11,0.12)',
-      border: 'rgba(245,158,11,0.15)',
+      color: '#cb6c2c',
+      glow: 'rgba(203,108,44,0.06)',
+      border: 'rgba(203,108,44,0.16)',
     },
   ]
 
   return (
     <div style={{
-      background: 'rgba(18,12,32,0.7)',
-      backdropFilter: 'blur(16px)',
-      WebkitBackdropFilter: 'blur(16px)',
-      border: '1px solid rgba(124,58,237,0.18)',
-      borderRadius: '8px',
+      background: 'var(--surface-1)',
+      border: '1px solid rgba(55,53,47,0.09)',
+      borderRadius: '10px',
       padding: '16px 20px',
+      boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
         <div style={{
           width: '24px', height: '24px', borderRadius: '6px',
-          background: 'rgba(255,255,255,0.08)',
-          border: '1px solid rgba(255,255,255,0.10)',
+          background: 'rgba(94,106,210,0.10)',
+          border: '1px solid rgba(94,106,210,0.20)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="12" width="4" height="9" rx="1" fill="rgba(255,255,255,0.70)" />
-            <rect x="10" y="7" width="4" height="14" rx="1" fill="rgba(255,255,255,0.70)" />
-            <rect x="17" y="3" width="4" height="18" rx="1" fill="rgba(255,255,255,0.70)" />
+            <rect x="3" y="12" width="4" height="9" rx="1" fill="#5e6ad2" />
+            <rect x="10" y="7" width="4" height="14" rx="1" fill="#5e6ad2" />
+            <rect x="17" y="3" width="4" height="18" rx="1" fill="#5e6ad2" />
           </svg>
         </div>
-        <span style={{ fontSize: '13px', fontWeight: '600', color: '#F0EEFF' }}>Revenue Impact</span>
-        <span style={{ fontSize: '11px', color: '#444', marginLeft: '4px' }}>Recurring values annualised</span>
+        <span style={{ fontSize: '13px', fontWeight: '600', color: '#37352f' }}>Revenue Impact</span>
+        <span style={{ fontSize: '11px', color: '#9b9a97', marginLeft: '4px' }}>Recurring values annualised</span>
         {collateralCount > 0 && (
-          <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#666' }}>
+          <span style={{ marginLeft: 'auto', fontSize: '11px', color: '#9b9a97' }}>
             ⏱ {timeSaved}h saved · {collateralCount} collateral
           </span>
         )}
@@ -142,15 +141,14 @@ export default function ROIWidget({ deals, collateralCount, currencySymbol = '£
             padding: '12px',
           }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginBottom: '6px' }}>
-              <span style={{ fontSize: '11px', color: '#666', letterSpacing: '0.02em' }}>{label}</span>
-              <span style={{ fontSize: '10px', color: '#444' }}>{sublabel}</span>
+              <span style={{ fontSize: '11px', color: '#9b9a97', letterSpacing: '0.02em' }}>{label}</span>
+              <span style={{ fontSize: '10px', color: '#9b9a97' }}>{sublabel}</span>
             </div>
             <div style={{
               fontSize: '22px', fontWeight: 800, letterSpacing: '-0.04em',
               color, lineHeight: 1, marginBottom: '4px',
-              textShadow: `0 0 16px ${color}50`,
             }}>{value}</div>
-            <div style={{ fontSize: '11px', color: '#555' }}>{hint}</div>
+            <div style={{ fontSize: '11px', color: '#9b9a97' }}>{hint}</div>
           </div>
         ))}
       </div>

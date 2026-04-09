@@ -87,7 +87,11 @@ export async function POST(req: NextRequest) {
         try {
           const result = streamText({
             model: openai('gpt-5.4-mini'),
-            maxTokens: 500,
+            providerOptions: {
+              openai: {
+                maxCompletionTokens: 500,
+              },
+            },
             system: `You are a concise B2B sales intelligence assistant. Answer in 2-4 sentences maximum. Be specific and direct — use actual numbers and deal names from the context. Never make up data. If the context doesn't cover what was asked, say so honestly in one sentence.`,
             messages: [{
               role: 'user',

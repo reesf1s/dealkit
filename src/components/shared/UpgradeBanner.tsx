@@ -27,30 +27,29 @@ export function UpgradeBanner({ message, plan = 'starter', dismissKey }: Props) 
     <div style={{
       display: 'flex', alignItems: 'center', gap: '12px',
       padding: '12px 16px',
-      background: 'rgba(255,255,255,0.06)',
-      border: '1px solid rgba(255,255,255,0.10)',
+      background: 'rgba(29, 184, 106, 0.05)',
+      border: '1px solid rgba(29, 184, 106, 0.16)',
       borderRadius: '8px', marginBottom: '16px',
     }}>
       <div style={{
         width: '30px', height: '30px', borderRadius: '8px',
-        background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.10)',
+        background: 'rgba(29, 184, 106, 0.10)', border: '1px solid rgba(29, 184, 106, 0.20)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>
-        <Zap size={14} color="rgba(255,255,255,0.70)" />
+        <Zap size={14} color="#1DB86A" />
       </div>
-      <div style={{ flex: 1, fontSize: '13px', color: 'rgba(255,255,255,0.70)', lineHeight: '1.5' }}>
+      <div style={{ flex: 1, fontSize: '13px', color: '#787774', lineHeight: '1.5' }}>
         {message}
       </div>
       <Link href="/settings#billing" style={{
         padding: '6px 14px', borderRadius: '7px', fontSize: '12px', fontWeight: '700',
-        background: 'rgba(255,255,255,0.90)',
-        boxShadow: '0 0 14px rgba(0,0,0,0.25)',
-        color: '#0a0b0f', textDecoration: 'none', flexShrink: 0, whiteSpace: 'nowrap',
+        background: '#1a1a1a',
+        color: '#ffffff', textDecoration: 'none', flexShrink: 0, whiteSpace: 'nowrap',
       }}>
         Upgrade to {plan === 'pro' ? 'Pro' : 'Starter'} →
       </Link>
       {dismissKey && (
-        <button onClick={dismiss} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', padding: '2px', display: 'flex' }}>
+        <button onClick={dismiss} style={{ background: 'none', border: 'none', color: '#9b9a97', cursor: 'pointer', padding: '2px', display: 'flex' }}>
           <X size={14} />
         </button>
       )}

@@ -1,10 +1,10 @@
 /**
  * GET /api/cron/win-loss-digest
- * Weekly on Mondays at 8 AM UTC — sends a win/loss intelligence digest to
- * opted-in team members via Slack DM.
+ * Weekly on Mondays at 8 AM UTC — logs win/loss intelligence digest for
+ * workspaces with closed deals.
  *
  * Reads winLossIntel + dealVelocity from the workspace brain.
- * Only sends if the workspace has at least 1 closed deal (win or loss).
+ * Only processes if the workspace has at least 1 closed deal (win or loss).
  *
  * Secured by CRON_SECRET.
  */
@@ -15,7 +15,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { workspaces } from '@/lib/db/schema'
 import { getWorkspaceBrain } from '@/lib/workspace-brain'
-import { notifyWinLossDigest } from '@/lib/slack-notify'
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET
@@ -35,15 +34,7 @@ export async function GET(req: NextRequest) {
         const intel = brain?.winLossIntel
         if (!intel || (intel.winCount + intel.lossCount) === 0) { skipped++; continue }
 
-        await notifyWinLossDigest(ws.id, {
-          winCount: intel.winCount,
-          lossCount: intel.lossCount,
-          winRate: intel.winRate,
-          topLossReasons: intel.topLossReasons,
-          competitorRecord: intel.competitorRecord,
-          weightedForecast: brain.dealVelocity?.weightedForecast,
-          forecastDealCount: brain.dealVelocity?.forecastDealCount,
-        })
+        console.log(`[cron/win-loss-digest] workspace=${ws.id} wins=${intel.winCount} losses=${intel.lossCount} win_rate=${intel.winRate}`)
         sent++
       } catch (err) {
         console.error(`[cron/win-loss-digest] workspace=${ws.id}`, err)

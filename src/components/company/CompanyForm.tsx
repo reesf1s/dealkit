@@ -19,7 +19,7 @@ function Label({ children }: { children: React.ReactNode }) {
         display: 'block',
         fontSize: '12px',
         fontWeight: 500,
-        color: '#888888',
+        color: '#9b9a97',
         letterSpacing: '0.04em',
         textTransform: 'uppercase',
         marginBottom: '6px',
@@ -52,19 +52,21 @@ function Input({
         height: '34px',
         padding: '0 10px',
         borderRadius: '6px',
-        background: 'rgba(0,0,0,0.3)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        color: '#EBEBEB',
+        background: 'rgba(55,53,47,0.04)',
+        border: '1px solid rgba(55,53,47,0.12)',
+        color: '#37352f',
         fontSize: '13px',
         outline: 'none',
         boxSizing: 'border-box',
-        transition: 'border-color 150ms ease',
+        transition: 'border-color 150ms ease, box-shadow 150ms ease',
       }}
       onFocus={(e) => {
-        e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.6)'
+        e.currentTarget.style.borderColor = 'rgba(94,106,210,0.35)'
+        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(94,106,210,0.10)'
       }}
       onBlur={(e) => {
-        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'
+        e.currentTarget.style.borderColor = 'rgba(55,53,47,0.12)'
+        e.currentTarget.style.boxShadow = 'none'
       }}
     />
   )
@@ -91,22 +93,24 @@ function Textarea({
         width: '100%',
         padding: '8px 10px',
         borderRadius: '6px',
-        background: 'rgba(0,0,0,0.3)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        color: '#EBEBEB',
+        background: 'rgba(55,53,47,0.04)',
+        border: '1px solid rgba(55,53,47,0.12)',
+        color: '#37352f',
         fontSize: '13px',
         outline: 'none',
         resize: 'vertical',
         boxSizing: 'border-box',
         lineHeight: 1.6,
-        transition: 'border-color 150ms ease',
+        transition: 'border-color 150ms ease, box-shadow 150ms ease',
         fontFamily: 'inherit',
       }}
       onFocus={(e) => {
-        e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.6)'
+        e.currentTarget.style.borderColor = 'rgba(94,106,210,0.35)'
+        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(94,106,210,0.10)'
       }}
       onBlur={(e) => {
-        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'
+        e.currentTarget.style.borderColor = 'rgba(55,53,47,0.12)'
+        e.currentTarget.style.boxShadow = 'none'
       }}
     />
   )
@@ -126,8 +130,8 @@ function SectionCard({
   return (
     <div
       style={{
-        background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255,255,255,0.06)',
+        background: 'var(--surface-1)',
+        border: '1px solid rgba(55,53,47,0.12)',
         borderRadius: '8px',
         overflow: 'hidden',
       }}
@@ -143,15 +147,15 @@ function SectionCard({
           backgroundColor: 'transparent',
           border: 'none',
           cursor: collapsible ? 'pointer' : 'default',
-          borderBottom: open ? '1px solid rgba(255,255,255,0.06)' : 'none',
+          borderBottom: open ? '1px solid rgba(55,53,47,0.09)' : 'none',
         }}
       >
-        <span style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB' }}>{title}</span>
+        <span style={{ fontSize: '13px', fontWeight: 600, color: '#37352f' }}>{title}</span>
         {collapsible &&
           (open ? (
-            <ChevronUp size={14} style={{ color: '#888' }} />
+            <ChevronUp size={14} style={{ color: '#9b9a97' }} />
           ) : (
-            <ChevronDown size={14} style={{ color: '#888' }} />
+            <ChevronDown size={14} style={{ color: '#9b9a97' }} />
           ))}
       </button>
       {open && <div style={{ padding: '16px' }}>{children}</div>}
@@ -193,19 +197,21 @@ function StringListEditor({
               justifyContent: 'center',
               borderRadius: '6px',
               backgroundColor: 'transparent',
-              border: '1px solid rgba(255,255,255,0.06)',
+              border: '1px solid rgba(55,53,47,0.12)',
               cursor: 'pointer',
-              color: '#555',
+              color: '#9b9a97',
               flexShrink: 0,
-              transition: 'color 150ms ease, background-color 150ms ease',
+              transition: 'color 150ms ease, background-color 150ms ease, border-color 150ms ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = '#EF4444'
-              e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.08)'
+              e.currentTarget.style.color = '#e03e3e'
+              e.currentTarget.style.backgroundColor = 'rgba(224,62,62,0.06)'
+              e.currentTarget.style.borderColor = 'rgba(224,62,62,0.2)'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.color = '#555'
+              e.currentTarget.style.color = '#9b9a97'
               e.currentTarget.style.backgroundColor = 'transparent'
+              e.currentTarget.style.borderColor = 'rgba(55,53,47,0.12)'
             }}
           >
             <Trash2 size={12} strokeWidth={2} />
@@ -223,19 +229,19 @@ function StringListEditor({
           width: 'fit-content',
           borderRadius: '6px',
           backgroundColor: 'transparent',
-          border: '1px dashed rgba(255,255,255,0.12)',
+          border: '1px dashed rgba(55,53,47,0.18)',
           cursor: 'pointer',
-          color: '#888',
+          color: '#787774',
           fontSize: '12px',
           transition: 'border-color 150ms ease, color 150ms ease',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = '#6366F1'
-          e.currentTarget.style.color = '#6366F1'
+          e.currentTarget.style.borderColor = '#5e6ad2'
+          e.currentTarget.style.color = '#5e6ad2'
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
-          e.currentTarget.style.color = '#888'
+          e.currentTarget.style.borderColor = 'rgba(55,53,47,0.18)'
+          e.currentTarget.style.color = '#787774'
         }}
       >
         <Plus size={12} strokeWidth={2.5} />
@@ -261,8 +267,8 @@ function ProductEditor({
   return (
     <div
       style={{
-        background: 'rgba(0,0,0,0.3)',
-        border: '1px solid rgba(255,255,255,0.08)',
+        background: '#f7f6f3',
+        border: '1px solid rgba(55,53,47,0.09)',
         borderRadius: '8px',
         padding: '14px',
         display: 'flex',
@@ -271,7 +277,7 @@ function ProductEditor({
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '12px', fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <span style={{ fontSize: '12px', fontWeight: 600, color: '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           Product {index + 1}
         </span>
         <button
@@ -285,12 +291,18 @@ function ProductEditor({
             backgroundColor: 'transparent',
             border: 'none',
             cursor: 'pointer',
-            color: '#555',
+            color: '#787774',
             fontSize: '12px',
-            transition: 'color 150ms ease',
+            transition: 'color 150ms ease, background-color 150ms ease',
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = '#EF4444' }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = '#555' }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = '#e03e3e'
+            e.currentTarget.style.backgroundColor = 'rgba(224,62,62,0.06)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = '#787774'
+            e.currentTarget.style.backgroundColor = 'transparent'
+          }}
         >
           <Trash2 size={11} strokeWidth={2} />
           Remove
@@ -499,6 +511,8 @@ export function CompanyForm({ initialData, onSave }: CompanyFormProps) {
     update({ products: form.products.filter((_, idx) => idx !== i) })
   }
 
+  const isDisabled = saving || !form.companyName.trim()
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Company basics */}
@@ -581,19 +595,19 @@ export function CompanyForm({ initialData, onSave }: CompanyFormProps) {
               width: 'fit-content',
               borderRadius: '6px',
               backgroundColor: 'transparent',
-              border: '1px dashed rgba(255,255,255,0.12)',
+              border: '1px dashed rgba(55,53,47,0.18)',
               cursor: 'pointer',
-              color: '#888',
+              color: '#787774',
               fontSize: '13px',
               transition: 'border-color 150ms ease, color 150ms ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#6366F1'
-              e.currentTarget.style.color = '#6366F1'
+              e.currentTarget.style.borderColor = '#5e6ad2'
+              e.currentTarget.style.color = '#5e6ad2'
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
-              e.currentTarget.style.color = '#888'
+              e.currentTarget.style.borderColor = 'rgba(55,53,47,0.18)'
+              e.currentTarget.style.color = '#787774'
             }}
           >
             <Plus size={14} strokeWidth={2.5} />
@@ -604,7 +618,7 @@ export function CompanyForm({ initialData, onSave }: CompanyFormProps) {
 
       {/* Value propositions */}
       <SectionCard title="Value propositions">
-        <p style={{ fontSize: '12px', color: '#555', margin: '0 0 10px' }}>
+        <p style={{ fontSize: '12px', color: '#787774', margin: '0 0 10px' }}>
           Your top-level value props — what makes you worth buying?
         </p>
         <StringListEditor
@@ -616,7 +630,7 @@ export function CompanyForm({ initialData, onSave }: CompanyFormProps) {
 
       {/* Differentiators */}
       <SectionCard title="Differentiators">
-        <p style={{ fontSize: '12px', color: '#555', margin: '0 0 10px' }}>
+        <p style={{ fontSize: '12px', color: '#787774', margin: '0 0 10px' }}>
           What makes you uniquely better than alternatives?
         </p>
         <StringListEditor
@@ -628,7 +642,7 @@ export function CompanyForm({ initialData, onSave }: CompanyFormProps) {
 
       {/* Common objections */}
       <SectionCard title="Common objections" collapsible>
-        <p style={{ fontSize: '12px', color: '#555', margin: '0 0 10px' }}>
+        <p style={{ fontSize: '12px', color: '#787774', margin: '0 0 10px' }}>
           Objections your team faces most often in deals.
         </p>
         <StringListEditor
@@ -663,28 +677,28 @@ export function CompanyForm({ initialData, onSave }: CompanyFormProps) {
       {/* Save status */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px' }}>
         {saving && (
-          <span style={{ fontSize: '12px', color: '#888' }}>Saving…</span>
+          <span style={{ fontSize: '12px', color: '#787774' }}>Saving…</span>
         )}
         <button
           onClick={() => save(form)}
-          disabled={saving || !form.companyName.trim()}
+          disabled={isDisabled}
           style={{
             height: '34px',
             padding: '0 16px',
             borderRadius: '6px',
             fontSize: '13px',
             fontWeight: 600,
-            color: '#fff',
-            backgroundColor: saving || !form.companyName.trim() ? '#333' : '#6366F1',
+            color: '#ffffff',
+            backgroundColor: isDisabled ? 'rgba(55,53,47,0.2)' : '#37352f',
             border: 'none',
-            cursor: saving || !form.companyName.trim() ? 'not-allowed' : 'pointer',
+            cursor: isDisabled ? 'not-allowed' : 'pointer',
             transition: 'background-color 150ms ease',
           }}
           onMouseEnter={(e) => {
-            if (!saving && form.companyName.trim()) e.currentTarget.style.backgroundColor = '#4F46E5'
+            if (!isDisabled) e.currentTarget.style.backgroundColor = '#2f2d28'
           }}
           onMouseLeave={(e) => {
-            if (!saving && form.companyName.trim()) e.currentTarget.style.backgroundColor = '#6366F1'
+            if (!isDisabled) e.currentTarget.style.backgroundColor = '#37352f'
           }}
         >
           Save profile

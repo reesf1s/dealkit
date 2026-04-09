@@ -7,9 +7,10 @@ import Link from 'next/link'
 import {
   Brain, TrendingUp, Target, Zap, Star, BarChart3, Award, AlertTriangle,
   CheckCircle, Clock, ArrowUpRight, ChevronRight, Lock, Info, Activity,
-  Database, Cpu, Shield, GitBranch, Users, Swords, BookOpen,
+  Database, Cpu, Shield, GitBranch, Users, Swords, BookOpen, Globe,
 } from 'lucide-react'
 import { PageTabs } from '@/components/shared/PageTabs'
+import { fetcher } from '@/lib/fetcher'
 
 // ── Forecast accuracy types ───────────────────────────────────────────────────
 interface BucketData { bucket: string; predicted: number; wonRate: number }
@@ -22,8 +23,6 @@ interface ForecastAccuracy {
   recentCalibration: CalibrationMonth[]
 }
 
-const fetcher = (url: string) => fetch(url).then(r => r.json())
-
 // ── Tooltip helper ────────────────────────────────────────────────────────────
 function Tooltip({ text, children }: { text: string; children: React.ReactNode }) {
   const [show, setShow] = useState(false)
@@ -34,9 +33,9 @@ function Tooltip({ text, children }: { text: string; children: React.ReactNode }
         <div style={{
           position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
           marginBottom: '8px', zIndex: 50, width: '256px', borderRadius: '8px',
-          background: '#18181b', border: '1px solid #3f3f46',
-          padding: '8px 12px', fontSize: '12px', color: '#d4d4d8',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+          background: '#37352f', border: '1px solid rgba(55,53,47,0.16)',
+          padding: '8px 12px', fontSize: '12px', color: '#ffffff',
+          boxShadow: '0 8px 24px rgba(55,53,47,0.16)',
         }}>
           {text}
         </div>
@@ -56,10 +55,10 @@ function InfoButton({ text }: { text: string }) {
 }
 
 // ── Mini bar chart component ──────────────────────────────────────────────────
-function BarChart({ value, max, color = 'var(--accent)' }: { value: number; max: number; color?: string }) {
+function BarChart({ value, max, color = '#5e6ad2' }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0
   return (
-    <div style={{ height: '6px', borderRadius: '3px', background: 'var(--border)', overflow: 'hidden', flex: 1 }}>
+    <div style={{ height: '6px', borderRadius: '3px', background: 'rgba(55,53,47,0.09)', overflow: 'hidden', flex: 1 }}>
       <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '3px', transition: 'width 0.6s ease-out' }} />
     </div>
   )
@@ -70,10 +69,10 @@ function AccuracyRing({ pct }: { pct: number }) {
   const r = 52
   const circ = 2 * Math.PI * r
   const dash = (pct / 100) * circ
-  const color = pct >= 70 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)'
+  const color = pct >= 70 ? '#0f7b6c' : pct >= 50 ? '#cb6c2c' : '#e03e3e'
   return (
     <svg width="128" height="128" viewBox="0 0 128 128" style={{ transform: 'rotate(-90deg)' }}>
-      <circle cx="64" cy="64" r={r} fill="none" stroke="var(--border)" strokeWidth="8" />
+      <circle cx="64" cy="64" r={r} fill="none" stroke="rgba(55,53,47,0.09)" strokeWidth="8" />
       <circle cx="64" cy="64" r={r} fill="none" stroke={color} strokeWidth="8"
         strokeDasharray={`${dash} ${circ - dash}`} strokeLinecap="round"
         style={{ transition: 'stroke-dasharray 0.8s ease-out' }} />
@@ -135,11 +134,11 @@ function MilestoneRoadmap({ trainingSize }: { trainingSize: number }) {
       {/* Track */}
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
         {/* Background line */}
-        <div style={{ position: 'absolute', left: '16px', right: '16px', height: '2px', background: 'var(--border)', top: '16px' }} />
+        <div style={{ position: 'absolute', left: '16px', right: '16px', height: '2px', background: 'rgba(55,53,47,0.09)', top: '16px' }} />
         {/* Progress fill */}
         <div style={{
           position: 'absolute', left: '16px', height: '2px',
-          background: 'var(--success)', top: '16px',
+          background: '#0f7b6c', top: '16px',
           width: `${Math.min(100, (trainingSize / 50) * 100)}%`,
           maxWidth: 'calc(100% - 32px)',
           transition: 'width 0.1s ease',
@@ -153,8 +152,8 @@ function MilestoneRoadmap({ trainingSize }: { trainingSize: number }) {
               <div key={threshold} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '32px' }}>
                 <div style={{
                   width: '32px', height: '32px', borderRadius: '50%',
-                  background: isPast ? 'var(--success)' : 'var(--card-bg)',
-                  border: `2px solid ${isPast ? 'var(--success)' : isCurrent ? 'var(--accent)' : 'var(--border)'}`,
+                  background: isPast ? '#0f7b6c' : '#ffffff',
+                  border: `2px solid ${isPast ? '#0f7b6c' : isCurrent ? '#5e6ad2' : 'rgba(55,53,47,0.16)'}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   transition: 'all 0.1s ease',
                   flexShrink: 0,
@@ -162,7 +161,7 @@ function MilestoneRoadmap({ trainingSize }: { trainingSize: number }) {
                   {isPast && idx > 0
                     ? <CheckCircle size={14} style={{ color: '#fff' }} />
                     : idx === 0
-                      ? <span style={{ fontSize: '10px', fontWeight: '600', color: trainingSize >= 10 ? '#fff' : 'var(--accent)' }}>{trainingSize}</span>
+                      ? <span style={{ fontSize: '10px', fontWeight: '600', color: trainingSize >= 10 ? '#fff' : '#5e6ad2' }}>{trainingSize}</span>
                       : <Lock size={12} style={{ color: 'var(--text-tertiary)' }} />
                   }
                 </div>
@@ -180,12 +179,12 @@ function MilestoneRoadmap({ trainingSize }: { trainingSize: number }) {
           return (
             <div key={idx} style={{
               padding: '12px',
-              borderRadius: '10px',
-              background: isCurrent ? 'color-mix(in srgb, var(--accent) 8%, transparent)' : isPast ? 'color-mix(in srgb, var(--success) 6%, transparent)' : 'var(--surface)',
-              border: `1px solid ${isCurrent ? 'color-mix(in srgb, var(--accent) 20%, transparent)' : isPast ? 'color-mix(in srgb, var(--success) 15%, transparent)' : 'var(--border)'}`,
+              borderRadius: '8px',
+              background: isCurrent ? 'rgba(94,106,210,0.06)' : isPast ? 'rgba(15,123,108,0.06)' : '#f7f6f3',
+              border: `1px solid ${isCurrent ? 'rgba(94,106,210,0.16)' : isPast ? 'rgba(15,123,108,0.16)' : 'rgba(55,53,47,0.09)'}`,
               opacity: (!isCurrent && !isPast) ? 0.6 : 1,
             }}>
-              <div style={{ fontSize: '10px', fontWeight: '600', color: isCurrent ? 'var(--accent)' : isPast ? 'var(--success)' : 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>
+              <div style={{ fontSize: '10px', fontWeight: '600', color: isCurrent ? '#5e6ad2' : isPast ? '#0f7b6c' : '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>
                 {m.label}
               </div>
               <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '6px' }}>
@@ -194,7 +193,7 @@ function MilestoneRoadmap({ trainingSize }: { trainingSize: number }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                 {m.bullets.map((b, bi) => (
                   <div key={bi} style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
-                    <span style={{ color: isCurrent ? 'var(--accent)' : isPast ? 'var(--success)' : 'var(--text-tertiary)', marginTop: '1px' }}>•</span>
+                    <span style={{ color: isCurrent ? '#5e6ad2' : isPast ? '#0f7b6c' : '#9b9a97', marginTop: '1px' }}>•</span>
                     {b}
                   </div>
                 ))}
@@ -276,28 +275,24 @@ function ModelGrid({ trainingSize, brainData }: { trainingSize: number; brainDat
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
       {models.map((model, i) => {
         const { status, output } = getModelStatus(model)
-        const dotColor = status === 'active' ? 'var(--success)' : status === 'warming' ? 'var(--warning)' : 'var(--border)'
+        const dotColor = status === 'active' ? '#0f7b6c' : status === 'warming' ? '#cb6c2c' : 'rgba(55,53,47,0.16)'
         const statusText = status === 'active' ? 'Active' : status === 'warming' ? 'Warming Up' : `Locked`
-        const statusColor = status === 'active' ? 'var(--success)' : status === 'warming' ? 'var(--warning)' : 'var(--text-tertiary)'
+        const statusColor = status === 'active' ? '#0f7b6c' : status === 'warming' ? '#cb6c2c' : '#9b9a97'
         return (
           <div key={i} style={{
             padding: '14px',
-            borderRadius: '12px',
-            background: 'var(--glass-card-bg)',
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            border: `1px solid var(--glass-card-border)`,
+            borderRadius: '8px',
+            background: 'var(--surface-1)',
+            border: `1px solid rgba(55,53,47,0.12)`,
+            boxShadow: status === 'active'
+              ? '0 1px 3px rgba(55,53,47,0.06)'
+              : '0 1px 3px rgba(55,53,47,0.04)',
             opacity: status === 'locked' ? 0.65 : 1,
             transition: 'opacity 0.1s ease',
-            boxShadow: status === 'active'
-              ? '0 0 16px var(--glass-glow-success, rgba(60,203,127,0.12))'
-              : status === 'warming'
-                ? '0 0 16px var(--glass-glow-warning, rgba(245,158,11,0.08))'
-                : 'var(--glow-grey, 0 0 8px rgba(255,255,255,0.02))',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{ color: status === 'active' ? 'var(--accent)' : 'var(--text-tertiary)' }}>
+                <div style={{ color: status === 'active' ? '#5e6ad2' : '#9b9a97' }}>
                   {model.icon}
                 </div>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
@@ -353,7 +348,7 @@ function FeatureImportanceChart({ features, isPlaceholder }: { features: { name:
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       {isPlaceholder && (
-        <div style={{ fontSize: '11px', color: 'var(--warning)', background: 'color-mix(in srgb, var(--warning) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--warning) 20%, transparent)', borderRadius: '6px', padding: '6px 10px', marginBottom: '4px' }}>
+        <div style={{ fontSize: '11px', color: '#cb6c2c', background: 'rgba(203,108,44,0.08)', border: '1px solid rgba(203,108,44,0.20)', borderRadius: '6px', padding: '6px 10px', marginBottom: '4px' }}>
           Example — unlocks with your data at 10+ closed deals
         </div>
       )}
@@ -362,15 +357,15 @@ function FeatureImportanceChart({ features, isPlaceholder }: { features: { name:
         const barWidth = mounted ? Math.min(100, f.pct) : 0
         const isPositive = f.direction !== 'negative'
         const barColor = isPlaceholder
-          ? 'rgba(255,255,255,0.25)'
-          : isPositive ? '#34d399' : '#f87171'
+          ? 'rgba(55,53,47,0.15)'
+          : isPositive ? '#0f7b6c' : '#e03e3e'
         return (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '160px', fontSize: '12px', fontWeight: '500', color: isPlaceholder ? 'var(--text-secondary)' : 'var(--text-primary)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <div style={{ width: '160px', fontSize: '12px', fontWeight: '500', color: isPlaceholder ? '#787774' : '#37352f', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px' }}>
               {f.name}
               <InfoButton text={tooltip} />
             </div>
-            <div style={{ flex: 1, height: '8px', borderRadius: '4px', background: 'rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+            <div style={{ flex: 1, height: '8px', borderRadius: '4px', background: 'rgba(55,53,47,0.07)', overflow: 'hidden' }}>
               <div style={{
                 height: '100%', width: `${barWidth}%`,
                 background: barColor,
@@ -378,7 +373,7 @@ function FeatureImportanceChart({ features, isPlaceholder }: { features: { name:
                 transition: 'width 0.6s ease-out',
               }} />
             </div>
-            <div style={{ width: '40px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: isPlaceholder ? 'var(--text-secondary)' : barColor, flexShrink: 0, fontFamily: 'var(--font-mono, monospace)' }}>
+            <div style={{ width: '40px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: isPlaceholder ? '#787774' : barColor, flexShrink: 0, fontFamily: 'var(--font-mono, monospace)' }}>
               {f.pct}%
             </div>
           </div>
@@ -403,9 +398,9 @@ function CalibrationBucketChart({ buckets }: { buckets: BucketData[] }) {
             <div style={{ width: '52px', fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', flexShrink: 0, fontFamily: 'var(--font-mono, monospace)' }}>
               {b.bucket}
             </div>
-            <div style={{ flex: 1, position: 'relative', height: '20px', borderRadius: '4px', background: 'var(--border)', overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', inset: 0, width: `${barPct}%`, background: 'color-mix(in srgb, var(--accent) 20%, transparent)', transition: 'width 0.6s ease-out' }} />
-              <div style={{ position: 'absolute', inset: 0, width: `${wonPct}%`, background: b.predicted > 0 ? 'var(--accent)' : 'transparent', opacity: 0.9, transition: 'width 0.6s ease-out' }} />
+            <div style={{ flex: 1, position: 'relative', height: '20px', borderRadius: '4px', background: 'rgba(55,53,47,0.07)', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', inset: 0, width: `${barPct}%`, background: 'rgba(94,106,210,0.15)', transition: 'width 0.6s ease-out' }} />
+              <div style={{ position: 'absolute', inset: 0, width: `${wonPct}%`, background: b.predicted > 0 ? '#5e6ad2' : 'transparent', opacity: 0.9, transition: 'width 0.6s ease-out' }} />
             </div>
             <div style={{ width: '72px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', flexShrink: 0, fontFamily: 'var(--font-mono, monospace)' }}>
               {b.predicted > 0 ? `${wonPct}% won` : '—'}
@@ -416,7 +411,7 @@ function CalibrationBucketChart({ buckets }: { buckets: BucketData[] }) {
           </div>
         )
       })}
-      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', paddingTop: '4px', borderTop: '1px solid var(--border)' }}>
+      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', paddingTop: '4px', borderTop: '1px solid rgba(55,53,47,0.09)' }}>
         Bar width = deal count. Fill = actual win rate. Ideal: win rate rises with score bucket.
       </div>
     </div>
@@ -442,30 +437,30 @@ function ForecastCalibrationChart({ points }: { points: CalibrationMonth[] }) {
   return (
     <div>
       <svg width={w} height={h} style={{ overflow: 'visible', display: 'block' }}>
-        <line x1={padX} y1={h - padY} x2={w - padX} y2={h - padY} stroke="var(--border)" strokeWidth="1" />
-        <path d={toPath(predictedYs)} fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round" strokeLinejoin="round" />
-        <path d={toPath(actualYs)} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <line x1={padX} y1={h - padY} x2={w - padX} y2={h - padY} stroke="rgba(55,53,47,0.09)" strokeWidth="1" />
+        <path d={toPath(predictedYs)} fill="none" stroke="#9b9a97" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={toPath(actualYs)} fill="none" stroke="#5e6ad2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         {points.map((p, i) => (
           <g key={i}>
-            <circle cx={xs[i]} cy={predictedYs[i]} r="3" fill="var(--card-bg)" stroke="var(--text-tertiary)" strokeWidth="1.5" />
-            <circle cx={xs[i]} cy={actualYs[i]} r="3" fill="var(--accent)" />
+            <circle cx={xs[i]} cy={predictedYs[i]} r="3" fill="#ffffff" stroke="#9b9a97" strokeWidth="1.5" />
+            <circle cx={xs[i]} cy={actualYs[i]} r="3" fill="#5e6ad2" />
           </g>
         ))}
         {[0, Math.floor((points.length - 1) / 2), points.length - 1]
           .filter((idx, pos, arr) => arr.indexOf(idx) === pos && idx < points.length)
           .map(idx => (
-            <text key={idx} x={xs[idx]} y={h} textAnchor="middle" fontSize="9" fill="var(--text-tertiary)">
+            <text key={idx} x={xs[idx]} y={h} textAnchor="middle" fontSize="9" fill="#9b9a97">
               {points[idx].month}
             </text>
           ))}
       </svg>
       <div style={{ display: 'flex', gap: '16px', marginTop: '6px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--text-secondary)' }}>
-          <div style={{ width: '20px', height: '2px', background: 'var(--text-tertiary)', borderTop: '2px dashed var(--text-tertiary)' }} />
+          <div style={{ width: '20px', height: '2px', background: '#9b9a97', borderTop: '2px dashed #9b9a97' }} />
           Avg predicted score
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--text-secondary)' }}>
-          <div style={{ width: '20px', height: '2px', background: 'var(--accent)' }} />
+          <div style={{ width: '20px', height: '2px', background: '#5e6ad2' }} />
           Actual win rate ×100
         </div>
       </div>
@@ -487,77 +482,137 @@ function CalibrationChart({ points }: { points: { discrimination?: number; month
   const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
   return (
     <svg width={w} height={h} style={{ overflow: 'visible' }}>
-      <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="var(--border)" strokeWidth="1" />
-      <path d={pathD} fill="none" stroke="var(--data-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="rgba(55,53,47,0.09)" strokeWidth="1" />
+      <path d={pathD} fill="none" stroke="#5e6ad2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       {pts.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r="3" fill={p.val >= 0 ? 'var(--success)' : 'var(--danger)'} />
+        <circle key={i} cx={p.x} cy={p.y} r="3" fill={p.val >= 0 ? '#0f7b6c' : '#e03e3e'} />
       ))}
     </svg>
   )
 }
 
 // ── Global Benchmarks Card ────────────────────────────────────────────────────
-function GlobalBenchmarksCard({ winRate, avgClose, mlAccuracy }: { winRate: number | null; avgClose: number | null; mlAccuracy: number | null }) {
-  const [showMsg, setShowMsg] = useState(false)
+function GlobalBenchmarksCard({
+  winPct, avgClose, avgDealValue, benchmarkRes,
+}: {
+  winPct: number | null
+  avgClose: number | null
+  avgDealValue: number | null
+  benchmarkRes: { available: boolean; benchmarks?: { winRate: number; avgCycleLength: number; topRiskThemes: string[]; avgDealValue: number; poolSize: number; cachedAt: string } } | undefined
+}) {
+  if (!benchmarkRes || !benchmarkRes.available || !benchmarkRes.benchmarks) return null
+
+  const b = benchmarkRes.benchmarks
+
+  const fmtCurrency = (v: number) => {
+    if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`
+    if (v >= 1_000) return `$${Math.round(v / 1_000)}k`
+    return `$${Math.round(v)}`
+  }
+
+  const rows: { label: string; yours: string | null; benchmark: string; delta: string | null; positive: boolean | null }[] = [
+    {
+      label: 'Win Rate',
+      yours: winPct != null ? `${winPct}%` : null,
+      benchmark: `${Math.round(b.winRate)}%`,
+      delta: winPct != null ? `${winPct - Math.round(b.winRate) >= 0 ? '+' : ''}${winPct - Math.round(b.winRate)}pp` : null,
+      positive: winPct != null ? winPct >= b.winRate : null,
+    },
+    {
+      label: 'Avg Cycle Length',
+      yours: avgClose != null ? `${avgClose} days` : null,
+      benchmark: `${Math.round(b.avgCycleLength)} days`,
+      delta: avgClose != null ? `${avgClose - Math.round(b.avgCycleLength) <= 0 ? '' : '+'}${avgClose - Math.round(b.avgCycleLength)} days` : null,
+      positive: avgClose != null ? avgClose <= b.avgCycleLength : null,
+    },
+    {
+      label: 'Avg Deal Value',
+      yours: avgDealValue != null ? fmtCurrency(avgDealValue) : null,
+      benchmark: fmtCurrency(b.avgDealValue),
+      delta: avgDealValue != null ? `${avgDealValue >= b.avgDealValue ? '+' : '-'}${fmtCurrency(Math.abs(avgDealValue - b.avgDealValue))}` : null,
+      positive: avgDealValue != null ? avgDealValue >= b.avgDealValue : null,
+    },
+  ]
 
   return (
     <div style={{
-      background: 'var(--card-bg)', border: 'none',
-      borderRadius: '8px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px',
+      background: 'var(--surface-1)', border: '1px solid rgba(55,53,47,0.12)',
+      borderRadius: '8px', padding: '24px', boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
+      display: 'flex', flexDirection: 'column', gap: '16px',
     }}>
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Globe size={14} style={{ color: 'var(--text-tertiary)' }} />
           <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            Global Benchmarks
+            Industry Benchmarks
           </div>
-          <InfoButton text="Compare your performance to similar B2B companies — opt in to contribute anonymous deal outcomes" />
-        </div>
-        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '3px 8px' }}>
-          Coming soon
+          <InfoButton text="Compare your performance to anonymised industry averages from similar B2B workspaces" />
         </div>
       </div>
-      <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, maxWidth: '520px' }}>
-        Contribute anonymous deal outcomes to the global model. In return, see how your performance compares to similar companies. Your data is anonymised — no deal names, companies, or notes are shared.
-      </div>
-      {/* Blurred preview metrics */}
-      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-        {[
-          { label: 'Your win rate', yours: winRate != null ? `${winRate}%` : '--%', benchmark: '52%' },
-          { label: 'Avg close time', yours: avgClose != null ? `${avgClose} days` : '-- days', benchmark: '45 days' },
-          { label: 'Model accuracy', yours: mlAccuracy != null ? `${mlAccuracy}%` : '--%', benchmark: '61%' },
-        ].map((m, i) => (
+
+      {/* Comparison grid */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+        {/* Column headers */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px', padding: '0 12px 8px', borderBottom: '1px solid rgba(55,53,47,0.09)' }}>
+          <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Metric</div>
+          <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>You</div>
+          <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Industry</div>
+          <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Delta</div>
+        </div>
+        {rows.map((row, i) => (
           <div key={i} style={{
-            flex: 1, minWidth: '140px', padding: '12px', borderRadius: '10px',
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            position: 'relative', overflow: 'hidden',
+            display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px',
+            padding: '10px 12px', borderBottom: i < rows.length - 1 ? '1px solid rgba(55,53,47,0.06)' : 'none',
           }}>
-            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '6px' }}>{m.label}</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-              <span style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)', fontFamily: 'var(--font-mono, monospace)' }}>{m.yours}</span>
-              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>vs</span>
-              <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono, monospace)', filter: 'blur(4px)', userSelect: 'none' }}>{m.benchmark}</span>
+            <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)' }}>{row.label}</div>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', fontFamily: 'var(--font-mono, monospace)' }}>
+              {row.yours ?? '--'}
             </div>
-            <div style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginTop: '2px' }}>Benchmark: opt in to reveal</div>
+            <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono, monospace)' }}>
+              {row.benchmark}
+            </div>
+            <div style={{
+              fontSize: '13px', fontWeight: '600', fontFamily: 'var(--font-mono, monospace)',
+              color: row.positive === null ? 'var(--text-tertiary)' : row.positive ? '#0f7b6c' : '#e03e3e',
+            }}>
+              {row.delta ?? '--'}
+            </div>
           </div>
         ))}
       </div>
-      <div>
-        {showMsg ? (
-          <div style={{ fontSize: '12px', color: 'var(--warning)', padding: '8px 12px', background: 'color-mix(in srgb, var(--warning) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--warning) 20%, transparent)', borderRadius: '8px' }}>
-            Coming soon — benchmarking will be available once global data accumulates.
+
+      {/* Pool size note */}
+      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', lineHeight: 1.5 }}>
+        Based on {b.poolSize.toLocaleString()} anonymised workspaces
+      </div>
+
+      {/* Top risk themes */}
+      {b.topRiskThemes.length > 0 && (
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+            Top Risk Themes (Industry)
           </div>
-        ) : (
-          <button
-            onClick={() => setShowMsg(true)}
-            style={{
-              padding: '8px 18px', borderRadius: '8px',
-              background: 'var(--accent-subtle)', border: '1px solid var(--accent)',
-              color: 'var(--accent)', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
-            }}
-          >
-            Enable Benchmarks
-          </button>
-        )}
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {b.topRiskThemes.map((theme, i) => (
+              <span key={i} style={{
+                fontSize: '11px', padding: '3px 10px', borderRadius: '6px',
+                background: 'rgba(224,62,62,0.08)', border: '1px solid rgba(224,62,62,0.16)',
+                color: '#e03e3e', fontWeight: '500',
+              }}>
+                {theme}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Opt-in note */}
+      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', lineHeight: 1.5 }}>
+        Manage benchmark participation in{' '}
+        <Link href="/settings" style={{ color: '#5e6ad2', textDecoration: 'none', fontWeight: '500' }}>
+          Settings &rarr; Industry Intelligence
+        </Link>
       </div>
     </div>
   )
@@ -573,14 +628,14 @@ export default function ModelsPage() {
   const [selectedArchetype, setSelectedArchetype] = useState<number | null>(null)
   const { data: forecastRes } = useSWR<{ data: ForecastAccuracy }>('/api/models/forecast-accuracy', fetcher, { revalidateOnFocus: false })
   const forecastData = forecastRes?.data
+  const { data: benchmarkRes } = useSWR<{ available: boolean; benchmarks?: { winRate: number; avgCycleLength: number; topRiskThemes: string[]; avgDealValue: number; poolSize: number; cachedAt: string } }>('/api/global/benchmarks', fetcher, { revalidateOnFocus: false })
 
   const cardStyle: React.CSSProperties = {
-    background: 'var(--glass-card-bg)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid var(--glass-card-border)',
-    borderRadius: '12px',
+    background: 'var(--surface-1)',
+    border: '1px solid rgba(55,53,47,0.12)',
+    borderRadius: '8px',
     padding: '24px',
+    boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
@@ -594,9 +649,9 @@ export default function ModelsPage() {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         {[1, 2, 3, 4].map(i => (
-          <div key={i} style={{ ...cardStyle, height: i === 1 ? '200px' : '160px', background: 'var(--skeleton-from)' }}>
-            <div style={{ width: '60%', height: '16px', borderRadius: '8px', background: 'var(--skeleton-mid)' }} />
-            <div style={{ width: '40%', height: '40px', borderRadius: '8px', background: 'var(--skeleton-mid)' }} />
+          <div key={i} style={{ ...cardStyle, height: i === 1 ? '200px' : '160px', background: '#f7f6f3' }}>
+            <div style={{ width: '60%', height: '16px', borderRadius: '8px', background: 'rgba(55,53,47,0.07)' }} />
+            <div style={{ width: '40%', height: '40px', borderRadius: '8px', background: 'rgba(55,53,47,0.07)' }} />
           </div>
         ))}
       </div>
@@ -669,9 +724,9 @@ export default function ModelsPage() {
 
       {/* ── ML Milestone celebration banner ── */}
       {showMlMilestoneBanner && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 20px', borderRadius: '8px', background: 'linear-gradient(135deg, color-mix(in srgb, var(--success) 10%, transparent) 0%, color-mix(in srgb, var(--accent) 8%, transparent) 100%)', border: '1px solid color-mix(in srgb, var(--success) 25%, transparent)' }}>
-          <div style={{ flexShrink: 0, width: '36px', height: '36px', borderRadius: '10px', background: 'color-mix(in srgb, var(--success) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 30%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Award size={18} style={{ color: 'var(--success)' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 20px', borderRadius: '8px', background: 'rgba(15,123,108,0.06)', border: '1px solid rgba(15,123,108,0.20)' }}>
+          <div style={{ flexShrink: 0, width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(15,123,108,0.10)', border: '1px solid rgba(15,123,108,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Award size={18} style={{ color: '#0f7b6c' }} />
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '2px' }}>Your ML model is now active!</div>
@@ -688,14 +743,14 @@ export default function ModelsPage() {
       {/* ── Header ── */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'var(--accent-subtle)', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Brain size={20} style={{ color: 'var(--accent)' }} />
+          <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'rgba(94,106,210,0.08)', border: '1px solid rgba(94,106,210,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Brain size={20} style={{ color: '#5e6ad2' }} />
           </div>
           <div>
-            <h1 style={{ fontSize: '28px', fontWeight: '500', letterSpacing: '0.01em', color: 'var(--text-primary)', lineHeight: 1.1 }} className="font-brand">
+            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1, margin: 0 }} className="font-brand">
               Your ML Model
             </h1>
-            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '2px', margin: 0 }}>
               Nine private models training exclusively on your closed deals — gets smarter every month
             </p>
           </div>
@@ -725,7 +780,7 @@ export default function ModelsPage() {
                 </div>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                    Your model correctly predicts deal outcomes <strong>{accuracy}%</strong> of the time on held-out deals.
+                    Your model correctly predicts deal outcomes <strong style={{ color: 'var(--text-primary)' }}>{accuracy}%</strong> of the time on held-out deals.
                   </div>
                   {ml?.trainingSize && (
                     <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
@@ -733,7 +788,7 @@ export default function ModelsPage() {
                     </div>
                   )}
                   {ml?.usingGlobalPrior && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--data-accent)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#2e78c6' }}>
                       <Zap size={10} /> Bayesian blend with global benchmarks active
                     </div>
                   )}
@@ -741,15 +796,15 @@ export default function ModelsPage() {
               </div>
               {/* Calibration display */}
               {highScoreWinRate != null && (
-                <div style={{ padding: '12px', background: 'var(--surface)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                <div style={{ padding: '12px', background: '#f7f6f3', borderRadius: '8px', border: '1px solid rgba(55,53,47,0.09)' }}>
                   <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Score Calibration</div>
                   <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      Deals scored <strong style={{ color: 'var(--success)' }}>70+</strong>: <strong>{Math.round(highScoreWinRate)}%</strong> actually closed
+                      Deals scored <strong style={{ color: '#0f7b6c' }}>70+</strong>: <strong style={{ color: 'var(--text-primary)' }}>{Math.round(highScoreWinRate)}%</strong> actually closed
                     </div>
                     {lowScoreWinRate != null && (
                       <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                        Deals scored <strong style={{ color: 'var(--danger)' }}>30−</strong>: <strong>{Math.round(lowScoreWinRate)}%</strong> actually closed
+                        Deals scored <strong style={{ color: '#e03e3e' }}>30−</strong>: <strong style={{ color: 'var(--text-primary)' }}>{Math.round(lowScoreWinRate)}%</strong> actually closed
                       </div>
                     )}
                   </div>
@@ -759,7 +814,7 @@ export default function ModelsPage() {
           ) : (
             <>
               <div style={{ textAlign: 'center', padding: '16px 8px 8px', color: 'var(--text-tertiary)', fontSize: '13px' }}>
-                <Lock size={28} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.3 }} />
+                <Lock size={28} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.3, color: 'var(--text-tertiary)' }} />
                 <div style={{ fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '4px' }}>Close 10+ deals to activate</div>
                 <div style={{ fontSize: '11px' }}>
                   {(() => {
@@ -792,29 +847,29 @@ export default function ModelsPage() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ textAlign: 'center', flex: 1, padding: '12px', background: 'color-mix(in srgb, var(--success) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)', borderRadius: '10px' }}>
-                <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--success)', lineHeight: 1 }} className="font-mono">{wl?.winCount ?? 0}</div>
+              <div style={{ textAlign: 'center', flex: 1, padding: '12px', background: 'rgba(15,123,108,0.08)', border: '1px solid rgba(15,123,108,0.20)', borderRadius: '8px' }}>
+                <div style={{ fontSize: '28px', fontWeight: '700', color: '#0f7b6c', lineHeight: 1 }} className="font-mono">{wl?.winCount ?? 0}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>Wins</div>
               </div>
-              <div style={{ textAlign: 'center', flex: 1, padding: '12px', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)', borderRadius: '10px' }}>
-                <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--danger)', lineHeight: 1 }} className="font-mono">{wl?.lossCount ?? 0}</div>
+              <div style={{ textAlign: 'center', flex: 1, padding: '12px', background: 'rgba(224,62,62,0.08)', border: '1px solid rgba(224,62,62,0.20)', borderRadius: '8px' }}>
+                <div style={{ fontSize: '28px', fontWeight: '700', color: '#e03e3e', lineHeight: 1 }} className="font-mono">{wl?.lossCount ?? 0}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>Losses</div>
               </div>
             </div>
 
             {/* Ratio warning */}
             {totalClosed > 0 && (wl?.lossCount ?? 0) === 0 && (
-              <div style={{ fontSize: '11px', color: 'var(--warning)', padding: '8px 10px', background: 'color-mix(in srgb, var(--warning) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--warning) 20%, transparent)', borderRadius: '8px', lineHeight: 1.5 }}>
+              <div style={{ fontSize: '11px', color: '#cb6c2c', padding: '8px 10px', background: 'rgba(203,108,44,0.08)', border: '1px solid rgba(203,108,44,0.20)', borderRadius: '8px', lineHeight: 1.5 }}>
                 Your model needs loss data too. Log deals you&apos;ve lost to improve risk detection.
               </div>
             )}
             {totalClosed >= 5 && winPct != null && winPct > 80 && (wl?.lossCount ?? 0) > 0 && (
-              <div style={{ fontSize: '11px', color: 'var(--warning)', padding: '8px 10px', background: 'color-mix(in srgb, var(--warning) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--warning) 20%, transparent)', borderRadius: '8px', lineHeight: 1.5 }}>
+              <div style={{ fontSize: '11px', color: '#cb6c2c', padding: '8px 10px', background: 'rgba(203,108,44,0.08)', border: '1px solid rgba(203,108,44,0.20)', borderRadius: '8px', lineHeight: 1.5 }}>
                 Win-heavy data ({winPct}% wins). Adding more loss examples will sharpen risk detection.
               </div>
             )}
             {totalClosed >= 5 && winPct != null && winPct < 20 && (
-              <div style={{ fontSize: '11px', color: 'var(--warning)', padding: '8px 10px', background: 'color-mix(in srgb, var(--warning) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--warning) 20%, transparent)', borderRadius: '8px', lineHeight: 1.5 }}>
+              <div style={{ fontSize: '11px', color: '#cb6c2c', padding: '8px 10px', background: 'rgba(203,108,44,0.08)', border: '1px solid rgba(203,108,44,0.20)', borderRadius: '8px', lineHeight: 1.5 }}>
                 Loss-heavy data ({100 - winPct}% losses). Adding more wins will help the model learn success patterns.
               </div>
             )}
@@ -830,12 +885,12 @@ export default function ModelsPage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{totalClosed} deals total</div>
-                    {totalClosed < 100 && <div style={{ fontSize: '11px', color: 'var(--accent)' }}>Next: {next.label} at {next.n}</div>}
+                    {totalClosed < 100 && <div style={{ fontSize: '11px', color: '#5e6ad2' }}>Next: {next.label} at {next.n}</div>}
                   </div>
                   {/* Bar with milestone tick marks */}
                   <div style={{ position: 'relative', height: '8px' }}>
-                    <div style={{ height: '6px', marginTop: '1px', borderRadius: '3px', background: 'var(--border)', overflow: 'hidden', position: 'relative' }}>
-                      <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, var(--accent), var(--data-accent))', borderRadius: '3px', transition: 'width 0.6s ease-out' }} />
+                    <div style={{ height: '6px', marginTop: '1px', borderRadius: '3px', background: 'rgba(55,53,47,0.09)', overflow: 'hidden', position: 'relative' }}>
+                      <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, #5e6ad2, #2e78c6)', borderRadius: '3px', transition: 'width 0.6s ease-out' }} />
                     </div>
                     {/* Milestone ticks at 10, 20, 50 — relative to segment */}
                     {[10, 20, 50].map(threshold => {
@@ -844,7 +899,7 @@ export default function ModelsPage() {
                       return (
                         <div key={threshold} style={{
                           position: 'absolute', top: 0, left: `${tickPct}%`,
-                          width: '1px', height: '8px', background: 'var(--border)',
+                          width: '1px', height: '8px', background: 'rgba(55,53,47,0.16)',
                           transform: 'translateX(-50%)',
                         }} />
                       )
@@ -852,8 +907,8 @@ export default function ModelsPage() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
                     {milestones.map(m => (
-                      <div key={m.n} style={{ fontSize: '9px', color: totalClosed >= m.n ? 'var(--success)' : 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                        {totalClosed >= m.n ? <CheckCircle size={8} /> : <div style={{ width: '8px', height: '8px', borderRadius: '50%', border: '1px solid var(--border)' }} />}
+                      <div key={m.n} style={{ fontSize: '9px', color: totalClosed >= m.n ? '#0f7b6c' : '#9b9a97', display: 'flex', alignItems: 'center', gap: '2px' }}>
+                        {totalClosed >= m.n ? <CheckCircle size={8} /> : <div style={{ width: '8px', height: '8px', borderRadius: '50%', border: '1px solid rgba(55,53,47,0.16)' }} />}
                         {m.n}
                       </div>
                     ))}
@@ -863,7 +918,7 @@ export default function ModelsPage() {
             })()}
 
             {/* Recent training data */}
-            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', paddingTop: '8px', borderTop: '1px solid rgba(55,53,47,0.09)' }}>
               {closedDeals.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                   <span style={{ fontWeight: '600', marginBottom: '2px' }}>Recent training data:</span>
@@ -872,7 +927,7 @@ export default function ModelsPage() {
                       <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>{d.name || d.company}</span>
                       {d.company && d.name ? <span> ({d.company})</span> : null}
                       {' — '}
-                      <span style={{ color: d.stage === 'closed_won' ? 'var(--success)' : 'var(--danger)' }}>
+                      <span style={{ color: d.stage === 'closed_won' ? '#0f7b6c' : '#e03e3e' }}>
                         {d.stage === 'closed_won' ? 'Won' : 'Lost'}
                       </span>
                       {d.lastUpdated && (
@@ -911,7 +966,7 @@ export default function ModelsPage() {
           {formattedFeatures.length > 0 ? (
             <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Unique to your workspace</div>
           ) : (
-            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#D97706', background: 'rgba(217,119,6,0.10)', border: '1px solid rgba(217,119,6,0.25)', padding: '2px 8px', borderRadius: '100px' }}>
+            <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#cb6c2c', background: 'rgba(203,108,44,0.10)', border: '1px solid rgba(203,108,44,0.25)', padding: '2px 8px', borderRadius: '100px' }}>
               EXAMPLE DATA
             </span>
           )}
@@ -932,28 +987,28 @@ export default function ModelsPage() {
                   <BarChart
                     value={f.importance}
                     max={maxImportance}
-                    color={f.direction === 'helps' ? 'var(--success)' : 'var(--danger)'}
+                    color={f.direction === 'helps' ? '#0f7b6c' : '#e03e3e'}
                   />
-                  <div style={{ width: '60px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: f.direction === 'helps' ? 'var(--success)' : 'var(--danger)', flexShrink: 0 }} className="font-mono">
+                  <div style={{ width: '60px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: f.direction === 'helps' ? '#0f7b6c' : '#e03e3e', flexShrink: 0 }} className="font-mono">
                     {(f.importance * 100).toFixed(1)}%
                   </div>
                   <div style={{ width: '14px', flexShrink: 0 }}>
                     {f.direction === 'helps'
-                      ? <TrendingUp size={12} style={{ color: 'var(--success)' }} />
-                      : <TrendingUp size={12} style={{ color: 'var(--danger)', transform: 'scaleY(-1)' }} />
+                      ? <TrendingUp size={12} style={{ color: '#0f7b6c' }} />
+                      : <TrendingUp size={12} style={{ color: '#e03e3e', transform: 'scaleY(-1)' }} />
                     }
                   </div>
                 </div>
               ))}
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', paddingTop: '4px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', paddingTop: '4px', borderTop: '1px solid rgba(55,53,47,0.09)' }}>
               Green = helps win. Red = associated with losses. Updates automatically as more deals close.
             </div>
           </>
         ) : (
           <>
             <FeatureImportanceChart features={PLACEHOLDER_FEATURES} isPlaceholder={true} />
-            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', textAlign: 'center', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', textAlign: 'center', paddingTop: '8px', borderTop: '1px solid rgba(55,53,47,0.09)' }}>
               Close 10+ deals to unlock your personalised feature importance rankings.
             </div>
           </>
@@ -975,15 +1030,15 @@ export default function ModelsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
             {archetypes.map((a) => {
               const isSelected = selectedArchetype === a.id
-              const winColor = a.winRate >= 60 ? 'var(--success)' : a.winRate >= 40 ? 'var(--warning)' : 'var(--danger)'
+              const winColor = a.winRate >= 60 ? '#0f7b6c' : a.winRate >= 40 ? '#cb6c2c' : '#e03e3e'
               return (
                 <button
                   key={a.id}
                   onClick={() => setSelectedArchetype(isSelected ? null : a.id)}
                   style={{
                     textAlign: 'left', padding: '16px', borderRadius: '8px', cursor: 'pointer',
-                    background: isSelected ? 'var(--accent-subtle)' : 'var(--surface)',
-                    border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
+                    background: isSelected ? 'rgba(94,106,210,0.06)' : '#f7f6f3',
+                    border: `1px solid ${isSelected ? '#5e6ad2' : 'rgba(55,53,47,0.12)'}`,
                     transition: 'all 0.15s',
                   }}
                 >
@@ -993,11 +1048,11 @@ export default function ModelsPage() {
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px', lineHeight: 1.4 }}>{a.winningCharacteristic}</div>
                   <div style={{ display: 'flex', gap: '8px' }}>
-                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--border)', padding: '2px 6px', borderRadius: '4px' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'rgba(55,53,47,0.09)', padding: '2px 6px', borderRadius: '4px' }}>
                       {a.dealCount} deals
                     </span>
                     {(a.openDealIds?.length ?? 0) > 0 && (
-                      <span style={{ fontSize: '10px', color: 'var(--accent)', background: 'var(--accent-subtle)', padding: '2px 6px', borderRadius: '4px' }}>
+                      <span style={{ fontSize: '10px', color: '#5e6ad2', background: 'rgba(94,106,210,0.08)', padding: '2px 6px', borderRadius: '4px' }}>
                         {a.openDealIds?.length} active
                       </span>
                     )}
@@ -1021,19 +1076,19 @@ export default function ModelsPage() {
               Win/loss rates and conditions derived from your actual deal history — per competitor
             </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(55,53,47,0.12)' }}>
             {patterns.map((p, i) => {
-              const winColor = p.winRate >= 60 ? 'var(--success)' : p.winRate >= 40 ? 'var(--warning)' : 'var(--danger)'
+              const winColor = p.winRate >= 60 ? '#0f7b6c' : p.winRate >= 40 ? '#cb6c2c' : '#e03e3e'
               return (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 16px', background: 'var(--card-bg)', borderBottom: i < patterns.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '14px 16px', background: i % 2 === 1 ? 'rgba(55,53,47,0.02)' : '#ffffff', borderBottom: i < patterns.length - 1 ? '1px solid rgba(55,53,47,0.09)' : 'none' }}>
                   <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', width: '120px', flexShrink: 0 }}>{p.competitor}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '20px', fontWeight: '700', color: winColor, flexShrink: 0 }} className="font-mono">{p.winRate}%</div>
                     <BarChart value={p.winRate} max={100} color={winColor} />
                   </div>
                   <div style={{ flex: 2, minWidth: 0 }}>
-                    <div style={{ fontSize: '11px', color: 'var(--success)', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✓ {p.topWinCondition}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--danger)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✗ {p.topLossRisk}</div>
+                    <div style={{ fontSize: '11px', color: '#0f7b6c', marginBottom: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✓ {p.topWinCondition}</div>
+                    <div style={{ fontSize: '11px', color: '#e03e3e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✗ {p.topLossRisk}</div>
                   </div>
                   <Link href={`/competitors`} style={{ flexShrink: 0 }}>
                     <ChevronRight size={14} style={{ color: 'var(--text-tertiary)' }} />
@@ -1059,7 +1114,7 @@ export default function ModelsPage() {
               </div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '22px', fontWeight: '600', color: 'var(--data-accent)' }} className="font-mono">
+              <div style={{ fontSize: '22px', fontWeight: '600', color: '#2e78c6' }} className="font-mono">
                 {calibration[calibration.length - 1]?.discrimination?.toFixed(1) ?? '—'}
               </div>
               <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>discrimination score</div>
@@ -1093,7 +1148,7 @@ export default function ModelsPage() {
           </div>
           {forecastData && forecastData.totalPredictions >= 5 && (
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div style={{ fontSize: '22px', fontWeight: '600', color: forecastData.accuracy >= 0.7 ? 'var(--success)' : forecastData.accuracy >= 0.5 ? 'var(--warning)' : 'var(--danger)' }} className="font-mono">
+              <div style={{ fontSize: '22px', fontWeight: '600', color: forecastData.accuracy >= 0.7 ? '#0f7b6c' : forecastData.accuracy >= 0.5 ? '#cb6c2c' : '#e03e3e' }} className="font-mono">
                 {Math.round(forecastData.accuracy * 100)}%
               </div>
               <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>overall accuracy</div>
@@ -1103,18 +1158,18 @@ export default function ModelsPage() {
 
         {(!forecastData || forecastData.totalPredictions < 5) ? (
           <div style={{ textAlign: 'center', padding: '32px 20px', color: 'var(--text-tertiary)', fontSize: '13px', lineHeight: 1.6 }}>
-            <Target size={32} style={{ margin: '0 auto 10px', display: 'block', opacity: 0.3 }} />
+            <Target size={32} style={{ margin: '0 auto 10px', display: 'block', opacity: 0.3, color: 'var(--text-tertiary)' }} />
             Not enough closed deals yet to show calibration. Predictions will appear here as deals close.
           </div>
         ) : (
           <>
             <div style={{ display: 'flex', gap: '16px' }}>
-              <div style={{ textAlign: 'center', flex: 1, padding: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px' }}>
+              <div style={{ textAlign: 'center', flex: 1, padding: '12px', background: '#f7f6f3', border: '1px solid rgba(55,53,47,0.09)', borderRadius: '8px' }}>
                 <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: 1 }} className="font-mono">{forecastData.totalPredictions}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>Predictions logged</div>
               </div>
-              <div style={{ textAlign: 'center', flex: 1, padding: '12px', background: 'color-mix(in srgb, var(--success) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)', borderRadius: '10px' }}>
-                <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--success)', lineHeight: 1 }} className="font-mono">{forecastData.correctPredictions}</div>
+              <div style={{ textAlign: 'center', flex: 1, padding: '12px', background: 'rgba(15,123,108,0.08)', border: '1px solid rgba(15,123,108,0.20)', borderRadius: '8px' }}>
+                <div style={{ fontSize: '24px', fontWeight: '700', color: '#0f7b6c', lineHeight: 1 }} className="font-mono">{forecastData.correctPredictions}</div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>Correct predictions</div>
               </div>
             </div>
@@ -1145,13 +1200,13 @@ export default function ModelsPage() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {stageVel.stageAlerts.slice(0, 5).map((a: { severity: string; company: string; stage: string; currentAgeDays: number; expectedMaxDays: number }, i: number) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', background: a.severity === 'critical' ? 'color-mix(in srgb, var(--danger) 6%, transparent)' : 'var(--surface)', border: `1px solid ${a.severity === 'critical' ? 'color-mix(in srgb, var(--danger) 20%, transparent)' : 'var(--border)'}`, borderRadius: '8px' }}>
-                <AlertTriangle size={14} style={{ color: a.severity === 'critical' ? 'var(--danger)' : 'var(--warning)', flexShrink: 0 }} />
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', background: a.severity === 'critical' ? 'rgba(224,62,62,0.06)' : '#f7f6f3', border: `1px solid ${a.severity === 'critical' ? 'rgba(224,62,62,0.20)' : 'rgba(55,53,47,0.09)'}`, borderRadius: '8px' }}>
+                <AlertTriangle size={14} style={{ color: a.severity === 'critical' ? '#e03e3e' : '#cb6c2c', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{a.company}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{a.stage} · {a.currentAgeDays}d (expected &lt;{a.expectedMaxDays}d)</div>
                 </div>
-                <Link href={`/deals`} style={{ fontSize: '11px', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
+                <Link href={`/deals`} style={{ fontSize: '11px', color: '#5e6ad2', display: 'flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
                   View <ArrowUpRight size={10} />
                 </Link>
               </div>
@@ -1174,7 +1229,7 @@ export default function ModelsPage() {
                 <div style={{ fontSize: '24px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1 }} className="font-mono">
                   {Math.round(mlTrends.winRate.recentPct)}%
                 </div>
-                <div style={{ fontSize: '11px', marginTop: '4px', color: mlTrends.winRate.direction === 'improving' ? 'var(--success)' : mlTrends.winRate.direction === 'declining' ? 'var(--danger)' : 'var(--text-tertiary)' }}>
+                <div style={{ fontSize: '11px', marginTop: '4px', color: mlTrends.winRate.direction === 'improving' ? '#0f7b6c' : mlTrends.winRate.direction === 'declining' ? '#e03e3e' : '#9b9a97' }}>
                   {mlTrends.winRate.direction === 'improving' ? '↑ Improving' : mlTrends.winRate.direction === 'declining' ? '↓ Declining' : '→ Stable'}
                 </div>
               </div>
@@ -1185,7 +1240,7 @@ export default function ModelsPage() {
                 <div style={{ fontSize: '24px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1 }} className="font-mono">
                   {Math.round(mlTrends.dealVelocity.recentAvgDays)}d
                 </div>
-                <div style={{ fontSize: '11px', marginTop: '4px', color: mlTrends.dealVelocity.direction === 'faster' ? 'var(--success)' : mlTrends.dealVelocity.direction === 'slower' ? 'var(--danger)' : 'var(--text-tertiary)' }}>
+                <div style={{ fontSize: '11px', marginTop: '4px', color: mlTrends.dealVelocity.direction === 'faster' ? '#0f7b6c' : mlTrends.dealVelocity.direction === 'slower' ? '#e03e3e' : '#9b9a97' }}>
                   {mlTrends.dealVelocity.direction === 'faster' ? '↑ Faster' : mlTrends.dealVelocity.direction === 'slower' ? '↓ Slower' : '→ Stable'}
                 </div>
               </div>
@@ -1196,7 +1251,7 @@ export default function ModelsPage() {
                 <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1 }}>
                   {mlTrends.competitorThreats[0].name}
                 </div>
-                <div style={{ fontSize: '11px', marginTop: '4px', color: 'var(--danger)' }}>
+                <div style={{ fontSize: '11px', marginTop: '4px', color: '#e03e3e' }}>
                   {Math.round(mlTrends.competitorThreats[0].recentWinRatePct)}% recent win rate
                 </div>
               </div>
@@ -1205,11 +1260,12 @@ export default function ModelsPage() {
         </div>
       )}
 
-      {/* ── Row 5: Global Benchmarks ── */}
+      {/* ── Row 5: Industry Benchmarks ── */}
       <GlobalBenchmarksCard
-        winRate={wl?.winRate ?? null}
+        winPct={winPct}
         avgClose={wl?.avgDaysToClose ? Math.round(wl.avgDaysToClose) : null}
-        mlAccuracy={accuracy}
+        avgDealValue={wl?.avgWonValue ? Math.round(wl.avgWonValue) : null}
+        benchmarkRes={benchmarkRes}
       />
 
       {/* ── Empty state ── */}
@@ -1221,7 +1277,7 @@ export default function ModelsPage() {
             As you close deals (wins AND losses), Halvex trains private ML models on your data.
             Close 10 deals to unlock predictions. Close 50 for per-competitor models.
           </p>
-          <Link href="/pipeline" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 20px', borderRadius: '10px', background: 'var(--accent)', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>
+          <Link href="/pipeline" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 20px', borderRadius: '8px', background: '#37352f', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>
             View Pipeline <ArrowUpRight size={14} />
           </Link>
         </div>

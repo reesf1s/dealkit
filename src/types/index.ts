@@ -146,7 +146,12 @@ export interface DealLog {
   expansionType?: ExpansionType | null
   projectPlan?: ProjectPlan | null
   conversionScore?: number | null
+  conversionInsights?: string[]
+  aiSummary?: string | null
+  dealRisks?: string[]
   assignedRepId?: string | null
+  forecastCategory?: 'commit' | 'upside' | 'pipeline' | 'omit' | null
+  scoreHistory?: Array<{ score: number; date: string }>
   createdAt: Date
   updatedAt: Date
 }

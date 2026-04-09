@@ -47,18 +47,19 @@ export default function ToolCallCard({ invocation }: ToolCallCardProps) {
   return (
     <div style={{
       margin: '4px 0',
-      borderRadius: '10px',
-      background: 'var(--glass-tool-card, rgba(15, 12, 30, 0.6))',
-      backdropFilter: 'blur(12px)',
-      WebkitBackdropFilter: 'blur(12px)',
-      border: `1px solid ${isDone ? (isToolError ? 'rgba(245,158,11,0.2)' : 'rgba(16,185,129,0.2)') : 'rgba(255,255,255,0.08)'}`,
+      borderRadius: '8px',
+      background: isDone && !isToolError
+        ? 'rgba(15,123,108,0.04)'
+        : isToolError
+          ? 'rgba(203,108,44,0.05)'
+          : '#fafafa',
+      border: `1px solid ${
+        isDone
+          ? isToolError ? 'rgba(203,108,44,0.20)' : 'rgba(15,123,108,0.20)'
+          : '#eeeeee'
+      }`,
       overflow: 'hidden',
       transition: 'border-color 0.2s',
-      boxShadow: isDone && !isToolError
-        ? '0 0 8px rgba(16,185,129,0.06)'
-        : isToolError
-          ? '0 0 8px rgba(245,158,11,0.06)'
-          : undefined,
     }}>
       <button
         onClick={() => resultText && setExpanded(p => !p)}
@@ -71,7 +72,7 @@ export default function ToolCallCard({ invocation }: ToolCallCardProps) {
           background: 'none',
           border: 'none',
           cursor: resultText ? 'pointer' : 'default',
-          color: isDone ? (isToolError ? '#FCD34D' : '#6EE7B7') : 'rgba(255,255,255,0.70)',
+          color: isDone ? (isToolError ? '#cb6c2c' : '#0f7b6c') : '#787774',
           fontSize: '11.5px',
           fontWeight: 500,
           fontFamily: 'inherit',
@@ -84,10 +85,10 @@ export default function ToolCallCard({ invocation }: ToolCallCardProps) {
             width: '16px', height: '16px', flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             borderRadius: '50%',
-            background: 'rgba(16,185,129,0.15)',
+            background: isToolError ? 'rgba(203,108,44,0.12)' : 'rgba(15,123,108,0.12)',
           }}>
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-              <path d="M2 5.5L4 7.5L8 3" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M2 5.5L4 7.5L8 3" stroke={isToolError ? '#cb6c2c' : '#0f7b6c'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
         ) : (
@@ -98,8 +99,8 @@ export default function ToolCallCard({ invocation }: ToolCallCardProps) {
             <span style={{
               width: '12px', height: '12px',
               borderRadius: '50%',
-              border: '2px solid rgba(255,255,255,0.14)',
-              borderTopColor: 'rgba(255,255,255,0.80)',
+              border: '2px solid var(--border-default)',
+              borderTopColor: '#1DB86A',
               animation: 'spin 0.8s linear infinite',
             }} />
           </span>
@@ -126,9 +127,9 @@ export default function ToolCallCard({ invocation }: ToolCallCardProps) {
       {expanded && resultText && (
         <div style={{
           padding: '6px 10px 8px',
-          borderTop: '1px solid rgba(255,255,255,0.05)',
+          borderTop: '1px solid #f0f0f0',
           fontSize: '11px',
-          color: '#9CA3AF',
+          color: '#9b9a97',
           lineHeight: '1.6',
           maxHeight: '160px',
           overflowY: 'auto',

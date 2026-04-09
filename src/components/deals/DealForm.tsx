@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import type { DealContact, DealLog, DealStage } from '@/types'
 
 interface DealFormProps {
@@ -9,41 +9,83 @@ interface DealFormProps {
   loading?: boolean
 }
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)',
+      letterSpacing: '0.08em', textTransform: 'uppercase',
+      marginBottom: '10px', paddingBottom: '6px',
+      borderBottom: '1px solid rgba(55,53,47,0.07)',
+    }}>
+      {children}
+    </div>
+  )
+}
+
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#888', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '6px' }}>
+    <label style={{
+      display: 'block', fontSize: '11px', fontWeight: 600,
+      color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase',
+      marginBottom: '5px',
+    }}>
       {children}
     </label>
   )
 }
 
-function Input({ value, onChange, placeholder, type = 'text' }: { value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
+function Input({ value, onChange, placeholder, type = 'text' }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; type?: string
+}) {
   return (
     <input
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', boxSizing: 'border-box', transition: 'border-color 150ms ease' }}
-      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.30)' }}
-      onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
+      style={{
+        width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px',
+        background: 'rgba(55,53,47,0.04)', border: '1px solid rgba(55,53,47,0.12)',
+        color: 'var(--text-primary)', fontSize: '13px', outline: 'none',
+        boxSizing: 'border-box', transition: 'border-color 150ms ease',
+      }}
+      onFocus={e => { e.currentTarget.style.borderColor = 'rgba(94,106,210,0.35)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(94,106,210,0.10)' }}
+      onBlur={e => { e.currentTarget.style.borderColor = 'rgba(55,53,47,0.12)'; e.currentTarget.style.boxShadow = 'none' }}
     />
   )
 }
 
-function Textarea({ value, onChange, placeholder, rows = 3 }: { value: string; onChange: (v: string) => void; placeholder?: string; rows?: number }) {
+function Textarea({ value, onChange, placeholder, rows = 3 }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; rows?: number
+}) {
   return (
     <textarea
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       rows={rows}
-      style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#EBEBEB', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, transition: 'border-color 150ms ease', fontFamily: 'inherit' }}
-      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.30)' }}
-      onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
+      style={{
+        width: '100%', padding: '8px 10px', borderRadius: '6px',
+        background: 'rgba(55,53,47,0.04)', border: '1px solid rgba(55,53,47,0.12)',
+        color: 'var(--text-primary)', fontSize: '13px', outline: 'none',
+        resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6,
+        transition: 'border-color 150ms ease', fontFamily: 'inherit',
+      }}
+      onFocus={e => { e.currentTarget.style.borderColor = 'rgba(94,106,210,0.35)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(94,106,210,0.10)' }}
+      onBlur={e => { e.currentTarget.style.borderColor = 'rgba(55,53,47,0.12)'; e.currentTarget.style.boxShadow = 'none' }}
     />
   )
 }
+
+const STAGES_LIST = [
+  { id: 'prospecting',   label: 'Prospecting',   color: '#94a3b8' },
+  { id: 'qualification', label: 'Qualification', color: '#3b82f6' },
+  { id: 'discovery',     label: 'Discovery',     color: '#8b5cf6' },
+  { id: 'proposal',      label: 'Proposal',      color: '#f59e0b' },
+  { id: 'negotiation',   label: 'Negotiation',   color: '#ef4444' },
+  { id: 'closed_won',    label: 'Won',           color: '#10b981' },
+  { id: 'closed_lost',   label: 'Lost',          color: '#e03e3e' },
+] as const
 
 const EMPTY_CONTACT: DealContact = { name: '', title: '', email: '' }
 
@@ -67,6 +109,7 @@ interface FormState {
   nextSteps: string
   lostReason: string
   assignedRepId: string
+  closeDate: string
 }
 
 export function DealForm({ onSubmit, loading = false }: DealFormProps) {
@@ -75,7 +118,7 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
     prospectCompany: '',
     description: '',
     dealValue: '',
-    stage: 'closed_won',
+    stage: 'proposal',
     dealType: 'one_off',
     recurringInterval: 'annual',
     competitors: '',
@@ -83,8 +126,12 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
     nextSteps: '',
     lostReason: '',
     assignedRepId: '',
+    closeDate: '',
   })
   const [members, setMembers] = useState<WorkspaceMember[]>([])
+  const [contacts, setContacts] = useState<DealContact[]>([])
+  const [contactsOpen, setContactsOpen] = useState(false)
+  const [errors, setErrors] = useState<{ dealValue?: string; dealName?: string; prospectCompany?: string }>({})
 
   useEffect(() => {
     fetch('/api/workspace/members')
@@ -92,16 +139,16 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
       .then((d: { data?: WorkspaceMember[] }) => { if (d.data) setMembers(d.data) })
       .catch(() => {})
   }, [])
-  const [contacts, setContacts] = useState<DealContact[]>([{ ...EMPTY_CONTACT }])
-  const [expanded, setExpanded] = useState(false)
-  const [errors, setErrors] = useState<{ dealValue?: string; dealName?: string }>({})
 
-  const u = (patch: Partial<FormState>) => setForm((p) => ({ ...p, ...patch }))
+  const u = (patch: Partial<FormState>) => setForm(p => ({ ...p, ...patch }))
 
   const updateContact = (i: number, field: keyof DealContact, value: string) =>
     setContacts(prev => prev.map((c, idx) => idx === i ? { ...c, [field]: value } : c))
 
-  const addContact = () => setContacts(prev => [...prev, { ...EMPTY_CONTACT }])
+  const addContact = () => {
+    setContacts(prev => [...prev, { ...EMPTY_CONTACT }])
+    setContactsOpen(true)
+  }
 
   const removeContact = (i: number) => setContacts(prev => prev.filter((_, idx) => idx !== i))
 
@@ -110,12 +157,15 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
   const isClosed = isWon || isLost
 
   const validateForm = () => {
-    const newErrors: { dealValue?: string; dealName?: string } = {}
+    const newErrors: typeof errors = {}
     if (form.dealValue !== '' && form.dealValue !== '0' && Number(form.dealValue) < 0) {
       newErrors.dealValue = 'Deal value cannot be negative.'
     }
     if (!form.dealName || form.dealName.trim().length < 2) {
       newErrors.dealName = 'Deal name is required (min 2 characters)'
+    }
+    if (!form.prospectCompany?.trim()) {
+      newErrors.prospectCompany = 'Company name is required'
     }
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -124,9 +174,7 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validateForm()) return
-    if (!form.prospectCompany.trim()) return
 
-    // Filter out empty contacts
     const cleanContacts = contacts
       .map(c => ({ name: c.name.trim(), title: c.title?.trim() || undefined, email: c.email?.trim() || undefined }))
       .filter(c => c.name)
@@ -136,7 +184,6 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
       dealName: form.dealName,
       prospectCompany: form.prospectCompany,
       description: form.description || null,
-      // Keep prospectName/prospectTitle in sync with first contact for backward compat
       prospectName: cleanContacts[0]?.name ?? null,
       prospectTitle: cleanContacts[0]?.title ?? null,
       contacts: cleanContacts,
@@ -144,286 +191,327 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
       stage: form.stage,
       dealType: form.dealType,
       recurringInterval: form.dealType === 'recurring' ? form.recurringInterval : null,
-      competitors: form.competitors
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean),
+      competitors: form.competitors.split(',').map(s => s.trim()).filter(Boolean),
       notes: form.notes || null,
       nextSteps: form.nextSteps || null,
       lostReason: form.lostReason || null,
       assignedRepId: form.assignedRepId || null,
       wonDate: isWon ? now : null,
       lostDate: isLost ? now : null,
-      closeDate: isClosed ? now : null,
+      closeDate: form.closeDate ? new Date(form.closeDate) : isClosed ? now : null,
     })
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      {/* Deal name */}
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+      {/* ── Section 1: Basics ── */}
       <div>
-        <Label>Deal name *</Label>
-        <Input value={form.dealName} onChange={(v) => { u({ dealName: v }); if (errors.dealName) setErrors(prev => ({ ...prev, dealName: undefined })) }} placeholder="e.g. Acme Corp Q2 Expansion" />
-        {errors.dealName && (
-          <p style={{ color: '#EF4444', fontSize: '12px', marginTop: '4px' }}>
-            {errors.dealName}
-          </p>
-        )}
-      </div>
+        <SectionLabel>Deal basics</SectionLabel>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-      {/* Prospect company */}
-      <div>
-        <Label>Prospect company *</Label>
-        <Input value={form.prospectCompany} onChange={(v) => u({ prospectCompany: v })} placeholder="e.g. Acme Corp" />
-      </div>
-
-      {/* Assign Rep */}
-      {members.length > 0 && (
-        <div>
-          <Label>Assign rep</Label>
-          <select
-            value={form.assignedRepId}
-            onChange={(e) => u({ assignedRepId: e.target.value })}
-            style={{ width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: form.assignedRepId ? '#EBEBEB' : '#666', fontSize: '13px', outline: 'none', boxSizing: 'border-box', cursor: 'pointer', fontFamily: 'inherit' }}
-            onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.30)' }}
-            onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
-          >
-            <option value="">Unassigned</option>
-            {members.map(m => (
-              <option key={m.userId} value={m.userId}>
-                {m.email}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* Outcome toggle */}
-      <div>
-        <Label>Outcome</Label>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {([
-            { stage: 'closed_won' as DealStage, label: '🏆 Won', color: '#22C55E', bg: 'rgba(34,197,94,0.1)', border: 'rgba(34,197,94,0.3)' },
-            { stage: 'closed_lost' as DealStage, label: '✗ Lost', color: '#EF4444', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.3)' },
-            { stage: 'proposal' as DealStage, label: 'In progress', color: '#888', bg: 'rgba(255,255,255,0.04)', border: 'rgba(255,255,255,0.1)' },
-          ] as const).map(({ stage, label, color, bg, border }) => (
-            <button
-              key={stage}
-              type="button"
-              onClick={() => u({ stage })}
-              style={{
-                flex: 1, height: '36px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
-                color: form.stage === stage ? color : '#555',
-                backgroundColor: form.stage === stage ? bg : 'transparent',
-                border: `2px solid ${form.stage === stage ? border : 'rgba(255,255,255,0.06)'}`,
-                cursor: 'pointer', transition: 'all 150ms ease',
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Lost reason */}
-      {isLost && (
-        <div>
-          <Label>Primary reason for loss</Label>
-          <Input value={form.lostReason} onChange={(v) => u({ lostReason: v })} placeholder="e.g. Price too high, went with competitor" />
-        </div>
-      )}
-
-      {/* Deal type */}
-      <div>
-        <Label>Deal type</Label>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {([
-            { type: 'one_off' as const, label: 'One-off' },
-            { type: 'recurring' as const, label: 'Recurring' },
-          ]).map(({ type, label }) => (
-            <button
-              key={type}
-              type="button"
-              onClick={() => u({ dealType: type })}
-              style={{
-                flex: 1, height: '34px', borderRadius: '6px', fontSize: '13px', fontWeight: 500,
-                color: form.dealType === type ? '#EBEBEB' : '#555',
-                backgroundColor: form.dealType === type ? 'rgba(255,255,255,0.08)' : 'transparent',
-                border: `1px solid ${form.dealType === type ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.08)'}`,
-                cursor: 'pointer', transition: 'all 150ms ease',
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {form.dealType === 'recurring' && (
-          <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-            {(['monthly', 'quarterly', 'annual'] as const).map((interval) => (
-              <button
-                key={interval}
-                type="button"
-                onClick={() => u({ recurringInterval: interval })}
-                style={{
-                  flex: 1, height: '28px', borderRadius: '6px', fontSize: '11px', fontWeight: 500, textTransform: 'capitalize',
-                  color: form.recurringInterval === interval ? '#EBEBEB' : '#666',
-                  backgroundColor: form.recurringInterval === interval ? 'rgba(255,255,255,0.08)' : 'transparent',
-                  border: `1px solid ${form.recurringInterval === interval ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)'}`,
-                  cursor: 'pointer', transition: 'all 150ms ease',
-                }}
-              >
-                {interval}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Competitor */}
-      <div>
-        <Label>Competitor(s)</Label>
-        <Input value={form.competitors} onChange={(v) => u({ competitors: v })} placeholder="Competitor A, Competitor B (comma-separated)" />
-      </div>
-
-      {/* Deal value */}
-      <div>
-        <Label>{form.dealType === 'recurring' ? `Deal value (${form.recurringInterval === 'monthly' ? 'MRR' : form.recurringInterval === 'quarterly' ? 'QRR' : 'ARR'} £)` : 'Deal value (£)'}</Label>
-        <input
-          type="number"
-          value={form.dealValue}
-          onChange={(e) => { u({ dealValue: e.target.value }); if (errors.dealValue) setErrors(prev => ({ ...prev, dealValue: undefined })) }}
-          placeholder="50000"
-          style={{
-            width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px',
-            background: 'rgba(0,0,0,0.3)',
-            border: `1px solid ${errors.dealValue ? '#EF4444' : 'rgba(255,255,255,0.1)'}`,
-            color: '#EBEBEB', fontSize: '13px', outline: 'none',
-            boxSizing: 'border-box', transition: 'border-color 150ms ease'
-          }}
-          onFocus={(e) => { e.currentTarget.style.borderColor = errors.dealValue ? '#EF4444' : 'rgba(255,255,255,0.30)' }}
-          onBlur={(e) => { e.currentTarget.style.borderColor = errors.dealValue ? '#EF4444' : 'rgba(255,255,255,0.1)' }}
-        />
-        {errors.dealValue && (
-          <p style={{ color: '#EF4444', fontSize: '12px', marginTop: '4px' }}>
-            {errors.dealValue}
-          </p>
-        )}
-      </div>
-
-      {/* Expand toggle */}
-      <button
-        type="button"
-        onClick={() => setExpanded((e) => !e)}
-        style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#888', background: 'none', border: 'none', cursor: 'pointer', padding: 0, width: 'fit-content' }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = '#EBEBEB' }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = '#888' }}
-      >
-        {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-        {expanded ? 'Hide' : 'Show'} additional details
-      </button>
-
-      {expanded && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingTop: '4px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-
-          {/* Description */}
           <div>
-            <Label>Deal description</Label>
-            <Textarea
-              value={form.description}
-              onChange={(v) => u({ description: v })}
-              placeholder="Overview of the opportunity, context, or key details…"
-              rows={2}
+            <Label>Company *</Label>
+            <Input
+              value={form.prospectCompany}
+              onChange={v => { u({ prospectCompany: v }); if (errors.prospectCompany) setErrors(p => ({ ...p, prospectCompany: undefined })) }}
+              placeholder="Acme Corp"
             />
+            {errors.prospectCompany && <p style={{ color: '#e03e3e', fontSize: '11px', marginTop: '4px', margin: '4px 0 0' }}>{errors.prospectCompany}</p>}
           </div>
 
-          {/* Contacts */}
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <Label>Contacts</Label>
-              <button
-                type="button"
-                onClick={addContact}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '4px',
-                  fontSize: '11px', color: 'rgba(255,255,255,0.80)', background: 'none', border: 'none',
-                  cursor: 'pointer', padding: 0, fontWeight: 600,
-                }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.70)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.80)' }}
-              >
-                <Plus size={11} /> Add contact
-              </button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {contacts.map((contact, i) => (
-                <div
-                  key={i}
+            <Label>Deal name *</Label>
+            <Input
+              value={form.dealName}
+              onChange={v => { u({ dealName: v }); if (errors.dealName) setErrors(p => ({ ...p, dealName: undefined })) }}
+              placeholder="Acme Corp — Q2 Expansion"
+            />
+            {errors.dealName && <p style={{ color: '#e03e3e', fontSize: '11px', marginTop: '4px', margin: '4px 0 0' }}>{errors.dealName}</p>}
+          </div>
+
+          {/* Stage selector — horizontal pills */}
+          <div>
+            <Label>Stage</Label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+              {STAGES_LIST.map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => u({ stage: s.id as DealStage })}
                   style={{
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid rgba(255,255,255,0.07)',
-                    borderRadius: '8px',
-                    padding: '10px',
-                    position: 'relative',
+                    padding: '4px 10px', borderRadius: '100px',
+                    fontSize: '12px', fontWeight: form.stage === s.id ? 600 : 400,
+                    color: form.stage === s.id ? '#ffffff' : 'rgba(55,53,47,0.60)',
+                    background: form.stage === s.id ? s.color : 'rgba(55,53,47,0.05)',
+                    border: `1px solid ${form.stage === s.id ? s.color : 'rgba(55,53,47,0.10)'}`,
+                    cursor: 'pointer', transition: 'all 100ms ease',
+                    display: 'flex', alignItems: 'center', gap: '4px',
                   }}
                 >
-                  {contacts.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeContact(i)}
-                      style={{
-                        position: 'absolute', top: '8px', right: '8px',
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        color: '#444', display: 'flex', alignItems: 'center', padding: '2px',
-                        borderRadius: '4px',
-                      }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#EF4444' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#444' }}
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '10px', color: '#555', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Name</label>
-                      <Input value={contact.name} onChange={v => updateContact(i, 'name', v)} placeholder="Jane Smith" />
-                    </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '10px', color: '#555', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Title</label>
-                      <Input value={contact.title ?? ''} onChange={v => updateContact(i, 'title', v)} placeholder="VP of Engineering" />
-                    </div>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '10px', color: '#555', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '4px' }}>Email</label>
-                    <Input value={contact.email ?? ''} onChange={v => updateContact(i, 'email', v)} placeholder="jane@acme.com" type="email" />
-                  </div>
-                </div>
+                  {s.label}
+                </button>
               ))}
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Notes */}
+      {/* ── Section 2: Value ── */}
+      <div>
+        <SectionLabel>Value</SectionLabel>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div>
+              <Label>{form.dealType === 'recurring' ? `Value (${form.recurringInterval === 'monthly' ? 'MRR' : form.recurringInterval === 'quarterly' ? 'QRR' : 'ARR'})` : 'Deal value'}</Label>
+              <input
+                type="number"
+                value={form.dealValue}
+                onChange={e => { u({ dealValue: e.target.value }); if (errors.dealValue) setErrors(p => ({ ...p, dealValue: undefined })) }}
+                placeholder="50000"
+                style={{
+                  width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px',
+                  background: 'rgba(55,53,47,0.04)',
+                  border: `1px solid ${errors.dealValue ? '#e03e3e' : 'rgba(55,53,47,0.12)'}`,
+                  color: 'var(--text-primary)', fontSize: '13px', outline: 'none',
+                  boxSizing: 'border-box', transition: 'border-color 150ms ease',
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = errors.dealValue ? '#e03e3e' : 'rgba(94,106,210,0.35)' }}
+                onBlur={e => { e.currentTarget.style.borderColor = errors.dealValue ? '#e03e3e' : 'rgba(55,53,47,0.12)' }}
+              />
+              {errors.dealValue && <p style={{ color: '#e03e3e', fontSize: '11px', margin: '4px 0 0' }}>{errors.dealValue}</p>}
+            </div>
+
+            <div>
+              <Label>Close date</Label>
+              <input
+                type="date"
+                value={form.closeDate}
+                onChange={e => u({ closeDate: e.target.value })}
+                style={{
+                  width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px',
+                  background: 'rgba(55,53,47,0.04)', border: '1px solid rgba(55,53,47,0.12)',
+                  color: form.closeDate ? '#37352f' : '#9b9a97', fontSize: '13px', outline: 'none',
+                  boxSizing: 'border-box', cursor: 'pointer', fontFamily: 'inherit',
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = 'rgba(94,106,210,0.35)' }}
+                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(55,53,47,0.12)' }}
+              />
+            </div>
+          </div>
+
+          {/* Deal type */}
           <div>
-            <Label>Notes / learnings</Label>
-            <Textarea value={form.notes} onChange={(v) => u({ notes: v })} placeholder="What did you learn from this deal?" rows={3} />
+            <Label>Deal type</Label>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {([
+                { type: 'one_off' as const, label: 'One-off' },
+                { type: 'recurring' as const, label: 'Recurring' },
+              ]).map(({ type, label }) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => u({ dealType: type })}
+                  style={{
+                    flex: 1, height: '32px', borderRadius: '6px', fontSize: '12.5px', fontWeight: 500,
+                    color: form.dealType === type ? '#37352f' : '#9b9a97',
+                    backgroundColor: form.dealType === type ? 'rgba(55,53,47,0.08)' : 'transparent',
+                    border: `1px solid ${form.dealType === type ? 'rgba(55,53,47,0.18)' : 'rgba(55,53,47,0.09)'}`,
+                    cursor: 'pointer', transition: 'all 150ms ease',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {form.dealType === 'recurring' && (
+              <div style={{ display: 'flex', gap: '5px', marginTop: '7px' }}>
+                {(['monthly', 'quarterly', 'annual'] as const).map(interval => (
+                  <button
+                    key={interval}
+                    type="button"
+                    onClick={() => u({ recurringInterval: interval })}
+                    style={{
+                      flex: 1, height: '26px', borderRadius: '5px', fontSize: '11px', fontWeight: 500, textTransform: 'capitalize',
+                      color: form.recurringInterval === interval ? '#37352f' : '#9b9a97',
+                      backgroundColor: form.recurringInterval === interval ? 'rgba(55,53,47,0.08)' : 'transparent',
+                      border: `1px solid ${form.recurringInterval === interval ? 'rgba(55,53,47,0.18)' : 'rgba(55,53,47,0.09)'}`,
+                      cursor: 'pointer', transition: 'all 150ms ease',
+                    }}
+                  >
+                    {interval}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+
+      {/* ── Lost reason (conditional) ── */}
+      {isLost && (
+        <div>
+          <Label>Primary reason for loss</Label>
+          <Input value={form.lostReason} onChange={v => u({ lostReason: v })} placeholder="e.g. Price too high, went with competitor" />
+        </div>
+      )}
+
+      {/* ── Section 3: Contact (collapsible) ── */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: contactsOpen || contacts.length > 0 ? '10px' : '0' }}>
+          <SectionLabel>Contact</SectionLabel>
+          {contacts.length === 0 ? (
+            <button
+              type="button"
+              onClick={addContact}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '4px',
+                fontSize: '11px', color: '#5e6ad2', background: 'none', border: 'none',
+                cursor: 'pointer', padding: '0 0 6px', fontWeight: 600,
+                marginTop: '-4px',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#4a56c0' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#5e6ad2' }}
+            >
+              <Plus size={11} /> Add contact
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={addContact}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '4px',
+                fontSize: '11px', color: '#5e6ad2', background: 'none', border: 'none',
+                cursor: 'pointer', padding: '0 0 6px', fontWeight: 600,
+                marginTop: '-4px',
+              }}
+            >
+              <Plus size={11} /> Add another
+            </button>
+          )}
+        </div>
+
+        {contacts.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {contacts.map((contact, i) => (
+              <div
+                key={i}
+                style={{
+                  background: 'rgba(55,53,47,0.03)',
+                  border: '1px solid rgba(55,53,47,0.09)',
+                  borderRadius: '8px',
+                  padding: '10px',
+                  position: 'relative',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => removeContact(i)}
+                  style={{
+                    position: 'absolute', top: '8px', right: '8px',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', padding: '2px',
+                    borderRadius: '4px',
+                  }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#e03e3e' }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)' }}
+                >
+                  <X size={12} />
+                </button>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Name</label>
+                    <Input value={contact.name} onChange={v => updateContact(i, 'name', v)} placeholder="Jane Smith" />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '10px', color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Title</label>
+                    <Input value={contact.title ?? ''} onChange={v => updateContact(i, 'title', v)} placeholder="VP of Engineering" />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '10px', color: 'var(--text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Email</label>
+                  <Input value={contact.email ?? ''} onChange={v => updateContact(i, 'email', v)} placeholder="jane@acme.com" type="email" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Section 4: Context ── */}
+      <div>
+        <SectionLabel>Context</SectionLabel>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+          <div>
+            <Label>Description</Label>
+            <Textarea
+              value={form.description}
+              onChange={v => u({ description: v })}
+              placeholder="Overview of the opportunity, meeting notes, context, or key details…"
+              rows={3}
+            />
+          </div>
+
+          <div>
+            <Label>Competitor(s)</Label>
+            <Input
+              value={form.competitors}
+              onChange={v => u({ competitors: v })}
+              placeholder="Competitor A, Competitor B"
+            />
           </div>
 
           {!isClosed && (
             <div>
               <Label>Next steps</Label>
-              <Input value={form.nextSteps} onChange={(v) => u({ nextSteps: v })} placeholder="Schedule follow-up call" />
+              <Input value={form.nextSteps} onChange={v => u({ nextSteps: v })} placeholder="Schedule follow-up call" />
             </div>
           )}
-        </div>
-      )}
 
-      {/* Submit */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '4px' }}>
+          {members.length > 0 && (
+            <div>
+              <Label>Assign rep</Label>
+              <select
+                value={form.assignedRepId}
+                onChange={e => u({ assignedRepId: e.target.value })}
+                style={{
+                  width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px',
+                  background: 'rgba(55,53,47,0.04)', border: '1px solid rgba(55,53,47,0.12)',
+                  color: form.assignedRepId ? '#37352f' : '#9b9a97',
+                  fontSize: '13px', outline: 'none', boxSizing: 'border-box',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = 'rgba(94,106,210,0.35)' }}
+                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(55,53,47,0.12)' }}
+              >
+                <option value="">Unassigned</option>
+                {members.map(m => (
+                  <option key={m.userId} value={m.userId}>{m.email}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+        </div>
+      </div>
+
+      {/* ── Submit ── */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '4px', borderTop: '1px solid rgba(55,53,47,0.07)' }}>
         <button
           type="submit"
           disabled={loading}
-          style={{ height: '34px', padding: '0 18px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, color: '#0a0b0f', backgroundColor: loading ? '#333' : 'rgba(255,255,255,0.90)', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
-          onMouseEnter={(e) => { if (!loading) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.80)' }}
-          onMouseLeave={(e) => { if (!loading) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.90)' }}
+          style={{
+            height: '36px', padding: '0 22px', borderRadius: '6px',
+            fontSize: '13px', fontWeight: 600, color: '#ffffff',
+            backgroundColor: loading ? 'rgba(55,53,47,0.40)' : '#37352f',
+            border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+            transition: 'background-color 150ms ease',
+          }}
+          onMouseEnter={e => { if (!loading) e.currentTarget.style.backgroundColor = '#2d2b28' }}
+          onMouseLeave={e => { if (!loading) e.currentTarget.style.backgroundColor = '#37352f' }}
         >
           {loading ? 'Logging…' : 'Log deal'}
         </button>

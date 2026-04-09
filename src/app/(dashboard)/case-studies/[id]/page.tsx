@@ -53,12 +53,12 @@ export default function CaseStudyDetailPage() {
   }
 
   return (
-    <div style={{ padding: '32px', maxWidth: '900px', margin: '0 auto' }}>
+    <div style={{ padding: '32px', maxWidth: '900px', margin: '0 auto', background: '#ffffff', minHeight: '100%' }}>
       <Link
         href="/case-studies"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#888', textDecoration: 'none', marginBottom: '20px' }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = '#EBEBEB' }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = '#888' }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#9b9a97', textDecoration: 'none', marginBottom: '20px' }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = '#9b9a97' }}
       >
         <ArrowLeft size={14} strokeWidth={2} />
         Back to case studies
@@ -71,7 +71,7 @@ export default function CaseStudyDetailPage() {
       )}
 
       {error && (
-        <div style={{ padding: '16px', borderRadius: '8px', backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#EF4444', fontSize: '13px' }}>
+        <div style={{ padding: '16px', borderRadius: '8px', backgroundColor: 'rgba(224,62,62,0.08)', border: '1px solid rgba(224,62,62,0.20)', color: '#e03e3e', fontSize: '13px' }}>
           Failed to load case study. Please refresh.
         </div>
       )}
@@ -79,11 +79,11 @@ export default function CaseStudyDetailPage() {
       {!isLoading && !error && caseStudy && (
         <>
           <div style={{ marginBottom: '24px' }}>
-            <h1 className="font-brand" style={{ fontSize: '22px', fontWeight: 500, color: '#EBEBEB', letterSpacing: '0.01em', margin: 0, marginBottom: '4px' }}>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, marginBottom: '4px' }}>
               {caseStudy.customerName}
             </h1>
             {caseStudy.customerIndustry && (
-              <p style={{ fontSize: '13px', color: '#888', margin: 0 }}>{caseStudy.customerIndustry}</p>
+              <p style={{ fontSize: '13px', color: '#787774', margin: 0 }}>{caseStudy.customerIndustry}</p>
             )}
           </div>
 
@@ -96,11 +96,11 @@ export default function CaseStudyDetailPage() {
 
           {/* Generated narrative */}
           {caseStudy.generatedNarrative && (
-            <div style={{ marginTop: '24px', background: 'rgba(255,255,255,0.03)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '20px' }}>
-              <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'rgba(255,255,255,0.80)', margin: '0 0 12px' }}>
+            <div style={{ marginTop: '24px', background: '#f7f6f3', border: '1px solid rgba(55,53,47,0.09)', borderRadius: '8px', padding: '20px' }}>
+              <h2 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 12px' }}>
                 Generated narrative
               </h2>
-              <p style={{ fontSize: '13px', color: '#EBEBEB', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>
+              <p style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>
                 {caseStudy.generatedNarrative}
               </p>
             </div>

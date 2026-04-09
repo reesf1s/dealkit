@@ -24,7 +24,7 @@ function ActionButton({ href, icon: Icon, label, description, color, bg, hoverBg
         padding: '14px 16px',
         borderRadius: '8px',
         backgroundColor: bg,
-        border: `1px solid ${color}33`,
+        border: '1px solid rgba(55,53,47,0.09)',
         textDecoration: 'none',
         transition: 'background-color 150ms ease, border-color 150ms ease',
         cursor: 'pointer',
@@ -54,10 +54,10 @@ function ActionButton({ href, icon: Icon, label, description, color, bg, hoverBg
       </div>
 
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: '13px', fontWeight: 600, color: '#EBEBEB', marginBottom: '2px' }}>
+        <div style={{ fontSize: '13px', fontWeight: 600, color: '#37352f', marginBottom: '2px' }}>
           {label}
         </div>
-        <div style={{ fontSize: '12px', color: '#888888' }}>{description}</div>
+        <div style={{ fontSize: '12px', color: '#787774' }}>{description}</div>
       </div>
     </Link>
   )
@@ -67,18 +67,18 @@ export function QuickActions() {
   return (
     <div
       style={{
-        background: 'rgba(255,255,255,0.03)',
-        backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255,255,255,0.07)',
+        background: 'var(--surface-1)',
+        border: '1px solid rgba(55,53,47,0.09)',
         borderRadius: '10px',
         padding: '16px',
+        boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
       }}
     >
       <p
         style={{
           fontSize: '13px',
           fontWeight: 600,
-          color: '#EBEBEB',
+          color: '#37352f',
           marginBottom: '12px',
           marginTop: 0,
         }}
@@ -92,27 +92,27 @@ export function QuickActions() {
           icon={FileText}
           label="Log a Deal"
           description="Record a won or lost deal with insights"
-          color="#6366F1"
-          bg="rgba(99, 102, 241, 0.06)"
-          hoverBg="rgba(99, 102, 241, 0.1)"
+          color="#5e6ad2"
+          bg="rgba(94, 106, 210, 0.06)"
+          hoverBg="#f7f6f3"
         />
         <ActionButton
           href="/competitors"
           icon={Users}
           label="Add Competitor"
           description="Track a new competitor and their positioning"
-          color="#F59E0B"
-          bg="rgba(245, 158, 11, 0.06)"
-          hoverBg="rgba(245, 158, 11, 0.1)"
+          color="#cb6c2c"
+          bg="rgba(203, 108, 44, 0.06)"
+          hoverBg="#f7f6f3"
         />
         <ActionButton
           href="/collateral"
           icon={Sparkles}
           label="Generate Collateral"
           description="AI-powered battlecards, one-pagers, and more"
-          color="#22C55E"
-          bg="rgba(34, 197, 94, 0.06)"
-          hoverBg="rgba(34, 197, 94, 0.1)"
+          color="#0f7b6c"
+          bg="rgba(15, 123, 108, 0.06)"
+          hoverBg="#f7f6f3"
         />
       </div>
     </div>

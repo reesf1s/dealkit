@@ -10,7 +10,12 @@ import { getWorkspaceContext } from '@/lib/workspace'
 import { db } from '@/lib/db'
 import { eq, and, inArray } from 'drizzle-orm'
 import { dealLinearLinks, dealLogs, linearIssuesCache, mcpActionLog } from '@/lib/db/schema'
-import { buildClaudeIssueReviewPrompt, ISSUE_LINKING_MODE } from '@/lib/issue-linking'
+
+const ISSUE_LINKING_MODE = 'mcp'
+
+function buildClaudeIssueReviewPrompt(params: { dealId: string; dealName: string; company: string }): string {
+  return `Use the Halvex MCP tools to review and link Linear issues for deal "${params.dealName}" (${params.company}, id: ${params.dealId}). Run halvex_list_deal_issues to see current links, then halvex_link_issue or halvex_dismiss_issue as needed.`
+}
 
 type Params = { params: Promise<{ id: string }> }
 

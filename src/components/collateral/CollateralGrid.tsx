@@ -50,19 +50,18 @@ function CollateralCard({
   return (
     <div
       style={{
-        background: 'var(--glass-card-bg)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        border: '1px solid var(--glass-card-border)',
-        borderRadius: '12px',
+        background: 'var(--surface-1)',
+        border: '1px solid rgba(55,53,47,0.12)',
+        borderRadius: '8px',
+        boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
         padding: '16px',
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
         transition: 'border-color 150ms ease, background 150ms ease',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--glass-card-hover-border)'; e.currentTarget.style.background = 'var(--glass-card-hover-bg)' }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--glass-card-border)'; e.currentTarget.style.background = 'var(--glass-card-bg)' }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(55,53,47,0.20)'; e.currentTarget.style.background = '#f7f6f3' }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(55,53,47,0.12)'; e.currentTarget.style.background = 'var(--surface-1)' }}
     >
       {/* Top row: type badge + status */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
@@ -76,7 +75,7 @@ function CollateralCard({
           style={{
             fontSize: '14px',
             fontWeight: 600,
-            color: '#EBEBEB',
+            color: '#37352f',
             margin: 0,
             letterSpacing: '-0.01em',
             lineHeight: 1.3,
@@ -91,9 +90,9 @@ function CollateralCard({
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '3px',
               fontSize: '10px', fontWeight: 600,
-              color: 'rgba(255,255,255,0.80)',
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              color: '#5e6ad2',
+              background: 'rgba(94,106,210,0.08)',
+              border: '1px solid rgba(94,106,210,0.20)',
               borderRadius: '4px',
               padding: '1px 6px',
               textDecoration: 'none',
@@ -109,16 +108,16 @@ function CollateralCard({
           </Link>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-          <p style={{ fontSize: '12px', color: '#555', margin: 0, fontVariantNumeric: 'tabular-nums' }}>
+          <p style={{ fontSize: '12px', color: '#787774', margin: 0, fontVariantNumeric: 'tabular-nums' }}>
             Generated {formatDate(item.generatedAt)}
           </p>
           {item.generationSource === 'proactive_brain' && (
             <span style={{
               fontSize: '10px',
               fontWeight: 500,
-              color: '#A78BFA',
-              background: 'rgba(167,139,250,0.1)',
-              border: '1px solid rgba(167,139,250,0.2)',
+              color: '#5e6ad2',
+              background: 'rgba(94,106,210,0.08)',
+              border: '1px solid rgba(94,106,210,0.20)',
               borderRadius: '4px',
               padding: '1px 5px',
               letterSpacing: '0.02em',
@@ -135,9 +134,9 @@ function CollateralCard({
                 gap: '3px',
                 fontSize: '10px',
                 fontWeight: 500,
-                color: '#6B7280',
-                background: 'rgba(107,114,128,0.08)',
-                border: '1px solid rgba(107,114,128,0.15)',
+                color: '#787774',
+                background: 'rgba(55,53,47,0.06)',
+                border: '1px solid rgba(55,53,47,0.12)',
                 borderRadius: '4px',
                 padding: '1px 5px',
                 letterSpacing: '0.02em',
@@ -164,14 +163,14 @@ function CollateralCard({
             borderRadius: '6px',
             fontSize: '12px',
             fontWeight: 500,
-            color: '#EBEBEB',
-            backgroundColor: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.08)',
+            color: '#37352f',
+            backgroundColor: 'rgba(55,53,47,0.06)',
+            border: '1px solid rgba(55,53,47,0.12)',
             textDecoration: 'none',
             transition: 'background-color 150ms ease',
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)' }}
-          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(55,53,47,0.10)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(55,53,47,0.06)' }}
         >
           <Eye size={11} strokeWidth={2} />
           View
@@ -188,14 +187,14 @@ function CollateralCard({
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: '6px',
-              backgroundColor: 'rgba(245,158,11,0.1)',
-              border: '1px solid rgba(245,158,11,0.25)',
+              backgroundColor: 'rgba(203,108,44,0.08)',
+              border: '1px solid rgba(203,108,44,0.25)',
               cursor: 'pointer',
-              color: '#F59E0B',
+              color: '#cb6c2c',
               transition: 'background-color 150ms ease',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.2)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(245,158,11,0.1)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(203,108,44,0.15)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(203,108,44,0.08)' }}
           >
             <RefreshCw size={12} strokeWidth={2} />
           </button>
@@ -212,14 +211,14 @@ function CollateralCard({
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: '6px',
-              backgroundColor: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              backgroundColor: 'rgba(55,53,47,0.06)',
+              border: '1px solid rgba(55,53,47,0.12)',
               cursor: 'pointer',
-              color: 'rgba(255,255,255,0.80)',
+              color: '#787774',
               transition: 'background-color 150ms ease',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(55,53,47,0.10)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(55,53,47,0.06)' }}
           >
             <Download size={12} strokeWidth={2} />
           </button>
@@ -238,17 +237,17 @@ function CollateralCard({
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderRadius: '6px',
-                  backgroundColor: 'rgba(239,68,68,0.15)',
-                  border: '1px solid rgba(239,68,68,0.35)',
+                  backgroundColor: 'rgba(224,62,62,0.08)',
+                  border: '1px solid rgba(224,62,62,0.25)',
                   cursor: 'pointer',
-                  color: '#EF4444',
+                  color: '#e03e3e',
                   fontSize: '11px',
                   fontWeight: 600,
                   whiteSpace: 'nowrap',
                   transition: 'background-color 150ms ease',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.25)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.15)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(224,62,62,0.15)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(224,62,62,0.08)' }}
               >
                 Delete
               </button>
@@ -262,15 +261,15 @@ function CollateralCard({
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderRadius: '6px',
-                  backgroundColor: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.08)',
+                  backgroundColor: 'rgba(55,53,47,0.04)',
+                  border: '1px solid rgba(55,53,47,0.12)',
                   cursor: 'pointer',
-                  color: '#888',
+                  color: '#787774',
                   fontSize: '13px',
                   transition: 'background-color 150ms ease',
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.08)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(55,53,47,0.08)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(55,53,47,0.04)' }}
               >
                 ✕
               </button>
@@ -286,21 +285,21 @@ function CollateralCard({
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: '6px',
-                backgroundColor: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.08)',
+                backgroundColor: 'rgba(55,53,47,0.04)',
+                border: '1px solid rgba(55,53,47,0.12)',
                 cursor: 'pointer',
-                color: '#555',
+                color: '#9b9a97',
                 transition: 'all 150ms ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.1)'
-                e.currentTarget.style.borderColor = 'rgba(239,68,68,0.25)'
-                e.currentTarget.style.color = '#EF4444'
+                e.currentTarget.style.backgroundColor = 'rgba(224,62,62,0.08)'
+                e.currentTarget.style.borderColor = 'rgba(224,62,62,0.25)'
+                e.currentTarget.style.color = '#e03e3e'
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)'
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
-                e.currentTarget.style.color = '#555'
+                e.currentTarget.style.backgroundColor = 'rgba(55,53,47,0.04)'
+                e.currentTarget.style.borderColor = 'rgba(55,53,47,0.12)'
+                e.currentTarget.style.color = '#9b9a97'
               }}
             >
               <Trash2 size={12} strokeWidth={2} />

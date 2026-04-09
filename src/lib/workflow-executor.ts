@@ -112,40 +112,6 @@ export async function executeWorkflow(
     .set({ lastRunAt: new Date(), lastOutput: output })
     .where(eq(workflows.id, workflowId))
 
-  // 5. Slack output — DM all opted-in users (fire-and-forget)
-  if (wf.outputTarget === 'slack') {
-    import('./slack-notify').then(async () => {
-      const { slackOpenDm, slackPostMessage } = await import('./slack-client')
-      const { slackConnections, slackUserMappings } = await import('./db/schema')
-      const { decrypt, getEncryptionKey } = await import('./encrypt')
-      const { eq: eqInner } = await import('drizzle-orm')
-      const { db: dbInner } = await import('./db')
-
-      const [conn] = await dbInner
-        .select({ botTokenEnc: slackConnections.botTokenEnc })
-        .from(slackConnections)
-        .where(eqInner(slackConnections.workspaceId, workspaceId))
-        .limit(1)
-      if (!conn) return
-
-      const botToken = decrypt(conn.botTokenEnc, getEncryptionKey())
-
-      const users = await dbInner
-        .select({ slackUserId: slackUserMappings.slackUserId })
-        .from(slackUserMappings)
-        .where(eqInner(slackUserMappings.workspaceId, workspaceId))
-
-      for (const u of users) {
-        try {
-          const channel = await slackOpenDm(botToken, u.slackUserId)
-          if (channel) await slackPostMessage(botToken, channel, [
-            { type: 'section', text: { type: 'mrkdwn', text: `*${wf.name}*\n${output}` } },
-          ])
-        } catch { /* non-fatal */ }
-      }
-    }).catch(() => { /* non-fatal */ })
-  }
-
   return { output, toolUsed }
 }
 

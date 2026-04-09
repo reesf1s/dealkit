@@ -26,92 +26,92 @@ interface EventConfig {
 const EVENT_CONFIG: Partial<Record<EventType, EventConfig>> = {
   'deal_log.closed_won': {
     icon: Trophy,
-    color: '#22C55E',
-    bg: 'rgba(34, 197, 94, 0.12)',
+    color: '#0f7b6c',
+    bg: 'rgba(15, 123, 108, 0.10)',
     label: (m) => `Deal won: ${m.dealName ?? 'Unknown deal'}`,
   },
   'deal_log.closed_lost': {
     icon: X,
-    color: '#EF4444',
-    bg: 'rgba(239, 68, 68, 0.12)',
+    color: '#e03e3e',
+    bg: 'rgba(224, 62, 62, 0.10)',
     label: (m) => `Deal lost: ${m.dealName ?? 'Unknown deal'}`,
   },
   'deal_log.created': {
     icon: FileText,
-    color: '#6366F1',
-    bg: 'rgba(99, 102, 241, 0.12)',
+    color: '#5e6ad2',
+    bg: 'rgba(94, 106, 210, 0.10)',
     label: (m) => `New deal logged: ${m.dealName ?? 'Unknown deal'}`,
   },
   'deal_log.updated': {
     icon: RefreshCw,
-    color: '#888888',
-    bg: 'rgba(136, 136, 136, 0.1)',
+    color: '#787774',
+    bg: 'rgba(55, 53, 47, 0.06)',
     label: (m) => `Deal updated: ${m.dealName ?? 'Unknown deal'}`,
   },
   'competitor.created': {
     icon: UserPlus,
-    color: '#F59E0B',
-    bg: 'rgba(245, 158, 11, 0.12)',
+    color: '#cb6c2c',
+    bg: 'rgba(203, 108, 44, 0.10)',
     label: (m) => `Competitor added: ${m.name ?? 'Unknown'}`,
   },
   'competitor.updated': {
     icon: RefreshCw,
-    color: '#888888',
-    bg: 'rgba(136, 136, 136, 0.1)',
+    color: '#787774',
+    bg: 'rgba(55, 53, 47, 0.06)',
     label: (m) => `Competitor updated: ${m.name ?? 'Unknown'}`,
   },
   'competitor.deleted': {
     icon: Trash2,
-    color: '#EF4444',
-    bg: 'rgba(239, 68, 68, 0.12)',
+    color: '#e03e3e',
+    bg: 'rgba(224, 62, 62, 0.10)',
     label: () => 'Competitor deleted',
   },
   'collateral.generated': {
     icon: FileText,
-    color: '#6366F1',
-    bg: 'rgba(99, 102, 241, 0.12)',
+    color: '#5e6ad2',
+    bg: 'rgba(94, 106, 210, 0.10)',
     label: (m) => `Collateral generated: ${m.title ?? m.collateralType ?? 'Unknown'}`,
   },
   'collateral.archived': {
     icon: Trash2,
-    color: '#888888',
-    bg: 'rgba(136, 136, 136, 0.1)',
+    color: '#787774',
+    bg: 'rgba(55, 53, 47, 0.06)',
     label: (m) => `Collateral archived: ${m.title ?? 'Unknown'}`,
   },
   'case_study.created': {
     icon: BookOpen,
-    color: '#22C55E',
-    bg: 'rgba(34, 197, 94, 0.12)',
+    color: '#0f7b6c',
+    bg: 'rgba(15, 123, 108, 0.10)',
     label: (m) => `Case study added: ${m.customerName ?? 'Unknown'}`,
   },
   'case_study.updated': {
     icon: RefreshCw,
-    color: '#888888',
-    bg: 'rgba(136, 136, 136, 0.1)',
+    color: '#787774',
+    bg: 'rgba(55, 53, 47, 0.06)',
     label: (m) => `Case study updated: ${m.customerName ?? 'Unknown'}`,
   },
   'case_study.deleted': {
     icon: Trash2,
-    color: '#EF4444',
-    bg: 'rgba(239, 68, 68, 0.12)',
+    color: '#e03e3e',
+    bg: 'rgba(224, 62, 62, 0.10)',
     label: () => 'Case study deleted',
   },
   'company_profile.updated': {
     icon: Building2,
-    color: '#6366F1',
-    bg: 'rgba(99, 102, 241, 0.12)',
+    color: '#5e6ad2',
+    bg: 'rgba(94, 106, 210, 0.10)',
     label: (m) => `Company profile updated: ${m.companyName ?? ''}`,
   },
   'plan.upgraded': {
     icon: Trophy,
-    color: '#22C55E',
-    bg: 'rgba(34, 197, 94, 0.12)',
+    color: '#0f7b6c',
+    bg: 'rgba(15, 123, 108, 0.10)',
     label: (m) => `Plan upgraded to ${m.toPlan}`,
   },
   'plan.downgraded': {
     icon: RefreshCw,
-    color: '#888888',
-    bg: 'rgba(136, 136, 136, 0.1)',
+    color: '#787774',
+    bg: 'rgba(55, 53, 47, 0.06)',
     label: (m) => `Plan changed to ${m.toPlan}`,
   },
 }
@@ -119,8 +119,8 @@ const EVENT_CONFIG: Partial<Record<EventType, EventConfig>> = {
 function fallbackConfig(): EventConfig {
   return {
     icon: FileText,
-    color: '#888888',
-    bg: 'rgba(136, 136, 136, 0.1)',
+    color: '#787774',
+    bg: 'rgba(55, 53, 47, 0.06)',
     label: () => 'Activity',
   }
 }
@@ -145,25 +145,25 @@ export function ActivityFeed({ events }: ActivityFeedProps) {
     return (
       <div
         style={{
-          background: 'rgba(255,255,255,0.03)',
-          backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(255,255,255,0.07)',
+          background: 'var(--surface-1)',
+          border: '1px solid rgba(55,53,47,0.09)',
           borderRadius: '10px',
           padding: '16px',
+          boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
         }}
       >
         <p
           style={{
             fontSize: '13px',
             fontWeight: 600,
-            color: '#EBEBEB',
+            color: '#37352f',
             marginBottom: '16px',
             marginTop: 0,
           }}
         >
           Recent activity
         </p>
-        <p style={{ fontSize: '13px', color: '#555', margin: 0, textAlign: 'center', padding: '24px 0' }}>
+        <p style={{ fontSize: '13px', color: '#9b9a97', margin: 0, textAlign: 'center', padding: '24px 0' }}>
           No activity yet. Start by setting up your company profile.
         </p>
       </div>
@@ -173,18 +173,18 @@ export function ActivityFeed({ events }: ActivityFeedProps) {
   return (
     <div
       style={{
-        background: 'rgba(255,255,255,0.03)',
-        backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255,255,255,0.07)',
+        background: 'var(--surface-1)',
+        border: '1px solid rgba(55,53,47,0.09)',
         borderRadius: '10px',
         padding: '16px',
+        boxShadow: '0 1px 3px rgba(55,53,47,0.06)',
       }}
     >
       <p
         style={{
           fontSize: '13px',
           fontWeight: 600,
-          color: '#EBEBEB',
+          color: '#37352f',
           marginBottom: '12px',
           marginTop: 0,
         }}
@@ -210,7 +210,7 @@ export function ActivityFeed({ events }: ActivityFeedProps) {
                 transition: 'background-color 100ms ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.03)'
+                e.currentTarget.style.backgroundColor = '#f7f6f3'
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent'
@@ -235,7 +235,7 @@ export function ActivityFeed({ events }: ActivityFeedProps) {
                 style={{
                   flex: 1,
                   fontSize: '13px',
-                  color: '#EBEBEB',
+                  color: '#37352f',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -247,7 +247,7 @@ export function ActivityFeed({ events }: ActivityFeedProps) {
               <span
                 style={{
                   fontSize: '11px',
-                  color: '#555',
+                  color: '#9b9a97',
                   whiteSpace: 'nowrap',
                   fontVariantNumeric: 'tabular-nums',
                 }}
