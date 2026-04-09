@@ -127,7 +127,7 @@ function eventDotColor(type: string): string {
   return '#3b82f6'
 }
 
-// ─── Deal Monitor Mini ──────────────────────────────────────────────────────
+// ─── Deal Monitor Mini — removed (merged into Pipeline card) ────────────────
 
 function DealMonitorMini() {
   const { data, isLoading } = useSWR<{
@@ -763,112 +763,95 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Pipeline Health Strip ── */}
+      {/* ── Pipeline + Forecast (merged) ── */}
       <div style={{
         background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-        borderRadius: 12, marginBottom: 16,
-        padding: '16px 22px', display: 'flex', alignItems: 'center',
+        borderRadius: 12, marginBottom: 16, overflow: 'hidden',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 22, flexShrink: 0 }}>
-          <Activity size={11} style={{ color: '#1DB86A' }} />
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Pipeline
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'stretch', flex: 1 }}>
-          {[
-            { value: fmtCurrency(pipelineValue), label: 'value' },
-            { value: String(openDeals.length), label: 'deals' },
-            { value: avgScore != null ? String(avgScore) : '—', label: 'avg score' },
-            { value: winRate != null ? `${winRate}%` : '—', label: 'win rate' },
-          ].map((item, i) => (
-            <div key={i} style={{
-              padding: '2px 18px',
-              borderRight: i < 3 ? '1px solid var(--border-subtle)' : 'none',
-              display: 'flex', flexDirection: 'column', gap: 1, justifyContent: 'center',
-            }}>
-              <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>
-                {item.value}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{item.label}</div>
-            </div>
-          ))}
-
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 14, paddingLeft: 18, flexWrap: 'wrap' }}>
-            {[
-              { count: atRisk,    label: 'at risk',  color: '#ef4444' },
-              { count: onTrack,   label: 'on track', color: '#1DB86A' },
-              { count: staleCount,label: 'stale',    color: '#f59e0b' },
-              { count: wonCount,  label: 'won',      color: '#3b82f6' },
-            ].map((s, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <div style={{ width: 6, height: 6, borderRadius: '50%', background: s.color }} />
-                <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                  {s.count} {s.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Revenue Forecast ── */}
-      <div style={{
-        background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-        borderRadius: 12, marginBottom: 16, padding: '18px 22px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <TrendingUp size={11} style={{ color: '#3b82f6' }} />
+        {/* Top: pipeline stats */}
+        <div style={{ padding: '16px 22px', display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 22, flexShrink: 0 }}>
+            <TrendingUp size={11} style={{ color: '#1DB86A' }} />
             <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Revenue Forecast
+              Pipeline
             </span>
           </div>
-          <Link href="/deals" style={{ fontSize: 11, color: 'var(--text-tertiary)', textDecoration: 'none' }}>
-            Set forecast →
-          </Link>
+          <div style={{ display: 'flex', alignItems: 'stretch', flex: 1 }}>
+            {[
+              { value: fmtCurrency(pipelineValue), label: 'value' },
+              { value: String(openDeals.length), label: 'deals' },
+              { value: avgScore != null ? String(avgScore) : '—', label: 'avg score' },
+              { value: winRate != null ? `${winRate}%` : '—', label: 'win rate' },
+            ].map((item, i) => (
+              <div key={i} style={{
+                padding: '2px 18px',
+                borderRight: i < 3 ? '1px solid var(--border-subtle)' : 'none',
+                display: 'flex', flexDirection: 'column', gap: 1, justifyContent: 'center',
+              }}>
+                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>
+                  {item.value}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{item.label}</div>
+              </div>
+            ))}
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 14, paddingLeft: 18, flexWrap: 'wrap' }}>
+              {[
+                { count: atRisk,    label: 'at risk',  color: '#ef4444' },
+                { count: onTrack,   label: 'on track', color: '#1DB86A' },
+                { count: staleCount,label: 'stale',    color: '#f59e0b' },
+                { count: wonCount,  label: 'won',      color: '#3b82f6' },
+              ].map((s, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: s.color }} />
+                  <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                    {s.count} {s.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {!hasForecast ? (
-          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', fontStyle: 'italic', paddingBottom: 2 }}>
-            Tag deals as <strong style={{ color: 'var(--text-secondary)', fontStyle: 'normal' }}>Commit</strong>, <strong style={{ color: 'var(--text-secondary)', fontStyle: 'normal' }}>Upside</strong> or <strong style={{ color: 'var(--text-secondary)', fontStyle: 'normal' }}>Pipeline</strong> on the deals board to unlock your forecast.
+        {/* Bottom: forecast */}
+        <div style={{ padding: '14px 22px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: hasForecast ? 12 : 0 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Forecast
+            </span>
+            {!hasForecast && (
+              <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+                Tag deals as <strong style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Commit</strong>, <strong style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Upside</strong> or <strong style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Pipeline</strong> to unlock
+              </span>
+            )}
+            <Link href="/deals" style={{ fontSize: 11, color: 'var(--text-tertiary)', textDecoration: 'none' }}>
+              Deals →
+            </Link>
           </div>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
-            {/* Commit */}
-            <div style={{ flex: 1, paddingRight: 20, borderRight: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: 10, color: '#1DB86A', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Commit</div>
-              <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>{fmtCurrency(commitValue)}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{commitDeals.length} deal{commitDeals.length !== 1 ? 's' : ''} · 90% confidence</div>
+          {hasForecast && (
+            <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
+              {[
+                { label: 'Commit',   value: commitValue,        color: '#1DB86A',          count: commitDeals.length,  sub: '90% confidence' },
+                { label: 'Upside',   value: upsideValue,        color: '#3b82f6',          count: upsideDeals.length,  sub: '50% confidence' },
+                { label: 'Best case',value: bestCase,           color: '#f59e0b',          count: null,                sub: 'Commit + Upside' },
+                { label: 'Weighted', value: weightedForecast,   color: 'var(--text-tertiary)', count: null,            sub: 'Probability-adjusted' },
+              ].map((item, i) => (
+                <div key={i} style={{
+                  flex: 1,
+                  paddingLeft: i > 0 ? 20 : 0,
+                  paddingRight: i < 3 ? 20 : 0,
+                  borderRight: i < 3 ? '1px solid var(--border-subtle)' : 'none',
+                }}>
+                  <div style={{ fontSize: 10, color: item.color, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>{item.label}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>{fmtCurrency(item.value)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                    {item.count != null ? `${item.count} deal${item.count !== 1 ? 's' : ''} · ` : ''}{item.sub}
+                  </div>
+                </div>
+              ))}
             </div>
-            {/* Upside */}
-            <div style={{ flex: 1, padding: '0 20px', borderRight: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: 10, color: '#3b82f6', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Upside</div>
-              <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>{fmtCurrency(upsideValue)}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{upsideDeals.length} deal{upsideDeals.length !== 1 ? 's' : ''} · 50% confidence</div>
-            </div>
-            {/* Best case */}
-            <div style={{ flex: 1, padding: '0 20px', borderRight: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Best Case</div>
-              <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>{fmtCurrency(bestCase)}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>Commit + Upside</div>
-            </div>
-            {/* Weighted */}
-            <div style={{ flex: 1, paddingLeft: 20 }}>
-              <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Weighted</div>
-              <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>{fmtCurrency(weightedForecast)}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>Probability-adjusted</div>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-
-      {/* ── Deal Monitor Mini ── */}
-      <DealMonitorMini />
-
-      {/* ── Focus Briefing ── */}
-      <FocusBriefing />
 
       {/* ── Bottom: Intelligence + Activity ── */}
       <div className="dash-bottom-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16 }}>

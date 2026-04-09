@@ -1491,9 +1491,8 @@ function MeetingPrepTab({ dealId, deal, objectionWinMap = [], objectionCondition
         <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '4px' }}>
           <button onClick={generateFullBrief} disabled={loading} style={{
             display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 24px',
-            background: loading ? 'var(--accent-subtle)' : '#1a1a1a',
-            boxShadow: loading ? 'none' : 'var(--shadow)',
-            border: loading ? '1px solid var(--accent)' : 'none',
+            background: loading ? 'var(--surface-3)' : '#1DB86A',
+            border: loading ? '1px solid var(--border-default)' : 'none',
             borderRadius: '9px', color: loading ? 'var(--text-secondary)' : '#ffffff', fontSize: '13px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer',
           }}>
             {loading
@@ -2106,7 +2105,7 @@ function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
               </Dialog.Close>
               <button onClick={save} disabled={saving} style={{
                 height: '34px', padding: '0 18px', borderRadius: '7px', fontSize: '13px', fontWeight: 600,
-                color: saving ? 'var(--text-secondary)' : '#ffffff', background: saving ? 'var(--surface)' : '#1a1a1a',
+                color: saving ? 'var(--text-secondary)' : '#ffffff', background: saving ? 'var(--surface-3)' : '#1DB86A',
                 border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
               }}>
                 {saving ? 'Saving…' : 'Save changes'}
@@ -2569,7 +2568,7 @@ function SuccessCriteriaTab({ dealId, deal, onUpdate, members }: { dealId: strin
           <button
             onClick={extract}
             disabled={loading || !text.trim()}
-            style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', background: loading ? 'var(--accent-subtle)' : '#1a1a1a', border: loading ? '1px solid var(--accent)' : 'none', borderRadius: '8px', color: loading ? 'var(--text-secondary)' : '#ffffff', fontSize: '13px', fontWeight: '600', cursor: loading || !text.trim() ? 'not-allowed' : 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', background: loading ? 'var(--surface-3)' : '#1DB86A', border: loading ? '1px solid var(--border-default)' : 'none', borderRadius: '8px', color: loading ? 'var(--text-secondary)' : '#ffffff', fontSize: '13px', fontWeight: '600', cursor: loading || !text.trim() ? 'not-allowed' : 'pointer' }}
           >
             {loading ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Extracting…</> : <><Sparkles size={13} /> Extract Criteria</>}
           </button>
@@ -2820,7 +2819,7 @@ function ProjectPlanTab({ dealId, deal, onUpdate, members }: { dealId: string; d
           <button
             onClick={extract}
             disabled={loading || !text.trim()}
-            style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', background: loading ? 'var(--accent-subtle)' : '#1a1a1a', border: loading ? '1px solid var(--accent)' : 'none', borderRadius: '8px', color: loading ? 'var(--text-secondary)' : '#ffffff', fontSize: '13px', fontWeight: '600', cursor: loading || !text.trim() ? 'not-allowed' : 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', background: loading ? 'var(--surface-3)' : '#1DB86A', border: loading ? '1px solid var(--border-default)' : 'none', borderRadius: '8px', color: loading ? 'var(--text-secondary)' : '#ffffff', fontSize: '13px', fontWeight: '600', cursor: loading || !text.trim() ? 'not-allowed' : 'pointer' }}
           >
             {loading ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Parsing…</> : <><Sparkles size={13} /> Create Plan</>}
           </button>
@@ -3250,8 +3249,8 @@ function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
           href={`/collateral?dealId=${dealId}`}
           style={{
             display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-            background: '#1a1a1a',
-            borderRadius: '8px', color: '#ffffff', fontSize: '13px', fontWeight: '600',
+            background: 'rgba(29,184,106,0.12)', border: '1px solid rgba(29,184,106,0.24)',
+            borderRadius: '8px', color: '#1DB86A', fontSize: '13px', fontWeight: '600',
             textDecoration: 'none',
           }}
         >
@@ -3278,9 +3277,9 @@ function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
             href={`/collateral?dealId=${dealId}`}
             style={{
               display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px',
-              background: '#1a1a1a',
+              background: '#1DB86A',
               borderRadius: '9px', color: '#ffffff', fontSize: '13px', fontWeight: '600',
-              textDecoration: 'none', boxShadow: 'var(--shadow)',
+              textDecoration: 'none',
             }}
           >
             <Sparkles size={14} /> Generate Collateral
@@ -3357,7 +3356,7 @@ function ScoreRing({ score, size = 64 }: { score: number | null; size?: number }
   return (
     <div style={{ position: 'relative', width: `${size}px`, height: `${size}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
       <svg className="absolute inset-0 w-full h-full" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', transform: 'rotate(-90deg)' }} viewBox="0 0 80 80">
-        <circle cx="40" cy="40" r="34" fill="none" stroke="#eeeeee" strokeWidth="6" />
+        <circle cx="40" cy="40" r="34" fill="none" stroke="var(--border-default)" strokeWidth="6" />
         <circle
           cx="40" cy="40" r="34" fill="none"
           stroke={color} strokeWidth="6"
@@ -6315,7 +6314,7 @@ function TeamTab({ deal, currencySymbol = '£' }: { deal: any; currencySymbol?: 
             .map(({ label, value }, i, arr) => (
               <div key={label} style={{
                 padding: '10px 0',
-                borderBottom: i < arr.length - 1 ? '1px solid #eeeeee' : 'none',
+                borderBottom: i < arr.length - 1 ? '1px solid var(--border-subtle)' : 'none',
               }}>
                 <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500, marginBottom: '3px' }}>{label}</div>
                 <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{value}</div>
@@ -6363,7 +6362,7 @@ export default function DealDetailPage() {
   )
   const parentDeal = parentDealRes?.data ?? parentDealRes
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'manage' | 'notes' | 'activity' | 'team'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'manage' | 'notes' | 'team'>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [winStoryOpen, setWinStoryOpen] = useState(false)
   const [wonDeal, setWonDeal] = useState<any>(null)
@@ -6483,7 +6482,6 @@ export default function DealDetailPage() {
           border: '1px solid var(--border-default)',
           borderRadius: '1.25rem',
           padding: isMobile ? '20px' : '24px 28px',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
         }}>
           <div style={{
             display: 'flex',
@@ -6635,7 +6633,6 @@ export default function DealDetailPage() {
             return `Manage (${total})`
           })() },
           { id: 'notes', label: 'Notes' },
-          { id: 'activity', label: 'Activity' },
           { id: 'team', label: 'Team' },
         ].map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{
@@ -6680,7 +6677,7 @@ export default function DealDetailPage() {
                 width: '100%', resize: 'vertical', padding: '12px 14px',
                 background: 'var(--surface-2)', border: '1px solid var(--border-default)',
                 borderRadius: '10px', fontSize: '13px', lineHeight: 1.6,
-                color: 'var(--text-primary)', outline: 'none', caretColor: '#1a1a1a',
+                color: 'var(--text-primary)', outline: 'none', caretColor: 'var(--text-primary)',
                 fontFamily: 'inherit',
               }}
               onFocus={e => (e.target.style.borderColor = '#1DB86A')}
@@ -6716,9 +6713,9 @@ export default function DealDetailPage() {
                 }}
                 style={{
                   padding: '9px 20px', borderRadius: '8px',
-                  background: meetingLogging || !meetingNotesDraft.trim() ? 'var(--surface-2)' : 'var(--text-primary)',
-                  border: '1px solid var(--border-default)',
-                  color: meetingLogging || !meetingNotesDraft.trim() ? '#9b9a97' : '#ffffff', fontSize: '13px', fontWeight: 600,
+                  background: meetingLogging || !meetingNotesDraft.trim() ? 'var(--surface-2)' : '#1DB86A',
+                  border: meetingLogging || !meetingNotesDraft.trim() ? '1px solid var(--border-default)' : 'none',
+                  color: meetingLogging || !meetingNotesDraft.trim() ? 'var(--text-tertiary)' : '#ffffff', fontSize: '13px', fontWeight: 600,
                   cursor: meetingLogging || !meetingNotesDraft.trim() ? 'not-allowed' : 'pointer',
                 }}
               >
@@ -6731,7 +6728,7 @@ export default function DealDetailPage() {
 
       {/* ── Meeting toast ───────────────────────────────────────────────── */}
       {meetingToast && (
-        <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 800, background: 'var(--surface-1)', border: '1px solid rgba(15,123,108,0.25)', borderRadius: '12px', padding: '14px 18px', color: '#0f7b6c', fontSize: '13px', fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,0.10)', maxWidth: '360px' }}>
+        <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 800, background: 'var(--surface-1)', border: '1px solid rgba(29,184,106,0.25)', borderRadius: '12px', padding: '14px 18px', color: '#1DB86A', fontSize: '13px', fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,0.10)', maxWidth: '360px' }}>
           ✓ {meetingToast}
         </div>
       )}
@@ -6756,11 +6753,6 @@ export default function DealDetailPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <ActivityTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
               <ActivityLog dealId={id} deal={deal} onUpdate={() => mutate()} />
-            </div>
-          )}
-          {activeTab === 'activity' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <AiActivitySection dealId={id} />
             </div>
           )}
           {activeTab === 'team' && (
