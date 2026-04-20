@@ -77,23 +77,29 @@ export default function Sidebar() {
   const enabledAutomations = Array.isArray(automationsRes?.data)
     ? automationsRes.data.filter((item: { enabled?: boolean }) => item.enabled).length
     : 0
+  const openTaskCount = deals.reduce((count: number, deal: { todos?: Array<{ done?: boolean }>; projectPlan?: { phases?: Array<{ tasks?: Array<{ status?: string }> }> }; successCriteriaTodos?: Array<{ achieved?: boolean }> }) => {
+    const openTodos = deal.todos?.filter(todo => !todo.done).length ?? 0
+    const openPlanTasks = deal.projectPlan?.phases?.flatMap(phase => phase.tasks ?? []).filter(task => task.status !== 'complete').length ?? 0
+    const openCriteria = deal.successCriteriaTodos?.filter(item => !item.achieved).length ?? 0
+    return count + openTodos + openPlanTasks + openCriteria
+  }, 0)
 
   const pipelineItems: NavItem[] = [
     { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-    { href: '/deals', label: 'Deals', icon: BriefcaseBusiness, count: openDeals.length, matchPaths: ['/deals', '/pipeline'] },
+    { href: '/deals', label: 'Deals', icon: BriefcaseBusiness, count: openDeals.length, matchPaths: ['/deals'] },
     { href: '/company', label: 'Accounts', icon: Target, count: accountCount, matchPaths: ['/company'] },
     { href: '/contacts', label: 'Contacts', icon: Users },
   ]
 
   const intelligenceItems: NavItem[] = [
     { href: '/analytics', label: 'Signals', icon: Sparkles, signal: enabledAutomations > 0, matchPaths: ['/analytics'] },
-    { href: '/dashboard', label: 'Forecast', icon: Gauge, matchPaths: ['/dashboard'] },
+    { href: '/pipeline', label: 'Forecast', icon: Gauge, matchPaths: ['/pipeline'] },
     { href: '/connections', label: 'Conversations', icon: MessageSquare, count: 7, matchPaths: ['/connections', '/chat'] },
-    { href: '/automations', label: 'Automations', icon: Bot, count: enabledAutomations, matchPaths: ['/automations', '/intelligence'] },
+    { href: '/automations', label: 'Automations', icon: Bot, count: enabledAutomations, matchPaths: ['/automations'] },
   ]
 
   const workspaceItems: NavItem[] = [
-    { href: '/deals', label: 'Tasks', icon: CircleDashed },
+    { href: '/tasks', label: 'Tasks', icon: CircleDashed, count: openTaskCount || undefined, matchPaths: ['/tasks'] },
     { href: '/calendar', label: 'Calendar', icon: Calendar },
     { href: '/settings', label: 'Settings', icon: Settings },
   ]

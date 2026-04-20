@@ -273,7 +273,7 @@ export default function ProductGapsPage() {
             </div>
             <div>
               <h1 className="font-brand" style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1, margin: 0 }}>
-                Product Gaps
+                Capability Gaps
               </h1>
               <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px', margin: 0 }}>
                 Feature gaps extracted from deal notes — ranked by revenue at risk

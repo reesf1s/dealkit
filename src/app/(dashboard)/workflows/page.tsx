@@ -7,7 +7,7 @@ import Link from 'next/link'
 import {
   Zap, Mail, GitBranch, Brain, RefreshCw, Shield,
   Check, AlertTriangle, Clock, ArrowRight, ChevronRight,
-  Target, Eye, TrendingDown, Swords, Calendar, Users,
+  TrendingDown, Swords, Calendar, Users,
   ToggleLeft, ToggleRight, Activity, Bell,
 } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
@@ -368,7 +368,7 @@ function DealMonitorCard() {
 // ─── Intelligence Health Card ─────────────────────────────────────────────────
 
 function IntelligenceHealthCard() {
-  const { data: brainData, error, isLoading, mutate } = useSWR<BrainData>('/api/brain', fetcher, {
+  const { data: brainData, error, mutate } = useSWR<BrainData>('/api/brain', fetcher, {
     revalidateOnFocus: false, dedupingInterval: 30000,
   })
   const [rebuilding, setRebuilding] = useState(false)
@@ -526,7 +526,7 @@ export default function WorkflowsPage() {
   const { data: automationsRes, mutate: mutateAutomations } = useSWR<{ data: Automation[] }>('/api/automations', fetcher, {
     revalidateOnFocus: false, dedupingInterval: 30000,
   })
-  const automations = automationsRes?.data ?? []
+  const automations = useMemo(() => automationsRes?.data ?? [], [automationsRes?.data])
   const [toggling, setToggling] = useState<string | null>(null)
 
   const grouped = useMemo(() => {
@@ -559,7 +559,7 @@ export default function WorkflowsPage() {
       {/* ── Page header ── */}
       <div>
         <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 4px', letterSpacing: '-0.04em' }}>
-          Sequences & Automations
+          Automations
         </h1>
         <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', margin: 0, lineHeight: 1.5 }}>
           Your CRM intelligence layer — deals are scored, signals are detected, and actions are surfaced automatically.
