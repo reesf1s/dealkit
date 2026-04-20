@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { startTransition, useDeferredValue, useMemo, useState } from 'react'
+import { Suspense, startTransition, useDeferredValue, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
 import {
@@ -225,7 +225,7 @@ function buildWorkItems(deals: DealRecord[]): WorkItem[] {
   })
 }
 
-export default function TasksPage() {
+function TasksPageInner() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -769,5 +769,24 @@ export default function TasksPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+function TasksPageFallback() {
+  return (
+    <div style={{ paddingTop: 4 }}>
+      <div className="panel-section" style={{ padding: 24 }}>
+        <div className="section-title">Tasks</div>
+        <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-3)' }}>Loading task priorities…</div>
+      </div>
+    </div>
+  )
+}
+
+export default function TasksPage() {
+  return (
+    <Suspense fallback={<TasksPageFallback />}>
+      <TasksPageInner />
+    </Suspense>
   )
 }
