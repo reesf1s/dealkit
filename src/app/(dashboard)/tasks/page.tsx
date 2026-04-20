@@ -2,23 +2,37 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
+import { startTransition, useDeferredValue, useMemo, useState } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
-import { CheckCircle2, ChevronRight, Circle, ClipboardList, Sparkles } from 'lucide-react'
+import {
+  ArrowUpRight,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardList,
+  Filter,
+  Search,
+  Sparkles,
+  Target,
+} from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { formatContextualDate, formatRelativeTime } from '@/lib/presentation'
+import { formatContextualDate, formatCurrencyGBP, formatRelativeTime } from '@/lib/presentation'
 
 type DealTodo = {
   id: string
   text: string
   done: boolean
   source?: 'manual' | 'ai'
+  priority?: 'low' | 'normal' | 'high'
   createdAt?: string
+  dueDate?: string | null
 }
 
 type SuccessCriterion = {
   id: string
   text: string
   achieved?: boolean
+  category?: string
 }
 
 type ProjectPlanTask = {
@@ -26,6 +40,7 @@ type ProjectPlanTask = {
   text: string
   status?: 'not_started' | 'in_progress' | 'complete'
   dueDate?: string | null
+  owner?: string | null
 }
 
 type DealRecord = {
@@ -34,11 +49,13 @@ type DealRecord = {
   prospectCompany: string
   stage: string
   conversionScore?: number | null
+  dealValue?: number | null
   updatedAt?: string
   todos?: DealTodo[] | null
   successCriteriaTodos?: SuccessCriterion[] | null
   projectPlan?: {
     phases?: Array<{
+      id: string
       name: string
       tasks?: ProjectPlanTask[]
     }>
@@ -49,12 +66,37 @@ type WorkItem = {
   id: string
   dealId: string
   dealLabel: string
+  stage: string
   kind: 'task' | 'project' | 'criterion'
   text: string
   meta: string
+  dueDate?: string | null
+  updatedAt?: string
   done: boolean
   priorityScore: number
-  updatedAt?: string
+  priorityLabel: 'critical' | 'high' | 'medium' | 'low'
+  priorityReason: string
+  sortDate: number
+}
+
+const STAGE_WEIGHTS: Record<string, number> = {
+  negotiation: 26,
+  proposal: 22,
+  discovery: 14,
+  qualification: 10,
+  prospecting: 6,
+}
+
+const PRIORITY_WEIGHTS: Record<string, number> = {
+  high: 34,
+  normal: 20,
+  low: 8,
+}
+
+const KIND_WEIGHTS: Record<WorkItem['kind'], number> = {
+  task: 22,
+  project: 16,
+  criterion: 14,
 }
 
 function stageLabel(stage?: string | null) {
@@ -62,164 +104,668 @@ function stageLabel(stage?: string | null) {
   return stage.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
 }
 
+function compactMoney(value: number | null | undefined) {
+  return formatCurrencyGBP(value, { compact: true })
+}
+
+function scorePriorityLabel(score: number): WorkItem['priorityLabel'] {
+  if (score >= 82) return 'critical'
+  if (score >= 62) return 'high'
+  if (score >= 40) return 'medium'
+  return 'low'
+}
+
+function dueDateWeight(dueDate?: string | null) {
+  if (!dueDate) return 0
+  const target = new Date(dueDate)
+  if (Number.isNaN(target.getTime())) return 0
+  const diffDays = Math.floor((target.getTime() - Date.now()) / 86_400_000)
+  if (diffDays < 0) return 28
+  if (diffDays <= 3) return 22
+  if (diffDays <= 7) return 16
+  if (diffDays <= 14) return 8
+  return 2
+}
+
+function describePriority(score: number, stage: string, dueDate?: string | null, source?: string, value?: number | null) {
+  const parts: string[] = []
+  if (dueDateWeight(dueDate) >= 22) {
+    parts.push(dueDate && new Date(dueDate).getTime() < Date.now() ? 'Overdue' : 'Due soon')
+  }
+  if (['proposal', 'negotiation'].includes(stage)) {
+    parts.push('Late-stage deal')
+  }
+  if (value && value >= 100_000) {
+    parts.push('High-value opportunity')
+  }
+  if (source === 'ai') {
+    parts.push('AI surfaced')
+  }
+  if (score < 40) {
+    parts.push('Needs intervention')
+  }
+  return parts[0] ?? 'Queued for follow-up'
+}
+
 function buildWorkItems(deals: DealRecord[]): WorkItem[] {
   return deals.flatMap(deal => {
-    const baseLabel = deal.dealName || deal.prospectCompany
     const score = deal.conversionScore ?? 50
-    const projectItems = (deal.projectPlan?.phases ?? []).flatMap(phase =>
-      (phase.tasks ?? []).map(task => ({
-        id: task.id,
+    const stageWeight = STAGE_WEIGHTS[deal.stage] ?? 4
+    const valueWeight = (deal.dealValue ?? 0) >= 100_000 ? 10 : (deal.dealValue ?? 0) >= 50_000 ? 6 : 0
+    const staleWeight = deal.updatedAt && Date.now() - new Date(deal.updatedAt).getTime() > 10 * 86_400_000 ? 8 : 0
+    const dealLabel = deal.prospectCompany || deal.dealName
+
+    const todoItems = (deal.todos ?? []).map(todo => {
+      const priorityBase = PRIORITY_WEIGHTS[todo.priority ?? 'normal'] ?? PRIORITY_WEIGHTS.normal
+      const scoreValue =
+        KIND_WEIGHTS.task + priorityBase + stageWeight + valueWeight + staleWeight + dueDateWeight(todo.dueDate) + Math.max(0, 60 - score) / 2
+      return {
+        id: todo.id,
         dealId: deal.id,
-        dealLabel: baseLabel,
-        kind: 'project' as const,
-        text: task.text,
-        meta: `${phase.name}${task.dueDate ? ` · ${formatContextualDate(task.dueDate)}` : ''}`,
-        done: task.status === 'complete',
-        priorityScore: score,
+        dealLabel,
+        stage: deal.stage,
+        kind: 'task' as const,
+        text: todo.text,
+        meta: `${stageLabel(deal.stage)}${todo.createdAt ? ` · ${formatRelativeTime(todo.createdAt)}` : ''}${todo.source === 'ai' ? ' · AI' : ''}`,
+        dueDate: todo.dueDate,
         updatedAt: deal.updatedAt,
-      })),
+        done: todo.done,
+        priorityScore: scoreValue,
+        priorityLabel: scorePriorityLabel(scoreValue),
+        priorityReason: describePriority(score, deal.stage, todo.dueDate, todo.source, deal.dealValue),
+        sortDate: todo.dueDate ? new Date(todo.dueDate).getTime() : new Date(todo.createdAt ?? deal.updatedAt ?? Date.now()).getTime(),
+      }
+    })
+
+    const projectItems = (deal.projectPlan?.phases ?? []).flatMap(phase =>
+      (phase.tasks ?? []).map(task => {
+        const scoreValue =
+          KIND_WEIGHTS.project + 18 + stageWeight + valueWeight + staleWeight + dueDateWeight(task.dueDate) + Math.max(0, 60 - score) / 2
+        return {
+          id: task.id,
+          dealId: deal.id,
+          dealLabel,
+          stage: deal.stage,
+          kind: 'project' as const,
+          text: task.text,
+          meta: `${phase.name}${task.owner ? ` · ${task.owner}` : ''}`,
+          dueDate: task.dueDate,
+          updatedAt: deal.updatedAt,
+          done: task.status === 'complete',
+          priorityScore: scoreValue,
+          priorityLabel: scorePriorityLabel(scoreValue),
+          priorityReason: describePriority(score, deal.stage, task.dueDate, undefined, deal.dealValue),
+          sortDate: task.dueDate ? new Date(task.dueDate).getTime() : new Date(deal.updatedAt ?? Date.now()).getTime(),
+        }
+      }),
     )
-    const todoItems = (deal.todos ?? []).map(todo => ({
-      id: todo.id,
-      dealId: deal.id,
-      dealLabel: baseLabel,
-      kind: 'task' as const,
-      text: todo.text,
-      meta: `${stageLabel(deal.stage)}${todo.createdAt ? ` · ${formatRelativeTime(todo.createdAt)}` : ''}${todo.source === 'ai' ? ' · AI' : ''}`,
-      done: todo.done,
-      priorityScore: score,
-      updatedAt: deal.updatedAt,
-    }))
-    const criteriaItems = (deal.successCriteriaTodos ?? []).map(item => ({
-      id: item.id,
-      dealId: deal.id,
-      dealLabel: baseLabel,
-      kind: 'criterion' as const,
-      text: item.text,
-      meta: `${stageLabel(deal.stage)} · Success criteria`,
-      done: Boolean(item.achieved),
-      priorityScore: score,
-      updatedAt: deal.updatedAt,
-    }))
+
+    const criteriaItems = (deal.successCriteriaTodos ?? []).map(item => {
+      const scoreValue =
+        KIND_WEIGHTS.criterion + 16 + stageWeight + valueWeight + staleWeight + Math.max(0, 60 - score) / 2
+      return {
+        id: item.id,
+        dealId: deal.id,
+        dealLabel,
+        stage: deal.stage,
+        kind: 'criterion' as const,
+        text: item.text,
+        meta: `${stageLabel(deal.stage)} · ${item.category ?? 'Success criteria'}`,
+        dueDate: null,
+        updatedAt: deal.updatedAt,
+        done: Boolean(item.achieved),
+        priorityScore: scoreValue,
+        priorityLabel: scorePriorityLabel(scoreValue),
+        priorityReason: describePriority(score, deal.stage, null, undefined, deal.dealValue),
+        sortDate: new Date(deal.updatedAt ?? Date.now()).getTime(),
+      }
+    })
+
     return [...todoItems, ...projectItems, ...criteriaItems]
   })
 }
 
 export default function TasksPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const dealFilter = searchParams.get('deal') ?? 'all'
   const { data, isLoading } = useSWR<{ data: DealRecord[] }>('/api/deals', fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 45_000,
   })
 
-  const items = buildWorkItems(data?.data ?? [])
-  const openItems = items
-    .filter(item => !item.done)
-    .sort((left, right) => left.priorityScore - right.priorityScore)
-  const doneItems = items
-    .filter(item => item.done)
-    .sort((left, right) => new Date(right.updatedAt ?? 0).getTime() - new Date(left.updatedAt ?? 0).getTime())
+  const [search, setSearch] = useState('')
+  const [priorityFilter, setPriorityFilter] = useState<'all' | WorkItem['priorityLabel']>('all')
+  const deferredSearch = useDeferredValue(search)
+  const deals = useMemo(() => data?.data ?? [], [data?.data])
+
+  const items = useMemo(() => buildWorkItems(deals), [deals])
+
+  const filteredItems = useMemo(() => {
+    return items.filter(item => {
+      if (dealFilter !== 'all' && item.dealId !== dealFilter) return false
+      if (priorityFilter !== 'all' && item.priorityLabel !== priorityFilter) return false
+      if (!deferredSearch.trim()) return true
+      const query = deferredSearch.trim().toLowerCase()
+      return [item.text, item.meta, item.dealLabel].some(value => value.toLowerCase().includes(query))
+    })
+  }, [dealFilter, deferredSearch, items, priorityFilter])
+
+  const openItems = useMemo(
+    () =>
+      filteredItems
+        .filter(item => !item.done)
+        .sort((left, right) => {
+          if (right.priorityScore !== left.priorityScore) return right.priorityScore - left.priorityScore
+          return left.sortDate - right.sortDate
+        }),
+    [filteredItems],
+  )
+
+  const doneItems = useMemo(
+    () =>
+      filteredItems
+        .filter(item => item.done)
+        .sort((left, right) => new Date(right.updatedAt ?? 0).getTime() - new Date(left.updatedAt ?? 0).getTime()),
+    [filteredItems],
+  )
+
+  const dealOptions = useMemo(() => {
+    const counts = openItems.reduce<Record<string, number>>((acc, item) => {
+      acc[item.dealId] = (acc[item.dealId] ?? 0) + 1
+      return acc
+    }, {})
+
+    return deals
+      .map(deal => ({
+        id: deal.id,
+        label: deal.prospectCompany || deal.dealName,
+        count: counts[deal.id] ?? 0,
+        value: deal.dealValue ?? 0,
+      }))
+      .filter(option => option.count > 0 || option.id === dealFilter)
+      .sort((left, right) => right.count - left.count || right.value - left.value)
+  }, [dealFilter, deals, openItems])
+
+  const summary = useMemo(() => {
+    const allOpenItems = items.filter(item => !item.done)
+    return {
+      open: allOpenItems.length,
+      critical: allOpenItems.filter(item => item.priorityLabel === 'critical').length,
+      activeDeals: new Set(allOpenItems.map(item => item.dealId)).size,
+      completed: items.filter(item => item.done).length,
+    }
+  }, [items])
+
+  const topDeals = useMemo(() => dealOptions.slice(0, 5), [dealOptions])
+
+  function updateDealFilter(nextValue: string) {
+    startTransition(() => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (nextValue === 'all') params.delete('deal')
+      else params.set('deal', nextValue)
+      const nextQuery = params.toString()
+      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
+    })
+  }
 
   return (
-    <div style={{ paddingTop: 4, maxWidth: 1120 }}>
+    <div className="tasks-shell">
       <style>{`
-        @media (max-width: 900px) {
-          .tasks-summary-grid,
+        .tasks-shell {
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
+          max-width: 1120px;
+        }
+        .tasks-header {
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          gap: 20px;
+          flex-wrap: wrap;
+        }
+        .tasks-title {
+          font-size: 34px;
+          line-height: 1.02;
+          letter-spacing: -0.05em;
+          color: var(--ink);
+          font-weight: 600;
+        }
+        .tasks-eyebrow {
+          font-size: 10.5px;
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--ink-4);
+          margin-bottom: 6px;
+        }
+        .tasks-subtitle {
+          margin-top: 10px;
+          font-size: 13px;
+          color: var(--ink-3);
+          max-width: 700px;
+        }
+        .tasks-summary-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 10px;
+        }
+        .tasks-summary-card {
+          padding: 14px;
+          border-radius: var(--radius);
+          background: rgba(255, 255, 255, 0.46);
+          border: 1px solid rgba(255, 255, 255, 0.72);
+        }
+        .tasks-summary-label {
+          font-size: 10px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--ink-4);
+          margin-bottom: 4px;
+          font-weight: 600;
+        }
+        .tasks-summary-value {
+          font-size: 24px;
+          line-height: 1;
+          letter-spacing: -0.04em;
+          color: var(--ink);
+          font-weight: 600;
+        }
+        .tasks-summary-meta {
+          margin-top: 6px;
+          font-size: 11px;
+          color: var(--ink-3);
+        }
+        .tasks-filter-card {
+          padding: 18px;
+        }
+        .tasks-filter-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 220px auto;
+          gap: 10px;
+          align-items: center;
+        }
+        .tasks-search {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 9px 12px;
+          border-radius: var(--radius);
+          background: rgba(255, 255, 255, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.74);
+        }
+        .tasks-search input {
+          background: transparent;
+          border: 0;
+          width: 100%;
+          color: var(--ink);
+          outline: none;
+        }
+        .tasks-select {
+          padding: 9px 12px;
+          border-radius: var(--radius);
+          background: rgba(255, 255, 255, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.74);
+          color: var(--ink);
+        }
+        .tasks-priority-row {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .tasks-priority-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 10px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.42);
+          border: 1px solid rgba(255, 255, 255, 0.72);
+          font-size: 11px;
+          color: var(--ink-3);
+        }
+        .tasks-priority-chip.active {
+          background: var(--ink);
+          color: var(--bg);
+          border-color: var(--ink);
+        }
+        .tasks-page-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+          gap: 16px;
+        }
+        .tasks-panel {
+          padding: 18px;
+        }
+        .tasks-list {
+          display: grid;
+          gap: 10px;
+        }
+        .tasks-item {
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr) auto;
+          gap: 12px;
+          align-items: center;
+          padding: 14px;
+          border-radius: var(--radius);
+          background: rgba(255, 255, 255, 0.46);
+          border: 1px solid rgba(255, 255, 255, 0.72);
+          transition: transform 0.16s ease, background 0.16s ease;
+        }
+        .tasks-item:hover {
+          transform: translateY(-1px);
+          background: rgba(255, 255, 255, 0.56);
+        }
+        .tasks-rank {
+          width: 32px;
+          height: 32px;
+          border-radius: 10px;
+          display: grid;
+          place-items: center;
+          background: rgba(20, 17, 10, 0.06);
+          color: var(--ink-2);
+          font-size: 11px;
+          font-weight: 700;
+        }
+        .tasks-copy {
+          min-width: 0;
+        }
+        .tasks-item-top {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: wrap;
+          margin-bottom: 4px;
+        }
+        .tasks-item-title {
+          font-size: 13px;
+          color: var(--ink);
+          font-weight: 600;
+        }
+        .tasks-item-body {
+          font-size: 12px;
+          color: var(--ink-2);
+          line-height: 1.55;
+        }
+        .tasks-item-meta {
+          margin-top: 4px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: wrap;
+          font-size: 11px;
+          color: var(--ink-4);
+        }
+        .tasks-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 7px;
+          border-radius: 999px;
+          font-size: 10px;
+          color: var(--ink-3);
+          background: rgba(20, 17, 10, 0.05);
+        }
+        .tasks-chip.priority-critical {
+          background: rgba(178, 58, 58, 0.12);
+          color: var(--risk);
+        }
+        .tasks-chip.priority-high {
+          background: rgba(196, 98, 27, 0.12);
+          color: var(--warn);
+        }
+        .tasks-chip.priority-medium {
+          background: rgba(46, 90, 172, 0.1);
+          color: var(--cool);
+        }
+        .tasks-chip.priority-low {
+          background: rgba(29, 184, 106, 0.1);
+          color: var(--signal);
+        }
+        .tasks-side-stack {
+          display: grid;
+          gap: 16px;
+        }
+        .tasks-focus-row,
+        .tasks-done-row {
+          display: grid;
+          gap: 8px;
+          padding: 12px 14px;
+          border-radius: var(--radius);
+          background: rgba(255, 255, 255, 0.46);
+          border: 1px solid rgba(255, 255, 255, 0.72);
+        }
+        .tasks-focus-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+        }
+        .tasks-row-title {
+          font-size: 13px;
+          color: var(--ink);
+          font-weight: 600;
+        }
+        .tasks-row-meta {
+          font-size: 11px;
+          color: var(--ink-4);
+        }
+        .tasks-empty {
+          min-height: 180px;
+          display: grid;
+          place-items: center;
+          text-align: center;
+          color: var(--ink-3);
+          font-size: 12px;
+          line-height: 1.6;
+        }
+        @media (max-width: 1080px) {
           .tasks-page-grid {
-            grid-template-columns: 1fr !important;
+            grid-template-columns: 1fr;
+          }
+          .tasks-filter-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+        @media (max-width: 720px) {
+          .tasks-title {
+            font-size: 28px;
+          }
+          .tasks-summary-grid {
+            grid-template-columns: 1fr 1fr;
+          }
+          .tasks-item {
+            grid-template-columns: auto minmax(0, 1fr);
           }
         }
       `}</style>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 22 }}>
+
+      <div className="tasks-header">
         <div>
-          <div className="section-label" style={{ marginBottom: 6 }}>Workspace</div>
-          <h1 className="page-title" style={{ margin: 0 }}>Tasks</h1>
-          <div className="page-subtitle">Every open action, milestone, and success check across the pipeline.</div>
-        </div>
-        <div className="notion-chip">
-          <Sparkles size={12} strokeWidth={2} />
-          {openItems.length} open across {new Set(openItems.map(item => item.dealId)).size} deals
-        </div>
-      </div>
-
-      <div className="panel-section" style={{ padding: 20, marginBottom: 16 }}>
-        <div className="tasks-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 12 }}>
-          {[
-            { label: 'Open items', value: openItems.length },
-            { label: 'Completed', value: doneItems.length },
-            { label: 'Deals covered', value: new Set(items.map(item => item.dealId)).size },
-            { label: 'AI generated', value: items.filter(item => item.meta.includes('AI')).length },
-          ].map(stat => (
-            <div key={stat.label} className="surface-glass-light" style={{ padding: 14, borderRadius: 'var(--radius)' }}>
-              <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.04em', lineHeight: 1 }}>{stat.value}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>{stat.label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="tasks-page-grid" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16 }}>
-        <div className="panel-section" style={{ padding: 20 }}>
-          <div className="manage-head">
-            <div className="manage-title">
-              <ClipboardList size={14} strokeWidth={2} />
-              Open work
-            </div>
+          <div className="tasks-eyebrow">Workspace / Tasks</div>
+          <div className="tasks-title">Tasks</div>
+          <div className="tasks-subtitle">
+            Every open task ranked by deal pressure, urgency, and timing so the team works the right accounts in the right order.
           </div>
+        </div>
+        <Link href="/deals" className="btn">
+          <ArrowUpRight size={13} strokeWidth={2} />
+          Browse deals
+        </Link>
+      </div>
+
+      <div className="tasks-summary-grid">
+        <div className="tasks-summary-card">
+          <div className="tasks-summary-label">Open work</div>
+          <div className="tasks-summary-value mono">{summary.open}</div>
+          <div className="tasks-summary-meta">All active tasks and criteria</div>
+        </div>
+        <div className="tasks-summary-card">
+          <div className="tasks-summary-label">Critical now</div>
+          <div className="tasks-summary-value mono">{summary.critical}</div>
+          <div className="tasks-summary-meta">Highest-priority items first</div>
+        </div>
+        <div className="tasks-summary-card">
+          <div className="tasks-summary-label">Deals in motion</div>
+          <div className="tasks-summary-value mono">{summary.activeDeals}</div>
+          <div className="tasks-summary-meta">Accounts with open execution work</div>
+        </div>
+        <div className="tasks-summary-card">
+          <div className="tasks-summary-label">Completed</div>
+          <div className="tasks-summary-value mono">{summary.completed}</div>
+          <div className="tasks-summary-meta">Recently closed out work</div>
+        </div>
+      </div>
+
+      <section className="panel-section tasks-filter-card">
+        <div className="section-head" style={{ marginBottom: 14 }}>
+          <h2 className="section-title">Filter and focus</h2>
+          <span className="section-action">
+            <Filter size={12} />
+            {dealFilter === 'all' ? 'All deals' : dealOptions.find(option => option.id === dealFilter)?.label ?? 'Deal filter'}
+          </span>
+        </div>
+
+        <div className="tasks-filter-grid">
+          <label className="tasks-search">
+            <Search size={13} strokeWidth={2} style={{ color: 'var(--ink-4)' }} />
+            <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search tasks, deals, or context…" />
+          </label>
+
+          <select className="tasks-select" value={dealFilter} onChange={event => updateDealFilter(event.target.value)}>
+            <option value="all">All deals</option>
+            {dealOptions.map(option => (
+              <option key={option.id} value={option.id}>
+                {option.label} ({option.count})
+              </option>
+            ))}
+          </select>
+
+          <div className="tasks-priority-row">
+            {(['all', 'critical', 'high', 'medium', 'low'] as const).map(priority => (
+              <button
+                key={priority}
+                className={`tasks-priority-chip${priorityFilter === priority ? ' active' : ''}`}
+                onClick={() => setPriorityFilter(priority)}
+              >
+                {priority === 'all' ? <ClipboardList size={12} strokeWidth={2} /> : priority === 'critical' ? <Target size={12} strokeWidth={2} /> : priority === 'high' ? <Sparkles size={12} strokeWidth={2} /> : null}
+                {priority === 'all' ? 'All priorities' : priority.charAt(0).toUpperCase() + priority.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div className="tasks-page-grid">
+        <section className="panel-section tasks-panel">
+          <div className="section-head">
+            <h2 className="section-title">Priority queue</h2>
+            <span className="section-action">{openItems.length} open</span>
+          </div>
+
           {isLoading ? (
-            <div className="skeleton" style={{ height: 220, borderRadius: 'var(--radius)' }} />
+            <div className="skeleton" style={{ height: 260, borderRadius: 'var(--radius-lg)' }} />
           ) : openItems.length === 0 ? (
-            <div style={{ display: 'grid', placeItems: 'center', minHeight: 220, textAlign: 'center', color: 'var(--ink-3)' }}>
-              <div>
-                <CheckCircle2 size={22} style={{ color: 'var(--signal)', display: 'block', margin: '0 auto 10px' }} />
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>No open tasks right now</div>
-                <div style={{ fontSize: 12, marginTop: 4 }}>The pipeline is clear or work is being tracked directly on each deal.</div>
-              </div>
+            <div className="tasks-empty">
+              No open work matches the current filters. Try another deal filter or clear the search to see the full queue.
             </div>
           ) : (
-            <div style={{ display: 'grid', gap: 8 }}>
-              {openItems.map(item => (
-                <Link key={`${item.dealId}-${item.kind}-${item.id}`} href={`/deals/${item.dealId}?tab=manage`} style={{ textDecoration: 'none' }}>
-                  <div className="surface-glass-light" style={{ padding: 14, borderRadius: 'var(--radius)', display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 12, alignItems: 'center' }}>
-                    <div className={`criteria-status ${item.kind === 'criterion' ? 'partial' : item.kind === 'project' ? 'met' : 'missing'}`}>
-                      {item.kind === 'criterion' ? '!' : item.kind === 'project' ? <Circle size={10} strokeWidth={2} /> : null}
+            <div className="tasks-list">
+              {openItems.map((item, index) => (
+                <Link key={`${item.dealId}-${item.kind}-${item.id}`} href={`/deals/${item.dealId}?tab=manage`} className="tasks-item">
+                  <div className="tasks-rank">{String(index + 1).padStart(2, '0')}</div>
+                  <div className="tasks-copy">
+                    <div className="tasks-item-top">
+                      <span className="tasks-item-title">{item.text}</span>
+                      <span className={`tasks-chip priority-${item.priorityLabel}`}>{item.priorityLabel}</span>
+                      <span className="tasks-chip">{item.kind === 'criterion' ? 'Success criteria' : item.kind === 'project' ? 'Project plan' : 'Task'}</span>
                     </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{item.text}</div>
-                      <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 3 }}>
-                        {item.dealLabel} · {item.meta}
-                      </div>
+                    <div className="tasks-item-body">{item.priorityReason}</div>
+                    <div className="tasks-item-meta">
+                      <span>{item.dealLabel}</span>
+                      <span>·</span>
+                      <span>{item.meta}</span>
+                      {item.dueDate ? (
+                        <>
+                          <span>·</span>
+                          <span>Due {formatContextualDate(item.dueDate)}</span>
+                        </>
+                      ) : null}
+                      {deals.find(deal => deal.id === item.dealId)?.dealValue ? (
+                        <>
+                          <span>·</span>
+                          <span className="mono">{compactMoney(deals.find(deal => deal.id === item.dealId)?.dealValue)}</span>
+                        </>
+                      ) : null}
                     </div>
-                    <ChevronRight size={14} style={{ color: 'var(--ink-4)' }} />
                   </div>
+                  <ChevronRight size={14} strokeWidth={1.8} style={{ color: 'var(--ink-4)' }} />
                 </Link>
               ))}
             </div>
           )}
-        </div>
+        </section>
 
-        <div className="panel-section" style={{ padding: 20 }}>
-          <div className="manage-head">
-            <div className="manage-title">
-              <CheckCircle2 size={14} strokeWidth={2} />
-              Recently completed
+        <div className="tasks-side-stack">
+          <section className="panel-section tasks-panel">
+            <div className="section-head">
+              <h2 className="section-title">Focus by deal</h2>
+              <span className="section-action">Filterable</span>
             </div>
-          </div>
-          {doneItems.length === 0 ? (
-            <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>Completed items will show up here once the team closes out work.</div>
-          ) : (
-            <div style={{ display: 'grid', gap: 8 }}>
-              {doneItems.slice(0, 8).map(item => (
-                <Link key={`${item.dealId}-${item.kind}-${item.id}`} href={`/deals/${item.dealId}?tab=history`} style={{ textDecoration: 'none' }}>
-                  <div className="surface-glass-light" style={{ padding: 12, borderRadius: 'var(--radius)' }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)' }}>{item.text}</div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>
+
+            <div className="tasks-list">
+              {topDeals.length === 0 ? (
+                <div className="tasks-empty" style={{ minHeight: 120 }}>
+                  Open work will cluster here by deal as execution starts to spread across the pipeline.
+                </div>
+              ) : (
+                topDeals.map(option => (
+                  <button
+                    key={option.id}
+                    className="tasks-focus-row"
+                    onClick={() => updateDealFilter(option.id)}
+                  >
+                    <div className="tasks-focus-head">
+                      <div className="tasks-row-title">{option.label}</div>
+                      <div className="tasks-chip mono">{option.count} open</div>
+                    </div>
+                    <div className="tasks-row-meta">
+                      {option.value ? `${compactMoney(option.value)} deal value` : 'Tracked in workspace'}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </section>
+
+          <section className="panel-section tasks-panel">
+            <div className="section-head">
+              <h2 className="section-title">Recently completed</h2>
+              <span className="section-action">{doneItems.length} done</span>
+            </div>
+
+            <div className="tasks-list">
+              {doneItems.length === 0 ? (
+                <div className="tasks-empty" style={{ minHeight: 120 }}>
+                  Completed tasks will appear here once the team starts closing out execution work on deals.
+                </div>
+              ) : (
+                doneItems.slice(0, 8).map(item => (
+                  <Link key={`${item.dealId}-${item.kind}-${item.id}`} href={`/deals/${item.dealId}?tab=history`} className="tasks-done-row">
+                    <div className="tasks-focus-head">
+                      <div className="tasks-row-title">{item.text}</div>
+                      <CheckCircle2 size={14} strokeWidth={2} style={{ color: 'var(--signal)' }} />
+                    </div>
+                    <div className="tasks-row-meta">
                       {item.dealLabel} · {item.updatedAt ? formatRelativeTime(item.updatedAt) : 'Completed'}
                     </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                ))
+              )}
             </div>
-          )}
+          </section>
         </div>
       </div>
     </div>

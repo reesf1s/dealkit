@@ -11,6 +11,7 @@ export interface ActiveDeal {
 
 interface SidebarContextValue {
   collapsed: boolean
+  isMobile: boolean
   mobileOpen: boolean
   sidebarWidth: number
   toggleCollapsed: () => void
@@ -31,6 +32,7 @@ interface SidebarContextValue {
 
 const SidebarContext = createContext<SidebarContextValue>({
   collapsed: false,
+  isMobile: false,
   mobileOpen: false,
   sidebarWidth: 232,
   toggleCollapsed: () => {},
@@ -49,8 +51,13 @@ const SidebarContext = createContext<SidebarContextValue>({
   setActiveDeal: () => {},
 })
 
+const COLLAPSED_STORAGE_KEY = 'halvex.sidebar.collapsed'
+
 export function SidebarProvider({ children }: { children: ReactNode }) {
-  const [collapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.localStorage.getItem(COLLAPSED_STORAGE_KEY) === 'true'
+  })
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -63,7 +70,12 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 900px)')
-    const update = (matches: boolean) => setIsMobile(matches)
+    const update = (matches: boolean) => {
+      setIsMobile(matches)
+      if (!matches) {
+        setMobileOpen(false)
+      }
+    }
     const onChange = (event: MediaQueryListEvent) => update(event.matches)
     update(mediaQuery.matches)
     mediaQuery.addEventListener('change', onChange)
@@ -71,7 +83,15 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     return () => mediaQuery.removeEventListener('change', onChange)
   }, [])
 
-  const toggleCollapsed = useCallback(() => {}, [])
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed(previous => {
+      const next = !previous
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(COLLAPSED_STORAGE_KEY, String(next))
+      }
+      return next
+    })
+  }, [])
 
   const prefillCopilot = useCallback((text: string) => {
     setCopilotPrefill(text)
@@ -91,12 +111,13 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     setCopilotAutoSend(null)
   }, [])
 
-  const sidebarWidth = isMobile ? 0 : 232
+  const sidebarWidth = isMobile ? 0 : collapsed ? 84 : 232
 
   return (
     <SidebarContext.Provider
       value={{
         collapsed,
+        isMobile,
         mobileOpen,
         sidebarWidth,
         toggleCollapsed,

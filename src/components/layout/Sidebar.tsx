@@ -34,20 +34,28 @@ type NavItem = {
 function SidebarNavItem({
   item,
   active,
+  collapsed,
   onClick,
 }: {
   item: NavItem
   active: boolean
+  collapsed: boolean
   onClick?: () => void
 }) {
   const Icon = item.icon
 
   return (
-    <Link href={item.href} onClick={onClick} className={`nav-item${active ? ' active' : ''}`}>
+    <Link
+      href={item.href}
+      onClick={onClick}
+      className={`nav-item${active ? ' active' : ''}${collapsed ? ' collapsed' : ''}`}
+      title={collapsed ? item.label : undefined}
+      aria-label={collapsed ? item.label : undefined}
+    >
       <Icon className="nav-icon" size={15} strokeWidth={1.8} />
-      <span>{item.label}</span>
-      {item.count != null ? <span className="nav-count">{item.count}</span> : null}
-      {item.signal ? <span className="signal-dot" /> : null}
+      {!collapsed ? <span>{item.label}</span> : null}
+      {item.count != null ? <span className={`nav-count${collapsed ? ' nav-count-collapsed' : ''}`}>{item.count}</span> : null}
+      {item.signal ? <span className={`signal-dot${collapsed ? ' signal-dot-collapsed' : ''}`} /> : null}
     </Link>
   )
 }
@@ -56,8 +64,8 @@ export default function Sidebar() {
   const pathname = usePathname()
   const { signOut } = useClerk()
   const { user } = useUser()
-  const { mobileOpen, closeMobile, sidebarWidth } = useSidebar()
-  const isMobile = sidebarWidth === 0
+  const { collapsed, isMobile, mobileOpen, closeMobile } = useSidebar()
+  const compact = collapsed && !isMobile
 
   const { data: dealsRes } = useSWR('/api/deals', fetcher, {
     revalidateOnFocus: false,
@@ -115,12 +123,16 @@ export default function Sidebar() {
   return (
     <>
       {isMobile && mobileOpen ? <button className="sidebar-overlay" onClick={closeMobile} aria-label="Close sidebar overlay" /> : null}
-      <aside className={`sidebar${isMobile ? ' sidebar-mobile' : ''}${mobileOpen ? ' mobile-open' : ''}`}>
+      <aside className={`sidebar${isMobile ? ' sidebar-mobile' : ''}${mobileOpen ? ' mobile-open' : ''}${compact ? ' collapsed' : ''}`}>
         <div className="brand">
           <Link href="/dashboard" onClick={closeMobile} style={{ display: 'contents' }}>
             <div className="brand-mark">H</div>
-            <div className="brand-name">Halvex</div>
-            <span className="brand-badge">Beta</span>
+            {!compact ? (
+              <>
+                <div className="brand-name">Halvex</div>
+                <span className="brand-badge">Beta</span>
+              </>
+            ) : null}
           </Link>
           {isMobile ? (
             <button className="icon-btn sidebar-close" onClick={closeMobile} aria-label="Close sidebar">
@@ -131,39 +143,52 @@ export default function Sidebar() {
 
         <button
           className="ask-bar"
+          aria-label="Ask Halvex"
+          title={compact ? 'Ask Halvex' : undefined}
           onClick={() => {
             window.dispatchEvent(new CustomEvent('openCommandPalette'))
             closeMobile()
           }}
         >
           <Sparkles className="ask-spark" size={14} strokeWidth={2} />
-          <span className="ask-text">Ask Halvex anything…</span>
-          <span className="ask-kbd">⌘K</span>
+          {!compact ? (
+            <>
+              <span className="ask-text">Ask Halvex anything…</span>
+              <span className="ask-kbd">⌘K</span>
+            </>
+          ) : null}
         </button>
 
-        <div className="nav-section">Pipeline</div>
+        {!compact ? <div className="nav-section">Pipeline</div> : null}
         {pipelineItems.map(item => (
-          <SidebarNavItem key={item.label} item={item} active={isActive(item)} onClick={closeMobile} />
+          <SidebarNavItem key={item.label} item={item} active={isActive(item)} collapsed={compact} onClick={closeMobile} />
         ))}
 
-        <div className="nav-section">Intelligence</div>
+        {!compact ? <div className="nav-section">Intelligence</div> : null}
         {intelligenceItems.map(item => (
-          <SidebarNavItem key={item.label} item={item} active={isActive(item)} onClick={closeMobile} />
+          <SidebarNavItem key={item.label} item={item} active={isActive(item)} collapsed={compact} onClick={closeMobile} />
         ))}
 
-        <div className="nav-section">Workspace</div>
+        {!compact ? <div className="nav-section">Workspace</div> : null}
         {workspaceItems.map(item => (
-          <SidebarNavItem key={item.label} item={item} active={isActive(item)} onClick={closeMobile} />
+          <SidebarNavItem key={item.label} item={item} active={isActive(item)} collapsed={compact} onClick={closeMobile} />
         ))}
 
-        <button onClick={() => signOut({ redirectUrl: '/' })} className="user-card">
+        <button
+          onClick={() => signOut({ redirectUrl: '/' })}
+          className={`user-card${compact ? ' compact' : ''}`}
+          title={compact ? fullName : undefined}
+          aria-label={compact ? fullName : undefined}
+        >
           <div className="user-avatar" style={{ background: avatarGradientFromName(fullName) }}>
             {initialsFromName(fullName)}
           </div>
-          <div style={{ minWidth: 0, textAlign: 'left' }}>
-            <div className="user-name">{fullName}</div>
-            <div className="user-org">{orgLabel}</div>
-          </div>
+          {!compact ? (
+            <div style={{ minWidth: 0, textAlign: 'left' }}>
+              <div className="user-name">{fullName}</div>
+              <div className="user-org">{orgLabel}</div>
+            </div>
+          ) : null}
         </button>
       </aside>
     </>

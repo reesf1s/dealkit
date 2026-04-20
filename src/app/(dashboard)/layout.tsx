@@ -6,16 +6,20 @@ import CommandPalette from '@/components/shared/CommandPalette'
 import ErrorBoundary from '@/components/shared/ErrorBoundary'
 import Sidebar from '@/components/layout/Sidebar'
 import TopNav from '@/components/layout/TopNav'
-import { SidebarProvider } from '@/components/layout/SidebarContext'
+import { SidebarProvider, useSidebar } from '@/components/layout/SidebarContext'
 
 const CopilotPanel = dynamic(() => import('@/components/ai/CopilotPanel'), { ssr: false })
 
 function LayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const { collapsed, isMobile, sidebarWidth } = useSidebar()
   const isDealDetail = pathname.startsWith('/deals/')
 
   return (
-    <div className="app">
+    <div
+      className={`app${collapsed && !isMobile ? ' app-sidebar-collapsed' : ''}`}
+      style={{ gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : `${sidebarWidth}px minmax(0, 1fr)` }}
+    >
       <Sidebar />
       <CommandPalette />
       <main className="dashboard-root">

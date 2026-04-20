@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { ArrowRight, Ellipsis, Menu, Send, Share2 } from 'lucide-react'
+import { ArrowRight, Ellipsis, Menu, PanelLeftClose, PanelLeftOpen, Send, Share2 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 
 const PAGE_LABELS: Record<string, string> = {
@@ -25,7 +25,7 @@ type TopNavProps = {
 
 export default function TopNav({ variant = 'global' }: TopNavProps) {
   const pathname = usePathname()
-  const { openMobile, activeDeal, sendToCopilot } = useSidebar()
+  const { activeDeal, collapsed, isMobile, openMobile, sendToCopilot, toggleCollapsed } = useSidebar()
   const isDealPage = pathname.startsWith('/deals/')
 
   if (variant === 'global' && isDealPage) return null
@@ -38,9 +38,19 @@ export default function TopNav({ variant = 'global' }: TopNavProps) {
 
   return (
     <header className={variant === 'global' ? 'topbar topbar-global' : 'topbar'}>
-      <button onClick={openMobile} className="icon-btn sidebar-mobile-toggle" aria-label="Open sidebar">
-        <Menu size={14} strokeWidth={1.8} />
-      </button>
+      {isMobile ? (
+        <button onClick={openMobile} className="icon-btn sidebar-mobile-toggle" aria-label="Open sidebar">
+          <Menu size={14} strokeWidth={1.8} />
+        </button>
+      ) : (
+        <button
+          onClick={toggleCollapsed}
+          className="icon-btn sidebar-desktop-toggle"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? <PanelLeftOpen size={14} strokeWidth={1.8} /> : <PanelLeftClose size={14} strokeWidth={1.8} />}
+        </button>
+      )}
 
       <div className="crumbs">
         {breadcrumb.map((crumb, index) => (
