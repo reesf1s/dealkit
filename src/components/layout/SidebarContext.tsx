@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 
 export interface ActiveDeal {
   id: string
@@ -9,37 +9,33 @@ export interface ActiveDeal {
   stage: string
 }
 
-interface SidebarCtx {
+interface SidebarContextValue {
   collapsed: boolean
   mobileOpen: boolean
+  sidebarWidth: number
   toggleCollapsed: () => void
   openMobile: () => void
   closeMobile: () => void
-  sidebarWidth: number
-  // Copilot panel
   copilotOpen: boolean
   toggleCopilot: () => void
   setCopilotOpen: (open: boolean) => void
-  // Prefill copilot input and open panel
   prefillCopilot: (text: string) => void
   copilotPrefill: string | null
   clearCopilotPrefill: () => void
-  // Auto-send a message through the copilot (bypasses prefill, submits immediately)
   sendToCopilot: (text: string) => void
   copilotAutoSend: string | null
   clearCopilotAutoSend: () => void
-  // Active deal context — set by deal detail page so AI chat knows what you're looking at
   activeDeal: ActiveDeal | null
   setActiveDeal: (deal: ActiveDeal | null) => void
 }
 
-const Ctx = createContext<SidebarCtx>({
+const SidebarContext = createContext<SidebarContextValue>({
   collapsed: false,
   mobileOpen: false,
+  sidebarWidth: 232,
   toggleCollapsed: () => {},
   openMobile: () => {},
   closeMobile: () => {},
-  sidebarWidth: 210,
   copilotOpen: false,
   toggleCopilot: () => {},
   setCopilotOpen: () => {},
@@ -54,34 +50,35 @@ const Ctx = createContext<SidebarCtx>({
 })
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.localStorage.getItem('halvex-sidebar-collapsed') === 'true'
+  })
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(max-width: 900px)').matches
+  })
   const [copilotOpen, setCopilotOpen] = useState(false)
   const [copilotPrefill, setCopilotPrefill] = useState<string | null>(null)
   const [copilotAutoSend, setCopilotAutoSend] = useState<string | null>(null)
   const [activeDeal, setActiveDeal] = useState<ActiveDeal | null>(null)
 
   useEffect(() => {
-    const stored = localStorage.getItem('sidebar-collapsed')
-    if (stored === 'true') setCollapsed(true)
+    const mediaQuery = window.matchMedia('(max-width: 900px)')
+    const update = (matches: boolean) => setIsMobile(matches)
+    const onChange = (event: MediaQueryListEvent) => update(event.matches)
+    mediaQuery.addEventListener('change', onChange)
 
-    const mq = window.matchMedia('(max-width: 768px)')
-    setIsMobile(mq.matches)
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
+    return () => mediaQuery.removeEventListener('change', onChange)
   }, [])
 
-  const toggleCollapsed = () => {
-    setCollapsed(p => {
-      localStorage.setItem('sidebar-collapsed', String(!p))
-      return !p
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed(previous => {
+      const next = !previous
+      window.localStorage.setItem('halvex-sidebar-collapsed', String(next))
+      return next
     })
-  }
-
-  const toggleCopilot = useCallback(() => {
-    setCopilotOpen(p => !p)
   }, [])
 
   const prefillCopilot = useCallback((text: string) => {
@@ -102,31 +99,35 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     setCopilotAutoSend(null)
   }, [])
 
-  const sidebarWidth = isMobile ? 0 : collapsed ? 52 : 210
+  const sidebarWidth = isMobile ? 0 : collapsed ? 76 : 232
 
   return (
-    <Ctx.Provider value={{
-      collapsed,
-      mobileOpen,
-      toggleCollapsed,
-      openMobile: () => setMobileOpen(true),
-      closeMobile: () => setMobileOpen(false),
-      sidebarWidth,
-      copilotOpen,
-      toggleCopilot,
-      setCopilotOpen,
-      prefillCopilot,
-      copilotPrefill,
-      clearCopilotPrefill,
-      sendToCopilot,
-      copilotAutoSend,
-      clearCopilotAutoSend,
-      activeDeal,
-      setActiveDeal,
-    }}>
+    <SidebarContext.Provider
+      value={{
+        collapsed,
+        mobileOpen,
+        sidebarWidth,
+        toggleCollapsed,
+        openMobile: () => setMobileOpen(true),
+        closeMobile: () => setMobileOpen(false),
+        copilotOpen,
+        toggleCopilot: () => setCopilotOpen(previous => !previous),
+        setCopilotOpen,
+        prefillCopilot,
+        copilotPrefill,
+        clearCopilotPrefill,
+        sendToCopilot,
+        copilotAutoSend,
+        clearCopilotAutoSend,
+        activeDeal,
+        setActiveDeal,
+      }}
+    >
       {children}
-    </Ctx.Provider>
+    </SidebarContext.Provider>
   )
 }
 
-export const useSidebar = () => useContext(Ctx)
+export function useSidebar() {
+  return useContext(SidebarContext)
+}

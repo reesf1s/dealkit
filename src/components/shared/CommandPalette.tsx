@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  LayoutDashboard, Swords, BookOpen, TrendingUp,
-  FileText, Building2, Settings, Plus, Zap,
+  LayoutDashboard, TrendingUp,
+  Building2, Settings, Plus, Zap,
   Sparkles, CornerDownLeft, Loader2,
-  BarChart2, Users, Brain, AlertTriangle, GitBranch, MessageSquare, Plug,
+  BarChart2, Users, Brain, GitBranch, MessageSquare, Plug, Bot,
 } from 'lucide-react'
 
 interface CommandItem {
@@ -19,25 +19,20 @@ interface CommandItem {
 }
 
 const ALL_ITEMS: CommandItem[] = [
-  { id: 'dashboard',      label: 'Dashboard',            section: 'navigate', icon: LayoutDashboard, href: '/dashboard' },
-  { id: 'pipeline',       label: 'Pipeline Map',         section: 'navigate', icon: GitBranch,       href: '/pipeline',     shortcut: '↩' },
-  { id: 'deals',          label: 'Opportunities',        section: 'navigate', icon: TrendingUp,      href: '/deals' },
-  { id: 'contacts',       label: 'Contacts',             section: 'navigate', icon: Users,           href: '/contacts' },
-  { id: 'analytics',      label: 'Analytics',            section: 'navigate', icon: BarChart2,       href: '/analytics' },
-  { id: 'intelligence',   label: 'Signals',              section: 'navigate', icon: Brain,           href: '/intelligence' },
-  { id: 'competitors',    label: 'Competitors',          section: 'navigate', icon: Swords,          href: '/competitors' },
-  { id: 'case-studies',   label: 'Case Studies',         section: 'navigate', icon: BookOpen,        href: '/case-studies' },
-  { id: 'collateral',     label: 'Collateral',           section: 'navigate', icon: FileText,        href: '/collateral' },
-  { id: 'product-gaps',   label: 'Product Gaps',         section: 'navigate', icon: AlertTriangle,   href: '/product-gaps' },
-  { id: 'workflows',      label: 'Sequences',            section: 'navigate', icon: Zap,             href: '/workflows' },
-  { id: 'playbook',       label: 'Win Playbook',         section: 'navigate', icon: BookOpen,        href: '/playbook' },
-  { id: 'models',         label: 'ML Models',            section: 'navigate', icon: Brain,           href: '/models' },
-  { id: 'company',        label: 'Integrations',         section: 'navigate', icon: Plug,            href: '/company' },
-  { id: 'settings',       label: 'Settings',             section: 'navigate', icon: Settings,        href: '/settings' },
-  { id: 'log-deal',       label: 'Log deal',             section: 'actions',  icon: Plus,            href: '/deals' },
-  { id: 'add-competitor', label: 'Add competitor',       section: 'actions',  icon: Plus,            href: '/competitors' },
-  { id: 'add-case-study', label: 'Add case study',       section: 'actions',  icon: Plus,            href: '/case-studies' },
-  { id: 'gen-collateral', label: 'Generate collateral',  section: 'actions',  icon: Zap,             href: '/collateral' },
+  { id: 'dashboard',    label: 'Overview',      section: 'navigate', icon: LayoutDashboard, href: '/dashboard' },
+  { id: 'deals',        label: 'Deals',         section: 'navigate', icon: TrendingUp,      href: '/deals' },
+  { id: 'accounts',     label: 'Accounts',      section: 'navigate', icon: Building2,       href: '/company' },
+  { id: 'contacts',     label: 'Contacts',      section: 'navigate', icon: Users,           href: '/contacts' },
+  { id: 'signals',      label: 'Signals',       section: 'navigate', icon: Brain,           href: '/analytics' },
+  { id: 'forecast',     label: 'Forecast',      section: 'navigate', icon: BarChart2,       href: '/dashboard' },
+  { id: 'conversations',label: 'Conversations', section: 'navigate', icon: MessageSquare,   href: '/connections' },
+  { id: 'automations',  label: 'Automations',   section: 'navigate', icon: Bot,             href: '/automations' },
+  { id: 'calendar',     label: 'Calendar',      section: 'navigate', icon: GitBranch,       href: '/calendar', shortcut: '↩' },
+  { id: 'integrations', label: 'Integrations',  section: 'navigate', icon: Plug,            href: '/company' },
+  { id: 'settings',     label: 'Settings',      section: 'navigate', icon: Settings,        href: '/settings' },
+  { id: 'log-deal',     label: 'Log deal',      section: 'actions',  icon: Plus,            href: '/deals' },
+  { id: 'ask-ai',       label: 'Ask Halvex',    section: 'actions',  icon: Sparkles,        href: '/dashboard' },
+  { id: 'run-auto',     label: 'Review automations', section: 'actions', icon: Zap,         href: '/automations' },
 ]
 
 // ── Intent classifier ─────────────────────────────────────────────────────────
@@ -112,7 +107,7 @@ export default function CommandPalette() {
   // In AI-intent mode: Ask AI is index 0, nav items follow
   // In nav-intent mode: nav items first, Ask AI is last
   const askAIFirst = intent === 'ai' && showAskAI
-  const navFlat = [...navigateItems, ...actionItems]
+  const navFlat = useMemo(() => [...navigateItems, ...actionItems], [navigateItems, actionItems])
 
   let totalItems: number
   let askAIIndex: number
@@ -209,8 +204,8 @@ export default function CommandPalette() {
       }
       setAiDone(true)
       setAiLoading(false)
-    } catch (err: any) {
-      if (err?.name !== 'AbortError') {
+    } catch (err: unknown) {
+      if (!(err instanceof DOMException && err.name === 'AbortError')) {
         setAiAnswer('Something went wrong. Please try again.')
         setAiDone(true)
       }

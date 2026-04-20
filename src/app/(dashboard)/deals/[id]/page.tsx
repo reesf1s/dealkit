@@ -1,6694 +1,1326 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
+import { useEffect } from 'react'
 import useSWR from 'swr'
-import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { useState, useEffect, useRef } from 'react'
-import Link from 'next/link'
-import * as Dialog from '@radix-ui/react-dialog'
+import { useParams } from 'next/navigation'
 import {
-  ArrowLeft, Sparkles, Square, Plus, Target, Loader2,
-  Clipboard, Banknote, Calendar,
-  User, Users, UserPlus, Edit, Trash2, CheckCircle, X, Link2, Check,
-  Mail, Sword, Zap, Layers,
-  Globe, FileText, Database, BookOpen, Github, Cloud,
-  ExternalLink, ChevronDown, ChevronRight, PenTool,
-  TrendingUp, ArrowUpRight, RefreshCw,
-  FileCheck, BarChart2, File,
-  ArrowUp, ArrowDown, MessageSquare, AlertTriangle, Flag
+  ArrowUpRight,
+  Bot,
+  Calendar,
+  Check,
+  CheckCheck,
+  ChevronRight,
+  Circle,
+  Clock3,
+  Mail,
+  MessageSquare,
+  MoveUpRight,
+  Send,
+  Sparkles,
+  Triangle,
+  Users,
 } from 'lucide-react'
-import type { DealContact, DealLink as DealLinkType, DealLinkType as LinkTypeEnum } from '@/types'
+import AIVoice from '@/components/AIVoice'
 import { useSidebar } from '@/components/layout/SidebarContext'
-import { getScoreColor, getScoreDisplay } from '@/lib/deal-context'
-import { track, Events } from '@/lib/analytics'
 import { fetcher } from '@/lib/fetcher'
-import { MiniBarChart } from '@/components/shared/MiniBarChart'
+import {
+  avatarGradientFromName,
+  formatContextualDate,
+  formatCurrencyGBP,
+  formatDelta,
+  formatPercentage,
+  formatRelativeTime,
+  initialsFromName,
+} from '@/lib/presentation'
 
-// ─── Signal highlighting helper ──────────────────────────────────────────────
-
-const POSITIVE_SIGNALS: string[] = [
-  'excited', 'committed', 'moving forward', 'approved', 'agreed', 'confirmed',
-  'ready to', 'champion', 'sponsor', 'budget approved', 'budget allocated',
-  'high priority', 'top priority', 'green light', 'sign off', 'signed off',
-  'go ahead', 'great fit', 'love it', 'impressed', 'strong fit',
-  'reference call', 'eager', 'enthusiastic', 'very interested',
-  'contract signed', 'contracts signed', 'signed contract', 'fully executed',
-  'purchase order', 'po issued', 'po received',
-]
-
-const NEGATIVE_SIGNALS: string[] = [
-  'budget freeze', 'budget cut', 'no budget', 'not sure', 'reconsidering',
-  'delay', 'postpone', 'no decision', 'on hold', 'not a priority',
-  'too expensive', 'cost concern', 'roi unclear', 'no response', 'ghosted',
-  'gone quiet', 'not responding', 'going with another', 'pushback',
-  'blocker', 'legal hold', 'lost', 'cancelled', 'walking away',
-  'no longer interested', 'competitor chosen',
-]
-
-const URGENCY_SIGNALS: string[] = [
-  'urgent', 'asap', 'immediately', 'end of quarter', 'end of year',
-  'eoy', 'eoq', 'deadline', 'must go live', 'launch date', 'go-live',
-  'this month', 'this quarter', 'time sensitive', 'hard deadline',
-]
-
-const PRODUCT_GAP_KEYWORDS: string[] = [
-  "gap", "missing", "doesn't have", "does not have", "wish", "would need",
-  "lacks", "no feature", "feature request", "can't do", "cannot do",
-]
-
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+type DealContact = {
+  name: string
+  title?: string | null
+  email?: string | null
 }
 
-function highlightSignals(text: string, competitors: string[]): string {
-  let result = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-
-  const applyHighlight = (words: string[], cls: string) => {
-    for (const word of words) {
-      const pattern = new RegExp(`(${escapeRegex(word)})`, 'gi')
-      result = result.replace(pattern, `<mark style="background:var(--highlight-${cls}-bg,#dcfce7);color:var(--highlight-${cls}-text,#166534);border-radius:2px;padding:0 2px">$1</mark>`)
-    }
-  }
-
-  applyHighlight(POSITIVE_SIGNALS, 'positive')
-
-  for (const word of NEGATIVE_SIGNALS) {
-    const pattern = new RegExp(`(${escapeRegex(word)})`, 'gi')
-    result = result.replace(pattern, `<mark style="background:rgba(239,68,68,0.18);color:#f87171;border-radius:2px;padding:0 2px">$1</mark>`)
-  }
-
-  for (const word of URGENCY_SIGNALS) {
-    const pattern = new RegExp(`(${escapeRegex(word)})`, 'gi')
-    result = result.replace(pattern, `<mark style="background:rgba(251,191,36,0.18);color:#fbbf24;border-radius:2px;padding:0 2px">$1</mark>`)
-  }
-
-  for (const competitor of competitors) {
-    if (!competitor.trim()) continue
-    const pattern = new RegExp(`(${escapeRegex(competitor.trim())})`, 'gi')
-    result = result.replace(pattern, `<mark style="background:rgba(96,165,250,0.18);color:#60a5fa;border-radius:2px;padding:0 2px">$1</mark>`)
-  }
-
-  for (const word of PRODUCT_GAP_KEYWORDS) {
-    const pattern = new RegExp(`(${escapeRegex(word)})`, 'gi')
-    result = result.replace(pattern, `<mark style="background:rgba(251,191,36,0.15);color:#fbbf24;border-radius:2px;padding:0 2px">$1</mark>`)
-  }
-
-  return result
+type DealTodo = {
+  id?: string
+  text?: string
+  done?: boolean
+  source?: string
+  createdAt?: string
 }
 
-// ─── Workspace members hook ─────────────────────────────────────────────────
+type ScoreHistoryPoint = {
+  score?: number
+  date?: string
+}
 
-interface WorkspaceMember {
+type DealRecord = {
   id: string
-  userId: string
-  email: string
-  role: string
+  dealName: string
+  prospectCompany: string
+  prospectName?: string | null
+  prospectTitle?: string | null
+  stage: string
+  dealValue?: number | null
+  forecastCategory?: 'commit' | 'upside' | 'pipeline' | 'omit' | null
+  closeDate?: string | null
+  nextSteps?: string | null
+  meetingNotes?: string | null
+  aiSummary?: string | null
+  conversionScore?: number | null
+  conversionInsights?: string[] | null
+  dealRisks?: string[] | null
+  competitors?: string[] | null
+  contacts?: DealContact[] | null
+  todos?: DealTodo[] | null
+  scoreHistory?: ScoreHistoryPoint[] | null
+  successCriteriaTodos?: Array<{
+    id?: string
+    text?: string
+    achieved?: boolean
+    category?: string
+    note?: string
+  }> | null
+  updatedAt?: string
+  createdAt?: string
 }
 
-function useWorkspaceMembers() {
-  const { data } = useSWR<{ data: WorkspaceMember[] }>('/api/workspaces/members', fetcher)
-  return data?.data ?? []
+type AutomationItem = {
+  id: string
+  name: string
+  enabled?: boolean
+  category?: string
 }
 
-// ─── Assignee helpers ───────────────────────────────────────────────────────
-
-function getInitials(name: string): string {
-  if (!name) return '?'
-  if (name.includes('@')) {
-    return name.split('@')[0][0]?.toUpperCase() ?? '?'
-  }
-  const parts = name.trim().split(/\s+/)
-  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-  return parts[0][0]?.toUpperCase() ?? '?'
+type SignalCard = {
+  label: string
+  body: string
+  meta: string
+  weight: number
+  tone: 'positive' | 'warn' | 'risk' | 'info'
+  icon: typeof Sparkles
 }
 
-function getDisplayName(assignee: string): string {
-  if (!assignee) return ''
-  if (assignee.includes('@')) return assignee.split('@')[0]
-  return assignee
+type TimelineItem = {
+  kind: 'ai' | 'email' | 'meeting'
+  label: string
+  timestamp: string
+  sender?: string
+  title: string
+  body: string
+  insight?: { label: string; text: string }
 }
 
-// ─── AssigneePicker component ───────────────────────────────────────────────
-
-function AssigneePill({ assignee, onClick, size = 'sm' }: { assignee?: string; onClick: () => void; size?: 'sm' | 'md' }) {
-  const isSm = size === 'sm'
-  if (!assignee) {
-    return (
-      <button
-        onClick={e => { e.stopPropagation(); onClick() }}
-        style={{
-          background: 'none', border: '1px dashed var(--ds-border)', borderRadius: '8px',
-          padding: isSm ? '1px 6px' : '2px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px',
-          color: 'var(--text-tertiary)', fontSize: isSm ? '10px' : '11px', flexShrink: 0,
-        }}
-        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLElement).style.color = 'var(--accent)' }}
-        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)' }}
-        title="Assign"
-      >
-        <UserPlus size={isSm ? 10 : 11} />
-      </button>
-    )
-  }
-  return (
-    <button
-      onClick={e => { e.stopPropagation(); onClick() }}
-      style={{
-        background: 'var(--accent-subtle)', border: 'none', borderRadius: '8px',
-        padding: isSm ? '1px 8px 1px 2px' : '2px 10px 2px 3px', cursor: 'pointer', display: 'flex',
-        alignItems: 'center', gap: '4px', flexShrink: 0,
-      }}
-      title={assignee}
-    >
-      <div style={{
-        width: isSm ? 16 : 18, height: isSm ? 16 : 18, borderRadius: '50%',
-        background: 'var(--accent)', color: '#fff', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', fontSize: isSm ? '8px' : '9px', fontWeight: 700,
-      }}>
-        {getInitials(assignee)}
-      </div>
-      <span style={{ fontSize: isSm ? '10px' : '11px', color: 'var(--accent)', fontWeight: 500, maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {getDisplayName(assignee)}
-      </span>
-    </button>
-  )
+function stageLabel(stage?: string | null): string {
+  if (!stage) return 'Proposal'
+  return stage.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
 }
 
-function AssigneeDropdown({
-  currentAssignee,
-  members,
-  onAssign,
-  onClose,
-  anchorRef,
-}: {
-  currentAssignee?: string
-  members: WorkspaceMember[]
-  onAssign: (assignee: string | null) => void
-  onClose: () => void
-  anchorRef: React.RefObject<HTMLDivElement | null>
-}) {
-  const [customName, setCustomName] = useState('')
-  const dropdownRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    inputRef.current?.focus()
-    const handleClick = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
-          anchorRef.current && !anchorRef.current.contains(e.target as Node)) {
-        onClose()
-      }
-    }
-    const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('mousedown', handleClick)
-    document.addEventListener('keydown', handleEscape)
-    return () => { document.removeEventListener('mousedown', handleClick); document.removeEventListener('keydown', handleEscape) }
-  }, [onClose, anchorRef])
-
-  const filteredMembers = customName.trim()
-    ? members.filter(m => m.email.toLowerCase().includes(customName.toLowerCase()))
-    : members
-
-  return (
-    <div
-      ref={dropdownRef}
-      style={{
-        position: 'absolute', top: '100%', right: 0, marginTop: '4px', zIndex: 100,
-        background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '6px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.10)', minWidth: '220px', maxHeight: '280px', overflowY: 'auto',
-      }}
-    >
-      <form onSubmit={e => { e.preventDefault(); if (customName.trim()) { onAssign(customName.trim()); onClose() } }}>
-        <input
-          ref={inputRef}
-          value={customName}
-          onChange={e => setCustomName(e.target.value)}
-          placeholder="Type a name or email..."
-          style={{
-            width: '100%', background: 'var(--input-bg)', border: 'none',
-            borderRadius: '6px', padding: '6px 8px', color: 'var(--text-primary)',
-            fontSize: '12px', outline: 'none', boxSizing: 'border-box', marginBottom: '4px',
-          }}
-          onFocus={e => (e.target as HTMLElement).style.borderColor = 'var(--accent)'}
-          onBlur={e => (e.target as HTMLElement).style.borderColor = 'var(--border)'}
-        />
-      </form>
-
-      {customName.trim() && !members.some(m => m.email.toLowerCase() === customName.toLowerCase().trim()) && (
-        <button
-          onClick={() => { onAssign(customName.trim()); onClose() }}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
-            background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer',
-            color: 'var(--accent)', fontSize: '12px', textAlign: 'left',
-          }}
-          onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'}
-          onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}
-        >
-          <UserPlus size={12} />
-          <span>Assign to &quot;{customName.trim()}&quot;</span>
-        </button>
-      )}
-
-      {filteredMembers.length > 0 && (
-        <div style={{ borderTop: customName.trim() ? '1px solid var(--border)' : 'none', paddingTop: customName.trim() ? '4px' : 0, marginTop: customName.trim() ? '2px' : 0 }}>
-          <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', padding: '4px 8px 2px' }}>
-            Workspace Members
-          </div>
-          {filteredMembers.map(m => (
-            <button
-              key={m.userId}
-              onClick={() => { onAssign(m.email); onClose() }}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 8px',
-                background: currentAssignee === m.email ? 'var(--accent-subtle)' : 'none',
-                border: 'none', borderRadius: '6px', cursor: 'pointer', textAlign: 'left',
-              }}
-              onMouseEnter={e => { if (currentAssignee !== m.email) (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)' }}
-              onMouseLeave={e => { if (currentAssignee !== m.email) (e.currentTarget as HTMLElement).style.background = 'none' }}
-            >
-              <div style={{
-                width: 20, height: 20, borderRadius: '50%', background: currentAssignee === m.email ? 'var(--accent)' : 'var(--surface-hover)',
-                color: currentAssignee === m.email ? '#fff' : 'var(--text-secondary)', display: 'flex',
-                alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 700, flexShrink: 0,
-              }}>
-                {getInitials(m.email)}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '12px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {m.email.split('@')[0]}
-                </div>
-                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {m.email}
-                </div>
-              </div>
-              {currentAssignee === m.email && <Check size={12} color="var(--accent)" />}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {currentAssignee && (
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '4px', marginTop: '4px' }}>
-          <button
-            onClick={() => { onAssign(null); onClose() }}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
-              background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer',
-              color: 'var(--text-tertiary)', fontSize: '12px', textAlign: 'left',
-            }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.06)'}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}
-          >
-            <X size={12} />
-            <span>Unassign</span>
-          </button>
-        </div>
-      )}
-    </div>
-  )
+function stageTone(stage?: string | null) {
+  switch (stage) {
+    case 'closed_won':
+      return { bg: 'var(--signal-soft)', border: 'rgba(29, 184, 106, 0.2)', text: 'var(--signal)' }
+    case 'closed_lost':
+      return { bg: 'var(--risk-soft)', border: 'rgba(178, 58, 58, 0.18)', text: 'var(--risk)' }
+    case 'negotiation':
+      return { bg: 'var(--signal-soft)', border: 'rgba(29, 184, 106, 0.2)', text: 'var(--signal)' }
+    case 'proposal':
+      return { bg: 'var(--warn-soft)', border: 'rgba(196, 98, 27, 0.18)', text: 'var(--warn)' }
+    default:
+      return { bg: 'rgba(20, 17, 10, 0.05)', border: 'rgba(20, 17, 10, 0.1)', text: 'var(--ink-3)' }
+  }
 }
 
-function AssigneePicker({
-  assignee,
-  members,
-  onAssign,
-  size = 'sm',
-}: {
-  assignee?: string
-  members: WorkspaceMember[]
-  onAssign: (assignee: string | null) => void
-  size?: 'sm' | 'md'
-}) {
-  const [open, setOpen] = useState(false)
-  const anchorRef = useRef<HTMLDivElement>(null)
-
-  return (
-    <div ref={anchorRef} style={{ position: 'relative', display: 'inline-flex' }}>
-      <AssigneePill assignee={assignee} onClick={() => setOpen(v => !v)} size={size} />
-      {open && (
-        <AssigneeDropdown
-          currentAssignee={assignee}
-          members={members}
-          onAssign={onAssign}
-          onClose={() => setOpen(false)}
-          anchorRef={anchorRef}
-        />
-      )}
-    </div>
-  )
+function compactDealId(id: string) {
+  return `#DE-${id.replace(/-/g, '').slice(0, 4).toUpperCase()}`
 }
 
-const STAGE_COLORS: Record<string, string> = {
-  prospecting: '#9b9a97', qualification: '#2e78c6', discovery: '#1DB86A',
-  demo: '#1DB86A', proposal: '#cb6c2c', negotiation: '#cb6c2c', closed_won: 'var(--success)', closed_lost: '#9b9a97',
+function splitMeetingNotes(notes?: string | null) {
+  if (!notes?.trim()) return []
+  return notes
+    .split(/\n---\n|\n##\s+/)
+    .map(chunk => chunk.replace(/^#+\s*/, '').trim())
+    .filter(Boolean)
 }
 
-/** Read-only panel showing emails/notes pulled from HubSpot on the last sync. */
-function HubSpotActivityBlock({ deal, dealCompetitors }: { deal: any; dealCompetitors: string[] }) {
-  const [expanded, setExpanded] = useState(false)
-  const raw: string = deal?.hubspotNotes ?? ''
-  if (!raw.trim()) return null
+function scoreTrend(history: ScoreHistoryPoint[] = [], currentScore: number) {
+  const values = history
+    .map(point => point.score)
+    .filter((value): value is number => typeof value === 'number' && !Number.isNaN(value))
 
-  // Split on double-newline before a [date] marker
-  const blocks = raw.split(/\n\n(?=\[)/).map((b: string) => b.trim()).filter(Boolean)
-
-  return (
-    <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '14px' }}>
-      <button
-        onClick={() => setExpanded(v => !v)}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <RefreshCw size={13} color="#FF7A59" />
-          <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)' }}>HubSpot Activity</span>
-          <span style={{ fontSize: '11px', color: '#FF7A59', background: 'rgba(255,122,89,0.1)', borderRadius: '4px', padding: '1px 6px', fontWeight: 600 }}>
-            {blocks.length} entr{blocks.length === 1 ? 'y' : 'ies'}
-          </span>
-          <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>· updates on every sync</span>
-        </div>
-        <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{expanded ? 'Hide ↑' : 'Show ↓'}</span>
-      </button>
-      {expanded && (
-        <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '380px', overflowY: 'auto' }}>
-          {blocks.map((entry: string, i: number) => {
-            const dateMatch = entry.match(/^\[([^\]]+)\]/)
-            const date = dateMatch?.[1] ?? ''
-            const body = entry.slice(dateMatch?.[0].length ?? 0).trim()
-            return (
-              <div key={i} style={{ padding: '9px 12px', background: 'var(--surface)', border: 'none', borderRadius: '8px' }}>
-                {date && (
-                  <div style={{ fontSize: '10px', fontWeight: 700, color: '#FF7A59', letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: '4px' }}>{date}</div>
-                )}
-                <div
-                  style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}
-                  dangerouslySetInnerHTML={{ __html: highlightSignals(body, dealCompetitors) }}
-                />
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
+  if (values.length === 0) return [Math.max(18, currentScore - 20), currentScore - 10, currentScore - 6, currentScore]
+  if (values.length >= 7) return values.slice(-7)
+  const seeded = [...values]
+  while (seeded.length < 7) {
+    seeded.unshift(Math.max(12, seeded[0] - 4))
+  }
+  return seeded
 }
 
-// ─── AI Insight Strip ─────────────────────────────────────────────────────────
-// Compact banner below hero card: health status + AI summary + next action
-// Auto-generates if the deal has meeting notes but no summary yet.
-
-function DealInsightStrip({ deal, dealId, onRefreshed }: { deal: any; dealId: string; onRefreshed: () => void }) {
-  const [generating, setGenerating] = useState(false)
-  const [localSummary, setLocalSummary] = useState<string | null>(null)
-  const [genError, setGenError] = useState<string | null>(null)
-
-  // Auto-generate if deal has notes but no summary
-  const autoTriggered = useRef(false)
-  useEffect(() => {
-    const hasNotes = typeof deal?.meetingNotes === 'string' && deal.meetingNotes.trim().length > 0
-    const hasSummary = !!deal?.aiSummary
-    if (hasNotes && !hasSummary && !autoTriggered.current && !generating) {
-      autoTriggered.current = true
-      generate()
-    }
-  }, [deal?.id]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const generate = async () => {
-    setGenerating(true)
-    setGenError(null)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/brief`)
-      const json = await res.json()
-      const generated = json.data?.brief ?? json.data?.summary ?? null
-      if (!res.ok) {
-        setGenError(json.error ?? 'Failed to generate analysis')
-      } else if (generated) {
-        setLocalSummary(generated)
-        // Persist back to deal so it shows on next load
-        await fetch(`/api/deals/${dealId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ aiSummary: generated }),
-        })
-        onRefreshed()
-      }
-      // generated === null means not enough data — not an error, just no output
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Generation failed'
-      setGenError(msg.includes('fetch') ? 'Network error — check your connection' : msg)
-    } finally {
-      setGenerating(false)
-    }
-  }
-
-  const summary = localSummary ?? deal?.aiSummary
-  const score = deal?.conversionScore as number | null
-  const history = Array.isArray(deal?.scoreHistory) ? deal.scoreHistory as Array<{ score: number }> : []
-  const prevScore = history.length >= 2 ? history[history.length - 2].score : null
-  const scoreDelta = (score != null && prevScore != null) ? score - prevScore : null
-
-  // Derive health
-  const stale = deal?.updatedAt
-    ? Math.floor((Date.now() - new Date(deal.updatedAt).getTime()) / 86400000)
-    : 0
-  const health: 'at_risk' | 'improving' | 'stable' | 'new' =
-    score == null ? 'new'
-    : stale > 21 || score < 30 ? 'at_risk'
-    : scoreDelta != null && scoreDelta > 5 && score >= 55 ? 'improving'
-    : stale > 14 || score < 45 ? 'at_risk'
-    : 'stable'
-
-  const healthMeta = {
-    at_risk:  { label: 'At risk',   color: '#b45309', bg: 'rgba(180,83,9,0.08)',   dot: '#ef4444' },
-    improving:{ label: 'Improving', color: '#166534', bg: 'rgba(22,101,52,0.08)',  dot: '#1DB86A' },
-    stable:   { label: 'On track',  color: 'var(--text-secondary)', bg: 'var(--surface-2)', dot: '#3b82f6' },
-    new:      { label: 'New deal',  color: 'var(--text-tertiary)', bg: 'var(--surface-2)',  dot: 'var(--text-muted)' },
-  }[health]
-
-  const hasNotes = typeof deal?.meetingNotes === 'string' && deal.meetingNotes.trim().length > 0
-
-  // Don't show strip if deal is closed
-  if (deal?.stage === 'closed_won' || deal?.stage === 'closed_lost') return null
-
-  return (
-    <div style={{
-      background: healthMeta.bg,
-      border: '1px solid var(--border-subtle)',
-      borderRadius: '10px',
-      padding: '11px 16px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '12px',
-      minHeight: '44px',
-    }}>
-      {/* Health pill */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '5px',
-        padding: '3px 9px', borderRadius: '100px',
-        background: 'var(--surface-1)',
-        border: '1px solid var(--border-default)',
-        flexShrink: 0,
-      }}>
-        <div style={{ width: 6, height: 6, borderRadius: '50%', background: healthMeta.dot }} />
-        <span style={{ fontSize: '11px', fontWeight: 600, color: healthMeta.color, whiteSpace: 'nowrap' }}>
-          {healthMeta.label}
-        </span>
-        {scoreDelta != null && (
-          <span style={{ fontSize: '10px', color: scoreDelta > 0 ? '#166534' : '#b45309', fontWeight: 600 }}>
-            {scoreDelta > 0 ? `↑+${scoreDelta}` : `↓${scoreDelta}`}
-          </span>
-        )}
-      </div>
-
-      {/* Summary text */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {generating ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <RefreshCw size={10} style={{ color: 'var(--text-tertiary)', animation: 'spin 1s linear infinite' }} />
-            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Analysing deal…</span>
-          </div>
-        ) : genError ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: '12px', color: 'var(--color-red)' }}>{genError}</span>
-            <button
-              onClick={generate}
-              style={{ fontSize: '11px', color: 'var(--color-red)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, padding: 0, textDecoration: 'underline' }}
-            >
-              Retry
-            </button>
-          </div>
-        ) : summary ? (
-          <span style={{ fontSize: '12.5px', color: healthMeta.color, lineHeight: 1.5 }}>
-            {summary}
-          </span>
-        ) : hasNotes ? (
-          <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
-            AI analysis not yet generated for this deal.
-          </span>
-        ) : (
-          <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
-            Log meeting notes to get AI deal intelligence — objections, risks, and next actions.
-          </span>
-        )}
-      </div>
-
-      {/* Refresh button */}
-      {(summary || hasNotes) && !generating && (
-        <button
-          onClick={generate}
-          title="Refresh AI analysis"
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0,
-            color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '3px',
-            fontSize: '11px', padding: '3px 6px', borderRadius: '5px',
-          }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; (e.currentTarget as HTMLElement).style.background = 'var(--surface-1)' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'; (e.currentTarget as HTMLElement).style.background = 'none' }}
-        >
-          <RefreshCw size={10} />
-          {summary ? 'Refresh' : 'Generate'}
-        </button>
-      )}
-    </div>
-  )
+function sparkPath(values: number[]) {
+  if (values.length === 0) return ''
+  const max = Math.max(...values)
+  const min = Math.min(...values)
+  const range = Math.max(1, max - min)
+  const points = values.map((value, index) => {
+    const x = (index / (values.length - 1 || 1)) * 88
+    const y = 28 - ((value - min) / range) * 22
+    return `${x},${y}`
+  })
+  return `M${points[0]} ${points.slice(1).map(point => `L${point}`).join(' ')}`
 }
 
-function MeetingNotesTab({ dealId, deal, onUpdate, onSwitchToPrep }: { dealId: string; deal: any; onUpdate: () => void; onSwitchToPrep?: () => void }) {
-  const dealCompetitors: string[] = deal?.competitors ?? []
-  const { sendToCopilot } = useSidebar()
-  const [updateText, setUpdateText] = useState('')
-  const [historyExpanded, setHistoryExpanded] = useState(false)
-  const [clearConfirm, setClearConfirm] = useState(false)
-  const [clearing, setClearing] = useState(false)
-  // AI memory correction
-  const [editingSummary, setEditingSummary] = useState(false)
-  const [summaryDraft, setSummaryDraft] = useState('')
-  const [resetAIConfirm, setResetAIConfirm] = useState(false)
-  const [savingAI, setSavingAI] = useState(false)
-  // Extraction confirmation state
-  const [analysing, setAnalysing] = useState(false)
-  const [lastExtraction, setLastExtraction] = useState<{ extraction: any; analysedAt: string } | null>(null)
-  const [verifyingExtraction, setVerifyingExtraction] = useState(false)
+function buildSignals(deal: DealRecord, noteBlocks: string[]): SignalCard[] {
+  const cards: SignalCard[] = []
+  const summary = [deal.aiSummary, ...(deal.conversionInsights ?? [])].filter(Boolean).join(' ')
+  const allNotes = [summary, deal.meetingNotes ?? '', ...(deal.dealRisks ?? [])].join(' ').toLowerCase()
+  const competitor = deal.competitors?.[0]
 
-  const patchDeal = async (payload: Record<string, unknown>) => {
-    setSavingAI(true)
-    try {
-      await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      onUpdate()
-    } finally {
-      setSavingAI(false)
-    }
-  }
-
-  const deleteRisk = (index: number) => {
-    const current: string[] = deal?.dealRisks ?? []
-    patchDeal({ dealRisks: current.filter((_: string, i: number) => i !== index) })
-  }
-
-  const deleteInsight = (index: number) => {
-    const current: string[] = deal?.conversionInsights ?? []
-    patchDeal({ conversionInsights: current.filter((_: string, i: number) => i !== index) })
-  }
-
-  const saveSummary = () => {
-    patchDeal({ aiSummary: summaryDraft.trim() || null })
-    setEditingSummary(false)
-  }
-
-  const resetAllAI = async () => {
-    // conversionScorePinned: false — ensure pin is cleared so AI can re-score after reset
-    await patchDeal({ aiSummary: null, conversionScore: null, conversionScorePinned: false, conversionInsights: [], dealRisks: [] })
-    setResetAIConfirm(false)
-  }
-
-  const clearNotes = async () => {
-    setClearing(true)
-    try {
-      await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ meetingNotes: null }),
-      })
-      setClearConfirm(false)
-      setHistoryExpanded(false)
-      onUpdate()
-    } finally {
-      setClearing(false)
-    }
-  }
-
-  // Direct note analysis — calls analyze-notes API and shows extraction confirmation card
-  const analyseNotes = async () => {
-    if (!updateText.trim()) return
-    setAnalysing(true)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/analyze-notes`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ meetingNotes: updateText.trim() }),
-      })
-      const json = await res.json()
-      if (json.data) {
-        const extraction = json.data.parsed
-        // Try to read the note_signals_json from updated deal
-        const signals = json.data.deal?.note_signals_json
-          ? (typeof json.data.deal.note_signals_json === 'string' ? JSON.parse(json.data.deal.note_signals_json) : json.data.deal.note_signals_json)
-          : null
-        setLastExtraction({ extraction: { ...extraction, signals }, analysedAt: new Date().toISOString() })
-        setUpdateText('')
-        onUpdate()
-        track(Events.AI_NOTE_ANALYZED, { dealId, signalsExtracted: signals ? Object.keys(signals).length : 0 })
-      }
-    } finally {
-      setAnalysing(false)
-    }
-  }
-
-  // Mark extraction as verified
-  const confirmExtraction = async () => {
-    if (!lastExtraction) return
-    setVerifyingExtraction(true)
-    try {
-      // Store user_verified: true in note_signals_json
-      const existing = deal?.note_signals_json
-        ? (typeof deal.note_signals_json === 'string' ? JSON.parse(deal.note_signals_json) : deal.note_signals_json)
-        : {}
-      await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note_signals_json: JSON.stringify({ ...existing, user_verified: true }) }),
-      })
-      setLastExtraction(null)
-      onUpdate()
-    } finally {
-      setVerifyingExtraction(false)
-    }
-  }
-
-  // Delete a single entry from the structured history
-  const deleteEntry = async (entryIndex: number) => {
-    if (!deal?.meetingNotes) return
-    const blocks = (deal.meetingNotes as string).split(/\n---\n/).map((b: string) => b.trim()).filter(Boolean)
-    const entries = blocks.filter((b: string) => /^\[/.test(b))
-    const legacy = blocks.filter((b: string) => !/^\[/.test(b))
-    const updatedEntries = entries.filter((_: string, i: number) => i !== entryIndex)
-    const updated = [...legacy, ...updatedEntries].join('\n---\n') || null
-    await fetch(`/api/deals/${dealId}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ meetingNotes: updated }),
+  if (deal.contacts?.length) {
+    cards.push({
+      label: 'Champion momentum',
+      body: `${deal.contacts[0]?.name} is active in the deal thread and giving Halvex fresh signal to work with.`,
+      meta: `${deal.contacts.length} stakeholders mapped`,
+      weight: 8,
+      tone: 'positive',
+      icon: Users,
     })
-    onUpdate()
   }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+  if (deal.nextSteps) {
+    cards.push({
+      label: 'Action clarity',
+      body: deal.nextSteps,
+      meta: 'Next step captured',
+      weight: 6,
+      tone: 'positive',
+      icon: Send,
+    })
+  }
 
-      {/* Empty state — no notes yet */}
-      {!deal?.meetingNotes && (
-        <div style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: '12px', padding: '32px 24px',
-          background: 'var(--surface)', border: '1px dashed var(--ds-border)', borderRadius: '8px',
-          textAlign: 'center',
-        }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--accent-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Clipboard size={18} color="var(--accent)" />
-          </div>
-          <div>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>No meeting notes yet</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '340px' }}>
-              Paste your first meeting note or transcript below to get AI-powered insights, risk detection, and action items.
-            </div>
-          </div>
-        </div>
-      )}
+  if (allNotes.includes('finance') || allNotes.includes('budget') || allNotes.includes('procurement')) {
+    cards.push({
+      label: 'Buying intent',
+      body: 'Finance and procurement language is showing up in recent deal context.',
+      meta: formatContextualDate(deal.updatedAt),
+      weight: 7,
+      tone: 'positive',
+      icon: ArrowUpRight,
+    })
+  }
 
-      {/* Previous meeting history */}
-      {deal?.meetingNotes && (() => {
-        // Parse entries separated by --- with [date] headers
-        const raw = (deal.meetingNotes as string)
-        const blocks = raw.split(/\n---\n/).map((b: string) => b.trim()).filter(Boolean)
-        const entries = blocks.filter((b: string) => /^\[/.test(b))
-        const legacy = blocks.filter((b: string) => !/^\[/.test(b))
-        return (
-          <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '14px' }}>
-            <button
-              onClick={() => setHistoryExpanded(v => !v)}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Clipboard size={13} color="var(--text-tertiary)" />
-                <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-tertiary)' }}>Meeting History</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'var(--surface-hover)', borderRadius: '4px', padding: '1px 6px' }}>
-                  {entries.length > 0 ? `${entries.length} meeting${entries.length > 1 ? 's' : ''}` : 'legacy notes'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {clearConfirm ? (
-                  <>
-                    <span style={{ fontSize: '11px', color: 'var(--danger)' }}>Clear all notes?</span>
-                    <button
-                      onClick={e => { e.stopPropagation(); clearNotes() }}
-                      disabled={clearing}
-                      style={{ fontSize: '11px', color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '2px 8px', borderRadius: '5px', cursor: 'pointer' }}
-                    >{clearing ? 'Clearing…' : 'Yes, clear'}</button>
-                    <button
-                      onClick={e => { e.stopPropagation(); setClearConfirm(false) }}
-                      style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}
-                    >Cancel</button>
-                  </>
-                ) : (
-                  <button
-                    onClick={e => { e.stopPropagation(); setClearConfirm(true) }}
-                    style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: '4px' }}
-                    title="Clear all notes for this deal"
-                  >Clear all</button>
-                )}
-                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{historyExpanded ? 'Hide ↑' : 'Show ↓'}</span>
-              </div>
-            </button>
-            {historyExpanded && (
-              <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '320px', overflowY: 'auto' }}>
-                {entries.length > 0 ? entries.map((entry: string, i: number) => {
-                  const dateMatch = entry.match(/^\[([^\]]+)\]/)
-                  const date = dateMatch?.[1] ?? ''
-                  const body = entry.slice(dateMatch?.[0].length ?? 0).trim()
-                  return (
-                    <div key={i} style={{ padding: '9px 12px', background: 'var(--surface)', border: 'none', borderRadius: '8px', position: 'relative' }}
-                      onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.entry-del') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
-                      onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.entry-del') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{date}</div>
-                        <button
-                          className="entry-del"
-                          onClick={() => deleteEntry(i)}
-                          style={{ opacity: 0, fontSize: '10px', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', padding: '1px 4px', borderRadius: '3px', transition: 'opacity 0.15s' }}
-                          title="Remove this entry"
-                        >✕ remove</button>
-                      </div>
-                      <div
-                        style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}
-                        dangerouslySetInnerHTML={{ __html: highlightSignals(body, dealCompetitors) }}
-                      />
-                    </div>
-                  )
-                }) : (
-                  <div
-                    style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: '1.7', margin: 0 }}
-                    dangerouslySetInnerHTML={{ __html: highlightSignals(legacy.join('\n'), dealCompetitors) }}
-                  />
-                )}
-              </div>
-            )}
-          </div>
-        )
-      })()}
+  if (allNotes.includes('security') || allNotes.includes('sso') || allNotes.includes('integration')) {
+    cards.push({
+      label: 'Unresolved objection',
+      body: 'Technical diligence is still open and should be answered before the next stage move.',
+      meta: 'Outstanding blocker',
+      weight: -6,
+      tone: 'warn',
+      icon: MessageSquare,
+    })
+  }
 
-      <HubSpotActivityBlock deal={deal} dealCompetitors={deal?.competitors ?? []} />
+  if (competitor) {
+    cards.push({
+      label: 'Competitor mentioned',
+      body: `${competitor} appears in the deal context and should be handled with a proof point or ROI angle.`,
+      meta: 'Competitive pressure',
+      weight: -5,
+      tone: 'risk',
+      icon: Sparkles,
+    })
+  }
 
-      {/* Add update */}
-      <div style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-          <Sparkles size={13} color="var(--accent)" />
-          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
-            {deal?.meetingNotes ? 'Add Update' : 'Log First Update'}
-          </span>
-          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>· AI extracts signals automatically</span>
-        </div>
-        <textarea
-          value={updateText}
-          onChange={e => setUpdateText(e.target.value)}
-          placeholder="Paste meeting notes or describe what happened — AI will extract signals, risks, and next steps."
-          rows={6}
-          style={{
-            width: '100%', resize: 'vertical', background: 'var(--input-bg)',
-            border: 'none', borderRadius: '8px',
-            color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6',
-            padding: '12px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
-          }}
-          onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
-          onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-          onKeyDown={e => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-              analyseNotes()
-            }
-          }}
-        />
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', gap: '8px', alignItems: 'center' }}>
-          <button
-            onClick={() => {
-              if (!updateText.trim()) return
-              sendToCopilot(`Update for ${deal?.prospectCompany ?? 'this deal'}:\n\n${updateText.trim()}`)
-              setUpdateText('')
-            }}
-            disabled={!updateText.trim()}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '7px 12px', borderRadius: '7px',
-              background: 'var(--surface)', border: 'none',
-              color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500',
-              cursor: updateText.trim() ? 'pointer' : 'not-allowed', opacity: updateText.trim() ? 1 : 0.5,
-            }}
-          >
-            <Sparkles size={11} />
-            Ask AI copilot
-          </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>⌘↵ to analyse</span>
-            <button
-              onClick={analyseNotes}
-              disabled={!updateText.trim() || analysing}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '8px 16px', borderRadius: '8px',
-                background: updateText.trim() && !analysing ? 'var(--text-primary)' : 'var(--surface)',
-                border: updateText.trim() && !analysing ? 'none' : '1px solid var(--border)',
-                color: updateText.trim() && !analysing ? 'var(--surface-1)' : 'var(--text-tertiary)',
-                fontSize: '13px', fontWeight: '600', cursor: updateText.trim() && !analysing ? 'pointer' : 'not-allowed',
-                transition: 'all 0.15s',
-              }}
-            >
-              {analysing ? <><RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> Analysing…</> : <><Zap size={12} /> Analyse Notes</>}
-            </button>
-          </div>
-        </div>
-      </div>
+  if (noteBlocks.length > 0) {
+    cards.push({
+      label: 'Conversation freshness',
+      body: 'Recent notes give Halvex enough context to keep scoring and action extraction current.',
+      meta: `${noteBlocks.length} updates logged`,
+      weight: 4,
+      tone: 'info',
+      icon: Clock3,
+    })
+  }
 
-      {/* Extraction confirmation card — shown after analyse-notes returns */}
-      {lastExtraction && (() => {
-        const ex = lastExtraction.extraction
-        const signals = ex.signals
-        const champStatus = ex.intentSignals?.championStatus ?? (signals?.champion_signal ? 'confirmed' : 'none')
-        const budgetStatus = ex.intentSignals?.budgetStatus ?? signals?.budget_signal ?? 'not_mentioned'
-        const timeline = ex.intentSignals?.decisionTimeline ?? signals?.decision_timeline ?? null
-        const nextStep = signals?.next_step ?? null
-        const competitors = (ex.competitors ?? []).length > 0 ? ex.competitors : (signals?.competitors_mentioned ?? [])
-        const objections = signals?.objections ?? []
-        const gaps = ex.productGaps ?? []
-        const sentiment = signals?.sentiment_score ?? null
-        const champLabel = champStatus === 'confirmed' ? '✓ Confirmed' : champStatus === 'suspected' ? '~ Likely' : '— Not detected'
-        const champColor = champStatus === 'confirmed' ? 'var(--success)' : champStatus === 'suspected' ? 'var(--warning)' : 'var(--text-tertiary)'
-        const budgetLabel = budgetStatus === 'approved' ? '✓ Confirmed' : budgetStatus === 'awaiting' ? '~ Awaiting approval' : budgetStatus === 'blocked' ? '⚠ Blocked' : '— Not discussed'
-        const budgetColor = budgetStatus === 'approved' ? 'var(--success)' : budgetStatus === 'blocked' ? 'var(--danger)' : budgetStatus === 'awaiting' ? 'var(--warning)' : 'var(--text-tertiary)'
-        return (
-          <div style={{ background: 'color-mix(in srgb, var(--accent) 5%, var(--card-bg))', border: 'none', borderRadius: '8px', padding: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                <CheckCircle size={14} color="var(--accent)" />
-                <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Note analysed</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>— {new Date(lastExtraction.analysedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
-              </div>
-              <button onClick={() => setLastExtraction(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', fontSize: '12px', padding: '2px 6px' }}>✕</button>
-            </div>
-            <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '8px' }}>Extracted signals</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Champion</span>
-                <span style={{ color: champColor, fontWeight: '600' }}>{champLabel}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Budget</span>
-                <span style={{ color: budgetColor, fontWeight: '600' }}>{budgetLabel}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Timeline</span>
-                <span style={{ color: timeline ? 'var(--text-primary)' : 'var(--text-tertiary)', fontWeight: '600' }}>{timeline ?? '— Not mentioned'}</span>
-              </div>
-              {nextStep && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Next step</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: '600', maxWidth: '200px', textAlign: 'right' }}>&ldquo;{nextStep}&rdquo;</span>
-                </div>
-              )}
-              {competitors.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Competitors</span>
-                  <span style={{ color: '#2e78c6', fontWeight: '600' }}>{competitors.join(', ')}</span>
-                </div>
-              )}
-              {objections.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Objections</span>
-                  <span style={{ color: 'var(--warning)', fontWeight: '600' }}>{objections.map((o: any) => o.theme).join(', ')} ({objections.length})</span>
-                </div>
-              )}
-              {gaps.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Product gaps</span>
-                  <span style={{ color: 'var(--danger)', fontWeight: '600' }}>{gaps.map((g: any) => g.title).join(', ')}</span>
-                </div>
-              )}
-              {sentiment !== null && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Sentiment</span>
-                  <span style={{ color: sentiment >= 0.6 ? 'var(--success)' : sentiment <= 0.4 ? 'var(--danger)' : 'var(--warning)', fontWeight: '600' }}>
-                    {sentiment >= 0.6 ? 'Positive' : sentiment <= 0.4 ? 'Negative' : 'Neutral'} ({sentiment.toFixed(2)})
-                  </span>
-                </div>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={confirmExtraction}
-                disabled={verifyingExtraction}
-                style={{
-                  flex: 2, padding: '8px 14px', borderRadius: '8px',
-                  background: 'var(--accent)', border: 'none', color: '#fff',
-                  fontSize: '13px', fontWeight: '600', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                }}
-              >
-                {verifyingExtraction ? <><RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</> : <><Check size={12} /> Confirm & mark verified</>}
-              </button>
-              <button
-                onClick={() => setLastExtraction(null)}
-                style={{ flex: 1, padding: '8px 14px', borderRadius: '8px', background: 'var(--surface)', border: 'none', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* AI Results */}
-      {(deal?.aiSummary || (deal?.dealRisks as string[])?.length > 0) && (
-        <div style={{ background: 'var(--accent-subtle)', border: 'none', borderRadius: '8px', padding: '16px' }}>
-          {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-            <Sparkles size={14} color="var(--accent)" />
-            <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--accent)' }}>AI Analysis</span>
-            {/* Conversion score — with clear button */}
-            {deal?.conversionScore != null && (
-              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '20px', fontWeight: '700', color: getScoreColor(deal.conversionScore ?? 0, false) }}>
-                  {deal.conversionScore}%
-                </span>
-                <button
-                  onClick={() => patchDeal({ conversionScore: null })}
-                  title="Clear conversion score"
-                  style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px', lineHeight: 1 }}
-                >✕</button>
-              </div>
-            )}
-          </div>
-
-          {/* Summary — inline editable */}
-          {editingSummary ? (
-            <div style={{ marginBottom: '12px' }}>
-              <textarea
-                value={summaryDraft}
-                onChange={e => setSummaryDraft(e.target.value)}
-                rows={4}
-                style={{ width: '100%', background: 'var(--input-bg)', border: '1px solid var(--accent)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6', padding: '10px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
-                autoFocus
-              />
-              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
-                <button onClick={saveSummary} disabled={savingAI} style={{ fontSize: '11px', padding: '4px 10px', background: 'var(--accent-subtle)', border: '1px solid var(--accent)', borderRadius: '5px', color: 'var(--accent)', cursor: 'pointer' }}>
-                  {savingAI ? 'Saving…' : 'Save'}
-                </button>
-                <button onClick={() => setEditingSummary(false)} style={{ fontSize: '11px', padding: '4px 10px', background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer' }}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : deal?.aiSummary ? (
-            <div style={{ marginBottom: '12px', position: 'relative' }}
-              onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.edit-summary') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
-              onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.edit-summary') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
-            >
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.6', margin: 0, paddingRight: '28px' }}>{deal.aiSummary}</p>
-              <button
-                className="edit-summary"
-                onClick={() => { setSummaryDraft(deal.aiSummary); setEditingSummary(true) }}
-                title="Edit AI summary"
-                style={{ opacity: 0, position: 'absolute', top: 0, right: 0, fontSize: '10px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', transition: 'opacity 0.15s', padding: '2px 4px' }}
-              >✎ edit</button>
-            </div>
-          ) : null}
-
-          {/* Insights — per-item delete (filter out score-summary insights to avoid conflicting scores) */}
-          {deal?.conversionInsights?.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '10px' }}>
-              {(deal.conversionInsights as string[]).filter((ins: string) => !/\d+\s*\/\s*100/i.test(ins)).map((insight: string, i: number) => (
-                <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: 'var(--text-secondary)' }}
-                  onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-insight') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
-                  onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-insight') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
-                >
-                  <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, marginTop: '5px' }} />
-                  <span style={{ flex: 1 }}>{insight}</span>
-                  <button className="del-insight" onClick={() => deleteInsight(i)} style={{ opacity: 0, fontSize: '10px', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s', padding: '0 2px' }}>✕</button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Risks — per-item delete */}
-          {(() => {
-            const risks: string[] = deal?.dealRisks ?? []
-            if (!risks.length) return null
-            return (
-              <div style={{ padding: '12px 14px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: '8px' }}>
-                <div style={{ fontSize: '11px', color: 'var(--warning)', fontWeight: '600', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  ⚠ Deal Risks
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                  {risks.map((risk: string, i: number) => (
-                    <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: 'var(--warning)' }}
-                      onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-risk') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
-                      onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.del-risk') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
-                    >
-                      <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--warning)', flexShrink: 0, marginTop: '5px' }} />
-                      <span style={{ flex: 1 }}>{risk}</span>
-                      <button className="del-risk" onClick={() => deleteRisk(i)} style={{ opacity: 0, fontSize: '10px', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0, transition: 'opacity 0.15s', padding: '0 2px' }}>✕</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Reset all AI — nuclear option */}
-          <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-            {resetAIConfirm ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '11px', color: 'var(--danger)' }}>Reset all AI memory for this deal?</span>
-                <button onClick={resetAllAI} disabled={savingAI} style={{ fontSize: '11px', color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '2px 8px', borderRadius: '5px', cursor: 'pointer' }}>
-                  {savingAI ? 'Resetting…' : 'Yes, reset'}
-                </button>
-                <button onClick={() => setResetAIConfirm(false)} style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}>Cancel</button>
-              </div>
-            ) : (
-              <button onClick={() => setResetAIConfirm(true)} style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-                Reset all AI inferences
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-    </div>
-  )
+  return cards.slice(0, 6)
 }
 
-const STAGE_PLAYBOOK: Record<string, string[]> = {
-  prospecting: [
-    'Research recent news, funding rounds, and pain signals for this prospect',
-    'Personalise your opening to their specific role and company context',
-    'Focus on creating curiosity — avoid feature-dumping',
-    'Goal: qualify fit and book a discovery call',
-  ],
-  qualification: [
-    'Validate BANT: Budget, Authority, Need, and Timeline',
-    'Ask who else is involved in the decision',
-    'Identify current solution and what\'s driving them to look now',
-    'Disqualify early and gracefully if not a genuine fit',
-  ],
-  discovery: [
-    'Lead with open-ended questions — let them talk 70% of the time',
-    'Map stakeholders, champions, and blockers',
-    'Uncover the emotional cost of their problem, not just the functional one',
-    'Confirm budget range and decision timeline before closing the call',
-  ],
-  proposal: [
-    'Open by recapping their stated pains — show you were listening',
-    'Lead with outcomes and ROI, then features as proof points',
-    'Pre-handle likely objections before they surface',
-    'Include a relevant win story or case study as social proof',
-    'End with a clear mutual success plan and next step',
-  ],
-  negotiation: [
-    'Know your walk-away point before entering',
-    'Anchor on business value, not product features',
-    'Lead concessions with non-monetary value (onboarding, success hours)',
-    'Create urgency with a mutual close plan tied to their deadline',
-    'Never discount without getting something in return',
-  ],
-  closed_won: [
-    'Kick off with a success handoff to CS / implementation',
-    'Confirm agreed outcomes and success metrics in writing',
-    'Set a 30/60/90 day check-in cadence',
-    'Ask for a referral or case study while goodwill is high',
-  ],
+function buildCriteria(deal: DealRecord) {
+  const existing = deal.successCriteriaTodos?.slice(0, 7) ?? []
+  if (existing.length > 0) {
+    return existing.map(item => ({
+      label: item.text ?? 'Success criterion',
+      sublabel: item.note ?? item.category ?? 'Tracked by Halvex',
+      confidence: item.achieved ? '96%' : '—',
+      status: item.achieved ? 'met' : 'missing',
+    }))
+  }
+
+  return [
+    {
+      label: 'Economic buyer identified',
+      sublabel: deal.contacts?.[0]?.name ? `${deal.contacts[0].name} is actively involved` : 'No buyer named yet',
+      confidence: deal.contacts?.[0]?.name ? '92%' : '—',
+      status: deal.contacts?.[0]?.name ? 'met' : 'missing',
+    },
+    {
+      label: 'Budget confirmed',
+      sublabel: deal.dealValue ? `${formatCurrencyGBP(deal.dealValue)} target contract value` : 'Commercial value still missing',
+      confidence: deal.dealValue ? '88%' : '—',
+      status: deal.dealValue ? 'met' : 'missing',
+    },
+    {
+      label: 'Champion secured',
+      sublabel: deal.prospectName ? `${deal.prospectName}${deal.prospectTitle ? ` · ${deal.prospectTitle}` : ''}` : 'No named champion in the record',
+      confidence: deal.prospectName ? '90%' : '—',
+      status: deal.prospectName ? 'met' : 'missing',
+    },
+    {
+      label: 'Technical fit validated',
+      sublabel: (deal.dealRisks ?? []).length > 0 ? 'Some diligence issues are still open' : 'No active technical blockers captured',
+      confidence: (deal.dealRisks ?? []).length > 0 ? '62%' : '89%',
+      status: (deal.dealRisks ?? []).length > 0 ? 'partial' : 'met',
+    },
+    {
+      label: 'Procurement approval',
+      sublabel: 'Not yet initiated',
+      confidence: '—',
+      status: 'missing',
+    },
+  ]
 }
 
-// ─── Score Simulator ──────────────────────────────────────────────────────────
-// Pure client-side what-if modelling: toggle signals and see how the score changes.
-// Replicates computeTextSignalScore logic inline to avoid importing server-only modules.
-
-function computeSimulatedTextScore(signals: {
-  champion_identified: boolean
-  budget_confirmed: boolean
-  competitor_present: boolean
-}): number {
-  let score = 50
-  if (signals.champion_identified) score += 8
-  if (signals.budget_confirmed) score += 8
-  if (signals.competitor_present) score -= 3
-  return Math.max(0, Math.min(100, Math.round(score)))
-}
-
-function ScoreSimulator({ deal, mlPrediction, brainData }: { deal: any; mlPrediction: any; brainData: any }) {
-  const baseScore: number = deal.conversionScore ?? 50
-
-  // Detect current signal state from deal data and mlPrediction
-  const detectChampion = (): boolean => {
-    const stored = (deal.intentSignals as any)?.championStatus
-    if (stored === 'confirmed' || stored === 'suspected') return true
-    const notes: string = (deal.meetingNotes ?? '').toLowerCase()
-    return /\bchampion\b|\bsponsor\b|\badvocate\b|\binternal champion\b/.test(notes)
-  }
-  const detectBudget = (): boolean => {
-    const stored = (deal.intentSignals as any)?.budgetStatus
-    if (stored === 'confirmed') return true
-    const notes: string = (deal.meetingNotes ?? '').toLowerCase()
-    return /budget (confirmed|approved|allocated|secured|signed off)|po raised|purchase order/.test(notes)
-  }
-
-  const [overrides, setOverrides] = useState({
-    champion_identified: detectChampion(),
-    budget_confirmed: detectBudget(),
-    competitor_present: ((deal.competitors ?? deal.dealCompetitors ?? []) as string[]).length > 0,
-  })
-
-  const toggle = (key: keyof typeof overrides) => {
-    setOverrides(o => ({ ...o, [key]: !o[key] }))
-  }
-
-  const simTextScore = computeSimulatedTextScore(overrides)
-
-  // Compute composite: if ML active, blend with ML probability
-  const mlProb = mlPrediction?.winProbability as number | undefined
-  const trainingSize: number = brainData?.mlModel?.trainingSize ?? 0
-  let simScore: number
-  if (mlProb != null && trainingSize >= 10) {
-    const mlWeight = Math.min(0.70, 0.14 * Math.log(Math.max(trainingSize, 1)))
-    const momentumWeight = 0.05
-    const textWeight = Math.max(0, 1.0 - mlWeight - momentumWeight)
-    const momentumComponent = 50 // neutral if no override
-    simScore = Math.max(0, Math.min(100, Math.round(
-      simTextScore * textWeight + mlProb * 100 * mlWeight + momentumComponent * momentumWeight
-    )))
-  } else {
-    simScore = Math.max(0, Math.min(100, Math.round(simTextScore * 0.70 + 50 * 0.25 + 50 * 0.05)))
-  }
-
-  const delta = simScore - baseScore
-
-  const toggleStyle = (active: boolean): React.CSSProperties => ({
-    position: 'relative',
-    width: '40px',
-    height: '20px',
-    borderRadius: '10px',
-    background: active ? 'var(--accent)' : 'var(--border)',
-    border: 'none',
-    cursor: 'pointer',
-    flexShrink: 0,
-    transition: 'background 0.1s ease',
-    padding: 0,
-  })
-  const knobStyle = (active: boolean): React.CSSProperties => ({
-    position: 'absolute',
-    top: '2px',
-    left: active ? '22px' : '2px',
-    width: '16px',
-    height: '16px',
-    borderRadius: '50%',
-    background: 'var(--surface-1)',
-    transition: 'left 0.1s ease',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-  })
-
-  const items = [
-    { key: 'champion_identified' as const, label: 'Champion identified', inverted: false },
-    { key: 'budget_confirmed' as const, label: 'Budget confirmed', inverted: false },
-    { key: 'competitor_present' as const, label: 'Competitor present', inverted: true },
+function buildTimeline(deal: DealRecord, currentScore: number, noteBlocks: string[]): TimelineItem[] {
+  const timeline: TimelineItem[] = [
+    {
+      kind: 'ai',
+      label: 'AI insight',
+      timestamp: 'Today',
+      title: `Deal score is ${currentScore} with momentum ${currentScore >= 70 ? 'holding' : 'under watch'}`,
+      body: deal.aiSummary ?? 'Halvex is combining recent note signal, stakeholder activity, and commercial context.',
+    },
   ]
 
-  return (
-    <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '12px', padding: '20px' }}>
-      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '4px' }}>Score Simulator</div>
-      <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '14px' }}>See how toggling key signals affects this deal&apos;s score</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {items.map(({ key, label, inverted }) => {
-          const active = overrides[key]
-          const isPositiveWhenOn = !inverted
-          return (
-            <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: active ? (isPositiveWhenOn ? 'var(--success)' : 'var(--danger)') : 'var(--border)', flexShrink: 0 }} />
-                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{label}</span>
-              </div>
-              <button onClick={() => toggle(key)} style={toggleStyle(active)} aria-label={`Toggle ${label}`}>
-                <span style={knobStyle(active)} />
-              </button>
-            </div>
-          )
-        })}
-      </div>
-      <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Simulated score</span>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-          <span style={{ fontSize: '22px', fontWeight: 700, fontFamily: 'monospace', color: getScoreColor(simScore, false), lineHeight: 1 }}>
-            {simScore}%
-          </span>
-          {delta !== 0 && (
-            <span style={{ fontSize: '12px', fontWeight: 600, color: delta > 0 ? 'var(--success)' : 'var(--danger)' }}>
-              {delta > 0 ? '+' : ''}{delta}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function MeetingPrepTab({ dealId, deal, objectionWinMap = [], objectionConditionalWins = [], mlPrediction = null, brainData = null }: { dealId: string; deal: any; objectionWinMap?: any[]; objectionConditionalWins?: any[]; mlPrediction?: any; brainData?: any }) {
-  const [prep, setPrep] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [fullBriefShown, setFullBriefShown] = useState(false)
-
-  const { data: compRes } = useSWR('/api/competitors', fetcher)
-  const { data: csRes } = useSWR('/api/case-studies', fetcher)
-  const { data: profileRes } = useSWR('/api/company', fetcher)
-
-  const allCompetitors: any[] = compRes?.data ?? []
-  const allCaseStudies: any[] = csRes?.data ?? []
-  const profile: any = profileRes?.data
-
-  const dealCompNames: string[] = deal?.competitors ?? []
-  const matchedCompetitors = allCompetitors.filter(c =>
-    dealCompNames.some((n: string) =>
-      c.name.toLowerCase().includes(n.toLowerCase()) ||
-      n.toLowerCase().includes(c.name.toLowerCase()),
-    ),
-  )
-
-  const dealRisks: string[] = deal?.dealRisks ?? []
-  const commonObjections: string[] = profile?.commonObjections ?? []
-  const stage: string = deal?.stage ?? 'discovery'
-  const playbook = STAGE_PLAYBOOK[stage] ?? STAGE_PLAYBOOK.discovery
-
-  const generateFullBrief = async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/meeting-prep`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
-      })
-      const data = await res.json()
-      setPrep(data.data?.prep ?? '')
-      setFullBriefShown(true)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const cardStyle: React.CSSProperties = {
-    background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '12px', padding: '20px',
-  }
-  const sectionTitle = (label: string, color = 'var(--text-secondary)') => (
-    <div style={{ fontSize: '11px', fontWeight: 700, color, letterSpacing: '0.06em', textTransform: 'uppercase' as const, marginBottom: '10px' }}>
-      {label}
-    </div>
-  )
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-
-      {/* Score Simulator — only shown when deal has a score */}
-      {deal.conversionScore != null && (
-        <ScoreSimulator deal={deal} mlPrediction={mlPrediction} brainData={brainData} />
-      )}
-
-      {/* Stage playbook */}
-      <div style={cardStyle}>
-        {sectionTitle(`${stage.replace('_', ' ')} Playbook`, 'var(--accent)')}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-          {playbook.map((tip, i) => (
-            <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-              <div style={{ width: '18px', height: '18px', borderRadius: '5px', background: 'var(--accent-subtle)', border: '1px solid rgba(29, 184, 106, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '10px', fontWeight: 700, color: 'var(--accent)', marginTop: '1px' }}>
-                {i + 1}
-              </div>
-              <span style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{tip}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Competitive intel */}
-      {matchedCompetitors.length > 0 && (
-        <div style={cardStyle}>
-          {sectionTitle('Competitive Intel', 'var(--warning)')}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {matchedCompetitors.map(comp => (
-              <div key={comp.id}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
-                  vs {comp.name}
-                </div>
-                {(comp.weaknesses as string[])?.length > 0 && (
-                  <div style={{ marginBottom: '5px' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--success)', fontWeight: 600 }}>Their weaknesses: </span>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '4px' }}>
-                      {(comp.weaknesses as string[]).slice(0, 3).map((w: string, i: number) => (
-                        <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                          <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--success)', flexShrink: 0, marginTop: '5px' }} />
-                          {w}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {(comp.differentiators as string[])?.length > 0 && (
-                  <div>
-                    <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>Your differentiators: </span>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '4px' }}>
-                      {(comp.differentiators as string[]).slice(0, 3).map((d: string, i: number) => (
-                        <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                          <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, marginTop: '5px' }} />
-                          {d}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Objections you've beaten before — from closed deal history */}
-      {objectionWinMap.filter((o: any) => o.winsWithTheme > 0).length > 0 && (
-        <div style={cardStyle}>
-          {sectionTitle('Objections You\'ve Beaten Before', 'var(--success)')}
-          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '10px', lineHeight: 1.5 }}>
-            These objection types appeared in past deals that still closed — use this when they surface.
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {objectionWinMap.filter((o: any) => o.winsWithTheme > 0).slice(0, 4).map((o: any, i: number) => {
-              const color = o.winRateWithTheme >= 60 ? 'var(--success)' : o.winRateWithTheme >= 40 ? 'var(--warning)' : 'var(--danger)'
-              const hasGlobal = typeof o.globalWinRate === 'number'
-              const delta = hasGlobal ? o.winRateWithTheme - o.globalWinRate : 0
-              return (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', background: `${color}06`, border: `1px solid ${color}18`, borderRadius: '8px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 700, color, minWidth: '38px', textAlign: 'right', flexShrink: 0 }}>{o.winRateWithTheme}%</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 600, textTransform: 'capitalize' }}>{o.theme.replace(/_/g, ' ')}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '1px' }}>
-                      {o.winsWithTheme}/{o.dealsWithTheme} deals closed despite this objection
-                      {hasGlobal && (
-                        <span style={{ marginLeft: '6px', color: delta >= 5 ? 'var(--success)' : delta <= -5 ? 'var(--danger)' : 'var(--text-secondary)', fontWeight: 600 }}>
-                          · {delta >= 5 ? `▲ ${delta}pts vs industry` : delta <= -5 ? `▼ ${Math.abs(delta)}pts vs industry` : `≈ industry avg (${o.globalWinRate}%)`}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Per-objection × stage × champion conditional model */}
-      {objectionConditionalWins.length > 0 && (() => {
-        const currentStage: string = deal?.stage ?? ''
-        // Find entries where we have data for this deal's current stage
-        const relevant = objectionConditionalWins
-          .map((entry: any) => {
-            const sb = (entry.stageBreakdown ?? []).find((s: any) => s.stage === currentStage)
-            return sb ? { ...entry, stageStat: sb } : null
-          })
-          .filter(Boolean)
-          .slice(0, 4)
-        if (relevant.length === 0) return null
-        return (
-          <div style={cardStyle}>
-            {sectionTitle('Champion Effect on Your Objections', '#9b9a97')}
-            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '10px', lineHeight: 1.5 }}>
-              In {currentStage.replace('_', ' ')} stage, having a champion changes the odds for each objection type.
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {relevant.map((entry: any, i: number) => {
-                const sb = entry.stageStat
-                const lift = sb.championLift as number | null
-                const liftColor = lift != null && lift >= 10 ? 'var(--success)' : lift != null && lift >= 0 ? '#9b9a97' : 'var(--danger)'
-                const liftLabel = lift != null ? (lift >= 0 ? `+${lift}pts with champion` : `${lift}pts without champion`) : null
-                return (
-                  <div key={i} style={{ padding: '9px 12px', background: 'var(--surface-2)', border: '1px solid var(--border-default)', borderRadius: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
-                      <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 600, textTransform: 'capitalize' }}>{entry.theme}</span>
-                      {liftLabel && (
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: liftColor }}>{liftLabel}</span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', gap: '16px' }}>
-                      {sb.winRateWithChampion != null && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--success)', flexShrink: 0 }} />
-                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>With champion:</span>
-                          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--success)' }}>{sb.winRateWithChampion}%</span>
-                        </div>
-                      )}
-                      {sb.winRateNoChampion != null && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--danger)', flexShrink: 0 }} />
-                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Without:</span>
-                          <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--danger)' }}>{sb.winRateNoChampion}%</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* Expected objections */}
-      {(dealRisks.length > 0 || commonObjections.length > 0) && (
-        <div style={cardStyle}>
-          {sectionTitle('Likely Objections to Address', 'var(--danger)')}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            {dealRisks.map((risk, i) => (
-              <div key={`risk-${i}`} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', padding: '8px 10px', background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: '7px' }}>
-                <span style={{ fontSize: '11px' }}>⚠</span>
-                <span style={{ fontSize: '12px', color: 'var(--warning)', lineHeight: 1.5 }}>{risk}</span>
-              </div>
-            ))}
-            {commonObjections.slice(0, 3).map((obj, i) => (
-              <div key={`obj-${i}`} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--danger)', flexShrink: 0, marginTop: '5px' }} />
-                {obj}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Relevant win stories */}
-      {allCaseStudies.length > 0 && (
-        <div style={cardStyle}>
-          {sectionTitle('Win Stories to Reference', 'var(--success)')}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {allCaseStudies.slice(0, 2).map((cs: any) => (
-              <div key={cs.id} style={{ padding: '10px 12px', background: 'rgba(15,123,108,0.05)', border: '1px solid rgba(15,123,108,0.15)', borderRadius: '8px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '3px' }}>{cs.customerName}</div>
-                {cs.customerIndustry && <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>{cs.customerIndustry}{cs.customerSize ? ` · ${cs.customerSize}` : ''}</div>}
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{cs.results?.slice(0, 120)}{cs.results?.length > 120 ? '…' : ''}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* AI full brief */}
-      {!fullBriefShown ? (
-        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '4px' }}>
-          <button onClick={generateFullBrief} disabled={loading} style={{
-            display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 24px',
-            background: loading ? 'var(--surface-3)' : '#1DB86A',
-            border: loading ? '1px solid var(--border-default)' : 'none',
-            borderRadius: '9px', color: loading ? 'var(--text-secondary)' : '#ffffff', fontSize: '13px', fontWeight: '600', cursor: loading ? 'not-allowed' : 'pointer',
-          }}>
-            {loading
-              ? <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Generating full brief…</>
-              : <><Sparkles size={14} /> Generate AI Full Brief</>}
-          </button>
-        </div>
-      ) : (
-        <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '12px', padding: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Sparkles size={14} color="var(--accent)" />
-              <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>AI Full Brief</span>
-            </div>
-            <button onClick={generateFullBrief} disabled={loading} style={{ fontSize: '12px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}>
-              {loading ? 'Regenerating…' : 'Regenerate'}
-            </button>
-          </div>
-          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.8' }}>
-            {prep.split('\n').map((line, i) => {
-              if (line.startsWith('## ')) return <div key={i} style={{ fontSize: '11px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: i === 0 ? 0 : '16px', marginBottom: '6px' }}>{line.slice(3)}</div>
-              if (line.startsWith('- ')) return <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', marginBottom: '4px' }}><span style={{ color: 'var(--accent)', flexShrink: 0, marginTop: '2px' }}>·</span><span>{line.slice(2)}</span></div>
-              if (line.trim() === '') return <div key={i} style={{ height: '4px' }} />
-              return <div key={i} style={{ marginBottom: '4px' }}>{line}</div>
-            })}
-          </div>
-        </div>
-      )}
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-    </div>
-  )
-}
-
-function TodosTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: any; onUpdate: () => void; members: WorkspaceMember[] }) {
-  const [newTodo, setNewTodo] = useState('')
-  const [doneExpanded, setDoneExpanded] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editText, setEditText] = useState('')
-  const [aiTasking, setAiTasking] = useState(false)
-  const [aiTaskError, setAiTaskError] = useState<string | null>(null)
-  const todos: any[] = deal?.todos ?? []
-  const pending = todos.filter((t: any) => !t.done)
-  const done = todos.filter((t: any) => t.done)
-
-  // Strip redundant company name in parentheses from action text (Fix 4)
-  const companyName = deal?.prospectCompany?.toLowerCase() ?? ''
-  const stripCompanyParens = (text: string) => {
-    if (!companyName) return text
-    return text.replace(new RegExp(`\\s*\\(${companyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`, 'gi'), '')
-  }
-
-  const copyPending = () => {
-    const text = `Open to-dos for ${deal?.dealName ?? 'deal'}:\n${pending.map((t: any, i: number) => `${i + 1}. ${t.text}`).join('\n')}`
-    navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
-  }
-
-  const saveTodos = async (updated: any[]) => {
-    await fetch(`/api/deals/${dealId}/todos`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ todos: updated }),
+  if (noteBlocks[0]) {
+    timeline.push({
+      kind: 'email',
+      label: 'Email received',
+      timestamp: formatContextualDate(deal.updatedAt),
+      sender: deal.contacts?.[0]?.name ?? deal.prospectName ?? undefined,
+      title: noteBlocks[0].slice(0, 72),
+      body: noteBlocks[0],
+      insight: {
+        label: 'Insight',
+        text: 'Recent outbound forwarding and finance language at this stage usually precede a sharper procurement cycle.',
+      },
     })
-    onUpdate()
   }
 
-  const toggleTodo = (id: string) => {
-    saveTodos(todos.map((t: any) => t.id === id ? { ...t, done: !t.done } : t))
-  }
-
-  const startEdit = (todo: any) => {
-    setEditingId(todo.id)
-    setEditText(todo.text)
-  }
-
-  const saveEdit = () => {
-    if (!editingId || !editText.trim()) return
-    saveTodos(todos.map((t: any) => t.id === editingId ? { ...t, text: editText.trim() } : t))
-    setEditingId(null)
-    setEditText('')
-  }
-
-  const cancelEdit = () => {
-    setEditingId(null)
-    setEditText('')
-  }
-
-  const addTodo = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newTodo.trim()) return
-    // New items go to top of pending list — insert before first pending item
-    const firstPendingIdx = todos.findIndex((t: any) => !t.done)
-    const newItem = { id: crypto.randomUUID(), text: newTodo.trim(), done: false, createdAt: new Date().toISOString(), source: 'manual' as const }
-    const updated = firstPendingIdx === -1
-      ? [newItem, ...todos]
-      : [...todos.slice(0, firstPendingIdx), newItem, ...todos.slice(firstPendingIdx)]
-    await saveTodos(updated)
-    setNewTodo('')
-  }
-
-  const moveTodoUp = (id: string) => {
-    const idx = todos.findIndex((t: any) => t.id === id)
-    if (idx <= 0) return
-    // Swap with previous pending item
-    const prevPendingIdx = todos.slice(0, idx).map((t: any, i: number) => ({ t, i })).filter(({ t }) => !t.done).pop()?.i
-    if (prevPendingIdx == null) return
-    const updated = [...todos].map((t: any) => t.id === id ? { ...t, reordered: true } : t)
-    ;[updated[prevPendingIdx], updated[idx]] = [updated[idx], updated[prevPendingIdx]]
-    saveTodos(updated)
-  }
-
-  const moveTodoDown = (id: string) => {
-    const idx = todos.findIndex((t: any) => t.id === id)
-    if (idx === -1) return
-    const nextPendingIdx = todos.slice(idx + 1).map((t: any, i: number) => ({ t, i: idx + 1 + i })).find(({ t }) => !t.done)?.i
-    if (nextPendingIdx == null) return
-    const updated = [...todos].map((t: any) => t.id === id ? { ...t, reordered: true } : t)
-    ;[updated[idx], updated[nextPendingIdx]] = [updated[nextPendingIdx], updated[idx]]
-    saveTodos(updated)
-  }
-
-  const deleteTodo = (id: string) => saveTodos(todos.filter((t: any) => t.id !== id))
-
-  const generateAiTasks = async () => {
-    setAiTasking(true)
-    setAiTaskError(null)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/ai-tasks`, { method: 'POST' })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Failed to generate tasks')
-      onUpdate()
-    } catch (e: any) {
-      setAiTaskError(e.message ?? 'Error generating tasks')
-    } finally {
-      setAiTasking(false)
-    }
-  }
-
-  const assignTodo = (id: string, assignee: string | null) => {
-    saveTodos(todos.map((t: any) => t.id === id ? { ...t, assignee: assignee ?? undefined } : t))
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{pending.length} open action{pending.length !== 1 ? 's' : ''}</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {aiTaskError && <span style={{ fontSize: 11, color: 'var(--color-red)' }}>{aiTaskError}</span>}
-          <button
-            onClick={generateAiTasks}
-            disabled={aiTasking}
-            title="Auto-generate tasks from meeting notes and AI analysis"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 4, fontSize: '11px', fontWeight: 600,
-              color: aiTasking ? 'var(--text-tertiary)' : '#6366f1',
-              background: 'none', border: 'none', cursor: aiTasking ? 'default' : 'pointer', padding: '4px 0',
-            }}
-          >
-            {aiTasking
-              ? <><svg style={{ animation: 'spin 1s linear infinite', width: 11, height: 11 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Generating…</>
-              : <><Sparkles size={11} /> AI Tasks</>
-            }
-          </button>
-          {pending.length > 0 && (
-            <button onClick={copyPending} style={{
-              fontSize: '11px', color: copied ? 'var(--success)' : 'var(--text-tertiary)', background: 'none', border: 'none',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 0',
-            }}>
-              {copied ? '✓ Copied' : '⎘ Copy list'}
-            </button>
-          )}
-        </div>
-      </div>
-      <form onSubmit={addTodo} style={{ display: 'flex', gap: '8px' }}>
-        <input
-          value={newTodo}
-          onChange={e => setNewTodo(e.target.value)}
-          placeholder="Add action item..."
-          style={{
-            flex: 1, background: 'var(--input-bg)', border: 'none',
-            borderRadius: '8px', padding: '9px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none',
-          }}
-          onFocus={e => (e.target as HTMLElement).style.borderColor = 'var(--accent)'}
-          onBlur={e => (e.target as HTMLElement).style.borderColor = 'var(--border)'}
-        />
-        <button type="submit" disabled={!newTodo.trim()} style={{
-          padding: '0 14px', background: 'var(--accent-subtle)', border: '1px solid var(--accent)',
-          borderRadius: '8px', color: 'var(--accent)', cursor: 'pointer', display: 'flex', alignItems: 'center',
-        }}>
-          <Plus size={14} />
-        </button>
-      </form>
-
-      {/* Pending todos */}
-      {pending.length === 0 && done.length === 0 ? (
-        <div style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: '10px', padding: '40px 24px',
-          background: 'var(--surface)', border: '1px dashed var(--ds-border)', borderRadius: '8px',
-          textAlign: 'center',
-        }}>
-          <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: 'var(--accent-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <CheckCircle size={16} color="var(--accent)" />
-          </div>
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>No action items yet</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '300px' }}>
-              Action items are automatically extracted when you add meeting notes and run AI analysis.
-            </div>
-          </div>
-        </div>
-      ) : (
-        <>
-          {pending.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {pending.map((todo: any) => (
-                <div key={todo.id} style={{
-                  display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
-                  background: 'var(--surface)', border: 'none', borderRadius: '8px',
-                }}>
-                  <button onClick={() => toggleTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}>
-                    <Square size={15} color="var(--text-tertiary)" />
-                  </button>
-                  {editingId === todo.id ? (
-                    <form onSubmit={e => { e.preventDefault(); saveEdit() }} style={{ flex: 1, display: 'flex', gap: '6px' }}>
-                      <input
-                        autoFocus
-                        value={editText}
-                        onChange={e => setEditText(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Escape') cancelEdit() }}
-                        style={{
-                          flex: 1, background: 'var(--input-bg)', border: '1px solid var(--accent)',
-                          borderRadius: '6px', padding: '4px 8px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none',
-                        }}
-                      />
-                      <button type="submit" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', color: 'var(--success)' }}>
-                        <Check size={14} />
-                      </button>
-                      <button type="button" onClick={cancelEdit} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex', color: 'var(--text-tertiary)' }}>
-                        <X size={14} />
-                      </button>
-                    </form>
-                  ) : (
-                    <>
-                      <span
-                        onDoubleClick={() => startEdit(todo)}
-                        style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)', cursor: 'text' }}
-                        title="Double-click to edit"
-                      >{stripCompanyParens(todo.text)}</span>
-                      <AssigneePicker
-                        assignee={todo.assignee}
-                        members={members}
-                        onAssign={(a) => assignTodo(todo.id, a)}
-                      />
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', flexShrink: 0 }}>
-                        <button
-                          onClick={() => moveTodoUp(todo.id)}
-                          title="Move up"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '1px 2px', display: 'flex', borderRadius: '3px', lineHeight: 1 }}
-                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'}
-                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
-                        ><ArrowUp size={10} /></button>
-                        <button
-                          onClick={() => moveTodoDown(todo.id)}
-                          title="Move down"
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '1px 2px', display: 'flex', borderRadius: '3px', lineHeight: 1 }}
-                          onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'}
-                          onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
-                        ><ArrowDown size={10} /></button>
-                      </div>
-                      <button onClick={() => startEdit(todo)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '2px', display: 'flex', borderRadius: '4px', flexShrink: 0 }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--accent)'}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
-                      >
-                        <Edit size={11} />
-                      </button>
-                      <button onClick={() => deleteTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '2px', display: 'flex', borderRadius: '4px', flexShrink: 0 }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--danger)'}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Completed todos — collapsed by default */}
-          {done.length > 0 && (
-            <div style={{ marginTop: '4px' }}>
-              <button
-                onClick={() => setDoneExpanded(v => !v)}
-                style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 2px', color: 'var(--text-tertiary)', fontSize: '11px' }}
-              >
-                <CheckCircle size={11} color="var(--success)" />
-                <span style={{ color: 'var(--success)', fontWeight: '600' }}>{done.length} completed</span>
-                <span style={{ color: 'var(--text-tertiary)' }}>{doneExpanded ? '↑' : '↓'}</span>
-              </button>
-              {doneExpanded && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
-                  {done.map((todo: any) => (
-                    <div key={todo.id} style={{
-                      display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px',
-                      background: 'rgba(15,123,108,0.04)', border: '1px solid rgba(15,123,108,0.10)', borderRadius: '6px',
-                    }}>
-                      <button onClick={() => toggleTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}>
-                        <CheckCircle size={13} color="var(--success)" />
-                      </button>
-                      <span style={{ flex: 1, fontSize: '12px', color: 'var(--text-tertiary)', textDecoration: 'line-through' }}>{stripCompanyParens(todo.text)}</span>
-                      {todo.assignee && (
-                        <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'var(--surface-hover)', borderRadius: '10px', padding: '1px 6px' }}>
-                          {getDisplayName(todo.assignee)}
-                        </span>
-                      )}
-                      <button onClick={() => deleteTodo(todo.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '1px', display: 'flex', borderRadius: '3px' }}
-                        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--danger)'}
-                        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
-                      >
-                        <Trash2 size={11} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
-
-const STAGES_OPTS = ['prospecting','qualification','discovery','proposal','negotiation','closed_won','closed_lost'] as const
-
-function EditDealModal({ deal, dealId, open, onOpenChange, onSaved, onWon }: {
-  deal: any; dealId: string; open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void; onWon?: (deal: any) => void
-}) {
-  const [form, setForm] = useState<Record<string, string>>({})
-  const [contacts, setContacts] = useState<DealContact[]>([{ name: '', title: '', email: '' }])
-  const [saving, setSaving] = useState(false)
-
-  // sync form state when deal or open changes
-  useEffect(() => {
-    if (open && deal) {
-      setForm({
-        dealName: deal.dealName ?? '',
-        prospectCompany: deal.prospectCompany ?? '',
-        description: deal.description ?? '',
-        dealValue: deal.dealValue != null ? String(deal.dealValue) : '',
-        stage: deal.stage ?? 'proposal',
-        dealType: deal.dealType ?? 'one_off',
-        recurringInterval: deal.recurringInterval ?? 'annual',
-        engagementType: deal.engagementType ?? '',
-        competitors: Array.isArray(deal.competitors) ? deal.competitors.join(', ') : '',
-        notes: deal.notes ?? '',
-        nextSteps: deal.nextSteps ?? '',
-        lostReason: deal.lostReason ?? '',
-      })
-      // Initialise contacts from saved array, fall back to legacy prospectName/Title
-      const existing: DealContact[] = Array.isArray(deal.contacts) && deal.contacts.length > 0
-        ? deal.contacts
-        : deal.prospectName ? [{ name: deal.prospectName, title: deal.prospectTitle ?? '', email: '' }] : [{ name: '', title: '', email: '' }]
-      setContacts(existing.map(c => ({ name: c.name ?? '', title: c.title ?? '', email: c.email ?? '' })))
-    }
-  }, [open, deal])
-
-  const updateContact = (i: number, field: keyof DealContact, value: string) =>
-    setContacts(prev => prev.map((c, idx) => idx === i ? { ...c, [field]: value } : c))
-  const addContact = () => setContacts(prev => [...prev, { name: '', title: '', email: '' }])
-  const removeContact = (i: number) => setContacts(prev => prev.filter((_, idx) => idx !== i))
-
-  const u = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
-  const inputStyle: React.CSSProperties = {
-    width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px',
-    background: 'var(--input-bg)', border: 'none',
-    color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box',
-  }
-  const labelStyle: React.CSSProperties = {
-    display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)',
-    textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '5px',
-  }
-
-  const save = async () => {
-    setSaving(true)
-    try {
-      const wasWon = deal?.stage !== 'closed_won' && form.stage === 'closed_won'
-      const cleanContacts = contacts
-        .map(c => ({ name: c.name.trim(), title: c.title?.trim() || undefined, email: c.email?.trim() || undefined }))
-        .filter(c => c.name)
-      await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          dealName: form.dealName,
-          prospectCompany: form.prospectCompany,
-          description: form.description || null,
-          prospectName: cleanContacts[0]?.name ?? null,
-          prospectTitle: cleanContacts[0]?.title ?? null,
-          contacts: cleanContacts,
-          dealValue: form.dealValue ? Number(form.dealValue) : null,
-          stage: form.stage,
-          dealType: form.dealType ?? 'one_off',
-          recurringInterval: form.dealType === 'recurring' ? (form.recurringInterval ?? 'annual') : null,
-          engagementType: form.engagementType || null,
-          competitors: form.competitors.split(',').map((s: string) => s.trim()).filter(Boolean),
-          notes: form.notes || null,
-          nextSteps: form.nextSteps || null,
-          lostReason: form.lostReason || null,
-        }),
-      })
-      onSaved()
-      onOpenChange(false)
-      if (wasWon) onWon?.({ ...form, dealId })
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', zIndex: 500 }} />
-        <Dialog.Content style={{
-          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-          zIndex: 501, width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto',
-          background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-          borderRadius: '10px', padding: '24px', outline: 'none',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.10)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-            <Dialog.Title style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Edit deal</Dialog.Title>
-            <Dialog.Close asChild>
-              <button style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', display: 'flex', padding: '4px', borderRadius: '5px' }}
-                onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')} onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}>
-                <X size={15} />
-              </button>
-            </Dialog.Close>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '13px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={labelStyle}>Deal name</label>
-                <input style={inputStyle} value={form.dealName ?? ''} onChange={e => u('dealName', e.target.value)}
-                  onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-              </div>
-              <div>
-                <label style={labelStyle}>Company</label>
-                <input style={inputStyle} value={form.prospectCompany ?? ''} onChange={e => u('prospectCompany', e.target.value)}
-                  onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-              </div>
-            </div>
-            {/* Description */}
-            <div>
-              <label style={labelStyle}>Description</label>
-              <textarea
-                style={{ ...inputStyle, height: 'auto', padding: '8px 10px', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5' }}
-                rows={2}
-                value={form.description ?? ''}
-                onChange={e => u('description', e.target.value)}
-                placeholder="Overview of the opportunity, context, or key details…"
-                onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-              />
-            </div>
-
-            {/* Contacts */}
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <label style={labelStyle}>Contacts</label>
-                <button
-                  type="button"
-                  onClick={addContact}
-                  style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-hover)' }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--accent)' }}
-                >
-                  <Plus size={11} /> Add contact
-                </button>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {contacts.map((contact, i) => (
-                  <div key={i} style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '10px', position: 'relative' }}>
-                    {contacts.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeContact(i)}
-                        style={{ position: 'absolute', top: '8px', right: '8px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', display: 'flex', padding: '2px', borderRadius: '4px' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--danger)' }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)' }}
-                      >
-                        <X size={12} />
-                      </button>
-                    )}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                      <div>
-                        <label style={{ ...labelStyle, fontSize: '10px' }}>Name</label>
-                        <input style={inputStyle} value={contact.name} onChange={e => updateContact(i, 'name', e.target.value)} placeholder="Jane Smith"
-                          onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-                      </div>
-                      <div>
-                        <label style={{ ...labelStyle, fontSize: '10px' }}>Title</label>
-                        <input style={inputStyle} value={contact.title ?? ''} onChange={e => updateContact(i, 'title', e.target.value)} placeholder="VP of Engineering"
-                          onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-                      </div>
-                    </div>
-                    <div>
-                      <label style={{ ...labelStyle, fontSize: '10px' }}>Email</label>
-                      <input style={inputStyle} type="email" value={contact.email ?? ''} onChange={e => updateContact(i, 'email', e.target.value)} placeholder="jane@acme.com"
-                        onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label style={labelStyle}>Deal type</label>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: form.dealType === 'recurring' ? '8px' : '0' }}>
-                {(['one_off', 'recurring'] as const).map(type => (
-                  <button key={type} type="button" onClick={() => u('dealType', type)} style={{
-                    flex: 1, height: '32px', borderRadius: '6px', fontSize: '12px', fontWeight: 500,
-                    color: form.dealType === type ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                    backgroundColor: form.dealType === type ? 'var(--accent-subtle)' : 'transparent',
-                    border: `1px solid ${form.dealType === type ? 'var(--accent)' : 'var(--border)'}`,
-                    cursor: 'pointer', transition: 'all 0.1s ease',
-                  }}>
-                    {type === 'one_off' ? 'One-off' : 'Recurring'}
-                  </button>
-                ))}
-              </div>
-              {form.dealType === 'recurring' && (
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  {(['monthly', 'quarterly', 'annual'] as const).map(interval => (
-                    <button key={interval} type="button" onClick={() => u('recurringInterval', interval)} style={{
-                      flex: 1, height: '26px', borderRadius: '5px', fontSize: '11px', fontWeight: 500, textTransform: 'capitalize',
-                      color: form.recurringInterval === interval ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                      backgroundColor: form.recurringInterval === interval ? 'var(--surface-hover)' : 'transparent',
-                      border: `1px solid ${form.recurringInterval === interval ? 'var(--border-strong)' : 'var(--border)'}`,
-                      cursor: 'pointer', transition: 'all 0.1s ease',
-                    }}>
-                      {interval}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={labelStyle}>
-                  {form.dealType === 'recurring'
-                    ? `Value (${form.recurringInterval === 'monthly' ? 'MRR' : form.recurringInterval === 'quarterly' ? 'QRR' : 'ARR'})`
-                    : 'Deal value'}
-                </label>
-                <input style={inputStyle} type="number" value={form.dealValue ?? ''} onChange={e => u('dealValue', e.target.value)} placeholder="50000"
-                  onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-              </div>
-              <div>
-                <label style={labelStyle}>Stage</label>
-                <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.stage ?? ''} onChange={e => u('stage', e.target.value)}>
-                  {STAGES_OPTS.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
-                </select>
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div>
-                <label style={labelStyle}>Competitors (comma-separated)</label>
-                <input style={inputStyle} value={form.competitors ?? ''} onChange={e => u('competitors', e.target.value)} placeholder="Competitor A, Competitor B"
-                  onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-              </div>
-              <div>
-                <label style={labelStyle}>Engagement type</label>
-                <select
-                  style={{ ...inputStyle, cursor: 'pointer' }}
-                  value={form.engagementType ?? ''}
-                  onChange={e => u('engagementType', e.target.value)}
-                >
-                  <option value="">— None —</option>
-                  {['POC', 'Pilot', 'Live', 'Expansion', 'Renewal', 'Upsell'].map(t => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                  {form.engagementType && !['POC','Pilot','Live','Expansion','Renewal','Upsell',''].includes(form.engagementType) && (
-                    <option value={form.engagementType}>{form.engagementType}</option>
-                  )}
-                </select>
-              </div>
-            </div>
-            {form.stage === 'closed_lost' && (
-              <div>
-                <label style={labelStyle}>Lost reason</label>
-                <input style={inputStyle} value={form.lostReason ?? ''} onChange={e => u('lostReason', e.target.value)} placeholder="e.g. Price too high"
-                  onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-              </div>
-            )}
-            <div>
-              <label style={labelStyle}>Notes</label>
-              <textarea style={{ ...inputStyle, height: 'auto', padding: '8px 10px', resize: 'vertical', fontFamily: 'inherit', lineHeight: '1.5' }}
-                rows={3} value={form.notes ?? ''} onChange={e => u('notes', e.target.value)}
-                onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-            </div>
-            <div>
-              <label style={labelStyle}>Next steps</label>
-              <input style={inputStyle} value={form.nextSteps ?? ''} onChange={e => u('nextSteps', e.target.value)} placeholder="Schedule follow-up call"
-                onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '4px' }}>
-              <Dialog.Close asChild>
-                <button style={{ height: '34px', padding: '0 14px', borderRadius: '7px', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', background: 'var(--surface-hover)', border: 'none', cursor: 'pointer' }}>
-                  Cancel
-                </button>
-              </Dialog.Close>
-              <button onClick={save} disabled={saving} style={{
-                height: '34px', padding: '0 18px', borderRadius: '7px', fontSize: '13px', fontWeight: 600,
-                color: saving ? 'var(--text-secondary)' : '#ffffff', background: saving ? 'var(--surface-3)' : '#1DB86A',
-                border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
-              }}>
-                {saving ? 'Saving…' : 'Save changes'}
-              </button>
-            </div>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  )
-}
-
-function WinStoryPromptModal({ wonDeal, open, onOpenChange, currencySymbol = '£' }: {
-  wonDeal: any; open: boolean; onOpenChange: (v: boolean) => void; currencySymbol?: string
-}) {
-  const [form, setForm] = useState({ customerName: '', customerIndustry: '', customerSize: '', challenge: '', solution: '', results: '' })
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-
-  useEffect(() => {
-    if (open && wonDeal) {
-      setForm({
-        customerName: wonDeal.prospectCompany ?? '',
-        customerIndustry: '',
-        customerSize: '',
-        challenge: wonDeal.notes ? `${wonDeal.notes.slice(0, 300)}` : '',
-        solution: '',
-        results: wonDeal.dealValue ? `Closed at ${currencySymbol}${Number(wonDeal.dealValue).toLocaleString()}` : '',
-      })
-      setSaved(false)
-    }
-  }, [open, wonDeal])
-
-  const u = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px',
-    background: 'var(--input-bg)', border: 'none',
-    color: 'var(--text-primary)', fontSize: '13px', outline: 'none', boxSizing: 'border-box',
-  }
-  const labelStyle: React.CSSProperties = {
-    display: 'block', fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)',
-    textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '5px',
-  }
-  const textareaStyle: React.CSSProperties = {
-    ...inputStyle, height: 'auto', padding: '8px 10px', resize: 'vertical',
-    fontFamily: 'inherit', lineHeight: '1.5',
-  }
-
-  const submit = async () => {
-    if (!form.customerName || !form.challenge || !form.solution || !form.results) return
-    setSaving(true)
-    try {
-      const res = await fetch('/api/case-studies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, metrics: [] }),
-      })
-      if (res.ok) {
-        setSaved(true)
-        setTimeout(() => onOpenChange(false), 1400)
-      }
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', zIndex: 600 }} />
-        <Dialog.Content style={{
-          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-          zIndex: 601, width: '100%', maxWidth: '500px', maxHeight: '90vh', overflowY: 'auto',
-          background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-          borderRadius: '10px', padding: '24px', outline: 'none',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.10)',
-        }}>
-          {saved ? (
-            <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <div style={{ fontSize: '32px', marginBottom: '10px' }}>🏆</div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--success)', marginBottom: '4px' }}>Win story saved!</div>
-              <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>Added to your case study library for future collateral.</div>
-            </div>
-          ) : (
-            <>
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '18px' }}>🏆</span>
-                    <Dialog.Title style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                      Turn this win into a case study
-                    </Dialog.Title>
-                  </div>
-                  <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: 0 }}>
-                    Capture the story now — it&apos;ll strengthen every future proposal and collateral piece.
-                  </p>
-                </div>
-                <Dialog.Close asChild>
-                  <button style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', display: 'flex', padding: '4px', flexShrink: 0 }}>
-                    <X size={15} />
-                  </button>
-                </Dialog.Close>
-              </div>
-
-              <div style={{ height: '1px', background: 'var(--border)', margin: '14px 0' }} />
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div>
-                    <label style={labelStyle}>Customer name *</label>
-                    <input style={inputStyle} value={form.customerName} onChange={e => u('customerName', e.target.value)}
-                      onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Industry</label>
-                    <input style={inputStyle} value={form.customerIndustry} onChange={e => u('customerIndustry', e.target.value)} placeholder="e.g. SaaS, Retail"
-                      onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-                  </div>
-                </div>
-                <div>
-                  <label style={labelStyle}>Company size</label>
-                  <input style={inputStyle} value={form.customerSize} onChange={e => u('customerSize', e.target.value)} placeholder="e.g. 50-200 employees, Series B"
-                    onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Their challenge *</label>
-                  <textarea style={textareaStyle} rows={3} value={form.challenge} onChange={e => u('challenge', e.target.value)}
-                    placeholder="What problem were they trying to solve?"
-                    onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-                </div>
-                <div>
-                  <label style={labelStyle}>How you solved it *</label>
-                  <textarea style={textareaStyle} rows={2} value={form.solution} onChange={e => u('solution', e.target.value)}
-                    placeholder="What did you implement or deliver?"
-                    onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Measurable results *</label>
-                  <textarea style={textareaStyle} rows={2} value={form.results} onChange={e => u('results', e.target.value)}
-                    placeholder="e.g. Reduced onboarding time by 40%, saved 10h/week"
-                    onFocus={e => (e.target.style.borderColor = 'var(--accent)')} onBlur={e => (e.target.style.borderColor = 'var(--border)')} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', paddingTop: '4px' }}>
-                  <Dialog.Close asChild>
-                    <button style={{ height: '34px', padding: '0 14px', borderRadius: '7px', fontSize: '13px', fontWeight: 500, color: 'var(--text-tertiary)', background: 'var(--surface-hover)', border: 'none', cursor: 'pointer' }}>
-                      Skip for now
-                    </button>
-                  </Dialog.Close>
-                  <button
-                    onClick={submit}
-                    disabled={saving || !form.customerName || !form.challenge || !form.solution || !form.results}
-                    style={{
-                      height: '34px', padding: '0 18px', borderRadius: '7px', fontSize: '13px', fontWeight: 600,
-                      color: '#fff', background: saving ? 'var(--surface)' : 'var(--brand)',
-                      border: 'none', cursor: saving ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {saving ? 'Saving…' : 'Save Win Story'}
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  )
-}
-
-function ActivityLog({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
-  const [entry, setEntry] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  // Parse date-stamped entries from accumulated notes
-  const entries: string[] = deal?.notes
-    ? deal.notes.split('\n').filter((l: string) => l.trim().length > 0)
-    : []
-
-  const logActivity = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!entry.trim()) return
-    setSaving(true)
-    try {
-      const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-      const newEntry = `[${dateStr}] ${entry.trim()}`
-      const updatedNotes = deal?.notes ? `${deal.notes}\n${newEntry}` : newEntry
-      await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes: updatedNotes }),
-      })
-      setEntry('')
-      onUpdate()
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-        <Clipboard size={13} color="var(--accent)" />
-        <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Activity Log</span>
-        <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>· manual entries + meeting summaries</span>
-      </div>
-
-      {/* Quick log input */}
-      <form onSubmit={logActivity} style={{ display: 'flex', gap: '8px', padding: '12px 16px', borderBottom: entries.length > 0 ? '1px solid var(--border)' : 'none' }}>
-        <input
-          value={entry}
-          onChange={e => setEntry(e.target.value)}
-          placeholder="Log an activity… e.g. 'Sent account access email to john@acme.com'"
-          style={{
-            flex: 1, height: '34px', padding: '0 10px', borderRadius: '7px',
-            background: 'var(--input-bg)', border: 'none',
-            color: 'var(--text-primary)', fontSize: '12px', outline: 'none', fontFamily: 'inherit',
-          }}
-          onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
-          onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-        />
-        <button type="submit" disabled={saving || !entry.trim()} style={{
-          height: '34px', padding: '0 14px', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
-          color: '#fff', background: saving || !entry.trim() ? 'var(--surface)' : 'var(--accent)',
-          border: '1px solid var(--accent)', cursor: saving || !entry.trim() ? 'not-allowed' : 'pointer',
-          transition: 'background 0.1s ease', whiteSpace: 'nowrap',
-        }}>
-          {saving ? '…' : 'Log'}
-        </button>
-      </form>
-
-      {/* Timeline */}
-      {entries.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0', maxHeight: '240px', overflowY: 'auto' }}>
-          {[...entries].reverse().map((e, i) => {
-            const isDateStamped = e.startsWith('[')
-            const dateMatch = e.match(/^\[([^\]]+)\]\s*(.*)/)
-            const date = dateMatch?.[1] ?? ''
-            const text = dateMatch?.[2] ?? e
-            return (
-              <div key={i} style={{
-                display: 'flex', gap: '12px', padding: '9px 16px',
-                borderBottom: i < entries.length - 1 ? '1px solid var(--border)' : 'none',
-              }}>
-                <div style={{ flexShrink: 0, marginTop: '4px' }}>
-                  <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--accent)' }} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {isDateStamped && <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '2px' }}>{date}</div>}
-                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>{text}</div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-      {entries.length === 0 && (
-        <div style={{ padding: '20px 16px', fontSize: '12px', color: 'var(--text-tertiary)', textAlign: 'center' }}>
-          No activity logged yet. Log meetings via the AI tab or add manual entries above.
-        </div>
-      )}
-    </div>
-  )
-}
-
-function SuccessCriteriaTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: any; onUpdate: () => void; members: WorkspaceMember[] }) {
-  const [text, setText] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [extractError, setExtractError] = useState<string | null>(null)
-  const [editingNote, setEditingNote] = useState<string | null>(null)
-  const [noteText, setNoteText] = useState('')
-  const [shareLoading, setShareLoading] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const isShared: boolean = deal?.successCriteriaIsShared ?? false
-  const shareToken: string | null = deal?.successCriteriaShareToken ?? null
-  const criteria: any[] = deal?.successCriteriaTodos ?? []
-
-  const categories = [...new Set(criteria.map((c: any) => c.category ?? 'General'))]
-  const achieved = criteria.filter((c: any) => c.achieved).length
-
-  const extract = async () => {
-    if (!text.trim()) return
-    setLoading(true)
-    setExtractError(null)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/success-criteria`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      })
-      const data = await res.json()
-      if (!res.ok || data.error) {
-        setExtractError(data.error ?? 'Failed to extract criteria')
-        return
-      }
-      setText('')
-      onUpdate()
-    } finally { setLoading(false) }
-  }
-
-  const toggle = async (criterionId: string, achieved: boolean) => {
-    await fetch(`/api/deals/${dealId}/success-criteria`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ criterionId, achieved }),
-    })
-    onUpdate()
-  }
-
-  const saveNote = async (criterionId: string) => {
-    await fetch(`/api/deals/${dealId}/success-criteria`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ criterionId, note: noteText }),
-    })
-    setEditingNote(null)
-    onUpdate()
-  }
-
-  const remove = async (criterionId: string) => {
-    await fetch(`/api/deals/${dealId}/success-criteria`, {
-      method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ criterionId }),
-    })
-    onUpdate()
-  }
-
-  const assignCriterion = async (criterionId: string, assignee: string | null) => {
-    await fetch(`/api/deals/${dealId}/success-criteria`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ criterionId, assignee: assignee ?? '' }),
-    })
-    onUpdate()
-  }
-
-  const toggleShare = async () => {
-    setShareLoading(true)
-    try {
-      await fetch(`/api/deals/${dealId}/success-criteria/share`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enable: !isShared }),
-      })
-      onUpdate()
-    } finally { setShareLoading(false) }
-  }
-
-  const copyLink = async () => {
-    if (!shareToken) return
-    await navigator.clipboard.writeText(`${window.location.origin}/share/criteria/${shareToken}`)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      {/* Progress bar */}
-      {criteria.length > 0 && (
-        <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Progress</span>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: achieved === criteria.length ? 'var(--success)' : 'var(--text-primary)' }}>
-              {achieved}/{criteria.length} met
-            </span>
-          </div>
-          <div style={{ height: '6px', background: 'var(--surface-hover)', borderRadius: '3px', overflow: 'hidden' }}>
-            <div style={{ height: '100%', width: `${criteria.length ? (achieved / criteria.length) * 100 : 0}%`, background: 'var(--brand)', borderRadius: '3px', transition: 'width 0.1s ease' }} />
-          </div>
-        </div>
-      )}
-
-      {/* Share controls */}
-      {criteria.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            onClick={toggleShare}
-            disabled={shareLoading}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: isShared ? 'var(--accent-subtle)' : 'var(--surface)', border: `1px solid ${isShared ? 'var(--accent)' : 'var(--border)'}`, borderRadius: '7px', color: isShared ? 'var(--accent)' : 'var(--text-secondary)', fontSize: '12px', fontWeight: 600, cursor: shareLoading ? 'not-allowed' : 'pointer' }}
-          >
-            {shareLoading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Link2 size={12} />}
-            {isShared ? 'Shared' : 'Share'}
-          </button>
-          {isShared && shareToken && (
-            <button
-              onClick={copyLink}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', background: copied ? 'rgba(34,197,94,0.1)' : 'var(--surface)', border: `1px solid ${copied ? 'rgba(34,197,94,0.3)' : 'var(--border)'}`, borderRadius: '7px', color: copied ? 'var(--success)' : 'var(--text-secondary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
-            >
-              {copied ? <Check size={12} /> : <Clipboard size={12} />}
-              {copied ? 'Copied!' : 'Copy link'}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Criteria list grouped by category */}
-      {categories.map(cat => (
-        <div key={cat} style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '14px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '10px' }}>{cat}</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {criteria.filter((c: any) => (c.category ?? 'General') === cat).map((c: any) => (
-              <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                  <button
-                    onClick={() => toggle(c.id, !c.achieved)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: '1px', flexShrink: 0, color: c.achieved ? 'var(--success)' : 'var(--text-tertiary)' }}
-                  >
-                    {c.achieved
-                      ? <CheckCircle size={16} />
-                      : <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid #444' }} />}
-                  </button>
-                  <span style={{ flex: 1, fontSize: '13px', color: c.achieved ? 'var(--text-tertiary)' : 'var(--text-primary)', lineHeight: 1.5, textDecoration: c.achieved ? 'line-through' : 'none' }}>
-                    {c.text}
-                  </span>
-                  <AssigneePicker
-                    assignee={c.assignee || undefined}
-                    members={members}
-                    onAssign={(a) => assignCriterion(c.id, a)}
-                  />
-                  <button onClick={() => { setEditingNote(c.id); setNoteText(c.note ?? '') }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', fontSize: '11px', color: c.note ? 'var(--accent)' : 'var(--text-tertiary)' }}>
-                    {c.note ? '✎' : '+ note'}
-                  </button>
-                  <button onClick={() => remove(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', color: 'var(--text-tertiary)' }}>
-                    <X size={12} />
-                  </button>
-                </div>
-                {c.note && editingNote !== c.id && (
-                  <div style={{ marginLeft: '26px', fontSize: '11px', color: 'var(--accent)', background: 'var(--accent-subtle)', borderRadius: '6px', padding: '5px 8px' }}>
-                    {c.note}
-                  </div>
-                )}
-                {editingNote === c.id && (
-                  <div style={{ marginLeft: '26px', display: 'flex', gap: '6px' }}>
-                    <input
-                      autoFocus
-                      value={noteText}
-                      onChange={e => setNoteText(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') saveNote(c.id); if (e.key === 'Escape') setEditingNote(null) }}
-                      placeholder="How was this achieved?"
-                      style={{ flex: 1, background: 'var(--surface-2)', border: '1px solid var(--border-default)', borderRadius: '6px', padding: '5px 8px', color: 'var(--text-primary)', fontSize: '12px', outline: 'none' }}
-                    />
-                    <button onClick={() => saveNote(c.id)} style={{ padding: '5px 10px', background: 'var(--accent-subtle)', border: 'none', borderRadius: '6px', color: 'var(--accent)', fontSize: '11px', cursor: 'pointer' }}>Save</button>
-                    <button onClick={() => setEditingNote(null)} style={{ padding: '5px 8px', background: 'none', border: 'none', color: 'var(--text-tertiary)', fontSize: '11px', cursor: 'pointer' }}>Cancel</button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {/* Paste new criteria */}
-      <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '14px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '10px' }}>
-          {criteria.length > 0 ? 'Add More Criteria' : 'Paste Success Criteria'}
-        </div>
-        <textarea
-          value={text}
-          onChange={e => setText(e.target.value)}
-          placeholder="Paste the success criteria from your proposal, RFP, or stakeholder requirements — AI will extract individual testable items..."
-          rows={5}
-          style={{ width: '100%', background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '10px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, fontFamily: 'inherit' }}
-        />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '10px', flexWrap: 'wrap' }}>
-          <button
-            onClick={extract}
-            disabled={loading || !text.trim()}
-            style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', background: loading ? 'var(--surface-3)' : '#1DB86A', border: loading ? '1px solid var(--border-default)' : 'none', borderRadius: '8px', color: loading ? 'var(--text-secondary)' : '#ffffff', fontSize: '13px', fontWeight: '600', cursor: loading || !text.trim() ? 'not-allowed' : 'pointer' }}
-          >
-            {loading ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Extracting…</> : <><Sparkles size={13} /> Extract Criteria</>}
-          </button>
-          {extractError && (
-            <span style={{ fontSize: '12px', color: 'var(--danger)' }}>{extractError}</span>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ProjectPlanTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: any; onUpdate: () => void; members: WorkspaceMember[] }) {
-  const [text, setText] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [newTaskText, setNewTaskText] = useState<Record<string, string>>({})
-  const plan = deal?.projectPlan as any
-  const phases = plan?.phases ?? []
-  const allTasks = phases.flatMap((p: any) => p.tasks ?? [])
-  const totalTasks = allTasks.length
-  const completeTasks = allTasks.filter((t: any) => t.status === 'complete').length
-  const inProgressTasks = allTasks.filter((t: any) => t.status === 'in_progress').length
-
-  const todos: any[] = deal?.todos ?? []
-
-  const extract = async () => {
-    if (!text.trim()) return
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/project-plan`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      })
-      const data = await res.json()
-      if (!res.ok || data.error) {
-        setError(data.error ?? 'Failed to create project plan')
-        return
-      }
-      setText('')
-      onUpdate()
-    } finally { setLoading(false) }
-  }
-
-  const updateTask = async (taskId: string, updates: Record<string, any>) => {
-    await fetch(`/api/deals/${dealId}/project-plan`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ taskId, ...updates }),
-    })
-    onUpdate()
-  }
-
-  const addTask = async (phaseId: string) => {
-    const taskText = newTaskText[phaseId]?.trim()
-    if (!taskText) return
-    await fetch(`/api/deals/${dealId}/project-plan`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phaseId, addTask: taskText }),
-    })
-    setNewTaskText(prev => ({ ...prev, [phaseId]: '' }))
-    onUpdate()
-  }
-
-  const deleteTask = async (taskId: string) => {
-    try {
-      const res = await fetch(`/api/deals/${dealId}/project-plan`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deleteTaskId: taskId }),
-      })
-      if (!res.ok) console.error('Failed to delete task:', await res.text())
-    } catch (e) { console.error('Failed to delete task:', e) }
-    onUpdate()
-  }
-
-  const deletePhase = async (phaseId: string) => {
-    try {
-      const res = await fetch(`/api/deals/${dealId}/project-plan`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deletePhaseId: phaseId }),
-      })
-      if (!res.ok) console.error('Failed to delete phase:', await res.text())
-    } catch (e) { console.error('Failed to delete phase:', e) }
-    onUpdate()
-  }
-
-  const statusColors: Record<string, { bg: string; border: string; text: string; label: string }> = {
-    not_started: { bg: 'var(--surface-2)', border: 'var(--border-default)', text: 'var(--text-secondary)', label: 'Not Started' },
-    in_progress: { bg: 'rgba(29, 184, 106, 0.08)', border: 'rgba(29, 184, 106, 0.25)', text: '#1DB86A', label: 'In Progress' },
-    complete: { bg: 'rgba(29,184,106,0.08)', border: 'rgba(29,184,106,0.25)', text: '#1DB86A', label: 'Complete' },
-  }
-
-  const cycleStatus = (current: string) => {
-    if (current === 'not_started') return 'in_progress'
-    if (current === 'in_progress') return 'complete'
-    return 'not_started'
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      {/* Progress bar */}
-      {totalTasks > 0 && (
-        <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Plan Progress</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{totalTasks - completeTasks - inProgressTasks} pending</span>
-              {inProgressTasks > 0 && <span style={{ fontSize: '11px', color: 'var(--accent)' }}>{inProgressTasks} in progress</span>}
-              <span style={{ fontSize: '12px', fontWeight: 600, color: completeTasks === totalTasks ? 'var(--success)' : 'var(--text-primary)' }}>
-                {completeTasks}/{totalTasks} done
-              </span>
-            </div>
-          </div>
-          <div style={{ height: '6px', background: 'var(--surface-hover)', borderRadius: '3px', overflow: 'hidden', display: 'flex' }}>
-            <div style={{ height: '100%', width: `${totalTasks ? (completeTasks / totalTasks) * 100 : 0}%`, background: 'var(--brand)', borderRadius: '3px 0 0 3px', transition: 'width 0.1s ease' }} />
-            <div style={{ height: '100%', width: `${totalTasks ? (inProgressTasks / totalTasks) * 100 : 0}%`, background: 'var(--accent)', transition: 'width 0.1s ease' }} />
-          </div>
-        </div>
-      )}
-
-      {/* Phases */}
-      {[...phases].sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0)).map((phase: any) => {
-        const phaseTasks = phase.tasks ?? []
-        const phaseComplete = phaseTasks.filter((t: any) => t.status === 'complete').length
-        return (
-          <div key={phase.id} style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', overflow: 'hidden' }}>
-            {/* Phase header */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-              <Layers size={13} color="var(--accent)" />
-              <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', flex: 1 }}>{phase.name}</span>
-              {phase.targetDate && (
-                <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>{new Date(phase.targetDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
-              )}
-              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'var(--surface)', borderRadius: '4px', padding: '2px 8px' }}>
-                {phaseComplete}/{phaseTasks.length}
-              </span>
-              <button onClick={() => deletePhase(phase.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '2px', display: 'flex' }}
-                onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--danger)'}
-                onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
-              >
-                <Trash2 size={12} />
-              </button>
-            </div>
-            {phase.description && (
-              <div style={{ padding: '8px 16px', fontSize: '11px', color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border)' }}>{phase.description}</div>
-            )}
-
-            {/* Tasks */}
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {phaseTasks.map((task: any) => {
-                const sc = statusColors[task.status] ?? statusColors.not_started
-                const linkedTodo = task.linkedTodoId ? todos.find((t: any) => t.id === task.linkedTodoId) : null
-                return (
-                  <div key={task.id} style={{
-                    display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px',
-                    borderBottom: '1px solid var(--border)',
-                  }}>
-                    <button
-                      onClick={() => updateTask(task.id, { status: cycleStatus(task.status) })}
-                      style={{
-                        background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: '4px',
-                        width: '20px', height: '20px', cursor: 'pointer', display: 'flex',
-                        alignItems: 'center', justifyContent: 'center', flexShrink: 0, padding: 0,
-                      }}
-                      title={`Click to change: ${sc.label}`}
-                    >
-                      {task.status === 'complete' && <Check size={12} color="var(--success)" />}
-                      {task.status === 'in_progress' && <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)' }} />}
-                    </button>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        fontSize: '13px', color: task.status === 'complete' ? 'var(--text-tertiary)' : 'var(--text-primary)',
-                        textDecoration: task.status === 'complete' ? 'line-through' : 'none',
-                      }}>
-                        {task.text}
-                      </div>
-                      <div style={{ display: 'flex', gap: '10px', marginTop: '3px', alignItems: 'center' }}>
-                        {task.owner && <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>👤 {task.owner}</span>}
-                        {task.dueDate && <span style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>📅 {new Date(task.dueDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>}
-                        {linkedTodo && (
-                          <span style={{ fontSize: '10px', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <Link2 size={9} /> Linked to-do{linkedTodo.done ? ' ✓' : ''}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <AssigneePicker
-                      assignee={task.assignee || task.owner || undefined}
-                      members={members}
-                      onAssign={(a) => updateTask(task.id, { assignee: a ?? '' })}
-                    />
-                    <span style={{
-                      fontSize: '10px', padding: '2px 8px', borderRadius: '4px',
-                      background: sc.bg, border: `1px solid ${sc.border}`, color: sc.text,
-                    }}>
-                      {sc.label}
-                    </span>
-                    <button onClick={() => deleteTask(task.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '2px', display: 'flex' }}
-                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--danger)'}
-                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
-                    >
-                      <Trash2 size={11} />
-                    </button>
-                  </div>
-                )
-              })}
-
-              {/* Add task to phase */}
-              <form onSubmit={e => { e.preventDefault(); addTask(phase.id) }} style={{ display: 'flex', gap: '8px', padding: '8px 16px' }}>
-                <input
-                  value={newTaskText[phase.id] ?? ''}
-                  onChange={e => setNewTaskText(prev => ({ ...prev, [phase.id]: e.target.value }))}
-                  placeholder="Add task..."
-                  style={{
-                    flex: 1, background: 'var(--surface)', border: 'none',
-                    borderRadius: '6px', padding: '6px 10px', color: 'var(--text-primary)', fontSize: '12px', outline: 'none',
-                  }}
-                />
-                <button type="submit" disabled={!(newTaskText[phase.id]?.trim())} style={{
-                  padding: '0 10px', background: 'var(--accent-subtle)', border: '1px solid rgba(29, 184, 106, 0.15)',
-                  borderRadius: '6px', color: 'var(--accent)', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                }}>
-                  <Plus size={12} />
-                </button>
-              </form>
-            </div>
-          </div>
-        )
-      })}
-
-      {/* Paste new plan */}
-      <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '14px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '10px' }}>
-          {phases.length > 0 ? 'Add More Phases' : 'Create Project Plan'}
-        </div>
-        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '10px', lineHeight: 1.6 }}>
-          Paste a project plan, timeline, milestones table, or any structured text — AI will extract phases and tasks automatically.
-          {phases.length > 0 && ' New phases will be appended to the existing plan.'}
-        </div>
-        <textarea
-          value={text}
-          onChange={e => setText(e.target.value)}
-          placeholder="Paste your project plan, implementation timeline, POC milestones, or any structured task list..."
-          rows={6}
-          style={{ width: '100%', background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '10px 12px', color: 'var(--text-primary)', fontSize: '13px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.6, fontFamily: 'inherit' }}
-        />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '10px' }}>
-          <button
-            onClick={extract}
-            disabled={loading || !text.trim()}
-            style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '9px 18px', background: loading ? 'var(--surface-3)' : '#1DB86A', border: loading ? '1px solid var(--border-default)' : 'none', borderRadius: '8px', color: loading ? 'var(--text-secondary)' : '#ffffff', fontSize: '13px', fontWeight: '600', cursor: loading || !text.trim() ? 'not-allowed' : 'pointer' }}
-          >
-            {loading ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Parsing…</> : <><Sparkles size={13} /> Create Plan</>}
-          </button>
-          {error && <span style={{ fontSize: '12px', color: 'var(--danger)' }}>{error}</span>}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// External Links Section
-// ─────────────────────────────────────────────────────────────────────────────
-
-function detectLinkType(url: string): LinkTypeEnum {
-  try {
-    const host = new URL(url).hostname.toLowerCase()
-    if (host.includes('sharepoint') || host.includes('.sharepoint.com')) return 'sharepoint'
-    if (host.includes('google.com') || host.includes('docs.google') || host.includes('drive.google') || host.includes('sheets.google') || host.includes('slides.google')) return 'google'
-    if (host.includes('salesforce') || host.includes('.force.com') || host.includes('.lightning.force.com')) return 'salesforce'
-    if (host.includes('notion.so') || host.includes('notion.site')) return 'notion'
-    if (host.includes('figma.com')) return 'figma'
-    if (host.includes('github.com') || host.includes('github.dev')) return 'github'
-  } catch { /* invalid URL */ }
-  return 'other'
-}
-
-function deriveLabelFromUrl(url: string): string {
-  try {
-    const u = new URL(url)
-    const path = u.pathname.replace(/\/$/, '')
-    const segments = path.split('/').filter(Boolean)
-    const lastSegment = segments[segments.length - 1] ?? ''
-    const decoded = decodeURIComponent(lastSegment).replace(/[-_]/g, ' ')
-    if (decoded && decoded.length < 80) return `${u.hostname.replace('www.', '')} — ${decoded}`
-    return u.hostname.replace('www.', '')
-  } catch {
-    return url.slice(0, 60)
-  }
-}
-
-const LINK_TYPE_ICON: Record<LinkTypeEnum, { icon: typeof Globe; color: string }> = {
-  proposal:   { icon: FileText,  color: 'var(--accent)' },
-  contract:   { icon: FileCheck, color: 'var(--success)' },
-  deck:       { icon: BarChart2, color: 'var(--warning)' },
-  document:   { icon: File,      color: 'var(--text-secondary)' },
-  sharepoint: { icon: Cloud,     color: '#0078D4' },
-  google:     { icon: FileText,  color: '#4285F4' },
-  salesforce: { icon: Database,  color: '#00A1E0' },
-  notion:     { icon: BookOpen,  color: 'var(--text-primary)' },
-  figma:      { icon: PenTool,   color: '#A259FF' },
-  github:     { icon: Github,    color: 'var(--text-primary)' },
-  other:      { icon: Globe,     color: 'var(--text-tertiary)' },
-}
-
-function relativeTime(iso: string | undefined): string {
-  if (!iso) return ''
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins  = Math.floor(diff / 60_000)
-  const hours = Math.floor(diff / 3_600_000)
-  const days  = Math.floor(diff / 86_400_000)
-  const weeks = Math.floor(days / 7)
-  const months = Math.floor(days / 30)
-  if (mins < 1)  return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  if (hours < 24) return `${hours}h ago`
-  if (days < 7)  return `${days}d ago`
-  if (weeks < 5) return `${weeks}w ago`
-  return `${months}mo ago`
-}
-
-function LinksSection({ dealId, deal, onUpdate }: { dealId: string; deal: any; onUpdate: () => void }) {
-  const rawLinks: DealLinkType[] = Array.isArray(deal.links) ? deal.links : []
-  // Show newest first
-  const links = [...rawLinks].sort((a, b) => new Date(b.addedAt ?? 0).getTime() - new Date(a.addedAt ?? 0).getTime())
-  const [expanded, setExpanded] = useState(rawLinks.length > 0)
-  const [adding, setAdding] = useState(false)
-  const [urlInput, setUrlInput] = useState('')
-  const [labelInput, setLabelInput] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editLabel, setEditLabel] = useState('')
-
-  const patchLinks = async (newLinks: DealLinkType[]) => {
-    setSaving(true)
-    try {
-      await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ links: newLinks }),
-      })
-      onUpdate()
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const addLink = async () => {
-    const trimmed = urlInput.trim()
-    if (!trimmed) return
-    let url = trimmed
-    if (!/^https?:\/\//i.test(url)) url = 'https://' + url
-    try { new URL(url) } catch { return }
-
-    const type = detectLinkType(url)
-    const label = labelInput.trim() || deriveLabelFromUrl(url)
-    const newLink: DealLinkType = {
-      id: crypto.randomUUID(),
-      url,
-      label,
-      type,
-      addedAt: new Date().toISOString(),
-    }
-    await patchLinks([...rawLinks, newLink])
-    setUrlInput('')
-    setLabelInput('')
-    setAdding(false)
-  }
-
-  const deleteLink = (linkId: string) => {
-    patchLinks(rawLinks.filter(l => l.id !== linkId))
-  }
-
-  const saveEditLabel = (linkId: string) => {
-    const updated = rawLinks.map(l => l.id === linkId ? { ...l, label: editLabel.trim() || l.label } : l)
-    patchLinks(updated)
-    setEditingId(null)
-  }
-
-  return (
-    <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '10px', overflow: 'hidden' }}>
-      <button
-        onClick={() => setExpanded(!expanded)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
-          padding: '12px 14px', background: 'none', border: 'none', cursor: 'pointer',
-          borderBottom: expanded ? '1px solid var(--border)' : 'none',
-        }}
-      >
-        {expanded ? <ChevronDown size={12} color="var(--text-tertiary)" /> : <ChevronRight size={12} color="var(--text-tertiary)" />}
-        <Link2 size={13} color="var(--accent)" />
-        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-          External Links{rawLinks.length > 0 ? ` (${rawLinks.length})` : ''}
-        </span>
-        {!adding && (
-          <span
-            onClick={e => { e.stopPropagation(); setAdding(true); setExpanded(true) }}
-            style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: 'var(--accent)', cursor: 'pointer', fontWeight: 500 }}
-          >
-            <Plus size={12} /> Add
-          </span>
-        )}
-      </button>
-
-      {expanded && (
-        <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {links.length === 0 && !adding && (
-            <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: 0, fontStyle: 'italic', padding: '4px 0' }}>
-              No links yet — paste a SharePoint, Google Doc, or any URL
-            </p>
-          )}
-
-          {links.map(link => {
-            const { icon: Icon, color } = LINK_TYPE_ICON[link.type] ?? LINK_TYPE_ICON.other
-            return (
-              <div
-                key={link.id}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px',
-                  borderRadius: '6px', background: 'var(--card-bg)',
-                  border: 'none', transition: 'border-color 0.15s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
-                onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
-              >
-                <Icon size={14} color={color} style={{ flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {editingId === link.id ? (
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        value={editLabel}
-                        onChange={e => setEditLabel(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') saveEditLabel(link.id); if (e.key === 'Escape') setEditingId(null) }}
-                        autoFocus
-                        style={{
-                          flex: 1, fontSize: '12px', padding: '2px 6px', background: 'var(--surface)',
-                          border: '1px solid var(--accent)', borderRadius: '4px', color: 'var(--text-primary)',
-                          outline: 'none', fontFamily: 'inherit',
-                        }}
-                      />
-                      <button onClick={() => saveEditLabel(link.id)} style={{ fontSize: '10px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                        <Check size={12} />
-                      </button>
-                      <button onClick={() => setEditingId(null)} style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
-                      onDoubleClick={() => { setEditingId(link.id); setEditLabel(link.label) }}
-                      title="Double-click to rename"
-                    >
-                      <a
-                        href={/^https?:\/\//i.test(link.url) ? link.url : `https://${link.url}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)',
-                          textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                          display: 'block', maxWidth: '100%',
-                        }}
-                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
-                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-primary)')}
-                      >
-                        {link.label}
-                      </a>
-                      <ExternalLink size={10} color="var(--text-tertiary)" style={{ flexShrink: 0 }} />
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '1px' }}>
-                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                      {link.url}
-                    </span>
-                    {link.addedAt && (
-                      <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                        {relativeTime(link.addedAt)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => deleteLink(link.id)}
-                  title="Remove link"
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
-                    color: 'var(--text-tertiary)', borderRadius: '4px', flexShrink: 0, display: 'flex',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--danger)')}
-                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            )
-          })}
-
-          {adding && (
-            <div style={{
-              padding: '10px', borderRadius: '8px', background: 'var(--card-bg)',
-              border: '1px solid var(--accent)', display: 'flex', flexDirection: 'column', gap: '8px',
-            }}>
-              <input
-                type="url"
-                value={urlInput}
-                onChange={e => setUrlInput(e.target.value)}
-                placeholder="Paste URL (SharePoint, Google Docs, Salesforce, ...)"
-                autoFocus
-                onKeyDown={e => { if (e.key === 'Enter' && urlInput.trim()) addLink(); if (e.key === 'Escape') { setAdding(false); setUrlInput(''); setLabelInput('') } }}
-                style={{
-                  width: '100%', fontSize: '12px', padding: '8px 10px',
-                  background: 'var(--surface)', border: 'none',
-                  borderRadius: '6px', color: 'var(--text-primary)', outline: 'none',
-                  fontFamily: 'inherit', boxSizing: 'border-box',
-                }}
-              />
-              <input
-                type="text"
-                value={labelInput}
-                onChange={e => setLabelInput(e.target.value)}
-                placeholder="Label (optional — auto-detected from URL)"
-                onKeyDown={e => { if (e.key === 'Enter' && urlInput.trim()) addLink(); if (e.key === 'Escape') { setAdding(false); setUrlInput(''); setLabelInput('') } }}
-                style={{
-                  width: '100%', fontSize: '12px', padding: '8px 10px',
-                  background: 'var(--surface)', border: 'none',
-                  borderRadius: '6px', color: 'var(--text-primary)', outline: 'none',
-                  fontFamily: 'inherit', boxSizing: 'border-box',
-                }}
-              />
-              {urlInput.trim() && (
-                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {(() => {
-                    const t = detectLinkType(urlInput.trim())
-                    const { icon: TypeIcon, color } = LINK_TYPE_ICON[t]
-                    return <><TypeIcon size={10} color={color} /> Detected: {t}</>
-                  })()}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                <button
-                  onClick={() => { setAdding(false); setUrlInput(''); setLabelInput('') }}
-                  style={{
-                    fontSize: '11px', padding: '5px 12px', background: 'none',
-                    border: 'none', borderRadius: '6px',
-                    color: 'var(--text-tertiary)', cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={addLink}
-                  disabled={!urlInput.trim() || saving}
-                  style={{
-                    fontSize: '11px', padding: '5px 12px',
-                    background: urlInput.trim() ? 'var(--accent)' : 'var(--surface-hover)',
-                    border: 'none', borderRadius: '6px',
-                    color: urlInput.trim() ? '#fff' : 'var(--text-tertiary)',
-                    cursor: urlInput.trim() ? 'pointer' : 'default',
-                    fontWeight: 600,
-                  }}
-                >
-                  {saving ? 'Saving...' : 'Add Link'}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Actions Tab (merged To-Dos + Project Plan + Success Criteria) ────────────
-
-function ActionsTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: any; onUpdate: () => void; members: WorkspaceMember[] }) {
-  const [subTab, setSubTab] = useState<'todos' | 'project-plan' | 'success'>('todos')
-
-  const openTodos = (deal?.todos ?? []).filter((t: any) => !t.done).length
-  const openTasks = (deal?.projectPlan as any)?.phases?.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete').length ?? 0
-  const openCriteria = (deal?.successCriteriaTodos as any[])?.filter((c: any) => !c.achieved).length ?? 0
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* Sub-tab pill navigation */}
-      <div style={{ display: 'flex', gap: '6px', padding: '3px', background: 'var(--surface)', borderRadius: '8px', width: 'fit-content' }}>
-        {([
-          { id: 'todos', label: `To-Dos${openTodos > 0 ? ` (${openTodos})` : ''}` },
-          { id: 'project-plan', label: `Project Plan${openTasks > 0 ? ` (${openTasks})` : ''}` },
-          { id: 'success', label: `Success Criteria${openCriteria > 0 ? ` (${openCriteria})` : ''}` },
-        ] as const).map(st => (
-          <button
-            key={st.id}
-            onClick={() => setSubTab(st.id)}
-            style={{
-              padding: '6px 14px', borderRadius: '6px', border: 'none', cursor: 'pointer',
-              fontSize: '12px', fontWeight: '600', transition: 'all 0.15s',
-              background: subTab === st.id ? 'var(--card-bg)' : 'transparent',
-              color: subTab === st.id ? 'var(--text-primary)' : 'var(--text-tertiary)',
-              boxShadow: subTab === st.id ? '0 1px 4px rgba(0,0,0,0.12)' : 'none',
-            }}
-          >
-            {st.label}
-          </button>
-        ))}
-      </div>
-
-      {subTab === 'todos' && (
-        <TodosTab dealId={dealId} deal={deal} onUpdate={onUpdate} members={members} />
-      )}
-      {subTab === 'project-plan' && (
-        <ProjectPlanTab dealId={dealId} deal={deal} onUpdate={onUpdate} members={members} />
-      )}
-      {subTab === 'success' && (
-        <SuccessCriteriaTab dealId={dealId} deal={deal} onUpdate={onUpdate} members={members} />
-      )}
-    </div>
-  )
-}
-
-// ─── Collateral Tab ──────────────────────────────────────────────────────────
-
-function CollateralTab({ dealId, deal }: { dealId: string; deal: any }) {
-  const { data: collateralRes } = useSWR('/api/collateral', fetcher)
-  const allCollateral: any[] = collateralRes?.data ?? []
-
-  // Filter client-side: prefer sourceDealLogId match, fall back to text matching
-  const dealName: string = deal?.dealName ?? ''
-  const company: string = deal?.prospectCompany ?? ''
-  const dealCollateral = allCollateral.filter((c: any) => {
-    // Primary: linked via sourceDealLogId
-    if (c.sourceDealLogId === dealId) return true
-    // Legacy fallback: match by text content
-    if (c.dealId === dealId) return true
-    const content = [c.title ?? '', c.content ?? '', c.generationSource ?? ''].join(' ').toLowerCase()
-    const terms = [dealId, dealName, company].filter(Boolean).map(s => s.toLowerCase())
-    return terms.some(t => t.length > 3 && content.includes(t))
+  timeline.push({
+    kind: 'meeting',
+    label: 'Meeting',
+    timestamp: formatContextualDate(deal.createdAt),
+    sender: deal.prospectName ?? undefined,
+    title: deal.nextSteps ? 'Next step captured for follow-up' : 'Deal context reviewed by Halvex',
+    body: deal.nextSteps ?? 'Halvex is waiting for a more concrete next action to improve close confidence.',
+    insight: {
+      label: 'Action extracted',
+      text: deal.nextSteps
+        ? `The current action is to ${deal.nextSteps.toLowerCase()}.`
+        : 'Add a concrete next action so Halvex can brief and prioritise the deal more precisely.',
+    },
   })
 
-  const typeLabels: Record<string, string> = {
-    proposal: 'Proposal',
-    case_study: 'Case Study',
-    one_pager: 'One-Pager',
-    email_sequence: 'Email Sequence',
-    battle_card: 'Battle Card',
-    roi_calculator: 'ROI Calculator',
-    custom: 'Custom',
-  }
-
-  const typeBadgeColors: Record<string, { bg: string; text: string }> = {
-    proposal: { bg: 'rgba(29, 184, 106, 0.08)', text: '#1DB86A' },
-    case_study: { bg: 'rgba(15,123,108,0.08)', text: '#0f7b6c' },
-    one_pager: { bg: 'rgba(203,108,44,0.08)', text: '#cb6c2c' },
-    email_sequence: { bg: 'rgba(46,120,198,0.08)', text: '#2e78c6' },
-    battle_card: { bg: 'rgba(224,62,62,0.08)', text: '#e03e3e' },
-    roi_calculator: { bg: 'rgba(15,123,108,0.08)', text: '#0f7b6c' },
-    custom: { bg: 'var(--surface-hover)', text: 'var(--text-secondary)' },
-  }
-
-  if (collateralRes === undefined) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {[1, 2].map(i => (
-          <div key={i} style={{ height: '80px', background: 'var(--surface)', borderRadius: '8px', animation: 'pulse 1.5s infinite' }} />
-        ))}
-      </div>
-    )
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
-          {dealCollateral.length > 0 ? `${dealCollateral.length} piece${dealCollateral.length !== 1 ? 's' : ''} of collateral` : 'No collateral yet for this deal'}
-        </span>
-        <Link
-          href={`/collateral?dealId=${dealId}`}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-            background: 'rgba(29,184,106,0.12)', border: '1px solid rgba(29,184,106,0.24)',
-            borderRadius: '8px', color: '#1DB86A', fontSize: '13px', fontWeight: '600',
-            textDecoration: 'none',
-          }}
-        >
-          <Sparkles size={13} /> Generate New
-        </Link>
-      </div>
-
-      {dealCollateral.length === 0 ? (
-        <div style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: '16px', padding: '60px 24px',
-          background: 'var(--surface)', border: '1px dashed var(--ds-border)', borderRadius: '8px',
-        }}>
-          <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: 'var(--accent-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FileText size={22} color="var(--accent)" />
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>No documents uploaded</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '320px' }}>
-              Upload proposals, contracts, or decks to keep everything in one place — or generate AI-tailored collateral in seconds.
-            </div>
-          </div>
-          <Link
-            href={`/collateral?dealId=${dealId}`}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 24px',
-              background: '#1DB86A',
-              borderRadius: '9px', color: '#ffffff', fontSize: '13px', fontWeight: '600',
-              textDecoration: 'none',
-            }}
-          >
-            <Sparkles size={14} /> Generate Collateral
-          </Link>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-          {dealCollateral.map((c: any) => {
-            const badge = typeBadgeColors[c.type] ?? typeBadgeColors.custom
-            const createdDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
-            return (
-              <div
-                key={c.id}
-                style={{
-                  background: 'var(--card-bg)', border: 'none',
-                  borderRadius: '8px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px',
-                  transition: 'border-color 0.15s',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
-                onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--card-border)')}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {c.title || typeLabels[c.type] || 'Collateral'}
-                    </div>
-                    {createdDate && (
-                      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{createdDate}</div>
-                    )}
-                  </div>
-                  <span style={{
-                    fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '100px',
-                    background: badge.bg, color: badge.text, whiteSpace: 'nowrap', flexShrink: 0,
-                  }}>
-                    {typeLabels[c.type] ?? c.type}
-                  </span>
-                </div>
-
-                {c.status === 'generating' && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--accent)' }}>
-                    <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />
-                    Generating…
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
-                  <Link
-                    href={`/collateral/${c.id}`}
-                    style={{
-                      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                      padding: '7px 12px', background: 'var(--accent-subtle)', border: '1px solid rgba(29, 184, 106, 0.15)',
-                      borderRadius: '7px', color: 'var(--accent)', fontSize: '12px', fontWeight: 600,
-                      textDecoration: 'none',
-                    }}
-                  >
-                    <ExternalLink size={11} /> View
-                  </Link>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
+  return timeline.slice(0, 3)
 }
 
-// ─── Score Ring ───────────────────────────────────────────────────────────────
+function ScoreCircle({ score }: { score: number }) {
+  const circumference = 2 * Math.PI * 24
+  const offset = circumference - (score / 100) * circumference
 
-function ScoreRing({ score, size = 64 }: { score: number | null; size?: number }) {
-  const pct = score == null ? 0 : Math.min(100, Math.max(0, score))
-  const color = score == null ? 'var(--text-muted)' : pct >= 70 ? '#1DB86A' : pct >= 40 ? '#f59e0b' : '#ef4444'
-  const circumference = 2 * Math.PI * 34
   return (
-    <div style={{ position: 'relative', width: `${size}px`, height: `${size}px`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-      <svg className="absolute inset-0 w-full h-full" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', transform: 'rotate(-90deg)' }} viewBox="0 0 80 80">
-        <circle cx="40" cy="40" r="34" fill="none" stroke="var(--border-default)" strokeWidth="6" />
+    <div style={{ width: 56, height: 56, position: 'relative' }}>
+      <svg width="56" height="56" viewBox="0 0 56 56" style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx="28" cy="28" r="24" fill="none" stroke="var(--bg-sunken)" strokeWidth="4" />
         <circle
-          cx="40" cy="40" r="34" fill="none"
-          stroke={color} strokeWidth="6"
-          strokeDasharray={`${(pct / 100) * circumference} ${circumference}`}
+          cx="28"
+          cy="28"
+          r="24"
+          fill="none"
+          stroke="var(--signal)"
+          strokeWidth="4"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
           strokeLinecap="round"
         />
       </svg>
-      <span style={{ fontSize: size >= 76 ? '22px' : '20px', fontWeight: 700, color, lineHeight: 1 }}>{score ?? 0}</span>
-    </div>
-  )
-}
-
-// ─── Score Breakdown Visual ──────────────────────────────────────────────────
-
-function ScoreBreakdown({ deal, mlPrediction, brainData }: { deal: any; mlPrediction: any; brainData: any }) {
-  const score = deal.conversionScore ?? 0
-  const mlProb = mlPrediction ? Math.round(mlPrediction.winProbability * 100) : null
-  const churnRisk = mlPrediction?.churnRisk ?? 50
-  const momentumPct = Math.max(0, 100 - churnRisk)  // high churn = low momentum
-
-  // Three layers: ML, text signals, momentum (all scale to the composite score)
-  const mlContrib = mlProb != null ? Math.round(mlProb * 0.6) : null
-  const textContrib = mlProb != null ? Math.max(0, score - mlContrib!) : score
-  const momentumContrib = Math.round(momentumPct * 0.1)
-
-  const scoreColor = getScoreColor(score, false)
-  const scoreBg = `color-mix(in srgb, ${scoreColor} 8%, transparent)`
-  const scoreBorder = `color-mix(in srgb, ${scoreColor} 20%, transparent)`
-
-  const drivers: any[] = mlPrediction?.scoreDrivers ?? []
-  const archetype = mlPrediction?.archetypeId != null
-    ? (brainData?.dealArchetypes ?? []).find((a: any) => a.id === mlPrediction.archetypeId)
-    : null
-
-  const similarWins = mlPrediction?.similarWins ?? []
-  const similarLosses = mlPrediction?.similarLosses ?? []
-
-  const [showBreakdown, setShowBreakdown] = useState(false)
-
-  // Compute detailed breakdown signals for the tooltip
-  const intentSignals = deal.intentSignals as any ?? {}
-  const notes: string = (deal.meetingNotes ?? '').toLowerCase()
-  const contacts = (deal.contacts ?? []) as any[]
-  const noteCount = deal.meetingNotes ? (deal.meetingNotes.match(/^## /gm) ?? []).length || (deal.meetingNotes.length > 50 ? 1 : 0) : 0
-  const championStatus = intentSignals?.championStatus ?? (/\bchampion\b|\bsponsor\b|\badvocate\b/.test(notes) ? 'confirmed' : 'none')
-  const budgetStatus = intentSignals?.budgetStatus ?? (/budget (confirmed|approved|allocated|secured)/.test(notes) ? 'confirmed' : 'not_mentioned')
-  const nextMeeting = intentSignals?.nextMeetingDate ?? (/next (meeting|call|session|step)/.test(notes) ? 'booked' : null)
-  const stakeholderCount = contacts.length
-  const sentimentScore = (deal.intentSignals as any)?.sentimentScore ?? null
-  const daysSinceLastNote = deal.updatedAt ? Math.floor((Date.now() - new Date(deal.updatedAt).getTime()) / 86400000) : null
-
-  // Reconstruct the text signal score components
-  const championPts = (championStatus === 'confirmed' || championStatus === 'suspected') ? 8 : 0
-  const budgetPts = budgetStatus === 'confirmed' ? 8 : 0
-  const nextMeetingPts = nextMeeting ? 5 : 0
-  const stakeholderPts = Math.min(stakeholderCount * 2, 6)
-  const sentimentPts = sentimentScore != null ? Math.round((sentimentScore - 0.5) * 10) : 0
-  const engagementPts = noteCount >= 3 ? 4 : noteCount >= 1 ? 2 : 0
-
-  // Compute weights based on ML state
-  const trainingSize = brainData?.mlModel?.trainingSize ?? 0
-  const mlActive = mlProb != null && trainingSize >= 10
-  const textWeight = mlActive ? Math.max(0, 1.0 - Math.min(0.70, 0.14 * Math.log(Math.max(trainingSize, 1))) - 0.05) : 0.70
-  const mlWeight = mlActive ? Math.min(0.70, 0.14 * Math.log(Math.max(trainingSize, 1))) : 0.25
-  const momWeight = 0.05
-
-  // Compute raw text signal score (baseline 50 + adjustments)
-  const rawTextScore = 50 + championPts + budgetPts + nextMeetingPts + stakeholderPts + sentimentPts + engagementPts
-  const clampedTextScore = Math.max(0, Math.min(100, rawTextScore))
-
-  const mlScoreVal = mlActive ? (mlProb ?? 0) : 50 // global prior = 50 in cold start
-  const momentumComponent = 50 + Math.max(-10, Math.min(10, momentumContrib))
-  const rawTotal = clampedTextScore * textWeight + mlScoreVal * mlWeight + momentumComponent * momWeight
-
-  return (
-    <div style={{ background: 'var(--card-bg)', border: 'none', borderRadius: '8px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Deal Score</div>
-        {mlPrediction?.confidence ? (
-          <div style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '100px', background: 'var(--accent-subtle)', color: 'var(--accent)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {mlPrediction.confidence} confidence
-          </div>
-        ) : (
-          <div
-            title="Score is estimated from text signals and a global prior. Your private ML model activates after 50 logged deals."
-            style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '100px', background: 'var(--surface-2)', color: 'var(--text-tertiary)', fontWeight: '500', cursor: 'default' }}
-          >
-            Scores are estimates
-          </div>
-        )}
-      </div>
-
-      {/* Main score + bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <ScoreRing score={score} />
-        <div style={{ flex: 1 }}>
-          {/* Stacked contribution bar — clickable to expand breakdown */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setShowBreakdown(b => !b)}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowBreakdown(b => !b) } }}
-            style={{ marginBottom: '8px', cursor: 'pointer' }}
-            title="Click to see full score breakdown"
-          >
-            <div style={{ height: '8px', borderRadius: '4px', display: 'flex', overflow: 'hidden', gap: '1px', background: 'var(--border)' }}>
-              {mlContrib != null && (
-                <div style={{ width: `${mlContrib}%`, background: 'var(--accent)', borderRadius: '4px 0 0 4px', transition: 'width 0.1s ease' }} title={`ML model: ${mlContrib}pts`} />
-              )}
-              <div style={{ width: `${textContrib}%`, background: 'var(--data-accent)', transition: 'width 0.1s ease' }} title={`Text signals: ${textContrib}pts`} />
-              {momentumContrib > 0 && (
-                <div style={{ width: `${momentumContrib}%`, background: 'var(--success)', borderRadius: '0 4px 4px 0', transition: 'width 0.1s ease' }} title={`Momentum: ${momentumContrib}pts`} />
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '6px', alignItems: 'center' }}>
-              {mlContrib != null && <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-tertiary)' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'var(--accent)', flexShrink: 0 }} />ML {mlContrib}pt</div>}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-tertiary)' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'var(--data-accent)', flexShrink: 0 }} />Signals {textContrib}pt</div>
-              {momentumContrib > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--text-tertiary)' }}><div style={{ width: '8px', height: '8px', borderRadius: '2px', background: 'var(--success)', flexShrink: 0 }} />Momentum {momentumContrib}pt</div>}
-              <ChevronDown size={10} style={{ color: 'var(--text-tertiary)', marginLeft: 'auto', transition: 'transform 0.1s ease', transform: showBreakdown ? 'rotate(180deg)' : 'rotate(0deg)' }} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Score Breakdown Detail (expanded) */}
-      {showBreakdown && (
-        <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '14px', fontFamily: 'monospace', fontSize: '11px', lineHeight: '1.7', color: 'var(--text-secondary)' }}>
-          <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>{score} / 100 — Score breakdown</div>
-          <div style={{ borderBottom: '1px solid var(--border)', marginBottom: '6px' }} />
-
-          {/* Text signals section */}
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Text signals:</span>
-            <span>{clampedTextScore} x {textWeight.toFixed(2)} = {(clampedTextScore * textWeight).toFixed(1)}</span>
-          </div>
-          <div style={{ paddingLeft: '12px', color: 'var(--text-tertiary)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Champion: {championStatus === 'confirmed' ? '\u2713 confirmed' : championStatus === 'suspected' ? '~ suspected' : '\u2014 not detected'}</span>
-              <span style={{ color: championPts > 0 ? 'var(--success)' : 'var(--text-tertiary)' }}>+{championPts}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Budget: {budgetStatus === 'confirmed' ? '\u2713 confirmed' : budgetStatus === 'awaiting' ? '~ awaiting' : '\u2014 not discussed'}</span>
-              <span style={{ color: budgetPts > 0 ? 'var(--success)' : 'var(--text-tertiary)' }}>+{budgetPts}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Next meeting: {nextMeeting ? '\u2713 booked' : '\u2014 none'}</span>
-              <span style={{ color: nextMeetingPts > 0 ? 'var(--success)' : 'var(--text-tertiary)' }}>+{nextMeetingPts}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Stakeholders: {stakeholderCount} identified</span>
-              <span style={{ color: stakeholderPts > 0 ? 'var(--success)' : 'var(--text-tertiary)' }}>+{stakeholderPts}</span>
-            </div>
-            {sentimentScore != null && (
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Sentiment: {sentimentScore >= 0.6 ? 'positive' : sentimentScore <= 0.4 ? 'negative' : 'neutral'} {sentimentScore.toFixed(2)}</span>
-                <span style={{ color: sentimentPts >= 0 ? 'var(--success)' : 'var(--danger)' }}>{sentimentPts >= 0 ? '+' : ''}{sentimentPts}</span>
-              </div>
-            )}
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Engagement: {noteCount} note{noteCount !== 1 ? 's' : ''}{daysSinceLastNote != null ? ` / ${daysSinceLastNote}d ago` : ''}</span>
-              <span style={{ color: engagementPts > 0 ? 'var(--success)' : 'var(--text-tertiary)' }}>+{engagementPts}</span>
-            </div>
-          </div>
-
-          <div style={{ marginTop: '4px' }} />
-
-          {/* ML or Global Prior */}
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>{mlActive ? 'ML model:' : 'Global prior:'}</span>
-            <span>{Math.round(mlScoreVal)} x {mlWeight.toFixed(2)} = {(mlScoreVal * mlWeight).toFixed(1)}</span>
-          </div>
-
-          {/* Momentum */}
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Momentum:</span>
-            <span>{momentumComponent.toFixed(1)} x {momWeight.toFixed(2)} = {(momentumComponent * momWeight).toFixed(1)}</span>
-          </div>
-
-          <div style={{ borderBottom: '1px solid var(--border)', margin: '6px 0' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: 'var(--text-primary)' }}>
-            <span>Total:</span>
-            <span>{rawTotal.toFixed(1)} → rounded to {score}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Score Drivers */}
-      {drivers.length > 0 && (
-        <div>
-          <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Top Score Drivers</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            {drivers.slice(0, 5).map((d: any, i: number) => {
-              const isPos = d.direction === 'positive'
-              const barWidth = Math.min(100, Math.abs(d.contribution) * 200)
-              return (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ width: '130px', fontSize: '11px', color: 'var(--text-secondary)', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</div>
-                  <div style={{ flex: 1, height: '4px', borderRadius: '2px', background: 'var(--border)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${barWidth}%`, background: isPos ? 'var(--success)' : 'var(--danger)', borderRadius: '2px', transition: 'width 0.1s ease' }} />
-                  </div>
-                  <div style={{ fontSize: '10px', color: isPos ? 'var(--success)' : 'var(--danger)', fontWeight: '600', width: '20px', textAlign: 'right', flexShrink: 0 }}>
-                    {isPos ? '↑' : '↓'}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Archetype */}
-      {archetype && (
-        <div style={{ padding: '10px 12px', background: 'var(--accent-subtle)', border: '1px solid rgba(29, 184, 106, 0.12)', borderRadius: '8px' }}>
-          <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>Deal Archetype</div>
-          <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{archetype.label}</div>
-          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>{archetype.winRate}% win rate for this type · {String(archetype.winningCharacteristic)}</div>
-        </div>
-      )}
-
-      {/* Similar deals */}
-      {(similarWins.length > 0 || similarLosses.length > 0) && (
-        <div>
-          <div style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>Similar Deals</div>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {similarWins.slice(0, 2).map((w: any, i: number) => (
-              <Link key={`w-${i}`} href={`/deals/${w.dealId}`} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'color-mix(in srgb, var(--success) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--success) 20%, transparent)', color: 'var(--success)', textDecoration: 'none', transition: 'opacity 0.1s ease' }}
-                onMouseEnter={e => { e.currentTarget.style.opacity = '0.8' }}
-                onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
-              >
-                ✓ {w.company}
-              </Link>
-            ))}
-            {similarLosses.slice(0, 2).map((l: any, i: number) => (
-              <Link key={`l-${i}`} href={`/deals/${l.dealId}`} style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '6px', background: 'color-mix(in srgb, var(--danger) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--danger) 20%, transparent)', color: 'var(--danger)', textDecoration: 'none', transition: 'opacity 0.1s ease' }}
-                onMouseEnter={e => { e.currentTarget.style.opacity = '0.8' }}
-                onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
-              >
-                ✗ {l.company}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-const LINK_TYPE_OPTIONS = [
-  { value: 'proposal',  label: 'Proposal' },
-  { value: 'contract',  label: 'Contract' },
-  { value: 'deck',      label: 'Deck' },
-  { value: 'document',  label: 'Document' },
-  { value: 'other',     label: 'Other' },
-] as const
-
-function linkIcon(type: string) {
-  switch (type) {
-    case 'proposal':  return <FileText  size={13} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-    case 'contract':  return <FileCheck size={13} style={{ color: 'var(--success)', flexShrink: 0 }} />
-    case 'deck':      return <BarChart2 size={13} style={{ color: 'var(--warning)', flexShrink: 0 }} />
-    case 'document':  return <File      size={13} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-    default:          return <Link2     size={13} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
-  }
-}
-
-function DealLinksSection({ deal, patchDeal }: { deal: any; patchDeal: (payload: Record<string, unknown>) => Promise<void> }) {
-  const [adding, setAdding] = useState(false)
-  const [newLabel, setNewLabel] = useState('')
-  const [newUrl, setNewUrl] = useState('')
-  const [newType, setNewType] = useState<string>('document')
-  const [saving, setSaving] = useState(false)
-
-  const links: DealLinkType[] = Array.isArray(deal.links) ? deal.links : []
-
-  const inputSt: React.CSSProperties = {
-    height: '30px', padding: '0 8px', borderRadius: '6px',
-    background: 'var(--input-bg)', border: 'none',
-    color: 'var(--text-primary)', fontSize: '12px', outline: 'none', boxSizing: 'border-box',
-  }
-
-  const addLink = async () => {
-    if (!newLabel.trim() || !newUrl.trim()) return
-    setSaving(true)
-    try {
-      let url = newUrl.trim()
-      if (!/^https?:\/\//i.test(url)) url = 'https://' + url
-      const newLink: DealLinkType = {
-        id: crypto.randomUUID(),
-        url,
-        label: newLabel.trim(),
-        type: newType as LinkTypeEnum,
-        addedAt: new Date().toISOString(),
-      }
-      await patchDeal({ links: [...links, newLink] })
-      setNewLabel('')
-      setNewUrl('')
-      setNewType('document')
-      setAdding(false)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const removeLink = async (id: string) => {
-    await patchDeal({ links: links.filter(l => l.id !== id) })
-  }
-
-  return (
-    <div style={{ background: 'var(--surface)', border: 'none', borderRadius: '8px', padding: '12px 14px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: links.length > 0 || adding ? '10px' : '0' }}>
-        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600 }}>Links</div>
-        {!adding && (
-          <button
-            onClick={() => setAdding(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 600, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px' }}
-            onMouseEnter={e => (e.currentTarget.style.opacity = '0.75')} onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-          >
-            <Plus size={11} /> Add link
-          </button>
-        )}
-      </div>
-
-      {links.length === 0 && !adding && (
-        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>No links yet</div>
-      )}
-
-      {links.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: adding ? '10px' : '0' }}>
-          {links.map(link => (
-            <div key={link.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {linkIcon(link.type)}
-              <a
-                href={/^https?:\/\//i.test(link.url) ? link.url : `https://${link.url}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ flex: 1, fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
-                onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
-              >
-                {link.label}
-              </a>
-              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px', flexShrink: 0 }}>
-                {(() => { try { return new URL(link.url).hostname } catch { return link.url } })()}
-              </span>
-              {link.addedAt && (
-                <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', flexShrink: 0 }}>
-                  {new Date(link.addedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                </span>
-              )}
-              <button
-                onClick={() => removeLink(link.id)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', display: 'flex', padding: '2px', borderRadius: '4px', flexShrink: 0 }}
-                onMouseEnter={e => (e.currentTarget.style.color = 'var(--danger)')}
-                onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-tertiary)')}
-              >
-                <X size={11} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {adding && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', paddingTop: links.length > 0 ? '8px' : '0', borderTop: links.length > 0 ? '1px solid var(--border)' : 'none' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-            <input
-              style={{ ...inputSt, width: '100%' }}
-              placeholder="Title (e.g. Proposal v2)"
-              value={newLabel}
-              onChange={e => setNewLabel(e.target.value)}
-              onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
-              onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-            />
-            <select
-              style={{ ...inputSt, width: '100%', cursor: 'pointer' }}
-              value={newType}
-              onChange={e => setNewType(e.target.value)}
-            >
-              {LINK_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-          </div>
-          <input
-            style={{ ...inputSt, width: '100%' }}
-            placeholder="URL (https://...)"
-            value={newUrl}
-            onChange={e => setNewUrl(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') addLink() }}
-            onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
-            onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-          />
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <button
-              onClick={addLink}
-              disabled={saving || !newLabel.trim() || !newUrl.trim()}
-              style={{
-                height: '28px', padding: '0 14px', borderRadius: '6px', fontSize: '12px', fontWeight: 600,
-                background: saving || !newLabel.trim() || !newUrl.trim() ? 'var(--surface)' : 'var(--accent)',
-                color: saving || !newLabel.trim() || !newUrl.trim() ? 'var(--text-tertiary)' : '#fff',
-                border: 'none', cursor: saving || !newLabel.trim() || !newUrl.trim() ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {saving ? 'Adding…' : 'Add'}
-            </button>
-            <button
-              onClick={() => { setAdding(false); setNewLabel(''); setNewUrl(''); setNewType('document') }}
-              style={{ height: '28px', padding: '0 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 500, background: 'transparent', color: 'var(--text-tertiary)', border: 'none', cursor: 'pointer' }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Activity Tab (merged Notes + Actions) ──────────────────────────────────
-
-function ActivityTab({ dealId, deal, onUpdate, members }: { dealId: string; deal: any; onUpdate: () => void; members: WorkspaceMember[] }) {
-  const dealCompetitors: string[] = deal?.competitors ?? []
-  const { sendToCopilot } = useSidebar()
-  const [updateText, setUpdateText] = useState('')
-  const [clearConfirm, setClearConfirm] = useState(false)
-  const [clearing, setClearing] = useState(false)
-  const [analysing, setAnalysing] = useState(false)
-  const [lastExtraction, setLastExtraction] = useState<{ extraction: any; analysedAt: string } | null>(null)
-  const [verifyingExtraction, setVerifyingExtraction] = useState(false)
-
-  const clearNotes = async () => {
-    setClearing(true)
-    try {
-      await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ meetingNotes: null }),
-      })
-      setClearConfirm(false)
-      onUpdate()
-    } finally {
-      setClearing(false)
-    }
-  }
-
-  const analyseNotes = async () => {
-    if (!updateText.trim()) return
-    setAnalysing(true)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/analyze-notes`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ meetingNotes: updateText.trim() }),
-      })
-      const json = await res.json()
-      if (json.data) {
-        const extraction = json.data.parsed
-        const signals = json.data.deal?.note_signals_json
-          ? (typeof json.data.deal.note_signals_json === 'string' ? JSON.parse(json.data.deal.note_signals_json) : json.data.deal.note_signals_json)
-          : null
-        setLastExtraction({ extraction: { ...extraction, signals }, analysedAt: new Date().toISOString() })
-        setUpdateText('')
-        onUpdate()
-        track(Events.AI_NOTE_ANALYZED, { dealId, signalsExtracted: signals ? Object.keys(signals).length : 0 })
-      }
-    } finally {
-      setAnalysing(false)
-    }
-  }
-
-  const confirmExtraction = async () => {
-    if (!lastExtraction) return
-    setVerifyingExtraction(true)
-    try {
-      const existing = deal?.note_signals_json
-        ? (typeof deal.note_signals_json === 'string' ? JSON.parse(deal.note_signals_json) : deal.note_signals_json)
-        : {}
-      await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note_signals_json: JSON.stringify({ ...existing, user_verified: true }) }),
-      })
-      setLastExtraction(null)
-      onUpdate()
-    } finally {
-      setVerifyingExtraction(false)
-    }
-  }
-
-  const deleteEntry = async (entryIndex: number) => {
-    if (!deal?.meetingNotes) return
-    const blocks = (deal.meetingNotes as string).split(/\n---\n/).map((b: string) => b.trim()).filter(Boolean)
-    const entries = blocks.filter((b: string) => /^\[/.test(b))
-    const legacy = blocks.filter((b: string) => !/^\[/.test(b))
-    const updatedEntries = entries.filter((_: string, i: number) => i !== entryIndex)
-    const updated = [...legacy, ...updatedEntries].join('\n---\n') || null
-    await fetch(`/api/deals/${dealId}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ meetingNotes: updated }),
-    })
-    onUpdate()
-  }
-
-  // State for controlling expanded meeting entries — first 3 expanded by default
-  const [collapsedEntries, setCollapsedEntries] = useState<Set<number>>(new Set())
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-
-      {/* ── Meeting History — most recent 3 expanded by default ── */}
-      {deal?.meetingNotes && (() => {
-        const raw = (deal.meetingNotes as string)
-        const blocks = raw.split(/\n---\n/).map((b: string) => b.trim()).filter(Boolean)
-        const entries = blocks.filter((b: string) => /^\[/.test(b))
-        const legacy = blocks.filter((b: string) => !/^\[/.test(b))
-        return (
-          <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '12px', padding: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Clipboard size={13} color="var(--text-tertiary)" />
-                <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Meeting History</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'var(--surface-hover)', borderRadius: '4px', padding: '1px 6px' }}>
-                  {entries.length > 0 ? `${entries.length} meeting${entries.length > 1 ? 's' : ''}` : 'legacy notes'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                {clearConfirm ? (
-                  <>
-                    <span style={{ fontSize: '11px', color: 'var(--danger)' }}>Clear all notes?</span>
-                    <button
-                      onClick={clearNotes}
-                      disabled={clearing}
-                      style={{ fontSize: '11px', color: 'var(--danger)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '2px 8px', borderRadius: '5px', cursor: 'pointer' }}
-                    >{clearing ? 'Clearing\u2026' : 'Yes, clear'}</button>
-                    <button
-                      onClick={() => setClearConfirm(false)}
-                      style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}
-                    >Cancel</button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => setClearConfirm(true)}
-                    style={{ fontSize: '11px', color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', borderRadius: '4px' }}
-                    title="Clear all notes for this deal"
-                  >Clear all</button>
-                )}
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {entries.length > 0 ? entries.map((entry: string, i: number) => {
-                const dateMatch = entry.match(/^\[([^\]]+)\]/)
-                const date = dateMatch?.[1] ?? ''
-                const body = entry.slice(dateMatch?.[0].length ?? 0).trim()
-                // First 3 entries expanded by default, rest collapsed
-                const isExpanded = i < 3 ? !collapsedEntries.has(i) : !collapsedEntries.has(i) && i < 3
-                const isExpandedActual = i < 3 ? !collapsedEntries.has(i) : collapsedEntries.has(i)
-                // Simplified: first 3 default expanded, rest default collapsed
-                const defaultExpanded = i < 3
-                const isShown = defaultExpanded ? !collapsedEntries.has(i) : collapsedEntries.has(i)
-
-                // Extract signal badges from the note body
-                const signalBadges: { label: string; color: string; bg: string }[] = []
-                const bodyLower = body.toLowerCase()
-                if (POSITIVE_SIGNALS.some(s => bodyLower.includes(s))) signalBadges.push({ label: 'Positive', color: 'var(--success)', bg: 'rgba(34,197,94,0.1)' })
-                if (NEGATIVE_SIGNALS.some(s => bodyLower.includes(s))) signalBadges.push({ label: 'Risk', color: 'var(--danger)', bg: 'rgba(239,68,68,0.1)' })
-                if (URGENCY_SIGNALS.some(s => bodyLower.includes(s))) signalBadges.push({ label: 'Urgent', color: 'var(--warning)', bg: 'rgba(245,158,11,0.1)' })
-                if (dealCompetitors.some(c => c.trim() && bodyLower.includes(c.trim().toLowerCase()))) signalBadges.push({ label: 'Competitor', color: '#2e78c6', bg: 'rgba(46,120,198,0.1)' })
-
-                return (
-                  <div key={i} style={{ padding: '9px 12px', background: 'var(--surface-2)', border: '1px solid var(--border-default)', borderRadius: '10px', position: 'relative', borderLeft: '2px solid var(--border-default)' }}
-                    onMouseEnter={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.entry-del') as HTMLElement | null; if (btn) btn.style.opacity = '1' }}
-                    onMouseLeave={e => { const btn = (e.currentTarget as HTMLElement).querySelector('.entry-del') as HTMLElement | null; if (btn) btn.style.opacity = '0' }}
-                  >
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => {
-                        setCollapsedEntries(prev => {
-                          const next = new Set(prev)
-                          if (defaultExpanded) {
-                            if (next.has(i)) next.delete(i); else next.add(i)
-                          } else {
-                            if (next.has(i)) next.delete(i); else next.add(i)
-                          }
-                          return next
-                        })
-                      }}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none' }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-                        <ChevronRight size={12} style={{ color: 'var(--text-tertiary)', flexShrink: 0, transition: 'transform 0.1s ease', transform: isShown ? 'rotate(90deg)' : 'rotate(0deg)' }} />
-                        <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{date}</div>
-                        {signalBadges.map((badge, bi) => (
-                          <span key={bi} style={{ fontSize: '9px', fontWeight: 600, padding: '1px 5px', borderRadius: '3px', background: badge.bg, color: badge.color }}>{badge.label}</span>
-                        ))}
-                      </div>
-                      <button
-                        className="entry-del"
-                        onClick={e => { e.stopPropagation(); deleteEntry(i) }}
-                        style={{ opacity: 0, fontSize: '10px', color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', padding: '1px 4px', borderRadius: '3px', transition: 'opacity 0.15s' }}
-                        title="Remove this entry"
-                      >\u2715 remove</button>
-                    </div>
-                    {isShown && (
-                      <div
-                        style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6, marginTop: '6px', paddingLeft: '20px' }}
-                        dangerouslySetInnerHTML={{ __html: highlightSignals(body, dealCompetitors) }}
-                      />
-                    )}
-                  </div>
-                )
-              }) : legacy.length > 0 ? (
-                <div
-                  style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: '1.7', margin: 0 }}
-                  dangerouslySetInnerHTML={{ __html: highlightSignals(legacy.join('\n'), dealCompetitors) }}
-                />
-              ) : null}
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* Empty state — no notes yet */}
-      {!deal?.meetingNotes && (
-        <div style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: '12px', padding: '32px 24px',
-          background: 'var(--surface)', border: '1px dashed var(--ds-border)', borderRadius: '8px',
-          textAlign: 'center',
-        }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--accent-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Clipboard size={18} color="var(--accent)" />
-          </div>
-          <div>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>No meeting notes yet</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.6, maxWidth: '340px' }}>
-              Paste your first meeting note or transcript below to get AI-powered insights, risk detection, and action items.
-            </div>
-          </div>
-        </div>
-      )}
-
-      <HubSpotActivityBlock deal={deal} dealCompetitors={deal?.competitors ?? []} />
-
-      {/* ── Add Update ── */}
-      <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '12px', padding: '14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-          <Sparkles size={13} color="var(--accent)" />
-          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
-            {deal?.meetingNotes ? 'Add Update' : 'Log First Update'}
-          </span>
-          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>\u00B7 AI extracts signals automatically</span>
-        </div>
-        <textarea
-          value={updateText}
-          onChange={e => setUpdateText(e.target.value)}
-          placeholder="Paste meeting notes or describe what happened \u2014 AI will extract signals, risks, and next steps."
-          rows={6}
-          style={{
-            width: '100%', resize: 'vertical', background: 'var(--input-bg)',
-            border: 'none', borderRadius: '8px',
-            color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.6',
-            padding: '12px', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
-          }}
-          onFocus={e => (e.target.style.borderColor = 'var(--accent)')}
-          onBlur={e => (e.target.style.borderColor = 'var(--border)')}
-          onKeyDown={e => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-              analyseNotes()
-            }
-          }}
-        />
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', gap: '8px', alignItems: 'center' }}>
-          <button
-            onClick={() => {
-              if (!updateText.trim()) return
-              sendToCopilot(`Update for ${deal?.prospectCompany ?? 'this deal'}:\n\n${updateText.trim()}`)
-              setUpdateText('')
-            }}
-            disabled={!updateText.trim()}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '7px 12px', borderRadius: '7px',
-              background: 'var(--surface)', border: 'none',
-              color: 'var(--text-secondary)', fontSize: '12px', fontWeight: '500',
-              cursor: updateText.trim() ? 'pointer' : 'not-allowed', opacity: updateText.trim() ? 1 : 0.5,
-            }}
-          >
-            <Sparkles size={11} />
-            Ask AI copilot
-          </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>\u2318\u21B5 to analyse</span>
-            <button
-              onClick={analyseNotes}
-              disabled={!updateText.trim() || analysing}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '6px',
-                padding: '8px 16px', borderRadius: '8px',
-                background: updateText.trim() && !analysing ? 'var(--text-primary)' : 'var(--surface)',
-                border: updateText.trim() && !analysing ? 'none' : '1px solid var(--border)',
-                color: updateText.trim() && !analysing ? 'var(--surface-1)' : 'var(--text-tertiary)',
-                fontSize: '13px', fontWeight: '600', cursor: updateText.trim() && !analysing ? 'pointer' : 'not-allowed',
-                transition: 'all 0.15s',
-              }}
-            >
-              {analysing ? <><RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> Analysing\u2026</> : <><Zap size={12} /> Analyse Notes</>}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Extraction confirmation card */}
-      {lastExtraction && (() => {
-        const ex = lastExtraction.extraction
-        const signals = ex.signals
-        const champStatus = ex.intentSignals?.championStatus ?? (signals?.champion_signal ? 'confirmed' : 'none')
-        const budgetStatus = ex.intentSignals?.budgetStatus ?? signals?.budget_signal ?? 'not_mentioned'
-        const timeline = ex.intentSignals?.decisionTimeline ?? signals?.decision_timeline ?? null
-        const nextStep = signals?.next_step ?? null
-        const competitors = (ex.competitors ?? []).length > 0 ? ex.competitors : (signals?.competitors_mentioned ?? [])
-        const objections = signals?.objections ?? []
-        const gaps = ex.productGaps ?? []
-        const sentiment = signals?.sentiment_score ?? null
-        const champLabel = champStatus === 'confirmed' ? '\u2713 Confirmed' : champStatus === 'suspected' ? '~ Likely' : '\u2014 Not detected'
-        const champColor = champStatus === 'confirmed' ? 'var(--success)' : champStatus === 'suspected' ? 'var(--warning)' : 'var(--text-tertiary)'
-        const budgetLabel = budgetStatus === 'approved' ? '\u2713 Confirmed' : budgetStatus === 'awaiting' ? '~ Awaiting approval' : budgetStatus === 'blocked' ? '\u26A0 Blocked' : '\u2014 Not discussed'
-        const budgetColor = budgetStatus === 'approved' ? 'var(--success)' : budgetStatus === 'blocked' ? 'var(--danger)' : budgetStatus === 'awaiting' ? 'var(--warning)' : 'var(--text-tertiary)'
-        return (
-          <div style={{ background: 'color-mix(in srgb, var(--accent) 5%, var(--card-bg))', border: 'none', borderRadius: '8px', padding: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                <CheckCircle size={14} color="var(--accent)" />
-                <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)' }}>Note analysed</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>\u2014 {new Date(lastExtraction.analysedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
-              </div>
-              <button onClick={() => setLastExtraction(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', fontSize: '12px', padding: '2px 6px' }}>\u2715</button>
-            </div>
-            <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '8px' }}>Extracted signals</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Champion</span>
-                <span style={{ color: champColor, fontWeight: '600' }}>{champLabel}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Budget</span>
-                <span style={{ color: budgetColor, fontWeight: '600' }}>{budgetLabel}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Timeline</span>
-                <span style={{ color: timeline ? 'var(--text-primary)' : 'var(--text-tertiary)', fontWeight: '600' }}>{timeline ?? '\u2014 Not mentioned'}</span>
-              </div>
-              {nextStep && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Next step</span>
-                  <span style={{ color: 'var(--text-primary)', fontWeight: '600', maxWidth: '200px', textAlign: 'right' }}>&ldquo;{nextStep}&rdquo;</span>
-                </div>
-              )}
-              {competitors.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Competitors</span>
-                  <span style={{ color: '#3B82F6', fontWeight: '600' }}>{competitors.join(', ')}</span>
-                </div>
-              )}
-              {objections.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Objections</span>
-                  <span style={{ color: 'var(--warning)', fontWeight: '600' }}>{objections.map((o: any) => o.theme).join(', ')} ({objections.length})</span>
-                </div>
-              )}
-              {gaps.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Product gaps</span>
-                  <span style={{ color: 'var(--danger)', fontWeight: '600' }}>{gaps.map((g: any) => g.title).join(', ')}</span>
-                </div>
-              )}
-              {sentiment !== null && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', padding: '5px 0' }}>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Sentiment</span>
-                  <span style={{ color: sentiment >= 0.6 ? 'var(--success)' : sentiment <= 0.4 ? 'var(--danger)' : 'var(--warning)', fontWeight: '600' }}>
-                    {sentiment >= 0.6 ? 'Positive' : sentiment <= 0.4 ? 'Negative' : 'Neutral'} ({sentiment.toFixed(2)})
-                  </span>
-                </div>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={confirmExtraction}
-                disabled={verifyingExtraction}
-                style={{
-                  flex: 2, padding: '8px 14px', borderRadius: '8px',
-                  background: 'var(--accent)', border: 'none', color: '#fff',
-                  fontSize: '13px', fontWeight: '600', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                }}
-              >
-                {verifyingExtraction ? <><RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> Saving\u2026</> : <><Check size={12} /> Confirm & mark verified</>}
-              </button>
-              <button
-                onClick={() => setLastExtraction(null)}
-                style={{ flex: 1, padding: '8px 14px', borderRadius: '8px', background: 'var(--surface)', border: 'none', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        )
-      })()}
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-    </div>
-  )
-}
-
-// ─── Linked issue column ─────────────────────────────────────────────────────
-
-function LinearColumn({ dealId }: { dealId: string }) {
-  const [preparingReview, setPreparingReview] = useState(false)
-  const [reviewStatus, setReviewStatus] = useState<'copied' | 'error' | null>(null)
-
-  const { data: linksData, mutate: mutateLinks } = useSWR<{ data: any[] }>(
-    `/api/deals/${dealId}/linear-links`,
-    fetcher,
-  )
-
-  const handlePrepareReview = async () => {
-    setPreparingReview(true)
-    setReviewStatus(null)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/discover-issues`, { method: 'POST' })
-      const json = await res.json()
-      if (!res.ok || !json?.data?.reviewPrompt) throw new Error('Missing review prompt')
-      await navigator.clipboard.writeText(json.data.reviewPrompt)
-      await mutateLinks()
-      setReviewStatus('copied')
-    } catch {
-      setReviewStatus('error')
-    } finally {
-      setPreparingReview(false)
-    }
-  }
-
-  const allLinks = linksData?.data ?? []
-  const visibleLinks = allLinks.filter((l: any) => l.status !== 'dismissed')
-
-  return (
-    <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-          Linked Issues
-        </span>
-        <span style={{ fontSize: '10px', padding: '2px 7px', borderRadius: '100px', background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border-default)', fontWeight: 700, letterSpacing: '0.04em' }}>
-          MCP
-        </span>
-      </div>
-
-      {/* Issue list or skeleton */}
-      {!linksData ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {[1, 2, 3].map(i => (
-            <div key={i} style={{ height: '56px', borderRadius: '8px', background: 'var(--surface-2)' }} />
-          ))}
-        </div>
-      ) : visibleLinks.length === 0 ? (
-        <div style={{ padding: '20px 0', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-          <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>No issues linked yet</div>
-          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>Review this deal in Claude, then saved issue links will appear here.</div>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {visibleLinks.map((link: any) => {
-            const STATUS_MAP: Record<string, { label: string; color: string }> = {
-              shipped: { label: 'Shipped', color: '#34d399' },
-              deployed: { label: 'Shipped', color: '#34d399' },
-              in_progress: { label: 'In Progress', color: '#3b82f6' },
-              in_review: { label: 'In Review', color: '#8b5cf6' },
-              in_cycle: { label: 'In Cycle', color: '#3b82f6' },
-              identified: { label: 'Identified', color: '#f59e0b' },
-              cancelled: { label: 'Cancelled', color: '#6b7280' },
-            }
-            const st = STATUS_MAP[link.status] ?? { label: 'Identified', color: '#f59e0b' }
-            const statusColor = st.color
-            const statusLabel = st.label
-            return (
-              <div
-                key={link.id}
-                onClick={() => { if (link.linearIssueUrl) window.open(link.linearIssueUrl, '_blank') }}
-                style={{
-                  padding: '10px 12px', borderRadius: '8px',
-                  background: 'var(--surface-2)',
-                  border: '1px solid var(--border-default)',
-                  cursor: link.linearIssueUrl ? 'pointer' : 'default',
-                  transition: 'border-color 0.15s',
-                }}
-                onMouseEnter={e => { if (link.linearIssueUrl) (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-default)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-default)' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', background: 'var(--surface-2)', padding: '2px 6px', borderRadius: '4px', flexShrink: 0, fontFamily: 'monospace', letterSpacing: '0.04em' }}>
-                    {link.linearIssueId}
-                  </span>
-                  <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 500, lineHeight: 1.4, flex: 1, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                    {link.linearTitle ?? link.linearIssueId}
-                  </span>
-                  {link.linearIssueUrl && (
-                    <ExternalLink size={10} color="#9b9a97" style={{ flexShrink: 0, marginTop: '2px' }} />
-                  )}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                  <span style={{
-                    fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: '100px',
-                    background: `color-mix(in srgb, ${statusColor} 12%, transparent)`,
-                    color: statusColor,
-                    border: `1px solid color-mix(in srgb, ${statusColor} 25%, transparent)`,
-                  }}>
-                    {statusLabel}
-                  </span>
-                  {link.addressesRisk && (
-                    <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
-                      ↳ {link.addressesRisk.length > 42 ? link.addressesRisk.slice(0, 42) + '…' : link.addressesRisk}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Claude review button */}
-      <button
-        onClick={handlePrepareReview}
-        disabled={preparingReview}
+      <div
         style={{
-          width: '100%', padding: '10px', borderRadius: '8px',
-          background: preparingReview ? '#fafafa' : '#fafafa',
-          border: '1px solid var(--border-default)',
-          color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 600,
-          cursor: preparingReview ? 'not-allowed' : 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
-          transition: 'all 0.15s',
+          position: 'absolute',
+          inset: 0,
+          display: 'grid',
+          placeItems: 'center',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 16,
+          fontWeight: 600,
+          color: 'var(--ink)',
         }}
-        onMouseEnter={e => { if (!preparingReview) { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.borderColor = 'var(--border-default)' } }}
-        onMouseLeave={e => { if (!preparingReview) { e.currentTarget.style.background = 'var(--surface-2)'; e.currentTarget.style.borderColor = 'var(--border-default)' } }}
       >
-        {preparingReview
-          ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Preparing…</>
-          : <><Zap size={12} /> Copy Claude Review Prompt</>
-        }
-      </button>
-
-      {reviewStatus === 'copied' && (
-        <div style={{ fontSize: '11px', color: '#0f7b6c', textAlign: 'center' }}>Claude review prompt copied</div>
-      )}
-      {reviewStatus === 'error' && (
-        <div style={{ fontSize: '11px', color: '#e03e3e', textAlign: 'center' }}>Could not prepare the Claude review prompt</div>
-      )}
-    </div>
-  )
-}
-
-// ─── AI Briefing Card ─────────────────────────────────────────────────────────
-
-function DealBriefingCard({ dealId }: { dealId: string }) {
-  const { data, isLoading } = useSWR<{ data: { brief: string | null; generatedAt: string | null } }>(
-    `/api/deals/${dealId}/brief`,
-    fetcher,
-    { revalidateOnFocus: false },
-  )
-
-  const brief = data?.data?.brief
-  const generatedAt = data?.data?.generatedAt
-
-  return (
-    <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-          AI Briefing
-        </span>
-        <Sparkles size={13} color="#9b9a97" />
-      </div>
-
-      {isLoading || !data ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ height: '14px', borderRadius: '4px', background: 'var(--surface-2)', width: '100%' }} />
-          <div style={{ height: '14px', borderRadius: '4px', background: 'var(--surface-2)', width: '100%' }} />
-          <div style={{ height: '14px', borderRadius: '4px', background: 'var(--surface-2)', width: '65%' }} />
-          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontStyle: 'italic', marginTop: '2px' }}>Generating…</div>
-        </div>
-      ) : brief ? (
-        <>
-          <p style={{ fontSize: '14px', color: 'var(--text-primary)', lineHeight: 1.7, margin: 0 }}>{brief}</p>
-          {generatedAt && (
-            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
-              Updated {timeAgoShort(generatedAt)}
-            </div>
-          )}
-        </>
-      ) : (
-        <div style={{ fontSize: '13px', color: 'var(--text-tertiary)', lineHeight: 1.6 }}>
-          Add meeting notes and run AI analysis to generate a briefing for this deal.
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Deal Coach Card (Sprint 5) ──────────────────────────────────────────────
-
-function DealCoachCard({ dealId, deal, brainData }: { dealId: string; deal: any; brainData: any }) {
-  if (!brainData) return null
-
-  const tips: Array<{ icon: string; text: string; color: string }> = []
-
-  // Patterns this deal is part of
-  const matchingPatterns = (brainData.keyPatterns ?? []).filter(
-    (p: any) => Array.isArray(p.dealIds) && p.dealIds.includes(dealId)
-  )
-  for (const p of matchingPatterns.slice(0, 2)) {
-    tips.push({ icon: '✦', text: p.label, color: '#1DB86A' })
-  }
-
-  // Urgency signal
-  const urgentSignal = (brainData.urgentDeals ?? []).find((d: any) => d.dealId === dealId)
-  if (urgentSignal?.topAction) {
-    tips.push({ icon: '⚡', text: urgentSignal.topAction, color: '#ef4444' })
-  }
-
-  // Stale signal
-  const staleSignal = (brainData.staleDeals ?? []).find((d: any) => d.dealId === dealId)
-  if (staleSignal) {
-    tips.push({
-      icon: '⏱',
-      text: `${staleSignal.daysSinceUpdate}d without activity — consider a direct outreach to re-engage`,
-      color: '#f59e0b',
-    })
-  }
-
-  // Win-rate context
-  const wl = brainData.winLossIntel
-  if (wl && wl.winCount + wl.lossCount >= 3) {
-    const wr = Math.round(wl.winRate * 100)
-    tips.push({
-      icon: '📊',
-      text: `Your team wins ${wr}% of deals at this stage — keep momentum with regular updates`,
-      color: '#3b82f6',
-    })
-  }
-
-  // Stage-specific tip
-  const stage = deal?.stage ?? ''
-  const stageTips: Record<string, string> = {
-    prospecting: 'Confirm budget and timeline before investing more time — qualify hard.',
-    qualification: 'Identify the economic buyer now. Unsponsored deals rarely close.',
-    discovery: 'Map the full buying committee and tie your solution to their key initiative.',
-    proposal: 'Get a verbal "yes" on the proposal before sending the contract.',
-    negotiation: 'Understand all blockers before discounting — non-price concessions preserve margin.',
-  }
-  if (stageTips[stage]) {
-    tips.push({ icon: '💡', text: stageTips[stage], color: '#8b5cf6' })
-  }
-
-  if (tips.length === 0) return null
-
-  return (
-    <div style={{
-      background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-      borderRadius: '10px', padding: '16px',
-    }}>
-      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>
-        AI Coach
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {tips.slice(0, 4).map((tip, i) => (
-          <div key={i} style={{
-            display: 'flex', alignItems: 'flex-start', gap: '10px',
-            padding: '9px 12px', borderRadius: '8px',
-            background: `${tip.color}08`,
-            border: `1px solid ${tip.color}18`,
-          }}>
-            <span style={{ fontSize: '13px', flexShrink: 0, marginTop: '1px' }}>{tip.icon}</span>
-            <div style={{ fontSize: '12.5px', color: 'var(--text-primary)', lineHeight: 1.55, flex: 1 }}>{tip.text}</div>
-          </div>
-        ))}
+        {score}
       </div>
     </div>
   )
 }
 
-// ─── Similar Deals Card ─────────────────────────────────────────────────────
-
-function SimilarDealsCard({ dealId }: { dealId: string }) {
-  const { data, isLoading } = useSWR<{ data: Array<{ id: string; dealName: string; prospectCompany: string; stage: string; dealValue: number; conversionScore: number; outcome: 'won' | 'lost' | null; similarityReason: string; overlappingRisks: string[]; advice: string }> }>(`/api/deals/${dealId}/similar`, fetcher)
-  const deals = data?.data ?? []
-
-  const stageColor = (stage: string) => {
-    switch (stage) {
-      case 'discovery': return '#3b82f6'
-      case 'proposal': return '#8b5cf6'
-      case 'negotiation': return '#f59e0b'
-      case 'closed_won': return '#10b981'
-      case 'closed_lost': return '#ef4444'
-      default: return 'var(--text-tertiary)'
-    }
-  }
-
+function LoadingState() {
   return (
-    <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '16px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-        <Target size={13} color="#3b82f6" />
-        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-          Similar Deals
-        </span>
-      </div>
-
-      {isLoading && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {[0, 1, 2].map(i => (
-            <div key={i} className="skeleton" style={{
-              height: 52, borderRadius: '8px',
-              border: '1px solid var(--border-subtle)',
-            }} />
-          ))}
-        </div>
-      )}
-
-      {!isLoading && deals.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--text-tertiary)', fontSize: 12.5, lineHeight: 1.6 }}>
-          No similar deals found yet. AI will identify patterns as your pipeline grows.
-        </div>
-      )}
-
-      {!isLoading && deals.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          {deals.slice(0, 4).map(d => (
-            <Link key={d.id} href={`/deals/${d.id}`} style={{ textDecoration: 'none' }}>
-              <div style={{
-                padding: '10px 12px', borderRadius: '8px',
-                background: 'var(--surface-2)', border: '1px solid var(--border-subtle)',
-                cursor: 'pointer', transition: 'border-color 100ms',
-              }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-default)' }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {d.prospectCompany}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                      {d.similarityReason}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                    {d.dealValue > 0 && (
-                      <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
-                        {'\u00A3'}{d.dealValue >= 1000 ? `${(d.dealValue / 1000).toFixed(0)}k` : d.dealValue.toLocaleString()}
-                      </span>
-                    )}
-                    <span style={{
-                      fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: '100px',
-                      background: `color-mix(in srgb, ${stageColor(d.stage)} 10%, transparent)`,
-                      color: stageColor(d.stage),
-                    }}>
-                      {d.stage.replace('_', ' ')}
-                    </span>
-                    {d.outcome === 'won' && (
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: '100px', background: 'rgba(16,185,129,0.10)', color: '#10b981' }}>Won</span>
-                    )}
-                    {d.outcome === 'lost' && (
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: '100px', background: 'rgba(239,68,68,0.10)', color: '#ef4444' }}>Lost</span>
-                    )}
-                  </div>
-                </div>
-                {d.advice && (
-                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontStyle: 'italic', marginTop: 5, lineHeight: 1.4 }}>
-                    {d.advice}
-                  </div>
-                )}
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Overview Tab (3-column layout) ──────────────────────────────────────────
-
-function OverviewTab({ dealId, deal, dealGaps, onUpdate, currencySymbol = '£', mlPrediction = null, globalPrior = null, brainData = null, objectionWinMap = [], objectionConditionalWins = [] }: { dealId: string; deal: any; dealGaps: any[]; onUpdate: () => void; currencySymbol?: string; mlPrediction?: any; globalPrior?: any; brainData?: any; objectionWinMap?: any[]; objectionConditionalWins?: any[] }) {
-  const router = useRouter()
-  const [expandingType, setExpandingType] = useState<string | null>(null)
-  const [regenerating, setRegenerating] = useState(false)
-  const [regenError, setRegenError] = useState<string | null>(null)
-
-  // Deal Links
-  const [linkFormOpen, setLinkFormOpen] = useState(false)
-  const [linkUrl, setLinkUrl] = useState('')
-  const [linkTitle, setLinkTitle] = useState('')
-  const [linkType, setLinkType] = useState<string>('website')
-  const [linkSaving, setLinkSaving] = useState(false)
-  const [linkError, setLinkError] = useState<string | null>(null)
-
-  const LINK_TYPE_OPTIONS: { value: string; label: string }[] = [
-    { value: 'website', label: 'Website' },
-    { value: 'document', label: 'Document' },
-    { value: 'crm', label: 'CRM' },
-    { value: 'repository', label: 'Repository' },
-    { value: 'presentation', label: 'Presentation' },
-    { value: 'spreadsheet', label: 'Spreadsheet' },
-    { value: 'other', label: 'Other' },
-  ]
-
-  const LINK_TYPE_ICON: Record<string, typeof Globe> = {
-    website: Globe, document: FileText, crm: Database, repository: Github,
-    presentation: Layers, spreadsheet: BarChart2, salesforce: Database,
-    google: Cloud, sharepoint: Cloud, notion: BookOpen, figma: PenTool,
-    proposal: FileCheck, contract: FileCheck, deck: Layers, github: Github,
-    other: ExternalLink,
-  }
-
-  const saveDealLink = async () => {
-    if (!linkUrl.trim()) return
-    setLinkSaving(true)
-    setLinkError(null)
-    try {
-      let finalUrl = linkUrl.trim()
-      if (!/^https?:\/\//i.test(finalUrl)) finalUrl = 'https://' + finalUrl
-      const existing: any[] = Array.isArray(deal.links) ? deal.links : []
-      const newLink = {
-        id: crypto.randomUUID(),
-        url: finalUrl,
-        label: linkTitle.trim() || new URL(finalUrl).hostname,
-        type: linkType,
-        addedAt: new Date().toISOString(),
-      }
-      const res = await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ links: [...existing, newLink] }),
-      })
-      if (!res.ok) throw new Error('Failed to save link')
-      setLinkUrl('')
-      setLinkTitle('')
-      setLinkType('website')
-      setLinkFormOpen(false)
-      onUpdate()
-    } catch (err: any) {
-      setLinkError(err.message ?? 'Failed to save link')
-    } finally {
-      setLinkSaving(false)
-    }
-  }
-
-  const removeDealLink = async (linkId: string) => {
-    const existing: any[] = Array.isArray(deal.links) ? deal.links : []
-    const updated = existing.filter((l: any) => l.id !== linkId)
-    try {
-      const res = await fetch(`/api/deals/${dealId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ links: updated }),
-      })
-      if (!res.ok) throw new Error('Failed to remove link')
-      onUpdate()
-    } catch {
-      setLinkError('Failed to remove link')
-    }
-  }
-
-  // AI Composer
-  const [composeOpen, setComposeOpen] = useState(false)
-  const [composeTone, setComposeTone] = useState<'professional' | 'friendly' | 'urgent'>('professional')
-  const [composing, setComposing] = useState(false)
-  const [composeResult, setComposeResult] = useState<{ subject: string; body: string } | null>(null)
-  const [composeError, setComposeError] = useState<string | null>(null)
-  const [composeCopied, setComposeCopied] = useState(false)
-
-  const composeEmail = async (tone = composeTone) => {
-    setComposing(true)
-    setComposeResult(null)
-    setComposeError(null)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/compose-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tone }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Composition failed')
-      setComposeResult(json.data)
-    } catch (e: any) {
-      setComposeError(e.message ?? 'Something went wrong')
-    } finally {
-      setComposing(false)
-    }
-  }
-
-  // MEDDIC
-  const [meddicRunning, setMeddicRunning] = useState(false)
-  const [meddicResult, setMeddicResult] = useState<any>(deal.meddic ?? null)
-  const [meddicError, setMeddicError] = useState<string | null>(null)
-
-  // Success Criteria
-  const [criteriaExpanded, setCriteriaExpanded] = useState(false)
-  const [criteriaText, setCriteriaText] = useState('')
-  const [criteriaImporting, setCriteriaImporting] = useState(false)
-  const [criteriaError, setCriteriaError] = useState<string | null>(null)
-  const [criteriaToggles, setCriteriaToggles] = useState<Record<string, boolean>>({})
-
-  // Milestones
-  const { data: milestonesRes, mutate: mutateMilestones } = useSWR<{ data: any[] }>(
-    `/api/deals/${dealId}/milestones`, fetcher, { revalidateOnFocus: false }
-  )
-  const milestones = milestonesRes?.data ?? []
-  const [milestoneAdding, setMilestoneAdding] = useState(false)
-  const [milestoneTitle, setMilestoneTitle] = useState('')
-  const [milestoneDate, setMilestoneDate] = useState('')
-  const [milestoneSaving, setMilestoneSaving] = useState(false)
-
-  const addMilestone = async () => {
-    if (!milestoneTitle.trim()) return
-    setMilestoneSaving(true)
-    try {
-      await fetch(`/api/deals/${dealId}/milestones`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: milestoneTitle.trim(),
-          dueDate: milestoneDate || null,
-          sortOrder: milestones.length
-        }),
-      })
-      setMilestoneTitle('')
-      setMilestoneDate('')
-      setMilestoneAdding(false)
-      mutateMilestones()
-    } catch {} finally { setMilestoneSaving(false) }
-  }
-
-  const toggleMilestoneStatus = async (milestoneId: string, currentStatus: string) => {
-    const nextStatus = currentStatus === 'pending' ? 'in_progress' : currentStatus === 'in_progress' ? 'done' : 'pending'
-    try {
-      await fetch(`/api/deals/${dealId}/milestones`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ milestoneId, status: nextStatus }),
-      })
-      mutateMilestones()
-    } catch {}
-  }
-
-  const importCriteria = async () => {
-    if (!criteriaText.trim()) return
-    setCriteriaImporting(true)
-    setCriteriaError(null)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/success-criteria`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: criteriaText }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Import failed')
-      setCriteriaText('')
-      setCriteriaExpanded(false)
-      onUpdate()
-    } catch (e: any) {
-      setCriteriaError(e.message ?? 'Something went wrong')
-    } finally {
-      setCriteriaImporting(false)
-    }
-  }
-
-  const toggleCriterion = async (criterionId: string, achieved: boolean) => {
-    setCriteriaToggles(prev => ({ ...prev, [criterionId]: true }))
-    try {
-      const res = await fetch(`/api/deals/${dealId}/success-criteria`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ criterionId, achieved }),
-      })
-      if (!res.ok) throw new Error('Toggle failed')
-      onUpdate()
-    } catch {
-      // Silently fail — will revert on next data refresh
-    } finally {
-      setCriteriaToggles(prev => { const n = { ...prev }; delete n[criterionId]; return n })
-    }
-  }
-
-  // Stakeholder Map
-  const [stakeholderRunning, setStakeholderRunning] = useState(false)
-  const [stakeholderData, setStakeholderData] = useState<any>(null)
-  const [stakeholderError, setStakeholderError] = useState<string | null>(null)
-
-  const runStakeholderMap = async () => {
-    setStakeholderRunning(true)
-    setStakeholderError(null)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/stakeholder-map`, { method: 'POST', credentials: 'include' })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Analysis failed')
-      setStakeholderData(json.data)
-    } catch (e: any) {
-      setStakeholderError(e.message ?? 'Something went wrong')
-    } finally {
-      setStakeholderRunning(false)
-    }
-  }
-
-  // Deal Reviewer
-  const [reviewRunning, setReviewRunning] = useState(false)
-  const [reviewResult, setReviewResult] = useState<import('@/app/api/deals/[id]/deal-review/route').DealReview | null>(
-    (deal.dealReview as import('@/app/api/deals/[id]/deal-review/route').DealReview | null) ?? null
-  )
-  const [reviewError, setReviewError] = useState<string | null>(null)
-
-  // Meeting Prep
-  const [meetingPrepOpen, setMeetingPrepOpen] = useState(false)
-  const [meetingPrepRunning, setMeetingPrepRunning] = useState(false)
-  const [meetingPrepResult, setMeetingPrepResult] = useState<string | null>(null)
-  const [meetingPrepError, setMeetingPrepError] = useState<string | null>(null)
-
-  const runMeetingPrep = async () => {
-    setMeetingPrepRunning(true)
-    setMeetingPrepResult(null)
-    setMeetingPrepError(null)
-    setMeetingPrepOpen(true)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/meeting-prep`, { method: 'POST', credentials: 'include' })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Meeting prep failed')
-      setMeetingPrepResult(json.data.prep)
-    } catch (e: any) {
-      setMeetingPrepError(e.message ?? 'Something went wrong')
-    } finally {
-      setMeetingPrepRunning(false)
-    }
-  }
-
-  // Risk Kit
-  const [riskKitRunning, setRiskKitRunning] = useState(false)
-  const [riskKitResult, setRiskKitResult] = useState<{ emailSubject: string; emailBody: string; meetingPrepAngle: string; collateralSuggestion: string; urgencyReason: string; generatedAt: string } | null>(null)
-  const [riskKitError, setRiskKitError] = useState<string | null>(null)
-
-  const runRiskKit = async () => {
-    setRiskKitRunning(true)
-    setRiskKitResult(null)
-    setRiskKitError(null)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/risk-kit`, { method: 'POST', credentials: 'include' })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Risk kit failed')
-      setRiskKitResult(json.data)
-    } catch (e: any) {
-      setRiskKitError(e.message ?? 'Something went wrong')
-    } finally {
-      setRiskKitRunning(false)
-    }
-  }
-
-  const runDealReview = async () => {
-    setReviewRunning(true)
-    setReviewError(null)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/deal-review`, { method: 'POST', credentials: 'include' })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Review failed')
-      setReviewResult(json.data)
-      onUpdate()
-    } catch (e: any) {
-      setReviewError(e.message ?? 'Something went wrong')
-    } finally {
-      setReviewRunning(false)
-    }
-  }
-
-  const runMeddic = async () => {
-    setMeddicRunning(true)
-    setMeddicError(null)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/meddic`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Analysis failed')
-      setMeddicResult(json.data)
-      onUpdate()
-    } catch (e: any) {
-      setMeddicError(e.message ?? 'Something went wrong')
-    } finally {
-      setMeddicRunning(false)
-    }
-  }
-
-  const regenAI = async () => {
-    const notes = deal.meetingNotes?.trim()
-    if (!notes) return
-    setRegenerating(true)
-    setRegenError(null)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/analyze-notes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ meetingNotes: notes }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Analysis failed')
-      onUpdate()
-    } catch (e: any) {
-      setRegenError(e.message ?? 'Something went wrong')
-    } finally {
-      setRegenerating(false)
-    }
-  }
-
-  const contacts: any[] = Array.isArray(deal.contacts) && deal.contacts.length > 0
-    ? deal.contacts
-    : deal.prospectName ? [{ name: deal.prospectName, title: deal.prospectTitle }] : []
-  const primaryContact = contacts[0]
-
-  const dealRisks: string[] = deal.dealRisks ?? []
-  const insights: string[] = deal.conversionInsights ?? []
-
-  const nextActions = [
-    ...dealRisks.slice(0, 3).map((r: string) => ({ priority: 'red' as const, text: r })),
-    ...insights.slice(0, 2).map((i: string) => ({ priority: 'green' as const, text: i })),
-  ].slice(0, 5)
-
-  const patchDeal = async (payload: Record<string, unknown>) => {
-    await fetch(`/api/deals/${dealId}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    onUpdate()
-  }
-
-  const handleExpand = async (expansionType: string) => {
-    setExpandingType(expansionType)
-    try {
-      const res = await fetch(`/api/deals/${dealId}/expand`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ expansionType }),
-      })
-      const result = await res.json()
-      if (result?.data?.id) router.push(`/deals/${result.data.id}`)
-    } finally {
-      setExpandingType(null)
-    }
-  }
-
-  const contextFields: { label: string; value: string }[] = [
-    primaryContact?.name ? { label: 'Primary Contact', value: `${primaryContact.name}${primaryContact.title ? ` · ${primaryContact.title}` : ''}` } : null,
-    primaryContact?.email ? { label: 'Email', value: primaryContact.email } : null,
-    deal.engagementType ? { label: 'Engagement', value: deal.engagementType } : null,
-    deal.dealType ? { label: 'Type', value: deal.dealType === 'recurring' ? `Recurring${deal.recurringInterval ? ` (${deal.recurringInterval})` : ''}` : 'One-off' } : null,
-    deal.dealValue ? { label: 'Value', value: `${currencySymbol}${Number(deal.dealValue).toLocaleString()}` } : null,
-    deal.closeDate ? { label: 'Close Date', value: new Date(deal.closeDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) } : null,
-    deal.contractStartDate ? { label: 'Contract Start', value: new Date(deal.contractStartDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) } : null,
-    deal.contractEndDate ? { label: 'Contract End', value: new Date(deal.contractEndDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) } : null,
-    (deal.competitors as string[])?.join(', ') ? { label: 'Competitors', value: (deal.competitors as string[]).join(', ') } : null,
-  ].filter(Boolean) as { label: string; value: string }[]
-
-  const expansionColors: Record<string, string> = {
-    upsell: '#1DB86A', cross_sell: '#3b82f6', renewal: '#1DB86A', expansion: '#f59e0b',
-  }
-
-  return (
-    <div className="deal-overview-grid" style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: '20px', alignItems: 'start' }}>
-      <style>{`@media (max-width: 900px) { .deal-overview-grid { grid-template-columns: 1fr !important; } }`}</style>
-
-      {/* ── LEFT: Deal Context ──────────────────────────────────── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-
-        {/* Single-threaded risk alert */}
-        {(() => {
-          const stagesAtRisk = ['discovery', 'proposal', 'negotiation']
-          const isRiskyStage = stagesAtRisk.includes(deal.stage)
-          const contactCount = contacts.length
-          if (!isRiskyStage || contactCount > 1) return null
-          return (
-            <div style={{
-              padding: '10px 14px', borderRadius: 9,
-              background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)',
-              display: 'flex', alignItems: 'flex-start', gap: 10,
-            }}>
-              <span style={{ fontSize: 15, lineHeight: 1 }}>⚠️</span>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 2 }}>
-                  Single-threaded risk
-                </div>
-                <div style={{ fontSize: 11.5, color: '#92400e', lineHeight: 1.5, opacity: 0.85 }}>
-                  Only {contactCount === 0 ? 'no contacts' : '1 contact'} engaged at {deal.stage.replace(/_/g, ' ')} stage. Add an economic buyer or champion to reduce risk.
-                </div>
-              </div>
-            </div>
-          )
-        })()}
-
-        {/* Score History Sparkline */}
-        {(() => {
-          const history: Array<{ score: number }> = Array.isArray(deal.scoreHistory) ? deal.scoreHistory as any : []
-          if (history.length < 2) return null
-          const scores = history.map(p => p.score)
-          const first = scores[0]
-          const last = scores[scores.length - 1]
-          const delta = last - first
-          return (
-            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '14px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                  Score Trend
-                </div>
-                <span style={{
-                  fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 99,
-                  background: delta > 0 ? 'var(--color-green-bg)' : delta < 0 ? 'var(--color-red-bg)' : 'var(--surface-2)',
-                  color: delta > 0 ? '#15803d' : delta < 0 ? '#b91c1c' : '#9b9a97',
-                }}>
-                  {delta > 0 ? `↑ +${delta}` : delta < 0 ? `↓ ${delta}` : '→ stable'}
-                </span>
-              </div>
-              <MiniBarChart
-                values={scores}
-                color={delta >= 0 ? '#1DB86A' : '#ef4444'}
-                maxHeight={24}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-                <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>{history.length} readings</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: getScoreColor(last, false) }}>{last}</span>
-              </div>
-            </div>
-          )
-        })()}
-
-        {/* ── MEDDIC Card ── */}
-        {(() => {
-          const PILLARS: Array<{ key: keyof import('@/app/api/deals/[id]/meddic/route').MeddicScore; label: string; abbr: string }> = [
-            { key: 'metrics',          label: 'Metrics',          abbr: 'M' },
-            { key: 'economicBuyer',    label: 'Economic Buyer',   abbr: 'E' },
-            { key: 'decisionCriteria', label: 'Decision Criteria',abbr: 'D' },
-            { key: 'decisionProcess',  label: 'Decision Process', abbr: 'D' },
-            { key: 'identifyPain',     label: 'Identify Pain',    abbr: 'I' },
-            { key: 'champion',         label: 'Champion',         abbr: 'C' },
-          ]
-          const score = meddicResult as import('@/app/api/deals/[id]/meddic/route').MeddicScore | null
-          const dotColor = (s: 0 | 0.5 | 1) => s === 1 ? '#1DB86A' : s === 0.5 ? '#f59e0b' : '#e5e7eb'
-          const totalScore = score ? Object.values(score).reduce((acc: number, v: any) => acc + (v.score ?? 0), 0) : null
-          return (
-            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '14px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: score ? 12 : 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>MEDDIC</span>
-                  {totalScore !== null && (
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 7px', borderRadius: 99, background: totalScore >= 4 ? 'rgba(29,184,106,0.12)' : totalScore >= 2 ? 'rgba(245,158,11,0.12)' : 'rgba(239,68,68,0.10)', color: totalScore >= 4 ? '#15803d' : totalScore >= 2 ? '#b45309' : '#b91c1c' }}>
-                      {totalScore}/6
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={runMeddic}
-                  disabled={meddicRunning}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: meddicRunning ? 'var(--text-tertiary)' : '#6366f1', background: 'none', border: 'none', cursor: meddicRunning ? 'default' : 'pointer', padding: 0 }}
-                >
-                  {meddicRunning ? (
-                    <><svg style={{ animation: 'spin 1s linear infinite', width: 12, height: 12 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Analysing…</>
-                  ) : (
-                    <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z"/><path d="M19 15l.75 2.25L22 18l-2.25.75L19 21l-.75-2.25L16 18l2.25-.75L19 15z"/></svg> {score ? 'Re-analyse' : 'Analyse'}</>
-                  )}
-                </button>
-              </div>
-              {meddicError && <div style={{ fontSize: 11, color: '#ef4444', marginBottom: 8 }}>{meddicError}</div>}
-              {score && !meddicRunning && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                  {PILLARS.map(({ key, label }) => {
-                    const p = score[key]
-                    return (
-                      <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                        <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 4, background: dotColor(p.score) }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{label}</span>
-                          {p.note && <span style={{ fontSize: 11, color: 'var(--text-secondary)', marginLeft: 5 }}>— {p.note}</span>}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-              {meddicRunning && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginTop: 4 }}>
-                  {[80, 65, 90, 70, 55, 75].map((w, i) => (
-                    <div key={i} className="skeleton" style={{ height: 14, width: `${w}%`, borderRadius: 4 }} />
-                  ))}
-                </div>
-              )}
-              {!score && !meddicRunning && (
-                <div style={{ fontSize: 12, color: 'var(--text-tertiary)', fontStyle: 'italic', marginTop: 6 }}>Run an AI analysis to score this deal against the MEDDIC framework.</div>
-              )}
-            </div>
-          )
-        })()}
-
-        {/* ── Deal Reviewer Card ── */}
-        {(() => {
-          const CRITERIA_ICONS: Record<string, string> = {
-            'Champion': '🏆', 'Urgency': '⚡', 'Economics': '💰',
-            'Process': '📋', 'Competition': '⚔️', 'Next Steps': '➡️',
-          }
-          const scoreColor = (s: 0 | 1 | 2) => s === 2 ? '#1DB86A' : s === 1 ? '#f59e0b' : '#ef4444'
-          const scoreBg    = (s: 0 | 1 | 2) => s === 2 ? 'rgba(29,184,106,0.10)' : s === 1 ? 'rgba(245,158,11,0.10)' : 'rgba(239,68,68,0.08)'
-          const gradeColor = (g: string) => g === 'A' ? '#1DB86A' : g === 'B' ? '#3b82f6' : g === 'C' ? '#f59e0b' : g === 'D' ? '#f97316' : '#ef4444'
-          return (
-            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '14px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: reviewResult ? 12 : 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Deal Review</span>
-                  {reviewResult && (
-                    <span style={{ fontSize: 13, fontWeight: 800, padding: '1px 8px', borderRadius: 99, background: scoreBg(reviewResult.overall >= 65 ? 2 : reviewResult.overall >= 40 ? 1 : 0), color: gradeColor(reviewResult.grade) }}>
-                      {reviewResult.grade} · {reviewResult.overall}
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={runDealReview}
-                  disabled={reviewRunning}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: reviewRunning ? 'var(--text-tertiary)' : '#f59e0b', background: 'none', border: 'none', cursor: reviewRunning ? 'default' : 'pointer', padding: 0 }}
-                >
-                  {reviewRunning
-                    ? <><svg style={{ animation: 'spin 1s linear infinite', width: 12, height: 12 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Reviewing…</>
-                    : <><Sparkles size={12} /> {reviewResult ? 'Re-review' : 'Review Deal'}</>
-                  }
-                </button>
-              </div>
-              {reviewError && <div style={{ fontSize: 11, color: '#ef4444', marginBottom: 8 }}>{reviewError}</div>}
-              {reviewResult && !reviewRunning && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {reviewResult.summary && (
-                    <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5, margin: '0 0 4px' }}>{reviewResult.summary}</p>
-                  )}
-                  {(reviewResult.criteria ?? []).map(c => (
-                    <div key={c.name} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 8px', borderRadius: 7, background: scoreBg(c.score) }}>
-                      <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>{CRITERIA_ICONS[c.name] ?? '•'}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{c.name}</span>
-                          <div style={{ width: 7, height: 7, borderRadius: '50%', background: scoreColor(c.score), flexShrink: 0 }} />
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4, marginTop: 1 }}>{c.finding}</div>
-                        {c.action && (
-                          <div style={{ fontSize: 11, color: scoreColor(c.score), fontWeight: 500, marginTop: 2, lineHeight: 1.3 }}>→ {c.action}</div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {reviewResult.coachingNote && (
-                    <div style={{ marginTop: 4, padding: '8px 10px', borderRadius: 7, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Manager Note</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{reviewResult.coachingNote}</div>
-                    </div>
-                  )}
-                </div>
-              )}
-              {reviewRunning && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
-                  {[85, 60, 75, 50, 90, 65].map((w, i) => (
-                    <div key={i} className="skeleton" style={{ height: 42, width: `${w}%`, borderRadius: 7 }} />
-                  ))}
-                </div>
-              )}
-              {!reviewResult && !reviewRunning && (
-                <div style={{ fontSize: 12, color: 'var(--text-tertiary)', fontStyle: 'italic', marginTop: 6 }}>Run an AI review to score this deal on Champion, Urgency, Economics, Process, Competition and Next Steps.</div>
-              )}
-            </div>
-          )
-        })()}
-
-        <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '16px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>
-            Deal Context
-          </div>
-          {contextFields.length === 0 ? (
-            <div style={{ fontSize: '13px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>No deal context yet — edit the deal to add details.</div>
-          ) : contextFields.map(({ label, value }, i) => (
-            <div key={label} style={{
-              padding: '10px 0',
-              borderBottom: i < contextFields.length - 1 ? '1px solid var(--border-default)' : 'none',
-            }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500, marginBottom: '3px' }}>{label}</div>
-              <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500, lineHeight: 1.4, wordBreak: 'break-word' }}>{value}</div>
-            </div>
-          ))}
-
-          {/* Product Gaps */}
-          {dealGaps.length > 0 && (
-            <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: '1px solid var(--border-default)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <span style={{ fontSize: '11px', color: '#e03e3e', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  Product Gaps ({dealGaps.length})
-                </span>
-                <Link href="/product-gaps" style={{ fontSize: '11px', color: '#e03e3e', textDecoration: 'none', opacity: 0.65 }}>View →</Link>
-              </div>
-              {dealGaps.slice(0, 4).map((g: any) => (
-                <div key={g.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
-                  <div style={{ width: '6px', height: '6px', borderRadius: '50%', flexShrink: 0, marginTop: '5px', background: g.priority === 'critical' ? '#e03e3e' : g.priority === 'high' ? '#cb6c2c' : '#787774' }} />
-                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{g.title}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-        </div>
-
-        {/* ── Deal Links ── */}
-        <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '14px 16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: (Array.isArray(deal.links) && deal.links.length > 0) || linkFormOpen ? 12 : 0 }}>
-            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-              Links
-            </div>
-            <button
-              onClick={() => { setLinkFormOpen(!linkFormOpen); setLinkError(null) }}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: 5, background: 'none', border: '1px solid var(--border-default)', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 0, transition: 'all 100ms' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-default)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)' }}
-              title={linkFormOpen ? 'Cancel' : 'Add link'}
-            >
-              {linkFormOpen ? <X size={11} /> : <Plus size={11} />}
-            </button>
-          </div>
-
-          {linkFormOpen && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, padding: '10px', background: 'var(--surface-2)', borderRadius: 8 }}>
-              <input
-                type="url"
-                placeholder="https://..."
-                value={linkUrl}
-                onChange={e => setLinkUrl(e.target.value)}
-                style={{ width: '100%', padding: '6px 10px', fontSize: 12, borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--surface-1)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
-                onKeyDown={e => e.key === 'Enter' && saveDealLink()}
-                autoFocus
-              />
-              <input
-                type="text"
-                placeholder="Title (optional)"
-                value={linkTitle}
-                onChange={e => setLinkTitle(e.target.value)}
-                style={{ width: '100%', padding: '6px 10px', fontSize: 12, borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--surface-1)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
-                onKeyDown={e => e.key === 'Enter' && saveDealLink()}
-              />
-              <div style={{ display: 'flex', gap: 6 }}>
-                <select
-                  value={linkType}
-                  onChange={e => setLinkType(e.target.value)}
-                  style={{ flex: 1, padding: '6px 8px', fontSize: 11, borderRadius: 6, border: '1px solid var(--border-default)', background: 'var(--surface-1)', color: 'var(--text-primary)', outline: 'none', cursor: 'pointer' }}
-                >
-                  {LINK_TYPE_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={saveDealLink}
-                  disabled={linkSaving || !linkUrl.trim()}
-                  style={{ padding: '6px 14px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: 'none', background: linkSaving || !linkUrl.trim() ? 'var(--surface-3)' : 'var(--text-primary)', color: linkSaving || !linkUrl.trim() ? 'var(--text-tertiary)' : '#fff', cursor: linkSaving || !linkUrl.trim() ? 'not-allowed' : 'pointer' }}
-                >
-                  {linkSaving ? 'Saving...' : 'Add'}
-                </button>
-              </div>
-              {linkError && <div style={{ fontSize: 11, color: '#ef4444' }}>{linkError}</div>}
-            </div>
-          )}
-
-          {(() => {
-            const links: any[] = Array.isArray(deal.links) ? deal.links : []
-            if (links.length === 0 && !linkFormOpen) {
-              return (
-                <div style={{ fontSize: 12, color: 'var(--text-tertiary)', fontStyle: 'italic', marginTop: 6, lineHeight: 1.5 }}>
-                  No links added yet. Add Salesforce, Google Docs, or other external resources.
-                </div>
-              )
-            }
-            return links.map((link: any) => {
-              const Icon = LINK_TYPE_ICON[link.type] ?? ExternalLink
-              let domain = ''
-              try { domain = new URL(link.url).hostname.replace(/^www\./, '') } catch { domain = link.url }
-              return (
-                <div
-                  key={link.id}
-                  className="deal-link-row"
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid var(--border-default)' }}
-                  onMouseEnter={e => { const btn = e.currentTarget.querySelector('.deal-link-del') as HTMLElement; if (btn) btn.style.opacity = '1' }}
-                  onMouseLeave={e => { const btn = e.currentTarget.querySelector('.deal-link-del') as HTMLElement; if (btn) btn.style.opacity = '0' }}
-                >
-                  <Icon size={13} style={{ flexShrink: 0, color: 'var(--text-tertiary)' }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <a
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', textDecoration: 'none', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.textDecoration = 'underline' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.textDecoration = 'none' }}
-                    >
-                      {link.label || domain}
-                    </a>
-                    <div style={{ fontSize: 10.5, color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{domain}</div>
-                  </div>
-                  <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 99, background: 'var(--surface-2)', color: 'var(--text-tertiary)', textTransform: 'capitalize', flexShrink: 0 }}>
-                    {link.type}
-                  </span>
-                  <button
-                    className="deal-link-del"
-                    onClick={() => removeDealLink(link.id)}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', opacity: 0, transition: 'opacity 100ms', padding: 0, flexShrink: 0 }}
-                    title="Remove link"
-                  >
-                    <X size={11} />
-                  </button>
-                </div>
-              )
-            })
-          })()}
-        </div>
-
-      </div>
-
-      {/* ── CENTER: Intelligence ────────────────────────────────── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-        {/* Regen AI row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-            AI Intelligence
-          </span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {regenError && (
-              <span style={{ fontSize: 11, color: 'var(--color-red)' }}>{regenError}</span>
-            )}
-            {/* Compose Email button */}
-            <button
-              onClick={() => { setComposeOpen(true); setComposeResult(null); setComposeError(null) }}
-              title="Draft a personalised follow-up email using AI"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                height: 28, padding: '0 10px', borderRadius: 6,
-                background: 'rgba(29,184,106,0.08)',
-                border: '1px solid rgba(29,184,106,0.22)',
-                color: '#1DB86A', fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
-                transition: 'all 100ms',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(29,184,106,0.14)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(29,184,106,0.08)' }}
-            >
-              <Mail size={11} /> Compose
-            </button>
-            {/* Meeting Prep button */}
-            <button
-              onClick={runMeetingPrep}
-              disabled={meetingPrepRunning}
-              title="Generate a meeting prep brief using AI"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                height: 28, padding: '0 10px', borderRadius: 6,
-                background: meetingPrepRunning ? 'var(--surface-2)' : 'rgba(59,130,246,0.08)',
-                border: `1px solid ${meetingPrepRunning ? 'var(--border-default)' : 'rgba(59,130,246,0.22)'}`,
-                color: meetingPrepRunning ? 'var(--text-tertiary)' : '#3b82f6',
-                fontSize: 11.5, fontWeight: 500, cursor: meetingPrepRunning ? 'not-allowed' : 'pointer',
-                transition: 'all 100ms',
-              }}
-              onMouseEnter={e => { if (!meetingPrepRunning) (e.currentTarget as HTMLElement).style.background = 'rgba(59,130,246,0.14)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = meetingPrepRunning ? 'var(--surface-2)' : 'rgba(59,130,246,0.08)' }}
-            >
-              <FileText size={11} /> {meetingPrepRunning ? 'Prepping…' : 'Meeting Prep'}
-            </button>
-            {/* Risk Kit button */}
-            <button
-              onClick={runRiskKit}
-              disabled={riskKitRunning}
-              title="Generate a risk mitigation kit using AI"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                height: 28, padding: '0 10px', borderRadius: 6,
-                background: riskKitRunning ? 'var(--surface-2)' : 'rgba(245,158,11,0.08)',
-                border: `1px solid ${riskKitRunning ? 'var(--border-default)' : 'rgba(245,158,11,0.22)'}`,
-                color: riskKitRunning ? 'var(--text-tertiary)' : '#f59e0b',
-                fontSize: 11.5, fontWeight: 500, cursor: riskKitRunning ? 'not-allowed' : 'pointer',
-                transition: 'all 100ms',
-              }}
-              onMouseEnter={e => { if (!riskKitRunning) (e.currentTarget as HTMLElement).style.background = 'rgba(245,158,11,0.14)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = riskKitRunning ? 'var(--surface-2)' : 'rgba(245,158,11,0.08)' }}
-            >
-              <AlertTriangle size={11} /> {riskKitRunning ? 'Generating…' : 'Risk Kit'}
-            </button>
-            {/* Regen AI button */}
-            <button
-              onClick={regenAI}
-              disabled={regenerating || !deal.meetingNotes?.trim()}
-              title={deal.meetingNotes?.trim() ? 'Re-run AI analysis on existing notes' : 'Add meeting notes first to run AI analysis'}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                height: 28, padding: '0 10px',
-                borderRadius: 6,
-                background: regenerating ? 'var(--surface-3)' : 'var(--surface-2)',
-                border: '1px solid var(--border-default)',
-                color: regenerating ? 'var(--text-tertiary)' : 'var(--text-secondary)',
-                fontSize: 11.5, fontWeight: 500, cursor: regenerating || !deal.meetingNotes?.trim() ? 'not-allowed' : 'pointer',
-                opacity: !deal.meetingNotes?.trim() ? 0.5 : 1,
-                transition: 'all 100ms',
-              }}
-              onMouseEnter={e => {
-                if (!regenerating && deal.meetingNotes?.trim()) {
-                  (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-strong)'
-                  ;(e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'
-                }
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-default)'
-                ;(e.currentTarget as HTMLElement).style.color = regenerating ? 'var(--text-tertiary)' : 'var(--text-secondary)'
-              }}
-            >
-              <RefreshCw size={11} style={{ animation: regenerating ? 'spin 1s linear infinite' : 'none' }} />
-              {regenerating ? 'Analysing…' : 'Regen AI'}
-            </button>
-          </div>
-        </div>
-
-        {/* ── Compose Email Modal ─────────────────────────────── */}
-        <Dialog.Root open={composeOpen} onOpenChange={setComposeOpen}>
-          <Dialog.Portal>
-            <Dialog.Overlay style={{
-              position: 'fixed', inset: 0, zIndex: 9999,
-              background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)',
-            }} />
-            <Dialog.Content style={{
-              position: 'fixed', top: '50%', left: '50%',
-              transform: 'translate(-50%, -50%)',
-              zIndex: 10000, width: 'min(580px, 92vw)', maxHeight: '85vh',
-              background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-              borderRadius: 14, padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: 16,
-              overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
-            }}>
-              {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(29,184,106,0.10)', border: '1px solid rgba(29,184,106,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Mail size={13} style={{ color: '#1DB86A' }} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>AI Email Composer</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>Personalised using your deal context & notes</div>
-                  </div>
-                </div>
-                <Dialog.Close asChild>
-                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4 }}>
-                    <X size={15} />
-                  </button>
-                </Dialog.Close>
-              </div>
-
-              {/* Tone selector */}
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Tone</div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {(['professional', 'friendly', 'urgent'] as const).map(t => (
-                    <button key={t} onClick={() => setComposeTone(t)} style={{
-                      padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500,
-                      cursor: 'pointer', transition: 'all 80ms',
-                      background: composeTone === t ? 'var(--text-primary)' : 'var(--surface-2)',
-                      border: composeTone === t ? '1px solid var(--text-primary)' : '1px solid var(--border-default)',
-                      color: composeTone === t ? 'var(--text-inverse)' : 'var(--text-secondary)',
-                    }}>
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => composeEmail(composeTone)}
-                    disabled={composing}
-                    style={{
-                      marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5,
-                      padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                      cursor: composing ? 'not-allowed' : 'pointer',
-                      background: composing ? 'var(--surface-3)' : '#1DB86A',
-                      border: 'none', color: composing ? 'var(--text-tertiary)' : '#fff',
-                      transition: 'all 100ms',
-                    }}
-                  >
-                    <Sparkles size={11} style={{ animation: composing ? 'spin 1s linear infinite' : 'none' }} />
-                    {composing ? 'Writing…' : composeResult ? 'Regenerate' : 'Generate'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Error */}
-              {composeError && (
-                <div style={{ padding: '8px 12px', borderRadius: 7, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', fontSize: 12, color: '#ef4444' }}>
-                  {composeError}
-                </div>
-              )}
-
-              {/* Loading skeleton */}
-              {composing && !composeResult && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {[40, 80, 80, 60, 40].map((h, i) => (
-                    <div key={i} style={{ height: h, borderRadius: 6 }} className="skeleton" />
-                  ))}
-                </div>
-              )}
-
-              {/* Result */}
-              {composeResult && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div>
-                    <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Subject</div>
-                    <input
-                      value={composeResult.subject}
-                      onChange={e => setComposeResult(r => r ? { ...r, subject: e.target.value } : r)}
-                      style={{
-                        width: '100%', padding: '8px 12px', borderRadius: 7,
-                        border: '1px solid var(--border-default)', background: 'var(--surface-2)',
-                        color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, outline: 'none',
-                        boxSizing: 'border-box',
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 5 }}>Body</div>
-                    <textarea
-                      value={composeResult.body.replace(/\\n/g, '\n')}
-                      onChange={e => setComposeResult(r => r ? { ...r, body: e.target.value } : r)}
-                      rows={10}
-                      style={{
-                        width: '100%', padding: '10px 12px', borderRadius: 7,
-                        border: '1px solid var(--border-default)', background: 'var(--surface-2)',
-                        color: 'var(--text-primary)', fontSize: 13, lineHeight: 1.65, resize: 'vertical', outline: 'none',
-                        fontFamily: 'inherit', boxSizing: 'border-box',
-                      }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      onClick={async () => {
-                        const full = `Subject: ${composeResult.subject}\n\n${composeResult.body.replace(/\\n/g, '\n')}`
-                        await navigator.clipboard.writeText(full).catch(() => {})
-                        setComposeCopied(true)
-                        setTimeout(() => setComposeCopied(false), 2500)
-                      }}
-                      style={{
-                        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                        padding: '9px 0', borderRadius: 8, fontSize: 13, fontWeight: 600,
-                        background: composeCopied ? 'rgba(29,184,106,0.12)' : 'var(--text-primary)',
-                        border: composeCopied ? '1px solid rgba(29,184,106,0.3)' : 'none',
-                        color: composeCopied ? '#1DB86A' : 'var(--text-inverse)', cursor: 'pointer',
-                        transition: 'all 150ms',
-                      }}
-                    >
-                      {composeCopied ? <><Check size={13} /> Copied!</> : <><Clipboard size={13} /> Copy email</>}
-                    </button>
-                    <Dialog.Close asChild>
-                      <button style={{
-                        padding: '9px 18px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-                        background: 'var(--surface-2)', border: '1px solid var(--border-default)',
-                        color: 'var(--text-secondary)', cursor: 'pointer',
-                      }}>
-                        Close
-                      </button>
-                    </Dialog.Close>
-                  </div>
-                </div>
-              )}
-
-              {/* Empty state */}
-              {!composing && !composeResult && !composeError && (
-                <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)' }}>
-                  <Mail size={28} style={{ display: 'block', margin: '0 auto 10px', opacity: 0.3 }} />
-                  <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Select a tone and click Generate</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 4 }}>AI will reference your meeting notes and next steps</div>
-                </div>
-              )}
-            </Dialog.Content>
-          </Dialog.Portal>
-        </Dialog.Root>
-
-        {/* AI Briefing */}
-        <DealBriefingCard dealId={dealId} />
-
-        {/* Score Breakdown — active deals only */}
-        {deal.conversionScore != null && deal.stage !== 'closed_lost' && deal.stage !== 'closed_won' && (
-          <ScoreBreakdown deal={deal} mlPrediction={mlPrediction} brainData={brainData} />
-        )}
-
-        {/* AI Coach — Sprint 5 */}
-        <DealCoachCard dealId={dealId} deal={deal} brainData={brainData} />
-
-        {/* What to Focus On */}
-        {nextActions.length > 0 && (
-          <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '16px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>
-              What to Focus On
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {nextActions.map((action, i) => (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'flex-start', gap: '10px',
-                  padding: '10px 12px', borderRadius: '8px',
-                  background: 'var(--surface-2)', border: '1px solid var(--border-default)',
-                }}>
-                  <div style={{
-                    width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, marginTop: '5px',
-                    background: action.priority === 'red' ? 'var(--color-red)' : 'var(--brand)',
-                  }} />
-                  <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.55, flex: 1 }}>{action.text}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Milestones */}
-        {(() => {
-          const today = new Date()
-          const sevenDaysFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
-          return (
-            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: milestones.length > 0 || milestoneAdding ? '12px' : '0' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Flag size={13} style={{ color: 'var(--text-tertiary)' }} />
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Milestones</span>
-                  {milestones.length > 0 && (
-                    <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', background: 'var(--surface-2)', borderRadius: '9px', padding: '1px 7px' }}>
-                      {milestones.filter((m: any) => m.status === 'done').length}/{milestones.length}
-                    </span>
-                  )}
-                </div>
-                {!milestoneAdding && (
-                  <button
-                    onClick={() => setMilestoneAdding(true)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px', color: 'var(--accent)', fontWeight: 600, padding: '2px 6px' }}
-                  >
-                    + Add
-                  </button>
-                )}
-              </div>
-
-              {milestones.length === 0 && !milestoneAdding && (
-                <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: 1.5, margin: '8px 0 0' }}>
-                  Add key milestones to track deal progress — e.g. POC approved, contract signed, go-live.
-                </p>
-              )}
-
-              {milestones.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0px', position: 'relative' }}>
-                  {milestones
-                    .sort((a: any, b: any) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-                    .map((m: any, i: number) => {
-                      const isDone = m.status === 'done'
-                      const isInProgress = m.status === 'in_progress'
-                      const dotColor = isDone ? '#1DB86A' : isInProgress ? '#f59e0b' : 'var(--border-default)'
-                      const dueDate = m.dueDate ? new Date(m.dueDate) : null
-                      let dueDateColor = 'var(--text-tertiary)'
-                      if (dueDate && !isDone) {
-                        if (dueDate < today) dueDateColor = '#e03e3e'
-                        else if (dueDate < sevenDaysFromNow) dueDateColor = '#f59e0b'
-                      }
-                      return (
-                        <div key={m.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', position: 'relative', paddingLeft: '18px', paddingBottom: i < milestones.length - 1 ? '12px' : '0', minHeight: '28px' }}>
-                          {/* Timeline line */}
-                          {i < milestones.length - 1 && (
-                            <div style={{ position: 'absolute', left: '4px', top: '14px', width: '2px', bottom: '0', background: 'var(--border-default)' }} />
-                          )}
-                          {/* Status dot */}
-                          <button
-                            onClick={() => toggleMilestoneStatus(m.id, m.status)}
-                            style={{
-                              position: 'absolute', left: '0', top: '4px',
-                              width: '10px', height: '10px', borderRadius: '50%',
-                              background: dotColor,
-                              border: m.status === 'pending' ? '2px solid var(--border-default)' : 'none',
-                              boxSizing: 'border-box',
-                              cursor: 'pointer', padding: 0, flexShrink: 0,
-                            }}
-                            title={`Status: ${m.status} — click to change`}
-                          />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{
-                              fontSize: '13px',
-                              color: isDone ? 'var(--text-tertiary)' : 'var(--text-primary)',
-                              textDecoration: isDone ? 'line-through' : 'none',
-                              lineHeight: 1.4,
-                            }}>
-                              {m.title}
-                            </div>
-                            {dueDate && (
-                              <div style={{ fontSize: '11px', color: dueDateColor, marginTop: '2px' }}>
-                                {dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                </div>
-              )}
-
-              {milestoneAdding && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: milestones.length > 0 ? '12px' : '0', padding: '10px', background: 'var(--surface-2)', borderRadius: '8px' }}>
-                  <input
-                    type="text"
-                    placeholder="Milestone title..."
-                    value={milestoneTitle}
-                    onChange={e => setMilestoneTitle(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && addMilestone()}
-                    autoFocus
-                    style={{ width: '100%', padding: '6px 8px', fontSize: '13px', border: '1px solid var(--border-default)', borderRadius: '6px', background: 'var(--surface-1)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                  <input
-                    type="date"
-                    value={milestoneDate}
-                    onChange={e => setMilestoneDate(e.target.value)}
-                    style={{ width: '100%', padding: '6px 8px', fontSize: '12px', border: '1px solid var(--border-default)', borderRadius: '6px', background: 'var(--surface-1)', color: 'var(--text-secondary)', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                  <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                    <button
-                      onClick={() => { setMilestoneAdding(false); setMilestoneTitle(''); setMilestoneDate('') }}
-                      style={{ padding: '4px 10px', fontSize: '12px', background: 'none', border: '1px solid var(--border-default)', borderRadius: '6px', color: 'var(--text-secondary)', cursor: 'pointer' }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={addMilestone}
-                      disabled={milestoneSaving || !milestoneTitle.trim()}
-                      style={{ padding: '4px 10px', fontSize: '12px', background: 'var(--accent)', border: 'none', borderRadius: '6px', color: '#fff', cursor: 'pointer', opacity: milestoneSaving || !milestoneTitle.trim() ? 0.5 : 1 }}
-                    >
-                      {milestoneSaving ? 'Saving...' : 'Save'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )
-        })()}
-
-        {/* Win Conditions — workspace patterns from brain */}
-        {objectionWinMap && objectionWinMap.length > 0 && deal.stage !== 'closed_won' && deal.stage !== 'closed_lost' && (
-          <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '16px' }}>
-            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '12px' }}>
-              Win Conditions
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {objectionWinMap.slice(0, 3).map((item: any, i: number) => (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '9px 12px', borderRadius: '8px',
-                  background: 'rgba(15,123,108,0.05)', border: '1px solid rgba(15,123,108,0.12)',
-                }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.4, flex: 1 }}>
-                    {item.theme}
-                  </div>
-                  {item.winRateWithTheme != null && (
-                    <div style={{
-                      fontSize: '11px', fontWeight: 700, color: '#0f7b6c',
-                      background: 'rgba(15,123,108,0.10)', padding: '2px 8px',
-                      borderRadius: '100px', flexShrink: 0, marginLeft: '8px',
-                    }}>
-                      {item.winRateWithTheme}% win
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Meeting Prep Modal ─────────────────────────────── */}
-        <Dialog.Root open={meetingPrepOpen} onOpenChange={setMeetingPrepOpen}>
-          <Dialog.Portal>
-            <Dialog.Overlay style={{
-              position: 'fixed', inset: 0, zIndex: 9999,
-              background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)',
-            }} />
-            <Dialog.Content style={{
-              position: 'fixed', top: '50%', left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: '90vw', maxWidth: 560, maxHeight: '80vh',
-              background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-              borderRadius: 14, padding: 24, zIndex: 10000,
-              overflowY: 'auto',
-              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <FileText size={15} color="#3b82f6" />
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Meeting Prep Brief</div>
-                </div>
-                <Dialog.Close asChild>
-                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 4 }}>
-                    <X size={16} />
-                  </button>
-                </Dialog.Close>
-              </div>
-
-              {meetingPrepRunning && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '40px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>
-                  <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Generating meeting prep...
-                </div>
-              )}
-
-              {meetingPrepError && (
-                <div style={{ padding: '12px 14px', borderRadius: 8, background: 'rgba(224,62,62,0.08)', border: '1px solid rgba(224,62,62,0.2)', color: '#e03e3e', fontSize: 13 }}>
-                  {meetingPrepError}
-                </div>
-              )}
-
-              {meetingPrepResult && !meetingPrepRunning && (
-                <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}
-                  dangerouslySetInnerHTML={{
-                    __html: meetingPrepResult
-                      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-                      .replace(/^## (.+)$/gm, '<div style="font-size:14px;font-weight:700;color:var(--text-primary);margin:16px 0 6px;letter-spacing:-0.01em">$1</div>')
-                      .replace(/^- \*\*(.+?)\*\*(.*)$/gm, '<div style="display:flex;gap:8px;padding:4px 0"><span style="color:var(--text-tertiary);flex-shrink:0">&bull;</span><span><strong>$1</strong>$2</span></div>')
-                      .replace(/^- (.+)$/gm, '<div style="display:flex;gap:8px;padding:4px 0"><span style="color:var(--text-tertiary);flex-shrink:0">&bull;</span><span>$1</span></div>')
-                      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                      .replace(/\n\n/g, '<div style="height:8px"></div>')
-                  }}
-                />
-              )}
-            </Dialog.Content>
-          </Dialog.Portal>
-        </Dialog.Root>
-
-        {/* ── Risk Kit Result Card ─────────────────────────────── */}
-        {riskKitResult && (
-          <div style={{ background: 'var(--surface-1)', border: '1px solid rgba(245,158,11,0.22)', borderRadius: '10px', padding: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <AlertTriangle size={13} color="#f59e0b" />
-                <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                  Risk Kit
-                </span>
-              </div>
-              <button
-                onClick={() => setRiskKitResult(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: 2 }}
-              >
-                <X size={13} />
-              </button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {[
-                { label: 'Urgency', value: riskKitResult.urgencyReason, color: '#e03e3e' },
-                { label: 'Email Angle', value: `${riskKitResult.emailSubject} — ${riskKitResult.emailBody}`, color: '#3b82f6' },
-                { label: 'Meeting Angle', value: riskKitResult.meetingPrepAngle, color: '#8b5cf6' },
-                { label: 'Collateral', value: riskKitResult.collateralSuggestion, color: '#0f7b6c' },
-              ].map((item, i) => (
-                <div key={i} style={{
-                  padding: '10px 12px', borderRadius: '8px',
-                  background: 'var(--surface-2)', border: '1px solid var(--border-subtle)',
-                }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: item.color, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3 }}>
-                    {item.label}
-                  </div>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-primary)', lineHeight: 1.5 }}>
-                    {item.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        {riskKitError && (
-          <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(224,62,62,0.08)', border: '1px solid rgba(224,62,62,0.2)', color: '#e03e3e', fontSize: 12.5 }}>
-            Risk Kit: {riskKitError}
-          </div>
-        )}
-
-        {/* ── Similar Deals Card ─────────────────────────────── */}
-        <SimilarDealsCard dealId={dealId} />
-
-        {/* ── Success Criteria Card ──────────────────────────── */}
-        {(() => {
-          const criteria: Array<{ id: string; text: string; category: string; achieved: boolean; note?: string; createdAt: string }> = deal?.successCriteriaTodos ?? []
-          const achievedCount = criteria.filter(c => c.achieved).length
-          const totalCount = criteria.length
-          const pct = totalCount > 0 ? Math.round((achievedCount / totalCount) * 100) : 0
-          const grouped = criteria.reduce<Record<string, typeof criteria>>((acc, c) => {
-            const cat = c.category || 'Uncategorized'
-            if (!acc[cat]) acc[cat] = []
-            acc[cat].push(c)
-            return acc
-          }, {})
-          return (
-            <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '16px' }}>
-              {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: totalCount > 0 ? '12px' : '0' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Target size={13} color="#1DB86A" />
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: '0.1em' }}>
-                    Success Criteria
-                  </span>
-                  {totalCount > 0 && (
-                    <span style={{ fontSize: '10px', fontWeight: 600, color: achievedCount === totalCount ? '#1DB86A' : 'var(--text-secondary)', background: achievedCount === totalCount ? 'var(--color-green-bg)' : 'var(--surface-2)', padding: '1px 6px', borderRadius: '8px' }}>
-                      {achievedCount}/{totalCount}
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={() => setCriteriaExpanded(!criteriaExpanded)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', padding: '2px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px' }}
-                >
-                  <Plus size={12} />
-                  <span>Import</span>
-                </button>
-              </div>
-
-              {/* Progress bar */}
-              {totalCount > 0 && (
-                <div style={{ height: '3px', background: 'var(--surface-2)', borderRadius: '2px', marginBottom: '12px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${pct}%`, background: '#1DB86A', borderRadius: '2px', transition: 'width 0.3s ease' }} />
-                </div>
-              )}
-
-              {/* Criteria list grouped by category */}
-              {totalCount > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {Object.entries(grouped).map(([category, items]) => (
-                    <div key={category}>
-                      <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.08em', marginBottom: '6px' }}>
-                        {category}
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {items.map(c => {
-                          const toggling = criteriaToggles[c.id]
-                          return (
-                            <div key={c.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '4px 0' }}>
-                              <button
-                                onClick={() => toggleCriterion(c.id, !c.achieved)}
-                                disabled={toggling}
-                                style={{ background: 'none', border: 'none', cursor: toggling ? 'wait' : 'pointer', padding: 0, flexShrink: 0, marginTop: '1px' }}
-                              >
-                                {toggling ? (
-                                  <Loader2 size={14} color="var(--text-muted)" style={{ animation: 'spin 1s linear infinite' }} />
-                                ) : c.achieved ? (
-                                  <CheckCircle size={14} color="#1DB86A" />
-                                ) : (
-                                  <div style={{ width: 14, height: 14, borderRadius: '50%', border: '1.5px solid var(--border-default)' }} />
-                                )}
-                              </button>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <span style={{ fontSize: '12px', color: c.achieved ? 'var(--text-muted)' : 'var(--text-primary)', textDecoration: c.achieved ? 'line-through' : 'none' }}>
-                                  {c.text}
-                                </span>
-                                {c.note && (
-                                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{c.note}</div>
-                                )}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : !criteriaExpanded ? (
-                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px', lineHeight: '1.5' }}>
-                  Paste proposal text or requirements to track success criteria for this deal.
-                </div>
-              ) : null}
-
-              {/* Collapsible import form */}
-              {criteriaExpanded && (
-                <div style={{ marginTop: totalCount > 0 ? '12px' : '8px', borderTop: totalCount > 0 ? '1px solid var(--border-subtle)' : 'none', paddingTop: totalCount > 0 ? '12px' : '0' }}>
-                  <textarea
-                    value={criteriaText}
-                    onChange={e => setCriteriaText(e.target.value)}
-                    placeholder="Paste proposal text, requirements, or success criteria..."
-                    rows={4}
-                    style={{
-                      width: '100%', fontSize: '12px', padding: '8px', background: 'var(--surface-2)',
-                      border: '1px solid var(--border-default)', borderRadius: '6px', color: 'var(--text-primary)',
-                      resize: 'vertical', fontFamily: 'inherit', outline: 'none',
-                    }}
-                  />
-                  {criteriaError && (
-                    <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '6px' }}>{criteriaError}</div>
-                  )}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
-                    <button
-                      onClick={() => { setCriteriaExpanded(false); setCriteriaText(''); setCriteriaError(null) }}
-                      style={{ fontSize: '11px', padding: '4px 10px', background: 'none', border: '1px solid var(--border-default)', borderRadius: '6px', color: 'var(--text-secondary)', cursor: 'pointer' }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={importCriteria}
-                      disabled={criteriaImporting || !criteriaText.trim()}
-                      style={{
-                        fontSize: '11px', padding: '4px 10px', background: '#1DB86A', border: 'none',
-                        borderRadius: '6px', color: '#fff', cursor: criteriaImporting || !criteriaText.trim() ? 'not-allowed' : 'pointer',
-                        opacity: criteriaImporting || !criteriaText.trim() ? 0.5 : 1,
-                        display: 'flex', alignItems: 'center', gap: '4px',
-                      }}
-                    >
-                      {criteriaImporting && <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} />}
-                      {criteriaImporting ? 'Importing...' : 'Import'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )
-        })()}
-
-        {/* Stakeholder Map */}
-        <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: stakeholderData ? '12px' : '0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Users size={13} color="#8b5cf6" />
-              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                Stakeholder Map
-              </span>
-            </div>
-            <button
-              onClick={runStakeholderMap}
-              disabled={stakeholderRunning}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                height: 26, padding: '0 10px', borderRadius: 6,
-                background: stakeholderRunning ? 'var(--surface-2)' : 'rgba(139,92,246,0.08)',
-                border: `1px solid ${stakeholderRunning ? 'var(--border-default)' : 'rgba(139,92,246,0.22)'}`,
-                color: stakeholderRunning ? 'var(--text-tertiary)' : '#8b5cf6',
-                fontSize: 11, fontWeight: 500, cursor: stakeholderRunning ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {stakeholderRunning ? <><Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> Analysing…</> : <><Sparkles size={10} /> {stakeholderData ? 'Refresh' : 'Analyse'}</>}
-            </button>
-          </div>
-
-          {stakeholderError && (
-            <div style={{ fontSize: '11px', color: 'var(--color-red)', marginTop: '6px', padding: '6px 10px', borderRadius: '6px', background: 'var(--color-red-bg)', border: '1px solid rgba(239,68,68,0.15)' }}>
-              {stakeholderError}
-              <button onClick={runStakeholderMap} style={{ marginLeft: '8px', fontSize: '11px', color: '#8b5cf6', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
-                Try again
-              </button>
-            </div>
-          )}
-
-          {stakeholderData && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {stakeholderData.stakeholders?.map((s: any, i: number) => {
-                const roleColors: Record<string, string> = {
-                  'Champion': '#1DB86A', 'Economic Buyer': '#3b82f6', 'Technical Evaluator': '#8b5cf6',
-                  'Blocker': '#ef4444', 'Coach': '#0ea5e9', 'End User': '#6b7280', 'Decision Maker': '#f59e0b',
-                }
-                const sentimentColors: Record<string, string> = {
-                  positive: '#1DB86A', neutral: '#6b7280', negative: '#ef4444', unknown: '#9ca3af',
-                }
-                const roleColor = roleColors[s.role] ?? '#6b7280'
-                const sentColor = sentimentColors[s.sentiment] ?? '#9ca3af'
-                const engagementBg = s.engagement === 'active' ? 'var(--color-green-bg)' : s.engagement === 'passive' ? 'var(--color-amber-bg)' : 'var(--color-red-bg)'
-                return (
-                  <div key={i} style={{
-                    padding: '10px 12px', borderRadius: '8px',
-                    background: 'var(--surface-2)', border: '1px solid var(--border-subtle)',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <div style={{
-                          width: '24px', height: '24px', borderRadius: '50%',
-                          background: `color-mix(in srgb, ${roleColor} 12%, transparent)`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '10px', fontWeight: 700, color: roleColor, flexShrink: 0,
-                        }}>{s.name?.[0]?.toUpperCase() ?? '?'}</div>
-                        <div>
-                          <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{s.name}</div>
-                          {s.title && <div style={{ fontSize: '10.5px', color: 'var(--text-tertiary)' }}>{s.title}</div>}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{
-                          fontSize: '9.5px', fontWeight: 600, padding: '1px 6px', borderRadius: '100px',
-                          background: `color-mix(in srgb, ${roleColor} 10%, transparent)`,
-                          color: roleColor, border: `1px solid color-mix(in srgb, ${roleColor} 22%, transparent)`,
-                        }}>{s.role}</span>
-                        <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: sentColor, flexShrink: 0 }} title={s.sentiment} />
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                      <span style={{
-                        fontSize: '9.5px', fontWeight: 500, padding: '1px 6px', borderRadius: '100px',
-                        background: engagementBg,
-                        color: 'var(--text-secondary)',
-                      }}>{s.engagement}</span>
-                      <span style={{ fontSize: '9.5px', color: 'var(--text-muted)' }}>Influence: {s.influence}</span>
-                    </div>
-                    {s.concerns?.length > 0 && (
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.4, marginBottom: '3px' }}>
-                        Concerns: {s.concerns.join(', ')}
-                      </div>
-                    )}
-                    {s.action && (
-                      <div style={{ fontSize: '11px', color: '#8b5cf6', fontWeight: 500, fontStyle: 'italic' }}>
-                        → {s.action}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-
-              {stakeholderData.gaps?.length > 0 && (
-                <div style={{ padding: '8px 10px', borderRadius: '6px', background: 'var(--color-amber-bg)', border: '1px solid rgba(245,158,11,0.20)' }}>
-                  <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--color-amber)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>Coverage Gaps</div>
-                  {stakeholderData.gaps.map((g: string, i: number) => (
-                    <div key={i} style={{ fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>• {g}</div>
-                  ))}
-                </div>
-              )}
-
-              {stakeholderData.recommendation && (
-                <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontStyle: 'italic', lineHeight: 1.5, padding: '4px 0' }}>
-                  {stakeholderData.recommendation}
-                </div>
-              )}
-            </div>
-          )}
-
-          {!stakeholderData && !stakeholderRunning && (
-            <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '8px', lineHeight: 1.5 }}>
-              Map the buying committee — identify champions, blockers, and coverage gaps across your stakeholders.
-            </div>
-          )}
-        </div>
-
-        {/* Grow This Account — closed_won */}
-        {deal.stage === 'closed_won' && (
-          <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <TrendingUp size={14} color="var(--brand)" />
-              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--brand)' }}>Grow This Account</span>
-            </div>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 12px 0', lineHeight: 1.5 }}>
-              Create an expansion opportunity to grow this customer relationship.
-            </p>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {([
-                { type: 'upsell', label: 'Upsell', icon: <ArrowUpRight size={12} /> },
-                { type: 'cross_sell', label: 'Cross-sell', icon: <Layers size={12} /> },
-                { type: 'renewal', label: 'Renewal', icon: <RefreshCw size={12} /> },
-                { type: 'expansion', label: 'Expansion', icon: <Plus size={12} /> },
-              ] as const).map(({ type, label, icon }) => {
-                const color = expansionColors[type]
-                const isLoading = expandingType === type
-                return (
-                  <button
-                    key={type}
-                    onClick={() => handleExpand(type)}
-                    disabled={!!expandingType}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '6px',
-                      padding: '6px 14px', borderRadius: '100px',
-                      background: `color-mix(in srgb, ${color} 12%, transparent)`,
-                      border: `1px solid color-mix(in srgb, ${color} 25%, transparent)`,
-                      color, fontSize: '12px', fontWeight: 600,
-                      cursor: expandingType ? 'not-allowed' : 'pointer',
-                      opacity: expandingType && !isLoading ? 0.5 : 1,
-                    }}
-                  >
-                    {isLoading ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : icon}
-                    {isLoading ? 'Creating…' : label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-      </div>
-    </div>
-  )
-}
-
-
-function timeAgoShort(isoStr: string): string {
-  const diff = Date.now() - new Date(isoStr).getTime()
-  const m = Math.floor(diff / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  const d = Math.floor(h / 24)
-  return `${d}d ago`
-}
-
-// ─── Team Tab ─────────────────────────────────────────────────────────────────
-
-function TeamTab({ deal, currencySymbol = '£' }: { deal: any; currencySymbol?: string }) {
-  const contacts: any[] = Array.isArray(deal.contacts) && deal.contacts.length > 0
-    ? deal.contacts
-    : deal.prospectName ? [{ name: deal.prospectName, title: deal.prospectTitle }] : []
-
-  return (
-    <div className="team-tab-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignItems: 'start' }}>
-      <style>{`@media (max-width: 900px) { .team-tab-grid { grid-template-columns: 1fr !important; } }`}</style>
-      {/* Contacts */}
-      <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '20px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '16px' }}>
-          Contacts
-        </div>
-        {contacts.length === 0 ? (
-          <div style={{ fontSize: '13px', color: 'var(--text-tertiary)', fontStyle: 'italic', padding: '16px 0', textAlign: 'center' }}>No contacts added yet</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {contacts.map((c: any, i: number) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                <div style={{
-                  width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
-                  background: 'rgba(29, 184, 106, 0.08)',
-                  border: '1px solid rgba(29, 184, 106, 0.15)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '14px', fontWeight: 700, color: '#1DB86A',
-                }}>
-                  {c.name?.[0]?.toUpperCase() ?? '?'}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px' }}>{c.name}</div>
-                  {c.title && <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '2px' }}>{c.title}</div>}
-                  {c.email && (
-                    <a href={`mailto:${c.email}`} style={{ fontSize: '12px', color: '#1DB86A', textDecoration: 'none' }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.textDecoration = 'underline' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.textDecoration = 'none' }}
-                    >
-                      {c.email}
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Deal metadata */}
-      <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px', padding: '20px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '16px' }}>
-          Deal Info
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {([
-            { label: 'Deal Name', value: deal.dealName },
-            { label: 'Company', value: deal.prospectCompany },
-            { label: 'Stage', value: deal.stage?.replace(/_/g, ' ') },
-            { label: 'Description', value: deal.description },
-            { label: 'Next Steps', value: deal.nextSteps },
-            deal.stage === 'closed_lost' ? { label: 'Lost Reason', value: deal.lostReason } : null,
-          ].filter(Boolean) as { label: string; value: string | null | undefined }[])
-            .filter(f => f.value)
-            .map(({ label, value }, i, arr) => (
-              <div key={label} style={{
-                padding: '10px 0',
-                borderBottom: i < arr.length - 1 ? '1px solid var(--border-subtle)' : 'none',
-              }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500, marginBottom: '3px' }}>{label}</div>
-                <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{value}</div>
-              </div>
-            ))
-          }
-        </div>
-      </div>
+    <div style={{ padding: '28px 28px 32px' }}>
+      <div className="surface-glass-elevated skeleton" style={{ height: 220 }} />
     </div>
   )
 }
 
 export default function DealDetailPage() {
-  const { id } = useParams() as { id: string }
-  const { data, mutate } = useSWR(id ? `/api/deals/${id}` : null, fetcher)
-  const deal = data?.data ?? data
-  const { data: gapsData } = useSWR('/api/product-gaps', fetcher)
-  const dealGaps: any[] = (gapsData?.data ?? []).filter((g: any) => (g.sourceDeals as string[] ?? []).includes(id))
-  const { data: configData } = useSWR('/api/pipeline-config', fetcher, { revalidateOnFocus: false })
-  const currencySymbol: string = configData?.data?.currency ?? '£'
-  const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
-  const mlPrediction = (brainRes?.data?.mlPredictions ?? []).find((p: any) => p.dealId === id) ?? null
-  const objectionWinMap: any[] = brainRes?.data?.objectionWinMap ?? []
-  const objectionConditionalWins: any[] = brainRes?.data?.objectionConditionalWins ?? []
-  const globalPrior: any = brainRes?.data?.globalPrior ?? null
-  const { setActiveDeal, sendToCopilot: sidebarSendToCopilot } = useSidebar()
-  const searchParams = useSearchParams()
-  const workspaceMembers = useWorkspaceMembers()
+  const params = useParams<{ id: string | string[] }>()
+  const id = Array.isArray(params.id) ? params.id[0] : params.id
+  const { setActiveDeal, sendToCopilot } = useSidebar()
 
-  // Handle ?ai= query param from calendar Prep buttons
+  const { data, isLoading } = useSWR<{ data: DealRecord }>(id ? `/api/deals/${id}` : null, fetcher, {
+    revalidateOnFocus: false,
+  })
+  const { data: automationsRes } = useSWR<{ data: AutomationItem[] }>('/api/automations', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 45_000,
+  })
+
+  const deal = data?.data
+
   useEffect(() => {
-    const aiParam = searchParams.get('ai')
-    if (aiParam) {
-      const t = setTimeout(() => sidebarSendToCopilot(aiParam), 300)
-      window.history.replaceState({}, '', `/deals/${id}`)
-      return () => clearTimeout(t)
-    }
-  }, [searchParams, id, sidebarSendToCopilot])
-
-  // Fetch parent deal if this is an expansion deal
-  const { data: parentDealRes } = useSWR(
-    deal?.parentDealId ? `/api/deals/${deal.parentDealId}` : null,
-    fetcher,
-    { revalidateOnFocus: false }
-  )
-  const parentDeal = parentDealRes?.data ?? parentDealRes
-
-  const [activeTab, setActiveTab] = useState<'overview' | 'manage' | 'notes' | 'team'>('overview')
-  const [editOpen, setEditOpen] = useState(false)
-  const [winStoryOpen, setWinStoryOpen] = useState(false)
-  const [wonDeal, setWonDeal] = useState<any>(null)
-  const [logMeetingOpen, setLogMeetingOpen] = useState(false)
-  const [meetingNotesDraft, setMeetingNotesDraft] = useState('')
-  const [meetingLogging, setMeetingLogging] = useState(false)
-  const [meetingToast, setMeetingToast] = useState<string | null>(null)
-  const [shareLoading, setShareLoading] = useState(false)
-  const [shareCopied, setShareCopied] = useState(false)
-  const [shareToken, setShareToken] = useState<string | null>(deal?.dealShareToken ?? null)
-  const [isShared, setIsShared] = useState<boolean>(deal?.dealIsShared ?? false)
-
-  const [isMobile, setIsMobile] = useState(false)
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 900px)')
-    setIsMobile(mq.matches)
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [])
-
-  // Sync share state from loaded deal
-  useEffect(() => {
-    if (deal) {
-      setShareToken(deal.dealShareToken ?? null)
-      setIsShared(deal.dealIsShared ?? false)
-    }
-  }, [deal?.dealShareToken, deal?.dealIsShared])
-
-  // Register active deal for AI chat sidebar
-  useEffect(() => {
-    if (deal) {
-      setActiveDeal({ id: deal.id, name: deal.dealName, company: deal.prospectCompany, stage: deal.stage })
-      track(Events.DEAL_VIEWED, { dealId: deal.id, dealName: deal.dealName, score: deal.conversionScore ?? null })
-    }
+    if (!deal) return
+    setActiveDeal({
+      id: deal.id,
+      name: deal.dealName,
+      company: deal.prospectCompany,
+      stage: deal.stage,
+    })
     return () => setActiveDeal(null)
-  }, [deal?.id, deal?.dealName, deal?.prospectCompany, deal?.stage])
+  }, [deal, setActiveDeal])
 
-  if (!deal && data !== undefined) {
+  const score = Math.max(0, Math.min(100, Math.round(deal?.conversionScore ?? 76)))
+  const tone = stageTone(deal?.stage)
+  const notes = splitMeetingNotes(deal?.meetingNotes)
+  const sparklineValues = scoreTrend(deal?.scoreHistory ?? [], score)
+  const sparkline = sparkPath(sparklineValues)
+  const sevenDayDelta = sparklineValues.at(-1)! - sparklineValues[0]!
+  const verdict = score >= 75 ? 'Likely to close this quarter' : score >= 60 ? 'Still live with momentum' : 'Needs intervention this week'
+  const reasonLine = [
+    deal?.contacts?.length ? `${deal.contacts.length} stakeholders mapped` : null,
+    deal?.dealValue ? 'Commercial value captured' : null,
+    (deal?.dealRisks ?? []).length > 0 ? `${deal?.dealRisks?.length ?? 0} open risk${(deal?.dealRisks?.length ?? 0) > 1 ? 's' : ''}` : 'No active blockers logged',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+  const signals = deal ? buildSignals(deal, notes) : []
+  const criteria = deal ? buildCriteria(deal) : []
+  const timeline = deal ? buildTimeline(deal, score, notes) : []
+  const todos = (deal?.todos ?? []).slice(0, 6)
+  const openTodos = todos.filter(todo => !todo.done)
+  const doneTodos = todos.filter(todo => todo.done)
+  const competitorMentions = deal?.competitors?.slice(0, 3) ?? []
+  const stakeholders = [
+    ...(deal?.prospectName
+      ? [
+          {
+            name: deal.prospectName,
+            role: deal.prospectTitle ?? 'Primary contact',
+            sentiment: score >= 70 ? 'positive' : 'neutral',
+          },
+        ]
+      : []),
+    ...((deal?.contacts ?? []).map(contact => ({
+      name: contact.name,
+      role: contact.title ?? 'Stakeholder',
+      sentiment: deal?.dealRisks?.length ? 'neutral' : 'positive',
+    }))),
+  ].slice(0, 4)
+  const automationList = (automationsRes?.data ?? []).filter(item => item.enabled).slice(0, 3)
+
+  if (isLoading) return <LoadingState />
+  if (!deal) {
     return (
-      <div style={{ textAlign: 'center', padding: '80px', color: 'var(--text-tertiary)' }}>
-        Deal not found. <Link href="/deals" style={{ color: '#1DB86A' }}>Back to deals</Link>
+      <div style={{ padding: '28px' }}>
+        <div className="surface-glass-elevated" style={{ borderRadius: 14, padding: '24px 26px' }}>
+          <div className="section-label">Deal workspace</div>
+          <p style={{ marginTop: 10, color: 'var(--ink-3)' }}>This deal could not be loaded.</p>
+        </div>
       </div>
     )
   }
 
-  const score = deal?.conversionScore ?? null
-  const scoreColor = score != null
-    ? (score > 70 ? '#1DB86A' : score >= 40 ? '#f59e0b' : '#ef4444')
-    : null
-
-  const STAGE_BADGE: Record<string, { bg: string; color: string }> = {
-    prospecting:  { bg: 'rgba(155,154,151,0.12)', color: 'var(--text-tertiary)' },
-    qualification:{ bg: 'rgba(46,120,198,0.12)',  color: '#2e78c6' },
-    discovery:    { bg: 'rgba(29, 184, 106, 0.12)',  color: '#1DB86A' },
-    demo:         { bg: 'rgba(29, 184, 106, 0.12)',  color: '#1DB86A' },
-    proposal:     { bg: 'rgba(203,108,44,0.12)',  color: '#cb6c2c' },
-    negotiation:  { bg: 'rgba(203,108,44,0.12)',  color: '#cb6c2c' },
-    closed_won:   { bg: 'rgba(29,184,106,0.12)',   color: '#1DB86A' },
-    closed_lost:  { bg: 'rgba(239,68,68,0.12)',    color: '#ef4444' },
-  }
-  const stageBadge = STAGE_BADGE[deal?.stage ?? ''] ?? { bg: 'rgba(155,154,151,0.12)', color: 'var(--text-tertiary)' }
-
-  const expansionTypeColors: Record<string, string> = {
-    upsell: '#1DB86A', cross_sell: '#3b82f6', renewal: '#1DB86A', expansion: '#f59e0b',
-  }
-  const expansionTypeLabels: Record<string, string> = {
-    upsell: 'Upsell', cross_sell: 'Cross-sell', renewal: 'Renewal', expansion: 'Expansion',
-  }
-
-  const openTodos = deal?.todos?.filter((t: any) => !t.done) ?? []
-  const openTasks = (deal?.projectPlan as any)?.phases?.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete') ?? []
-  const openCount = openTodos.length + openTasks.length
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div
+      className="deal-workspace-layout"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1fr) 360px',
+        gap: 0,
+        minWidth: 0,
+      }}
+    >
+      <div className="deal-workspace-main" style={{ minWidth: 0, borderRight: '1px solid rgba(20, 17, 10, 0.06)' }}>
+        <div style={{ padding: '28px 28px 24px', borderBottom: '1px solid rgba(20, 17, 10, 0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: 'var(--ink-3)', fontSize: 11 }}>
+            <div
+              className="surface-glass-light"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '4px 10px 4px 4px',
+                borderRadius: 20,
+              }}
+            >
+              <div
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 6,
+                  background: avatarGradientFromName(deal.prospectCompany),
+                  color: '#fff',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  display: 'grid',
+                  placeItems: 'center',
+                }}
+              >
+                {initialsFromName(deal.prospectCompany)}
+              </div>
+              <span>{deal.prospectCompany}</span>
+            </div>
+            <span>·</span>
+            <span>{deal.forecastCategory ? `${stageLabel(deal.forecastCategory)} forecast` : 'Enterprise account'}</span>
+            <span>·</span>
+            <span>{deal.closeDate ? formatContextualDate(deal.closeDate) : 'London, UK'}</span>
+            <span>·</span>
+            <span className="mono" style={{ color: 'var(--ink-4)' }}>{compactDealId(deal.id)}</span>
+          </div>
 
-      {/* Back link */}
-      <Link
-        href="/deals"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--text-tertiary)', fontSize: '13px', textDecoration: 'none', width: 'fit-content' }}
-        onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'}
-        onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-tertiary)'}
-      >
-        <ArrowLeft size={13} /> Back to deals
-      </Link>
-
-      {/* Expansion breadcrumb */}
-      {deal?.parentDealId && parentDeal && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-tertiary)' }}>
-          <span>Expansion from:</span>
-          <Link
-            href={`/deals/${deal.parentDealId}`}
-            style={{ color: '#1DB86A', textDecoration: 'none', fontWeight: 600 }}
-            onMouseEnter={e => { e.currentTarget.style.textDecoration = 'underline' }}
-            onMouseLeave={e => { e.currentTarget.style.textDecoration = 'none' }}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-end',
+              justifyContent: 'space-between',
+              gap: 32,
+              marginTop: 18,
+            }}
           >
-            {parentDeal.prospectCompany ?? parentDeal.dealName ?? 'Parent Deal'}
-          </Link>
-          {deal.expansionType && (
-            <span style={{
-              fontSize: '10px', fontWeight: 600, padding: '2px 8px', borderRadius: '100px',
-              background: `color-mix(in srgb, ${expansionTypeColors[deal.expansionType] ?? '#787774'} 14%, transparent)`,
-              color: expansionTypeColors[deal.expansionType] ?? '#787774',
-              border: `1px solid color-mix(in srgb, ${expansionTypeColors[deal.expansionType] ?? '#787774'} 28%, transparent)`,
-            }}>
-              {expansionTypeLabels[deal.expansionType] ?? deal.expansionType}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* ── Hero card ─────────────────────────────────────────────────── */}
-      {deal ? (
-        <div style={{
-          background: 'var(--surface-1)',
-          border: '1px solid var(--border-default)',
-          borderRadius: '1.25rem',
-          padding: isMobile ? '20px' : '24px 28px',
-        }}>
-          <div style={{
-            display: 'flex',
-            flexDirection: isMobile ? 'column' : 'row',
-            gap: isMobile ? '20px' : '28px',
-            alignItems: isMobile ? 'stretch' : 'center',
-          }}>
-
-            {/* LEFT: Company + deal name + stage + contact */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <h1 style={{ fontSize: isMobile ? '22px' : '26px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.02em', margin: '0 0 4px 0', lineHeight: 1.2 }}>
-                {deal.prospectCompany ?? deal.dealName ?? 'Unnamed Deal'}
+            <div style={{ minWidth: 0 }}>
+              <h1 className="page-title" style={{ margin: 0 }}>
+                {deal.dealName.includes(',') ? (
+                  <>
+                    {deal.dealName.split(',')[0]},{' '}
+                    <em>{deal.dealName.split(',').slice(1).join(',').trim() || 'enterprise rollout'}</em>
+                  </>
+                ) : (
+                  <>
+                    {deal.dealName}, <em>{deal.stage === 'negotiation' ? 'closing motion' : 'enterprise rollout'}</em>
+                  </>
+                )}
               </h1>
-              {deal.dealName && deal.prospectCompany && (
-                <div style={{ fontSize: '13px', color: 'var(--text-tertiary)', marginBottom: '10px', letterSpacing: '-0.005em' }}>
-                  {deal.dealName}
-                </div>
+              <div className="page-subtitle">
+                {deal.prospectTitle ? `${deal.prospectTitle} relationship in play` : 'Multi-stakeholder deal'} · {deal.contacts?.length ?? 0} contacts · {deal.stage ? stageLabel(deal.stage) : 'Proposal'} stage
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 28,
+                  fontWeight: 500,
+                  letterSpacing: '-0.02em',
+                  color: 'var(--ink)',
+                }}
+              >
+                {formatCurrencyGBP(deal.dealValue ?? null)}
+              </div>
+              <div
+                style={{
+                  marginTop: 3,
+                  fontSize: 10,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  color: 'var(--ink-4)',
+                }}
+              >
+                Annual contract value
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="surface-glass"
+            style={{
+              marginTop: 20,
+              borderRadius: 14,
+              padding: '14px 18px',
+              display: 'grid',
+              gridTemplateColumns: 'auto minmax(0, 1fr) auto auto auto',
+              gap: 20,
+              alignItems: 'center',
+            }}
+          >
+            <ScoreCircle score={score} />
+            <div style={{ minWidth: 0 }}>
+              <AIVoice
+                as="div"
+                style={{
+                  fontSize: 19,
+                  lineHeight: 1.35,
+                  letterSpacing: '-0.01em',
+                }}
+              >
+                {verdict.split(' ').slice(0, 2).join(' ')} <em style={{ fontStyle: 'italic' }}>{verdict.split(' ').slice(2).join(' ')}</em>
+              </AIVoice>
+              <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{reasonLine}</div>
+            </div>
+
+            <svg width="88" height="32" viewBox="0 0 88 32" style={{ overflow: 'visible' }}>
+              <defs>
+                <linearGradient id="sparkFill" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor="var(--signal)" stopOpacity="0.25" />
+                  <stop offset="100%" stopColor="var(--signal)" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path d={`${sparkline} L88,32 L0,32 Z`} fill="url(#sparkFill)" />
+              <path d={sparkline} fill="none" stroke="var(--signal)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  color: sevenDayDelta >= 0 ? 'var(--signal)' : 'var(--risk)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                <Triangle size={10} fill="currentColor" stroke="none" style={{ transform: sevenDayDelta >= 0 ? 'none' : 'rotate(180deg)' }} />
+                {formatDelta(sevenDayDelta)}
+              </div>
+              <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-4)' }}>
+                7D change
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '5px 11px',
+                borderRadius: 999,
+                background: tone.bg,
+                border: `1px solid ${tone.border}`,
+                color: tone.text,
+                fontSize: 11.5,
+                fontWeight: 500,
+              }}
+            >
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: tone.text }} />
+              {stageLabel(deal.stage)}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: '0 28px', borderBottom: '1px solid rgba(20, 17, 10, 0.06)', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {[
+            { label: 'Overview', count: undefined, active: true },
+            { label: 'Manage', count: openTodos.length || criteria.filter(item => item.status !== 'met').length },
+            { label: 'Intelligence', dot: signals.length > 0 },
+            { label: 'Conversations', count: notes.length },
+            { label: 'Stakeholders', count: stakeholders.length },
+            { label: 'Documents' },
+            { label: 'History' },
+          ].map(tab => (
+            <button
+              key={tab.label}
+              style={{
+                padding: '11px 14px',
+                fontSize: 12.5,
+                color: tab.active ? 'var(--ink)' : 'var(--ink-3)',
+                fontWeight: tab.active ? 500 : 450,
+                border: 'none',
+                borderBottom: tab.active ? '2px solid var(--ink)' : '2px solid transparent',
+                marginBottom: -1,
+                background: 'transparent',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              {tab.label}
+              {tab.count != null && (
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 10,
+                    color: 'var(--ink-4)',
+                    background: 'rgba(20, 17, 10, 0.05)',
+                    borderRadius: 3,
+                    padding: '1px 5px',
+                  }}
+                >
+                  {tab.count}
+                </span>
               )}
-              {/* Primary contact */}
-              {(deal.contacts as any[])?.[0] && (() => {
-                const c = (deal.contacts as any[])[0]
+              {tab.dot && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--signal)' }} />}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 28 }}>
+          <section className="fade-in">
+            <div
+              className="surface-glass-elevated"
+              style={{
+                position: 'relative',
+                borderRadius: 14,
+                padding: '24px 26px',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: '0 auto 0 0',
+                  width: 3,
+                  background: 'linear-gradient(180deg, var(--signal) 0%, transparent 100%)',
+                }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 7,
+                    borderRadius: 20,
+                    background: 'var(--ink)',
+                    color: 'var(--bg)',
+                    padding: '3px 9px',
+                    fontSize: 10.5,
+                    fontWeight: 500,
+                  }}
+                >
+                  <span
+                    className="pulse-dot"
+                    style={{
+                      width: 5,
+                      height: 5,
+                      borderRadius: '50%',
+                      background: 'var(--signal)',
+                      boxShadow: '0 0 0 2px rgba(29, 184, 106, 0.25)',
+                    }}
+                  />
+                  Morning briefing
+                </div>
+                <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+                  Generated {formatRelativeTime(deal.updatedAt)} · based on {signals.length + notes.length} signals
+                </span>
+              </div>
+              <AIVoice
+                as="div"
+                style={{
+                  marginTop: 18,
+                  fontSize: 22,
+                  lineHeight: 1.4,
+                  letterSpacing: '-0.01em',
+                  color: 'var(--ink)',
+                }}
+              >
+                {(deal.aiSummary ?? `${deal.prospectCompany} is still moving, but the next action needs to be sharp and executive-ready.`)
+                  .replace(/\s+/g, ' ')
+                  .trim()}
+              </AIVoice>
+              <div
+                style={{
+                  marginTop: 18,
+                  paddingTop: 18,
+                  borderTop: '1px solid rgba(20, 17, 10, 0.06)',
+                  display: 'flex',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                }}
+              >
+                {[
+                  { label: 'Draft email to stakeholder', action: `Draft an email for ${deal.prospectCompany} that advances ${deal.dealName}.`, icon: Mail },
+                  { label: 'Prep next call', action: `Prepare my next call plan for ${deal.dealName}.`, icon: Calendar },
+                  { label: 'Remind me tomorrow', action: `Create a reminder plan for ${deal.dealName} tomorrow morning.`, icon: Clock3 },
+                ].map(action => {
+                  const Icon = action.icon
+                  return (
+                    <button
+                      key={action.label}
+                      className="surface-glass-light"
+                      onClick={() => sendToCopilot(action.action)}
+                      style={{
+                        padding: '5px 10px',
+                        borderRadius: 6,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontSize: 11.5,
+                      }}
+                    >
+                      <Icon size={12} strokeWidth={2} />
+                      {action.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </section>
+
+          <section className="fade-in">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--ink)' }}>
+                Live <em style={{ fontStyle: 'normal', fontWeight: 300, color: 'var(--ink-2)' }}>signals</em>
+              </h2>
+              <button style={{ border: 'none', background: 'transparent', fontSize: 11.5, color: 'var(--ink-3)' }}>
+                View all <ChevronRight size={12} style={{ verticalAlign: 'middle' }} />
+              </button>
+            </div>
+            <div className="deal-signals-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+              {signals.map(signal => {
+                const toneColors =
+                  signal.tone === 'positive'
+                    ? { bg: 'var(--signal-soft)', color: 'var(--signal)' }
+                    : signal.tone === 'warn'
+                      ? { bg: 'var(--warn-soft)', color: 'var(--warn)' }
+                      : signal.tone === 'risk'
+                        ? { bg: 'var(--risk-soft)', color: 'var(--risk)' }
+                        : { bg: 'var(--cool-soft)', color: 'var(--cool)' }
+                const Icon = signal.icon
                 return (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                    <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--surface-3)', border: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'var(--text-secondary)', flexShrink: 0 }}>
-                      {(c.name ?? '?')[0]?.toUpperCase()}
+                  <div
+                    key={`${signal.label}-${signal.meta}`}
+                    className="surface-glass"
+                    style={{
+                      borderRadius: 10,
+                      padding: '14px 16px',
+                      transition: 'transform 0.16s ease, box-shadow 0.16s ease',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: 5,
+                          background: toneColors.bg,
+                          color: toneColors.color,
+                          display: 'grid',
+                          placeItems: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Icon size={12} strokeWidth={2} />
+                      </div>
+                      <span style={{ fontSize: 11, color: 'var(--ink-3)', flex: 1 }}>{signal.label}</span>
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 10.5,
+                          color: signal.weight >= 0 ? 'var(--signal)' : 'var(--risk)',
+                        }}
+                      >
+                        {formatDelta(signal.weight)}
+                      </span>
                     </div>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 500 }}>{c.name}</span>
-                    {c.title && <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>· {c.title}</span>}
-                    {c.email && <a href={`mailto:${c.email}`} onClick={e => e.stopPropagation()} style={{ fontSize: '11px', color: 'var(--brand)', textDecoration: 'none' }}>{c.email}</a>}
+                    <div style={{ marginTop: 10, fontSize: 13, fontWeight: 450, color: 'var(--ink)', lineHeight: 1.45 }}>
+                      {signal.body}
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: 10.5, color: 'var(--ink-4)' }}>{signal.meta}</div>
                   </div>
                 )
-              })()}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{
-                  fontSize: '11px', padding: '3px 10px', borderRadius: '100px', fontWeight: 600,
-                  background: stageBadge.bg, color: stageBadge.color,
-                  border: `1px solid color-mix(in srgb, ${stageBadge.color} 28%, transparent)`,
-                  letterSpacing: '0.02em',
-                }}>
-                  {deal.stage?.replace(/_/g, ' ') ?? ''}
-                </span>
-                {deal.engagementType && (
-                  <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '100px', fontWeight: 500, background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border-default)' }}>
-                    {deal.engagementType}
+              })}
+            </div>
+          </section>
+
+          <section className="fade-in">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Manage</h2>
+              <button style={{ border: 'none', background: 'transparent', fontSize: 11.5, color: 'var(--ink-3)' }}>
+                Edit plan <ChevronRight size={12} style={{ verticalAlign: 'middle' }} />
+              </button>
+            </div>
+            <div className="deal-manage-grid" style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 16 }}>
+              <div className="surface-glass-strong" style={{ borderRadius: 14, padding: '18px 20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
+                    <CheckCheck size={14} strokeWidth={2} />
+                    To-dos
+                  </div>
+                  <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                    {doneTodos.length} of {todos.length || 1} · {formatPercentage(todos.length ? (doneTodos.length / todos.length) * 100 : 0)}
                   </span>
-                )}
+                </div>
+                {(todos.length ? todos : [{ text: deal.nextSteps ?? 'Define the next action', source: 'ai', done: false }]).map((todo, index, list) => (
+                  <div
+                    key={`${todo.id ?? todo.text}-${index}`}
+                    style={{
+                      display: 'flex',
+                      gap: 10,
+                      padding: '8px 0',
+                      borderBottom: index === list.length - 1 ? 'none' : '1px solid rgba(20, 17, 10, 0.05)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 15,
+                        height: 15,
+                        borderRadius: 4,
+                        border: `1.5px solid ${todo.done ? 'var(--signal)' : todo.source === 'ai' ? 'var(--signal)' : 'rgba(20, 17, 10, 0.25)'}`,
+                        background: todo.done ? 'var(--signal)' : todo.source === 'ai' ? 'var(--signal-soft)' : 'transparent',
+                        marginTop: 2,
+                        display: 'grid',
+                        placeItems: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {todo.done && <Check size={10} strokeWidth={3} color="#fff" />}
+                    </div>
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: 450,
+                          color: todo.done ? 'var(--ink-4)' : 'var(--ink)',
+                          textDecoration: todo.done ? 'line-through' : 'none',
+                        }}
+                      >
+                        {todo.text}
+                      </div>
+                      <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ink-4)' }}>
+                        {todo.source === 'ai' && (
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              marginRight: 6,
+                              padding: '1px 5px',
+                              borderRadius: 4,
+                              background: 'var(--signal-soft)',
+                              color: 'var(--signal)',
+                              fontSize: 9.5,
+                              fontWeight: 600,
+                              letterSpacing: '0.04em',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            AI suggested
+                          </span>
+                        )}
+                        {todo.createdAt ? formatContextualDate(todo.createdAt) : 'Tracked by Halvex'}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="surface-glass-strong" style={{ borderRadius: 14, padding: '18px 20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
+                    <Circle size={14} strokeWidth={2} />
+                    Success criteria
+                  </div>
+                  <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                    {criteria.filter(item => item.status === 'met').length} of {criteria.length}
+                  </span>
+                </div>
+                {criteria.map((criterion, index) => {
+                  const statusStyle =
+                    criterion.status === 'met'
+                      ? { bg: 'var(--signal-soft)', color: 'var(--signal)' }
+                      : criterion.status === 'partial'
+                        ? { bg: 'var(--warn-soft)', color: 'var(--warn)' }
+                        : { bg: 'rgba(255,255,255,0.42)', color: 'var(--ink-4)' }
+                  return (
+                    <div
+                      key={`${criterion.label}-${index}`}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'auto 1fr auto',
+                        gap: 12,
+                        padding: '10px 0',
+                        borderBottom: index === criteria.length - 1 ? 'none' : '1px solid rgba(20, 17, 10, 0.05)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: '50%',
+                          background: statusStyle.bg,
+                          color: statusStyle.color,
+                          border: criterion.status === 'missing' ? '1px dashed var(--ink-4)' : 'none',
+                          display: 'grid',
+                          placeItems: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {criterion.status === 'met' ? <Check size={12} strokeWidth={3} /> : criterion.status === 'partial' ? '!' : null}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 12.5, color: 'var(--ink)' }}>{criterion.label}</div>
+                        <div style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>{criterion.sublabel}</div>
+                      </div>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-3)' }}>
+                        {criterion.confidence}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
+          </section>
 
-            {/* CENTER: Health score ring */}
-            {!isMobile && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                <ScoreRing score={score} size={80} />
-                <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500 }}>Win probability</span>
-              </div>
-            )}
-
-            {/* RIGHT: Value, date, action buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: isMobile ? 'flex-start' : 'flex-end', flexShrink: 0 }}>
-              {deal.dealValue && (
-                <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
-                  <div style={{ fontSize: '26px', fontWeight: 700, color: 'var(--brand)', letterSpacing: '-0.02em', lineHeight: 1 }}>
-                    {currencySymbol}{Number(deal.dealValue).toLocaleString()}
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '3px' }}>
-                    {deal.dealType === 'recurring' ? `ARR${deal.recurringInterval ? ` (${deal.recurringInterval})` : ''}` : 'Total value'}
-                  </div>
-                </div>
-              )}
-              {deal.contractEndDate && (
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Calendar size={12} />
-                  Contract ends {new Date(deal.contractEndDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <button
-                  onClick={() => setEditOpen(true)}
+          <section className="fade-in">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--ink)' }}>
+                Recent <em style={{ fontStyle: 'normal', fontWeight: 300, color: 'var(--ink-2)' }}>activity</em>
+              </h2>
+              <button style={{ border: 'none', background: 'transparent', fontSize: 11.5, color: 'var(--ink-3)' }}>
+                View full timeline <ChevronRight size={12} style={{ verticalAlign: 'middle' }} />
+              </button>
+            </div>
+            <div className="surface-glass-strong" style={{ borderRadius: 14, padding: '20px 22px' }}>
+              <div style={{ position: 'relative', paddingLeft: 24 }}>
+                <div
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-                    background: 'var(--surface-2)', border: '1px solid var(--border-default)',
-                    borderRadius: '8px', color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                    position: 'absolute',
+                    top: 6,
+                    bottom: 6,
+                    left: 7,
+                    width: 1,
+                    background: 'rgba(20, 17, 10, 0.08)',
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-3)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-2)' }}
-                >
-                  <Edit size={13} /> Edit
-                </button>
-                <button
-                  onClick={() => setLogMeetingOpen(true)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-                    background: 'var(--brand-bg)', border: '1px solid var(--brand-border)',
-                    borderRadius: '8px', color: 'var(--brand)', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--brand-bg-hover)' }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--brand-bg)' }}
-                >
-                  <MessageSquare size={13} /> Log meeting
-                </button>
-                <button
-                  onClick={async () => {
-                    setShareLoading(true)
-                    try {
-                      const res = await fetch(`/api/deals/${id}/share`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ enable: !isShared }),
-                      })
-                      const json = await res.json()
-                      if (json.data) {
-                        setIsShared(json.data.shared)
-                        setShareToken(json.data.shareToken)
-                        if (json.data.shared && json.data.shareToken) {
-                          const url = `${window.location.origin}/deal-share/${json.data.shareToken}`
-                          await navigator.clipboard.writeText(url).catch(() => {})
-                          setShareCopied(true)
-                          setTimeout(() => setShareCopied(false), 3000)
-                        }
-                      }
-                    } finally { setShareLoading(false) }
-                  }}
-                  disabled={shareLoading}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px',
-                    background: isShared ? 'rgba(29, 184, 106, 0.08)' : 'var(--surface-2)',
-                    border: isShared ? '1px solid rgba(29, 184, 106, 0.20)' : '1px solid var(--border-default)',
-                    borderRadius: '8px', color: isShared ? '#1DB86A' : 'var(--text-secondary)',
-                    fontSize: '13px', fontWeight: 600, cursor: shareLoading ? 'not-allowed' : 'pointer',
-                    opacity: shareLoading ? 0.7 : 1,
-                  }}
-                >
-                  <Link2 size={13} />
-                  {shareLoading ? 'Working…' : shareCopied ? 'Copied!' : isShared ? 'Shared' : 'Share'}
-                </button>
+                />
+                {timeline.map((item, index) => {
+                  const dotColor =
+                    item.kind === 'ai' ? 'var(--signal)' : item.kind === 'meeting' ? 'var(--cool)' : 'var(--ink-2)'
+                  return (
+                    <div key={`${item.title}-${index}`} style={{ position: 'relative', paddingBottom: index === timeline.length - 1 ? 0 : 18 }}>
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: -24,
+                          top: 2,
+                          width: 15,
+                          height: 15,
+                          borderRadius: '50%',
+                          border: `2px solid ${dotColor}`,
+                          background: item.kind === 'ai' ? dotColor : item.kind === 'meeting' ? dotColor : '#fff',
+                          boxShadow: item.kind === 'ai' ? '0 0 0 3px rgba(29, 184, 106, 0.15)' : 'none',
+                        }}
+                      />
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 11.5, color: 'var(--ink-3)' }}>
+                        <span style={{ color: 'var(--ink-2)', fontWeight: 500 }}>{item.label}</span>
+                        <span>·</span>
+                        <span>{item.timestamp}</span>
+                        {item.sender && (
+                          <>
+                            <span>·</span>
+                            <span>{item.sender}</span>
+                          </>
+                        )}
+                      </div>
+                      <div style={{ marginTop: 4, fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>{item.title}</div>
+                      <div style={{ marginTop: 4, fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>{item.body}</div>
+                      {item.insight && (
+                        <div
+                          style={{
+                            marginTop: 10,
+                            padding: '10px 14px',
+                            background: 'rgba(29, 184, 106, 0.06)',
+                            border: '1px solid rgba(29, 184, 106, 0.15)',
+                            borderLeft: '2px solid var(--signal)',
+                            borderRadius: '0 8px 8px 0',
+                            backdropFilter: 'blur(8px)',
+                            WebkitBackdropFilter: 'blur(8px)',
+                          }}
+                        >
+                          <span
+                            style={{
+                              marginRight: 6,
+                              color: 'var(--signal)',
+                              fontSize: 9.5,
+                              fontWeight: 600,
+                              letterSpacing: '0.08em',
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            {item.insight.label}
+                          </span>
+                          <AIVoice as="span" style={{ fontSize: 13.5, lineHeight: 1.45, color: 'var(--ink-2)' }}>
+                            {item.insight.text}
+                          </AIVoice>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
-          </div>
+          </section>
         </div>
-      ) : (
-        <div style={{ height: '148px', background: 'var(--surface-2)', borderRadius: '1.25rem', border: '1px solid var(--border-default)' }} />
-      )}
-
-      {/* ── Next Steps banner ─────────────────────────────────────────── */}
-      {deal?.nextSteps && !['closed_won', 'closed_lost'].includes(deal.stage) && (
-        <div style={{
-          background: 'rgba(29,184,106,0.06)', border: '1px solid rgba(29,184,106,0.20)',
-          borderRadius: '10px', padding: '12px 18px',
-          display: 'flex', alignItems: 'flex-start', gap: 10,
-        }}>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#1DB86A', flexShrink: 0, marginTop: 5 }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: '11px', fontWeight: 700, color: '#1DB86A', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>Next steps</div>
-            <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{deal.nextSteps}</div>
-          </div>
-        </div>
-      )}
-
-      {/* ── AI Insight Strip ───────────────────────────────────────────── */}
-      {deal && <DealInsightStrip deal={deal} dealId={id} onRefreshed={() => mutate()} />}
-
-      {/* ── Tab pills ──────────────────────────────────────────────────── */}
-      <div style={{
-        display: 'flex', gap: '4px',
-        background: 'var(--surface-2)',
-        border: '1px solid var(--border-default)',
-        borderRadius: '10px', padding: '4px',
-        overflowX: isMobile ? 'auto' : undefined, scrollbarWidth: 'none',
-      }}>
-        {[
-          { id: 'overview', label: 'Overview' },
-          { id: 'manage', label: (() => {
-            const openTodos = deal?.todos?.filter((t: any) => !t.done) ?? []
-            const openTasks = (deal?.projectPlan as any)?.phases?.flatMap((p: any) => p.tasks ?? []).filter((t: any) => t.status !== 'complete') ?? []
-            const openCriteria = (deal?.successCriteriaTodos as any[])?.filter((c: any) => !c.achieved) ?? []
-            const total = openTodos.length + openTasks.length + openCriteria.length
-            if (total === 0) return 'Manage'
-            return `Manage (${total})`
-          })() },
-          { id: 'notes', label: 'Notes' },
-          { id: 'team', label: 'Team' },
-        ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} style={{
-            padding: isMobile ? '12px 16px' : '10px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '500',
-            color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-tertiary)',
-            borderBottom: activeTab === tab.id ? '2px solid #1DB86A' : '2px solid transparent',
-            marginBottom: '-1px', transition: 'color 0.1s',
-            minHeight: isMobile ? '44px' : undefined, flexShrink: 0,
-          }}>
-            {tab.label}
-          </button>
-        ))}
       </div>
 
-      {/* Modals */}
-      <EditDealModal
-        deal={deal} dealId={id} open={editOpen} onOpenChange={setEditOpen}
-        onSaved={() => mutate()}
-        onWon={(data) => { setWonDeal(data); setWinStoryOpen(true) }}
-      />
-      <WinStoryPromptModal wonDeal={wonDeal} open={winStoryOpen} onOpenChange={setWinStoryOpen} currencySymbol={currencySymbol} />
-
-      {/* ── Log Meeting modal ─────────────────────────────────────────── */}
-      {logMeetingOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', zIndex: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '16px', width: '100%', maxWidth: '560px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.10)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.02em' }}>Log meeting</h3>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '4px 0 0' }}>Paste your notes — Halvex will extract objections, competitors, and product gaps automatically.</p>
-              </div>
-              <button onClick={() => setLogMeetingOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: '4px' }}>
-                <X size={16} />
-              </button>
-            </div>
-            <textarea
-              value={meetingNotesDraft}
-              onChange={e => setMeetingNotesDraft(e.target.value)}
-              placeholder="Paste or type your meeting notes here…"
-              rows={10}
+      <aside className="deal-right-panel" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            borderRadius: 14,
+            padding: '16px 18px',
+            color: 'var(--bg)',
+            background: 'linear-gradient(135deg, var(--ink) 0%, #2A2822 100%)',
+            boxShadow: '0 16px 40px rgba(20, 17, 10, 0.16)',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              inset: '-24px -24px auto auto',
+              width: 120,
+              height: 120,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(29, 184, 106, 0.15) 0%, transparent 72%)',
+              filter: 'blur(20px)',
+            }}
+          />
+          <div
+            style={{
+              position: 'relative',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 9.5,
+              fontWeight: 600,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              color: 'rgba(250, 250, 247, 0.6)',
+            }}
+          >
+            <Sparkles size={10} strokeWidth={2.5} />
+            Recommended next action
+          </div>
+          <AIVoice as="div" style={{ position: 'relative', marginTop: 12, fontSize: 17, lineHeight: 1.35, letterSpacing: '-0.01em' }}>
+            {deal.nextSteps ? `Send the ${deal.nextSteps.toLowerCase()}.` : 'Tighten the next action and share it with the buying team before momentum cools.'}
+          </AIVoice>
+          <div style={{ position: 'relative', marginTop: 14, display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => sendToCopilot(`Draft the next-action message for ${deal.dealName}.`)}
               style={{
-                width: '100%', resize: 'vertical', padding: '12px 14px',
-                background: 'var(--surface-2)', border: '1px solid var(--border-default)',
-                borderRadius: '10px', fontSize: '13px', lineHeight: 1.6,
-                color: 'var(--text-primary)', outline: 'none', caretColor: 'var(--text-primary)',
-                fontFamily: 'inherit',
+                flex: 1,
+                padding: '5px 10px',
+                borderRadius: 5,
+                border: 'none',
+                background: 'var(--signal)',
+                color: 'var(--bg)',
+                fontSize: 11,
+                fontWeight: 600,
               }}
-              onFocus={e => (e.target.style.borderColor = '#1DB86A')}
-              onBlur={e => (e.target.style.borderColor = 'var(--border-default)')}
-            />
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => { setLogMeetingOpen(false); setMeetingNotesDraft('') }}
-                style={{ padding: '9px 16px', borderRadius: '8px', background: 'var(--surface-2)', border: '1px solid var(--border-default)', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-              <button
-                disabled={meetingLogging || !meetingNotesDraft.trim()}
-                onClick={async () => {
-                  if (!meetingNotesDraft.trim()) return
-                  setMeetingLogging(true)
-                  try {
-                    const res = await fetch(`/api/deals/${id}/meeting-notes`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ notes: meetingNotesDraft }),
-                    })
-                    const json = await res.json()
-                    setLogMeetingOpen(false)
-                    setMeetingNotesDraft('')
-                    setMeetingToast(json.message ?? 'Meeting notes logged.')
-                    setTimeout(() => setMeetingToast(null), 5000)
-                    mutate()
-                  } finally {
-                    setMeetingLogging(false)
-                  }
-                }}
-                style={{
-                  padding: '9px 20px', borderRadius: '8px',
-                  background: meetingLogging || !meetingNotesDraft.trim() ? 'var(--surface-2)' : '#1DB86A',
-                  border: meetingLogging || !meetingNotesDraft.trim() ? '1px solid var(--border-default)' : 'none',
-                  color: meetingLogging || !meetingNotesDraft.trim() ? 'var(--text-tertiary)' : '#ffffff', fontSize: '13px', fontWeight: 600,
-                  cursor: meetingLogging || !meetingNotesDraft.trim() ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {meetingLogging ? 'Extracting…' : 'Log & extract'}
-              </button>
-            </div>
+            >
+              Draft now
+            </button>
+            <button
+              onClick={() => sendToCopilot(`What should I do if I skip the current next action on ${deal.dealName}?`)}
+              style={{
+                flex: 1,
+                padding: '5px 10px',
+                borderRadius: 5,
+                border: '1px solid rgba(250, 250, 247, 0.15)',
+                background: 'rgba(250, 250, 247, 0.1)',
+                color: 'var(--bg)',
+                fontSize: 11,
+                fontWeight: 500,
+              }}
+            >
+              Skip
+            </button>
           </div>
         </div>
-      )}
 
-      {/* ── Meeting toast ───────────────────────────────────────────────── */}
-      {meetingToast && (
-        <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 800, background: 'var(--surface-1)', border: '1px solid rgba(29,184,106,0.25)', borderRadius: '12px', padding: '14px 18px', color: '#1DB86A', fontSize: '13px', fontWeight: 600, boxShadow: '0 8px 32px rgba(0,0,0,0.10)', maxWidth: '360px' }}>
-          ✓ {meetingToast}
+        <div className="surface-glass-strong" style={{ borderRadius: 14, padding: '16px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span className="section-label">Stakeholders</span>
+            <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{stakeholders.length} · map →</span>
+          </div>
+          {stakeholders.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>No stakeholders mapped yet.</div>
+          ) : (
+            stakeholders.map(person => (
+              <div
+                key={`${person.name}-${person.role}`}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'auto 1fr auto',
+                  gap: 10,
+                  alignItems: 'center',
+                  padding: '8px 0',
+                  borderBottom: '1px solid rgba(20, 17, 10, 0.05)',
+                }}
+              >
+                <div
+                  style={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 8,
+                    background: avatarGradientFromName(person.name),
+                    color: '#fff',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    display: 'grid',
+                    placeItems: 'center',
+                  }}
+                >
+                  {initialsFromName(person.name)}
+                </div>
+                <div>
+                  <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink)' }}>{person.name}</div>
+                  <div style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>{person.role}</div>
+                </div>
+                <div
+                  className={person.sentiment === 'positive' ? 'sentiment-ripple' : undefined}
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: person.sentiment === 'positive' ? 'var(--signal)' : 'var(--ink-4)',
+                  }}
+                />
+              </div>
+            ))
+          )}
         </div>
-      )}
 
-      {/* ── Tab content ────────────────────────────────────────────────── */}
-      {!deal ? (
-        <div style={{ height: '200px', borderRadius: '1rem', background: 'var(--surface-2)' }} />
-      ) : (
-        <div>
-          {activeTab === 'overview' && (
-            <OverviewTab
-              dealId={id} deal={deal} dealGaps={dealGaps} onUpdate={() => mutate()}
-              currencySymbol={currencySymbol} mlPrediction={mlPrediction}
-              globalPrior={globalPrior} brainData={brainRes?.data}
-              objectionWinMap={objectionWinMap} objectionConditionalWins={objectionConditionalWins}
-            />
-          )}
-          {activeTab === 'manage' && (
-            <ActionsTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
-          )}
-          {activeTab === 'notes' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <ActivityTab dealId={id} deal={deal} onUpdate={() => mutate()} members={workspaceMembers} />
-              <ActivityLog dealId={id} deal={deal} onUpdate={() => mutate()} />
+        <div className="surface-glass-strong" style={{ borderRadius: 14, padding: '16px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span className="section-label">Close forecast</span>
+            <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>Model →</span>
+          </div>
+          {[
+            { label: 'Quarter this', value: score, gradient: 'linear-gradient(90deg, #1DB86A 0%, #69D59F 100%)' },
+            { label: 'Quarter next', value: Math.max(5, 100 - score - 12), gradient: 'linear-gradient(90deg, #C4621B 0%, #E8A05E 100%)' },
+            { label: 'Lost', value: Math.max(3, 100 - score), gradient: 'linear-gradient(90deg, #B23A3A 0%, #D86B6B 100%)' },
+          ].map(row => (
+            <div key={row.label} style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>{row.label}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500 }}>{formatPercentage(row.value)}</span>
+              </div>
+              <div style={{ width: '100%', height: 4, borderRadius: 999, background: 'rgba(20, 17, 10, 0.06)' }}>
+                <div style={{ width: `${Math.min(100, row.value)}%`, height: 4, borderRadius: 999, background: row.gradient }} />
+              </div>
             </div>
-          )}
-          {activeTab === 'team' && (
-            <TeamTab deal={deal} currencySymbol={currencySymbol} />
+          ))}
+        </div>
+
+        <div className="surface-glass-strong" style={{ borderRadius: 14, padding: '16px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span className="section-label">Competitor mentions</span>
+            <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>30d</span>
+          </div>
+          {competitorMentions.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>No competitor mentions in this deal yet.</div>
+          ) : (
+            competitorMentions.map(name => (
+              <div
+                key={name}
+                className="surface-glass-light"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  borderRadius: 6,
+                  padding: '8px 10px',
+                  marginBottom: 8,
+                }}
+              >
+                <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{name}</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-3)' }}>
+                  1 <MoveUpRight size={10} style={{ verticalAlign: 'middle' }} />
+                </span>
+              </div>
+            ))
           )}
         </div>
-      )}
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+        <div className="surface-glass-strong" style={{ borderRadius: 14, padding: '16px 18px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span className="section-label">Automations active</span>
+            <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{automationList.length || 0} running</span>
+          </div>
+          {(automationList.length ? automationList : [{ id: 'briefing', name: 'Morning briefing', category: 'intelligence' }]).map(item => (
+            <div
+              key={item.id}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '24px 1fr',
+                gap: 10,
+                alignItems: 'center',
+                padding: '8px 0',
+                borderBottom: '1px solid rgba(20, 17, 10, 0.05)',
+              }}
+            >
+              <div
+                className="surface-glass-light"
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 6,
+                  display: 'grid',
+                  placeItems: 'center',
+                }}
+              >
+                <Bot size={12} strokeWidth={2} />
+              </div>
+              <div>
+                <div style={{ fontSize: 12.5, color: 'var(--ink)' }}>{item.name}</div>
+                <div style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>
+                  {item.category === 'alerts' ? 'Alerts' : 'Intelligence'} · active now
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </aside>
+      <style>{`
+        @media (max-width: 1180px) {
+          .deal-workspace-layout {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+
+          .deal-workspace-main {
+            border-right: none !important;
+            border-bottom: 1px solid rgba(20, 17, 10, 0.06);
+          }
+
+          .deal-right-panel {
+            padding-top: 0 !important;
+          }
+        }
+
+        @media (max-width: 900px) {
+          .deal-signals-grid,
+          .deal-manage-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
     </div>
   )
 }

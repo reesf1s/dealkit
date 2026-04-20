@@ -11,6 +11,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import type { Event, EventType } from '@/types'
+import { humanizeActivityLabel } from '@/lib/presentation'
 
 interface ActivityFeedProps {
   events: Event[]
@@ -121,7 +122,7 @@ function fallbackConfig(): EventConfig {
     icon: FileText,
     color: '#787774',
     bg: 'rgba(55, 53, 47, 0.06)',
-    label: () => 'Activity',
+    label: (meta) => humanizeActivityLabel(String(meta.type ?? 'activity'), meta),
   }
 }
 
@@ -196,7 +197,7 @@ export function ActivityFeed({ events }: ActivityFeedProps) {
         {recent.map((event) => {
           const config = EVENT_CONFIG[event.type] ?? fallbackConfig()
           const { icon: Icon, color, bg, label } = config
-          const meta = event.metadata as Record<string, unknown>
+          const meta = { ...(event.metadata as Record<string, unknown>), type: event.type }
 
           return (
             <div

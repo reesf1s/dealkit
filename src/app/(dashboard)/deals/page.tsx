@@ -154,7 +154,7 @@ function StatCell({
         </div>
         <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
           {trend && (
-            <span style={{ fontSize: 12, fontFamily: "'Geist Mono', monospace", color: '#1DB86A' }}>
+            <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: '#1DB86A' }}>
               ↗ {trend}
             </span>
           )}
@@ -406,7 +406,7 @@ function KanbanView({
                 background: 'var(--surface-3)',
                 padding: '1px 7px',
                 borderRadius: 99,
-                fontFamily: "'Geist Mono', monospace",
+                fontFamily: 'var(--font-mono)',
               }}>
                 {(dealsByStage[stage.id] ?? []).length}
               </span>
@@ -481,7 +481,7 @@ function KanbanView({
                           fontSize: 11,
                           color: 'var(--text-secondary)',
                           fontVariantNumeric: 'tabular-nums',
-                          fontFamily: "'Geist Mono', monospace",
+                          fontFamily: 'var(--font-mono)',
                           fontWeight: 500,
                         }}>
                           {formatVal(deal.dealValue, currencySymbol)}
@@ -944,7 +944,7 @@ function DealsPageInner() {
                 fontSize: 14,
                 color: 'var(--text-primary)',
                 background: 'transparent',
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                fontFamily: 'var(--font-sans)',
               }}
             />
             {search && (
@@ -1206,7 +1206,7 @@ function DealsPageInner() {
                     fontWeight: 500,
                     color: deal.dealValue > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
                     textAlign: 'right',
-                    fontFamily: "'Geist Mono', monospace",
+                    fontFamily: 'var(--font-mono)',
                     letterSpacing: '-0.03em',
                     display: 'block',
                   }}>

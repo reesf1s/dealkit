@@ -10,6 +10,7 @@ import {
   RefreshCw, CheckCircle2, Zap,
 } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
+import { formatCurrencyGBP, humanizeActivityLabel } from '@/lib/presentation'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -66,11 +67,11 @@ interface ActivityEvent {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function fmtCurrency(n: number | null | undefined, sym = '£'): string {
-  if (!n && n !== 0) return '—'
-  if (n >= 1_000_000) return `${sym}${(n / 1_000_000).toFixed(1)}m`
-  if (n >= 1_000) return `${sym}${Math.round(n / 1_000)}k`
-  return `${sym}${Math.round(n)}`
+function fmtCurrency(n: number | null | undefined): string {
+  if (n == null) return '—'
+  if (n >= 1_000_000) return `£${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `£${Math.round(n / 1_000)}k`
+  return formatCurrencyGBP(n)
 }
 
 function relativeTime(iso: string): string {
@@ -87,36 +88,7 @@ function todayLabel(): string {
 }
 
 function eventLabel(type: string, meta: Record<string, unknown>, enrichedDealName?: string): string {
-  const deal = (meta?.dealName ?? enrichedDealName ?? meta?.customerName ?? 'Unknown') as string
-  const stage = String(meta?.value ?? meta?.newStage ?? meta?.stage ?? '').replace(/_/g, ' ')
-  switch (type) {
-    case 'deal_log.created':   return `${deal} added to pipeline`
-    case 'deal_log.updated':
-      if (meta?.field === 'stage' && stage) return `${deal} moved to ${stage}`
-      return `${deal} updated`
-    case 'deal_log.deleted':   return `${deal} removed`
-    case 'deal_log.closed_won':  return `${deal} won`
-    case 'deal_log.closed_lost': return `${deal} lost`
-    case 'deal_log.todos_updated': return `${deal} todos updated`
-    case 'note_added':         return `Note added to ${deal}`
-    case 'deal_log.note_added': return `Note added to ${deal}`
-    case 'ai_analysis':        return `AI analysed ${deal}`
-    case 'deal_log.ai_scored': return `AI scored ${deal}`
-    case 'collateral.generated': return `${String(meta?.collateralType ?? 'Collateral').replace(/_/g, ' ')} generated`
-    case 'collateral.archived':  return 'Collateral archived'
-    case 'competitor.created':  return `Competitor added — ${deal}`
-    case 'competitor.updated':  return `Competitor updated — ${deal}`
-    case 'company_profile.updated': return 'Company profile updated'
-    case 'case_study.created':  return `Case study — ${deal}`
-    case 'case_study.updated':  return `Case study updated — ${deal}`
-    case 'plan.upgraded':   return 'Plan upgraded'
-    case 'plan.downgraded': return 'Plan downgraded'
-    case 'deal_created': return `${deal} added to pipeline`
-    case 'deal_stage_changed': return `${deal} moved to ${stage}`
-    case 'deal_won': return `${deal} won`
-    case 'deal_lost': return `${deal} lost`
-    default: return type.replace(/[_.]/g, ' ')
-  }
+  return humanizeActivityLabel(type, meta, enrichedDealName)
 }
 
 function eventDotColor(type: string): string {
@@ -255,7 +227,7 @@ function TodayActionCard({ item }: { item: TodayAction }) {
               </span>
             )}
             {item.value != null && item.value > 0 && (
-              <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--brand)', fontFamily: "'Geist Mono', monospace" }}>
+              <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--brand)', fontFamily: 'var(--font-mono)' }}>
                 {fmtCurrency(item.value)}
               </span>
             )}
@@ -309,6 +281,7 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
+  const [renderedAt] = useState(() => new Date())
   const { user } = useUser()
 
   const { data: brainRes, isLoading: brainLoading, mutate: mutateBrain } = useSWR('/api/brain', fetcher, {
@@ -373,14 +346,14 @@ export default function DashboardPage() {
   const isBrainBuilding = brainRes?.status === 'building'
   const brainAge = brain.updatedAt
     ? (() => {
-        const mins = Math.floor((Date.now() - new Date(brain.updatedAt).getTime()) / 60000)
+        const mins = Math.floor((renderedAt.getTime() - new Date(brain.updatedAt).getTime()) / 60000)
         if (mins < 2) return 'live'
         if (mins < 60) return `${mins}m ago`
         return `${Math.floor(mins / 60)}h ago`
       })()
     : null
 
-  const hour = new Date().getHours()
+  const hour = renderedAt.getHours()
   const greeting = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
 
   return (

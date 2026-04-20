@@ -60,7 +60,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
         fontSize: '11px',
         fontWeight: 500,
         letterSpacing: '0.02em',
-        fontFamily: 'var(--font-geist-mono), ui-monospace, monospace',
+        fontFamily: 'var(--font-mono), ui-monospace, monospace',
         color: config.color,
         backgroundColor: config.bg,
         whiteSpace: 'nowrap',
