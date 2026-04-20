@@ -2,13 +2,30 @@ import Link from 'next/link'
 import { auth } from '@clerk/nextjs/server'
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
+import {
+  ArrowRight,
+  CalendarClock,
+  Check,
+  ChevronRight,
+  LineChart,
+  MessagesSquare,
+  PoundSterling,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  Workflow,
+  type LucideIcon,
+} from 'lucide-react'
+import AIVoice from '@/components/AIVoice'
 
 export const metadata: Metadata = {
   title: 'Halvex — AI Deal Intelligence',
-  description: 'Halvex turns your deal updates into AI-powered intelligence. Daily briefings, risk scoring, meeting extraction, and pipeline analytics that help you close more revenue.',
+  description:
+    'Halvex turns deal updates, meeting notes, and stakeholder signals into a revenue operating system your team can actually run from.',
   openGraph: {
     title: 'Halvex — AI Deal Intelligence',
-    description: 'AI that reads every deal update and tells you exactly what to do next. Daily briefings, live scoring, and pipeline intelligence for revenue teams.',
+    description:
+      'The deal workspace that turns every update into a briefing, a next action, and a cleaner forecast.',
     type: 'website',
     url: 'https://halvex.ai',
     siteName: 'Halvex',
@@ -16,8 +33,87 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Halvex — AI Deal Intelligence',
-    description: 'AI that reads every deal update and tells you exactly what to do next.',
+    description:
+      'AI that reads the whole deal, not just the CRM field you remembered to update.',
   },
+}
+
+type Capability = {
+  eyebrow: string
+  title: string
+  body: string
+  icon: LucideIcon
+}
+
+const proofPoints = [
+  { label: 'Morning briefing', value: 'Live every day' },
+  { label: 'Next action', value: 'Always explicit' },
+  { label: 'Forecast view', value: 'Deal-aware' },
+]
+
+const capabilities: Capability[] = [
+  {
+    eyebrow: 'Morning Briefing',
+    title: 'Start the day with a point of view',
+    body:
+      'Halvex reads the whole workspace and tells reps what needs action, what is slipping, and which opportunities are actually moving.',
+    icon: Sparkles,
+  },
+  {
+    eyebrow: 'Deal Workspace',
+    title: 'Run every account from one operating surface',
+    body:
+      'Notes, tasks, project plans, stakeholders, documents, and AI coaching stay in the same workspace so context never fragments.',
+    icon: Workflow,
+  },
+  {
+    eyebrow: 'Signals And Forecast',
+    title: 'See pressure before it becomes regret',
+    body:
+      'Track stakeholder movement, blockers, timing risk, and revenue exposure with a clearer view of what to push, rescue, or deprioritize.',
+    icon: LineChart,
+  },
+]
+
+const operatingModel = [
+  {
+    step: '01',
+    title: 'Capture the truth of the deal',
+    body:
+      'Reps paste call notes, log updates, or connect the system they already use. Halvex turns raw information into usable structure.',
+  },
+  {
+    step: '02',
+    title: 'Create the next move automatically',
+    body:
+      'Tasks, project steps, stakeholder actions, and recommended follow-ups are generated inside the deal instead of living in scattered tools.',
+  },
+  {
+    step: '03',
+    title: 'Run the whole workspace from signal, not guesswork',
+    body:
+      'Overview, signals, tasks, and the deal workspace stay aligned so the team sees the same pressure and acts from the same picture.',
+  },
+]
+
+const pricingPoints = [
+  'Unlimited deals, contacts, and deal workspaces',
+  'AI briefings, recommended actions, and task generation',
+  'Signals, forecasting, and deal-level risk detection',
+  'Meeting intelligence, stakeholder mapping, and project plans',
+]
+
+function CapabilityCard({ eyebrow, title, body, icon: Icon }: Capability) {
+  return (
+    <article className="surface-glass-strong marketing-card">
+      <div className="marketing-card-icon">
+        <Icon size={16} strokeWidth={2} />
+      </div>
+      <div className="marketing-card-eyebrow">{eyebrow}</div>
+      <h3 className="marketing-card-title">{title}</h3>
+      <p className="marketing-card-body">{body}</p>
+    </article>
+  )
 }
 
 export default async function LandingPage() {
@@ -25,581 +121,1355 @@ export default async function LandingPage() {
     const { userId } = await auth()
     if (userId) redirect('/dashboard')
   } catch {
-    // Clerk not configured — show landing page
+    // Clerk not configured — render marketing page
   }
 
   return (
-    <div style={{
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-      fontSize: '14px',
-      lineHeight: '1.6',
-      minHeight: '100vh',
-      overflowX: 'hidden',
-      WebkitFontSmoothing: 'antialiased',
-      MozOsxFontSmoothing: 'grayscale',
-    }}>
+    <main className="marketing-shell">
       <style>{`
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        a { color: inherit; text-decoration: none; }
-
-        @keyframes fade-in {
-          from { opacity: 0; transform: translateY(12px); }
-          to { opacity: 1; transform: translateY(0); }
+        .marketing-shell {
+          position: relative;
+          z-index: 1;
+          min-height: 100vh;
+          color: var(--ink);
         }
-        @keyframes pulse-dot {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(0.85); }
+        .marketing-frame {
+          width: min(1180px, calc(100vw - 40px));
+          margin: 0 auto;
         }
-        @keyframes gradient-shift {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
+        .marketing-nav-wrap {
+          position: sticky;
+          top: 0;
+          z-index: 40;
+          padding: 18px 0 0;
         }
-
-        .lp-nav-link { color: rgba(255,255,255,0.6); transition: color 0.15s; }
-        .lp-nav-link:hover { color: #ffffff; }
-        .lp-cta-primary {
-          display: inline-flex; align-items: center; gap: 8px;
-          padding: 14px 28px; border-radius: 10px; border: none;
-          background: #1DB86A; color: #ffffff;
-          font-size: 15px; font-weight: 700; font-family: inherit;
-          cursor: pointer; transition: all 0.2s; text-decoration: none;
+        .marketing-nav {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 18px;
+          padding: 12px 16px;
+          border-radius: 14px;
         }
-        .lp-cta-primary:hover { background: #19a45e; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(29,184,106,0.3); }
-        .lp-cta-secondary {
-          display: inline-flex; align-items: center; gap: 8px;
-          padding: 14px 28px; border-radius: 10px;
-          border: 1px solid rgba(255,255,255,0.15);
-          background: rgba(255,255,255,0.05); color: #ffffff;
-          font-size: 15px; font-weight: 600; font-family: inherit;
-          cursor: pointer; transition: all 0.2s; text-decoration: none;
+        .marketing-brand {
+          display: inline-flex;
+          align-items: center;
+          gap: 12px;
+          min-width: 0;
         }
-        .lp-cta-secondary:hover { background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.25); }
-        .lp-cta-dark {
-          display: inline-flex; align-items: center; gap: 8px;
-          padding: 14px 32px; border-radius: 10px; border: none;
-          background: #0f0f0f; color: #ffffff;
-          font-size: 15px; font-weight: 700; font-family: inherit;
-          cursor: pointer; transition: all 0.2s; text-decoration: none;
+        .marketing-mark {
+          width: 32px;
+          height: 32px;
+          border-radius: 10px;
+          background: var(--ink);
+          color: var(--bg);
+          display: grid;
+          place-items: center;
+          font-size: 14px;
+          font-weight: 700;
+          letter-spacing: -0.04em;
         }
-        .lp-cta-dark:hover { background: #1a1a1a; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
-        .lp-feature-card {
-          background: #ffffff; border: 1px solid #eee;
-          border-radius: 14px; padding: 32px;
-          transition: all 0.25s;
+        .marketing-brand-copy {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          min-width: 0;
         }
-        .lp-feature-card:hover { border-color: #ddd; box-shadow: 0 8px 32px rgba(0,0,0,0.06); transform: translateY(-2px); }
-        .lp-step-card {
-          background: #ffffff; border: 1px solid #eee;
-          border-radius: 14px; padding: 28px 24px;
-          text-align: center; transition: all 0.25s;
+        .marketing-brand-name {
+          font-size: 15px;
+          font-weight: 600;
+          letter-spacing: -0.02em;
+          color: var(--ink);
         }
-        .lp-step-card:hover { border-color: #ddd; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
-
-        @media (max-width: 768px) {
-          .lp-hero-h1 { font-size: 36px !important; }
-          .lp-hero-sub { font-size: 16px !important; }
-          .lp-feature-grid { grid-template-columns: 1fr !important; }
-          .lp-step-grid { grid-template-columns: 1fr !important; }
-          .lp-hero-ctas { flex-direction: column !important; }
-          .lp-nav-links { display: none !important; }
-          .lp-footer-inner { flex-direction: column !important; gap: 16px !important; text-align: center !important; }
-          .lp-briefing-mockup { display: none !important; }
-          .lp-two-col { grid-template-columns: 1fr !important; }
+        .marketing-beta {
+          display: inline-flex;
+          align-items: center;
+          padding: 4px 8px;
+          border-radius: 999px;
+          background: rgba(29, 184, 106, 0.1);
+          color: var(--signal);
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+        .marketing-nav-links {
+          display: inline-flex;
+          align-items: center;
+          gap: 18px;
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+        .marketing-nav-links a {
+          color: var(--ink-3);
+          font-size: 12px;
+          font-weight: 500;
+          transition: color 0.16s ease;
+        }
+        .marketing-nav-links a:hover {
+          color: var(--ink);
+        }
+        .marketing-nav-actions {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .marketing-section {
+          padding: 36px 0;
+        }
+        .marketing-hero {
+          padding-top: 46px;
+          padding-bottom: 26px;
+        }
+        .marketing-hero-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.02fr) minmax(360px, 0.98fr);
+          gap: 28px;
+          align-items: stretch;
+        }
+        .marketing-eyebrow {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 12px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.52);
+          border: 1px solid rgba(255, 255, 255, 0.72);
+          color: var(--ink-2);
+          font-size: 11px;
+          font-weight: 600;
+          margin-bottom: 18px;
+        }
+        .marketing-eyebrow-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--signal);
+          box-shadow: 0 0 0 4px rgba(29, 184, 106, 0.12);
+        }
+        .marketing-hero-panel {
+          padding: 26px;
+          border-radius: 14px;
+        }
+        .marketing-title {
+          font-size: clamp(42px, 6vw, 72px);
+          line-height: 0.96;
+          letter-spacing: -0.075em;
+          font-weight: 600;
+          color: var(--ink);
+          max-width: 9.5em;
+        }
+        .marketing-title-muted {
+          color: rgba(21, 19, 14, 0.46);
+          display: block;
+        }
+        .marketing-subtitle {
+          margin-top: 22px;
+          max-width: 650px;
+          font-size: 15px;
+          line-height: 1.75;
+          color: var(--ink-3);
+        }
+        .marketing-hero-note {
+          margin-top: 18px;
+          max-width: 620px;
+          font-size: 28px;
+          line-height: 1.26;
+          color: var(--ink);
+        }
+        .marketing-hero-actions {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          flex-wrap: wrap;
+          margin-top: 28px;
+        }
+        .marketing-proof-row {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 10px;
+          margin-top: 26px;
+        }
+        .marketing-proof-card {
+          padding: 14px;
+          border-radius: 10px;
+          background: rgba(255, 255, 255, 0.46);
+          border: 1px solid rgba(255, 255, 255, 0.74);
+        }
+        .marketing-proof-label {
+          font-size: 10px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--ink-4);
+          margin-bottom: 6px;
+          font-weight: 600;
+        }
+        .marketing-proof-value {
+          font-size: 16px;
+          line-height: 1.1;
+          letter-spacing: -0.04em;
+          color: var(--ink);
+          font-weight: 600;
+        }
+        .marketing-preview {
+          padding: 18px;
+          border-radius: 14px;
+          min-height: 100%;
+          overflow: hidden;
+        }
+        .preview-topbar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding-bottom: 14px;
+          border-bottom: 1px solid rgba(20, 17, 10, 0.06);
+          margin-bottom: 16px;
+        }
+        .preview-breadcrumb {
+          font-size: 12px;
+          color: var(--ink-3);
+        }
+        .preview-toolbar {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .preview-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 1.08fr) 300px;
+          gap: 16px;
+        }
+        .preview-main {
+          display: grid;
+          gap: 14px;
+        }
+        .preview-title-row {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 14px;
+          align-items: end;
+        }
+        .preview-meta {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+          font-size: 11px;
+          color: var(--ink-4);
+          margin-bottom: 12px;
+        }
+        .preview-title {
+          font-size: clamp(28px, 3vw, 44px);
+          line-height: 0.98;
+          letter-spacing: -0.065em;
+          font-weight: 600;
+          color: var(--ink);
+          max-width: 8.4em;
+        }
+        .preview-value {
+          text-align: right;
+        }
+        .preview-value .mono {
+          font-size: 18px;
+          font-weight: 600;
+          letter-spacing: -0.04em;
+        }
+        .preview-value span:last-child {
+          display: block;
+          margin-top: 6px;
+          color: var(--ink-4);
+          font-size: 10px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+        .preview-score {
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr) auto auto;
+          gap: 12px;
+          align-items: center;
+          padding: 16px 18px;
+          border-radius: 14px;
+          background: rgba(255, 255, 255, 0.68);
+          border: 1px solid rgba(255, 255, 255, 0.82);
+          box-shadow: var(--glass-shadow);
+        }
+        .preview-score-ring {
+          width: 56px;
+          height: 56px;
+          border-radius: 50%;
+          border: 4px solid rgba(29, 184, 106, 0.18);
+          border-top-color: var(--signal);
+          display: grid;
+          place-items: center;
+          font-size: 18px;
+          font-weight: 700;
+          color: var(--ink);
+        }
+        .preview-score-copy strong {
+          display: block;
+          font-size: 26px;
+          line-height: 1;
+          letter-spacing: -0.05em;
+          color: var(--ink);
+          font-weight: 500;
+        }
+        .preview-score-copy span {
+          display: block;
+          margin-top: 7px;
+          color: var(--ink-3);
+          font-size: 12px;
+          line-height: 1.5;
+        }
+        .preview-delta {
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--signal);
+          white-space: nowrap;
+        }
+        .preview-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 7px 12px;
+          border-radius: 999px;
+          background: rgba(29, 184, 106, 0.12);
+          color: #0d7a43;
+          font-size: 11px;
+          font-weight: 600;
+        }
+        .preview-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--signal);
+        }
+        .preview-tabs {
+          display: flex;
+          align-items: center;
+          gap: 18px;
+          padding: 0 10px;
+          border-bottom: 1px solid rgba(20, 17, 10, 0.08);
+        }
+        .preview-tab {
+          position: relative;
+          padding: 0 0 11px;
+          color: var(--ink-3);
+          font-size: 12px;
+          font-weight: 500;
+        }
+        .preview-tab.active {
+          color: var(--ink);
+        }
+        .preview-tab.active::after {
+          content: "";
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: -1px;
+          height: 2px;
+          border-radius: 999px;
+          background: var(--ink);
+        }
+        .preview-briefing {
+          padding: 22px;
+          border-radius: 14px;
+          position: relative;
+          overflow: hidden;
+        }
+        .preview-briefing::before {
+          content: "";
+          position: absolute;
+          inset: 0 auto 0 0;
+          width: 3px;
+          background: linear-gradient(180deg, var(--signal) 0%, rgba(29, 184, 106, 0.12) 100%);
+        }
+        .preview-section-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 10px;
+          margin-bottom: 14px;
+          flex-wrap: wrap;
+        }
+        .preview-ai-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          border-radius: 999px;
+          background: var(--ink);
+          color: var(--bg);
+          font-size: 10px;
+          font-weight: 600;
+        }
+        .preview-ai-badge .preview-dot {
+          box-shadow: 0 0 0 3px rgba(29, 184, 106, 0.18);
+        }
+        .preview-briefing-time {
+          font-size: 11px;
+          color: var(--ink-4);
+        }
+        .preview-briefing-copy {
+          font-size: 28px;
+          line-height: 1.33;
+          color: var(--ink);
+        }
+        .preview-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 18px;
+          padding-top: 18px;
+          border-top: 1px solid rgba(20, 17, 10, 0.06);
+        }
+        .preview-action-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 12px;
+          border-radius: 999px;
+          background: rgba(255, 255, 255, 0.55);
+          border: 1px solid rgba(255, 255, 255, 0.82);
+          color: var(--ink-2);
+          font-size: 11px;
+          font-weight: 500;
+        }
+        .preview-signals {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+        .preview-signal-card {
+          padding: 14px;
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.46);
+          border: 1px solid rgba(255, 255, 255, 0.74);
+        }
+        .preview-signal-label {
+          font-size: 10px;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: var(--ink-4);
+          margin-bottom: 8px;
+          font-weight: 600;
+        }
+        .preview-signal-body {
+          font-size: 13px;
+          line-height: 1.5;
+          color: var(--ink);
+        }
+        .preview-side {
+          display: grid;
+          gap: 12px;
+          align-content: start;
+        }
+        .preview-next-action {
+          padding: 18px;
+          border-radius: 14px;
+          background:
+            linear-gradient(180deg, rgba(40, 36, 31, 0.98), rgba(20, 17, 10, 0.98)),
+            linear-gradient(135deg, rgba(29, 184, 106, 0.1), transparent 60%);
+          color: var(--bg);
+          box-shadow: 0 14px 34px rgba(20, 17, 10, 0.22);
+        }
+        .preview-next-label {
+          font-size: 10px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: rgba(250, 250, 247, 0.5);
+          margin-bottom: 10px;
+          font-weight: 600;
+        }
+        .preview-next-copy {
+          font-size: 16px;
+          line-height: 1.5;
+          color: var(--bg);
+        }
+        .preview-next-actions {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+          margin-top: 14px;
+        }
+        .preview-next-actions button {
+          height: 34px;
+          border-radius: 8px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+        .preview-next-actions button:first-child {
+          background: var(--signal);
+          color: #0d2417;
+        }
+        .preview-next-actions button:last-child {
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: rgba(250, 250, 247, 0.78);
+        }
+        .preview-side-card {
+          padding: 16px;
+          border-radius: 14px;
+        }
+        .preview-side-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          margin-bottom: 10px;
+        }
+        .preview-side-title {
+          font-size: 11px;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--ink-4);
+          font-weight: 600;
+        }
+        .preview-side-meta {
+          font-size: 11px;
+          color: var(--ink-4);
+        }
+        .preview-list {
+          display: grid;
+          gap: 10px;
+        }
+        .preview-list-item {
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr) auto;
+          gap: 10px;
+          align-items: center;
+        }
+        .preview-avatar {
+          width: 32px;
+          height: 32px;
+          border-radius: 9px;
+          display: grid;
+          place-items: center;
+          color: #fff;
+          font-size: 11px;
+          font-weight: 700;
+        }
+        .preview-avatar.orange { background: linear-gradient(135deg, #df8f4d, #b66127); }
+        .preview-avatar.blue { background: linear-gradient(135deg, #5d88dd, #3357b7); }
+        .preview-avatar.purple { background: linear-gradient(135deg, #8f73d8, #6541c7); }
+        .preview-avatar.green { background: linear-gradient(135deg, #58ca86, #1b9f57); }
+        .preview-person {
+          min-width: 0;
+        }
+        .preview-person strong {
+          display: block;
+          font-size: 13px;
+          color: var(--ink);
+          font-weight: 600;
+        }
+        .preview-person span {
+          display: block;
+          margin-top: 3px;
+          font-size: 11px;
+          color: var(--ink-4);
+          line-height: 1.4;
+        }
+        .preview-status {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: var(--signal);
+        }
+        .preview-status.warn { background: var(--warn); }
+        .preview-status.idle { background: rgba(20, 17, 10, 0.22); }
+        .preview-forecast-row {
+          display: grid;
+          gap: 10px;
+        }
+        .preview-forecast-line {
+          display: grid;
+          gap: 4px;
+        }
+        .preview-forecast-line strong {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+          font-size: 12px;
+          color: var(--ink-2);
+          font-weight: 500;
+        }
+        .preview-track {
+          height: 6px;
+          border-radius: 999px;
+          background: rgba(20, 17, 10, 0.08);
+          overflow: hidden;
+        }
+        .preview-track > span {
+          display: block;
+          height: 100%;
+          border-radius: inherit;
+        }
+        .preview-track > span.green { background: var(--signal); width: 68%; }
+        .preview-track > span.orange { background: var(--warn); width: 24%; }
+        .preview-track > span.red { background: var(--risk); width: 8%; }
+        .marketing-band {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
+          padding: 16px;
+          border-radius: 14px;
+        }
+        .marketing-band-card {
+          padding: 16px;
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.46);
+          border: 1px solid rgba(255, 255, 255, 0.74);
+        }
+        .marketing-band-card strong {
+          display: block;
+          font-size: 12px;
+          color: var(--ink);
+          margin-bottom: 6px;
+        }
+        .marketing-band-card span {
+          display: block;
+          font-size: 12px;
+          line-height: 1.6;
+          color: var(--ink-3);
+        }
+        .marketing-section-header {
+          display: grid;
+          gap: 12px;
+          margin-bottom: 24px;
+          max-width: 760px;
+        }
+        .marketing-kicker {
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: var(--ink-4);
+        }
+        .marketing-section-title {
+          font-size: clamp(30px, 4vw, 52px);
+          line-height: 0.98;
+          letter-spacing: -0.06em;
+          color: var(--ink);
+          font-weight: 600;
+        }
+        .marketing-section-copy {
+          font-size: 14px;
+          line-height: 1.75;
+          color: var(--ink-3);
+          max-width: 640px;
+        }
+        .marketing-card-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 14px;
+        }
+        .marketing-card {
+          padding: 18px;
+          border-radius: 14px;
+        }
+        .marketing-card-icon {
+          width: 34px;
+          height: 34px;
+          display: grid;
+          place-items: center;
+          border-radius: 10px;
+          background: rgba(20, 17, 10, 0.06);
+          color: var(--ink);
+          margin-bottom: 18px;
+        }
+        .marketing-card-eyebrow {
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: var(--ink-4);
+          margin-bottom: 10px;
+        }
+        .marketing-card-title {
+          font-size: 20px;
+          line-height: 1.02;
+          letter-spacing: -0.04em;
+          color: var(--ink);
+          font-weight: 600;
+        }
+        .marketing-card-body {
+          margin-top: 12px;
+          font-size: 13px;
+          line-height: 1.7;
+          color: var(--ink-3);
+        }
+        .marketing-operating-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 0.92fr) minmax(320px, 1.08fr);
+          gap: 18px;
+          align-items: start;
+        }
+        .marketing-steps,
+        .marketing-operator-panel,
+        .marketing-pricing-card,
+        .marketing-enterprise-card,
+        .marketing-cta-panel {
+          padding: 20px;
+          border-radius: 14px;
+        }
+        .marketing-step-list {
+          display: grid;
+          gap: 12px;
+        }
+        .marketing-step {
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr);
+          gap: 14px;
+          align-items: start;
+          padding: 14px 0;
+          border-top: 1px solid rgba(20, 17, 10, 0.06);
+        }
+        .marketing-step:first-child {
+          border-top: 0;
+          padding-top: 0;
+        }
+        .marketing-step-num {
+          width: 34px;
+          height: 34px;
+          border-radius: 10px;
+          background: rgba(20, 17, 10, 0.06);
+          color: var(--ink);
+          display: grid;
+          place-items: center;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: -0.02em;
+        }
+        .marketing-step h3 {
+          font-size: 16px;
+          line-height: 1.2;
+          letter-spacing: -0.03em;
+          color: var(--ink);
+          font-weight: 600;
+        }
+        .marketing-step p {
+          margin-top: 8px;
+          font-size: 13px;
+          line-height: 1.7;
+          color: var(--ink-3);
+        }
+        .marketing-operator-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+          margin-top: 18px;
+        }
+        .marketing-operator-cell {
+          padding: 16px;
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.52);
+          border: 1px solid rgba(255, 255, 255, 0.76);
+        }
+        .marketing-operator-cell strong {
+          display: block;
+          font-size: 13px;
+          color: var(--ink);
+          margin-bottom: 6px;
+          font-weight: 600;
+        }
+        .marketing-operator-cell span {
+          display: block;
+          font-size: 12px;
+          line-height: 1.65;
+          color: var(--ink-3);
+        }
+        .marketing-pricing-grid {
+          display: grid;
+          grid-template-columns: minmax(0, 0.95fr) minmax(280px, 0.75fr);
+          gap: 16px;
+          align-items: stretch;
+        }
+        .marketing-pricing-card {
+          display: grid;
+          gap: 18px;
+        }
+        .marketing-price {
+          display: flex;
+          align-items: baseline;
+          gap: 8px;
+        }
+        .marketing-price strong {
+          font-size: clamp(40px, 5vw, 58px);
+          line-height: 1;
+          letter-spacing: -0.07em;
+          color: var(--ink);
+          font-weight: 600;
+        }
+        .marketing-price span {
+          font-size: 14px;
+          color: var(--ink-3);
+        }
+        .marketing-checklist {
+          display: grid;
+          gap: 10px;
+        }
+        .marketing-check {
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          font-size: 13px;
+          color: var(--ink-2);
+          line-height: 1.55;
+        }
+        .marketing-check-icon {
+          width: 18px;
+          height: 18px;
+          border-radius: 50%;
+          background: var(--signal-soft);
+          color: var(--signal);
+          display: grid;
+          place-items: center;
+          flex-shrink: 0;
+          margin-top: 1px;
+        }
+        .marketing-enterprise-card {
+          display: grid;
+          gap: 14px;
+        }
+        .marketing-enterprise-card p {
+          font-size: 13px;
+          line-height: 1.7;
+          color: var(--ink-3);
+        }
+        .marketing-cta-panel {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          gap: 20px;
+          align-items: center;
+        }
+        .marketing-cta-copy h2 {
+          font-size: clamp(30px, 4vw, 52px);
+          line-height: 0.98;
+          letter-spacing: -0.06em;
+          color: var(--ink);
+          font-weight: 600;
+        }
+        .marketing-cta-copy p {
+          margin-top: 14px;
+          font-size: 14px;
+          line-height: 1.75;
+          color: var(--ink-3);
+          max-width: 620px;
+        }
+        .marketing-footer {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 14px;
+          padding: 24px 0 34px;
+          color: var(--ink-4);
+          font-size: 12px;
+        }
+        .marketing-footer-links {
+          display: inline-flex;
+          align-items: center;
+          gap: 18px;
+          flex-wrap: wrap;
+        }
+        .marketing-footer-links a:hover {
+          color: var(--ink-2);
+        }
+        @media (max-width: 1120px) {
+          .marketing-hero-grid,
+          .marketing-operating-grid,
+          .marketing-pricing-grid,
+          .marketing-cta-panel,
+          .preview-grid {
+            grid-template-columns: 1fr;
+          }
+          .preview-side {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+        @media (max-width: 960px) {
+          .marketing-nav {
+            flex-wrap: wrap;
+            justify-content: center;
+          }
+          .marketing-nav-links {
+            order: 3;
+            width: 100%;
+          }
+          .marketing-card-grid,
+          .marketing-band,
+          .marketing-proof-row,
+          .marketing-operator-grid,
+          .preview-signals {
+            grid-template-columns: 1fr;
+          }
+          .preview-title-row,
+          .preview-score {
+            grid-template-columns: 1fr;
+          }
+          .preview-value {
+            text-align: left;
+          }
+        }
+        @media (max-width: 720px) {
+          .marketing-frame {
+            width: min(100vw - 24px, 1180px);
+          }
+          .marketing-hero-panel,
+          .marketing-preview,
+          .marketing-steps,
+          .marketing-operator-panel,
+          .marketing-pricing-card,
+          .marketing-enterprise-card,
+          .marketing-cta-panel {
+            padding: 18px;
+          }
+          .marketing-nav-actions {
+            width: 100%;
+            justify-content: center;
+          }
+          .marketing-hero-note,
+          .preview-briefing-copy {
+            font-size: 22px;
+          }
+          .preview-side {
+            grid-template-columns: 1fr;
+          }
+          .preview-next-actions {
+            grid-template-columns: 1fr;
+          }
+          .marketing-cta-panel {
+            justify-items: start;
+          }
+          .marketing-footer {
+            flex-direction: column;
+            text-align: center;
+          }
         }
       `}</style>
 
-      {/* ── Nav ──────────────────────────────────────────────────────────── */}
-      <nav style={{
-        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
-        background: 'rgba(10,10,10,0.85)',
-        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        padding: '0 32px', height: '60px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '36px' }}>
-          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '28px', height: '28px', borderRadius: '8px',
-              background: '#1DB86A',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '14px', fontWeight: 800, color: '#ffffff',
-            }}>H</div>
-            <span style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '0.04em', color: '#ffffff' }}>HALVEX</span>
+      <div className="marketing-frame marketing-nav-wrap">
+        <nav className="surface-glass-heavy marketing-nav">
+          <Link href="/" className="marketing-brand">
+            <div className="marketing-mark">H</div>
+            <div className="marketing-brand-copy">
+              <span className="marketing-brand-name">Halvex</span>
+              <span className="marketing-beta">Beta</span>
+            </div>
           </Link>
-          <div className="lp-nav-links" style={{ display: 'flex', gap: '28px' }}>
-            {['Features', 'How it works', 'Pricing'].map(item => (
-              <a key={item} href={`#${item.toLowerCase().replace(/\s/g, '-')}`} className="lp-nav-link"
-                style={{ fontSize: '13px', fontWeight: 500 }}>
-                {item}
-              </a>
-            ))}
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Link href="/sign-in" className="lp-nav-link" style={{ fontSize: '13px', fontWeight: 500, padding: '8px 16px' }}>
-            Sign in
-          </Link>
-          <Link href="/sign-up" className="lp-cta-primary" style={{ padding: '9px 20px', fontSize: '13px' }}>
-            Get started free
-          </Link>
-        </div>
-      </nav>
 
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section style={{
-        background: 'linear-gradient(135deg, #0a0a0a 0%, #111827 50%, #0a0a0a 100%)',
-        color: '#ffffff',
-        paddingTop: '140px', paddingBottom: '100px',
-        position: 'relative', overflow: 'hidden',
-      }}>
-        {/* Subtle gradient orb */}
-        <div style={{
-          position: 'absolute', top: '-200px', right: '-100px',
-          width: '600px', height: '600px', borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(29,184,106,0.08) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }} />
-        <div style={{
-          position: 'absolute', bottom: '-150px', left: '-50px',
-          width: '400px', height: '400px', borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }} />
-
-        <div style={{ maxWidth: '900px', margin: '0 auto', padding: '0 32px', textAlign: 'center', position: 'relative' }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: '8px',
-            padding: '6px 16px', borderRadius: '999px',
-            background: 'rgba(29,184,106,0.1)', border: '1px solid rgba(29,184,106,0.2)',
-            fontSize: '12px', fontWeight: 600, color: '#1DB86A',
-            marginBottom: '28px',
-            animation: 'fade-in 0.6s ease-out',
-          }}>
-            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#1DB86A', animation: 'pulse-dot 2s ease-in-out infinite' }} />
-            AI-powered deal intelligence
+          <div className="marketing-nav-links">
+            <a href="#product">Product</a>
+            <a href="#workflow">Workflow</a>
+            <a href="#pricing">Pricing</a>
           </div>
 
-          <h1 className="lp-hero-h1" style={{
-            fontSize: '56px', fontWeight: 800, letterSpacing: '-0.035em',
-            lineHeight: 1.1, marginBottom: '24px',
-            animation: 'fade-in 0.6s ease-out 0.1s both',
-          }}>
-            Your AI knows every deal.<br />
-            <span style={{ color: 'rgba(255,255,255,0.4)' }}>You just decide what to close.</span>
-          </h1>
-
-          <p className="lp-hero-sub" style={{
-            fontSize: '18px', color: 'rgba(255,255,255,0.55)',
-            lineHeight: 1.7, maxWidth: '600px', margin: '0 auto 40px',
-            animation: 'fade-in 0.6s ease-out 0.2s both',
-          }}>
-            Halvex reads your meeting notes, scores every deal, and generates a daily briefing telling you exactly who to call, what to say, and which deals need saving.
-          </p>
-
-          <div className="lp-hero-ctas" style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px',
-            animation: 'fade-in 0.6s ease-out 0.3s both',
-          }}>
-            <Link href="/sign-up" className="lp-cta-primary" style={{ padding: '16px 32px', fontSize: '15px' }}>
-              Start for free
+          <div className="marketing-nav-actions">
+            <Link href="/sign-in" className="btn">
+              Sign in
             </Link>
-            <a href="#how-it-works" className="lp-cta-secondary">
-              See how it works
-            </a>
-          </div>
-        </div>
-
-        {/* Briefing mockup */}
-        <div className="lp-briefing-mockup" style={{
-          maxWidth: '680px', margin: '64px auto 0', padding: '0 32px',
-          animation: 'fade-in 0.8s ease-out 0.5s both',
-        }}>
-          <div style={{
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: '16px', padding: '28px 32px',
-            backdropFilter: 'blur(20px)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '18px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#8b5cf6' }} />
-              <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.4)' }}>
-                Daily Focus
-              </span>
-              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)', marginLeft: 'auto' }}>generated 2 min ago</span>
-            </div>
-            <div style={{ fontSize: '13px', lineHeight: 1.9, color: 'rgba(255,255,255,0.7)' }}>
-              <div style={{ marginBottom: '12px' }}>
-                <span style={{ color: '#ef4444' }}>&#x1F534;</span> <strong style={{ color: 'rgba(255,255,255,0.9)' }}>Urgent</strong>
-              </div>
-              <div style={{ paddingLeft: '8px', marginBottom: '6px' }}>
-                1. <strong style={{ color: 'rgba(255,255,255,0.85)' }}>Acme Corp</strong> (£180k) — Chase Sarah on the stalled security review; contract expires Friday.
-              </div>
-              <div style={{ paddingLeft: '8px', marginBottom: '16px' }}>
-                2. <strong style={{ color: 'rgba(255,255,255,0.85)' }}>GlobalTech</strong> (£95k) — Re-engage Mike after his budget objection; offer the phased rollout.
-              </div>
-              <div style={{ marginBottom: '12px' }}>
-                <span style={{ color: '#f59e0b' }}>&#x1F7E1;</span> <strong style={{ color: 'rgba(255,255,255,0.9)' }}>Push Forward</strong>
-              </div>
-              <div style={{ paddingLeft: '8px' }}>
-                3. <strong style={{ color: 'rgba(255,255,255,0.85)' }}>DataFlow Inc</strong> (£220k) — Send the updated proposal to James; he needs it before Thursday board meeting.
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Logos / Trust ────────────────────────────────────────────────── */}
-      <section style={{ background: '#fafafa', borderBottom: '1px solid #eee', padding: '32px 32px' }}>
-        <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
-          <p style={{ fontSize: '12px', fontWeight: 600, color: '#999', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '20px' }}>
-            Built on
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '48px', flexWrap: 'wrap', opacity: 0.5 }}>
-            {['Next.js', 'Claude AI', 'Supabase', 'Vercel', 'HubSpot'].map(name => (
-              <span key={name} style={{ fontSize: '14px', fontWeight: 700, color: '#666', letterSpacing: '0.02em' }}>
-                {name}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Features ─────────────────────────────────────────────────────── */}
-      <section id="features" style={{ background: '#ffffff', padding: '100px 32px' }}>
-        <div style={{ maxWidth: '1080px', margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '64px' }}>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: '#1DB86A', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>
-              Features
-            </p>
-            <h2 style={{ fontSize: '38px', fontWeight: 800, color: '#0f0f0f', letterSpacing: '-0.03em', marginBottom: '16px' }}>
-              Everything your pipeline needs
-            </h2>
-            <p style={{ fontSize: '16px', color: '#777', maxWidth: '540px', margin: '0 auto', lineHeight: 1.7 }}>
-              From the first meeting note to closed-won, Halvex extracts intelligence and turns it into action.
-            </p>
-          </div>
-
-          <div className="lp-feature-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
-            {[
-              {
-                icon: '&#x1F4CA;',
-                title: 'AI Deal Scoring',
-                desc: 'Every deal gets a live conversion score based on engagement, risks, stage velocity, and historical patterns. Scores update automatically as new information comes in.',
-                color: '#3b82f6',
-              },
-              {
-                icon: '&#x2728;',
-                title: 'Daily Focus Briefing',
-                desc: 'AI reads your entire pipeline every morning and generates a prioritised action list. Names, values, and specific next steps — not generic advice.',
-                color: '#8b5cf6',
-              },
-              {
-                icon: '&#x1F399;',
-                title: 'Meeting Intelligence',
-                desc: 'Paste your call notes and AI extracts objections, competitors, product gaps, and next steps. Deal records update automatically.',
-                color: '#1DB86A',
-              },
-              {
-                icon: '&#x1F6A8;',
-                title: 'Risk Detection',
-                desc: 'Stale deals, declining scores, missed follow-ups — Halvex flags problems before they become lost deals. Get coached on exactly how to recover.',
-                color: '#ef4444',
-              },
-              {
-                icon: '&#x1F3AF;',
-                title: 'Win/Loss Intelligence',
-                desc: 'ML models trained on your closed deals identify what winning patterns look like and where current deals are diverging from the path to closed-won.',
-                color: '#f59e0b',
-              },
-              {
-                icon: '&#x1F50D;',
-                title: 'Competitive Intel',
-                desc: 'Track competitor mentions across every deal. See win rates against each competitor, their strengths and weaknesses, and battlecard-ready talking points.',
-                color: '#06b6d4',
-              },
-            ].map(f => (
-              <div key={f.title} className="lp-feature-card">
-                <div style={{
-                  width: '44px', height: '44px', borderRadius: '11px',
-                  background: `${f.color}10`, border: `1px solid ${f.color}20`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '20px', marginBottom: '20px',
-                }} dangerouslySetInnerHTML={{ __html: f.icon }} />
-                <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#0f0f0f', marginBottom: '10px' }}>
-                  {f.title}
-                </h3>
-                <p style={{ fontSize: '14px', color: '#777', lineHeight: 1.7 }}>
-                  {f.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── How it works ─────────────────────────────────────────────────── */}
-      <section id="how-it-works" style={{ background: '#fafafa', padding: '100px 32px', borderTop: '1px solid #eee', borderBottom: '1px solid #eee' }}>
-        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '64px' }}>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: '#1DB86A', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>
-              How it works
-            </p>
-            <h2 style={{ fontSize: '38px', fontWeight: 800, color: '#0f0f0f', letterSpacing: '-0.03em', marginBottom: '16px' }}>
-              Three steps to pipeline intelligence
-            </h2>
-            <p style={{ fontSize: '16px', color: '#777', maxWidth: '500px', margin: '0 auto', lineHeight: 1.7 }}>
-              Set up in under five minutes. No integrations required to start.
-            </p>
-          </div>
-
-          <div className="lp-step-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px' }}>
-            {[
-              {
-                num: '01',
-                title: 'Add your deals',
-                desc: 'Enter your pipeline manually or import from HubSpot. Each deal gets a company, value, stage, and context.',
-                color: '#3b82f6',
-              },
-              {
-                num: '02',
-                title: 'Update with notes',
-                desc: 'After every call, paste your notes. AI extracts objections, risks, competitors, and next steps automatically.',
-                color: '#1DB86A',
-              },
-              {
-                num: '03',
-                title: 'Get intelligence',
-                desc: 'Your AI brain learns your pipeline and generates daily briefings, deal scores, risk alerts, and coaching.',
-                color: '#8b5cf6',
-              },
-            ].map(s => (
-              <div key={s.num} className="lp-step-card">
-                <div style={{
-                  width: '48px', height: '48px', borderRadius: '50%',
-                  background: `${s.color}10`, border: `1.5px solid ${s.color}25`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '16px', fontWeight: 800, color: s.color,
-                  margin: '0 auto 20px',
-                }}>
-                  {s.num}
-                </div>
-                <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#0f0f0f', marginBottom: '10px' }}>
-                  {s.title}
-                </h3>
-                <p style={{ fontSize: '14px', color: '#777', lineHeight: 1.7 }}>
-                  {s.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Intelligence showcase ────────────────────────────────────────── */}
-      <section style={{ background: '#ffffff', padding: '100px 32px' }}>
-        <div className="lp-two-col" style={{ maxWidth: '1000px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '64px', alignItems: 'center' }}>
-          <div>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>
-              The brain
-            </p>
-            <h2 style={{ fontSize: '34px', fontWeight: 800, color: '#0f0f0f', letterSpacing: '-0.03em', marginBottom: '16px', lineHeight: 1.2 }}>
-              AI that actually knows your deals
-            </h2>
-            <p style={{ fontSize: '15px', color: '#777', lineHeight: 1.8, marginBottom: '28px' }}>
-              Every deal update, meeting note, and stage change feeds into your workspace brain. It learns what winning looks like for your team and applies that intelligence across your entire pipeline.
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {[
-                'ML models trained on your win/loss history',
-                'Deal scoring calibrated to your actual close rates',
-                'Pattern detection across objections and competitors',
-                'Forecast accuracy tracking with confidence intervals',
-              ].map(item => (
-                <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: '#555' }}>
-                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#1DB86A15', border: '1px solid #1DB86A30', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <div style={{ color: '#1DB86A', fontSize: '11px', fontWeight: 800 }}>&#x2713;</div>
-                  </div>
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div style={{
-            background: '#fafafa', border: '1px solid #eee', borderRadius: '16px',
-            padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#1DB86A' }} />
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Intelligence</span>
-            </div>
-            {[
-              { label: 'Win Rate', value: '34%', delta: '+6% vs last quarter', positive: true },
-              { label: 'Avg Deal Cycle', value: '42 days', delta: '-8 days vs benchmark', positive: true },
-              { label: 'Pipeline Health', value: '£1.2M', delta: '12 deals active', positive: true },
-              { label: 'At Risk', value: '3 deals', delta: '£340k exposure', positive: false },
-            ].map(m => (
-              <div key={m.label} style={{
-                background: '#ffffff', border: '1px solid #eee', borderRadius: '10px',
-                padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              }}>
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{m.label}</div>
-                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f0f0f', marginTop: '2px' }}>{m.value}</div>
-                </div>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: m.positive ? '#1DB86A' : '#ef4444', textAlign: 'right' }}>
-                  {m.delta}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── For Sales / For Product ──────────────────────────────────────── */}
-      <section style={{ background: '#fafafa', padding: '100px 32px', borderTop: '1px solid #eee', borderBottom: '1px solid #eee' }}>
-        <div className="lp-two-col" style={{ maxWidth: '900px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-          {[
-            {
-              title: 'For sales teams',
-              color: '#1DB86A',
-              items: [
-                'Daily AI briefing with exact names and actions',
-                'Deal scoring that predicts close probability',
-                'Risk alerts before deals go dark',
-                'Meeting intelligence from every call',
-                'Stakeholder mapping and coaching',
-              ],
-            },
-            {
-              title: 'For revenue leaders',
-              color: '#3b82f6',
-              items: [
-                'Pipeline analytics with stage velocity',
-                'Win/loss patterns across the team',
-                'Forecast accuracy with ML confidence',
-                'Competitive win rates and trends',
-                'Product gap impact on revenue',
-              ],
-            },
-          ].map(col => (
-            <div key={col.title} className="lp-feature-card" style={{ padding: '36px' }}>
-              <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#0f0f0f', marginBottom: '20px' }}>
-                {col.title}
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                {col.items.map(item => (
-                  <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: '#555' }}>
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: col.color, flexShrink: 0 }} />
-                    {item}
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Pricing ──────────────────────────────────────────────────────── */}
-      <section id="pricing" style={{ background: '#ffffff', padding: '100px 32px' }}>
-        <div style={{ maxWidth: '480px', margin: '0 auto', textAlign: 'center' }}>
-          <p style={{ fontSize: '12px', fontWeight: 700, color: '#1DB86A', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>
-            Pricing
-          </p>
-          <h2 style={{ fontSize: '38px', fontWeight: 800, color: '#0f0f0f', letterSpacing: '-0.03em', marginBottom: '16px' }}>
-            Simple, transparent pricing
-          </h2>
-          <p style={{ fontSize: '15px', color: '#777', lineHeight: 1.7, marginBottom: '40px' }}>
-            Start free. Upgrade when Halvex is closing deals for you.
-          </p>
-
-          <div style={{
-            background: '#ffffff', border: '2px solid #1DB86A', borderRadius: '16px',
-            padding: '40px 32px', textAlign: 'center',
-            boxShadow: '0 0 0 4px rgba(29,184,106,0.08)',
-          }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#1DB86A', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>
-              Pro
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '4px', marginBottom: '8px' }}>
-              <span style={{ fontSize: '48px', fontWeight: 800, color: '#0f0f0f' }}>£79</span>
-              <span style={{ fontSize: '16px', color: '#999', fontWeight: 500 }}>/month</span>
-            </div>
-            <p style={{ fontSize: '14px', color: '#777', marginBottom: '28px' }}>per workspace</p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left', marginBottom: '32px' }}>
-              {[
-                'Unlimited deals and contacts',
-                'AI deal scoring and daily briefings',
-                'Meeting intelligence extraction',
-                'Pipeline analytics and forecasting',
-                'Win/loss ML models',
-                'HubSpot integration',
-                'MCP server for Claude',
-              ].map(f => (
-                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: '#555' }}>
-                  <span style={{ color: '#1DB86A', fontWeight: 700 }}>&#x2713;</span>
-                  {f}
-                </div>
-              ))}
-            </div>
-
-            <Link href="/sign-up" className="lp-cta-primary" style={{ width: '100%', justifyContent: 'center', padding: '16px' }}>
-              Start free trial
+            <Link href="/sign-up" className="btn btn-primary">
+              Start free
+              <ArrowRight size={13} strokeWidth={2} />
             </Link>
-            <p style={{ fontSize: '12px', color: '#999', marginTop: '12px' }}>14-day free trial. No credit card required.</p>
           </div>
-        </div>
-      </section>
+        </nav>
+      </div>
 
-      {/* ── Final CTA ────────────────────────────────────────────────────── */}
-      <section style={{
-        background: 'linear-gradient(135deg, #0a0a0a 0%, #111827 100%)',
-        padding: '100px 32px', textAlign: 'center', color: '#ffffff',
-      }}>
-        <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-          <h2 style={{ fontSize: '36px', fontWeight: 800, letterSpacing: '-0.03em', marginBottom: '16px', lineHeight: 1.2 }}>
-            Stop guessing.<br />Start closing.
-          </h2>
-          <p style={{ fontSize: '16px', color: 'rgba(255,255,255,0.5)', lineHeight: 1.7, marginBottom: '36px' }}>
-            Join revenue teams using Halvex to turn pipeline chaos into closed deals.
-          </p>
-          <Link href="/sign-up" className="lp-cta-primary" style={{ padding: '16px 36px', fontSize: '16px' }}>
-            Get started free
-          </Link>
-        </div>
-      </section>
+      <section className="marketing-section marketing-hero">
+        <div className="marketing-frame marketing-hero-grid">
+          <div className="surface-glass-heavy marketing-hero-panel">
+            <div className="marketing-eyebrow">
+              <span className="marketing-eyebrow-dot" />
+              AI deal intelligence for revenue teams
+            </div>
 
-      {/* ── Footer ───────────────────────────────────────────────────────── */}
-      <footer style={{ background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.06)', padding: '32px' }}>
-        <div className="lp-footer-inner" style={{
-          maxWidth: '1080px', margin: '0 auto',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{
-              width: '20px', height: '20px', borderRadius: '6px', background: '#1DB86A',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '10px', fontWeight: 800, color: '#fff',
-            }}>H</div>
-            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>
-              &copy; {new Date().getFullYear()} Halvex
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: '24px' }}>
-            {[
-              { label: 'Privacy', href: '/privacy' },
-              { label: 'Terms', href: '/terms' },
-              { label: 'Sign in', href: '/sign-in' },
-            ].map(l => (
-              <Link key={l.label} href={l.href} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', transition: 'color 0.15s' }}
-                className="lp-nav-link">
-                {l.label}
+            <h1 className="marketing-title">
+              The deal workspace that thinks like your best operator.
+              <span className="marketing-title-muted">Every note becomes a next move.</span>
+            </h1>
+
+            <p className="marketing-subtitle">
+              Halvex turns meeting notes, stakeholder movement, blockers, and pipeline drift into a workspace your team can actually run from. Morning briefing, tasks, signals, forecasting, and the live deal all stay connected.
+            </p>
+
+            <AIVoice as="p" className="marketing-hero-note">
+              You should never have to remember what matters in a deal. The system should already know.
+            </AIVoice>
+
+            <div className="marketing-hero-actions">
+              <Link href="/sign-up" className="btn btn-primary">
+                Start free
+                <ArrowRight size={13} strokeWidth={2} />
               </Link>
+              <Link href="/sign-in" className="btn">
+                Open product
+              </Link>
+            </div>
+
+            <div className="marketing-proof-row">
+              {proofPoints.map(point => (
+                <div key={point.label} className="marketing-proof-card">
+                  <div className="marketing-proof-label">{point.label}</div>
+                  <div className="marketing-proof-value">{point.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="surface-glass-heavy marketing-preview">
+            <div className="preview-topbar">
+              <div className="preview-breadcrumb">Deals / Enterprise Pipeline / Meridian Partners</div>
+              <div className="preview-toolbar">
+                <div className="btn">Log activity</div>
+                <div className="btn btn-primary">Advance stage</div>
+              </div>
+            </div>
+
+            <div className="preview-grid">
+              <div className="preview-main">
+                <div className="preview-title-row">
+                  <div>
+                    <div className="preview-meta">
+                      <span className="surface-glass" style={{ padding: '5px 10px', borderRadius: '999px' }}>Meridian Partners</span>
+                      <span>Financial Services</span>
+                      <span>London, UK</span>
+                      <span>#DE-0428</span>
+                    </div>
+                    <div className="preview-title">Platform expansion, EMEA rollout</div>
+                  </div>
+
+                  <div className="preview-value">
+                    <span className="mono">£248,500</span>
+                    <span>Annual contract value</span>
+                  </div>
+                </div>
+
+                <div className="preview-score">
+                  <div className="preview-score-ring">76</div>
+                  <div className="preview-score-copy">
+                    <strong>Likely to close this quarter</strong>
+                    <span>Strong champion engagement · Budget confirmed · 2 outstanding objections</span>
+                  </div>
+                  <div className="preview-delta">+14<br /><span style={{ color: 'var(--ink-4)', fontSize: 10, fontWeight: 500 }}>7d change</span></div>
+                  <div className="preview-pill">
+                    <span className="preview-dot" />
+                    Proposal
+                  </div>
+                </div>
+
+                <div className="preview-tabs">
+                  <span className="preview-tab active">Overview</span>
+                  <span className="preview-tab">Manage</span>
+                  <span className="preview-tab">Intelligence</span>
+                  <span className="preview-tab">Conversations</span>
+                  <span className="preview-tab">Documents</span>
+                </div>
+
+                <div className="surface-glass-strong preview-briefing">
+                  <div className="preview-section-head">
+                    <div className="preview-ai-badge">
+                      <span className="preview-dot" />
+                      Morning briefing
+                    </div>
+                    <div className="preview-briefing-time">Generated 06:42 · based on 23 signals</div>
+                  </div>
+
+                  <AIVoice as="div" className="preview-briefing-copy">
+                    Sarah Chen forwarded your proposal to their CFO yesterday evening. The main blocker is the SSO integration question raised on the May 14th call; sending the technical brief to Marcus before Thursday’s follow-up would remove the last procurement objection.
+                  </AIVoice>
+
+                  <div className="preview-actions">
+                    <div className="preview-action-chip">
+                      <MessagesSquare size={12} strokeWidth={2} />
+                      Draft email to Marcus
+                    </div>
+                    <div className="preview-action-chip">
+                      <CalendarClock size={12} strokeWidth={2} />
+                      Prep for Thursday&apos;s call
+                    </div>
+                    <div className="preview-action-chip">
+                      <Target size={12} strokeWidth={2} />
+                      Remind me tomorrow
+                    </div>
+                  </div>
+                </div>
+
+                <div className="preview-signals">
+                  <div className="preview-signal-card">
+                    <div className="preview-signal-label">Signal</div>
+                    <div className="preview-signal-body">Forwarding behaviour from the champion suggests internal momentum rather than passive review.</div>
+                  </div>
+                  <div className="preview-signal-card">
+                    <div className="preview-signal-label">Watch</div>
+                    <div className="preview-signal-body">Legal has been quiet for 12 days. If the brief lands late, procurement timing may slip the quarter.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="preview-side">
+                <div className="preview-next-action">
+                  <div className="preview-next-label">Recommended next action</div>
+                  <AIVoice as="div" className="preview-next-copy">
+                    Send the SSO technical brief to Marcus before Thursday&apos;s follow-up call.
+                  </AIVoice>
+                  <div className="preview-next-actions">
+                    <button type="button">Draft now</button>
+                    <button type="button">Skip</button>
+                  </div>
+                </div>
+
+                <div className="surface-glass-strong preview-side-card">
+                  <div className="preview-side-head">
+                    <div className="preview-side-title">Stakeholders</div>
+                    <div className="preview-side-meta">7 mapped</div>
+                  </div>
+                  <div className="preview-list">
+                    <div className="preview-list-item">
+                      <div className="preview-avatar orange">SC</div>
+                      <div className="preview-person">
+                        <strong>Sarah Chen</strong>
+                        <span>Head of Operations · Champion</span>
+                      </div>
+                      <span className="preview-status" />
+                    </div>
+                    <div className="preview-list-item">
+                      <div className="preview-avatar blue">JH</div>
+                      <div className="preview-person">
+                        <strong>James Holloway</strong>
+                        <span>VP Finance · Economic buyer</span>
+                      </div>
+                      <span className="preview-status idle" />
+                    </div>
+                    <div className="preview-list-item">
+                      <div className="preview-avatar purple">MD</div>
+                      <div className="preview-person">
+                        <strong>Marcus Devlin</strong>
+                        <span>IT Director · Technical gatekeeper</span>
+                      </div>
+                      <span className="preview-status warn" />
+                    </div>
+                    <div className="preview-list-item">
+                      <div className="preview-avatar green">PL</div>
+                      <div className="preview-person">
+                        <strong>Priya Laghari</strong>
+                        <span>Regional Director · Active sponsor</span>
+                      </div>
+                      <span className="preview-status" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="surface-glass-strong preview-side-card">
+                  <div className="preview-side-head">
+                    <div className="preview-side-title">Close forecast</div>
+                    <div className="preview-side-meta">Model view</div>
+                  </div>
+                  <div className="preview-forecast-row">
+                    <div className="preview-forecast-line">
+                      <strong><span>Q2 (this quarter)</span><span>68%</span></strong>
+                      <div className="preview-track"><span className="green" /></div>
+                    </div>
+                    <div className="preview-forecast-line">
+                      <strong><span>Q3 (slips)</span><span>24%</span></strong>
+                      <div className="preview-track"><span className="orange" /></div>
+                    </div>
+                    <div className="preview-forecast-line">
+                      <strong><span>Lost / stalled</span><span>8%</span></strong>
+                      <div className="preview-track"><span className="red" /></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="marketing-section" id="product">
+        <div className="marketing-frame">
+          <div className="surface-glass-strong marketing-band">
+            <div className="marketing-band-card">
+              <strong>Run the workspace from one surface</strong>
+              <span>Overview, tasks, signals, documents, and stakeholder context stay tied to the same deal state.</span>
+            </div>
+            <div className="marketing-band-card">
+              <strong>Give reps a clearer next move</strong>
+              <span>Every recommendation is grounded in actual notes, actual people, and actual timing risk.</span>
+            </div>
+            <div className="marketing-band-card">
+              <strong>Give leaders a forecast they can trust</strong>
+              <span>Pipeline view, risk pressure, and execution lag roll up from the work already happening in deals.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="marketing-section">
+        <div className="marketing-frame">
+          <div className="marketing-section-header">
+            <div className="marketing-kicker">Product</div>
+            <h2 className="marketing-section-title">Built to feel like an operating system for revenue, not another dashboard.</h2>
+            <p className="marketing-section-copy">
+              Halvex is designed around the way deals actually move: conversations create signal, signal creates action, action changes forecast quality. The product keeps that chain visible.
+            </p>
+          </div>
+
+          <div className="marketing-card-grid">
+            {capabilities.map(capability => (
+              <CapabilityCard key={capability.title} {...capability} />
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="marketing-section" id="workflow">
+        <div className="marketing-frame marketing-operating-grid">
+          <div className="surface-glass-strong marketing-steps">
+            <div className="marketing-section-header" style={{ marginBottom: 0 }}>
+              <div className="marketing-kicker">Workflow</div>
+              <h2 className="marketing-section-title">From every call note to a confident next move.</h2>
+            </div>
+
+            <div className="marketing-step-list">
+              {operatingModel.map(item => (
+                <div key={item.step} className="marketing-step">
+                  <div className="marketing-step-num">{item.step}</div>
+                  <div>
+                    <h3>{item.title}</h3>
+                    <p>{item.body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="surface-glass-strong marketing-operator-panel">
+            <div className="marketing-kicker">What teams get back</div>
+            <h2 className="marketing-section-title" style={{ fontSize: '38px' }}>Less drift. Better follow-through. Cleaner decisions.</h2>
+            <p className="marketing-section-copy" style={{ marginTop: 12 }}>
+              The value is not just AI output. It is the shared rhythm: one place to see what matters, one place to act, and a clearer line from execution to forecast.
+            </p>
+
+            <div className="marketing-operator-grid">
+              <div className="marketing-operator-cell">
+                <strong>Recommended actions</strong>
+                <span>Action cards are specific enough to draft, send, schedule, or assign immediately.</span>
+              </div>
+              <div className="marketing-operator-cell">
+                <strong>Stakeholder clarity</strong>
+                <span>See who is active, who is blocking, and where political gaps are starting to form.</span>
+              </div>
+              <div className="marketing-operator-cell">
+                <strong>Execution pressure</strong>
+                <span>Tasks, project-plan milestones, and success criteria all feed the same prioritized queue.</span>
+              </div>
+              <div className="marketing-operator-cell">
+                <strong>Forecast quality</strong>
+                <span>Leaders see revenue pressure shaped by real activity, not just stage labels and optimism.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="marketing-section" id="pricing">
+        <div className="marketing-frame marketing-pricing-grid">
+          <div className="surface-glass-strong marketing-pricing-card">
+            <div>
+              <div className="marketing-kicker">Pricing</div>
+              <h2 className="marketing-section-title" style={{ fontSize: '42px', marginTop: 12 }}>Simple enough to start fast.</h2>
+              <p className="marketing-section-copy" style={{ marginTop: 12 }}>
+                Start with one workspace, bring in the team, and let the system prove its value in the way your pipeline gets run day to day.
+              </p>
+            </div>
+
+            <div className="marketing-price">
+              <strong>£79</strong>
+              <span>per workspace / month</span>
+            </div>
+
+            <div className="marketing-checklist">
+              {pricingPoints.map(item => (
+                <div key={item} className="marketing-check">
+                  <span className="marketing-check-icon">
+                    <Check size={11} strokeWidth={3} />
+                  </span>
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <Link href="/sign-up" className="btn btn-primary">
+                Start free
+                <ArrowRight size={13} strokeWidth={2} />
+              </Link>
+              <span style={{ fontSize: 12, color: 'var(--ink-4)' }}>14-day free trial. No credit card required.</span>
+            </div>
+          </div>
+
+          <div className="surface-glass-strong marketing-enterprise-card">
+            <div className="marketing-kicker">For larger teams</div>
+            <h2 className="marketing-section-title" style={{ fontSize: '34px' }}>Designed for the whole operating rhythm.</h2>
+            <p>
+              Halvex works best when reps, managers, and revenue leaders are all looking at the same live picture. The product language, workflows, and reporting are built around that shared system.
+            </p>
+            <div className="marketing-checklist">
+              <div className="marketing-check">
+                <span className="marketing-check-icon"><ShieldCheck size={11} strokeWidth={3} /></span>
+                <span>Shared deal workspaces with the same narrative across rep and leader views</span>
+              </div>
+              <div className="marketing-check">
+                <span className="marketing-check-icon"><PoundSterling size={11} strokeWidth={3} /></span>
+                <span>Commercially aware pipeline and forecast views anchored in real deal execution</span>
+              </div>
+              <div className="marketing-check">
+                <span className="marketing-check-icon"><CalendarClock size={11} strokeWidth={3} /></span>
+                <span>Daily operating rhythm across overview, tasks, signals, and the live deal workspace</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="marketing-section">
+        <div className="marketing-frame">
+          <div className="surface-glass-heavy marketing-cta-panel">
+            <div className="marketing-cta-copy">
+              <div className="marketing-kicker">Start now</div>
+              <h2>Stop reconstructing the deal from memory.</h2>
+              <p>
+                Halvex gives your team a clearer way to run the day: one morning briefing, one deal workspace, one place to turn signal into action and action into revenue.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <Link href="/sign-up" className="btn btn-primary">
+                Create workspace
+                <ArrowRight size={13} strokeWidth={2} />
+              </Link>
+              <Link href="/sign-in" className="btn">
+                Sign in
+                <ChevronRight size={13} strokeWidth={2} />
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer className="marketing-frame marketing-footer">
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+          <div className="marketing-mark" style={{ width: 24, height: 24, borderRadius: 8, fontSize: 11 }}>H</div>
+          <span>© {new Date().getFullYear()} Halvex</span>
+        </div>
+
+        <div className="marketing-footer-links">
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
+          <Link href="/sign-in">Sign in</Link>
         </div>
       </footer>
-    </div>
+    </main>
   )
 }

@@ -11,10 +11,12 @@ import {
   ChevronRight,
   ClipboardList,
   Filter,
+  Loader2,
   Search,
   Sparkles,
   Target,
 } from 'lucide-react'
+import { useToast } from '@/components/shared/Toast'
 import { fetcher } from '@/lib/fetcher'
 import { formatContextualDate, formatCurrencyGBP, formatRelativeTime } from '@/lib/presentation'
 
@@ -147,6 +149,21 @@ function describePriority(score: number, stage: string, dueDate?: string | null,
   return parts[0] ?? 'Queued for follow-up'
 }
 
+async function requestJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
+  const response = await fetch(input, init)
+  const json = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error((json as { error?: string }).error ?? 'Request failed')
+  }
+  return json as T
+}
+
+function itemKindLabel(kind: WorkItem['kind']) {
+  if (kind === 'criterion') return 'Success criteria'
+  if (kind === 'project') return 'Project plan'
+  return 'Task'
+}
+
 function buildWorkItems(deals: DealRecord[]): WorkItem[] {
   return deals.flatMap(deal => {
     const score = deal.conversionScore ?? 50
@@ -229,16 +246,19 @@ function TasksPageInner() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const { toast } = useToast()
   const dealFilter = searchParams.get('deal') ?? 'all'
-  const { data, isLoading } = useSWR<{ data: DealRecord[] }>('/api/deals', fetcher, {
+  const { data, isLoading, mutate } = useSWR<{ data: DealRecord[] }>('/api/deals', fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 45_000,
   })
 
   const [search, setSearch] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<'all' | WorkItem['priorityLabel']>('all')
+  const [savingItemKey, setSavingItemKey] = useState<string | null>(null)
   const deferredSearch = useDeferredValue(search)
   const deals = useMemo(() => data?.data ?? [], [data?.data])
+  const dealById = useMemo(() => new Map(deals.map(deal => [deal.id, deal])), [deals])
 
   const items = useMemo(() => buildWorkItems(deals), [deals])
 
@@ -308,6 +328,54 @@ function TasksPageInner() {
       const nextQuery = params.toString()
       router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false })
     })
+  }
+
+  async function updateItemDone(item: WorkItem, done: boolean) {
+    const itemKey = `${item.dealId}-${item.kind}-${item.id}`
+    const targetDeal = dealById.get(item.dealId)
+
+    if (!targetDeal) {
+      toast('This deal could not be found. Refresh and try again.', 'error')
+      return
+    }
+
+    setSavingItemKey(itemKey)
+    try {
+      if (item.kind === 'task') {
+        const existingTodos = targetDeal.todos ?? []
+        const hasTodo = existingTodos.some(todo => todo.id === item.id)
+        if (!hasTodo) throw new Error('Task no longer exists on this deal.')
+
+        const nextTodos = existingTodos.map(todo =>
+          todo.id === item.id ? { ...todo, done } : todo,
+        )
+
+        await requestJson(`/api/deals/${item.dealId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ todos: nextTodos }),
+        })
+      } else if (item.kind === 'project') {
+        await requestJson(`/api/deals/${item.dealId}/project-plan`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId: item.id, status: done ? 'complete' : 'in_progress' }),
+        })
+      } else {
+        await requestJson(`/api/deals/${item.dealId}/success-criteria`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ criterionId: item.id, achieved: done }),
+        })
+      }
+
+      await mutate()
+      toast(done ? 'Task marked done' : 'Task reopened', 'success')
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not update this task', 'error')
+    } finally {
+      setSavingItemKey(null)
+    }
   }
 
   return (
@@ -472,6 +540,12 @@ function TasksPageInner() {
         .tasks-copy {
           min-width: 0;
         }
+        .tasks-link {
+          display: block;
+          min-width: 0;
+          text-decoration: none;
+          color: inherit;
+        }
         .tasks-item-top {
           display: flex;
           align-items: center;
@@ -497,6 +571,52 @@ function TasksPageInner() {
           flex-wrap: wrap;
           font-size: 11px;
           color: var(--ink-4);
+        }
+        .tasks-actions {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .tasks-complete-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          height: 32px;
+          padding: 0 11px;
+          border-radius: 999px;
+          border: 1px solid rgba(20, 17, 10, 0.1);
+          background: rgba(255, 255, 255, 0.62);
+          color: var(--ink);
+          font-size: 11px;
+          font-weight: 600;
+          transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+        }
+        .tasks-complete-btn:hover:not(:disabled) {
+          background: rgba(255, 255, 255, 0.82);
+          border-color: rgba(20, 17, 10, 0.16);
+          transform: translateY(-1px);
+        }
+        .tasks-complete-btn:disabled {
+          opacity: 0.72;
+          cursor: progress;
+        }
+        .tasks-open-link {
+          width: 32px;
+          height: 32px;
+          border-radius: 999px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          text-decoration: none;
+          color: var(--ink-4);
+          border: 1px solid rgba(20, 17, 10, 0.08);
+          background: rgba(255, 255, 255, 0.44);
+          transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
+        }
+        .tasks-open-link:hover {
+          background: rgba(255, 255, 255, 0.66);
+          border-color: rgba(20, 17, 10, 0.12);
+          transform: translateY(-1px);
         }
         .tasks-chip {
           display: inline-flex;
@@ -578,6 +698,10 @@ function TasksPageInner() {
           }
           .tasks-item {
             grid-template-columns: auto minmax(0, 1fr);
+          }
+          .tasks-actions {
+            grid-column: 2;
+            justify-content: flex-start;
           }
         }
       `}</style>
@@ -674,35 +798,59 @@ function TasksPageInner() {
           ) : (
             <div className="tasks-list">
               {openItems.map((item, index) => (
-                <Link key={`${item.dealId}-${item.kind}-${item.id}`} href={`/deals/${item.dealId}?tab=manage`} className="tasks-item">
+                <div key={`${item.dealId}-${item.kind}-${item.id}`} className="tasks-item">
                   <div className="tasks-rank">{String(index + 1).padStart(2, '0')}</div>
-                  <div className="tasks-copy">
-                    <div className="tasks-item-top">
-                      <span className="tasks-item-title">{item.text}</span>
-                      <span className={`tasks-chip priority-${item.priorityLabel}`}>{item.priorityLabel}</span>
-                      <span className="tasks-chip">{item.kind === 'criterion' ? 'Success criteria' : item.kind === 'project' ? 'Project plan' : 'Task'}</span>
+                  <Link href={`/deals/${item.dealId}?tab=manage`} className="tasks-link">
+                    <div className="tasks-copy">
+                      <div className="tasks-item-top">
+                        <span className="tasks-item-title">{item.text}</span>
+                        <span className={`tasks-chip priority-${item.priorityLabel}`}>{item.priorityLabel}</span>
+                        <span className="tasks-chip">{itemKindLabel(item.kind)}</span>
+                      </div>
+                      <div className="tasks-item-body">{item.priorityReason}</div>
+                      <div className="tasks-item-meta">
+                        <span>{item.dealLabel}</span>
+                        <span>·</span>
+                        <span>{item.meta}</span>
+                        {item.dueDate ? (
+                          <>
+                            <span>·</span>
+                            <span>Due {formatContextualDate(item.dueDate)}</span>
+                          </>
+                        ) : null}
+                        {dealById.get(item.dealId)?.dealValue ? (
+                          <>
+                            <span>·</span>
+                            <span className="mono">{compactMoney(dealById.get(item.dealId)?.dealValue)}</span>
+                          </>
+                        ) : null}
+                      </div>
                     </div>
-                    <div className="tasks-item-body">{item.priorityReason}</div>
-                    <div className="tasks-item-meta">
-                      <span>{item.dealLabel}</span>
-                      <span>·</span>
-                      <span>{item.meta}</span>
-                      {item.dueDate ? (
-                        <>
-                          <span>·</span>
-                          <span>Due {formatContextualDate(item.dueDate)}</span>
-                        </>
-                      ) : null}
-                      {deals.find(deal => deal.id === item.dealId)?.dealValue ? (
-                        <>
-                          <span>·</span>
-                          <span className="mono">{compactMoney(deals.find(deal => deal.id === item.dealId)?.dealValue)}</span>
-                        </>
-                      ) : null}
-                    </div>
+                  </Link>
+                  <div className="tasks-actions">
+                    <button
+                      type="button"
+                      className="tasks-complete-btn"
+                      onClick={() => void updateItemDone(item, true)}
+                      disabled={savingItemKey === `${item.dealId}-${item.kind}-${item.id}`}
+                      aria-label={`Mark ${item.text} as done`}
+                    >
+                      {savingItemKey === `${item.dealId}-${item.kind}-${item.id}` ? (
+                        <Loader2 size={12} strokeWidth={2} style={{ animation: 'spin 1s linear infinite' }} />
+                      ) : (
+                        <CheckCircle2 size={13} strokeWidth={2} />
+                      )}
+                      Done
+                    </button>
+                    <Link
+                      href={`/deals/${item.dealId}?tab=manage`}
+                      className="tasks-open-link"
+                      aria-label={`Open ${item.dealLabel} in the deal workspace`}
+                    >
+                      <ChevronRight size={14} strokeWidth={1.8} />
+                    </Link>
                   </div>
-                  <ChevronRight size={14} strokeWidth={1.8} style={{ color: 'var(--ink-4)' }} />
-                </Link>
+                </div>
               ))}
             </div>
           )}
@@ -753,15 +901,37 @@ function TasksPageInner() {
                 </div>
               ) : (
                 doneItems.slice(0, 8).map(item => (
-                  <Link key={`${item.dealId}-${item.kind}-${item.id}`} href={`/deals/${item.dealId}?tab=history`} className="tasks-done-row">
+                  <div key={`${item.dealId}-${item.kind}-${item.id}`} className="tasks-done-row">
                     <div className="tasks-focus-head">
                       <div className="tasks-row-title">{item.text}</div>
-                      <CheckCircle2 size={14} strokeWidth={2} style={{ color: 'var(--signal)' }} />
+                      <div className="tasks-actions">
+                        <button
+                          type="button"
+                          className="tasks-complete-btn"
+                          onClick={() => void updateItemDone(item, false)}
+                          disabled={savingItemKey === `${item.dealId}-${item.kind}-${item.id}`}
+                          aria-label={`Reopen ${item.text}`}
+                        >
+                          {savingItemKey === `${item.dealId}-${item.kind}-${item.id}` ? (
+                            <Loader2 size={12} strokeWidth={2} style={{ animation: 'spin 1s linear infinite' }} />
+                          ) : (
+                            <CheckCircle2 size={13} strokeWidth={2} />
+                          )}
+                          Undo
+                        </button>
+                        <Link
+                          href={`/deals/${item.dealId}?tab=history`}
+                          className="tasks-open-link"
+                          aria-label={`Open ${item.dealLabel} history`}
+                        >
+                          <ChevronRight size={14} strokeWidth={1.8} />
+                        </Link>
+                      </div>
                     </div>
                     <div className="tasks-row-meta">
                       {item.dealLabel} · {item.updatedAt ? formatRelativeTime(item.updatedAt) : 'Completed'}
                     </div>
-                  </Link>
+                  </div>
                 ))
               )}
             </div>
