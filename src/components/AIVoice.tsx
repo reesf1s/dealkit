@@ -11,7 +11,7 @@ export function AIVoice({ as = 'span', children, className, ...props }: AIVoiceP
 
   return (
     <Component
-      className={cn('font-serif italic', className)}
+      className={cn('font-serif tracking-[-0.01em]', className)}
       {...props}
     >
       {children}

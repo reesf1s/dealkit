@@ -50,10 +50,7 @@ const SidebarContext = createContext<SidebarContextValue>({
 })
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return window.localStorage.getItem('halvex-sidebar-collapsed') === 'true'
-  })
+  const [collapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -68,18 +65,13 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     const mediaQuery = window.matchMedia('(max-width: 900px)')
     const update = (matches: boolean) => setIsMobile(matches)
     const onChange = (event: MediaQueryListEvent) => update(event.matches)
+    update(mediaQuery.matches)
     mediaQuery.addEventListener('change', onChange)
 
     return () => mediaQuery.removeEventListener('change', onChange)
   }, [])
 
-  const toggleCollapsed = useCallback(() => {
-    setCollapsed(previous => {
-      const next = !previous
-      window.localStorage.setItem('halvex-sidebar-collapsed', String(next))
-      return next
-    })
-  }, [])
+  const toggleCollapsed = useCallback(() => {}, [])
 
   const prefillCopilot = useCallback((text: string) => {
     setCopilotPrefill(text)
@@ -99,7 +91,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     setCopilotAutoSend(null)
   }, [])
 
-  const sidebarWidth = isMobile ? 0 : collapsed ? 76 : 232
+  const sidebarWidth = isMobile ? 0 : 232
 
   return (
     <SidebarContext.Provider

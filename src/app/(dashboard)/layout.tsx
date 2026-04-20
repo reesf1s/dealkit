@@ -1,41 +1,26 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import { usePathname } from 'next/navigation'
 import CommandPalette from '@/components/shared/CommandPalette'
 import ErrorBoundary from '@/components/shared/ErrorBoundary'
 import Sidebar from '@/components/layout/Sidebar'
 import TopNav from '@/components/layout/TopNav'
-import { SidebarProvider, useSidebar } from '@/components/layout/SidebarContext'
+import { SidebarProvider } from '@/components/layout/SidebarContext'
 
 const CopilotPanel = dynamic(() => import('@/components/ai/CopilotPanel'), { ssr: false })
 
 function LayoutShell({ children }: { children: React.ReactNode }) {
-  const { sidebarWidth } = useSidebar()
+  const pathname = usePathname()
+  const isDealDetail = pathname.startsWith('/deals/')
 
   return (
-    <div className="app" style={{ display: 'flex', minHeight: '100vh' }}>
+    <div className="app">
       <Sidebar />
-      <TopNav />
       <CommandPalette />
-      <main
-        style={{
-          flex: 1,
-          minWidth: 0,
-          marginLeft: sidebarWidth,
-          minHeight: '100vh',
-          paddingTop: 56,
-          position: 'relative',
-          zIndex: 1,
-          transition: 'margin-left 0.16s ease',
-        }}
-      >
-        <div
-          style={{
-            minHeight: 'calc(100vh - 56px)',
-            padding: '0 0 32px',
-            background: 'transparent',
-          }}
-        >
+      <main className="dashboard-root">
+        <TopNav variant="global" />
+        <div className={isDealDetail ? 'dashboard-page dashboard-page-deal' : 'dashboard-page'}>
           <ErrorBoundary>{children}</ErrorBoundary>
         </div>
       </main>

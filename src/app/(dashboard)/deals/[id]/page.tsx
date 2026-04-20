@@ -2,8 +2,8 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect } from 'react'
-import useSWR from 'swr'
 import { useParams } from 'next/navigation'
+import useSWR from 'swr'
 import {
   ArrowUpRight,
   Bot,
@@ -22,6 +22,7 @@ import {
   Users,
 } from 'lucide-react'
 import AIVoice from '@/components/AIVoice'
+import TopNav from '@/components/layout/TopNav'
 import { useSidebar } from '@/components/layout/SidebarContext'
 import { fetcher } from '@/lib/fetcher'
 import {
@@ -118,11 +119,11 @@ function stageLabel(stage?: string | null): string {
 function stageTone(stage?: string | null) {
   switch (stage) {
     case 'closed_won':
-      return { bg: 'var(--signal-soft)', border: 'rgba(29, 184, 106, 0.2)', text: 'var(--signal)' }
+      return { bg: 'var(--signal-soft)', border: 'rgba(29, 184, 106, 0.2)', text: '#0D7A43' }
     case 'closed_lost':
       return { bg: 'var(--risk-soft)', border: 'rgba(178, 58, 58, 0.18)', text: 'var(--risk)' }
     case 'negotiation':
-      return { bg: 'var(--signal-soft)', border: 'rgba(29, 184, 106, 0.2)', text: 'var(--signal)' }
+      return { bg: 'var(--signal-soft)', border: 'rgba(29, 184, 106, 0.2)', text: '#0D7A43' }
     case 'proposal':
       return { bg: 'var(--warn-soft)', border: 'rgba(196, 98, 27, 0.18)', text: 'var(--warn)' }
     default:
@@ -150,9 +151,7 @@ function scoreTrend(history: ScoreHistoryPoint[] = [], currentScore: number) {
   if (values.length === 0) return [Math.max(18, currentScore - 20), currentScore - 10, currentScore - 6, currentScore]
   if (values.length >= 7) return values.slice(-7)
   const seeded = [...values]
-  while (seeded.length < 7) {
-    seeded.unshift(Math.max(12, seeded[0] - 4))
-  }
+  while (seeded.length < 7) seeded.unshift(Math.max(12, seeded[0] - 4))
   return seeded
 }
 
@@ -338,8 +337,8 @@ function ScoreCircle({ score }: { score: number }) {
   const offset = circumference - (score / 100) * circumference
 
   return (
-    <div style={{ width: 56, height: 56, position: 'relative' }}>
-      <svg width="56" height="56" viewBox="0 0 56 56" style={{ transform: 'rotate(-90deg)' }}>
+    <div className="score-circle">
+      <svg width="56" height="56" viewBox="0 0 56 56">
         <circle cx="28" cy="28" r="24" fill="none" stroke="var(--bg-sunken)" strokeWidth="4" />
         <circle
           cx="28"
@@ -353,28 +352,53 @@ function ScoreCircle({ score }: { score: number }) {
           strokeLinecap="round"
         />
       </svg>
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'grid',
-          placeItems: 'center',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 16,
-          fontWeight: 600,
-          color: 'var(--ink)',
-        }}
-      >
-        {score}
-      </div>
+      <div className="score-value">{score}</div>
+    </div>
+  )
+}
+
+function SectionHeader({
+  title,
+  accent,
+  action,
+}: {
+  title: string
+  accent?: string
+  action?: string
+}) {
+  return (
+    <div className="section-head">
+      <h2 className="section-title">
+        {title}
+        {accent ? (
+          <>
+            {' '}
+            <em>{accent}</em>
+          </>
+        ) : null}
+      </h2>
+      {action ? (
+        <button className="section-action">
+          {action}
+          <ChevronRight size={12} />
+        </button>
+      ) : null}
     </div>
   )
 }
 
 function LoadingState() {
   return (
-    <div style={{ padding: '28px 28px 32px' }}>
-      <div className="surface-glass-elevated skeleton" style={{ height: 220 }} />
+    <div className="main">
+      <div className="workspace">
+        <TopNav variant="workspace" />
+        <div className="content">
+          <div className="briefing skeleton" style={{ height: 220 }} />
+        </div>
+      </div>
+      <aside className="right-panel">
+        <div className="panel-section skeleton" style={{ height: 200 }} />
+      </aside>
     </div>
   )
 }
@@ -405,30 +429,49 @@ export default function DealDetailPage() {
     return () => setActiveDeal(null)
   }, [deal, setActiveDeal])
 
-  const score = Math.max(0, Math.min(100, Math.round(deal?.conversionScore ?? 76)))
-  const tone = stageTone(deal?.stage)
-  const notes = splitMeetingNotes(deal?.meetingNotes)
-  const sparklineValues = scoreTrend(deal?.scoreHistory ?? [], score)
+  if (isLoading) return <LoadingState />
+  if (!deal) {
+    return (
+      <div className="main">
+        <div className="workspace">
+          <TopNav variant="workspace" />
+          <div className="content">
+            <div className="panel-section">
+              <div className="panel-head">
+                <span>Deal workspace</span>
+              </div>
+              <p style={{ color: 'var(--ink-3)' }}>This deal could not be loaded.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const score = Math.max(0, Math.min(100, Math.round(deal.conversionScore ?? 76)))
+  const tone = stageTone(deal.stage)
+  const notes = splitMeetingNotes(deal.meetingNotes)
+  const sparklineValues = scoreTrend(deal.scoreHistory ?? [], score)
   const sparkline = sparkPath(sparklineValues)
   const sevenDayDelta = sparklineValues.at(-1)! - sparklineValues[0]!
   const verdict = score >= 75 ? 'Likely to close this quarter' : score >= 60 ? 'Still live with momentum' : 'Needs intervention this week'
   const reasonLine = [
-    deal?.contacts?.length ? `${deal.contacts.length} stakeholders mapped` : null,
-    deal?.dealValue ? 'Commercial value captured' : null,
-    (deal?.dealRisks ?? []).length > 0 ? `${deal?.dealRisks?.length ?? 0} open risk${(deal?.dealRisks?.length ?? 0) > 1 ? 's' : ''}` : 'No active blockers logged',
+    deal.contacts?.length ? `${deal.contacts.length} stakeholders mapped` : null,
+    deal.dealValue ? 'Commercial value captured' : null,
+    (deal.dealRisks ?? []).length > 0 ? `${deal.dealRisks?.length ?? 0} open risk${(deal.dealRisks?.length ?? 0) > 1 ? 's' : ''}` : 'No active blockers logged',
   ]
     .filter(Boolean)
     .join(' · ')
 
-  const signals = deal ? buildSignals(deal, notes) : []
-  const criteria = deal ? buildCriteria(deal) : []
-  const timeline = deal ? buildTimeline(deal, score, notes) : []
-  const todos = (deal?.todos ?? []).slice(0, 6)
-  const openTodos = todos.filter(todo => !todo.done)
+  const signals = buildSignals(deal, notes)
+  const criteria = buildCriteria(deal)
+  const timeline = buildTimeline(deal, score, notes)
+  const todos = (deal.todos ?? []).slice(0, 6)
   const doneTodos = todos.filter(todo => todo.done)
-  const competitorMentions = deal?.competitors?.slice(0, 3) ?? []
+  const openTodos = todos.filter(todo => !todo.done)
+  const competitorMentions = deal.competitors?.slice(0, 3) ?? []
   const stakeholders = [
-    ...(deal?.prospectName
+    ...(deal.prospectName
       ? [
           {
             name: deal.prospectName,
@@ -437,62 +480,32 @@ export default function DealDetailPage() {
           },
         ]
       : []),
-    ...((deal?.contacts ?? []).map(contact => ({
+    ...((deal.contacts ?? []).map(contact => ({
       name: contact.name,
       role: contact.title ?? 'Stakeholder',
-      sentiment: deal?.dealRisks?.length ? 'neutral' : 'positive',
+      sentiment: deal.dealRisks?.length ? 'neutral' : 'positive',
     }))),
   ].slice(0, 4)
   const automationList = (automationsRes?.data ?? []).filter(item => item.enabled).slice(0, 3)
-
-  if (isLoading) return <LoadingState />
-  if (!deal) {
-    return (
-      <div style={{ padding: '28px' }}>
-        <div className="surface-glass-elevated" style={{ borderRadius: 14, padding: '24px 26px' }}>
-          <div className="section-label">Deal workspace</div>
-          <p style={{ marginTop: 10, color: 'var(--ink-3)' }}>This deal could not be loaded.</p>
-        </div>
-      </div>
-    )
-  }
+  const titleParts = deal.dealName.includes(',')
+    ? {
+        lead: deal.dealName.split(',')[0],
+        tail: deal.dealName.split(',').slice(1).join(',').trim() || 'enterprise rollout',
+      }
+    : {
+        lead: deal.dealName,
+        tail: deal.stage === 'negotiation' ? 'closing motion' : 'enterprise rollout',
+      }
 
   return (
-    <div
-      className="deal-workspace-layout"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) 360px',
-        gap: 0,
-        minWidth: 0,
-      }}
-    >
-      <div className="deal-workspace-main" style={{ minWidth: 0, borderRight: '1px solid rgba(20, 17, 10, 0.06)' }}>
-        <div style={{ padding: '28px 28px 24px', borderBottom: '1px solid rgba(20, 17, 10, 0.06)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: 'var(--ink-3)', fontSize: 11 }}>
-            <div
-              className="surface-glass-light"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '4px 10px 4px 4px',
-                borderRadius: 20,
-              }}
-            >
-              <div
-                style={{
-                  width: 20,
-                  height: 20,
-                  borderRadius: 6,
-                  background: avatarGradientFromName(deal.prospectCompany),
-                  color: '#fff',
-                  fontSize: 10,
-                  fontWeight: 600,
-                  display: 'grid',
-                  placeItems: 'center',
-                }}
-              >
+    <div className="main">
+      <div className="workspace">
+        <TopNav variant="workspace" />
+
+        <div className="deal-header">
+          <div className="deal-meta">
+            <div className="org-chip">
+              <div className="org-logo" style={{ background: avatarGradientFromName(deal.prospectCompany) }}>
                 {initialsFromName(deal.prospectCompany)}
               </div>
               <span>{deal.prospectCompany}</span>
@@ -502,89 +515,36 @@ export default function DealDetailPage() {
             <span>·</span>
             <span>{deal.closeDate ? formatContextualDate(deal.closeDate) : 'London, UK'}</span>
             <span>·</span>
-            <span className="mono" style={{ color: 'var(--ink-4)' }}>{compactDealId(deal.id)}</span>
+            <span className="mono" style={{ color: 'var(--ink-4)' }}>
+              {compactDealId(deal.id)}
+            </span>
           </div>
 
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'flex-end',
-              justifyContent: 'space-between',
-              gap: 32,
-              marginTop: 18,
-            }}
-          >
-            <div style={{ minWidth: 0 }}>
-              <h1 className="page-title" style={{ margin: 0 }}>
-                {deal.dealName.includes(',') ? (
-                  <>
-                    {deal.dealName.split(',')[0]},{' '}
-                    <em>{deal.dealName.split(',').slice(1).join(',').trim() || 'enterprise rollout'}</em>
-                  </>
-                ) : (
-                  <>
-                    {deal.dealName}, <em>{deal.stage === 'negotiation' ? 'closing motion' : 'enterprise rollout'}</em>
-                  </>
-                )}
+          <div className="deal-title-row">
+            <div>
+              <h1 className="deal-title">
+                {titleParts.lead}, <em>{titleParts.tail}</em>
               </h1>
-              <div className="page-subtitle">
-                {deal.prospectTitle ? `${deal.prospectTitle} relationship in play` : 'Multi-stakeholder deal'} · {deal.contacts?.length ?? 0} contacts · {deal.stage ? stageLabel(deal.stage) : 'Proposal'} stage
+              <div className="deal-subtitle">
+                {deal.prospectTitle ? `${deal.prospectTitle} relationship in play` : 'Multi-stakeholder deal'} · {deal.contacts?.length ?? 0} contacts · {stageLabel(deal.stage)} stage
               </div>
             </div>
-            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <div
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 28,
-                  fontWeight: 500,
-                  letterSpacing: '-0.02em',
-                  color: 'var(--ink)',
-                }}
-              >
-                {formatCurrencyGBP(deal.dealValue ?? null)}
-              </div>
-              <div
-                style={{
-                  marginTop: 3,
-                  fontSize: 10,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  color: 'var(--ink-4)',
-                }}
-              >
-                Annual contract value
-              </div>
+            <div className="deal-value">
+              <div className="value-amount">{formatCurrencyGBP(deal.dealValue ?? null)}</div>
+              <div className="value-label">Annual contract value</div>
             </div>
           </div>
 
-          <div
-            className="surface-glass"
-            style={{
-              marginTop: 20,
-              borderRadius: 14,
-              padding: '14px 18px',
-              display: 'grid',
-              gridTemplateColumns: 'auto minmax(0, 1fr) auto auto auto',
-              gap: 20,
-              alignItems: 'center',
-            }}
-          >
+          <div className="score-strip">
             <ScoreCircle score={score} />
-            <div style={{ minWidth: 0 }}>
-              <AIVoice
-                as="div"
-                style={{
-                  fontSize: 19,
-                  lineHeight: 1.35,
-                  letterSpacing: '-0.01em',
-                }}
-              >
-                {verdict.split(' ').slice(0, 2).join(' ')} <em style={{ fontStyle: 'italic' }}>{verdict.split(' ').slice(2).join(' ')}</em>
+            <div className="score-info">
+              <AIVoice as="div" className="score-verdict">
+                {verdict}
               </AIVoice>
-              <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{reasonLine}</div>
+              <div className="score-reason">{reasonLine}</div>
             </div>
 
-            <svg width="88" height="32" viewBox="0 0 88 32" style={{ overflow: 'visible' }}>
+            <svg className="score-spark" viewBox="0 0 88 32">
               <defs>
                 <linearGradient id="sparkFill" x1="0" x2="0" y1="0" y2="1">
                   <stop offset="0%" stopColor="var(--signal)" stopOpacity="0.25" />
@@ -595,49 +555,27 @@ export default function DealDetailPage() {
               <path d={sparkline} fill="none" stroke="var(--signal)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  color: sevenDayDelta >= 0 ? 'var(--signal)' : 'var(--risk)',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-              >
+            <div className="score-delta">
+              <div className="delta-val" style={{ color: sevenDayDelta >= 0 ? 'var(--signal)' : 'var(--risk)' }}>
                 <Triangle size={10} fill="currentColor" stroke="none" style={{ transform: sevenDayDelta >= 0 ? 'none' : 'rotate(180deg)' }} />
                 {formatDelta(sevenDayDelta)}
               </div>
-              <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ink-4)' }}>
-                7D change
-              </div>
+              <div className="delta-label">7d change</div>
             </div>
 
             <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '5px 11px',
-                borderRadius: 999,
-                background: tone.bg,
-                border: `1px solid ${tone.border}`,
-                color: tone.text,
-                fontSize: 11.5,
-                fontWeight: 500,
-              }}
+              className="stage-chip"
+              style={{ background: tone.bg, border: `1px solid ${tone.border}`, color: tone.text }}
             >
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: tone.text }} />
+              <span className="dot" style={{ background: tone.text }} />
               {stageLabel(deal.stage)}
             </div>
           </div>
         </div>
 
-        <div style={{ padding: '0 28px', borderBottom: '1px solid rgba(20, 17, 10, 0.06)', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <div className="tabs">
           {[
-            { label: 'Overview', count: undefined, active: true },
+            { label: 'Overview', active: true },
             { label: 'Manage', count: openTodos.length || criteria.filter(item => item.status !== 'met').length },
             { label: 'Intelligence', dot: signals.length > 0 },
             { label: 'Conversations', count: notes.length },
@@ -645,115 +583,30 @@ export default function DealDetailPage() {
             { label: 'Documents' },
             { label: 'History' },
           ].map(tab => (
-            <button
-              key={tab.label}
-              style={{
-                padding: '11px 14px',
-                fontSize: 12.5,
-                color: tab.active ? 'var(--ink)' : 'var(--ink-3)',
-                fontWeight: tab.active ? 500 : 450,
-                border: 'none',
-                borderBottom: tab.active ? '2px solid var(--ink)' : '2px solid transparent',
-                marginBottom: -1,
-                background: 'transparent',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
-            >
+            <button key={tab.label} className={`tab${tab.active ? ' active' : ''}`}>
               {tab.label}
-              {tab.count != null && (
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 10,
-                    color: 'var(--ink-4)',
-                    background: 'rgba(20, 17, 10, 0.05)',
-                    borderRadius: 3,
-                    padding: '1px 5px',
-                  }}
-                >
-                  {tab.count}
-                </span>
-              )}
-              {tab.dot && <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--signal)' }} />}
+              {tab.count != null ? <span className="tab-count">{tab.count}</span> : null}
+              {tab.dot ? <span className="tab-dot" /> : null}
             </button>
           ))}
         </div>
 
-        <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 28 }}>
+        <div className="content">
           <section className="fade-in">
-            <div
-              className="surface-glass-elevated"
-              style={{
-                position: 'relative',
-                borderRadius: 14,
-                padding: '24px 26px',
-                overflow: 'hidden',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: '0 auto 0 0',
-                  width: 3,
-                  background: 'linear-gradient(180deg, var(--signal) 0%, transparent 100%)',
-                }}
-              />
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 7,
-                    borderRadius: 20,
-                    background: 'var(--ink)',
-                    color: 'var(--bg)',
-                    padding: '3px 9px',
-                    fontSize: 10.5,
-                    fontWeight: 500,
-                  }}
-                >
-                  <span
-                    className="pulse-dot"
-                    style={{
-                      width: 5,
-                      height: 5,
-                      borderRadius: '50%',
-                      background: 'var(--signal)',
-                      boxShadow: '0 0 0 2px rgba(29, 184, 106, 0.25)',
-                    }}
-                  />
+            <div className="briefing">
+              <div className="briefing-head">
+                <div className="ai-badge">
+                  <span className="pulse" />
                   Morning briefing
                 </div>
-                <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+                <span className="briefing-time">
                   Generated {formatRelativeTime(deal.updatedAt)} · based on {signals.length + notes.length} signals
                 </span>
               </div>
-              <AIVoice
-                as="div"
-                style={{
-                  marginTop: 18,
-                  fontSize: 22,
-                  lineHeight: 1.4,
-                  letterSpacing: '-0.01em',
-                  color: 'var(--ink)',
-                }}
-              >
-                {(deal.aiSummary ?? `${deal.prospectCompany} is still moving, but the next action needs to be sharp and executive-ready.`)
-                  .replace(/\s+/g, ' ')
-                  .trim()}
+              <AIVoice as="div" className="briefing-text">
+                {deal.aiSummary ?? `${deal.prospectCompany} is still moving, but the next action needs to be sharp and executive-ready.`}
               </AIVoice>
-              <div
-                style={{
-                  marginTop: 18,
-                  paddingTop: 18,
-                  borderTop: '1px solid rgba(20, 17, 10, 0.06)',
-                  display: 'flex',
-                  gap: 8,
-                  flexWrap: 'wrap',
-                }}
-              >
+              <div className="briefing-actions">
                 {[
                   { label: 'Draft email to stakeholder', action: `Draft an email for ${deal.prospectCompany} that advances ${deal.dealName}.`, icon: Mail },
                   { label: 'Prep next call', action: `Prepare my next call plan for ${deal.dealName}.`, icon: Calendar },
@@ -761,19 +614,7 @@ export default function DealDetailPage() {
                 ].map(action => {
                   const Icon = action.icon
                   return (
-                    <button
-                      key={action.label}
-                      className="surface-glass-light"
-                      onClick={() => sendToCopilot(action.action)}
-                      style={{
-                        padding: '5px 10px',
-                        borderRadius: 6,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontSize: 11.5,
-                      }}
-                    >
+                    <button key={action.label} className="action-chip" onClick={() => sendToCopilot(action.action)}>
                       <Icon size={12} strokeWidth={2} />
                       {action.label}
                     </button>
@@ -784,65 +625,21 @@ export default function DealDetailPage() {
           </section>
 
           <section className="fade-in">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--ink)' }}>
-                Live <em style={{ fontStyle: 'normal', fontWeight: 300, color: 'var(--ink-2)' }}>signals</em>
-              </h2>
-              <button style={{ border: 'none', background: 'transparent', fontSize: 11.5, color: 'var(--ink-3)' }}>
-                View all <ChevronRight size={12} style={{ verticalAlign: 'middle' }} />
-              </button>
-            </div>
-            <div className="deal-signals-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+            <SectionHeader title="Live" accent="signals" action="View all" />
+            <div className="signals-grid">
               {signals.map(signal => {
-                const toneColors =
-                  signal.tone === 'positive'
-                    ? { bg: 'var(--signal-soft)', color: 'var(--signal)' }
-                    : signal.tone === 'warn'
-                      ? { bg: 'var(--warn-soft)', color: 'var(--warn)' }
-                      : signal.tone === 'risk'
-                        ? { bg: 'var(--risk-soft)', color: 'var(--risk)' }
-                        : { bg: 'var(--cool-soft)', color: 'var(--cool)' }
                 const Icon = signal.icon
                 return (
-                  <div
-                    key={`${signal.label}-${signal.meta}`}
-                    className="surface-glass"
-                    style={{
-                      borderRadius: 10,
-                      padding: '14px 16px',
-                      transition: 'transform 0.16s ease, box-shadow 0.16s ease',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div
-                        style={{
-                          width: 22,
-                          height: 22,
-                          borderRadius: 5,
-                          background: toneColors.bg,
-                          color: toneColors.color,
-                          display: 'grid',
-                          placeItems: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
+                  <div key={`${signal.label}-${signal.meta}`} className="signal-card">
+                    <div className="signal-head">
+                      <div className={`signal-icon ${signal.tone}`}>
                         <Icon size={12} strokeWidth={2} />
                       </div>
-                      <span style={{ fontSize: 11, color: 'var(--ink-3)', flex: 1 }}>{signal.label}</span>
-                      <span
-                        style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 10.5,
-                          color: signal.weight >= 0 ? 'var(--signal)' : 'var(--risk)',
-                        }}
-                      >
-                        {formatDelta(signal.weight)}
-                      </span>
+                      <span className="signal-label">{signal.label}</span>
+                      <span className={`signal-weight ${signal.weight >= 0 ? 'pos' : 'neg'}`}>{formatDelta(signal.weight)}</span>
                     </div>
-                    <div style={{ marginTop: 10, fontSize: 13, fontWeight: 450, color: 'var(--ink)', lineHeight: 1.45 }}>
-                      {signal.body}
-                    </div>
-                    <div style={{ marginTop: 8, fontSize: 10.5, color: 'var(--ink-4)' }}>{signal.meta}</div>
+                    <div className="signal-body">{signal.body}</div>
+                    <div className="signal-meta">{signal.meta}</div>
                   </div>
                 )
               })}
@@ -850,408 +647,170 @@ export default function DealDetailPage() {
           </section>
 
           <section className="fade-in">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Manage</h2>
-              <button style={{ border: 'none', background: 'transparent', fontSize: 11.5, color: 'var(--ink-3)' }}>
-                Edit plan <ChevronRight size={12} style={{ verticalAlign: 'middle' }} />
-              </button>
-            </div>
-            <div className="deal-manage-grid" style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 16 }}>
-              <div className="surface-glass-strong" style={{ borderRadius: 14, padding: '18px 20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
+            <SectionHeader title="Manage" action="Edit plan" />
+            <div className="manage-grid">
+              <div className="manage-card">
+                <div className="manage-head">
+                  <div className="manage-title">
                     <CheckCheck size={14} strokeWidth={2} />
                     To-dos
                   </div>
-                  <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                  <span className="progress-meta">
                     {doneTodos.length} of {todos.length || 1} · {formatPercentage(todos.length ? (doneTodos.length / todos.length) * 100 : 0)}
                   </span>
                 </div>
                 {(todos.length ? todos : [{ text: deal.nextSteps ?? 'Define the next action', source: 'ai', done: false }]).map((todo, index, list) => (
-                  <div
-                    key={`${todo.id ?? todo.text}-${index}`}
-                    style={{
-                      display: 'flex',
-                      gap: 10,
-                      padding: '8px 0',
-                      borderBottom: index === list.length - 1 ? 'none' : '1px solid rgba(20, 17, 10, 0.05)',
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 15,
-                        height: 15,
-                        borderRadius: 4,
-                        border: `1.5px solid ${todo.done ? 'var(--signal)' : todo.source === 'ai' ? 'var(--signal)' : 'rgba(20, 17, 10, 0.25)'}`,
-                        background: todo.done ? 'var(--signal)' : todo.source === 'ai' ? 'var(--signal-soft)' : 'transparent',
-                        marginTop: 2,
-                        display: 'grid',
-                        placeItems: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {todo.done && <Check size={10} strokeWidth={3} color="#fff" />}
+                  <div key={`${todo.id ?? todo.text}-${index}`} className="todo-item" style={{ borderBottom: index === list.length - 1 ? 'none' : undefined }}>
+                    <div className={`todo-check${todo.done ? ' done' : ''}${todo.source === 'ai' && !todo.done ? ' ai' : ''}`}>
+                      {todo.done ? <Check size={10} strokeWidth={3} color="#fff" /> : null}
                     </div>
-                    <div>
-                      <div
-                        style={{
-                          fontSize: 12.5,
-                          fontWeight: 450,
-                          color: todo.done ? 'var(--ink-4)' : 'var(--ink)',
-                          textDecoration: todo.done ? 'line-through' : 'none',
-                        }}
-                      >
-                        {todo.text}
-                      </div>
-                      <div style={{ marginTop: 4, fontSize: 11, color: 'var(--ink-4)' }}>
-                        {todo.source === 'ai' && (
-                          <span
-                            style={{
-                              display: 'inline-block',
-                              marginRight: 6,
-                              padding: '1px 5px',
-                              borderRadius: 4,
-                              background: 'var(--signal-soft)',
-                              color: 'var(--signal)',
-                              fontSize: 9.5,
-                              fontWeight: 600,
-                              letterSpacing: '0.04em',
-                              textTransform: 'uppercase',
-                            }}
-                          >
-                            AI suggested
-                          </span>
-                        )}
-                        {todo.createdAt ? formatContextualDate(todo.createdAt) : 'Tracked by Halvex'}
+                    <div className="todo-body">
+                      <div className={`todo-text${todo.done ? ' done' : ''}`}>{todo.text}</div>
+                      <div className="todo-sub">
+                        {todo.source === 'ai' ? <span className="ai-tag">AI suggested</span> : null}
+                        <span>{todo.createdAt ? formatContextualDate(todo.createdAt) : 'Tracked by Halvex'}</span>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="surface-glass-strong" style={{ borderRadius: 14, padding: '18px 20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600 }}>
+              <div className="manage-card">
+                <div className="manage-head">
+                  <div className="manage-title">
                     <Circle size={14} strokeWidth={2} />
                     Success criteria
                   </div>
-                  <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                  <span className="progress-meta">
                     {criteria.filter(item => item.status === 'met').length} of {criteria.length}
                   </span>
                 </div>
-                {criteria.map((criterion, index) => {
-                  const statusStyle =
-                    criterion.status === 'met'
-                      ? { bg: 'var(--signal-soft)', color: 'var(--signal)' }
-                      : criterion.status === 'partial'
-                        ? { bg: 'var(--warn-soft)', color: 'var(--warn)' }
-                        : { bg: 'rgba(255,255,255,0.42)', color: 'var(--ink-4)' }
-                  return (
-                    <div
-                      key={`${criterion.label}-${index}`}
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'auto 1fr auto',
-                        gap: 12,
-                        padding: '10px 0',
-                        borderBottom: index === criteria.length - 1 ? 'none' : '1px solid rgba(20, 17, 10, 0.05)',
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 22,
-                          height: 22,
-                          borderRadius: '50%',
-                          background: statusStyle.bg,
-                          color: statusStyle.color,
-                          border: criterion.status === 'missing' ? '1px dashed var(--ink-4)' : 'none',
-                          display: 'grid',
-                          placeItems: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        {criterion.status === 'met' ? <Check size={12} strokeWidth={3} /> : criterion.status === 'partial' ? '!' : null}
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 12.5, color: 'var(--ink)' }}>{criterion.label}</div>
-                        <div style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>{criterion.sublabel}</div>
-                      </div>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-3)' }}>
-                        {criterion.confidence}
-                      </span>
+                {criteria.map((criterion, index) => (
+                  <div key={`${criterion.label}-${index}`} className="criteria-row">
+                    <div className={`criteria-status ${criterion.status}`}>
+                      {criterion.status === 'met' ? <Check size={12} strokeWidth={3} /> : criterion.status === 'partial' ? '!' : null}
                     </div>
-                  )
-                })}
+                    <div>
+                      <div className="criteria-label">{criterion.label}</div>
+                      <div className="criteria-sub">{criterion.sublabel}</div>
+                    </div>
+                    <span className="criteria-confidence">{criterion.confidence}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </section>
 
           <section className="fade-in">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--ink)' }}>
-                Recent <em style={{ fontStyle: 'normal', fontWeight: 300, color: 'var(--ink-2)' }}>activity</em>
-              </h2>
-              <button style={{ border: 'none', background: 'transparent', fontSize: 11.5, color: 'var(--ink-3)' }}>
-                View full timeline <ChevronRight size={12} style={{ verticalAlign: 'middle' }} />
-              </button>
-            </div>
-            <div className="surface-glass-strong" style={{ borderRadius: 14, padding: '20px 22px' }}>
-              <div style={{ position: 'relative', paddingLeft: 24 }}>
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 6,
-                    bottom: 6,
-                    left: 7,
-                    width: 1,
-                    background: 'rgba(20, 17, 10, 0.08)',
-                  }}
-                />
-                {timeline.map((item, index) => {
-                  const dotColor =
-                    item.kind === 'ai' ? 'var(--signal)' : item.kind === 'meeting' ? 'var(--cool)' : 'var(--ink-2)'
-                  return (
-                    <div key={`${item.title}-${index}`} style={{ position: 'relative', paddingBottom: index === timeline.length - 1 ? 0 : 18 }}>
-                      <div
-                        style={{
-                          position: 'absolute',
-                          left: -24,
-                          top: 2,
-                          width: 15,
-                          height: 15,
-                          borderRadius: '50%',
-                          border: `2px solid ${dotColor}`,
-                          background: item.kind === 'ai' ? dotColor : item.kind === 'meeting' ? dotColor : '#fff',
-                          boxShadow: item.kind === 'ai' ? '0 0 0 3px rgba(29, 184, 106, 0.15)' : 'none',
-                        }}
-                      />
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 11.5, color: 'var(--ink-3)' }}>
-                        <span style={{ color: 'var(--ink-2)', fontWeight: 500 }}>{item.label}</span>
-                        <span>·</span>
-                        <span>{item.timestamp}</span>
-                        {item.sender && (
-                          <>
-                            <span>·</span>
-                            <span>{item.sender}</span>
-                          </>
-                        )}
-                      </div>
-                      <div style={{ marginTop: 4, fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>{item.title}</div>
-                      <div style={{ marginTop: 4, fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>{item.body}</div>
-                      {item.insight && (
-                        <div
-                          style={{
-                            marginTop: 10,
-                            padding: '10px 14px',
-                            background: 'rgba(29, 184, 106, 0.06)',
-                            border: '1px solid rgba(29, 184, 106, 0.15)',
-                            borderLeft: '2px solid var(--signal)',
-                            borderRadius: '0 8px 8px 0',
-                            backdropFilter: 'blur(8px)',
-                            WebkitBackdropFilter: 'blur(8px)',
-                          }}
-                        >
-                          <span
-                            style={{
-                              marginRight: 6,
-                              color: 'var(--signal)',
-                              fontSize: 9.5,
-                              fontWeight: 600,
-                              letterSpacing: '0.08em',
-                              textTransform: 'uppercase',
-                            }}
-                          >
-                            {item.insight.label}
-                          </span>
-                          <AIVoice as="span" style={{ fontSize: 13.5, lineHeight: 1.45, color: 'var(--ink-2)' }}>
-                            {item.insight.text}
-                          </AIVoice>
-                        </div>
-                      )}
+            <SectionHeader title="Recent" accent="activity" action="View full timeline" />
+            <div className="timeline-card">
+              <div className="timeline">
+                {timeline.map((item, index) => (
+                  <div key={`${item.title}-${index}`} className="timeline-item">
+                    <div className={`timeline-dot ${item.kind}`} />
+                    <div className="timeline-header">
+                      <span className="timeline-type">{item.label}</span>
+                      <span>·</span>
+                      <span>{item.timestamp}</span>
+                      {item.sender ? (
+                        <>
+                          <span>·</span>
+                          <span>{item.sender}</span>
+                        </>
+                      ) : null}
                     </div>
-                  )
-                })}
+                    <div className="timeline-title">{item.title}</div>
+                    <div className="timeline-body">{item.body}</div>
+                    {item.insight ? (
+                      <div className="timeline-insight">
+                        <span className="timeline-insight-label">{item.insight.label}</span>
+                        <AIVoice as="span" className="italic">
+                          {item.insight.text}
+                        </AIVoice>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
               </div>
             </div>
           </section>
         </div>
       </div>
 
-      <aside className="deal-right-panel" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div
-          style={{
-            position: 'relative',
-            overflow: 'hidden',
-            borderRadius: 14,
-            padding: '16px 18px',
-            color: 'var(--bg)',
-            background: 'linear-gradient(135deg, var(--ink) 0%, #2A2822 100%)',
-            boxShadow: '0 16px 40px rgba(20, 17, 10, 0.16)',
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              inset: '-24px -24px auto auto',
-              width: 120,
-              height: 120,
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(29, 184, 106, 0.15) 0%, transparent 72%)',
-              filter: 'blur(20px)',
-            }}
-          />
-          <div
-            style={{
-              position: 'relative',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              fontSize: 9.5,
-              fontWeight: 600,
-              letterSpacing: '0.1em',
-              textTransform: 'uppercase',
-              color: 'rgba(250, 250, 247, 0.6)',
-            }}
-          >
+      <aside className="right-panel">
+        <div className="next-action-card">
+          <div className="next-action-label">
             <Sparkles size={10} strokeWidth={2.5} />
             Recommended next action
           </div>
-          <AIVoice as="div" style={{ position: 'relative', marginTop: 12, fontSize: 17, lineHeight: 1.35, letterSpacing: '-0.01em' }}>
+          <AIVoice as="div" className="next-action-text">
             {deal.nextSteps ? `Send the ${deal.nextSteps.toLowerCase()}.` : 'Tighten the next action and share it with the buying team before momentum cools.'}
           </AIVoice>
-          <div style={{ position: 'relative', marginTop: 14, display: 'flex', gap: 8 }}>
-            <button
-              onClick={() => sendToCopilot(`Draft the next-action message for ${deal.dealName}.`)}
-              style={{
-                flex: 1,
-                padding: '5px 10px',
-                borderRadius: 5,
-                border: 'none',
-                background: 'var(--signal)',
-                color: 'var(--bg)',
-                fontSize: 11,
-                fontWeight: 600,
-              }}
-            >
+          <div className="next-action-buttons">
+            <button className="next-action-btn primary" onClick={() => sendToCopilot(`Draft the next-action message for ${deal.dealName}.`)}>
               Draft now
             </button>
-            <button
-              onClick={() => sendToCopilot(`What should I do if I skip the current next action on ${deal.dealName}?`)}
-              style={{
-                flex: 1,
-                padding: '5px 10px',
-                borderRadius: 5,
-                border: '1px solid rgba(250, 250, 247, 0.15)',
-                background: 'rgba(250, 250, 247, 0.1)',
-                color: 'var(--bg)',
-                fontSize: 11,
-                fontWeight: 500,
-              }}
-            >
+            <button className="next-action-btn" onClick={() => sendToCopilot(`What should I do if I skip the current next action on ${deal.dealName}?`)}>
               Skip
             </button>
           </div>
         </div>
 
-        <div className="surface-glass-strong" style={{ borderRadius: 14, padding: '16px 18px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-            <span className="section-label">Stakeholders</span>
-            <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{stakeholders.length} · map →</span>
+        <div className="panel-section">
+          <div className="panel-head">
+            <span>Stakeholders</span>
+            <span className="panel-head-action">{stakeholders.length} · map →</span>
           </div>
           {stakeholders.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>No stakeholders mapped yet.</div>
           ) : (
             stakeholders.map(person => (
-              <div
-                key={`${person.name}-${person.role}`}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'auto 1fr auto',
-                  gap: 10,
-                  alignItems: 'center',
-                  padding: '8px 0',
-                  borderBottom: '1px solid rgba(20, 17, 10, 0.05)',
-                }}
-              >
-                <div
-                  style={{
-                    width: 30,
-                    height: 30,
-                    borderRadius: 8,
-                    background: avatarGradientFromName(person.name),
-                    color: '#fff',
-                    fontSize: 11,
-                    fontWeight: 600,
-                    display: 'grid',
-                    placeItems: 'center',
-                  }}
-                >
+              <div key={`${person.name}-${person.role}`} className="stakeholder">
+                <div className="stake-avatar" style={{ background: avatarGradientFromName(person.name) }}>
                   {initialsFromName(person.name)}
                 </div>
                 <div>
-                  <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--ink)' }}>{person.name}</div>
-                  <div style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>{person.role}</div>
+                  <div className="stake-name">{person.name}</div>
+                  <div className="stake-role">{person.role}</div>
                 </div>
-                <div
-                  className={person.sentiment === 'positive' ? 'sentiment-ripple' : undefined}
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    background: person.sentiment === 'positive' ? 'var(--signal)' : 'var(--ink-4)',
-                  }}
-                />
+                <div className={`sentiment-dot ${person.sentiment}`} />
               </div>
             ))
           )}
         </div>
 
-        <div className="surface-glass-strong" style={{ borderRadius: 14, padding: '16px 18px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-            <span className="section-label">Close forecast</span>
-            <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>Model →</span>
+        <div className="panel-section">
+          <div className="panel-head">
+            <span>Close forecast</span>
+            <span className="panel-head-action">Model →</span>
           </div>
           {[
             { label: 'Quarter this', value: score, gradient: 'linear-gradient(90deg, #1DB86A 0%, #69D59F 100%)' },
             { label: 'Quarter next', value: Math.max(5, 100 - score - 12), gradient: 'linear-gradient(90deg, #C4621B 0%, #E8A05E 100%)' },
             { label: 'Lost', value: Math.max(3, 100 - score), gradient: 'linear-gradient(90deg, #B23A3A 0%, #D86B6B 100%)' },
           ].map(row => (
-            <div key={row.label} style={{ marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>{row.label}</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 500 }}>{formatPercentage(row.value)}</span>
-              </div>
-              <div style={{ width: '100%', height: 4, borderRadius: 999, background: 'rgba(20, 17, 10, 0.06)' }}>
-                <div style={{ width: `${Math.min(100, row.value)}%`, height: 4, borderRadius: 999, background: row.gradient }} />
+            <div key={row.label} className="forecast-row">
+              <span className="forecast-label">{row.label}</span>
+              <span className="forecast-value">{formatPercentage(row.value)}</span>
+              <div className="forecast-bar">
+                <div className="forecast-bar-fill" style={{ width: `${Math.min(100, row.value)}%`, background: row.gradient }} />
               </div>
             </div>
           ))}
         </div>
 
-        <div className="surface-glass-strong" style={{ borderRadius: 14, padding: '16px 18px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-            <span className="section-label">Competitor mentions</span>
-            <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>30d</span>
+        <div className="panel-section">
+          <div className="panel-head">
+            <span>Competitor mentions</span>
+            <span className="panel-head-action">30d</span>
           </div>
           {competitorMentions.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--ink-4)' }}>No competitor mentions in this deal yet.</div>
           ) : (
             competitorMentions.map(name => (
-              <div
-                key={name}
-                className="surface-glass-light"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                  borderRadius: 6,
-                  padding: '8px 10px',
-                  marginBottom: 8,
-                }}
-              >
-                <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{name}</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-3)' }}>
+              <div key={name} className="competitor-chip">
+                <span className="competitor-name">{name}</span>
+                <span className="competitor-mentions">
                   1 <MoveUpRight size={10} style={{ verticalAlign: 'middle' }} />
                 </span>
               </div>
@@ -1259,68 +818,24 @@ export default function DealDetailPage() {
           )}
         </div>
 
-        <div className="surface-glass-strong" style={{ borderRadius: 14, padding: '16px 18px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-            <span className="section-label">Automations active</span>
-            <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{automationList.length || 0} running</span>
+        <div className="panel-section">
+          <div className="panel-head">
+            <span>Automations active</span>
+            <span className="panel-head-action">{automationList.length || 0} running</span>
           </div>
           {(automationList.length ? automationList : [{ id: 'briefing', name: 'Morning briefing', category: 'intelligence' }]).map(item => (
-            <div
-              key={item.id}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '24px 1fr',
-                gap: 10,
-                alignItems: 'center',
-                padding: '8px 0',
-                borderBottom: '1px solid rgba(20, 17, 10, 0.05)',
-              }}
-            >
-              <div
-                className="surface-glass-light"
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 6,
-                  display: 'grid',
-                  placeItems: 'center',
-                }}
-              >
+            <div key={item.id} className="automation-row">
+              <div className="auto-icon">
                 <Bot size={12} strokeWidth={2} />
               </div>
               <div>
-                <div style={{ fontSize: 12.5, color: 'var(--ink)' }}>{item.name}</div>
-                <div style={{ fontSize: 10.5, color: 'var(--ink-4)' }}>
-                  {item.category === 'alerts' ? 'Alerts' : 'Intelligence'} · active now
-                </div>
+                <div className="auto-text">{item.name}</div>
+                <div className="auto-time">{item.category === 'alerts' ? 'Alerts' : 'Intelligence'} · active now</div>
               </div>
             </div>
           ))}
         </div>
       </aside>
-      <style>{`
-        @media (max-width: 1180px) {
-          .deal-workspace-layout {
-            grid-template-columns: minmax(0, 1fr) !important;
-          }
-
-          .deal-workspace-main {
-            border-right: none !important;
-            border-bottom: 1px solid rgba(20, 17, 10, 0.06);
-          }
-
-          .deal-right-panel {
-            padding-top: 0 !important;
-          }
-        }
-
-        @media (max-width: 900px) {
-          .deal-signals-grid,
-          .deal-manage-grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
     </div>
   )
 }
