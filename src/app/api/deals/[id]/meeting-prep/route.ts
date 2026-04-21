@@ -5,12 +5,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { anthropic } from '@/lib/ai/client'
 import { db } from '@/lib/db'
-import { dealLogs, companyProfiles, competitors, collateral } from '@/lib/db/schema'
+import { dealLogs, companyProfiles, competitors } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getWorkspaceBrain, formatBrainContext } from '@/lib/workspace-brain'
 import { ensureLinksColumn } from '@/lib/api-helpers'
 
+function getFirstText(content: Array<{ type: string; text?: string }>): string {
+  const part = content.find(item => item.type === 'text' && typeof item.text === 'string')
+  return part?.text ?? ''
+}
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -21,11 +25,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { workspaceId } = await getWorkspaceContext(userId)
     const { id } = await params
     await ensureLinksColumn()
-    const [[deal], [company], comps, relatedCollateral, brain] = await Promise.all([
+    const [[deal], [company], comps, brain] = await Promise.all([
       db.select().from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1),
       db.select().from(companyProfiles).where(eq(companyProfiles.workspaceId, workspaceId)).limit(1),
       db.select().from(competitors).where(eq(competitors.workspaceId, workspaceId)),
-      db.select().from(collateral).where(and(eq(collateral.workspaceId, workspaceId), eq(collateral.sourceDealLogId, id))),
       getWorkspaceBrain(workspaceId),
     ])
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -47,6 +50,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         r.toLowerCase().includes(o.theme.toLowerCase().split(' ')[0])
       )
     )
+    const meetingHistory = typeof deal.meetingNotes === 'string' ? deal.meetingNotes.trim() : ''
+    const historyEntries = meetingHistory
+      ? meetingHistory.split(/\n---\n/).map(entry => entry.trim()).filter(Boolean)
+      : []
+    const latestMeetingNote = historyEntries.length > 0 ? historyEntries[historyEntries.length - 1].slice(0, 700) : null
+    const workspaceNotes = typeof deal.notes === 'string' && deal.notes.trim().length > 0
+      ? deal.notes.trim().slice(-600)
+      : null
 
     const mlSection = [
       winProb != null ? `Win probability (ML): ${Math.round(winProb * 100)}%` : '',
@@ -67,12 +78,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const prompt = `You are a senior B2B sales coach. Produce a sharp, deal-specific meeting prep brief. Be direct — no filler, no generic advice. Every point must be specific to this deal.
 
+CRITICAL: Treat meeting notes and uploaded notes as the source of truth. Do not reference task lists, checklists, or success criteria unless those facts are explicitly stated in the notes themselves.
+
 DEAL: ${deal.dealName} | ${deal.prospectName ?? 'Unknown'} at ${deal.prospectCompany} | Stage: ${deal.stage}${deal.dealValue ? ` | Value: £${deal.dealValue.toLocaleString()}` : ''}
 ${deal.aiSummary ? `Status: ${deal.aiSummary}` : ''}
 ${mlSection ? `\nML SIGNALS:\n${mlSection}` : ''}
 ${(deal.dealRisks as string[])?.length ? `\nKnown risks: ${(deal.dealRisks as string[]).join('; ')}` : ''}
-${((deal.todos as any[]) ?? []).filter((t: any) => !t.done).length > 0 ? `Open actions: ${((deal.todos as any[]) ?? []).filter((t: any) => !t.done).map((t: any) => t.text).join('; ')}` : ''}
-${deal.meetingNotes ? `\nMeeting history:\n${deal.meetingNotes}` : ''}
+${latestMeetingNote ? `\nLatest meeting note:\n${latestMeetingNote}` : ''}
+${meetingHistory ? `\nMeeting history:\n${meetingHistory}` : ''}
+${workspaceNotes ? `\nUploaded notes:\n${workspaceNotes}` : ''}
 ${company ? `\nOUR PRODUCT: ${company.companyName} — ${(company.valuePropositions as string[])?.slice(0, 3).join(' · ')}. Differentiators: ${(company.differentiators as string[])?.slice(0, 3).join(', ')}` : ''}
 ${dealComps.length > 0 ? `\nCOMPETITORS IN THIS DEAL: ${dealComps.map(c => `${c.name} (weaknesses: ${(c.weaknesses as string[])?.slice(0, 2).join(', ')})`).join('; ')}` : ''}
 ${objIntelSection}
@@ -101,7 +115,7 @@ One sentence: how to leverage or build a champion at ${deal.prospectCompany} giv
 ## Next Step
 One concrete, time-bound action to advance or close this deal.`
     const msg = await anthropic.messages.create({ model: 'gpt-5.4-mini', max_tokens: 1500, messages: [{ role: 'user', content: prompt }] })
-    const prep = (msg.content[0] as any).text
+    const prep = getFirstText(msg.content)
     return NextResponse.json({ data: { prep } })
   } catch (e: unknown) { console.error('[meeting-prep] failed:', e instanceof Error ? e.message : e); return NextResponse.json({ error: 'Meeting prep failed' }, { status: 500 }) }
 }

@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useUser } from '@clerk/nextjs'
 import useSWR from 'swr'
 import {
@@ -224,6 +224,7 @@ export default function DashboardPage() {
   const { user } = useUser()
   const { sendToCopilot } = useSidebar()
   const [refreshing, setRefreshing] = useState(false)
+  const overviewAutoRequested = useRef(false)
 
   const { data: overviewRes, isLoading: overviewLoading, mutate: mutateOverview } = useSWR<{ data: AIOverview }>(
     '/api/dashboard/ai-overview',
@@ -401,18 +402,31 @@ export default function DashboardPage() {
     if (notes.length === 0) {
       notes.push({
         title: 'Signal layer warming up',
-        detail: 'Halvex will elevate patterns here as more calls, tasks, and outcomes accumulate.',
+        detail: 'Halvex will elevate patterns here as more calls, notes, and outcomes accumulate.',
       })
     }
 
     return notes.slice(0, 3)
   }, [brain.keyPatterns, brain.productGapPriority, overview?.topRisk])
 
+  useEffect(() => {
+    if (overview || overviewLoading || overviewAutoRequested.current) return
+    overviewAutoRequested.current = true
+    void (async () => {
+      try {
+        await fetch('/api/dashboard/ai-overview', { method: 'POST' })
+        await mutateOverview()
+      } catch {
+        overviewAutoRequested.current = false
+      }
+    })()
+  }, [mutateOverview, overview, overviewLoading])
+
   async function refreshAll() {
     setRefreshing(true)
     try {
       await Promise.all([
-        mutateOverview(),
+        fetch('/api/dashboard/ai-overview', { method: 'POST' }).then(() => mutateOverview()),
         mutateBrain(),
         mutateDeals(),
         mutateActivity(),
@@ -904,8 +918,8 @@ export default function DashboardPage() {
           <section className="panel-section overview-kpi-panel">
             <div className="section-head" style={{ marginBottom: 16 }}>
               <h2 className="section-title">Pipeline pulse</h2>
-              <Link href="/pipeline" className="section-action">
-                Forecast
+              <Link href="/deals?view=board" className="section-action">
+                Pipeline
                 <ChevronRight size={12} />
               </Link>
             </div>
@@ -1017,8 +1031,8 @@ export default function DashboardPage() {
         <section className="panel-section overview-mini-card">
           <div className="section-head">
             <h2 className="section-title">Signals to watch</h2>
-            <Link href="/analytics" className="section-action">
-              Signals
+            <Link href="/intelligence" className="section-action">
+              Intelligence
               <ChevronRight size={12} />
             </Link>
           </div>

@@ -6,9 +6,10 @@ import { useSidebar } from './SidebarContext'
 
 const PAGE_LABELS: Record<string, string> = {
   '/dashboard': 'Enterprise Pipeline',
-  '/deals': 'Deals',
-  '/pipeline': 'Forecast',
-  '/analytics': 'Signals',
+  '/deals': 'Pipeline',
+  '/pipeline': 'Pipeline',
+  '/analytics': 'Intelligence',
+  '/intelligence': 'Intelligence',
   '/connections': 'Conversations',
   '/contacts': 'Contacts',
   '/company': 'Accounts',

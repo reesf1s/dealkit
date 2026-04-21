@@ -418,7 +418,7 @@ export default function ProductGapsPage() {
             This is either great news — or you haven&apos;t pasted enough meeting notes yet. Every time a prospect says &ldquo;we&apos;d need X to move forward,&rdquo; Halvex captures it here automatically.
           </div>
           <a
-            href="/pipeline"
+            href="/deals?view=board"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
               padding: '9px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: '600',

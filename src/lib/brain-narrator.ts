@@ -306,8 +306,6 @@ export interface ActionItemContext {
   daysSinceUpdate?: number | null
   /** Upcoming scheduled events from the latest note */
   scheduledEvents?: { description: string; date: string | null }[]
-  /** Open action items not yet done */
-  pendingTodos?: string[]
   /** Whether the next meeting is booked */
   nextMeetingBooked?: boolean
   /** Decision timeline stated by prospect */
@@ -355,9 +353,6 @@ export function scoreNarrationPrompt(briefing: DealBriefing, extra?: ActionItemC
   const scheduledLine = extra?.scheduledEvents?.length
     ? `Upcoming: ${extra.scheduledEvents.map(e => e.date ? `${e.description} on ${e.date}` : e.description).join('; ')}.`
     : ''
-  const todosLine = extra?.pendingTodos?.length
-    ? `Open action items: ${extra.pendingTodos.slice(0, 3).join('; ')}.`
-    : ''
   const nextMeetingLine = extra?.nextMeetingBooked === false
     ? `No next meeting booked.`
     : ''
@@ -371,7 +366,7 @@ DEAL SIGNALS:
 ${[mlLine, positivesLine, risksLine, stalledLine, competitorLine, momentumLine, stakeholderLine].filter(Boolean).join('\n')}
 
 SPECIFIC DEAL FACTS:
-${[contactsLine, staleDaysLine, scheduledLine, todosLine, nextMeetingLine, timelineLine, `Primary recommendation: ${briefing.recommendation}`].filter(Boolean).join('\n')}
+${[contactsLine, staleDaysLine, scheduledLine, nextMeetingLine, timelineLine, `Primary recommendation: ${briefing.recommendation}`].filter(Boolean).join('\n')}
 
 INSTRUCTIONS — write exactly 3 bullet action items. Each item MUST:
 1. Start with an ACTION VERB (Call, Send, Book, Address, Confirm, Follow up, Schedule, Share, Request)
@@ -389,7 +384,7 @@ EXAMPLES OF BAD output (NEVER write these):
 - "Continue to nurture the relationship" (vague, no specifics)
 - "Ensure stakeholder alignment" (generic fluff)
 
-If specific names/dates are not available for an item, ground it in the most specific available risk or open todo.
+If specific names/dates are not available for an item, ground it in the most specific available risk, note, or scheduled event.
 Return exactly 3 lines, each starting with "- ".`
 }
 
@@ -430,7 +425,6 @@ export function meetingPrepNarrationPrompt(
 ): string {
   const lines = [
     `Deal: ${briefing.dealName} with ${briefing.company} (stage: ${briefing.stage}, score: ${briefing.score ?? 'unscored'}).`,
-    briefing.pendingActions.length ? `Open actions: ${briefing.pendingActions.join('; ')}.` : '',
     briefing.risks.length ? `Known risks: ${briefing.risks.join('; ')}.` : '',
     briefing.competitors.length ? `Competitors in play: ${briefing.competitors.join(', ')}.` : '',
     briefing.competitorInsights.length ? `Competitive intel: ${briefing.competitorInsights.join(' | ')}.` : '',

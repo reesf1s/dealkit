@@ -1277,7 +1277,7 @@ export default function ModelsPage() {
             As you close deals (wins AND losses), Halvex trains private ML models on your data.
             Close 10 deals to unlock predictions. Close 50 for per-competitor models.
           </p>
-          <Link href="/pipeline" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 20px', borderRadius: '8px', background: '#37352f', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>
+          <Link href="/deals?view=board" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 20px', borderRadius: '8px', background: '#37352f', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}>
             View Pipeline <ArrowUpRight size={14} />
           </Link>
         </div>

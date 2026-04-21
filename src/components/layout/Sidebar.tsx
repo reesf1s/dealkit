@@ -9,7 +9,6 @@ import {
   BriefcaseBusiness,
   Calendar,
   CircleDashed,
-  Gauge,
   LayoutDashboard,
   MessageSquare,
   Settings,
@@ -94,14 +93,13 @@ export default function Sidebar() {
 
   const pipelineItems: NavItem[] = [
     { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-    { href: '/deals', label: 'Deals', icon: BriefcaseBusiness, count: openDeals.length, matchPaths: ['/deals'] },
+    { href: '/deals', label: 'Pipeline', icon: BriefcaseBusiness, count: openDeals.length, matchPaths: ['/deals', '/pipeline'] },
     { href: '/company', label: 'Accounts', icon: Target, count: accountCount, matchPaths: ['/company'] },
     { href: '/contacts', label: 'Contacts', icon: Users },
   ]
 
   const intelligenceItems: NavItem[] = [
-    { href: '/analytics', label: 'Signals', icon: Sparkles, signal: enabledAutomations > 0, matchPaths: ['/analytics'] },
-    { href: '/pipeline', label: 'Forecast', icon: Gauge, matchPaths: ['/pipeline'] },
+    { href: '/intelligence', label: 'Intelligence', icon: Sparkles, signal: enabledAutomations > 0, matchPaths: ['/intelligence', '/analytics'] },
     { href: '/connections', label: 'Conversations', icon: MessageSquare, count: 7, matchPaths: ['/connections', '/chat'] },
     { href: '/automations', label: 'Automations', icon: Bot, count: enabledAutomations, matchPaths: ['/automations'] },
   ]

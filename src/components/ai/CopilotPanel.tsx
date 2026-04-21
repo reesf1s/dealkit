@@ -19,15 +19,15 @@ interface QuickAction {
 function getQuickActions(activeDealCompany?: string, currentPage?: string): QuickAction[] {
   if (activeDealCompany) {
     return [
-      { label: 'What should I focus on?', prompt: `Give me a complete briefing on the ${activeDealCompany} deal — score, contacts, risks, todos, and what to do next.` },
+      { label: 'What should I focus on?', prompt: `Give me a complete briefing on the ${activeDealCompany} deal using the latest meeting notes and uploaded notes. Summarise score, contacts, risks, momentum, and the best next move.` },
       { label: 'What\'s blocking progress?', prompt: `Analyze the ${activeDealCompany} deal — what are the blockers, objections, and risks preventing this from closing? Check the ML intelligence and suggest specific actions to unblock it.` },
       { label: 'How is this deal trending?', prompt: `Show me the score history and health trend for the ${activeDealCompany} deal. Is it improving or declining? What changed and when?` },
       { label: 'How does this compare to wins?', prompt: `Compare the ${activeDealCompany} deal to similar deals we've won. What did those deals have that this one is missing? What patterns led to wins?` },
       { label: 'Help me write a follow-up', prompt: `Draft a follow-up email for ${activeDealCompany} addressing the biggest risk in this deal.` },
-      { label: 'Review my to-dos', prompt: `Review and clean up the todos for ${activeDealCompany}. Remove anything stale.` },
+      { label: 'What changed recently?', prompt: `Review the latest notes and meetings for ${activeDealCompany}. What changed, what still matters, and what needs follow-up?` },
     ]
   }
-  if (currentPage?.includes('/pipeline') || currentPage === '/') {
+  if (currentPage?.includes('/deals') || currentPage?.includes('/pipeline') || currentPage === '/') {
     return [
       { label: 'How does my pipeline look?', prompt: "What's my pipeline looking like? Give me a full overview with what to focus on." },
       { label: 'What needs my attention?', prompt: 'Which deals need attention right now? Flag anything at risk or stale.' },
@@ -58,33 +58,44 @@ type ToolInvocationLike = {
   toolCallId?: string
 }
 
+type MessagePartLike = {
+  type?: string
+  text?: string
+  toolInvocation?: ToolInvocationLike
+}
+
+type MessageWithMetadata = Message & {
+  parts?: MessagePartLike[]
+  toolInvocations?: ToolInvocationLike[]
+}
+
+function getMessageParts(message: Message | null | undefined): MessagePartLike[] {
+  const parts = (message as MessageWithMetadata | null | undefined)?.parts
+  return Array.isArray(parts) ? parts : []
+}
+
 function getMessageText(message: Message | null | undefined): string {
   if (!message) return ''
   if (typeof message.content === 'string' && message.content.trim()) {
     return message.content
   }
 
-  const parts = (message as any).parts
-  if (!Array.isArray(parts)) return ''
-
-  return parts
-    .filter((part: any) => part?.type === 'text' && typeof part?.text === 'string')
-    .map((part: any) => part.text)
+  return getMessageParts(message)
+    .filter((part): part is MessagePartLike & { type: 'text'; text: string } => part?.type === 'text' && typeof part?.text === 'string')
+    .map(part => part.text)
     .join('\n')
     .trim()
 }
 
 function getMessageToolInvocations(message: Message | null | undefined): ToolInvocationLike[] {
   if (!message) return []
-  const legacyInvocations = Array.isArray((message as any).toolInvocations)
-    ? (message as any).toolInvocations
+  const legacyInvocations = Array.isArray((message as MessageWithMetadata).toolInvocations)
+    ? (message as MessageWithMetadata).toolInvocations ?? []
     : []
 
-  const partInvocations = Array.isArray((message as any).parts)
-    ? (message as any).parts
-      .filter((part: any) => part?.type === 'tool-invocation' && part?.toolInvocation)
-      .map((part: any) => part.toolInvocation)
-    : []
+  const partInvocations = getMessageParts(message)
+    .filter((part): part is MessagePartLike & { type: 'tool-invocation'; toolInvocation: ToolInvocationLike } => part?.type === 'tool-invocation' && !!part.toolInvocation)
+    .map(part => part.toolInvocation)
 
   const merged = [...legacyInvocations, ...partInvocations].filter(
     (inv): inv is ToolInvocationLike =>
@@ -154,7 +165,7 @@ function getFollowUpActions(intent: ConversationIntent, activeDealCompany?: stri
       return [
         { label: 'What should I do next?', prompt: `What are my next steps${dealRef}? What should I prioritise?` },
         { label: 'Check deal health', prompt: `How is${dealRef ? ' the' + dealRef.slice(4) + ' deal' : ' my pipeline'} looking? Give me the ML analysis.` },
-        { label: 'Review to-dos', prompt: `Review my action items${dealRef} — anything stale or missing?` },
+        { label: 'Review recent context', prompt: `Review the latest notes${dealRef} and tell me what changed, what is blocked, and what follow-up matters most.` },
       ]
     case 'information':
       // No follow-up buttons for pure information queries — the answer IS the response
@@ -565,7 +576,7 @@ export default function CopilotPanel() {
             }}>
               <span style={{ fontSize: '13px' }}>&#128202;</span>
               <span>
-                {pathname?.includes('/pipeline') ? 'Pipeline View' :
+                {pathname?.includes('/deals') || pathname?.includes('/pipeline') ? 'Pipeline View' :
                  pathname?.includes('/competitors') ? 'Competitors' :
                  pathname?.includes('/collateral') ? 'Collateral' :
                  pathname?.includes('/settings') ? 'Settings' :
@@ -662,7 +673,7 @@ export default function CopilotPanel() {
                 lineHeight: '1.7',
               }}>
                 <span style={{ color: '#1DB86A', fontWeight: 600 }}>Ask anything:</span>{' '}
-                pipeline overview &middot; deal analysis &middot; competitor intel &middot; generate assets &middot; manage todos &middot; process updates &middot; update deals
+                pipeline overview &middot; deal analysis &middot; competitor intel &middot; generate assets &middot; process notes &middot; process updates &middot; update deals
               </div>
             </div>
           )}
@@ -703,7 +714,7 @@ export default function CopilotPanel() {
                     {/* Tool call cards */}
                     {hasToolCalls(msg) && (
                       <div style={{ marginBottom: '6px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                        {getToolInvocations(msg).map((inv: any, j: number) => (
+                        {getToolInvocations(msg).map((inv: ToolInvocationLike, j: number) => (
                           <ToolCallCard key={j} invocation={inv} />
                         ))}
                       </div>

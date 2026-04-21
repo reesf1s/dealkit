@@ -19,6 +19,29 @@ import { buildDealBriefing, scoreNarrationPrompt, type ActionItemContext } from 
 import { NoteExtractionSchema, buildCorrectionPrompt, type NoteExtraction } from '@/lib/extraction-schema'
 import { smartMatchDeal } from '@/lib/smart-match'
 
+type PipelineStageConfig = { id: string; order: number; isDefault?: boolean }
+type DealTodo = {
+  id: string
+  text: string
+  done: boolean
+  createdAt?: string
+  source?: 'ai' | 'manual'
+}
+type ScheduledEvent = {
+  id?: string
+  type?: string
+  description?: string
+  date?: string | null
+  time?: string | null
+  participants?: string[]
+  extractedAt?: string
+}
+
+function getFirstText(content: Array<{ type: string; text?: string }>): string {
+  const part = content.find(item => item.type === 'text' && typeof item.text === 'string')
+  return part?.text ?? ''
+}
+
 
 // ── Zod schema for LLM output validation ──────────────────────────────────────
 const AnalyzeNotesSchema = z.object({
@@ -58,7 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // (custom stages need position-relative baseline, not hardcoded stage-name priors)
     const [wsRow] = await db.select({ pipelineConfig: workspaces.pipelineConfig })
       .from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1)
-    const pipelineStages = ((wsRow?.pipelineConfig as any)?.stages ?? []) as { id: string; order: number; isDefault?: boolean }[]
+    const pipelineStages = ((wsRow?.pipelineConfig as { stages?: PipelineStageConfig[] } | null | undefined)?.stages ?? []) as PipelineStageConfig[]
     const activeStages = pipelineStages
       .filter(s => s.id !== 'closed_won' && s.id !== 'closed_lost')
       .sort((a, b) => a.order - b.order)
@@ -111,10 +134,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       (deal.dealRisks as string[])?.length ? `KNOWN RISKS: ${(deal.dealRisks as string[]).join('; ')}` : '',
     ].filter(Boolean).join('\n\n')
 
-    const existingTodos = (deal.todos as any[]) ?? []
-    const openTodos = existingTodos.filter((t: any) => !t.done)
+    const existingTodos = (deal.todos as DealTodo[] | null) ?? []
+    const openTodos = existingTodos.filter(todo => !todo.done)
     const existingTodosContext = openTodos.length > 0
-      ? `\n\nEXISTING OPEN ACTION ITEMS:\n${openTodos.map((t: any) => `- [${t.id}] ${t.text}`).join('\n')}\n\nRules for todos:\n- Do NOT add duplicates or near-duplicates of existing items\n- Return obsoleteTodoIds: IDs of existing items that are now done, superseded, irrelevant, or duplicated — these will be DELETED`
+      ? `\n\nEXISTING OPEN ACTION ITEMS:\n${openTodos.map(todo => `- [${todo.id}] ${todo.text}`).join('\n')}\n\nRules for todos:\n- Do NOT add duplicates or near-duplicates of existing items\n- Return obsoleteTodoIds: IDs of existing items that are now done, superseded, irrelevant, or duplicated — these will be DELETED`
       : ''
 
     // Phase 1: LLM extracts structured data ONLY — no scoring.
@@ -228,7 +251,7 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
               { role: 'user', content: `Return ONLY valid JSON matching the exact schema. No markdown, no explanation.\n\nOriginal output:\n${rawText}\n\nValidation errors: ${issues}\n\nFix the JSON and return only the corrected object.` },
             ],
           })
-          const retryRaw = (retryMsg.content[0] as any).text.trim()
+          const retryRaw = getFirstText(retryMsg.content).trim()
           return parseAndValidate(retryRaw, 2)
         }
 
@@ -244,7 +267,7 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
               { role: 'user', content: `The following response is not valid JSON. Return ONLY the corrected JSON object with no markdown fences, no explanation:\n\n${rawText}` },
             ],
           })
-          const retryRaw = (retryMsg.content[0] as any).text.trim()
+          const retryRaw = getFirstText(retryMsg.content).trim()
           return parseAndValidate(retryRaw, 2)
         }
         // Both attempts failed — return safe defaults
@@ -252,7 +275,7 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
       }
     }
 
-    const rawText = (msg.content[0] as any).text.trim()
+    const rawText = getFirstText(msg.content).trim()
     const { parsed, parseOk } = await parseAndValidate(rawText)
 
     // ── Parse and validate the <extraction> signal block ──────────────────────
@@ -273,7 +296,7 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
           model: 'gpt-5.4-mini', max_tokens: 1024,
           messages: [{ role: 'user', content: correctionPrompt }],
         })
-        const retryText = (retryMsg.content[0] as any).type === 'text' ? (retryMsg.content[0] as any).text : ''
+        const retryText = getFirstText(retryMsg.content)
         const jsonMatch = retryText.match(/\{[\s\S]*\}/)
         if (!jsonMatch) return null
         const retryParsed = JSON.parse(jsonMatch[0])
@@ -293,23 +316,28 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
 
     const noteExtraction = await parseExtractionBlock(rawText)
 
-    const newTodos = (parsed.todos ?? []).map((t: any) => ({ id: crypto.randomUUID(), text: t.text, done: false, createdAt: new Date().toISOString(), source: 'ai' as const }))
+    const newTodos: DealTodo[] = (parsed.todos ?? []).map(todo => ({
+      id: crypto.randomUUID(),
+      text: todo.text,
+      done: false,
+      createdAt: new Date().toISOString(),
+      source: 'ai',
+    }))
     const obsoleteIds = new Set<string>(parsed.obsoleteTodoIds ?? [])
     const dateStamp = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     // Store compact takeaways (not raw notes) to keep history token-efficient across many meetings
     const risksLine = (parsed.risks ?? []).length > 0 ? ` Risks: ${(parsed.risks as string[]).join('; ')}.` : ''
-    const actionLine = newTodos.length > 0 ? ` Actions: ${newTodos.map((t: any) => t.text).join('; ')}.` : ''
     const compactEntry = parsed.summary
-      ? `[${dateStamp}] ${parsed.summary}${risksLine}${actionLine}`
-      : `[${dateStamp}] Meeting notes processed (analysis unavailable)${actionLine}`
+      ? `[${dateStamp}] ${parsed.summary}${risksLine}`
+      : `[${dateStamp}] Meeting notes processed (analysis unavailable)`
     const appendedNotes = deal.meetingNotes
       ? `${deal.meetingNotes}\n---\n${compactEntry}`
       : compactEntry
     // Remove obsolete todos entirely; deduplicate by normalising text; append new non-duplicate todos
-    const existingKept = ((deal.todos as any[]) ?? []).filter((t: any) => !obsoleteIds.has(t.id))
+    const existingKept = ((deal.todos as DealTodo[] | null) ?? []).filter(todo => !obsoleteIds.has(todo.id))
     const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 60)
-    const existingKeys = new Set(existingKept.map((t: any) => normalize(t.text)))
-    const dedupedNew = newTodos.filter((t: any) => !existingKeys.has(normalize(t.text)))
+    const existingKeys = new Set(existingKept.map(todo => normalize(todo.text)))
+    const dedupedNew = newTodos.filter(todo => !existingKeys.has(normalize(todo.text)))
     const mergedTodos = [...existingKept, ...dedupedNew]
     // Merge newly extracted competitors with existing stored competitors (dedup, lowercase-normalised)
     const extractedComps: string[] = (parsed.competitors ?? [])
@@ -419,7 +447,6 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
         contacts: noteExtraction?.stakeholders_mentioned?.map(s => ({ name: s.name, role: s.role })) ?? [],
         daysSinceUpdate,
         scheduledEvents: noteExtraction?.scheduled_events?.map(e => ({ description: e.description, date: e.date })) ?? [],
-        pendingTodos: mergedTodos.filter((t: any) => !t.done).map((t: any) => t.text),
         nextMeetingBooked: parsed.intentSignals?.nextMeetingBooked ?? undefined,
         decisionTimeline: parsed.intentSignals?.decisionTimeline ?? null,
       }
@@ -428,7 +455,7 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
         model: 'gpt-5.4-mini', max_tokens: 400,
         messages: [{ role: 'user', content: scoreNarrationPrompt(briefing, extra) }],
       })
-      const narration = (narrationMsg.content[0] as any)?.text?.trim() ?? ''
+      const narration = getFirstText(narrationMsg.content).trim()
       // Parse bullet points from narration into insight strings
       const narratedInsights = narration
         .split('\n')
@@ -515,9 +542,9 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
     // The <extraction> block may contain scheduled_events that need to be persisted
     // to the scheduledEvents column so the calendar API can read them.
     if (noteExtraction && (noteExtraction.scheduled_events ?? []).length > 0) {
-      const existingEvents = (deal.scheduledEvents as any[]) ?? []
-      const existingKeys = new Set(existingEvents.map((e: any) =>
-        `${e.date}|${(e.description ?? '').slice(0, 40).toLowerCase()}`
+      const existingEvents = (deal.scheduledEvents as ScheduledEvent[] | null) ?? []
+      const existingKeys = new Set(existingEvents.map(event =>
+        `${event.date}|${(event.description ?? '').slice(0, 40).toLowerCase()}`
       ))
       const newEvents = noteExtraction.scheduled_events
         .filter(e => e.date && e.description)
@@ -592,8 +619,10 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
     })
 
     return NextResponse.json({ data: { deal: updatedDeal, productGaps: createdGaps, parsed } })
-  } catch (e: any) {
-    console.error('[analyze-notes] 500:', e?.message, e?.stack?.split('\n')[1])
-    return NextResponse.json({ error: e?.message ?? 'Unknown error' }, { status: 500 })
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : 'Unknown error'
+    const stackLine = e instanceof Error ? e.stack?.split('\n')[1] : undefined
+    console.error('[analyze-notes] 500:', message, stackLine)
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

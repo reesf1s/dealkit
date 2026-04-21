@@ -20,11 +20,11 @@ interface CommandItem {
 
 const ALL_ITEMS: CommandItem[] = [
   { id: 'dashboard',    label: 'Overview',      section: 'navigate', icon: LayoutDashboard, href: '/dashboard' },
-  { id: 'deals',        label: 'Deals',         section: 'navigate', icon: TrendingUp,      href: '/deals' },
+  { id: 'pipeline',     label: 'Pipeline',      section: 'navigate', icon: TrendingUp,      href: '/deals' },
   { id: 'accounts',     label: 'Accounts',      section: 'navigate', icon: Building2,       href: '/company' },
   { id: 'contacts',     label: 'Contacts',      section: 'navigate', icon: Users,           href: '/contacts' },
-  { id: 'signals',      label: 'Signals',       section: 'navigate', icon: Brain,           href: '/analytics' },
-  { id: 'forecast',     label: 'Forecast',      section: 'navigate', icon: BarChart2,       href: '/dashboard' },
+  { id: 'intelligence', label: 'Intelligence',  section: 'navigate', icon: Brain,           href: '/intelligence' },
+  { id: 'board',        label: 'Pipeline Board',section: 'navigate', icon: BarChart2,       href: '/deals?view=board' },
   { id: 'conversations',label: 'Conversations', section: 'navigate', icon: MessageSquare,   href: '/connections' },
   { id: 'automations',  label: 'Automations',   section: 'navigate', icon: Bot,             href: '/automations' },
   { id: 'calendar',     label: 'Calendar',      section: 'navigate', icon: GitBranch,       href: '/calendar', shortcut: '↩' },

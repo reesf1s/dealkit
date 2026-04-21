@@ -10,6 +10,21 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getWorkspaceBrain, formatBrainContext } from '@/lib/workspace-brain'
 import { parseMeetingEntries } from '@/lib/text-signals'
 
+type PipelineConfig = {
+  stages?: Array<{ id: string; label: string }>
+}
+
+type ScheduledEvent = {
+  date?: string | null
+  description?: string
+  time?: string | null
+}
+
+type IntentSignals = {
+  budgetStatus?: string | null
+  championStatus?: string | null
+}
+
 // Safe date construction — never throws "Invalid time value"
 function safeDate(val: unknown): Date | null {
   if (!val) return null
@@ -25,7 +40,7 @@ async function loadStageLabels(workspaceId: string): Promise<Record<string, stri
       .from(workspaces)
       .where(eq(workspaces.id, workspaceId))
       .limit(1)
-    const pConfig = ws?.pipelineConfig as any
+    const pConfig = ws?.pipelineConfig as PipelineConfig | null | undefined
     if (pConfig?.stages?.length) {
       const labels: Record<string, string> = {}
       for (const s of pConfig.stages) labels[s.id] = s.label
@@ -73,14 +88,6 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
     stageMap[d.stage].value += d.dealValue ?? 0
   }
 
-  // Pending todos across open deals
-  type Todo = { text: string; done: boolean }
-  const allTodos = openDeals.flatMap(d =>
-    ((d.todos as Todo[]) ?? [])
-      .filter(t => !t.done)
-      .map(t => ({ text: t.text, deal: d.dealName, stage: sl(d.stage) }))
-  )
-
   // Risks across open deals
   const allRisks = openDeals.flatMap(d =>
     ((d.dealRisks as string[]) ?? []).map(r => ({ risk: r, deal: d.dealName }))
@@ -91,6 +98,68 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
 
   const fmt = (v: number) => v >= 1000 ? `£${(v / 1000).toFixed(0)}k` : `£${v}`
   const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  const confirmationKeywords = /\b(confirmed|scheduled|booked|agreed|arranged|set up|locked in)\b/i
+
+  const dealContexts = openDeals.slice(0, 12).map(d => {
+    const allNotes = [d.meetingNotes, d.hubspotNotes, typeof d.notes === 'string' ? d.notes : null]
+      .filter(Boolean)
+      .join('\n---\n')
+    const entries = parseMeetingEntries(allNotes)
+    const sortedEntries = entries
+      .filter(e => e.date && !isNaN(e.date.getTime()))
+      .sort((a, b) => (b.date!.getTime() - a.date!.getTime()))
+    const lastEntry = sortedEntries[0]
+    const lastNoteDate = lastEntry?.date ? lastEntry.date.toISOString().split('T')[0] : null
+    const daysSinceLastNote = lastEntry?.date
+      ? Math.round((Date.now() - lastEntry.date.getTime()) / 86400000)
+      : null
+    const lastNoteOneLiner = lastEntry?.text
+      ? lastEntry.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().slice(0, 120)
+      : null
+    const recentNotes = sortedEntries.slice(0, 3).map(entry => {
+      const dateStr = entry.date
+        ? entry.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+        : '?'
+      const summary = entry.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().slice(0, 140)
+      return `${dateStr}: ${summary}`
+    })
+    const uploadedNotes = typeof d.notes === 'string' && d.notes.trim().length > 0
+      ? d.notes.trim().slice(-600)
+      : null
+    const dealRisks = (d.dealRisks as string[]) ?? []
+    const scheduledEvents = (d.scheduledEvents as ScheduledEvent[] | null) ?? []
+    const upcomingEvents = scheduledEvents
+      .filter(event => {
+        const eventDate = safeDate(event.date)
+        return eventDate !== null && eventDate.getTime() >= Date.now() - 7 * 86400000
+      })
+      .slice(0, 5)
+    const recentConfirmationNotes = sortedEntries
+      .slice(0, 5)
+      .map(entry => entry.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().split(/[.\n]/)[0].trim())
+      .filter(sentence => confirmationKeywords.test(sentence))
+      .slice(0, 3)
+
+    const parts = [
+      `- "${d.dealName}" @ ${d.prospectCompany} | Stage: ${sl(d.stage)} | Value: ${fmt(d.dealValue ?? 0)} | Score: ${d.conversionScore ?? 'N/A'} | Close: ${safeDate(d.closeDate)?.toLocaleDateString('en-GB') ?? 'TBD'} | Competitors: ${((d.competitors as string[]) ?? []).join(', ') || 'none'}`,
+      dealRisks[0] ? `  Primary blocker: ${dealRisks[0]}` : null,
+      daysSinceLastNote != null ? `  Days since last note: ${daysSinceLastNote}` : null,
+      lastNoteDate && lastNoteOneLiner ? `  Latest note (${lastNoteDate}): "${lastNoteOneLiner}"` : null,
+      d.nextSteps ? `  Latest stated next step: ${d.nextSteps}` : null,
+      upcomingEvents.length > 0
+        ? `  CONFIRMED EVENTS (already booked — do NOT re-suggest):\n${upcomingEvents.map(event => `    - ${event.description ?? 'event'}${event.date ? ` — ${event.date}` : ''}${event.time ? ` ${event.time}` : ''}`).join('\n')}`
+        : null,
+      recentConfirmationNotes.length > 0
+        ? `  CONFIRMED IN NOTES (already done — do NOT re-suggest):\n${recentConfirmationNotes.map(note => `    - "${note}"`).join('\n')}`
+        : null,
+      recentNotes.length > 0
+        ? `  Recent note evidence:\n${recentNotes.map(note => `    - ${note}`).join('\n')}`
+        : null,
+      uploadedNotes ? `  Uploaded notes:\n    ${uploadedNotes}` : null,
+    ]
+
+    return parts.filter(Boolean).join('\n')
+  })
 
   const contextStr = [
     `Company: ${companyRows[0]?.companyName ?? 'Unknown'}`,
@@ -106,100 +175,8 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
       `- ${sl(stage)}: ${count} deal${count > 1 ? 's' : ''} (${fmt(value)})`
     ),
     '',
-    'OPEN DEALS (top 12) — each with UNIQUE context:',
-    ...openDeals.slice(0, 12).map(d => {
-      // Parse meeting notes to extract last note info
-      const allNotes = [d.meetingNotes, d.hubspotNotes].filter(Boolean).join('\n---\n')
-      const entries = parseMeetingEntries(allNotes)
-      // Guard: filter out invalid Date objects (truthy but isNaN) — they throw on toISOString/toLocaleDateString
-      const sortedEntries = entries.filter(e => e.date && !isNaN(e.date.getTime())).sort((a, b) => (b.date!.getTime() - a.date!.getTime()))
-      const lastEntry = sortedEntries[0]
-      const lastNoteDate = (lastEntry?.date && !isNaN(lastEntry.date.getTime())) ? lastEntry.date.toISOString().split('T')[0] : null
-      const daysSinceLastNote = (lastEntry?.date && !isNaN(lastEntry.date.getTime())) ? Math.round((Date.now() - lastEntry.date.getTime()) / 86400000) : null
-      const lastNoteOneLiner = lastEntry?.text ? lastEntry.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().slice(0, 100) : null
-
-      // Action items from todos (with status)
-      const todos = ((d.todos as any[]) ?? [])
-      const pendingActions = todos.filter((t: any) => !t.done).map((t: any) => ({ text: t.text, status: 'pending' as const }))
-      const inProgressActions: { text: string; status: string }[] = []
-      const completedActions: { text: string; status: string }[] = []
-
-      // Action items from project plan tasks
-      const projectPlan = d.projectPlan as any
-      if (projectPlan?.phases) {
-        for (const phase of projectPlan.phases) {
-          for (const task of (phase.tasks ?? [])) {
-            if (task.status === 'in_progress') {
-              inProgressActions.push({ text: task.text, status: 'in_progress' })
-            } else if (task.status === 'complete') {
-              completedActions.push({ text: task.text, status: 'complete' })
-            } else if (task.status === 'not_started') {
-              pendingActions.push({ text: task.text, status: 'pending' })
-            }
-          }
-        }
-      }
-
-      // Recent completed todos (done=true)
-      const recentlyDoneTodos = todos.filter((t: any) => t.done).map((t: any) => ({ text: t.text, status: 'complete' }))
-      const allRecentlyCompleted = [...completedActions, ...recentlyDoneTodos].slice(0, 5)
-
-      const openActionCount = pendingActions.length + inProgressActions.length
-
-      // Deal risks for unique risk
-      const dealRisks = (d.dealRisks as string[]) ?? []
-      const uniqueRisk = dealRisks[0] ?? null
-
-      // AI summary as one-line context
-      const oneLineContext = d.aiSummary ? d.aiSummary.split('.')[0].trim().slice(0, 100) : null
-
-      // Last 3 note summaries
-      const last3Notes = sortedEntries.slice(0, 3).map(e => {
-        const dateStr = (e.date && !isNaN(e.date.getTime())) ? e.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '?'
-        const summary = e.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().slice(0, 120)
-        return `${dateStr}: ${summary}`
-      })
-
-      // Scheduled events (CONFIRMED — do NOT suggest confirming/scheduling these)
-      const scheduledEvents = ((d as any).scheduledEvents as { type?: string; date?: string | null; description?: string; time?: string | null }[]) ?? []
-      const upcomingEvents = scheduledEvents
-        .filter(e => { const d = safeDate(e.date); return d !== null && d.getTime() >= Date.now() - 7 * 86400000 }) // include recent past week too
-        .slice(0, 5)
-
-      // Recent notes mentioning confirmation/scheduling (first sentences)
-      const confirmationKeywords = /\b(confirmed|scheduled|booked|agreed|arranged|set up|locked in)\b/i
-      const recentConfirmationNotes = sortedEntries.slice(0, 5)
-        .map(e => e.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().split(/[.\n]/)[0].trim())
-        .filter(sentence => confirmationKeywords.test(sentence))
-        .slice(0, 3)
-
-      // CHANGE 1 & 4: Include ALL deal data — notes field, all todos with status, project plan, scheduled events
-      const recentNotes = (d.notes || '').trim().slice(-800)
-      const allTodosForDeal = todos.map((t: any) => `    - [${t.done ? 'done' : 'not done'}] ${t.text}`).join('\n')
-
-      const parts = [
-        `- "${d.dealName}" @ ${d.prospectCompany} | Stage: ${sl(d.stage)} | Value: ${fmt(d.dealValue ?? 0)} | Score: ${d.conversionScore ?? 'N/A'} | Close: ${safeDate(d.closeDate)?.toLocaleDateString('en-GB') ?? 'TBD'} | Competitors: ${((d.competitors as string[]) ?? []).join(', ') || 'none'}`,
-        oneLineContext ? `  Context: ${oneLineContext}` : null,
-        uniqueRisk ? `  Top risk: ${uniqueRisk}` : null,
-        daysSinceLastNote != null ? `  Days since last note: ${daysSinceLastNote}` : null,
-        lastNoteDate ? `  Last note (${lastNoteDate}): "${lastNoteOneLiner}"` : null,
-        openActionCount > 0 ? `  Open actions: ${openActionCount}` : null,
-        upcomingEvents.length > 0 ? `  SCHEDULED EVENTS (already confirmed — do NOT suggest "confirm" or "schedule" these):\n${upcomingEvents.map(e => `    - [confirmed] ${e.description ?? 'event'}${e.date ? ` — ${e.date}` : ''}${e.time ? ` ${e.time}` : ''}`).join('\n')}` : null,
-        recentConfirmationNotes.length > 0 ? `  CONFIRMED IN NOTES (already done — do NOT re-suggest):\n${recentConfirmationNotes.map(n => `    - "${n}"`).join('\n')}` : null,
-        inProgressActions.length > 0 ? `  IN-PROGRESS actions (already being worked on — DO NOT suggest these):\n${inProgressActions.map(a => `    - [in_progress] ${a.text}`).join('\n')}` : null,
-        pendingActions.length > 0 ? `  PENDING actions (not started — these are candidates for today's actions):\n${pendingActions.slice(0, 5).map(a => `    - [pending] ${a.text}`).join('\n')}` : null,
-        allRecentlyCompleted.length > 0 ? `  RECENTLY COMPLETED (already done — DO NOT suggest these):\n${allRecentlyCompleted.map(a => `    - [complete] ${a.text}`).join('\n')}` : null,
-        todos.length > 0 ? `  ALL TODOS (with status):\n${allTodosForDeal}` : null,
-        last3Notes.length > 0 ? `  Recent notes:\n${last3Notes.map(n => `    - ${n}`).join('\n')}` : null,
-        recentNotes ? `  Deal notes (last 800 chars — check for confirmations/scheduled items):\n    ${recentNotes}` : null,
-      ]
-      return parts.filter(Boolean).join('\n')
-    }),
-    '',
-    'PENDING TODOS (top 10):',
-    ...(allTodos.length > 0
-      ? allTodos.slice(0, 10).map(t => `- [${t.deal} · ${t.stage}] ${t.text}`)
-      : ['- No pending todos']),
+    'OPEN DEALS (top 12) — use note evidence as the source of truth:',
+    ...dealContexts,
     '',
     'ACTIVE RISKS:',
     ...(allRisks.length > 0
@@ -263,15 +240,21 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
       let sortKey: number
 
       // Build deal-specific signal fragments
-      const intentSignals = d.intentSignals as any
+      const intentSignals = d.intentSignals as IntentSignals | null
       const budgetStatus = intentSignals?.budgetStatus
       const championStatus = intentSignals?.championStatus
       const dealRisks = (d.dealRisks as string[]) ?? []
       const dealCompetitors = (d.competitors as string[]) ?? []
-      const openTodosCount = ((d.todos as any[]) ?? []).filter((t: any) => !t.done).length
       const stageLabel = sl(d.stage)
-      const lastNote = d.meetingNotes
-        ? d.meetingNotes.split('---')[0].replace(/^\[.*?\]\s*/, '').trim().slice(0, 80)
+      const noteEntries = parseMeetingEntries([d.meetingNotes, d.hubspotNotes, typeof d.notes === 'string' ? d.notes : null].filter(Boolean).join('\n---\n'))
+      const sortedNoteEntries = noteEntries
+        .filter(entry => entry.date && !isNaN(entry.date.getTime()))
+        .sort((a, b) => (b.date!.getTime() - a.date!.getTime()))
+      const lastNote = sortedNoteEntries[0]?.text
+        ? sortedNoteEntries[0].text.replace(/^\[.*?\]\s*/, '').trim().slice(0, 80)
+        : null
+      const daysSinceNote = sortedNoteEntries[0]?.date
+        ? Math.round((Date.now() - sortedNoteEntries[0].date!.getTime()) / 86400000)
         : null
 
       // Compose signal-rich reason text
@@ -292,7 +275,7 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
         if (championStatus === 'none' || !championStatus) signals.push('no champion')
         if (dealCompetitors.length > 0) signals.push(`${dealCompetitors[0]} in evaluation`)
         if (dealRisks.length > 0) signals.push(dealRisks[0].slice(0, 60))
-        if (openTodosCount > 0) signals.push(`${openTodosCount} open action${openTodosCount > 1 ? 's' : ''}`)
+        if (daysSinceNote != null) signals.push(`${daysSinceNote}d since last note`)
         urgency = score <= 20 ? 'high' : 'medium'
         sortKey = (100 - score) * 100
       } else {
@@ -302,7 +285,7 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
         if (budgetStatus === 'blocked') signals.push('budget blocked')
         if (championStatus === 'none' || !championStatus) signals.push('no champion identified')
         if (dealCompetitors.length > 0) signals.push(`${dealCompetitors[0]} competing`)
-        if (openTodosCount > 0) signals.push(`${openTodosCount} open action${openTodosCount > 1 ? 's' : ''}`)
+        if (daysSinceNote != null) signals.push(`${daysSinceNote}d since last note`)
         urgency = 'medium'
         sortKey = daysToClose != null ? (14 - daysToClose) * 10 : 0
       }
@@ -325,7 +308,13 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
     }
   }
   attentionDeals.sort((a, b) => b._sortKey - a._sortKey)
-  const topAttentionDeals = attentionDeals.slice(0, 3).map(({ _sortKey: _sk, ...rest }) => rest)
+  const topAttentionDeals = attentionDeals.slice(0, 3).map(item => ({
+    dealId: item.dealId,
+    dealName: item.dealName,
+    company: item.company,
+    reason: item.reason,
+    urgency: item.urgency,
+  }))
 
   // --- Deterministic: briefingHealth ---
   const allPreds = predictions
@@ -362,7 +351,7 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
         .filter(l => l.length > 0)
         .slice(0, 4)
     } else if (openDeals.length > 0) {
-      focusBullets = ['Pipeline looks healthy — review any pending todos.']
+      focusBullets = ['Pipeline looks healthy — stay close to the latest note signal.']
     }
   } catch {
     // non-fatal: fallback to topAttentionDeals reason strings
@@ -386,15 +375,13 @@ CRITICAL: Every action MUST be unique. If two deals have similar scores, their a
 STALE ACTION DETECTION — CRITICAL:
 Before suggesting ANY action for a deal, CHECK ALL of the following:
 
-1. NOTES: Read the deal's recent notes AND the "Deal notes (last 800 chars)" section. If a note mentions something is "confirmed", "scheduled", "booked", "done", "completed", "already arranged", or "set up" — that action is DONE. Do not suggest it.
+1. NOTES: Treat recent meeting notes and uploaded notes as the source of truth. If a note mentions something is "confirmed", "scheduled", "booked", "done", "completed", "already arranged", or "set up" — that action is DONE. Do not suggest it.
 
-2. TODOS: Check the deal's todo list (ALL TODOS section). If a todo is marked [done], do not suggest it. If a todo is still [not done], it's a candidate — but only if it's genuinely the next step.
+2. SCHEDULED EVENTS: If the deal has scheduled events, those meetings are CONFIRMED. Do not suggest "confirm" or "schedule" anything that's already in the events list.
 
-3. SCHEDULED EVENTS: If the deal has scheduled events, those meetings are CONFIRMED. Do not suggest "confirm" or "schedule" anything that's already in the events list.
+3. DATE CHECK: Today is ${today}. Do not suggest actions for past dates. "Confirm Monday 23 March call" on March 25 is stale.
 
-4. PROJECT PLAN: Check task statuses. "complete" or "in_progress" tasks are not suggestions.
-
-5. DATE CHECK: Today is ${today}. Do not suggest actions for past dates. "Confirm Monday 23 March call" on March 25 is stale.
+4. DO NOT use todos, project plans, or success criteria as evidence. Ground every action in notes, risks, competitors, stage movement, scheduled events, and explicit next steps captured in the deal record.
 
 BANNED PATTERNS:
 - "Confirm [event that's already in notes/events]"
@@ -430,7 +417,7 @@ GOOD: "Prepare QA test scenarios for the BOE Monday call — ensure the floor pl
     singleMostImportantAction: topAttentionDeals[0] ? `Review ${topAttentionDeals[0].dealName} — ${topAttentionDeals[0].reason.slice(0, 80)}` : 'Review your pipeline and update deal statuses.',
   }
 
-  // ── Action deduplication: filter out suggested actions semantically similar to existing in-progress/completed items ──
+  // ── Action deduplication: filter out suggestions already reflected in notes or booked events ──
   const existingActionTexts: string[] = []
   // Build a map of deal name → scheduled event descriptions for stale-confirm detection
   const dealScheduledDescriptions: { dealName: string; description: string }[] = []
@@ -439,30 +426,18 @@ GOOD: "Prepare QA test scenarios for the BOE Monday call — ensure the floor pl
   const confirmKw = /\b(confirmed|scheduled|booked|agreed|arranged|set up|locked in)\b/i
 
   for (const d of openDeals) {
-    // Collect completed + in-progress todos
-    for (const t of ((d.todos as any[]) ?? [])) {
-      if (t.done) existingActionTexts.push(String(t.text))
-    }
-    // Collect completed + in-progress project plan tasks
-    const plan = d.projectPlan as any
-    if (plan?.phases) {
-      for (const phase of plan.phases) {
-        for (const task of (phase.tasks ?? [])) {
-          if (task.status === 'in_progress' || task.status === 'complete') {
-            existingActionTexts.push(String(task.text))
-          }
-        }
-      }
+    if (typeof d.nextSteps === 'string' && d.nextSteps.trim().length > 0) {
+      existingActionTexts.push(d.nextSteps.trim())
     }
     // Collect scheduled events per deal
-    const events = ((d as any).scheduledEvents as { description?: string; date?: string | null }[]) ?? []
+    const events = (d.scheduledEvents as ScheduledEvent[] | null) ?? []
     for (const ev of events) {
       if (ev.description) {
         dealScheduledDescriptions.push({ dealName: d.dealName, description: ev.description })
       }
     }
     // Collect confirmation notes from meeting notes
-    const allNotes = [d.meetingNotes, d.hubspotNotes].filter(Boolean).join('\n---\n')
+    const allNotes = [d.meetingNotes, d.hubspotNotes, typeof d.notes === 'string' ? d.notes : null].filter(Boolean).join('\n---\n')
     const noteEntries = parseMeetingEntries(allNotes)
     const sortedNotes = noteEntries.filter(e => e.date && !isNaN(e.date.getTime())).sort((a, b) => (b.date!.getTime() - a.date!.getTime()))
     for (const entry of sortedNotes.slice(0, 5)) {
@@ -613,7 +588,7 @@ export async function POST() {
     const { workspaceId } = await getWorkspaceContext(userId)
 
     // Check if cached briefing is less than 4 hours old — skip regeneration
-    const cachedRows = await db.execute<{ ai_overview: any; ai_overview_generated_at: Date | null }>(
+    const cachedRows = await db.execute<{ ai_overview: AIOverview | null; ai_overview_generated_at: Date | null }>(
       sql`SELECT ai_overview, ai_overview_generated_at FROM workspaces WHERE id = ${workspaceId} LIMIT 1`
     )
     const cached = cachedRows[0]

@@ -1,6 +1,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
+import type { CSSProperties } from 'react'
 import { useState, useMemo, useRef, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
@@ -25,6 +26,24 @@ type SortKey = 'contact' | 'org' | 'value' | 'stage' | 'health' | 'activity' | '
 type SortDir = 'asc' | 'desc'
 type Health = 'green' | 'amber' | 'red' | 'grey'
 type FocusZone = 'ready_to_close' | 'engaged_recently' | 'waiting_on_reply' | 'cold' | null
+type BrainData = {
+  staleDeals?: Array<{ dealId: string }>
+  urgentDeals?: Array<{ dealId: string; reason: string }>
+  winRate?: number | null
+}
+type PipelineStageConfig = {
+  id: string
+  label: string
+  color: string
+  order?: number
+  hidden?: boolean
+}
+type PipelineConfigResponse = {
+  data?: {
+    currency?: string
+    stages?: PipelineStageConfig[]
+  }
+}
 
 /* ── Constants ── */
 
@@ -99,6 +118,12 @@ const FOCUS_ZONE_LABELS: Record<NonNullable<FocusZone>, string> = {
   engaged_recently: 'Engaged Recently',
   waiting_on_reply: 'Waiting on Reply',
   cold:             'Cold',
+}
+
+function tabFromView(view: string | null): Tab {
+  if (view === 'board') return 'pipeline'
+  if (view === 'closed') return 'archived'
+  return 'active'
 }
 
 function applyFocusFilter(deals: DealLog[], focus: FocusZone): DealLog[] {
@@ -348,7 +373,6 @@ function KanbanView({
   currencySymbol,
   isLoading,
   onAdd,
-  brain,
   onForecastChange,
 }: {
   dealsByStage: Record<string, DealLog[]>
@@ -356,7 +380,6 @@ function KanbanView({
   currencySymbol: string
   isLoading: boolean
   onAdd: () => void
-  brain?: any
   onForecastChange: (dealId: string, category: DealLog['forecastCategory']) => void
 }) {
   const activeStages = stages.filter(s => s.id !== 'closed_won' && s.id !== 'closed_lost')
@@ -413,7 +436,7 @@ function KanbanView({
             </div>
 
             <div>
-              {(dealsByStage[stage.id] ?? []).map((deal: any) => {
+              {(dealsByStage[stage.id] ?? []).map((deal: DealLog) => {
                 const health = getDealHealth(deal)
                 const insight = dealInsight(deal)
                 const hasAI = !!(deal.aiSummary || (deal.conversionInsights as string[])?.length)
@@ -526,7 +549,7 @@ function KanbanView({
 function DealsPageInner() {
   const { toast } = useToast()
   const searchParams = useSearchParams()
-  const [tab, setTab] = useState<Tab>('active')
+  const [tab, setTab] = useState<Tab>(() => tabFromView(searchParams.get('view')))
   const [sortKey, setSortKey] = useState<SortKey>('activity')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [search, setSearch] = useState('')
@@ -541,13 +564,14 @@ function DealsPageInner() {
 
   // Sync focus when URL changes
   useEffect(() => {
+    setTab(tabFromView(searchParams.get('view')))
     setActiveFocus(searchParams.get('focus') as FocusZone)
   }, [searchParams])
 
   /* ── Data ── */
   const { data, isLoading, error, mutate } = useSWR<{ data: DealLog[] }>('/api/deals', fetcher)
-  const { data: configData } = useSWR('/api/pipeline-config', fetcher, { revalidateOnFocus: false })
-  const { data: brainRes } = useSWR('/api/brain', fetcher, { revalidateOnFocus: false })
+  const { data: configData } = useSWR<PipelineConfigResponse>('/api/pipeline-config', fetcher, { revalidateOnFocus: false })
+  const { data: brainRes } = useSWR<{ data?: BrainData }>('/api/brain', fetcher, { revalidateOnFocus: false })
 
   // AI snapshots — generated once, cached in aiSummary field on deals
   // dedupingInterval: 5 min so we don't hammer on every navigation
@@ -561,10 +585,10 @@ function DealsPageInner() {
   const aiSnapshots = snapshotData?.snapshots ?? {}
   const aiHealth = snapshotData?.health ?? {}
 
-  const deals = data?.data ?? []
+  const deals = useMemo(() => data?.data ?? [], [data?.data])
   const dbError = isDbNotConfigured(error)
   const currencySymbol: string = configData?.data?.currency ?? '£'
-  const brain: any = brainRes?.data
+  const brain = brainRes?.data
 
   /* ── Derived maps ── */
   const staleDealIds = useMemo(() =>
@@ -577,12 +601,15 @@ function DealsPageInner() {
     for (const u of (brain?.urgentDeals ?? [])) m.set(u.dealId, u.reason)
     return m
   }, [brain?.urgentDeals])
+  const atRiskCount = useMemo(
+    () => new Set([...Array.from(staleDealIds), ...Array.from(urgentDealMap.keys())]).size,
+    [staleDealIds, urgentDealMap],
+  )
 
   /* ── Pipeline stats ── */
   const activeDeals = deals.filter(d => d.stage !== 'closed_won' && d.stage !== 'closed_lost')
   const totalPipelineValue = activeDeals.reduce((sum, d) => sum + (Number(d.dealValue) || 0), 0)
   const winRatePct: number | null = brain?.winRate ?? null
-  const highPriCount = activeDeals.filter(d => (d.conversionScore ?? 0) >= 70).length
 
   const avgScore = useMemo(() => {
     const scored = activeDeals.filter(d => (d.conversionScore ?? 0) > 0)
@@ -639,7 +666,7 @@ function DealsPageInner() {
 
   /* ── Resolve stages from pipeline-config (supports custom stage labels/colors) ── */
   const configStages = useMemo(() => {
-    const raw = configData?.data?.stages as Array<{ id: string; label: string; color: string; order?: number; hidden?: boolean }> | undefined
+    const raw = configData?.data?.stages
     if (!raw || raw.length === 0) return STAGES
     return [...raw]
       .filter(s => !s.hidden)
@@ -648,13 +675,15 @@ function DealsPageInner() {
   }, [configData?.data?.stages])
 
   /* ── Kanban map ── */
-  const dealsByStage: Record<string, DealLog[]> = {}
-  for (const s of configStages) dealsByStage[s.id] = deals.filter(d => d.stage === s.id)
-  // Also bucket any deals in stages not in configStages (custom or removed stages)
-  for (const deal of deals) {
-    if (!dealsByStage[deal.stage]) dealsByStage[deal.stage] = []
-    if (!dealsByStage[deal.stage].includes(deal)) dealsByStage[deal.stage].push(deal)
-  }
+  const dealsByStage = useMemo(() => {
+    const grouped: Record<string, DealLog[]> = {}
+    for (const stage of configStages) grouped[stage.id] = deals.filter(deal => deal.stage === stage.id)
+    for (const deal of deals) {
+      if (!grouped[deal.stage]) grouped[deal.stage] = []
+      if (!grouped[deal.stage].includes(deal)) grouped[deal.stage].push(deal)
+    }
+    return grouped
+  }, [configStages, deals])
 
   /* ── Forecast stats ── */
   const commitValue = activeDeals.filter(d => d.forecastCategory === 'commit').reduce((s, d) => s + (Number(d.dealValue) || 0), 0)
@@ -702,7 +731,8 @@ function DealsPageInner() {
   function toggleRow(id: string) {
     setSelectedIds(prev => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }
@@ -725,7 +755,7 @@ function DealsPageInner() {
         fontSize: 12,
         color: 'var(--text-tertiary)',
         fontWeight: 400,
-      }}>Opportunities</span>
+      }}>Pipeline</span>
       <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>/</span>
       <span style={{
         background: 'var(--surface-2)',
@@ -734,7 +764,7 @@ function DealsPageInner() {
         fontSize: 12,
         color: 'var(--text-secondary)',
         fontWeight: 500,
-      }}>Active Flow</span>
+      }}>Revenue workspace</span>
     </div>
   )
 
@@ -796,10 +826,10 @@ function DealsPageInner() {
             letterSpacing: '-0.04em',
             lineHeight: 1.1,
           }}>
-            Active Opportunities
+            Pipeline
           </h1>
           <p style={{ fontSize: 14, color: 'var(--text-tertiary)', margin: 0 }}>
-            Real-time signals shaping your revenue pipeline
+            Prioritise what to move now, then work the board with a clean forecast.
           </p>
         </div>
         <button
@@ -836,18 +866,18 @@ function DealsPageInner() {
         marginBottom: 24,
       }}>
         <StatCell
-          label="Leads"
+          label="Active"
           value={isLoading ? '—' : String(activeDeals.length)}
           trend={activeDeals.length > 0 ? '+8.4%' : undefined}
-          trendLabel="Leads"
+          trendLabel="Open deals"
           chartValues={[3, 5, 4, 6, 5, 7, 6, 8, 7, 6, 8, activeDeals.length > 0 ? 9 : 0]}
         />
         <StatCell
-          label="High Priority"
-          value={isLoading ? '—' : String(highPriCount)}
-          trend={highPriCount > 0 ? '+2.4%' : undefined}
-          trendLabel="High priority"
-          chartValues={[2, 3, 2, 4, 3, 5, 4, 3, 5, 4, 6, highPriCount]}
+          label="At Risk"
+          value={isLoading ? '—' : String(atRiskCount)}
+          trend={atRiskCount > 0 ? '+2.4%' : undefined}
+          trendLabel="Need attention"
+          chartValues={[2, 3, 2, 4, 3, 5, 4, 3, 5, 4, 6, atRiskCount]}
         />
         <StatCell
           label="Pipeline"
@@ -885,9 +915,9 @@ function DealsPageInner() {
         marginBottom: 16,
       }}>
         {([
-          { id: 'active' as Tab,   label: 'Intelligence',  icon: '◉' },
-          { id: 'pipeline' as Tab, label: 'Pipeline',      icon: '▦' },
-          { id: 'archived' as Tab, label: 'Archived',      icon: '▣' },
+          { id: 'active' as Tab,   label: 'Focus queue', icon: '◉' },
+          { id: 'pipeline' as Tab, label: 'Stage board', icon: '▦' },
+          { id: 'archived' as Tab, label: 'Closed',      icon: '▣' },
         ] as const).map(t => (
           <button
             key={t.id}
@@ -936,7 +966,7 @@ function DealsPageInner() {
               ref={searchRef}
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search people, companies, or activity..."
+              placeholder="Search deals, companies, or latest note signal..."
               style={{
                 border: 'none',
                 outline: 'none',
@@ -1039,7 +1069,6 @@ function DealsPageInner() {
           currencySymbol={currencySymbol}
           isLoading={isLoading}
           onAdd={() => setAddOpen(true)}
-          brain={brain}
           onForecastChange={handleForecastChange}
         />
       )}
@@ -1070,7 +1099,7 @@ function DealsPageInner() {
             <SortHeader label="Value" icon="£" sortKey="value" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} align="right" />
             <SortHeader label="Stage" icon="◆" sortKey="stage" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
             <SortHeader label="Score" icon="●" sortKey="score" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} align="center" />
-            <SortHeader label="AI Intel" sortKey="health" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+            <SortHeader label="Halvex View" sortKey="health" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
           </div>
 
           {/* Rows */}
@@ -1081,8 +1110,7 @@ function DealsPageInner() {
           ) : sortedDeals.length === 0 ? (
             <EmptyState onAdd={() => setAddOpen(true)} filtered={deals.length > 0} />
           ) : (
-            sortedDeals.map((deal: any) => {
-              const health = getDealHealth(deal)
+            sortedDeals.map((deal: DealLog) => {
               const name = contactName(deal)
               const org = deal.prospectCompany ?? ''
               const selected = selectedIds.has(deal.id)
@@ -1204,7 +1232,7 @@ function DealsPageInner() {
                     textDecoration: 'none',
                     fontSize: 13.5,
                     fontWeight: 500,
-                    color: deal.dealValue > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
+                    color: Number(deal.dealValue) > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
                     textAlign: 'right',
                     fontFamily: 'var(--font-mono)',
                     letterSpacing: '-0.03em',
@@ -1256,7 +1284,7 @@ function DealsPageInner() {
                         lineHeight: 1.4,
                         display: '-webkit-box',
                         WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical' as any,
+                        WebkitBoxOrient: 'vertical' as CSSProperties['WebkitBoxOrient'],
                         overflow: 'hidden',
                       }}>
                         {snapshot}

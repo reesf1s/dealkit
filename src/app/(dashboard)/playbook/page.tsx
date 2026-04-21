@@ -301,7 +301,7 @@ function EmptyState({ totalDeals, winCount, lossCount, recentDeals }: { totalDea
           Every deal you close — won or lost — makes your playbook more accurate. The fastest way to build it: paste meeting notes for your existing deals, then mark them as won or lost.
         </p>
         <Link
-          href="/pipeline"
+          href="/deals?view=board"
           style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 20px', marginTop: '16px', borderRadius: '8px', background: '#37352f', color: '#fff', fontSize: '13px', fontWeight: '600', textDecoration: 'none' }}
         >
           Log a closed deal <ArrowUpRight size={14} />

@@ -2,9 +2,9 @@
  * GET /api/deals/[id]/brief
  *
  * Returns an AI-generated briefing paragraph for a deal.
- * - If the deal has an existing aiSummary, returns it immediately.
- * - Otherwise, calls Claude Haiku to generate a concise brief and returns it.
- *   The brief is NOT persisted — callers can optionally PATCH the deal to save it.
+ * - Meeting notes and uploaded notes are treated as the source of truth.
+ * - If notes are available, generate a fresh brief from that context.
+ * - Otherwise, fall back to an existing aiSummary when present.
  */
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -17,6 +17,10 @@ import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 
+type DealContact = {
+  name: string
+  title?: string | null
+}
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -36,24 +40,26 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    // Return existing summary immediately if available
-    if (deal.aiSummary) {
+    const meetingNotes = typeof deal.meetingNotes === 'string' ? deal.meetingNotes.trim() : ''
+    const noteEntries = meetingNotes ? meetingNotes.split(/\n---\n/).map(entry => entry.trim()).filter(Boolean) : []
+    const latestMeetingNote = noteEntries.length > 0
+      ? noteEntries[noteEntries.length - 1].slice(0, 700)
+      : null
+    const uploadedNotes = typeof deal.notes === 'string' && deal.notes.trim().length > 0
+      ? deal.notes.trim().slice(-700)
+      : null
+    const hasSourceNotes = Boolean(latestMeetingNote || uploadedNotes)
+
+    // Fall back to the stored summary only when there is no note context to ground a fresh brief.
+    if (!hasSourceNotes && deal.aiSummary) {
       return NextResponse.json({
         data: { brief: deal.aiSummary, generatedAt: deal.updatedAt },
       })
     }
 
-    // Build deal context for prompt
     const dealRisks = (deal.dealRisks as string[] | null) ?? []
     const insights = (deal.conversionInsights as string[] | null) ?? []
-    const contacts = (deal.contacts as any[] | null) ?? []
-
-    // Extract latest meeting note entry
-    const meetingNotes = typeof deal.meetingNotes === 'string' ? deal.meetingNotes : null
-    const noteEntries = meetingNotes ? meetingNotes.split(/\n---\n/).filter(Boolean) : []
-    const latestNote = noteEntries.length > 0
-      ? noteEntries[noteEntries.length - 1].trim().slice(0, 600)
-      : null
+    const contacts = (deal.contacts as DealContact[] | null) ?? []
 
     const lines = [
       `Company: ${deal.prospectCompany ?? 'Unknown'}`,
@@ -61,16 +67,19 @@ export async function GET(_req: NextRequest, { params }: Params) {
       deal.dealValue ? `Value: £${Number(deal.dealValue).toLocaleString()}` : null,
       deal.conversionScore != null ? `Win probability: ${deal.conversionScore}%` : null,
       contacts.length > 0
-        ? `Contacts: ${contacts.slice(0, 3).map((c: any) => c.title ? `${c.name} (${c.title})` : c.name).join(', ')}`
+        ? `Contacts: ${contacts.slice(0, 3).map(contact => contact.title ? `${contact.name} (${contact.title})` : contact.name).join(', ')}`
         : null,
       deal.nextSteps ? `Next steps: ${deal.nextSteps}` : null,
       dealRisks.length > 0 ? `Known risks: ${dealRisks.slice(0, 3).join('; ')}` : null,
       insights.length > 0 ? `AI signals: ${insights.slice(0, 2).join('; ')}` : null,
-      latestNote ? `Latest meeting note:\n${latestNote}` : null,
+      latestMeetingNote ? `Latest meeting note:\n${latestMeetingNote}` : null,
+      uploadedNotes ? `Uploaded notes:\n${uploadedNotes}` : null,
     ].filter(Boolean).join('\n')
 
-    if (!lines.trim() || (!latestNote && !deal.nextSteps && dealRisks.length === 0)) {
-      return NextResponse.json({ data: { brief: null, generatedAt: null } })
+    if (!lines.trim()) {
+      return NextResponse.json({
+        data: { brief: deal.aiSummary ?? null, generatedAt: deal.updatedAt ?? null },
+      })
     }
 
     const response = await anthropic.messages.create({
@@ -79,7 +88,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       messages: [
         {
           role: 'user',
-          content: `You are a sales intelligence assistant. Write a concise 2–3 sentence briefing for a sales rep. Use the data below — especially the latest meeting note if present. Focus on: current status, the main blocker or opportunity, and the single most important next action. Name specific people. Be direct — no filler.\n\n${lines}`,
+          content: `You are a sales intelligence assistant. Write a concise 2–3 sentence briefing for a sales rep. Treat meeting notes and uploaded notes as the source of truth. Focus on: current status, the main blocker or opportunity, and the single most important next action. Name specific people. Do not mention task lists, success criteria, or checklist state unless the notes themselves say it. Be direct — no filler.\n\n${lines}`,
         },
       ],
     })

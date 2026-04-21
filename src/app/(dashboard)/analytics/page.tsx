@@ -130,6 +130,7 @@ type DealRecord = {
   stage: string
   dealValue?: number | null
   conversionScore?: number | null
+  forecastCategory?: 'commit' | 'upside' | 'pipeline' | 'omit' | null
   updatedAt?: string
 }
 
@@ -232,8 +233,28 @@ export default function AnalyticsPage() {
   const winLoss = winLossRes?.data
   const brain = brainRes?.data ?? {}
   const deals = useMemo(() => dealsRes?.data ?? [], [dealsRes?.data])
+  const openDeals = useMemo(
+    () => deals.filter(deal => !['closed_won', 'closed_lost'].includes(deal.stage)),
+    [deals],
+  )
   const productSignals = productRes?.data
   const loopSignals = loopRes?.data
+  const commitValue = useMemo(
+    () => openDeals.filter(deal => deal.forecastCategory === 'commit').reduce((sum, deal) => sum + (deal.dealValue ?? 0), 0),
+    [openDeals],
+  )
+  const upsideValue = useMemo(
+    () => openDeals.filter(deal => deal.forecastCategory === 'upside').reduce((sum, deal) => sum + (deal.dealValue ?? 0), 0),
+    [openDeals],
+  )
+  const weightedValue = useMemo(
+    () => openDeals.reduce((sum, deal) => sum + ((deal.dealValue ?? 0) * ((deal.conversionScore ?? 0) / 100)), 0),
+    [openDeals],
+  )
+  const lateStageCount = useMemo(
+    () => openDeals.filter(deal => ['proposal', 'negotiation'].includes(deal.stage)).length,
+    [openDeals],
+  )
 
   const watchlist = useMemo<WatchItem[]>(() => {
     const dealMap = new Map(deals.map(deal => [deal.id, deal]))
@@ -621,10 +642,10 @@ export default function AnalyticsPage() {
 
       <div className="signals-header">
         <div>
-          <div className="signals-eyebrow">Signals / Analytics</div>
-          <div className="signals-title">Signals</div>
+          <div className="signals-eyebrow">Intelligence</div>
+          <div className="signals-title">Intelligence</div>
           <div className="signals-subtitle">
-            Pressure-test the pipeline, see where momentum is compounding or stalling, and understand what is actually driving wins and losses.
+            Pressure-test forecast quality, see where momentum is compounding or stalling, and understand what is actually driving wins and losses.
           </div>
         </div>
         <div className="signals-refresh">
@@ -643,13 +664,13 @@ export default function AnalyticsPage() {
         <section className="panel-section signals-hero-card">
           <div className="ai-badge">
             <span className="pulse" />
-            Signal briefing
+            Intelligence briefing
           </div>
           <div className="signals-hero-copy">
             <AIVoice as="span">{heroCopy}</AIVoice>
           </div>
           <div className="signals-hero-notes">
-            {(brain.keyPatterns?.length ? brain.keyPatterns : [{ label: 'Signals will strengthen as Halvex sees more closed outcomes.', dealIds: [], companies: [] }])
+            {(brain.keyPatterns?.length ? brain.keyPatterns : [{ label: 'Intelligence sharpens as Halvex sees more closed outcomes.', dealIds: [], companies: [] }])
               .slice(0, 3)
               .map((pattern, index) => (
                 <span key={`${pattern.label}-${index}`} className="signals-note">
@@ -662,32 +683,32 @@ export default function AnalyticsPage() {
 
         <section className="panel-section signals-panel">
           <div className="section-head" style={{ marginBottom: 16 }}>
-            <h2 className="section-title">Signal summary</h2>
-            <Link href="/pipeline" className="section-action">
-              Forecast
+            <h2 className="section-title">Forecast lens</h2>
+            <Link href="/deals?view=board" className="section-action">
+              Pipeline board
               <ArrowRight size={12} />
             </Link>
           </div>
           <div className="signals-metric-grid">
             <SignalsMetric
-              label="Velocity"
-              value={velocity?.velocity?.value ? compactMoney(velocity.velocity.value) : '—'}
-              meta="Pipeline throughput per day"
+              label="Commit"
+              value={commitValue ? compactMoney(commitValue) : '—'}
+              meta={`${openDeals.filter(deal => deal.forecastCategory === 'commit').length} deals in commit`}
             />
             <SignalsMetric
-              label="Win rate"
-              value={winLoss?.overall ? `${winLoss.overall.winRate}%` : '—'}
-              meta={`${winLoss?.overall?.won ?? 0} wins / ${winLoss?.overall?.lost ?? 0} losses`}
+              label="Upside"
+              value={upsideValue ? compactMoney(upsideValue) : '—'}
+              meta={`${openDeals.filter(deal => deal.forecastCategory === 'upside').length} deals in upside`}
             />
             <SignalsMetric
-              label="Cycle"
-              value={velocity?.avgCycleLength ? `${velocity.avgCycleLength}d` : '—'}
-              meta="Average days to close"
+              label="Weighted"
+              value={weightedValue ? compactMoney(weightedValue) : '—'}
+              meta="Probability-weighted pipeline"
             />
             <SignalsMetric
-              label="Avg size"
-              value={winLoss?.overall?.avgWonValue ? compactMoney(winLoss.overall.avgWonValue) : '—'}
-              meta="Average won deal value"
+              label="Late stage"
+              value={String(lateStageCount)}
+              meta={velocity?.avgCycleLength ? `${velocity.avgCycleLength}d average cycle` : 'Proposal + negotiation'}
             />
           </div>
         </section>
@@ -728,7 +749,7 @@ export default function AnalyticsPage() {
           <div className="section-head">
             <h2 className="section-title">Watchlist</h2>
             <Link href="/deals" className="section-action">
-              Open deals
+              Pipeline
               <ArrowRight size={12} />
             </Link>
           </div>

@@ -563,6 +563,8 @@ function buildTimeline(
   notes: NoteEntry[],
   aiActivity: AiActivityItem[],
   recommendedAction: string,
+  briefingText: string,
+  briefingGeneratedAt: string | null,
 ): TimelineItem[] {
   const timeline: TimelineItem[] = []
 
@@ -570,9 +572,9 @@ function buildTimeline(
     id: 'timeline-ai',
     kind: 'ai',
     label: 'AI briefing',
-    timestamp: formatRelativeTime(deal.updatedAt),
+    timestamp: formatRelativeTime(briefingGeneratedAt ?? deal.updatedAt),
     title: `Halvex refreshed the deal outlook for ${deal.prospectCompany}.`,
-    body: deal.aiSummary ?? 'Halvex is blending note signal, deal score, and stakeholder coverage.',
+    body: briefingText || 'Halvex is blending note signal, deal score, and stakeholder coverage.',
     insight: recommendedAction,
   })
 
@@ -1456,11 +1458,15 @@ function MeetingPrepPanel({
 function ConversationsTab({
   deal,
   notes,
+  latestAiUpdate,
+  latestAiUpdateAt,
   onRefresh,
   onOpenEmail,
 }: {
   deal: DealRecord
   notes: NoteEntry[]
+  latestAiUpdate: string | null
+  latestAiUpdateAt: string | null
   onRefresh: () => Promise<void>
   onOpenEmail: () => Promise<void>
 }) {
@@ -1521,15 +1527,33 @@ function ConversationsTab({
             <Calendar size={14} strokeWidth={2} />
             Conversation history
           </div>
-          <span className="progress-meta">{notes.length} entries</span>
+          <span className="progress-meta">{notes.length + (latestAiUpdate ? 1 : 0)} entries</span>
         </div>
-        {notes.length === 0 ? (
+        {notes.length === 0 && !latestAiUpdate ? (
           <EmptyPanel
             title="No conversations logged yet"
             body="As soon as you log notes, Halvex will extract objections, next steps, and competitor mentions into the workspace."
           />
         ) : (
           <div style={{ display: 'grid', gap: 10 }}>
+            {latestAiUpdate ? (
+              <div className="surface-glass-light" style={{ padding: 14, borderRadius: 'var(--radius)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div className="ai-badge" style={{ padding: '4px 10px', minHeight: 28 }}>
+                      <span className="pulse" />
+                      Latest Halvex update
+                    </div>
+                  </div>
+                  <span className="notion-chip">
+                    {latestAiUpdateAt ? formatRelativeTime(latestAiUpdateAt) : 'Just now'}
+                  </span>
+                </div>
+                <AIVoice as="div" style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--ink)' }}>
+                  {latestAiUpdate}
+                </AIVoice>
+              </div>
+            ) : null}
             {notes.map(note => (
               <div key={note.id} className="surface-glass-light" style={{ padding: 14, borderRadius: 'var(--radius)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
@@ -1926,9 +1950,14 @@ export default function DealDetailPage() {
     [deal, notes],
   )
   const aiActivity = useMemo(() => aiActivityRes?.data ?? [], [aiActivityRes?.data])
+  const briefingText =
+    briefRes?.data?.brief ??
+    deal?.aiSummary ??
+    (deal ? `${deal.prospectCompany} is moving, but the next action needs to be sharper and more specific to the buying team.` : '')
+  const briefingGeneratedAt = briefRes?.data?.generatedAt ?? deal?.updatedAt ?? deal?.createdAt ?? null
   const timeline = useMemo(
-    () => (deal ? buildTimeline(deal, notes, aiActivity, recommendedAction) : []),
-    [aiActivity, deal, notes, recommendedAction],
+    () => (deal ? buildTimeline(deal, notes, aiActivity, recommendedAction, briefingText, briefingGeneratedAt) : []),
+    [aiActivity, briefingGeneratedAt, briefingText, deal, notes, recommendedAction],
   )
 
   useEffect(() => {
@@ -2092,11 +2121,6 @@ export default function DealDetailPage() {
     (deal.todos?.filter(todo => !todo.done).length ?? 0) +
     ((deal.projectPlan?.phases ?? []).flatMap(phase => phase.tasks ?? []).filter(task => task.status !== 'complete').length ?? 0) +
     criteria.filter(item => !item.achieved).length
-  const briefingText =
-    briefRes?.data?.brief ??
-    deal.aiSummary ??
-    `${deal.prospectCompany} is moving, but the next action needs to be sharper and more specific to the buying team.`
-  const briefingGeneratedAt = briefRes?.data?.generatedAt ?? deal.updatedAt ?? deal.createdAt ?? null
   const primaryEmail = deal.contacts?.find(contact => contact.email)?.email ?? null
   const primaryName = deal.contacts?.[0]?.name ?? deal.prospectName ?? deal.prospectCompany
 
@@ -2341,7 +2365,14 @@ export default function DealDetailPage() {
             ) : null}
 
             {activeTab === 'conversations' ? (
-              <ConversationsTab deal={deal} notes={notes} onRefresh={refreshAll} onOpenEmail={() => openEmailComposer()} />
+              <ConversationsTab
+                deal={deal}
+                notes={notes}
+                latestAiUpdate={briefingText}
+                latestAiUpdateAt={briefingGeneratedAt}
+                onRefresh={refreshAll}
+                onOpenEmail={() => openEmailComposer()}
+              />
             ) : null}
 
             {activeTab === 'stakeholders' ? (
