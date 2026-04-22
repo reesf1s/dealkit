@@ -32,16 +32,16 @@ const config: Config = {
         mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
       },
       backgroundImage: {
-        glass: 'linear-gradient(135deg, rgba(255,255,255,0.48) 0%, rgba(255,255,255,0.32) 100%)',
-        'glass-strong': 'linear-gradient(135deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.45) 100%)',
+        glass: 'var(--glass-bg)',
+        'glass-strong': 'var(--glass-bg-strong)',
       },
       backdropBlur: {
-        glass: '24px',
-        'glass-heavy': '40px',
+        glass: '28px',
+        'glass-heavy': '44px',
       },
       backdropSaturate: {
         glass: '1.8',
-        'glass-heavy': '2',
+        'glass-heavy': '2.1',
       },
       borderRadius: {
         sm: '6px',
