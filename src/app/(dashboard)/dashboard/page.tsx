@@ -850,13 +850,41 @@ export default function DashboardPage() {
           font-size: 12px;
           line-height: 1.6;
         }
-        @media (max-width: 1080px) {
+        @media (max-width: 1240px) {
+          .overview-header {
+            align-items: flex-start;
+          }
+          .overview-refresh {
+            width: 100%;
+            justify-content: space-between;
+            flex-wrap: wrap;
+          }
           .overview-hero-grid,
           .overview-section-grid {
             grid-template-columns: 1fr;
           }
           .overview-next-actions {
             grid-template-columns: 1fr;
+          }
+        }
+        @media (max-width: 840px) {
+          .overview-briefing,
+          .overview-kpi-panel,
+          .overview-list-card,
+          .overview-mini-card {
+            padding: 16px;
+          }
+          .overview-list-row,
+          .overview-mini-row,
+          .overview-mini-row-static {
+            grid-template-columns: auto minmax(0, 1fr);
+            align-items: flex-start;
+          }
+          .overview-row-meta,
+          .overview-mini-meta {
+            grid-column: 2;
+            white-space: normal;
+            margin-top: 6px;
           }
         }
         @media (max-width: 720px) {
@@ -868,7 +896,7 @@ export default function DashboardPage() {
             font-size: 22px;
           }
           .overview-kpi-grid {
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr;
           }
           .overview-header {
             align-items: flex-start;

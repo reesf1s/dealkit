@@ -14,6 +14,29 @@ export type DatedNoteEntry = {
   date: Date
 }
 
+export type BriefingNoteFocus = {
+  latestEntries: DatedNoteEntry[]
+  outstandingEntries: DatedNoteEntry[]
+  legacyContext: string | null
+  preferredNotes: string
+}
+
+const OUTSTANDING_THEME_PATTERNS: Array<{ theme: string; pattern: RegExp }> = [
+  { theme: 'budget', pattern: /\b(budget|funding|finance|commercial approval|pricing|commercials?)\b/i },
+  { theme: 'legal', pattern: /\b(legal|msa|dpa|redlines?|contract|procurement)\b/i },
+  { theme: 'security', pattern: /\b(security|infosec|compliance|soc2|data residency|data room)\b/i },
+  { theme: 'technical', pattern: /\b(integration|api|implementation|migration|sso|directory|headcount|hierarchy|floorplan|deployment)\b/i },
+  { theme: 'stakeholder', pattern: /\b(champion|sponsor|stakeholder|buyer|sign[- ]?off|approval|decision maker|committee)\b/i },
+  { theme: 'competitor', pattern: /\b(competitor|salesforce|hubspot|microsoft|alternative|evaluation)\b/i },
+  { theme: 'timeline', pattern: /\b(deadline|go-live|timeline|quarter|month-end|close date|decision date)\b/i },
+]
+
+const OUTSTANDING_MARKERS =
+  /\b(blocked|blocker|pending|awaiting|waiting|stalled|delayed|stuck|risk|issue|concern|challenge|needs|need|requires|review|approval|sign[- ]?off|redlines?|procurement|security review|budget review|not confirmed|not approved|evaluation|decision pending|follow[- ]?up required|outstanding)\b/i
+
+const RESOLVED_MARKERS =
+  /\b(resolved|done|complete|completed|implemented|delivered|live|shipped|approved|signed|booked|confirmed|scheduled|working|closed|rolled out|enabled|in place|on track)\b/i
+
 function normalizeNoteText(value: string | null | undefined): string {
   return typeof value === 'string' ? value.trim() : ''
 }
@@ -50,6 +73,22 @@ export function extractDatedEntries(notes: string): DatedNoteEntry[] {
     .sort((left, right) => right.date.getTime() - left.date.getTime())
 }
 
+function extractThemes(text: string): string[] {
+  return OUTSTANDING_THEME_PATTERNS
+    .filter(({ pattern }) => pattern.test(text))
+    .map(({ theme }) => theme)
+}
+
+function recentNotesResolveTheme(recentText: string, theme: string): boolean {
+  const themePattern = OUTSTANDING_THEME_PATTERNS.find(item => item.theme === theme)?.pattern
+  if (!themePattern) return false
+  return themePattern.test(recentText) && RESOLVED_MARKERS.test(recentText)
+}
+
+function isOutstandingCandidate(text: string): boolean {
+  return OUTSTANDING_MARKERS.test(text) && !RESOLVED_MARKERS.test(text)
+}
+
 export function daysSince(date: Date, nowMs = Date.now()): number {
   return Math.round((nowMs - date.getTime()) / MS_PER_DAY)
 }
@@ -59,6 +98,48 @@ export function formatDatedNote(entry: DatedNoteEntry, nowMs = Date.now()): stri
   const age = daysSince(entry.date, nowMs)
   const dateLabel = entry.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
   return `${dateLabel} (${age}d ago): ${summary}`
+}
+
+export function buildBriefingNoteFocus(
+  fields: NoteSourceFields,
+  options?: { latestCount?: number; maxOutstanding?: number; legacyContextChars?: number },
+): BriefingNoteFocus {
+  const latestCount = options?.latestCount ?? 2
+  const maxOutstanding = options?.maxOutstanding ?? 2
+  const legacyContextChars = options?.legacyContextChars ?? 700
+
+  const structuredNotes = buildStructuredNoteCorpus(fields)
+  const preferredNotes = structuredNotes || buildPreferredNoteCorpus(fields)
+  const datedEntries = extractDatedEntries(preferredNotes)
+  const latestEntries = datedEntries.slice(0, latestCount)
+  const recentText = latestEntries.map(entry => stripDatePrefix(entry.text).toLowerCase()).join(' ')
+
+  const seenThemes = new Set<string>()
+  const outstandingEntries = datedEntries
+    .slice(latestCount)
+    .filter(entry => {
+      const clean = stripDatePrefix(entry.text)
+      if (!isOutstandingCandidate(clean)) return false
+      const themes = extractThemes(clean)
+      if (themes.length === 0) return false
+      if (themes.some(theme => recentNotesResolveTheme(recentText, theme))) return false
+      const hasNewTheme = themes.some(theme => !seenThemes.has(theme))
+      if (!hasNewTheme) return false
+      themes.forEach(theme => seenThemes.add(theme))
+      return true
+    })
+    .slice(0, maxOutstanding)
+
+  const legacyContext = preferredNotes && datedEntries.length === 0
+    ? preferredNotes.slice(-legacyContextChars)
+    : null
+
+  return {
+    latestEntries,
+    outstandingEntries,
+    legacyContext,
+    preferredNotes,
+  }
 }
 
 export function buildNoteCentricBrainContext(

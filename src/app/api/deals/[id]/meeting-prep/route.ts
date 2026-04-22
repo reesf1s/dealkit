@@ -11,10 +11,8 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getWorkspaceBrain } from '@/lib/workspace-brain'
 import { ensureLinksColumn } from '@/lib/api-helpers'
 import {
+  buildBriefingNoteFocus,
   buildNoteCentricBrainContext,
-  buildPreferredNoteCorpus,
-  buildStructuredNoteCorpus,
-  extractDatedEntries,
   formatDatedNote,
 } from '@/lib/note-intelligence'
 
@@ -62,22 +60,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         r.toLowerCase().includes(o.theme.toLowerCase().split(' ')[0])
       )
     )
-    const structuredNotes = buildStructuredNoteCorpus({
+    const noteFocus = buildBriefingNoteFocus({
       meetingNotes: deal.meetingNotes,
       hubspotNotes: deal.hubspotNotes,
       notes: typeof deal.notes === 'string' ? deal.notes : null,
     })
-    const preferredNotes = structuredNotes || buildPreferredNoteCorpus({
-      meetingNotes: deal.meetingNotes,
-      hubspotNotes: deal.hubspotNotes,
-      notes: typeof deal.notes === 'string' ? deal.notes : null,
-    })
-    const datedEntries = extractDatedEntries(preferredNotes)
-    const latestMeetingNote = datedEntries[0] ? formatDatedNote(datedEntries[0]) : null
-    const recentEvidence = datedEntries.slice(0, 6).map(entry => `- ${formatDatedNote(entry)}`).join('\n')
-    const legacyContext = preferredNotes && datedEntries.length === 0
-      ? preferredNotes.slice(-700)
-      : null
+    const latestMeetingNote = noteFocus.latestEntries[0] ? formatDatedNote(noteFocus.latestEntries[0]) : null
+    const recentEvidence = noteFocus.latestEntries.map(entry => `- ${formatDatedNote(entry)}`).join('\n')
+    const outstandingOlderContext = noteFocus.outstandingEntries.map(entry => `- ${formatDatedNote(entry)}`).join('\n')
+    const legacyContext = noteFocus.legacyContext
 
     const mlSection = [
       winProb != null ? `Win probability (ML): ${Math.round(winProb * 100)}%` : '',
@@ -100,13 +91,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
 CRITICAL: Treat meeting notes and uploaded notes as the source of truth. Do not reference task lists, checklists, or success criteria unless those facts are explicitly stated in the notes themselves.
 If a note says "tomorrow", "next week", or a weekday, interpret it relative to the note date, not today.
+Use the last two dated notes as the current truth. Only bring in older note context if it is explicitly older outstanding context and still unresolved. Never surface older delivered, implemented, scheduled, confirmed, or "on track" work as if it is still active.
 
 DEAL: ${deal.dealName} | ${deal.prospectName ?? 'Unknown'} at ${deal.prospectCompany} | Stage: ${deal.stage}${deal.dealValue ? ` | Value: £${deal.dealValue.toLocaleString()}` : ''}
-${!latestMeetingNote && !recentEvidence && deal.aiSummary ? `Status fallback: ${deal.aiSummary}` : ''}
+${!latestMeetingNote && !recentEvidence && !outstandingOlderContext && deal.aiSummary ? `Status fallback: ${deal.aiSummary}` : ''}
 ${mlSection ? `\nML SIGNALS:\n${mlSection}` : ''}
-${(deal.dealRisks as string[])?.length ? `\nKnown risks: ${(deal.dealRisks as string[]).join('; ')}` : ''}
-${latestMeetingNote ? `\nLatest dated note:\n${latestMeetingNote}` : ''}
-${recentEvidence ? `\nRecent dated evidence:\n${recentEvidence}` : ''}
+${latestMeetingNote ? `\nLatest note:\n${latestMeetingNote}` : ''}
+${recentEvidence ? `\nPrimary note evidence — use these last two dated notes as current truth:\n${recentEvidence}` : ''}
+${outstandingOlderContext ? `\nOlder outstanding context — use only if still unresolved:\n${outstandingOlderContext}` : ''}
 ${legacyContext ? `\nLegacy undated context (use cautiously, never as current momentum):\n${legacyContext}` : ''}
 ${company ? `\nOUR PRODUCT: ${company.companyName} — ${(company.valuePropositions as string[])?.slice(0, 3).join(' · ')}. Differentiators: ${(company.differentiators as string[])?.slice(0, 3).join(', ')}` : ''}
 ${dealComps.length > 0 ? `\nCOMPETITORS IN THIS DEAL: ${dealComps.map(c => `${c.name} (weaknesses: ${(c.weaknesses as string[])?.slice(0, 2).join(', ')})`).join('; ')}` : ''}
