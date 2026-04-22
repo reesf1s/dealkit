@@ -604,7 +604,7 @@ Text: ${text.slice(0, 3000)}`,
 
   const names = created.join(', ')
   return {
-    reply: `Logged ${created.length} product gap${created.length > 1 ? 's' : ''}: **${names}**.\n\nView and manage on the [Feature Gaps](/product-gaps) page.`,
+    reply: `Logged ${created.length} product gap${created.length > 1 ? 's' : ''}: **${names}**.\n\nReview them in [Intelligence](/intelligence).`,
     actions: [{ type: 'gaps_logged', gaps: created, count: created.length }],
   }
 }
@@ -1625,7 +1625,7 @@ Request: ${text.slice(0, 500)}`
   await db.update(productGaps).set(updatePayload).where(eq(productGaps.id, gap.id))
 
   return {
-    reply: `**${gap.title}**: ${changes.join(', ')}.\n\nView in [Feature Gaps](/product-gaps).`,
+    reply: `**${gap.title}**: ${changes.join(', ')}.\n\nView it in [Intelligence](/intelligence).`,
     actions: [{ type: 'gaps_logged', gaps: [gap.title], count: 1 }],
   }
 }

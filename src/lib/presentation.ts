@@ -109,6 +109,29 @@ export function humanizeActivityLabel(
       return `Notes were added on ${deal}`
     case 'deal_log.ai_scored':
       return `Deal intelligence rescored ${deal}`
+    case 'prepare_customer_followup':
+      return `Prepared a customer follow-up for ${deal}`
+    case 'hubspot_email_logged':
+      return `Logged a HubSpot email on ${deal}`
+    case 'follow_up_reminder':
+      return `Set a follow-up reminder for ${deal}`
+    case 'save_issue_link':
+      return `Captured a product issue from ${deal}`
+    case 'link_created':
+      return `Linked a product issue to ${deal}`
+    case 'link_confirmed':
+      return `Confirmed the linked issue for ${deal}`
+    case 'link_dismissed':
+      return `Dismissed a suggested issue link for ${deal}`
+    case 'scope_issue':
+    case 'issue_scoped':
+    case 'issue_scoped_to_cycle':
+      return `Scoped a linked product issue for ${deal}`
+    case 'issue_deployed_notification':
+    case 'all_issues_deployed_notification':
+      return `Recorded a shipped product update for ${deal}`
+    case 'release_email_generated':
+      return `Drafted a release email for ${deal}`
     default:
       return titleCaseWords(type.replace(/[._]/g, ' '))
     }

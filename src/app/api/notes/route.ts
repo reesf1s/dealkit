@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { and, eq, isNotNull } from 'drizzle-orm'
+import { and, desc, eq, isNotNull } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { dbErrResponse } from '@/lib/api-helpers'
@@ -15,9 +15,10 @@ interface ParsedNote {
   date: string
   content: string
   source: string
+  updatedAt: string
 }
 
-function parseNotes(raw: string, deal: { id: string; dealName: string; prospectCompany: string; stage: string; noteSource: string | null }): ParsedNote[] {
+function parseNotes(raw: string, deal: { id: string; dealName: string; prospectCompany: string; stage: string; noteSource: string | null; updatedAt: string }): ParsedNote[] {
   const notes: ParsedNote[] = []
   // Split on [YYYY-MM-DD] headers
   const parts = raw.split(/(?=\[\d{4}-\d{2}-\d{2}\])/)
@@ -37,6 +38,7 @@ function parseNotes(raw: string, deal: { id: string; dealName: string; prospectC
         date: match[1],
         content,
         source: deal.noteSource ?? 'manual',
+        updatedAt: deal.updatedAt,
       })
     } else if (trimmed.length > 0) {
       // No date header — treat as legacy note
@@ -49,10 +51,18 @@ function parseNotes(raw: string, deal: { id: string; dealName: string; prospectC
         date: '',
         content: trimmed,
         source: deal.noteSource ?? 'manual',
+        updatedAt: deal.updatedAt,
       })
     }
   }
   return notes
+}
+
+function noteSortKey(note: ParsedNote): number {
+  const datedKey = note.date ? Date.parse(`${note.date}T23:59:59.999Z`) : Number.NaN
+  if (!Number.isNaN(datedKey)) return datedKey
+  const updatedKey = Date.parse(note.updatedAt)
+  return Number.isNaN(updatedKey) ? 0 : updatedKey
 }
 
 export async function GET(req: NextRequest) {
@@ -81,7 +91,7 @@ export async function GET(req: NextRequest) {
       })
       .from(dealLogs)
       .where(and(...conditions))
-      .orderBy(dealLogs.updatedAt)
+      .orderBy(desc(dealLogs.updatedAt))
 
     const allNotes: ParsedNote[] = []
     for (const row of rows) {
@@ -92,17 +102,13 @@ export async function GET(req: NextRequest) {
         prospectCompany: row.prospectCompany,
         stage: row.stage,
         noteSource: row.noteSource ?? null,
+        updatedAt: row.updatedAt.toISOString(),
       })
       allNotes.push(...parsed)
     }
 
     // Sort newest first
-    allNotes.sort((a, b) => {
-      if (!a.date && !b.date) return 0
-      if (!a.date) return 1
-      if (!b.date) return -1
-      return b.date.localeCompare(a.date)
-    })
+    allNotes.sort((a, b) => noteSortKey(b) - noteSortKey(a))
 
     return NextResponse.json({ data: allNotes })
   } catch (err) { return dbErrResponse(err) }

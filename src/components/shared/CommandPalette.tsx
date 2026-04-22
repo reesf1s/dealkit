@@ -6,7 +6,7 @@ import {
   LayoutDashboard, TrendingUp,
   Building2, Settings, Plus, Zap,
   Sparkles, CornerDownLeft, Loader2,
-  BarChart2, Users, Brain, GitBranch, MessageSquare, Plug, Bot,
+  BarChart2, Users, Brain, Calendar, MessageSquare, ClipboardList, Bot,
 } from 'lucide-react'
 
 interface CommandItem {
@@ -27,8 +27,8 @@ const ALL_ITEMS: CommandItem[] = [
   { id: 'board',        label: 'Pipeline Board',section: 'navigate', icon: BarChart2,       href: '/deals?view=board' },
   { id: 'conversations',label: 'Conversations', section: 'navigate', icon: MessageSquare,   href: '/connections' },
   { id: 'automations',  label: 'Automations',   section: 'navigate', icon: Bot,             href: '/automations' },
-  { id: 'calendar',     label: 'Calendar',      section: 'navigate', icon: GitBranch,       href: '/calendar', shortcut: '↩' },
-  { id: 'integrations', label: 'Integrations',  section: 'navigate', icon: Plug,            href: '/company' },
+  { id: 'tasks',        label: 'Tasks',         section: 'navigate', icon: ClipboardList,   href: '/tasks' },
+  { id: 'calendar',     label: 'Calendar',      section: 'navigate', icon: Calendar,        href: '/calendar', shortcut: '↩' },
   { id: 'settings',     label: 'Settings',      section: 'navigate', icon: Settings,        href: '/settings' },
   { id: 'log-deal',     label: 'Log deal',      section: 'actions',  icon: Plus,            href: '/deals' },
   { id: 'ask-ai',       label: 'Ask Halvex',    section: 'actions',  icon: Sparkles,        href: '/dashboard' },

@@ -36,7 +36,7 @@ export default function CompanyPage() {
   }, [brainState])
 
   return (
-    <div style={{ maxWidth: '760px', background: '#ffffff', minHeight: '100%' }}>
+    <div style={{ maxWidth: '760px', background: 'transparent', minHeight: '100%' }}>
       {/* Company / AI Import tabs */}
       <PageTabs tabs={[
         { label: 'Company Profile', href: '/company',    icon: Building2 },

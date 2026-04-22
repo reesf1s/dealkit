@@ -235,6 +235,14 @@ type TimelineItem = {
   insight?: string
 }
 
+type LatestHalvexUpdate = {
+  id: string
+  source: 'briefing' | 'activity'
+  title: string
+  body: string
+  createdAt: string | null
+}
+
 type SignalCard = {
   label: string
   body: string
@@ -525,6 +533,110 @@ function countMentions(haystack: string, needle: string) {
   return matches?.length ?? 0
 }
 
+function parseTimestamp(value?: string | null): number {
+  if (!value) return 0
+  const parsed = Date.parse(value)
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
+function extractRecordSnippet(record?: Record<string, unknown> | null): string | null {
+  if (!record) return null
+  const keys = [
+    'summary',
+    'message',
+    'body',
+    'notes',
+    'description',
+    'reason',
+    'nextAction',
+    'emailBody',
+    'customerMessage',
+    'comment',
+  ]
+
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+
+  return null
+}
+
+function summarizeAiActivityBody(item: AiActivityItem, deal: DealRecord): string {
+  const resultSnippet = extractRecordSnippet(item.result)
+  if (resultSnippet) return ensureSentence(resultSnippet)
+
+  const payloadSnippet = extractRecordSnippet(item.payload)
+  if (payloadSnippet) return ensureSentence(payloadSnippet)
+
+  const result = item.result ?? {}
+  const issueIdentifier =
+    typeof result.linear_issue_identifier === 'string'
+      ? result.linear_issue_identifier
+      : typeof result.linear_issue_id === 'string'
+        ? result.linear_issue_id
+        : typeof item.payload?.linearIssueId === 'string'
+          ? item.payload.linearIssueId
+          : null
+
+  if (item.actionType === 'link_created' && issueIdentifier) {
+    return `Halvex linked ${issueIdentifier} so the product blocker stays attached to ${deal.prospectCompany}.`
+  }
+
+  if (item.actionType === 'link_confirmed' && issueIdentifier) {
+    return `Halvex confirmed ${issueIdentifier} as the live product issue shaping ${deal.prospectCompany}.`
+  }
+
+  if (item.status?.trim()) {
+    return `${humanizeActivityLabel(item.actionType, item.payload ?? {}, deal.dealName)}. Status: ${item.status}.`
+  }
+
+  return ensureSentence(humanizeActivityLabel(item.actionType, item.payload ?? {}, deal.dealName))
+}
+
+function buildLatestHalvexUpdate(
+  deal: DealRecord,
+  briefingText: string,
+  briefingGeneratedAt: string | null,
+  aiActivity: AiActivityItem[],
+): LatestHalvexUpdate | null {
+  const latestActivity = aiActivity[0]
+  const latestActivityAt = parseTimestamp(latestActivity?.createdAt)
+  const latestBriefingAt = parseTimestamp(briefingGeneratedAt)
+
+  if (latestActivity && latestActivityAt > latestBriefingAt) {
+    return {
+      id: latestActivity.id,
+      source: 'activity',
+      title: humanizeActivityLabel(latestActivity.actionType, latestActivity.payload ?? {}, deal.dealName),
+      body: summarizeAiActivityBody(latestActivity, deal),
+      createdAt: latestActivity.createdAt,
+    }
+  }
+
+  if (briefingText.trim()) {
+    return {
+      id: 'timeline-ai',
+      source: 'briefing',
+      title: `Halvex refreshed the deal outlook for ${deal.prospectCompany}.`,
+      body: briefingText,
+      createdAt: briefingGeneratedAt,
+    }
+  }
+
+  if (latestActivity) {
+    return {
+      id: latestActivity.id,
+      source: 'activity',
+      title: humanizeActivityLabel(latestActivity.actionType, latestActivity.payload ?? {}, deal.dealName),
+      body: summarizeAiActivityBody(latestActivity, deal),
+      createdAt: latestActivity.createdAt,
+    }
+  }
+
+  return null
+}
+
 function buildForecastRows(deal: DealRecord, prediction?: BrainPrediction | null) {
   const win = clamp(
     Math.round(
@@ -563,20 +675,22 @@ function buildTimeline(
   notes: NoteEntry[],
   aiActivity: AiActivityItem[],
   recommendedAction: string,
-  briefingText: string,
-  briefingGeneratedAt: string | null,
+  latestHalvexUpdate: LatestHalvexUpdate | null,
 ): TimelineItem[] {
-  const timeline: TimelineItem[] = []
+  const timeline: Array<TimelineItem & { sortAt: number }> = []
 
-  timeline.push({
-    id: 'timeline-ai',
-    kind: 'ai',
-    label: 'AI briefing',
-    timestamp: formatRelativeTime(briefingGeneratedAt ?? deal.updatedAt),
-    title: `Halvex refreshed the deal outlook for ${deal.prospectCompany}.`,
-    body: briefingText || 'Halvex is blending note signal, deal score, and stakeholder coverage.',
-    insight: recommendedAction,
-  })
+  if (latestHalvexUpdate) {
+    timeline.push({
+      id: latestHalvexUpdate.id,
+      kind: 'ai',
+      label: latestHalvexUpdate.source === 'briefing' ? 'AI briefing' : 'AI activity',
+      timestamp: formatRelativeTime(latestHalvexUpdate.createdAt ?? deal.updatedAt),
+      title: latestHalvexUpdate.title,
+      body: latestHalvexUpdate.body,
+      insight: latestHalvexUpdate.source === 'briefing' ? recommendedAction : undefined,
+      sortAt: parseTimestamp(latestHalvexUpdate.createdAt ?? deal.updatedAt),
+    })
+  }
 
   notes.slice(0, 2).forEach((entry, index) => {
     timeline.push({
@@ -588,21 +702,38 @@ function buildTimeline(
       title: entry.title,
       body: entry.text,
       insight: index === 0 ? ensureSentence(deal.nextSteps) : undefined,
+      sortAt: parseTimestamp(entry.iso),
     })
   })
 
-  aiActivity.slice(0, 2).forEach(item => {
+  aiActivity
+    .filter(item => item.id !== latestHalvexUpdate?.id)
+    .slice(0, 2)
+    .forEach(item => {
     timeline.push({
       id: item.id,
       kind: item.actionType.includes('email') ? 'email' : 'ai',
       label: 'AI activity',
       timestamp: formatRelativeTime(item.createdAt),
       title: humanizeActivityLabel(item.actionType, item.payload ?? {}, deal.dealName),
-      body: item.status ? `Status: ${item.status}` : 'Halvex recorded an internal action against this deal.',
+      body: summarizeAiActivityBody(item, deal),
+      sortAt: parseTimestamp(item.createdAt),
     })
-  })
+    })
 
-  return timeline.slice(0, 5)
+  return timeline
+    .sort((left, right) => right.sortAt - left.sortAt)
+    .slice(0, 5)
+    .map(item => ({
+      id: item.id,
+      kind: item.kind,
+      label: item.label,
+      timestamp: item.timestamp,
+      sender: item.sender,
+      title: item.title,
+      body: item.body,
+      insight: item.insight,
+    }))
 }
 
 function recommendedActionText(deal: DealRecord, notes: NoteEntry[]) {
@@ -1459,14 +1590,12 @@ function ConversationsTab({
   deal,
   notes,
   latestAiUpdate,
-  latestAiUpdateAt,
   onRefresh,
   onOpenEmail,
 }: {
   deal: DealRecord
   notes: NoteEntry[]
-  latestAiUpdate: string | null
-  latestAiUpdateAt: string | null
+  latestAiUpdate: LatestHalvexUpdate | null
   onRefresh: () => Promise<void>
   onOpenEmail: () => Promise<void>
 }) {
@@ -1546,12 +1675,19 @@ function ConversationsTab({
                     </div>
                   </div>
                   <span className="notion-chip">
-                    {latestAiUpdateAt ? formatRelativeTime(latestAiUpdateAt) : 'Just now'}
+                    {latestAiUpdate.createdAt ? formatRelativeTime(latestAiUpdate.createdAt) : 'Just now'}
                   </span>
                 </div>
-                <AIVoice as="div" style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--ink)' }}>
-                  {latestAiUpdate}
-                </AIVoice>
+                <div style={{ fontSize: 12, color: 'var(--ink-4)', marginBottom: 8 }}>{latestAiUpdate.title}</div>
+                {latestAiUpdate.source === 'briefing' ? (
+                  <AIVoice as="div" style={{ fontSize: 16, lineHeight: 1.65, color: 'var(--ink)' }}>
+                    {latestAiUpdate.body}
+                  </AIVoice>
+                ) : (
+                  <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.65 }}>
+                    {latestAiUpdate.body}
+                  </div>
+                )}
               </div>
             ) : null}
             {notes.map(note => (
@@ -1955,9 +2091,13 @@ export default function DealDetailPage() {
     deal?.aiSummary ??
     (deal ? `${deal.prospectCompany} is moving, but the next action needs to be sharper and more specific to the buying team.` : '')
   const briefingGeneratedAt = briefRes?.data?.generatedAt ?? deal?.updatedAt ?? deal?.createdAt ?? null
+  const latestHalvexUpdate = useMemo(
+    () => (deal ? buildLatestHalvexUpdate(deal, briefingText, briefingGeneratedAt, aiActivity) : null),
+    [aiActivity, briefingGeneratedAt, briefingText, deal],
+  )
   const timeline = useMemo(
-    () => (deal ? buildTimeline(deal, notes, aiActivity, recommendedAction, briefingText, briefingGeneratedAt) : []),
-    [aiActivity, briefingGeneratedAt, briefingText, deal, notes, recommendedAction],
+    () => (deal ? buildTimeline(deal, notes, aiActivity, recommendedAction, latestHalvexUpdate) : []),
+    [aiActivity, deal, latestHalvexUpdate, notes, recommendedAction],
   )
 
   useEffect(() => {
@@ -2201,7 +2341,7 @@ export default function DealDetailPage() {
               { id: 'overview', label: 'Overview' },
               { id: 'manage', label: 'Manage', count: manageCount || undefined },
               { id: 'intelligence', label: 'Intelligence', dot: signals.length > 0 },
-              { id: 'conversations', label: 'Conversations', count: notes.length || undefined },
+              { id: 'conversations', label: 'Conversations', count: notes.length + (latestHalvexUpdate ? 1 : 0) || undefined },
               { id: 'stakeholders', label: 'Stakeholders', count: stakeholders.length || undefined },
               { id: 'documents', label: 'Documents', count: (deal.links?.length ?? 0) || undefined },
               { id: 'history', label: 'History', count: aiActivity.length || undefined },
@@ -2368,8 +2508,7 @@ export default function DealDetailPage() {
               <ConversationsTab
                 deal={deal}
                 notes={notes}
-                latestAiUpdate={briefingText}
-                latestAiUpdateAt={briefingGeneratedAt}
+                latestAiUpdate={latestHalvexUpdate}
                 onRefresh={refreshAll}
                 onOpenEmail={() => openEmailComposer()}
               />

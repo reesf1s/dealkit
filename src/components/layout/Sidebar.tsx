@@ -76,6 +76,11 @@ export default function Sidebar() {
     dedupingInterval: 45_000,
   })
 
+  const { data: notesRes } = useSWR('/api/notes', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 45_000,
+  })
+
   const deals = Array.isArray(dealsRes?.data) ? dealsRes.data : []
   const openDeals = deals.filter((deal: { stage?: string }) => !['closed_won', 'closed_lost'].includes(deal.stage ?? ''))
   const accountCount = new Set(
@@ -84,6 +89,7 @@ export default function Sidebar() {
   const enabledAutomations = Array.isArray(automationsRes?.data)
     ? automationsRes.data.filter((item: { enabled?: boolean }) => item.enabled).length
     : 0
+  const conversationCount = Array.isArray(notesRes?.data) ? notesRes.data.length : 0
   const openTaskCount = deals.reduce((count: number, deal: { todos?: Array<{ done?: boolean }>; projectPlan?: { phases?: Array<{ tasks?: Array<{ status?: string }> }> }; successCriteriaTodos?: Array<{ achieved?: boolean }> }) => {
     const openTodos = deal.todos?.filter(todo => !todo.done).length ?? 0
     const openPlanTasks = deal.projectPlan?.phases?.flatMap(phase => phase.tasks ?? []).filter(task => task.status !== 'complete').length ?? 0
@@ -100,7 +106,7 @@ export default function Sidebar() {
 
   const intelligenceItems: NavItem[] = [
     { href: '/intelligence', label: 'Intelligence', icon: Sparkles, signal: enabledAutomations > 0, matchPaths: ['/intelligence', '/analytics'] },
-    { href: '/connections', label: 'Conversations', icon: MessageSquare, count: 7, matchPaths: ['/connections', '/chat'] },
+    { href: '/connections', label: 'Conversations', icon: MessageSquare, count: conversationCount || undefined, matchPaths: ['/connections', '/chat'] },
     { href: '/automations', label: 'Automations', icon: Bot, count: enabledAutomations, matchPaths: ['/automations'] },
   ]
 

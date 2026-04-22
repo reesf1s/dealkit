@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { useState } from 'react'
 import useSWR from 'swr'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Plus, X, BookOpen, Swords, AlertTriangle, TrendingUp, Brain } from 'lucide-react'
+import { Plus, X, BookOpen, Swords, Brain } from 'lucide-react'
 import { PageTabs } from '@/components/shared/PageTabs'
 import { CaseStudyGrid } from '@/components/case-studies/CaseStudyGrid'
 import { CaseStudyForm } from '@/components/case-studies/CaseStudyForm'
@@ -48,15 +48,12 @@ export default function CaseStudiesPage() {
   }
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1100px', margin: '0 auto', background: '#ffffff', minHeight: '100%' }}>
+    <div style={{ padding: '32px', maxWidth: '1100px', margin: '0 auto', background: 'transparent', minHeight: '100%' }}>
       {/* Intelligence tabs */}
       <PageTabs tabs={[
         { label: 'Overview',     href: '/intelligence', icon: Brain         },
         { label: 'Competitors',  href: '/competitors',  icon: Swords        },
         { label: 'Case Studies', href: '/case-studies', icon: BookOpen      },
-        { label: 'Feature Gaps', href: '/product-gaps', icon: AlertTriangle },
-        { label: 'Playbook',     href: '/playbook',     icon: TrendingUp    },
-        { label: 'Models',       href: '/models',       icon: Brain         },
       ]} />
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
