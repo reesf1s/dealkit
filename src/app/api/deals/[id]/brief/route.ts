@@ -15,6 +15,12 @@ import { and, eq } from 'drizzle-orm'
 import { anthropic } from '@/lib/ai/client'
 import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
+import {
+  buildPreferredNoteCorpus,
+  buildStructuredNoteCorpus,
+  extractDatedEntries,
+  formatDatedNote,
+} from '@/lib/note-intelligence'
 import { getWorkspaceContext } from '@/lib/workspace'
 
 type DealContact = {
@@ -40,15 +46,23 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    const meetingNotes = typeof deal.meetingNotes === 'string' ? deal.meetingNotes.trim() : ''
-    const noteEntries = meetingNotes ? meetingNotes.split(/\n---\n/).map(entry => entry.trim()).filter(Boolean) : []
-    const latestMeetingNote = noteEntries.length > 0
-      ? noteEntries[noteEntries.length - 1].slice(0, 700)
+    const structuredNotes = buildStructuredNoteCorpus({
+      meetingNotes: deal.meetingNotes,
+      hubspotNotes: deal.hubspotNotes,
+      notes: typeof deal.notes === 'string' ? deal.notes : null,
+    })
+    const preferredNotes = structuredNotes || buildPreferredNoteCorpus({
+      meetingNotes: deal.meetingNotes,
+      hubspotNotes: deal.hubspotNotes,
+      notes: typeof deal.notes === 'string' ? deal.notes : null,
+    })
+    const datedEntries = extractDatedEntries(preferredNotes)
+    const latestMeetingNote = datedEntries[0] ? formatDatedNote(datedEntries[0]) : null
+    const recentEvidence = datedEntries.slice(0, 4).map(entry => `- ${formatDatedNote(entry)}`).join('\n')
+    const legacyContext = preferredNotes && datedEntries.length === 0
+      ? preferredNotes.slice(-700)
       : null
-    const uploadedNotes = typeof deal.notes === 'string' && deal.notes.trim().length > 0
-      ? deal.notes.trim().slice(-700)
-      : null
-    const hasSourceNotes = Boolean(latestMeetingNote || uploadedNotes)
+    const hasSourceNotes = Boolean(latestMeetingNote || legacyContext)
 
     // Fall back to the stored summary only when there is no note context to ground a fresh brief.
     if (!hasSourceNotes && deal.aiSummary) {
@@ -58,7 +72,6 @@ export async function GET(_req: NextRequest, { params }: Params) {
     }
 
     const dealRisks = (deal.dealRisks as string[] | null) ?? []
-    const insights = (deal.conversionInsights as string[] | null) ?? []
     const contacts = (deal.contacts as DealContact[] | null) ?? []
 
     const lines = [
@@ -69,11 +82,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
       contacts.length > 0
         ? `Contacts: ${contacts.slice(0, 3).map(contact => contact.title ? `${contact.name} (${contact.title})` : contact.name).join(', ')}`
         : null,
-      deal.nextSteps ? `Next steps: ${deal.nextSteps}` : null,
       dealRisks.length > 0 ? `Known risks: ${dealRisks.slice(0, 3).join('; ')}` : null,
-      insights.length > 0 ? `AI signals: ${insights.slice(0, 2).join('; ')}` : null,
-      latestMeetingNote ? `Latest meeting note:\n${latestMeetingNote}` : null,
-      uploadedNotes ? `Uploaded notes:\n${uploadedNotes}` : null,
+      latestMeetingNote ? `Latest dated note:\n${latestMeetingNote}` : null,
+      recentEvidence ? `Recent dated evidence (relative words refer to the note date, not today):\n${recentEvidence}` : null,
+      legacyContext ? `Legacy undated context (use cautiously, never as current momentum):\n${legacyContext}` : null,
     ].filter(Boolean).join('\n')
 
     if (!lines.trim()) {
@@ -88,7 +100,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       messages: [
         {
           role: 'user',
-          content: `You are a sales intelligence assistant. Write a concise 2–3 sentence briefing for a sales rep. Treat meeting notes and uploaded notes as the source of truth. Focus on: current status, the main blocker or opportunity, and the single most important next action. Name specific people. Do not mention task lists, success criteria, or checklist state unless the notes themselves say it. Be direct — no filler.\n\n${lines}`,
+          content: `You are a sales intelligence assistant. Write a concise 2–3 sentence briefing for a sales rep. Treat dated meeting notes as the source of truth; only use undated context as background. Focus on: current status, the main blocker or opportunity, and the single most important next action. Name specific people. Do not mention task lists, success criteria, checklist state, or stale AI summaries unless the notes themselves say it. If a note says "tomorrow" or "next week", interpret that relative to the note date, not today. Be direct — no filler.\n\n${lines}`,
         },
       ],
     })

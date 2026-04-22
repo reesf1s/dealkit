@@ -8,8 +8,15 @@ import { db } from '@/lib/db'
 import { dealLogs, companyProfiles, competitors } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
-import { getWorkspaceBrain, formatBrainContext } from '@/lib/workspace-brain'
+import { getWorkspaceBrain } from '@/lib/workspace-brain'
 import { ensureLinksColumn } from '@/lib/api-helpers'
+import {
+  buildNoteCentricBrainContext,
+  buildPreferredNoteCorpus,
+  buildStructuredNoteCorpus,
+  extractDatedEntries,
+  formatDatedNote,
+} from '@/lib/note-intelligence'
 
 function getFirstText(content: Array<{ type: string; text?: string }>): string {
   const part = content.find(item => item.type === 'text' && typeof item.text === 'string')
@@ -33,11 +40,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     ])
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     const dealComps = comps.filter(c => (deal.competitors as string[])?.includes(c.name))
-    let brainContext: string | null = null
-    if (brain) {
-      try { brainContext = formatBrainContext(brain) }
-      catch { /* non-fatal: stale/corrupt brain snapshot */ }
-    }
+    const brainContext = buildNoteCentricBrainContext(
+      brain,
+      [
+        {
+          id: deal.id,
+          dealName: deal.dealName,
+          prospectCompany: deal.prospectCompany ?? '',
+        },
+      ],
+    )
     // Extract ML prediction and churn risk for this deal from the brain
     const mlPred = brain?.mlPredictions?.find(p => p.dealId === id)
     const churnRisk = mlPred?.churnRisk
@@ -50,13 +62,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         r.toLowerCase().includes(o.theme.toLowerCase().split(' ')[0])
       )
     )
-    const meetingHistory = typeof deal.meetingNotes === 'string' ? deal.meetingNotes.trim() : ''
-    const historyEntries = meetingHistory
-      ? meetingHistory.split(/\n---\n/).map(entry => entry.trim()).filter(Boolean)
-      : []
-    const latestMeetingNote = historyEntries.length > 0 ? historyEntries[historyEntries.length - 1].slice(0, 700) : null
-    const workspaceNotes = typeof deal.notes === 'string' && deal.notes.trim().length > 0
-      ? deal.notes.trim().slice(-600)
+    const structuredNotes = buildStructuredNoteCorpus({
+      meetingNotes: deal.meetingNotes,
+      hubspotNotes: deal.hubspotNotes,
+      notes: typeof deal.notes === 'string' ? deal.notes : null,
+    })
+    const preferredNotes = structuredNotes || buildPreferredNoteCorpus({
+      meetingNotes: deal.meetingNotes,
+      hubspotNotes: deal.hubspotNotes,
+      notes: typeof deal.notes === 'string' ? deal.notes : null,
+    })
+    const datedEntries = extractDatedEntries(preferredNotes)
+    const latestMeetingNote = datedEntries[0] ? formatDatedNote(datedEntries[0]) : null
+    const recentEvidence = datedEntries.slice(0, 6).map(entry => `- ${formatDatedNote(entry)}`).join('\n')
+    const legacyContext = preferredNotes && datedEntries.length === 0
+      ? preferredNotes.slice(-700)
       : null
 
     const mlSection = [
@@ -79,14 +99,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const prompt = `You are a senior B2B sales coach. Produce a sharp, deal-specific meeting prep brief. Be direct — no filler, no generic advice. Every point must be specific to this deal.
 
 CRITICAL: Treat meeting notes and uploaded notes as the source of truth. Do not reference task lists, checklists, or success criteria unless those facts are explicitly stated in the notes themselves.
+If a note says "tomorrow", "next week", or a weekday, interpret it relative to the note date, not today.
 
 DEAL: ${deal.dealName} | ${deal.prospectName ?? 'Unknown'} at ${deal.prospectCompany} | Stage: ${deal.stage}${deal.dealValue ? ` | Value: £${deal.dealValue.toLocaleString()}` : ''}
-${deal.aiSummary ? `Status: ${deal.aiSummary}` : ''}
+${!latestMeetingNote && !recentEvidence && deal.aiSummary ? `Status fallback: ${deal.aiSummary}` : ''}
 ${mlSection ? `\nML SIGNALS:\n${mlSection}` : ''}
 ${(deal.dealRisks as string[])?.length ? `\nKnown risks: ${(deal.dealRisks as string[]).join('; ')}` : ''}
-${latestMeetingNote ? `\nLatest meeting note:\n${latestMeetingNote}` : ''}
-${meetingHistory ? `\nMeeting history:\n${meetingHistory}` : ''}
-${workspaceNotes ? `\nUploaded notes:\n${workspaceNotes}` : ''}
+${latestMeetingNote ? `\nLatest dated note:\n${latestMeetingNote}` : ''}
+${recentEvidence ? `\nRecent dated evidence:\n${recentEvidence}` : ''}
+${legacyContext ? `\nLegacy undated context (use cautiously, never as current momentum):\n${legacyContext}` : ''}
 ${company ? `\nOUR PRODUCT: ${company.companyName} — ${(company.valuePropositions as string[])?.slice(0, 3).join(' · ')}. Differentiators: ${(company.differentiators as string[])?.slice(0, 3).join(', ')}` : ''}
 ${dealComps.length > 0 ? `\nCOMPETITORS IN THIS DEAL: ${dealComps.map(c => `${c.name} (weaknesses: ${(c.weaknesses as string[])?.slice(0, 2).join(', ')})`).join('; ')}` : ''}
 ${objIntelSection}

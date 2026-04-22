@@ -26,6 +26,7 @@ import {
   formatRelativeTime,
   humanizeActivityLabel,
 } from '@/lib/presentation'
+import { buildPreferredNoteCorpus, extractDatedEntries } from '@/lib/note-intelligence'
 
 type AIOverview = {
   summary: string
@@ -94,6 +95,11 @@ type DealRecord = {
   updatedAt?: string
   aiSummary?: string | null
   nextSteps?: string | null
+  notes?: string | null
+  meetingNotes?: string | null
+  hubspotNotes?: string | null
+  dealRisks?: string[] | null
+  closeDate?: string | null
   forecastCategory?: 'commit' | 'upside' | 'pipeline' | 'omit' | null
   todos?: Array<{ id: string; text: string; done: boolean }> | null
 }
@@ -126,7 +132,18 @@ type AttentionItem = {
   urgency: 'high' | 'medium'
   value?: number | null
   score?: number | null
+  lastNoteAt?: string | null
   updatedAt?: string
+}
+
+type LatestNoteMeta = {
+  at: string | null
+  summary: string | null
+  daysSince: number | null
+}
+
+type RankedAttentionItem = AttentionItem & {
+  sortKey: number
 }
 
 function todayLabel() {
@@ -145,6 +162,30 @@ function stageLabel(stage?: string | null) {
 
 function compactMoney(value: number | null | undefined) {
   return formatCurrencyGBP(value, { compact: true })
+}
+
+function extractLatestNoteMeta(deal: DealRecord): LatestNoteMeta {
+  const allNotes = buildPreferredNoteCorpus({
+    meetingNotes: deal.meetingNotes,
+    hubspotNotes: deal.hubspotNotes,
+    notes: deal.notes,
+  })
+  if (!allNotes.trim()) return { at: null, summary: null, daysSince: null }
+
+  const latest = extractDatedEntries(allNotes)[0]
+
+  if (!latest) return { at: null, summary: null, daysSince: null }
+
+  const cleaned = latest.text
+    .replace(/^\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return {
+    at: latest.date.toISOString(),
+    summary: cleaned ? cleaned.charAt(0).toUpperCase() + cleaned.slice(1) : null,
+    daysSince: Math.round((Date.now() - latest.date.getTime()) / 86_400_000),
+  }
 }
 
 function greetingForHour(hour: number) {
@@ -183,7 +224,13 @@ function AttentionRow({ item }: { item: AttentionItem }) {
           {item.value ? <span className="overview-row-chip mono">{compactMoney(item.value)}</span> : null}
         </div>
         <div className="overview-row-body">{item.reason}</div>
-        <div className="overview-row-meta">{item.updatedAt ? `Updated ${formatRelativeTime(item.updatedAt)}` : 'In the focus queue'}</div>
+        <div className="overview-row-meta">
+          {item.lastNoteAt
+            ? `Latest note ${formatRelativeTime(item.lastNoteAt)}`
+            : item.updatedAt
+              ? `Updated ${formatRelativeTime(item.updatedAt)}`
+              : 'In the focus queue'}
+        </div>
       </div>
       <ChevronRight size={14} strokeWidth={1.8} />
     </Link>
@@ -302,62 +349,89 @@ export default function DashboardPage() {
   }, [brain.pipeline?.stageBreakdown, openDeals])
 
   const attentionItems = useMemo<AttentionItem[]>(() => {
-    const seen = new Set<string>()
+    const overviewAttentionDeals = overview?.topAttentionDeals ?? []
     const dealMap = new Map(openDeals.map(deal => [deal.id, deal]))
-    const next: AttentionItem[] = []
+    if (overviewAttentionDeals.length > 0) {
+      return overviewAttentionDeals.slice(0, 5).map(item => {
+        const deal = dealMap.get(item.dealId)
+        const noteMeta = deal ? extractLatestNoteMeta(deal) : { at: null, summary: null, daysSince: null }
+        return {
+          dealId: item.dealId,
+          company: deal?.prospectCompany ?? item.company ?? item.dealName,
+          stage: deal?.stage ?? '',
+          reason: item.reason,
+          urgency: item.urgency,
+          value: deal?.dealValue,
+          score: deal?.conversionScore,
+          lastNoteAt: noteMeta.at,
+          updatedAt: deal?.updatedAt,
+        }
+      })
+    }
 
-    for (const item of overview?.topAttentionDeals ?? []) {
-      if (seen.has(item.dealId)) continue
-      const deal = dealMap.get(item.dealId)
-      next.push({
+    const fallbackItems: RankedAttentionItem[] = openDeals
+      .map(deal => {
+        const noteMeta = extractLatestNoteMeta(deal)
+        const risk = deal.dealRisks?.[0] ?? null
+        const closeDate = deal.closeDate ? new Date(deal.closeDate) : null
+        const daysToClose = closeDate && !Number.isNaN(closeDate.getTime())
+          ? Math.round((closeDate.getTime() - Date.now()) / 86_400_000)
+          : null
+
+        let reason: string | null = null
+        let urgency: 'high' | 'medium' = 'medium'
+        let sortKey = 0
+
+        if (risk && noteMeta.daysSince != null) {
+          reason = `${risk} Latest note was ${noteMeta.daysSince}d ago${noteMeta.summary ? ` — ${noteMeta.summary.slice(0, 72)}${noteMeta.summary.length > 72 ? '…' : ''}` : ''}`
+          urgency = noteMeta.daysSince > 10 ? 'high' : 'medium'
+          sortKey = 100 - (deal.conversionScore ?? 50) + Math.max(noteMeta.daysSince, 0)
+        } else if (daysToClose != null && daysToClose <= 14 && noteMeta.summary) {
+          reason = `Close date in ${daysToClose}d. Latest dated note: ${noteMeta.summary.slice(0, 88)}${noteMeta.summary.length > 88 ? '…' : ''}`
+          urgency = daysToClose <= 7 ? 'high' : 'medium'
+          sortKey = 80 - Math.max(daysToClose, 0)
+        } else if (noteMeta.daysSince != null && noteMeta.daysSince >= 14 && noteMeta.summary) {
+          reason = `No new note for ${noteMeta.daysSince}d. Last recorded context: ${noteMeta.summary.slice(0, 88)}${noteMeta.summary.length > 88 ? '…' : ''}`
+          urgency = noteMeta.daysSince >= 21 ? 'high' : 'medium'
+          sortKey = noteMeta.daysSince
+        } else if (deal.nextSteps && noteMeta.daysSince != null && noteMeta.daysSince >= 7) {
+          reason = `Latest next step still reads: ${deal.nextSteps}`
+          urgency = 'medium'
+          sortKey = noteMeta.daysSince
+        }
+
+        if (!reason) return null
+
+        return {
+              dealId: deal.id,
+              company: deal.prospectCompany,
+              stage: deal.stage,
+              reason,
+              urgency,
+              value: deal.dealValue,
+              score: deal.conversionScore,
+              lastNoteAt: noteMeta.at,
+              updatedAt: deal.updatedAt,
+              sortKey,
+            }
+      })
+      .flatMap(item => (item ? [item] : []))
+
+    return fallbackItems
+      .sort((left, right) => right.sortKey - left.sortKey)
+      .slice(0, 5)
+      .map(item => ({
         dealId: item.dealId,
-        company: deal?.prospectCompany ?? item.company ?? item.dealName,
-        stage: deal?.stage ?? '',
+        company: item.company,
+        stage: item.stage,
         reason: item.reason,
         urgency: item.urgency,
-        value: deal?.dealValue,
-        score: deal?.conversionScore,
-        updatedAt: deal?.updatedAt,
-      })
-      seen.add(item.dealId)
-    }
-
-    for (const item of brain.urgentDeals ?? []) {
-      if (seen.has(item.dealId)) continue
-      const deal = dealMap.get(item.dealId)
-      next.push({
-        dealId: item.dealId,
-        company: deal?.prospectCompany ?? item.company,
-        stage: deal?.stage ?? '',
-        reason: item.topAction ?? item.reason,
-        urgency: 'high',
-        value: deal?.dealValue,
-        score: deal?.conversionScore,
-        updatedAt: deal?.updatedAt,
-      })
-      seen.add(item.dealId)
-      if (next.length >= 5) break
-    }
-
-    for (const item of brain.staleDeals ?? []) {
-      if (seen.has(item.dealId)) continue
-      const deal = dealMap.get(item.dealId)
-      next.push({
-        dealId: item.dealId,
-        company: deal?.prospectCompany ?? item.company,
-        stage: deal?.stage ?? '',
-        reason: `${item.daysSinceUpdate} days without a meaningful update.`,
-        urgency: item.daysSinceUpdate > 14 ? 'high' : 'medium',
-        value: deal?.dealValue,
-        score: deal?.conversionScore,
-        updatedAt: deal?.updatedAt,
-      })
-      seen.add(item.dealId)
-      if (next.length >= 5) break
-    }
-
-    return next.slice(0, 5)
-  }, [brain.staleDeals, brain.urgentDeals, openDeals, overview?.topAttentionDeals])
+        value: item.value,
+        score: item.score,
+        lastNoteAt: item.lastNoteAt,
+        updatedAt: item.updatedAt,
+      }))
+  }, [openDeals, overview?.topAttentionDeals])
 
   const upcomingEvents = useMemo(() => {
     const now = new Date()
@@ -408,7 +482,6 @@ export default function DashboardPage() {
 
     return notes.slice(0, 3)
   }, [brain.keyPatterns, brain.productGapPriority, overview?.topRisk])
-
   useEffect(() => {
     if (overview || overviewLoading || overviewAutoRequested.current) return
     overviewAutoRequested.current = true

@@ -7,8 +7,22 @@ import { dbErrResponse, ensureLinksColumn } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { anthropic } from '@/lib/ai/client'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
-import { getWorkspaceBrain, formatBrainContext } from '@/lib/workspace-brain'
-import { parseMeetingEntries } from '@/lib/text-signals'
+import { getWorkspaceBrain, type WorkspaceBrain } from '@/lib/workspace-brain'
+import {
+  buildNoteCentricBrainContext,
+  buildPreferredNoteCorpus,
+  buildStructuredNoteCorpus,
+  daysSince,
+  extractDatedEntries,
+  formatDatedNote,
+  sentenceCase,
+  stripDatePrefix,
+} from '@/lib/note-intelligence'
+
+const OVERVIEW_VERSION = 4
+const MS_PER_DAY = 86_400_000
+const CURRENT_SIGNAL_WINDOW_DAYS = 10
+const NOTE_CONTEXT_WINDOW_DAYS = 30
 
 type PipelineConfig = {
   stages?: Array<{ id: string; label: string }>
@@ -18,11 +32,6 @@ type ScheduledEvent = {
   date?: string | null
   description?: string
   time?: string | null
-}
-
-type IntentSignals = {
-  budgetStatus?: string | null
-  championStatus?: string | null
 }
 
 // Safe date construction — never throws "Invalid time value"
@@ -51,6 +60,7 @@ async function loadStageLabels(workspaceId: string): Promise<Record<string, stri
 }
 
 export type AIOverview = {
+  version?: number
   summary: string
   keyActions: string[]
   focusBullets: string[]
@@ -61,6 +71,80 @@ export type AIOverview = {
   briefingHealth: 'green' | 'amber' | 'red'
   topAttentionDeals: { dealId: string; dealName: string; company: string; reason: string; urgency: 'high' | 'medium' }[]
   singleMostImportantAction: string
+}
+
+type DealSignalMeta = {
+  dealId: string
+  dealName: string
+  company: string
+  stage: string
+  dealValue: number
+  conversionScore: number | null
+  closeDate: string | null
+  lastNoteAt: string | null
+  daysSinceLastNote: number | null
+  lastNoteSummary: string | null
+  topRisk: string | null
+  futureEventText: string | null
+  futureEventAt: string | null
+  scoreShift: { delta: number; from: number; to: number; days: number } | null
+}
+
+function recentScoreShift(
+  history: WorkspaceBrain['deals'][number]['scoreHistory'] | undefined,
+  nowMs = Date.now(),
+): { delta: number; from: number; to: number; days: number } | null {
+  if (!history || history.length < 2) return null
+  const recent = history
+    .map(point => ({ ...point, dateObj: safeDate(point.date) }))
+    .filter((point): point is typeof point & { dateObj: Date } => point.dateObj !== null && nowMs - point.dateObj.getTime() <= CURRENT_SIGNAL_WINDOW_DAYS * MS_PER_DAY)
+    .sort((left, right) => left.dateObj.getTime() - right.dateObj.getTime())
+
+  if (recent.length < 2) return null
+  const first = recent[0]
+  const last = recent[recent.length - 1]
+  const delta = last.score - first.score
+  if (Math.abs(delta) < 8) return null
+
+  return {
+    delta,
+    from: first.score,
+    to: last.score,
+    days: Math.max(1, Math.round((last.dateObj.getTime() - first.dateObj.getTime()) / MS_PER_DAY)),
+  }
+}
+
+function deriveFreshMomentum(signalMeta: DealSignalMeta[]): string | null {
+  const candidates = signalMeta
+    .filter(item =>
+      (item.daysSinceLastNote != null && item.daysSinceLastNote <= CURRENT_SIGNAL_WINDOW_DAYS) ||
+      item.futureEventAt !== null,
+    )
+    .map(item => {
+      let text: string | null = null
+      if (item.scoreShift && item.futureEventText) {
+        const delta = item.scoreShift.delta >= 0 ? `+${item.scoreShift.delta}` : `${item.scoreShift.delta}`
+        text = `${item.dealName} ${delta}pts (${item.scoreShift.from}→${item.scoreShift.to}) over ${item.scoreShift.days}d — ${item.futureEventText}.`
+      } else if (item.futureEventText) {
+        text = `${item.dealName}: ${item.futureEventText}.`
+      } else if (item.lastNoteSummary) {
+        text = `${item.dealName}: ${sentenceCase(item.lastNoteSummary)}`
+      }
+
+      const freshnessBoost = item.daysSinceLastNote == null ? 0 : Math.max(0, CURRENT_SIGNAL_WINDOW_DAYS - item.daysSinceLastNote)
+      const eventBoost = item.futureEventAt ? 18 : 0
+      const shiftBoost = item.scoreShift ? Math.abs(item.scoreShift.delta) : 0
+      const valueBoost = Math.min(item.dealValue / 10_000, 20)
+
+      return {
+        text,
+        sortKey: freshnessBoost + eventBoost + shiftBoost + valueBoost,
+      }
+    })
+    .filter((item): item is { text: string; sortKey: number } => Boolean(item.text))
+    .sort((left, right) => right.sortKey - left.sortKey)
+
+  return candidates[0]?.text ?? null
 }
 
 async function generateOverview(workspaceId: string): Promise<AIOverview> {
@@ -79,6 +163,10 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
   const closedCount = wonDeals.length + lostDeals.length
   const winRate = closedCount > 0 ? Math.round((wonDeals.length / closedCount) * 100) : 0
   const totalPipelineValue = openDeals.reduce((sum, d) => sum + (d.dealValue ?? 0), 0)
+  const nowMs = Date.now()
+  const brain = await getWorkspaceBrain(workspaceId)
+  const brainDealMap = new Map((brain?.deals ?? []).map(deal => [deal.id, deal]))
+  const dealSignalMeta: DealSignalMeta[] = []
 
   // Stage breakdown
   const stageMap: Record<string, { count: number; value: number }> = {}
@@ -101,50 +189,72 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
   const confirmationKeywords = /\b(confirmed|scheduled|booked|agreed|arranged|set up|locked in)\b/i
 
   const dealContexts = openDeals.slice(0, 12).map(d => {
-    const allNotes = [d.meetingNotes, d.hubspotNotes, typeof d.notes === 'string' ? d.notes : null]
-      .filter(Boolean)
-      .join('\n---\n')
-    const entries = parseMeetingEntries(allNotes)
-    const sortedEntries = entries
-      .filter(e => e.date && !isNaN(e.date.getTime()))
-      .sort((a, b) => (b.date!.getTime() - a.date!.getTime()))
+    const structuredNotes = buildStructuredNoteCorpus({
+      meetingNotes: d.meetingNotes,
+      hubspotNotes: d.hubspotNotes,
+      notes: typeof d.notes === 'string' ? d.notes : null,
+    })
+    const preferredNotes = structuredNotes || buildPreferredNoteCorpus({
+      meetingNotes: d.meetingNotes,
+      hubspotNotes: d.hubspotNotes,
+      notes: typeof d.notes === 'string' ? d.notes : null,
+    })
+    const sortedEntries = extractDatedEntries(preferredNotes)
     const lastEntry = sortedEntries[0]
     const lastNoteDate = lastEntry?.date ? lastEntry.date.toISOString().split('T')[0] : null
-    const daysSinceLastNote = lastEntry?.date
-      ? Math.round((Date.now() - lastEntry.date.getTime()) / 86400000)
-      : null
-    const lastNoteOneLiner = lastEntry?.text
-      ? lastEntry.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().slice(0, 120)
-      : null
-    const recentNotes = sortedEntries.slice(0, 3).map(entry => {
-      const dateStr = entry.date
-        ? entry.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-        : '?'
-      const summary = entry.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().slice(0, 140)
-      return `${dateStr}: ${summary}`
-    })
-    const uploadedNotes = typeof d.notes === 'string' && d.notes.trim().length > 0
-      ? d.notes.trim().slice(-600)
-      : null
+    const daysSinceLastNote = lastEntry?.date ? daysSince(lastEntry.date, nowMs) : null
+    const lastNoteOneLiner = lastEntry?.text ? stripDatePrefix(lastEntry.text).slice(0, 120) : null
+    const contextualEntries = sortedEntries.filter(entry => nowMs - entry.date.getTime() <= NOTE_CONTEXT_WINDOW_DAYS * MS_PER_DAY)
+    const currentEntries = contextualEntries.filter(entry => nowMs - entry.date.getTime() <= CURRENT_SIGNAL_WINDOW_DAYS * MS_PER_DAY)
+    const noteEvidence = (currentEntries.length > 0 ? currentEntries : contextualEntries).slice(0, 3)
+    const legacyContext = preferredNotes && noteEvidence.length === 0 ? preferredNotes.slice(-240) : null
     const dealRisks = (d.dealRisks as string[]) ?? []
     const scheduledEvents = (d.scheduledEvents as ScheduledEvent[] | null) ?? []
     const upcomingEvents = scheduledEvents
       .filter(event => {
         const eventDate = safeDate(event.date)
-        return eventDate !== null && eventDate.getTime() >= Date.now() - 7 * 86400000
+        return eventDate !== null && eventDate.getTime() >= nowMs - 7 * MS_PER_DAY
       })
       .slice(0, 5)
-    const recentConfirmationNotes = sortedEntries
+    const recentConfirmationNotes = noteEvidence
       .slice(0, 5)
-      .map(entry => entry.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().split(/[.\n]/)[0].trim())
+      .map(entry => {
+        const dateLabel = entry.date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+        const sentence = stripDatePrefix(entry.text).split(/[.\n]/)[0].trim()
+        return `${dateLabel}: ${sentence}`
+      })
       .filter(sentence => confirmationKeywords.test(sentence))
       .slice(0, 3)
+    const primaryFutureEvent = upcomingEvents[0]
+    const primaryFutureEventText = primaryFutureEvent
+      ? `${primaryFutureEvent.description ?? 'Upcoming meeting'} on ${safeDate(primaryFutureEvent.date)?.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) ?? primaryFutureEvent.date}`
+      : null
+
+    dealSignalMeta.push({
+      dealId: d.id,
+      dealName: d.dealName,
+      company: d.prospectCompany ?? '',
+      stage: d.stage,
+      dealValue: d.dealValue ?? 0,
+      conversionScore: d.conversionScore ?? null,
+      closeDate: safeDate(d.closeDate)?.toISOString() ?? null,
+      lastNoteAt: lastEntry?.date?.toISOString() ?? null,
+      daysSinceLastNote,
+      lastNoteSummary: lastNoteOneLiner,
+      topRisk: dealRisks[0] ?? null,
+      futureEventText: primaryFutureEventText,
+      futureEventAt: safeDate(primaryFutureEvent?.date)?.toISOString() ?? null,
+      scoreShift: recentScoreShift(brainDealMap.get(d.id)?.scoreHistory, nowMs),
+    })
 
     const parts = [
       `- "${d.dealName}" @ ${d.prospectCompany} | Stage: ${sl(d.stage)} | Value: ${fmt(d.dealValue ?? 0)} | Score: ${d.conversionScore ?? 'N/A'} | Close: ${safeDate(d.closeDate)?.toLocaleDateString('en-GB') ?? 'TBD'} | Competitors: ${((d.competitors as string[]) ?? []).join(', ') || 'none'}`,
       dealRisks[0] ? `  Primary blocker: ${dealRisks[0]}` : null,
       daysSinceLastNote != null ? `  Days since last note: ${daysSinceLastNote}` : null,
       lastNoteDate && lastNoteOneLiner ? `  Latest note (${lastNoteDate}): "${lastNoteOneLiner}"` : null,
+      daysSinceLastNote != null && daysSinceLastNote > CURRENT_SIGNAL_WINDOW_DAYS
+        ? `  NOTE RECENCY WARNING: latest dated note is ${daysSinceLastNote} days old — treat older notes as history, not current momentum.`
+        : null,
       d.nextSteps ? `  Latest stated next step: ${d.nextSteps}` : null,
       upcomingEvents.length > 0
         ? `  CONFIRMED EVENTS (already booked — do NOT re-suggest):\n${upcomingEvents.map(event => `    - ${event.description ?? 'event'}${event.date ? ` — ${event.date}` : ''}${event.time ? ` ${event.time}` : ''}`).join('\n')}`
@@ -152,10 +262,12 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
       recentConfirmationNotes.length > 0
         ? `  CONFIRMED IN NOTES (already done — do NOT re-suggest):\n${recentConfirmationNotes.map(note => `    - "${note}"`).join('\n')}`
         : null,
-      recentNotes.length > 0
-        ? `  Recent note evidence:\n${recentNotes.map(note => `    - ${note}`).join('\n')}`
+      noteEvidence.length > 0
+        ? `  DATED NOTE EVIDENCE (relative words like "tomorrow" or "next week" refer to the note date, not today):\n${noteEvidence.map(note => `    - ${formatDatedNote(note, nowMs)}`).join('\n')}`
         : null,
-      uploadedNotes ? `  Uploaded notes:\n    ${uploadedNotes}` : null,
+      legacyContext
+        ? `  LEGACY CONTEXT (undated — use cautiously and never as current momentum): ${legacyContext}`
+        : null,
     ]
 
     return parts.filter(Boolean).join('\n')
@@ -187,128 +299,71 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
     activeCompetitors.join(', ') || 'None',
   ].join('\n')
 
-  // Enrich context with workspace brain if available (includes per-deal summaries + risks from analyze-notes)
-  const brain = await getWorkspaceBrain(workspaceId)
-  let brainContext = ''
-  if (brain) {
-    try {
-      const baseBrainCtx = formatBrainContext(brain, Object.keys(stageLabels).length > 0 ? stageLabels : undefined)
-
-      // Churn risk alerts — deals overdue for follow-up
-      const churnAlerts = (brain.mlPredictions ?? [])
-        .filter(p => (p.churnRisk ?? 0) >= 65)
-        .sort((a, b) => (b.churnRisk ?? 0) - (a.churnRisk ?? 0))
-        .slice(0, 5)
-      const churnCtx = churnAlerts.length > 0
-        ? `\nCHURN RISK ALERTS:\n${churnAlerts.map(p => {
-            const deal = openDeals.find(d => d.id === p.dealId)
-            return `- ${deal?.dealName ?? p.dealId}: ${p.churnRisk}% churn risk${p.churnDaysOverdue ? ` (${p.churnDaysOverdue}d overdue)` : ''}`
-          }).join('\n')}`
-        : ''
-
-      // Product gap win rate deltas
-      const gapDeltas = (brain.productGapPriority ?? [])
-        .filter(g => typeof g.winRateDelta === 'number' && g.winRateDelta <= -10)
-        .slice(0, 3)
-      const gapCtx = gapDeltas.length > 0
-        ? `\nPRODUCT GAPS HURTING WIN RATE:\n${gapDeltas.map(g =>
-            `- "${g.title}": ${g.winRateWithGap}% win rate with gap vs ${g.winRateWithoutGap}% without (▼${Math.abs(g.winRateDelta!)}pts impact)`
-          ).join('\n')}`
-        : ''
-
-      brainContext = `\n\nDEAL INTELLIGENCE (from meeting analysis):\n${baseBrainCtx}${churnCtx}${gapCtx}`
-    }
-    catch { /* non-fatal: stale/corrupt brain snapshot */ }
-  }
+  const brainContext = buildNoteCentricBrainContext(brain, openDeals)
+  const freshMomentum = deriveFreshMomentum(dealSignalMeta)
 
   // --- Deterministic: topAttentionDeals ---
   const predictions = brain?.mlPredictions ?? []
   type AttentionDeal = { dealId: string; dealName: string; company: string; reason: string; urgency: 'high' | 'medium'; _sortKey: number }
-  const nowMs = Date.now()
-  const attentionDeals: AttentionDeal[] = []
-  for (const d of openDeals) {
-    const pred = predictions.find(p => p.dealId === d.id)
-    const churnRisk = pred?.churnRisk ?? 0
-    const score = d.conversionScore ?? 100
-    const closeDateMs = safeDate(d.closeDate)?.getTime() ?? null
-    const daysToClose = closeDateMs != null ? Math.round((closeDateMs - nowMs) / 86400000) : null
-    const closeSoon = daysToClose != null && daysToClose <= 14 && !['negotiation', 'closed_won', 'closed_lost'].includes(d.stage)
-
-    if (churnRisk >= 65 || score <= 30 || closeSoon) {
-      let reason: string
-      let urgency: 'high' | 'medium'
-      let sortKey: number
-
-      // Build deal-specific signal fragments
-      const intentSignals = d.intentSignals as IntentSignals | null
-      const budgetStatus = intentSignals?.budgetStatus
-      const championStatus = intentSignals?.championStatus
-      const dealRisks = (d.dealRisks as string[]) ?? []
-      const dealCompetitors = (d.competitors as string[]) ?? []
-      const stageLabel = sl(d.stage)
-      const noteEntries = parseMeetingEntries([d.meetingNotes, d.hubspotNotes, typeof d.notes === 'string' ? d.notes : null].filter(Boolean).join('\n---\n'))
-      const sortedNoteEntries = noteEntries
-        .filter(entry => entry.date && !isNaN(entry.date.getTime()))
-        .sort((a, b) => (b.date!.getTime() - a.date!.getTime()))
-      const lastNote = sortedNoteEntries[0]?.text
-        ? sortedNoteEntries[0].text.replace(/^\[.*?\]\s*/, '').trim().slice(0, 80)
-        : null
-      const daysSinceNote = sortedNoteEntries[0]?.date
-        ? Math.round((Date.now() - sortedNoteEntries[0].date!.getTime()) / 86400000)
+  const attentionDeals: AttentionDeal[] = dealSignalMeta
+    .map(meta => {
+      const prediction = predictions.find(item => item.dealId === meta.dealId)
+      const closeDateMs = safeDate(meta.closeDate)?.getTime() ?? null
+      const daysToClose = closeDateMs != null ? Math.round((closeDateMs - nowMs) / MS_PER_DAY) : null
+      const stageName = sl(meta.stage)
+      const valueBoost = Math.min(meta.dealValue / 12_500, 18)
+      const lastNoteSnippet = meta.lastNoteSummary
+        ? `${meta.lastNoteSummary.slice(0, 88)}${meta.lastNoteSummary.length > 88 ? '…' : ''}`
         : null
 
-      // Compose signal-rich reason text
-      const signals: string[] = []
-      if (churnRisk >= 65) {
-        const overdue = pred?.churnDaysOverdue ?? 0
-        signals.push(`${churnRisk}% churn risk, ${overdue}d since last contact`)
-        if (budgetStatus === 'not_discussed' || !budgetStatus) signals.push('budget never confirmed')
-        if (championStatus === 'none' || !championStatus) signals.push('no champion identified')
-        if (dealRisks.length > 0) signals.push(dealRisks[0].slice(0, 60))
-        if (dealCompetitors.length > 0) signals.push(`competing with ${dealCompetitors[0]}`)
-        urgency = 'high'
-        sortKey = churnRisk * 1000
-      } else if (score <= 30) {
-        signals.push(`score ${score}/100 in ${stageLabel}`)
-        if (budgetStatus === 'not_discussed' || !budgetStatus) signals.push('budget unconfirmed')
-        if (budgetStatus === 'blocked') signals.push('budget blocked')
-        if (championStatus === 'none' || !championStatus) signals.push('no champion')
-        if (dealCompetitors.length > 0) signals.push(`${dealCompetitors[0]} in evaluation`)
-        if (dealRisks.length > 0) signals.push(dealRisks[0].slice(0, 60))
-        if (daysSinceNote != null) signals.push(`${daysSinceNote}d since last note`)
-        urgency = score <= 20 ? 'high' : 'medium'
-        sortKey = (100 - score) * 100
-      } else {
-        // closeSoon
-        signals.push(`close date in ${daysToClose}d, still in ${stageLabel}`)
-        if (budgetStatus === 'not_discussed' || !budgetStatus) signals.push('budget not confirmed')
-        if (budgetStatus === 'blocked') signals.push('budget blocked')
-        if (championStatus === 'none' || !championStatus) signals.push('no champion identified')
-        if (dealCompetitors.length > 0) signals.push(`${dealCompetitors[0]} competing`)
-        if (daysSinceNote != null) signals.push(`${daysSinceNote}d since last note`)
+      let reason: string | null = null
+      let urgency: 'high' | 'medium' = 'medium'
+      let sortKey = 0
+
+      if (meta.topRisk && meta.daysSinceLastNote != null && meta.daysSinceLastNote <= 14) {
+        reason = `${sentenceCase(meta.topRisk)} Latest dated note was ${meta.daysSinceLastNote}d ago${lastNoteSnippet ? `: ${lastNoteSnippet}` : ''}`
+        urgency = meta.daysSinceLastNote <= 7 ? 'high' : 'medium'
+        sortKey = 140 + Math.max(0, 14 - meta.daysSinceLastNote) + valueBoost
+      } else if (meta.scoreShift && meta.scoreShift.delta < 0 && meta.daysSinceLastNote != null && meta.daysSinceLastNote <= 10) {
+        reason = `Score dropped ${Math.abs(meta.scoreShift.delta)}pts (${meta.scoreShift.from}→${meta.scoreShift.to}) over ${meta.scoreShift.days}d in ${stageName}${lastNoteSnippet ? ` — ${lastNoteSnippet}` : ''}`
+        urgency = Math.abs(meta.scoreShift.delta) >= 14 ? 'high' : 'medium'
+        sortKey = 130 + Math.abs(meta.scoreShift.delta) + valueBoost
+      } else if (daysToClose != null && daysToClose <= 14 && meta.daysSinceLastNote != null) {
+        reason = `Close date in ${daysToClose}d, but latest dated note is ${meta.daysSinceLastNote}d old${lastNoteSnippet ? ` — ${lastNoteSnippet}` : ''}`
+        urgency = daysToClose <= 7 || meta.daysSinceLastNote >= 14 ? 'high' : 'medium'
+        sortKey = 120 + Math.max(0, 14 - daysToClose) + Math.max(0, meta.daysSinceLastNote - 6) + valueBoost
+      } else if (meta.daysSinceLastNote != null && meta.daysSinceLastNote >= 14 && lastNoteSnippet) {
+        reason = `No fresh dated note for ${meta.daysSinceLastNote}d. Last recorded context: ${lastNoteSnippet}`
+        urgency = meta.daysSinceLastNote >= 21 ? 'high' : 'medium'
+        sortKey = 110 + meta.daysSinceLastNote + valueBoost
+      } else if (meta.futureEventText && meta.topRisk) {
+        reason = `Before ${meta.futureEventText.toLowerCase()}, resolve ${meta.topRisk.toLowerCase()}`
         urgency = 'medium'
-        sortKey = daysToClose != null ? (14 - daysToClose) * 10 : 0
+        sortKey = 105 + valueBoost
+      } else if (meta.topRisk && lastNoteSnippet) {
+        reason = `${sentenceCase(meta.topRisk)}${meta.daysSinceLastNote != null ? ` Latest evidence ${meta.daysSinceLastNote}d ago` : ''}${lastNoteSnippet ? `: ${lastNoteSnippet}` : ''}`
+        urgency = 'medium'
+        sortKey = 95 + valueBoost
+      } else if ((prediction?.churnRisk ?? 0) >= 70 && lastNoteSnippet) {
+        reason = `${prediction?.churnRisk}% churn risk with no stronger fresh signal. Latest dated note: ${lastNoteSnippet}`
+        urgency = 'medium'
+        sortKey = 85 + ((prediction?.churnRisk ?? 0) / 5)
       }
 
-      // Build sentence: lead with stage + primary trigger, then supporting signals
-      const signalStr = signals.slice(0, 3).join('; ')
-      reason = signalStr.charAt(0).toUpperCase() + signalStr.slice(1) + '.'
-      if (lastNote && reason.length < 80) {
-        reason = `${reason} Last note: "${lastNote.slice(0, 60)}${lastNote.length > 60 ? '…' : ''}"`
-      }
+      if (!reason) return null
 
-      attentionDeals.push({
-        dealId: d.id,
-        dealName: d.dealName,
-        company: d.prospectCompany ?? '',
+      return {
+        dealId: meta.dealId,
+        dealName: meta.dealName,
+        company: meta.company,
         reason,
         urgency,
         _sortKey: sortKey,
-      })
-    }
-  }
+      }
+    })
+    .flatMap(item => (item ? [item] : []))
   attentionDeals.sort((a, b) => b._sortKey - a._sortKey)
-  const topAttentionDeals = attentionDeals.slice(0, 3).map(item => ({
+  const topAttentionDeals = attentionDeals.slice(0, 5).map(item => ({
     dealId: item.dealId,
     dealName: item.dealName,
     company: item.company,
@@ -396,6 +451,8 @@ BAD: "Confirm BOE QA call for Monday" (already in notes as confirmed)
 GOOD: "Prepare QA test scenarios for the BOE Monday call — ensure the floor plan data covers all 3 buildings Phil mentioned."
 - "pipelineHealth": string — a short phrase rating overall health (e.g. "Strong — 3 deals in late stage", "Caution — pipeline stagnating", "Healthy — £120k in negotiation").
 - "momentum": string | null — one short positive signal or win to note, or null if there is none. If a deal's score improved, include the delta and before/after: e.g. "BOE +18pts (74→92%) — POC trial started". Never use vague phrases like "Engagement strengthening"; cite the specific event.
+- Only treat note evidence from the last ${CURRENT_SIGNAL_WINDOW_DAYS} days as current momentum. Older notes are historical context only.
+- Never interpret "tomorrow", "next week", or weekday references in notes as relative to today unless an absolute future scheduled event confirms them.
 - "topRisk": string | null — the single biggest risk or blocker across the pipeline, or null if pipeline is empty or risk-free.
 - "singleMostImportantAction": string — one sentence describing the single most impactful action the rep should take today, chosen from the full context. Must be specific, start with a verb, reference a specific deal or person, and be under 20 words.`,
       messages: [{ role: 'user', content: `Pipeline data for ${today}:\n\n${contextStr}${brainContext}` }],
@@ -437,22 +494,16 @@ GOOD: "Prepare QA test scenarios for the BOE Monday call — ensure the floor pl
       }
     }
     // Collect confirmation notes from meeting notes
-    const allNotes = [d.meetingNotes, d.hubspotNotes, typeof d.notes === 'string' ? d.notes : null].filter(Boolean).join('\n---\n')
-    const noteEntries = parseMeetingEntries(allNotes)
-    const sortedNotes = noteEntries.filter(e => e.date && !isNaN(e.date.getTime())).sort((a, b) => (b.date!.getTime() - a.date!.getTime()))
+    const preferredNotes = buildPreferredNoteCorpus({
+      meetingNotes: d.meetingNotes,
+      hubspotNotes: d.hubspotNotes,
+      notes: typeof d.notes === 'string' ? d.notes : null,
+    })
+    const sortedNotes = extractDatedEntries(preferredNotes)
     for (const entry of sortedNotes.slice(0, 5)) {
-      const firstSentence = entry.text.replace(/\[?\d{4}[-/]\d{1,2}[-/]\d{1,2}\]?\s*/, '').trim().split(/[.\n]/)[0].trim()
+      const firstSentence = stripDatePrefix(entry.text).split(/[.\n]/)[0].trim()
       if (confirmKw.test(firstSentence)) {
         confirmedNoteTexts.push(`${d.dealName}: ${firstSentence}`)
-      }
-    }
-    // Also check the raw notes field (populated by Ask AI interactions)
-    const rawNotes = (d.notes || '').trim()
-    if (rawNotes && confirmKw.test(rawNotes)) {
-      // Extract sentences containing confirmation keywords
-      const sentences = rawNotes.split(/[.\n]/).filter((s: string) => confirmKw.test(s))
-      for (const s of sentences.slice(0, 3)) {
-        confirmedNoteTexts.push(`${d.dealName}: ${s.trim().slice(0, 120)}`)
       }
     }
   }
@@ -539,18 +590,26 @@ GOOD: "Prepare QA test scenarios for the BOE Monday call — ensure the floor pl
 
   const rawActions: string[] = Array.isArray(parsed.keyActions) ? parsed.keyActions.map(String) : []
   const dedupedActions = rawActions.filter(a => !isDuplicate(a))
+  const rawSingleAction = String(parsed.singleMostImportantAction ?? '')
+  const singleMostImportantAction =
+    rawSingleAction && !isDuplicate(rawSingleAction)
+      ? rawSingleAction
+      : topAttentionDeals[0]
+        ? `Review ${topAttentionDeals[0].dealName} — ${topAttentionDeals[0].reason.slice(0, 90)}`
+        : 'Review your pipeline and update deal statuses.'
 
   return {
+    version: OVERVIEW_VERSION,
     summary: String(parsed.summary ?? ''),
     keyActions: dedupedActions,
     focusBullets,
     pipelineHealth: String(parsed.pipelineHealth ?? ''),
-    momentum: parsed.momentum ? String(parsed.momentum) : null,
+    momentum: freshMomentum,
     topRisk: parsed.topRisk ? String(parsed.topRisk) : null,
     generatedAt: new Date().toISOString(),
     briefingHealth,
     topAttentionDeals,
-    singleMostImportantAction: String(parsed.singleMostImportantAction ?? ''),
+    singleMostImportantAction,
   }
 }
 
@@ -568,7 +627,7 @@ export async function GET() {
     }>(sql`SELECT ai_overview, ai_overview_generated_at FROM workspaces WHERE id = ${workspaceId} LIMIT 1`)
 
     const row = rows[0]
-    if (row?.ai_overview) {
+    if (row?.ai_overview?.version === OVERVIEW_VERSION) {
       return NextResponse.json({ data: row.ai_overview, cached: true })
     }
 
@@ -592,7 +651,7 @@ export async function POST() {
       sql`SELECT ai_overview, ai_overview_generated_at FROM workspaces WHERE id = ${workspaceId} LIMIT 1`
     )
     const cached = cachedRows[0]
-    if (cached?.ai_overview && cached?.ai_overview_generated_at) {
+    if (cached?.ai_overview?.version === OVERVIEW_VERSION && cached?.ai_overview_generated_at) {
       const genDate = safeDate(cached.ai_overview_generated_at)
       const ageMs = genDate ? Date.now() - genDate.getTime() : Infinity
       if (ageMs < 4 * 60 * 60 * 1000) {
@@ -619,6 +678,7 @@ export async function POST() {
         const closedCount = won.length + lost.length
         const winRate = closedCount > 0 ? Math.round((won.length / closedCount) * 100) : 0
         overview = {
+          version: OVERVIEW_VERSION,
           summary: `${open.length} open deal${open.length !== 1 ? 's' : ''} worth ${fmtFb(totalValue)} in pipeline. Win rate: ${winRate}%. AI briefing temporarily unavailable — refresh to retry.`,
           keyActions: [],
           focusBullets: [],
@@ -635,6 +695,7 @@ export async function POST() {
       } catch {
         // Absolute last-resort — no DB access, no date calculations
         overview = {
+          version: OVERVIEW_VERSION,
           summary: 'AI briefing temporarily unavailable. Refresh to retry.',
           keyActions: [],
           focusBullets: [],
