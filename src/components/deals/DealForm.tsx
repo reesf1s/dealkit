@@ -4,9 +4,34 @@ import { useState, useEffect } from 'react'
 import { Plus, X } from 'lucide-react'
 import type { DealContact, DealLog, DealStage } from '@/types'
 
+type DealFormSeed = {
+  dealName?: string | null
+  prospectCompany?: string | null
+  prospectName?: string | null
+  prospectTitle?: string | null
+  contacts?: Array<{ name: string; title?: string | null; email?: string | null }> | null
+  description?: string | null
+  dealValue?: number | null
+  stage?: string | DealStage | null
+  dealType?: 'one_off' | 'recurring' | null
+  recurringInterval?: 'monthly' | 'quarterly' | 'annual' | null
+  competitors?: string[] | null
+  nextSteps?: string | null
+  lostReason?: string | null
+  assignedRepId?: string | null
+  engagementType?: string | null
+  forecastCategory?: '' | 'commit' | 'upside' | 'pipeline' | 'omit' | null
+  closeDate?: string | Date | null
+  wonDate?: string | Date | null
+  lostDate?: string | Date | null
+  contractEndDate?: string | Date | null
+}
+
 interface DealFormProps {
   onSubmit: (data: Partial<DealLog>) => Promise<void>
   loading?: boolean
+  initialData?: DealFormSeed | null
+  submitLabel?: string
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -105,32 +130,71 @@ interface FormState {
   dealType: 'one_off' | 'recurring'
   recurringInterval: 'monthly' | 'quarterly' | 'annual'
   competitors: string
-  notes: string
   nextSteps: string
   lostReason: string
   assignedRepId: string
   closeDate: string
+  engagementType: string
+  forecastCategory: '' | 'commit' | 'upside' | 'pipeline' | 'omit'
+  contractEndDate: string
 }
 
-export function DealForm({ onSubmit, loading = false }: DealFormProps) {
-  const [form, setForm] = useState<FormState>({
-    dealName: '',
-    prospectCompany: '',
-    description: '',
-    dealValue: '',
-    stage: 'proposal',
-    dealType: 'one_off',
-    recurringInterval: 'annual',
-    competitors: '',
-    notes: '',
-    nextSteps: '',
-    lostReason: '',
-    assignedRepId: '',
-    closeDate: '',
-  })
+function toDateInputValue(value?: string | Date | null) {
+  if (!value) return ''
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().slice(0, 10)
+}
+
+function buildSeedContacts(initialData?: DealFormSeed | null): DealContact[] {
+  if (initialData?.contacts?.length) {
+    return initialData.contacts.map(contact => ({
+      name: contact.name ?? '',
+      title: contact.title ?? '',
+      email: contact.email ?? '',
+    }))
+  }
+
+  if (initialData?.prospectName?.trim()) {
+    return [{
+      name: initialData.prospectName,
+      title: initialData.prospectTitle ?? '',
+      email: '',
+    }]
+  }
+
+  return []
+}
+
+function buildFormState(initialData?: DealFormSeed | null): FormState {
+  const seededStage = STAGES_LIST.some(stage => stage.id === initialData?.stage)
+    ? (initialData?.stage as DealStage)
+    : 'proposal'
+
+  return {
+    dealName: initialData?.dealName ?? '',
+    prospectCompany: initialData?.prospectCompany ?? '',
+    description: initialData?.description ?? '',
+    dealValue: initialData?.dealValue != null ? String(initialData.dealValue) : '',
+    stage: seededStage,
+    dealType: initialData?.dealType ?? 'one_off',
+    recurringInterval: initialData?.recurringInterval ?? 'annual',
+    competitors: (initialData?.competitors ?? []).join(', '),
+    nextSteps: initialData?.nextSteps ?? '',
+    lostReason: initialData?.lostReason ?? '',
+    assignedRepId: initialData?.assignedRepId ?? '',
+    closeDate: toDateInputValue(initialData?.closeDate),
+    engagementType: initialData?.engagementType ?? '',
+    forecastCategory: initialData?.forecastCategory ?? '',
+    contractEndDate: toDateInputValue(initialData?.contractEndDate),
+  }
+}
+
+export function DealForm({ onSubmit, loading = false, initialData = null, submitLabel = 'Log deal' }: DealFormProps) {
+  const [form, setForm] = useState<FormState>(() => buildFormState(initialData))
   const [members, setMembers] = useState<WorkspaceMember[]>([])
-  const [contacts, setContacts] = useState<DealContact[]>([])
-  const [contactsOpen, setContactsOpen] = useState(false)
+  const [contacts, setContacts] = useState<DealContact[]>(() => buildSeedContacts(initialData))
+  const [contactsOpen, setContactsOpen] = useState(() => buildSeedContacts(initialData).length > 0)
   const [errors, setErrors] = useState<{ dealValue?: string; dealName?: string; prospectCompany?: string }>({})
 
   useEffect(() => {
@@ -180,6 +244,10 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
       .filter(c => c.name)
 
     const now = new Date()
+    const existingWonDate = initialData?.wonDate ? new Date(initialData.wonDate) : null
+    const existingLostDate = initialData?.lostDate ? new Date(initialData.lostDate) : null
+    const existingCloseDate = initialData?.closeDate ? new Date(initialData.closeDate) : null
+
     await onSubmit({
       dealName: form.dealName,
       prospectCompany: form.prospectCompany,
@@ -192,13 +260,15 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
       dealType: form.dealType,
       recurringInterval: form.dealType === 'recurring' ? form.recurringInterval : null,
       competitors: form.competitors.split(',').map(s => s.trim()).filter(Boolean),
-      notes: form.notes || null,
       nextSteps: form.nextSteps || null,
       lostReason: form.lostReason || null,
       assignedRepId: form.assignedRepId || null,
-      wonDate: isWon ? now : null,
-      lostDate: isLost ? now : null,
-      closeDate: form.closeDate ? new Date(form.closeDate) : isClosed ? now : null,
+      engagementType: form.engagementType || null,
+      forecastCategory: form.forecastCategory || null,
+      wonDate: isWon ? existingWonDate ?? now : null,
+      lostDate: isLost ? existingLostDate ?? now : null,
+      closeDate: form.closeDate ? new Date(form.closeDate) : isClosed ? existingCloseDate ?? now : null,
+      contractEndDate: form.contractEndDate ? new Date(form.contractEndDate) : null,
     })
   }
 
@@ -293,6 +363,48 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
                   width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px',
                   background: 'rgba(55,53,47,0.04)', border: '1px solid rgba(55,53,47,0.12)',
                   color: form.closeDate ? '#37352f' : '#9b9a97', fontSize: '13px', outline: 'none',
+                  boxSizing: 'border-box', cursor: 'pointer', fontFamily: 'inherit',
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = 'rgba(94,106,210,0.35)' }}
+                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(55,53,47,0.12)' }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div>
+              <Label>Forecast category</Label>
+              <select
+                value={form.forecastCategory}
+                onChange={e => u({ forecastCategory: e.target.value as FormState['forecastCategory'] })}
+                style={{
+                  width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px',
+                  background: 'rgba(55,53,47,0.04)', border: '1px solid rgba(55,53,47,0.12)',
+                  color: form.forecastCategory ? '#37352f' : '#9b9a97',
+                  fontSize: '13px', outline: 'none', boxSizing: 'border-box',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+                onFocus={e => { e.currentTarget.style.borderColor = 'rgba(94,106,210,0.35)' }}
+                onBlur={e => { e.currentTarget.style.borderColor = 'rgba(55,53,47,0.12)' }}
+              >
+                <option value="">Not set</option>
+                <option value="pipeline">Pipeline</option>
+                <option value="upside">Upside</option>
+                <option value="commit">Commit</option>
+                <option value="omit">Omit</option>
+              </select>
+            </div>
+
+            <div>
+              <Label>Renewal / contract date</Label>
+              <input
+                type="date"
+                value={form.contractEndDate}
+                onChange={e => u({ contractEndDate: e.target.value })}
+                style={{
+                  width: '100%', height: '34px', padding: '0 10px', borderRadius: '6px',
+                  background: 'rgba(55,53,47,0.04)', border: '1px solid rgba(55,53,47,0.12)',
+                  color: form.contractEndDate ? '#37352f' : '#9b9a97', fontSize: '13px', outline: 'none',
                   boxSizing: 'border-box', cursor: 'pointer', fontFamily: 'inherit',
                 }}
                 onFocus={e => { e.currentTarget.style.borderColor = 'rgba(94,106,210,0.35)' }}
@@ -464,6 +576,15 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
             />
           </div>
 
+          <div>
+            <Label>Deal motion</Label>
+            <Input
+              value={form.engagementType}
+              onChange={v => u({ engagementType: v })}
+              placeholder="Enterprise account, POC, renewal, upsell…"
+            />
+          </div>
+
           {!isClosed && (
             <div>
               <Label>Next steps</Label>
@@ -513,7 +634,7 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
           onMouseEnter={e => { if (!loading) e.currentTarget.style.backgroundColor = '#2d2b28' }}
           onMouseLeave={e => { if (!loading) e.currentTarget.style.backgroundColor = '#37352f' }}
         >
-          {loading ? 'Logging…' : 'Log deal'}
+          {loading ? 'Saving…' : submitLabel}
         </button>
       </div>
     </form>

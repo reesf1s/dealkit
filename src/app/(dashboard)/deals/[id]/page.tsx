@@ -19,6 +19,7 @@ import {
   Mail,
   MessageSquare,
   MoveUpRight,
+  Pencil,
   Plus,
   RefreshCw,
   Send,
@@ -30,6 +31,7 @@ import {
   X,
 } from 'lucide-react'
 import AIVoice from '@/components/AIVoice'
+import { DealForm } from '@/components/deals/DealForm'
 import TopNav from '@/components/layout/TopNav'
 import { useSidebar } from '@/components/layout/SidebarContext'
 import { fetcher } from '@/lib/fetcher'
@@ -43,6 +45,7 @@ import {
   humanizeActivityLabel,
   initialsFromName,
 } from '@/lib/presentation'
+import type { DealLog } from '@/types'
 
 type WorkspaceTab =
   | 'overview'
@@ -1033,6 +1036,72 @@ function EmailComposerModal({
             body="Kick off a draft from the Morning briefing actions or the Conversations tab."
           />
         )}
+      </div>
+    </div>
+  )
+}
+
+function EditDealModal({
+  open,
+  loading,
+  deal,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean
+  loading: boolean
+  deal: DealRecord | null
+  onClose: () => void
+  onSubmit: (payload: Partial<DealLog>) => Promise<void>
+}) {
+  if (!open || !deal) return null
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 75,
+        background: 'rgba(20, 17, 10, 0.22)',
+        backdropFilter: 'blur(8px)',
+        display: 'grid',
+        placeItems: 'center',
+        padding: 20,
+      }}
+      onClick={onClose}
+    >
+      <div
+        className="panel-section"
+        style={{
+          width: 'min(620px, 100%)',
+          maxHeight: 'min(90vh, 980px)',
+          overflow: 'auto',
+          padding: 24,
+          boxShadow: 'var(--glass-shadow-lg)',
+        }}
+        onClick={event => event.stopPropagation()}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 18 }}>
+          <div>
+            <div className="section-label" style={{ marginBottom: 6 }}>Manual edit</div>
+            <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--ink)', letterSpacing: '-0.03em' }}>
+              Edit deal details
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>
+              Update the deal manually when ownership, timing, stage, or commercial details change.
+            </div>
+          </div>
+          <button className="icon-btn" onClick={onClose} aria-label="Close edit deal modal">
+            <X size={14} strokeWidth={1.8} />
+          </button>
+        </div>
+
+        <DealForm
+          initialData={deal}
+          onSubmit={onSubmit}
+          loading={loading}
+          submitLabel="Save changes"
+        />
       </div>
     </div>
   )
@@ -2041,6 +2110,8 @@ export default function DealDetailPage() {
   const [stakeholderError, setStakeholderError] = useState<string | null>(null)
   const [meetingPrep, setMeetingPrep] = useState<string | null>(null)
   const [meetingPrepBusy, setMeetingPrepBusy] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editLoading, setEditLoading] = useState(false)
   const [emailModalOpen, setEmailModalOpen] = useState(false)
   const [emailBusy, setEmailBusy] = useState(false)
   const [emailDraft, setEmailDraft] = useState<ComposeEmailResponse | null>(null)
@@ -2148,6 +2219,25 @@ export default function DealDetailPage() {
       body: JSON.stringify(fields),
     })
     await mutateDeal()
+  }
+
+  async function saveManualEdit(payload: Partial<DealLog>) {
+    if (!id) return
+    setEditLoading(true)
+    try {
+      await requestJson(`/api/deals/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      await refreshAll()
+      setEditModalOpen(false)
+      setToast({ kind: 'success', message: 'Deal details updated' })
+    } catch (error) {
+      setToast({ kind: 'error', message: error instanceof Error ? error.message : 'Could not update deal' })
+    } finally {
+      setEditLoading(false)
+    }
   }
 
   async function openEmailComposer(tone: 'professional' | 'friendly' | 'urgent' = 'professional') {
@@ -2298,6 +2388,14 @@ export default function DealDetailPage() {
               <div className="deal-value">
                 <div className="value-amount">{formatCurrencyGBP(deal.dealValue ?? null)}</div>
                 <div className="value-label">Annual contract value</div>
+                <button
+                  className="action-chip"
+                  style={{ marginTop: 12, marginLeft: 'auto' }}
+                  onClick={() => setEditModalOpen(true)}
+                >
+                  <Pencil size={12} strokeWidth={2} />
+                  Edit deal
+                </button>
               </div>
             </div>
 
@@ -2626,6 +2724,15 @@ export default function DealDetailPage() {
         onClose={() => setEmailModalOpen(false)}
         onCopy={copyEmailDraft}
         onRegenerate={openEmailComposer}
+      />
+      <EditDealModal
+        open={editModalOpen}
+        loading={editLoading}
+        deal={deal}
+        onClose={() => {
+          if (!editLoading) setEditModalOpen(false)
+        }}
+        onSubmit={saveManualEdit}
       />
 
       {toast ? (
