@@ -1,12 +1,23 @@
 import { after } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { dealLogs, events } from '@/lib/db/schema'
+import { clearManualBriefOverride, setManualBriefOverride } from '@/lib/brief-override'
 import { dbErrResponse, ensureIndexes } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { requestBrainRebuild } from '@/lib/brain-rebuild'
+
+type LegacyPlanPhase = {
+  id?: string
+  [key: string]: unknown
+}
+
+type LegacyProjectPlan = {
+  phases?: LegacyPlanPhase[]
+  [key: string]: unknown
+}
 
 async function logEvent(workspaceId: string, userId: string, type: string, metadata: Record<string, unknown>) {
   await db.insert(events).values({ workspaceId, userId, type, metadata, createdAt: new Date() })
@@ -24,15 +35,15 @@ export async function GET(_req: NextRequest, { params }: Params) {
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     // Backfill IDs onto any project plan phases that were created without one (legacy data fix)
-    const planData = deal.projectPlan as any
-    if (planData?.phases?.some((p: any) => !p.id)) {
+    const planData = deal.projectPlan as LegacyProjectPlan | null | undefined
+    if (Array.isArray(planData?.phases) && planData.phases.some(phase => !phase.id)) {
       const fixedPlan = {
         ...planData,
-        phases: planData.phases.map((p: any) => p.id ? p : { ...p, id: crypto.randomUUID() }),
+        phases: planData.phases.map(phase => (phase.id ? phase : { ...phase, id: crypto.randomUUID() })),
       }
       // Persist the fix so it's permanent
       await db.update(dealLogs)
-        .set({ projectPlan: fixedPlan } as any)
+        .set({ projectPlan: fixedPlan })
         .where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId)))
       return NextResponse.json({ data: { ...deal, projectPlan: fixedPlan } })
     }
@@ -47,7 +58,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { workspaceId } = await getWorkspaceContext(userId)
     const { id } = await params
-    const [existing] = await db.select({ id: dealLogs.id }).from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
+    const [existing] = await db.select({ id: dealLogs.id, dealReview: dealLogs.dealReview }).from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     const body = await req.json()
     const updateData: Record<string, unknown> = { updatedAt: new Date() }
@@ -68,6 +79,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       } else {
         updateData[f] = body[f]
       }
+    }
+    if (body.aiSummary !== undefined && typeof body.aiSummary === 'string' && body.dealReview === undefined) {
+      updateData.dealReview = setManualBriefOverride(
+        existing.dealReview as Record<string, unknown> | null | undefined,
+        body.aiSummary,
+        'ui',
+      )
+    }
+    if (
+      (body.meetingNotes !== undefined || body.notes !== undefined)
+      && body.aiSummary === undefined
+      && body.dealReview === undefined
+    ) {
+      updateData.dealReview = clearManualBriefOverride(existing.dealReview as Record<string, unknown> | null | undefined)
     }
     // Score integrity: clamp to 0-100 if provided as a number
     if (typeof updateData.conversionScore === 'number') {

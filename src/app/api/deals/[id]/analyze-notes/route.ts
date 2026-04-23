@@ -12,6 +12,7 @@ import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getWorkspaceBrain } from '@/lib/workspace-brain'
 import { requestBrainRebuild } from '@/lib/brain-rebuild'
+import { clearManualBriefOverride } from '@/lib/brief-override'
 import { computeCompositeScore, type ScoreBreakdown } from '@/lib/deal-ml'
 import { ensureLinksColumn } from '@/lib/api-helpers'
 import { extractTextSignals, heuristicScore } from '@/lib/text-signals'
@@ -103,6 +104,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       conversionScorePinned: dealLogs.conversionScorePinned,
       scheduledEvents: dealLogs.scheduledEvents,
       scoreHistory: dealLogs.scoreHistory,
+      dealReview: dealLogs.dealReview,
     }).from(dealLogs).where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId))).limit(1)
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -368,6 +370,7 @@ Severity: "high" = deal-blocking, "medium" = significant concern, "low" = minor/
       meetingNotes: appendedNotes,
       dealRisks: mergedRisks,
       todos: mergedTodos,
+      dealReview: clearManualBriefOverride(deal.dealReview as Record<string, unknown> | null | undefined),
       updatedAt: new Date(),
     }
     if (mergedCompetitors) updateFields.competitors = mergedCompetitors

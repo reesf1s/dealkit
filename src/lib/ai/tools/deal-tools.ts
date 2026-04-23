@@ -21,6 +21,7 @@ import { extractTextSignals, heuristicScore } from '@/lib/text-signals'
 import { computeCompositeScore } from '@/lib/deal-ml'
 import { buildDealBriefing, scoreNarrationPrompt } from '@/lib/brain-narrator'
 import { generateCollateral, generateFreeformCollateral } from '@/lib/ai/generate'
+import { clearManualBriefOverride, setManualBriefOverride } from '@/lib/brief-override'
 import { upsertCollateral } from '@/lib/collateral-helpers'
 import { executeWithVerification } from '@/lib/ai/tool-wrapper'
 import type { ToolContext, ToolResult } from './types'
@@ -839,6 +840,10 @@ export const update_deal = {
     if (c.addNote) {
       const { updateFields: noteFields, changes: noteChanges, parsed } = await processMeetingNotesHelper(c.addNote, deal, ctx)
       Object.assign(updateFields, noteFields)
+      updateFields.dealReview = clearManualBriefOverride(
+        (updateFields.dealReview as Record<string, unknown> | null | undefined)
+          ?? (deal.dealReview as Record<string, unknown> | null | undefined),
+      )
       changesList.push(...noteChanges)
 
       // Create product gaps
@@ -966,12 +971,22 @@ export const update_deal = {
     if (c.appendNotes) {
       const existingNotes = deal.notes ?? ''
       updateFields.notes = existingNotes ? `${existingNotes}\n\n${c.appendNotes}` : c.appendNotes
+      updateFields.dealReview = clearManualBriefOverride(
+        (updateFields.dealReview as Record<string, unknown> | null | undefined)
+          ?? (deal.dealReview as Record<string, unknown> | null | undefined),
+      )
       changesList.push('Notes appended')
     }
 
     // ── Correction / Replace operations ─────────────────────────────────
     if (c.replaceSummary) {
       updateFields.aiSummary = c.replaceSummary
+      updateFields.dealReview = setManualBriefOverride(
+        (updateFields.dealReview as Record<string, unknown> | null | undefined)
+          ?? (deal.dealReview as Record<string, unknown> | null | undefined),
+        c.replaceSummary,
+        'agent',
+      )
       changesList.push('Summary replaced')
     }
     if (c.replaceRisks !== undefined) {
@@ -1023,6 +1038,10 @@ export const update_deal = {
     }
     if (c.replaceMeetingNotes !== undefined) {
       updateFields.meetingNotes = c.replaceMeetingNotes || null
+      updateFields.dealReview = clearManualBriefOverride(
+        (updateFields.dealReview as Record<string, unknown> | null | undefined)
+          ?? (deal.dealReview as Record<string, unknown> | null | undefined),
+      )
       changesList.push('Meeting history replaced')
     }
 

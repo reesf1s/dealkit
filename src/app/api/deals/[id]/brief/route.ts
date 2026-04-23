@@ -13,6 +13,7 @@ import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { anthropic } from '@/lib/ai/client'
+import { getManualBriefOverride } from '@/lib/brief-override'
 import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import {
@@ -43,6 +44,13 @@ export async function GET(_req: NextRequest, { params }: Params) {
       .limit(1)
 
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    const manualOverride = getManualBriefOverride(deal.dealReview as Record<string, unknown> | null | undefined)
+    if (manualOverride) {
+      return NextResponse.json({
+        data: { brief: manualOverride.text, generatedAt: manualOverride.updatedAt },
+      })
+    }
 
     const noteFocus = buildBriefingNoteFocus({
       meetingNotes: deal.meetingNotes,
