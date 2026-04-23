@@ -36,6 +36,10 @@ import TopNav from '@/components/layout/TopNav'
 import { useSidebar } from '@/components/layout/SidebarContext'
 import { fetcher } from '@/lib/fetcher'
 import {
+  stageLabelFor,
+  type PipelineConfigLike,
+} from '@/lib/pipeline-presentation'
+import {
   avatarGradientFromName,
   formatContextualDate,
   formatCurrencyGBP,
@@ -209,6 +213,10 @@ type ComposeEmailResponse = {
   body: string
 }
 
+type PipelineConfigResponse = {
+  data?: PipelineConfigLike
+}
+
 type AiActivityItem = {
   id: string
   actionType: string
@@ -285,11 +293,6 @@ async function requestJson<T>(input: RequestInfo, init?: RequestInit): Promise<T
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
-}
-
-function stageLabel(stage?: string | null): string {
-  if (!stage) return 'Proposal'
-  return stage.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
 }
 
 function stageTone(stage?: string | null) {
@@ -2125,6 +2128,10 @@ export default function DealDetailPage() {
     revalidateOnFocus: false,
     dedupingInterval: 60_000,
   })
+  const { data: pipelineConfigRes } = useSWR<PipelineConfigResponse>('/api/pipeline-config', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 120_000,
+  })
   const { data: briefRes, mutate: mutateBrief } = useSWR<{ data: BriefResponse }>(
     id ? `/api/deals/${id}/brief` : null,
     fetcher,
@@ -2141,6 +2148,7 @@ export default function DealDetailPage() {
   )
 
   const deal = dealRes?.data
+  const pipelineConfig = pipelineConfigRes?.data
   const prediction = useMemo(
     () => brainRes?.data?.mlPredictions?.find(item => item.dealId === id) ?? null,
     [brainRes?.data?.mlPredictions, id],
@@ -2338,6 +2346,7 @@ export default function DealDetailPage() {
 
   const score = clamp(Math.round(deal.conversionScore ?? 76), 0, 100)
   const tone = stageTone(deal.stage)
+  const stageLabelText = stageLabelFor(deal.stage, pipelineConfig)
   const sparklineValues = scoreTrend(deal.scoreHistory ?? [], score)
   const sparkline = sparkPath(sparklineValues)
   const sevenDayDelta = sparklineValues.at(-1)! - sparklineValues[0]!
@@ -2382,7 +2391,7 @@ export default function DealDetailPage() {
                   {title.lead}, <em>{title.tail}</em>
                 </h1>
                 <div className="deal-subtitle">
-                  {deal.description || `${deal.contacts?.length ?? 0} stakeholders · ${stageLabel(deal.stage)} stage`}
+                  {deal.description || `${deal.contacts?.length ?? 0} stakeholders · ${stageLabelText} stage`}
                 </div>
               </div>
               <div className="deal-value">
@@ -2429,7 +2438,7 @@ export default function DealDetailPage() {
 
               <div className="stage-chip" style={{ background: tone.bg, border: `1px solid ${tone.border}`, color: tone.text }}>
                 <span className="dot" style={{ background: tone.text }} />
-                {stageLabel(deal.stage)}
+                {stageLabelText}
               </div>
             </div>
           </div>

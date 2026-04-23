@@ -21,6 +21,13 @@ import AIVoice from '@/components/AIVoice'
 import { useSidebar } from '@/components/layout/SidebarContext'
 import { fetcher } from '@/lib/fetcher'
 import {
+  getPipelineStageLabelMap,
+  getPipelineStages,
+  stageLabelFor,
+  stageOrderFor,
+  type PipelineConfigLike,
+} from '@/lib/pipeline-presentation'
+import {
   formatContextualDate,
   formatCurrencyGBP,
   formatRelativeTime,
@@ -128,6 +135,7 @@ type AttentionItem = {
   dealId: string
   company: string
   stage: string
+  stageLabelText: string
   reason: string
   urgency: 'high' | 'medium'
   value?: number | null
@@ -146,6 +154,10 @@ type RankedAttentionItem = AttentionItem & {
   sortKey: number
 }
 
+type PipelineConfigResponse = {
+  data?: PipelineConfigLike
+}
+
 function todayLabel() {
   return new Date().toLocaleDateString('en-GB', {
     weekday: 'long',
@@ -155,13 +167,13 @@ function todayLabel() {
   })
 }
 
-function stageLabel(stage?: string | null) {
-  if (!stage) return 'Pipeline'
-  return stage.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
-}
-
 function compactMoney(value: number | null | undefined) {
   return formatCurrencyGBP(value, { compact: true })
+}
+
+function isLowSignalAttentionReason(reason?: string | null) {
+  if (!reason) return false
+  return /\b(open todo|open task|since last contact|follow up with|review and update|update statuses?)\b/i.test(reason)
 }
 
 function extractLatestNoteMeta(deal: DealRecord): LatestNoteMeta {
@@ -219,7 +231,7 @@ function AttentionRow({ item }: { item: AttentionItem }) {
       <div className="overview-list-copy">
         <div className="overview-row-top">
           <span className="overview-row-title">{item.company}</span>
-          <span className="overview-row-chip">{stageLabel(item.stage)}</span>
+          <span className="overview-row-chip">{item.stageLabelText}</span>
           {item.score != null ? <span className="overview-row-chip mono">{Math.round(item.score)}</span> : null}
           {item.value ? <span className="overview-row-chip mono">{compactMoney(item.value)}</span> : null}
         </div>
@@ -286,6 +298,10 @@ export default function DashboardPage() {
     revalidateOnFocus: false,
     dedupingInterval: 45_000,
   })
+  const { data: pipelineConfigRes } = useSWR<PipelineConfigResponse>('/api/pipeline-config', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 120_000,
+  })
   const { data: activityRes, mutate: mutateActivity } = useSWR<{ data: ActivityEvent[] }>(
     '/api/activity?limit=10',
     fetcher,
@@ -301,6 +317,8 @@ export default function DashboardPage() {
   const activity = activityRes?.data ?? []
   const deals = useMemo(() => dealsRes?.data ?? [], [dealsRes?.data])
   const calendar = useMemo(() => calendarRes?.data ?? [], [calendarRes?.data])
+  const pipelineConfig = pipelineConfigRes?.data
+  const stageLabelMap = useMemo(() => getPipelineStageLabelMap(pipelineConfig), [pipelineConfig])
   const hour = new Date().getHours()
   const fullName = user?.firstName ?? user?.fullName?.split(' ')[0] ?? 'there'
 
@@ -341,15 +359,36 @@ export default function DashboardPage() {
         acc[key].value += deal.dealValue ?? 0
         return acc
       }, {})
+    const configuredStages = getPipelineStages(pipelineConfig, { includeClosed: false })
+    const configuredIds = new Set(configuredStages.map(stage => stage.id))
+    const orderedConfiguredStages = configuredStages
+      .map(stage => ({
+        stage: stage.id,
+        label: stageLabelMap[stage.id] ?? stageLabelFor(stage.id, pipelineConfig),
+        count: fromDeals[stage.id]?.count ?? 0,
+        value: fromDeals[stage.id]?.value ?? 0,
+      }))
+      .filter(stage => stage.count > 0)
+    const additionalStages = Object.entries(fromDeals)
+      .filter(([stage, metrics]) => metrics.count > 0 && !configuredIds.has(stage))
+      .map(([stage, metrics]) => ({
+        stage,
+        label: stageLabelFor(stage, pipelineConfig),
+        count: metrics.count,
+        value: metrics.value,
+      }))
 
-    return Object.entries(fromDeals)
-      .map(([stage, metrics]) => ({ stage, ...metrics }))
-      .sort((left, right) => right.value - left.value)
-      .slice(0, 5)
-  }, [brain.pipeline?.stageBreakdown, openDeals])
+    return [...orderedConfiguredStages, ...additionalStages].sort((left, right) => {
+      const leftOrder = stageOrderFor(left.stage, pipelineConfig)
+      const rightOrder = stageOrderFor(right.stage, pipelineConfig)
+      if (leftOrder !== rightOrder) return leftOrder - rightOrder
+      if (left.count !== right.count) return right.count - left.count
+      return right.value - left.value
+    })
+  }, [brain.pipeline?.stageBreakdown, openDeals, pipelineConfig, stageLabelMap])
 
   const attentionItems = useMemo<AttentionItem[]>(() => {
-    const overviewAttentionDeals = overview?.topAttentionDeals ?? []
+    const overviewAttentionDeals = (overview?.topAttentionDeals ?? []).filter(item => !isLowSignalAttentionReason(item.reason))
     const dealMap = new Map(openDeals.map(deal => [deal.id, deal]))
     if (overviewAttentionDeals.length > 0) {
       return overviewAttentionDeals.slice(0, 5).map(item => {
@@ -359,6 +398,7 @@ export default function DashboardPage() {
           dealId: item.dealId,
           company: deal?.prospectCompany ?? item.company ?? item.dealName,
           stage: deal?.stage ?? '',
+          stageLabelText: stageLabelFor(deal?.stage ?? '', pipelineConfig),
           reason: item.reason,
           urgency: item.urgency,
           value: deal?.dealValue,
@@ -394,10 +434,6 @@ export default function DashboardPage() {
           reason = `No new note for ${noteMeta.daysSince}d. Last recorded context: ${noteMeta.summary.slice(0, 88)}${noteMeta.summary.length > 88 ? '…' : ''}`
           urgency = noteMeta.daysSince >= 21 ? 'high' : 'medium'
           sortKey = noteMeta.daysSince
-        } else if (deal.nextSteps && noteMeta.daysSince != null && noteMeta.daysSince >= 7) {
-          reason = `Latest next step still reads: ${deal.nextSteps}`
-          urgency = 'medium'
-          sortKey = noteMeta.daysSince
         }
 
         if (!reason) return null
@@ -406,6 +442,7 @@ export default function DashboardPage() {
               dealId: deal.id,
               company: deal.prospectCompany,
               stage: deal.stage,
+              stageLabelText: stageLabelFor(deal.stage, pipelineConfig),
               reason,
               urgency,
               value: deal.dealValue,
@@ -424,6 +461,7 @@ export default function DashboardPage() {
         dealId: item.dealId,
         company: item.company,
         stage: item.stage,
+        stageLabelText: item.stageLabelText,
         reason: item.reason,
         urgency: item.urgency,
         value: item.value,
@@ -431,7 +469,17 @@ export default function DashboardPage() {
         lastNoteAt: item.lastNoteAt,
         updatedAt: item.updatedAt,
       }))
-  }, [openDeals, overview?.topAttentionDeals])
+  }, [openDeals, overview?.topAttentionDeals, pipelineConfig])
+
+  const recommendedAction = useMemo(() => {
+    if (overview?.singleMostImportantAction && !isLowSignalAttentionReason(overview.singleMostImportantAction)) {
+      return overview.singleMostImportantAction
+    }
+    if (attentionItems[0]) {
+      return `Review ${attentionItems[0].company} — ${attentionItems[0].reason}`
+    }
+    return 'Focus the team on the one account most likely to slip before the week closes.'
+  }, [attentionItems, overview?.singleMostImportantAction])
 
   const upcomingEvents = useMemo(() => {
     const now = new Date()
@@ -514,10 +562,11 @@ export default function DashboardPage() {
     <div className="overview-shell">
       <style>{`
         .overview-shell {
+          width: min(100%, 1280px);
           padding-top: 4px;
           display: flex;
           flex-direction: column;
-          gap: 28px;
+          gap: clamp(20px, 2.4vw, 28px);
         }
         .overview-header {
           display: flex;
@@ -577,7 +626,7 @@ export default function DashboardPage() {
           align-items: stretch;
         }
         .overview-briefing {
-          padding: 24px 26px;
+          padding: clamp(18px, 2.2vw, 26px);
           position: relative;
           overflow: hidden;
         }
@@ -669,7 +718,7 @@ export default function DashboardPage() {
           gap: 8px;
         }
         .overview-kpi-panel {
-          padding: 18px;
+          padding: clamp(16px, 2vw, 18px);
         }
         .overview-kpi-grid {
           display: grid;
@@ -747,7 +796,8 @@ export default function DashboardPage() {
         }
         .overview-list-card,
         .overview-mini-card {
-          padding: 18px;
+          padding: clamp(16px, 2vw, 18px);
+          min-width: 0;
         }
         .overview-list {
           display: grid;
@@ -851,6 +901,9 @@ export default function DashboardPage() {
           line-height: 1.6;
         }
         @media (max-width: 1240px) {
+          .overview-shell {
+            width: 100%;
+          }
           .overview-header {
             align-items: flex-start;
           }
@@ -900,6 +953,10 @@ export default function DashboardPage() {
           }
           .overview-header {
             align-items: flex-start;
+          }
+          .overview-refresh {
+            width: 100%;
+            justify-content: space-between;
           }
         }
       `}</style>
@@ -992,20 +1049,14 @@ export default function DashboardPage() {
             <div className="overview-next-label">Recommended next action</div>
             <div className="overview-next-copy">
               <AIVoice as="span">
-                {overview?.singleMostImportantAction ??
-                  'Focus the team on the one account most likely to slip before the week closes.'}
+                {recommendedAction}
               </AIVoice>
             </div>
             <div className="overview-next-actions">
               <button
                 className="btn"
                 style={{ background: 'rgba(29, 184, 106, 0.95)', color: '#0B2418', borderColor: 'rgba(29, 184, 106, 0.95)' }}
-                onClick={() =>
-                  sendToCopilot(
-                    overview?.singleMostImportantAction ??
-                      'Help me execute the single most important action across my pipeline.',
-                  )
-                }
+                onClick={() => sendToCopilot(recommendedAction)}
               >
                 <ArrowRight size={13} strokeWidth={2} />
                 Draft now
@@ -1034,8 +1085,12 @@ export default function DashboardPage() {
               />
               <OverviewMetric
                 label="Win rate"
-                value={brain.winLossIntel ? `${Math.round(brain.winLossIntel.winRate * 100)}%` : '—'}
-                meta={`${brain.winLossIntel?.winCount ?? 0} won`}
+                value={brain.winLossIntel ? `${Math.round(brain.winLossIntel.winRate)}%` : '—'}
+                meta={
+                  brain.winLossIntel
+                    ? `${brain.winLossIntel.winCount} won · ${brain.winLossIntel.lossCount} lost`
+                    : 'Closed-deal signal builds here'
+                }
               />
               <OverviewMetric label="Open work" value={String(openTaskCount)} meta="Tasks still to close" />
             </div>
@@ -1047,7 +1102,7 @@ export default function DashboardPage() {
                   <div key={stage.stage} className="overview-stage-row">
                     <div className="overview-stage-copy">
                       <div className="overview-stage-title">
-                        <span>{stageLabel(stage.stage)}</span>
+                        <span>{stage.label}</span>
                         <span>{stage.count} deals</span>
                       </div>
                       <div className="overview-stage-bar">

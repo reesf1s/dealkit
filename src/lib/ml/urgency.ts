@@ -173,13 +173,13 @@ function deriveTopAction(
     return `Address budget objection at ${deal.company}`
   }
   if (reasons.some(r => r.includes('No activity') || r.includes('No update'))) {
-    return `Follow up with ${deal.company} — ${deal.daysSinceUpdate}d since last contact`
-  }
-  if (deal.pendingTodos?.length > 0) {
-    return `Complete ${deal.pendingTodos.length} open todo${deal.pendingTodos.length !== 1 ? 's' : ''} for ${deal.company}`
+    return `Requalify ${deal.company} — no fresh commercial signal for ${deal.daysSinceUpdate}d`
   }
   if (daysToClose !== null && daysToClose <= 30) {
     return `Accelerate ${deal.company} — close in ${daysToClose}d`
   }
-  return `Review and update ${deal.company} deal`
+  if (deal.pendingTodos?.length > 0) {
+    return `Clarify the blocking step on ${deal.company} before work fragments further`
+  }
+  return `Reassess the live path to close for ${deal.company}`
 }

@@ -9,6 +9,7 @@ import { anthropic } from '@/lib/ai/client'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getWorkspaceBrain, type WorkspaceBrain } from '@/lib/workspace-brain'
 import {
+  buildBriefingNoteFocus,
   buildNoteCentricBrainContext,
   buildPreferredNoteCorpus,
   buildStructuredNoteCorpus,
@@ -19,7 +20,7 @@ import {
   stripDatePrefix,
 } from '@/lib/note-intelligence'
 
-const OVERVIEW_VERSION = 4
+const OVERVIEW_VERSION = 5
 const MS_PER_DAY = 86_400_000
 const CURRENT_SIGNAL_WINDOW_DAYS = 10
 const NOTE_CONTEXT_WINDOW_DAYS = 30
@@ -84,6 +85,7 @@ type DealSignalMeta = {
   lastNoteAt: string | null
   daysSinceLastNote: number | null
   lastNoteSummary: string | null
+  outstandingNoteSummary: string | null
   topRisk: string | null
   futureEventText: string | null
   futureEventAt: string | null
@@ -199,14 +201,22 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
       hubspotNotes: d.hubspotNotes,
       notes: typeof d.notes === 'string' ? d.notes : null,
     })
+    const noteFocus = buildBriefingNoteFocus({
+      meetingNotes: d.meetingNotes,
+      hubspotNotes: d.hubspotNotes,
+      notes: typeof d.notes === 'string' ? d.notes : null,
+    })
     const sortedEntries = extractDatedEntries(preferredNotes)
-    const lastEntry = sortedEntries[0]
+    const lastEntry = noteFocus.latestEntries[0] ?? sortedEntries[0]
     const lastNoteDate = lastEntry?.date ? lastEntry.date.toISOString().split('T')[0] : null
     const daysSinceLastNote = lastEntry?.date ? daysSince(lastEntry.date, nowMs) : null
     const lastNoteOneLiner = lastEntry?.text ? stripDatePrefix(lastEntry.text).slice(0, 120) : null
     const contextualEntries = sortedEntries.filter(entry => nowMs - entry.date.getTime() <= NOTE_CONTEXT_WINDOW_DAYS * MS_PER_DAY)
     const currentEntries = contextualEntries.filter(entry => nowMs - entry.date.getTime() <= CURRENT_SIGNAL_WINDOW_DAYS * MS_PER_DAY)
     const noteEvidence = (currentEntries.length > 0 ? currentEntries : contextualEntries).slice(0, 3)
+    const outstandingNoteSummary = noteFocus.outstandingEntries[0]
+      ? stripDatePrefix(noteFocus.outstandingEntries[0].text).slice(0, 120)
+      : null
     const legacyContext = preferredNotes && noteEvidence.length === 0 ? preferredNotes.slice(-240) : null
     const dealRisks = (d.dealRisks as string[]) ?? []
     const scheduledEvents = (d.scheduledEvents as ScheduledEvent[] | null) ?? []
@@ -241,6 +251,7 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
       lastNoteAt: lastEntry?.date?.toISOString() ?? null,
       daysSinceLastNote,
       lastNoteSummary: lastNoteOneLiner,
+      outstandingNoteSummary,
       topRisk: dealRisks[0] ?? null,
       futureEventText: primaryFutureEventText,
       futureEventAt: safeDate(primaryFutureEvent?.date)?.toISOString() ?? null,
@@ -320,8 +331,12 @@ async function generateOverview(workspaceId: string): Promise<AIOverview> {
       let urgency: 'high' | 'medium' = 'medium'
       let sortKey = 0
 
-      if (meta.topRisk && meta.daysSinceLastNote != null && meta.daysSinceLastNote <= 14) {
-        reason = `${sentenceCase(meta.topRisk)} Latest dated note was ${meta.daysSinceLastNote}d ago${lastNoteSnippet ? `: ${lastNoteSnippet}` : ''}`
+      if (meta.outstandingNoteSummary && meta.lastNoteSummary) {
+        reason = `Outstanding from notes: ${meta.outstandingNoteSummary}${meta.daysSinceLastNote != null ? ` · latest note ${meta.daysSinceLastNote}d ago` : ''}`
+        urgency = meta.daysSinceLastNote != null && meta.daysSinceLastNote >= 10 ? 'high' : 'medium'
+        sortKey = 145 + valueBoost + Math.max(0, 10 - (meta.daysSinceLastNote ?? 0))
+      } else if (meta.topRisk && meta.daysSinceLastNote != null && meta.daysSinceLastNote <= 14 && lastNoteSnippet) {
+        reason = `${sentenceCase(meta.topRisk)} Latest dated note was ${meta.daysSinceLastNote}d ago: ${lastNoteSnippet}`
         urgency = meta.daysSinceLastNote <= 7 ? 'high' : 'medium'
         sortKey = 140 + Math.max(0, 14 - meta.daysSinceLastNote) + valueBoost
       } else if (meta.scoreShift && meta.scoreShift.delta < 0 && meta.daysSinceLastNote != null && meta.daysSinceLastNote <= 10) {

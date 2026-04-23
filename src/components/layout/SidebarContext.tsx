@@ -63,24 +63,37 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined') return false
     return window.matchMedia('(max-width: 900px)').matches
   })
+  const [isCompactDesktop, setIsCompactDesktop] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia('(max-width: 1180px)').matches
+  })
   const [copilotOpen, setCopilotOpen] = useState(false)
   const [copilotPrefill, setCopilotPrefill] = useState<string | null>(null)
   const [copilotAutoSend, setCopilotAutoSend] = useState<string | null>(null)
   const [activeDeal, setActiveDeal] = useState<ActiveDeal | null>(null)
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 900px)')
-    const update = (matches: boolean) => {
-      setIsMobile(matches)
-      if (!matches) {
+    const mobileQuery = window.matchMedia('(max-width: 900px)')
+    const compactDesktopQuery = window.matchMedia('(max-width: 1180px)')
+
+    const update = () => {
+      const mobile = mobileQuery.matches
+      setIsMobile(mobile)
+      setIsCompactDesktop(compactDesktopQuery.matches)
+      if (!mobile) {
         setMobileOpen(false)
       }
     }
-    const onChange = (event: MediaQueryListEvent) => update(event.matches)
-    update(mediaQuery.matches)
-    mediaQuery.addEventListener('change', onChange)
+    const onMobileChange = () => update()
+    const onCompactChange = () => update()
+    update()
+    mobileQuery.addEventListener('change', onMobileChange)
+    compactDesktopQuery.addEventListener('change', onCompactChange)
 
-    return () => mediaQuery.removeEventListener('change', onChange)
+    return () => {
+      mobileQuery.removeEventListener('change', onMobileChange)
+      compactDesktopQuery.removeEventListener('change', onCompactChange)
+    }
   }, [])
 
   const toggleCollapsed = useCallback(() => {
@@ -111,7 +124,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     setCopilotAutoSend(null)
   }, [])
 
-  const sidebarWidth = isMobile ? 0 : collapsed ? 84 : 232
+  const sidebarWidth = isMobile ? 0 : collapsed ? 84 : isCompactDesktop ? 208 : 232
 
   return (
     <SidebarContext.Provider

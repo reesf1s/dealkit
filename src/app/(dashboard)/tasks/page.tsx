@@ -18,6 +18,10 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/components/shared/Toast'
 import { fetcher } from '@/lib/fetcher'
+import {
+  stageLabelFor,
+  type PipelineConfigLike,
+} from '@/lib/pipeline-presentation'
 import { formatContextualDate, formatCurrencyGBP, formatRelativeTime } from '@/lib/presentation'
 
 type DealTodo = {
@@ -81,6 +85,10 @@ type WorkItem = {
   sortDate: number
 }
 
+type PipelineConfigResponse = {
+  data?: PipelineConfigLike
+}
+
 const STAGE_WEIGHTS: Record<string, number> = {
   negotiation: 26,
   proposal: 22,
@@ -99,11 +107,6 @@ const KIND_WEIGHTS: Record<WorkItem['kind'], number> = {
   task: 22,
   project: 16,
   criterion: 14,
-}
-
-function stageLabel(stage?: string | null) {
-  if (!stage) return 'Pipeline'
-  return stage.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
 }
 
 function compactMoney(value: number | null | undefined) {
@@ -164,7 +167,7 @@ function itemKindLabel(kind: WorkItem['kind']) {
   return 'Task'
 }
 
-function buildWorkItems(deals: DealRecord[]): WorkItem[] {
+function buildWorkItems(deals: DealRecord[], pipelineConfig?: PipelineConfigLike): WorkItem[] {
   return deals.flatMap(deal => {
     const score = deal.conversionScore ?? 50
     const stageWeight = STAGE_WEIGHTS[deal.stage] ?? 4
@@ -183,7 +186,7 @@ function buildWorkItems(deals: DealRecord[]): WorkItem[] {
         stage: deal.stage,
         kind: 'task' as const,
         text: todo.text,
-        meta: `${stageLabel(deal.stage)}${todo.createdAt ? ` · ${formatRelativeTime(todo.createdAt)}` : ''}${todo.source === 'ai' ? ' · AI' : ''}`,
+        meta: `${stageLabelFor(deal.stage, pipelineConfig)}${todo.createdAt ? ` · ${formatRelativeTime(todo.createdAt)}` : ''}${todo.source === 'ai' ? ' · AI' : ''}`,
         dueDate: todo.dueDate,
         updatedAt: deal.updatedAt,
         done: todo.done,
@@ -227,7 +230,7 @@ function buildWorkItems(deals: DealRecord[]): WorkItem[] {
         stage: deal.stage,
         kind: 'criterion' as const,
         text: item.text,
-        meta: `${stageLabel(deal.stage)} · ${item.category ?? 'Success criteria'}`,
+        meta: `${stageLabelFor(deal.stage, pipelineConfig)} · ${item.category ?? 'Success criteria'}`,
         dueDate: null,
         updatedAt: deal.updatedAt,
         done: Boolean(item.achieved),
@@ -252,15 +255,20 @@ function TasksPageInner() {
     revalidateOnFocus: false,
     dedupingInterval: 45_000,
   })
+  const { data: pipelineConfigRes } = useSWR<PipelineConfigResponse>('/api/pipeline-config', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 120_000,
+  })
 
   const [search, setSearch] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<'all' | WorkItem['priorityLabel']>('all')
   const [savingItemKey, setSavingItemKey] = useState<string | null>(null)
   const deferredSearch = useDeferredValue(search)
   const deals = useMemo(() => data?.data ?? [], [data?.data])
+  const pipelineConfig = pipelineConfigRes?.data
   const dealById = useMemo(() => new Map(deals.map(deal => [deal.id, deal])), [deals])
 
-  const items = useMemo(() => buildWorkItems(deals), [deals])
+  const items = useMemo(() => buildWorkItems(deals, pipelineConfig), [deals, pipelineConfig])
 
   const filteredItems = useMemo(() => {
     return items.filter(item => {
@@ -384,8 +392,8 @@ function TasksPageInner() {
         .tasks-shell {
           display: flex;
           flex-direction: column;
-          gap: 24px;
-          max-width: 1120px;
+          gap: clamp(20px, 2.2vw, 26px);
+          width: min(100%, 1240px);
         }
         .tasks-header {
           display: flex;
@@ -447,7 +455,7 @@ function TasksPageInner() {
           color: var(--ink-3);
         }
         .tasks-filter-card {
-          padding: 18px;
+          padding: clamp(16px, 2vw, 18px);
         }
         .tasks-filter-grid {
           display: grid;
@@ -505,7 +513,8 @@ function TasksPageInner() {
           gap: 16px;
         }
         .tasks-panel {
-          padding: 18px;
+          padding: clamp(16px, 2vw, 18px);
+          min-width: 0;
         }
         .tasks-list {
           display: grid;
@@ -682,6 +691,9 @@ function TasksPageInner() {
           line-height: 1.6;
         }
         @media (max-width: 1080px) {
+          .tasks-shell {
+            width: 100%;
+          }
           .tasks-page-grid {
             grid-template-columns: 1fr;
           }
@@ -694,7 +706,7 @@ function TasksPageInner() {
             font-size: 28px;
           }
           .tasks-summary-grid {
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr;
           }
           .tasks-item {
             grid-template-columns: auto minmax(0, 1fr);
@@ -702,6 +714,9 @@ function TasksPageInner() {
           .tasks-actions {
             grid-column: 2;
             justify-content: flex-start;
+          }
+          .tasks-header {
+            align-items: flex-start;
           }
         }
       `}</style>

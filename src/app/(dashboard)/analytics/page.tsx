@@ -12,6 +12,10 @@ import {
 } from 'lucide-react'
 import AIVoice from '@/components/AIVoice'
 import { fetcher } from '@/lib/fetcher'
+import {
+  stageLabelFor,
+  type PipelineConfigLike,
+} from '@/lib/pipeline-presentation'
 import { formatCurrencyGBP, formatRelativeTime } from '@/lib/presentation'
 
 type VelocityData = {
@@ -143,13 +147,12 @@ type WatchItem = {
   value?: number | null
 }
 
-function compactMoney(value: number | null | undefined) {
-  return formatCurrencyGBP(value, { compact: true })
+type PipelineConfigResponse = {
+  data?: PipelineConfigLike
 }
 
-function stageLabel(stage?: string | null) {
-  if (!stage) return 'Pipeline'
-  return stage.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase())
+function compactMoney(value: number | null | undefined) {
+  return formatCurrencyGBP(value, { compact: true })
 }
 
 function SignalsMetric({
@@ -218,6 +221,10 @@ export default function AnalyticsPage() {
     revalidateOnFocus: false,
     dedupingInterval: 45_000,
   })
+  const { data: pipelineConfigRes } = useSWR<PipelineConfigResponse>('/api/pipeline-config', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 120_000,
+  })
   const { data: productRes, mutate: mutateProduct } = useSWR<{ data: ProductSignalsData }>(
     '/api/dashboard/product-signals',
     fetcher,
@@ -233,6 +240,7 @@ export default function AnalyticsPage() {
   const winLoss = winLossRes?.data
   const brain = brainRes?.data ?? {}
   const deals = useMemo(() => dealsRes?.data ?? [], [dealsRes?.data])
+  const pipelineConfig = pipelineConfigRes?.data
   const openDeals = useMemo(
     () => deals.filter(deal => !['closed_won', 'closed_lost'].includes(deal.stage)),
     [deals],
@@ -309,7 +317,7 @@ export default function AnalyticsPage() {
 
   const heroCopy = useMemo(() => {
     const stagePressure = velocity?.bottleneck
-      ? `${stageLabel(velocity.bottleneck.stage)} is constraining throughput with ${velocity.bottleneck.reason.toLowerCase()}.`
+      ? `${stageLabelFor(velocity.bottleneck.stage, pipelineConfig)} is constraining throughput with ${velocity.bottleneck.reason.toLowerCase()}.`
       : 'The pipeline is building signal across active stages.'
     const winSignal = winLoss?.winFactors?.[0]?.factor
       ? `The strongest repeatable win factor right now is ${winLoss.winFactors[0].factor.toLowerCase()}.`
@@ -319,7 +327,7 @@ export default function AnalyticsPage() {
       : 'No single deal is materially overheating right now.'
 
     return `${stagePressure} ${winSignal} ${riskSignal}`
-  }, [velocity?.bottleneck, watchlist, winLoss?.winFactors])
+  }, [pipelineConfig, velocity?.bottleneck, watchlist, winLoss?.winFactors])
 
   const maxWinFactor = Math.max(...(winLoss?.winFactors?.map(item => item.count) ?? [1]), 1)
   const maxLossReason = Math.max(...(winLoss?.lossReasons?.map(item => item.count) ?? [1]), 1)
@@ -347,8 +355,8 @@ export default function AnalyticsPage() {
         .signals-shell {
           display: flex;
           flex-direction: column;
-          gap: 28px;
-          max-width: 1180px;
+          gap: clamp(20px, 2.4vw, 28px);
+          width: min(100%, 1280px);
         }
         .signals-header {
           display: flex;
@@ -401,7 +409,7 @@ export default function AnalyticsPage() {
           gap: 16px;
         }
         .signals-hero-card {
-          padding: 24px 26px;
+          padding: clamp(18px, 2.2vw, 26px);
         }
         .signals-hero-copy {
           margin-top: 14px;
@@ -464,7 +472,8 @@ export default function AnalyticsPage() {
           gap: 16px;
         }
         .signals-panel {
-          padding: 18px;
+          padding: clamp(16px, 2vw, 18px);
+          min-width: 0;
         }
         .signals-stage-stack,
         .signals-pattern-stack,
@@ -618,6 +627,11 @@ export default function AnalyticsPage() {
           font-size: 12px;
           line-height: 1.6;
         }
+        @media (max-width: 1180px) {
+          .signals-shell {
+            width: 100%;
+          }
+        }
         @media (max-width: 1080px) {
           .signals-hero,
           .signals-grid {
@@ -635,7 +649,7 @@ export default function AnalyticsPage() {
             font-size: 22px;
           }
           .signals-metric-grid {
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr;
           }
         }
       `}</style>
@@ -718,7 +732,7 @@ export default function AnalyticsPage() {
         <section className="panel-section signals-panel">
           <div className="section-head">
             <h2 className="section-title">Stage pressure</h2>
-            <span className="section-action">{velocity?.bottleneck ? `Bottleneck: ${stageLabel(velocity.bottleneck.stage)}` : 'Healthy flow'}</span>
+            <span className="section-action">{velocity?.bottleneck ? `Bottleneck: ${stageLabelFor(velocity.bottleneck.stage, pipelineConfig)}` : 'Healthy flow'}</span>
           </div>
           {velocityLoading ? (
             <div className="skeleton" style={{ height: 220, borderRadius: 'var(--radius-lg)' }} />
@@ -729,7 +743,7 @@ export default function AnalyticsPage() {
               {velocity.stageMetrics.map(stage => (
                 <div key={stage.stage} className="signals-stage-row">
                   <div className="signals-stage-head">
-                    <div className="signals-row-title">{stageLabel(stage.stage)}</div>
+                    <div className="signals-row-title">{stageLabelFor(stage.stage, pipelineConfig)}</div>
                     <div className="signals-row-meta">{stage.dealCount} deals</div>
                   </div>
                   <div className="signals-stage-bar">
@@ -762,7 +776,7 @@ export default function AnalyticsPage() {
                   <div className="signals-watch-head">
                     <div className="signals-row-title">{item.company}</div>
                     <div className="signals-chip-row">
-                      <span className="signals-chip">{stageLabel(item.stage)}</span>
+                      <span className="signals-chip">{stageLabelFor(item.stage, pipelineConfig)}</span>
                       {item.score != null ? <span className="signals-chip mono">{Math.round(item.score)}</span> : null}
                       {item.value ? <span className="signals-chip mono">{compactMoney(item.value)}</span> : null}
                     </div>
@@ -900,7 +914,7 @@ export default function AnalyticsPage() {
                     <div className="signals-row-title">{item.company}</div>
                     <div className="signals-chip">{item.suggestedCount} links</div>
                   </div>
-                  <div className="signals-row-meta">{stageLabel(item.stage)}</div>
+                  <div className="signals-row-meta">{stageLabelFor(item.stage, pipelineConfig)}</div>
                 </div>
               ))}
               {!(loopSignals?.signals?.length ?? 0) ? <div className="signals-row-meta">No suggested loops waiting for action.</div> : null}
