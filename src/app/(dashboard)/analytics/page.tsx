@@ -147,6 +147,14 @@ type WatchItem = {
   value?: number | null
 }
 
+type IntelligenceBriefItem = {
+  id: string
+  title: string
+  detail: string
+  meta: string
+  tone: 'risk' | 'active' | 'resolved'
+}
+
 type PipelineConfigResponse = {
   data?: PipelineConfigLike
 }
@@ -314,6 +322,68 @@ export default function AnalyticsPage() {
 
     return next.slice(0, 5)
   }, [brain.mlPredictions, brain.staleDeals, brain.urgentDeals, deals])
+
+  const revenueFrictionItems = useMemo<IntelligenceBriefItem[]>(() => {
+    const next: IntelligenceBriefItem[] = []
+
+    for (const gap of (productSignals?.gaps ?? []).slice(0, 3)) {
+      next.push({
+        id: `gap-${gap.title}`,
+        title: gap.title,
+        detail: `${gap.dealsBlocked} live deal${gap.dealsBlocked === 1 ? '' : 's'} are feeling this friction right now.`,
+        meta: `${compactMoney(gap.revenueAtRisk)} at risk · ${gap.status}`,
+        tone: 'risk',
+      })
+    }
+
+    for (const loop of (productSignals?.recentLoops ?? []).slice(0, 2)) {
+      next.push({
+        id: `recent-loop-${loop.id}`,
+        title: loop.label,
+        detail: loop.dealName ?? loop.issueId ?? 'A linked commercial issue is waiting for product or ops follow-through.',
+        meta: `Raised ${formatRelativeTime(loop.createdAt)}`,
+        tone: 'active',
+      })
+    }
+
+    for (const item of (loopSignals?.inFlight ?? []).slice(0, 2)) {
+      next.push({
+        id: `in-flight-${item.id}`,
+        title: item.company,
+        detail: `Commercial feedback is already moving through delivery${item.inCycleIssues?.length ? ` with ${item.inCycleIssues.length} linked issue${item.inCycleIssues.length === 1 ? '' : 's'}` : ''}.`,
+        meta: `${item.loopStage === 'awaiting_approval' ? 'Awaiting approval' : 'In flight'} · ${item.pendingActionCreatedAt ? `Updated ${formatRelativeTime(item.pendingActionCreatedAt)}` : stageLabelFor(item.stage, pipelineConfig)}`,
+        tone: 'active',
+      })
+    }
+
+    return next.slice(0, 6)
+  }, [loopSignals?.inFlight, pipelineConfig, productSignals?.gaps, productSignals?.recentLoops])
+
+  const recentChangeItems = useMemo<IntelligenceBriefItem[]>(() => {
+    const next: IntelligenceBriefItem[] = []
+
+    for (const action of (productSignals?.recentActions ?? []).slice(0, 3)) {
+      next.push({
+        id: `action-${action.id}`,
+        title: action.label,
+        detail: action.dealName ?? action.issueId ?? 'Workspace action captured by Halvex.',
+        meta: `Logged ${formatRelativeTime(action.createdAt)}`,
+        tone: 'active',
+      })
+    }
+
+    for (const item of (loopSignals?.closedLoops ?? []).slice(0, 3)) {
+      next.push({
+        id: `closed-${item.id}`,
+        title: item.company,
+        detail: `A revenue loop closed with ${item.issueCount} shipped item${item.issueCount === 1 ? '' : 's'}.`,
+        meta: item.deployedAt ? `Shipped ${formatRelativeTime(item.deployedAt)}` : 'Recently closed',
+        tone: 'resolved',
+      })
+    }
+
+    return next.slice(0, 6)
+  }, [loopSignals?.closedLoops, productSignals?.recentActions])
 
   const heroCopy = useMemo(() => {
     const stagePressure = velocity?.bottleneck
@@ -510,6 +580,11 @@ export default function AnalyticsPage() {
           font-size: 11px;
           color: var(--ink-4);
         }
+        .signals-simple-body {
+          font-size: 12px;
+          line-height: 1.55;
+          color: var(--ink-2);
+        }
         .signals-stage-bar,
         .signals-pattern-bar {
           height: 5px;
@@ -565,6 +640,18 @@ export default function AnalyticsPage() {
           font-size: 10px;
           color: var(--ink-3);
           background: rgba(20, 17, 10, 0.05);
+        }
+        .signals-chip-risk {
+          background: rgba(178, 58, 58, 0.12);
+          color: var(--risk);
+        }
+        .signals-chip-active {
+          background: rgba(46, 90, 172, 0.12);
+          color: var(--cool);
+        }
+        .signals-chip-resolved {
+          background: rgba(29, 184, 106, 0.1);
+          color: var(--signal);
         }
         .signals-pattern-row {
           display: grid;
@@ -659,7 +746,7 @@ export default function AnalyticsPage() {
           <div className="signals-eyebrow">Intelligence</div>
           <div className="signals-title">Intelligence</div>
           <div className="signals-subtitle">
-            Pressure-test forecast quality, see where momentum is compounding or stalling, and understand what is actually driving wins and losses.
+            See where momentum is compounding, where deals are sticking, and which patterns are actually worth acting on.
           </div>
         </div>
         <div className="signals-refresh">
@@ -731,8 +818,8 @@ export default function AnalyticsPage() {
       <div className="signals-grid">
         <section className="panel-section signals-panel">
           <div className="section-head">
-            <h2 className="section-title">Stage pressure</h2>
-            <span className="section-action">{velocity?.bottleneck ? `Bottleneck: ${stageLabelFor(velocity.bottleneck.stage, pipelineConfig)}` : 'Healthy flow'}</span>
+            <h2 className="section-title">Where deals are sticking</h2>
+            <span className="section-action">{velocity?.bottleneck ? `Focus: ${stageLabelFor(velocity.bottleneck.stage, pipelineConfig)}` : 'Healthy flow'}</span>
           </div>
           {velocityLoading ? (
             <div className="skeleton" style={{ height: 220, borderRadius: 'var(--radius-lg)' }} />
@@ -761,7 +848,7 @@ export default function AnalyticsPage() {
 
         <section className="panel-section signals-panel">
           <div className="section-head">
-            <h2 className="section-title">Watchlist</h2>
+            <h2 className="section-title">Needs intervention</h2>
             <Link href="/deals" className="section-action">
               Pipeline
               <ArrowRight size={12} />
@@ -792,7 +879,7 @@ export default function AnalyticsPage() {
       <div className="signals-grid">
         <section className="panel-section signals-panel">
           <div className="section-head">
-            <h2 className="section-title">Win patterns</h2>
+            <h2 className="section-title">Signals to repeat</h2>
             <span className="section-action">{winLoss?.overall?.won ?? 0} closed won</span>
           </div>
           {winLossLoading ? (
@@ -816,7 +903,7 @@ export default function AnalyticsPage() {
 
         <section className="panel-section signals-panel">
           <div className="section-head">
-            <h2 className="section-title">Loss pressure</h2>
+            <h2 className="section-title">Signals that kill momentum</h2>
             <span className="section-action">{winLoss?.overall?.lost ?? 0} closed lost</span>
           </div>
           {winLossLoading ? (
@@ -842,7 +929,7 @@ export default function AnalyticsPage() {
       <div className="signals-grid">
         <section className="panel-section signals-panel">
           <div className="section-head">
-            <h2 className="section-title">Competitor pressure</h2>
+            <h2 className="section-title">Competitive pressure</h2>
             <span className="section-action">{winLoss?.competitorImpact?.length ?? 0} tracked</span>
           </div>
           {!(winLoss?.competitorImpact?.length ?? 0) ? (
@@ -866,32 +953,21 @@ export default function AnalyticsPage() {
 
         <section className="panel-section signals-panel">
           <div className="section-head">
-            <h2 className="section-title">Product signals</h2>
-            <Link href="/automations" className="section-action">
-              Automations
-              <ArrowRight size={12} />
-            </Link>
+            <h2 className="section-title">Revenue friction</h2>
+            <span className="section-action">{revenueFrictionItems.length} active threads</span>
           </div>
-          {!(productSignals?.gaps?.length ?? 0) && !(productSignals?.recentLoops?.length ?? 0) ? (
-            <div className="signals-empty">No product-to-revenue loop signal has surfaced yet.</div>
+          {revenueFrictionItems.length === 0 ? (
+            <div className="signals-empty">No material revenue friction is surfacing right now.</div>
           ) : (
             <div className="signals-simple-stack">
-              {(productSignals?.gaps ?? []).slice(0, 3).map(gap => (
-                <div key={gap.title} className="signals-simple-row">
+              {revenueFrictionItems.map(item => (
+                <div key={item.id} className="signals-simple-row">
                   <div className="signals-simple-head">
-                    <div className="signals-row-title">{gap.title}</div>
-                    <div className="signals-chip mono">{compactMoney(gap.revenueAtRisk)}</div>
+                    <div className="signals-row-title">{item.title}</div>
+                    <div className={`signals-chip signals-chip-${item.tone}`}>{item.tone === 'risk' ? 'Risk' : 'In motion'}</div>
                   </div>
-                  <div className="signals-row-meta">{gap.dealsBlocked} deals blocked</div>
-                </div>
-              ))}
-              {(productSignals?.recentLoops ?? []).slice(0, 2).map(loop => (
-                <div key={loop.id} className="signals-simple-row">
-                  <div className="signals-simple-head">
-                    <div className="signals-row-title">{loop.label}</div>
-                    <div className="signals-row-meta">{formatRelativeTime(loop.createdAt)}</div>
-                  </div>
-                  <div className="signals-row-meta">{loop.dealName ?? loop.issueId ?? 'Workspace loop activity'}</div>
+                  <div className="signals-simple-body">{item.detail}</div>
+                  <div className="signals-row-meta">{item.meta}</div>
                 </div>
               ))}
             </div>
@@ -901,60 +977,25 @@ export default function AnalyticsPage() {
 
       <section className="panel-section signals-panel">
         <div className="section-head">
-          <h2 className="section-title">Loop activity</h2>
-          <span className="section-action">{loopSignals?.closedCount ?? 0} closed this week</span>
+          <h2 className="section-title">What changed recently</h2>
+          <span className="section-action">{recentChangeItems.length} recent shifts</span>
         </div>
-        <div className="signals-loop-grid">
-          <div className="signals-loop-column">
-            <div className="signals-loop-label">Signal</div>
-            <div className="signals-loop-stack">
-              {(loopSignals?.signals ?? []).slice(0, 3).map(item => (
-                <div key={item.id} className="signals-simple-row">
-                  <div className="signals-simple-head">
-                    <div className="signals-row-title">{item.company}</div>
-                    <div className="signals-chip">{item.suggestedCount} links</div>
-                  </div>
-                  <div className="signals-row-meta">{stageLabelFor(item.stage, pipelineConfig)}</div>
+        {recentChangeItems.length === 0 ? (
+          <div className="signals-empty">Recent shifts will appear here once Halvex sees shipping, follow-through, and revenue feedback close the loop.</div>
+        ) : (
+          <div className="signals-simple-stack">
+            {recentChangeItems.map(item => (
+              <div key={item.id} className="signals-simple-row">
+                <div className="signals-simple-head">
+                  <div className="signals-row-title">{item.title}</div>
+                  <div className={`signals-chip signals-chip-${item.tone}`}>{item.tone === 'resolved' ? 'Resolved' : 'Recent'}</div>
                 </div>
-              ))}
-              {!(loopSignals?.signals?.length ?? 0) ? <div className="signals-row-meta">No suggested loops waiting for action.</div> : null}
-            </div>
+                <div className="signals-simple-body">{item.detail}</div>
+                <div className="signals-row-meta">{item.meta}</div>
+              </div>
+            ))}
           </div>
-
-          <div className="signals-loop-column">
-            <div className="signals-loop-label">In flight</div>
-            <div className="signals-loop-stack">
-              {(loopSignals?.inFlight ?? []).slice(0, 3).map(item => (
-                <div key={item.id} className="signals-simple-row">
-                  <div className="signals-simple-head">
-                    <div className="signals-row-title">{item.company}</div>
-                    <div className="signals-chip">{item.loopStage === 'awaiting_approval' ? 'Approval' : 'In cycle'}</div>
-                  </div>
-                  <div className="signals-row-meta">
-                    {item.pendingActionCreatedAt ? `Updated ${formatRelativeTime(item.pendingActionCreatedAt)}` : `${item.inCycleIssues?.length ?? 0} issue(s) in motion`}
-                  </div>
-                </div>
-              ))}
-              {!(loopSignals?.inFlight?.length ?? 0) ? <div className="signals-row-meta">No active loops are moving through delivery right now.</div> : null}
-            </div>
-          </div>
-
-          <div className="signals-loop-column">
-            <div className="signals-loop-label">Closed</div>
-            <div className="signals-loop-stack">
-              {(loopSignals?.closedLoops ?? []).slice(0, 3).map(item => (
-                <div key={item.id} className="signals-simple-row">
-                  <div className="signals-simple-head">
-                    <div className="signals-row-title">{item.company}</div>
-                    <div className="signals-chip">{item.issueCount} shipped</div>
-                  </div>
-                  <div className="signals-row-meta">{item.deployedAt ? formatRelativeTime(item.deployedAt) : 'Closed loop'}</div>
-                </div>
-              ))}
-              {!(loopSignals?.closedLoops?.length ?? 0) ? <div className="signals-row-meta">No fully closed loops this week yet.</div> : null}
-            </div>
-          </div>
-        </div>
+        )}
       </section>
     </div>
   )

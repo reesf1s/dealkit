@@ -3,11 +3,11 @@ export const dynamic = 'force-dynamic'
 
 import type { CSSProperties } from 'react'
 import { useState, useMemo, useRef, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
 import Link from 'next/link'
 import * as Dialog from '@radix-ui/react-dialog'
-import { Plus, X, Search, SlidersHorizontal, ChevronUp, ChevronDown, Target } from 'lucide-react'
+import { Plus, X, Search, ChevronUp, ChevronDown, Target } from 'lucide-react'
 import { DealForm } from '@/components/deals/DealForm'
 import { useToast } from '@/components/shared/Toast'
 import SetupBanner from '@/components/shared/SetupBanner'
@@ -27,6 +27,7 @@ type SortKey = 'contact' | 'org' | 'value' | 'stage' | 'health' | 'activity' | '
 type SortDir = 'asc' | 'desc'
 type Health = 'green' | 'amber' | 'red' | 'grey'
 type FocusZone = 'ready_to_close' | 'engaged_recently' | 'waiting_on_reply' | 'cold' | null
+type QuickFilter = 'all' | 'at_risk' | 'late_stage' | 'high_value' | 'needs_context' | 'stale'
 type BrainData = {
   staleDeals?: Array<{ dealId: string }>
   urgentDeals?: Array<{ dealId: string; reason: string }>
@@ -60,6 +61,17 @@ const STAGES = [
 
 const STAGE_ORDER: Record<string, number> = {}
 STAGES.forEach((s, i) => { STAGE_ORDER[s.id] = i })
+
+const LIST_GRID_TEMPLATE = 'minmax(260px,1.45fr) minmax(120px,160px) minmax(120px,160px) 92px minmax(220px,1fr)'
+
+const QUICK_FILTER_LABELS: Record<QuickFilter, string> = {
+  all: 'All deals',
+  at_risk: 'At risk',
+  late_stage: 'Late stage',
+  high_value: 'High value',
+  needs_context: 'Needs context',
+  stale: 'Stale',
+}
 
 /* ── Helpers ── */
 
@@ -109,6 +121,32 @@ function dealInsight(deal: DealLog): string | null {
   if (insights?.length) return insights[0]
   if (deal.nextSteps) return deal.nextSteps
   return null
+}
+
+function matchesQuickFilter(
+  deal: DealLog,
+  quickFilter: QuickFilter,
+  staleDealIds: Set<string>,
+  urgentDealMap: Map<string, string>,
+) {
+  if (quickFilter === 'all') return true
+
+  const score = deal.conversionScore ?? 0
+
+  switch (quickFilter) {
+    case 'at_risk':
+      return urgentDealMap.has(deal.id) || staleDealIds.has(deal.id) || (score > 0 && score < 40)
+    case 'late_stage':
+      return ['proposal', 'negotiation'].includes(deal.stage)
+    case 'high_value':
+      return (deal.dealValue ?? 0) >= 100_000
+    case 'needs_context':
+      return !dealInsight(deal)
+    case 'stale':
+      return daysAgo(deal.updatedAt) >= 14
+    default:
+      return true
+  }
 }
 
 function daysAgo(dateStr: string | Date): number {
@@ -238,7 +276,7 @@ function SkeletonRow({ delay = 0 }: { delay?: number }) {
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '36px 1fr minmax(100px,180px) minmax(80px,110px) minmax(80px,120px) 72px minmax(120px,200px)',
+        gridTemplateColumns: LIST_GRID_TEMPLATE,
         gap: 8,
         padding: '13px 16px',
         borderBottom: '1px solid var(--border-subtle)',
@@ -247,10 +285,10 @@ function SkeletonRow({ delay = 0 }: { delay?: number }) {
       }}
       className="skeleton"
     >
-      {[36, 180, 120, 80, 90, 40, 120].map((w, i) => (
+      {[180, 120, 120, 70, 180].map((w, i) => (
         <div key={i} style={{
-          height: i === 0 ? 16 : 14,
-          width: i === 0 ? 16 : '80%',
+          height: 14,
+          width: typeof w === 'number' ? w : '80%',
           borderRadius: 4,
           background: 'var(--surface-2)',
         }} />
@@ -550,14 +588,16 @@ function KanbanView({
 
 function DealsPageInner() {
   const { toast } = useToast()
+  const router = useRouter()
+  const pathname = usePathname()
   const searchParams = useSearchParams()
   const [tab, setTab] = useState<Tab>(() => tabFromView(searchParams.get('view')))
   const [sortKey, setSortKey] = useState<SortKey>('activity')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [search, setSearch] = useState('')
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all')
   const [addOpen, setAddOpen] = useState(false)
   const [addLoading, setAddLoading] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const searchRef = useRef<HTMLInputElement>(null)
 
   // Focus zone from sidebar navigation
@@ -647,9 +687,26 @@ function DealsPageInner() {
     )
   }, [tabDeals, search])
 
+  const quickFilterCounts = useMemo(() => {
+    const base = searchedDeals
+    return {
+      all: base.length,
+      at_risk: base.filter(deal => matchesQuickFilter(deal, 'at_risk', staleDealIds, urgentDealMap)).length,
+      late_stage: base.filter(deal => matchesQuickFilter(deal, 'late_stage', staleDealIds, urgentDealMap)).length,
+      high_value: base.filter(deal => matchesQuickFilter(deal, 'high_value', staleDealIds, urgentDealMap)).length,
+      needs_context: base.filter(deal => matchesQuickFilter(deal, 'needs_context', staleDealIds, urgentDealMap)).length,
+      stale: base.filter(deal => matchesQuickFilter(deal, 'stale', staleDealIds, urgentDealMap)).length,
+    }
+  }, [searchedDeals, staleDealIds, urgentDealMap])
+
+  const visibleDeals = useMemo(
+    () => searchedDeals.filter(deal => matchesQuickFilter(deal, quickFilter, staleDealIds, urgentDealMap)),
+    [quickFilter, searchedDeals, staleDealIds, urgentDealMap],
+  )
+
   /* ── Sort ── */
   const sortedDeals = useMemo(() => {
-    const list = [...searchedDeals]
+    const list = [...visibleDeals]
     list.sort((a, b) => {
       let cmp = 0
       switch (sortKey) {
@@ -664,7 +721,7 @@ function DealsPageInner() {
       return sortDir === 'asc' ? cmp : -cmp
     })
     return list
-  }, [searchedDeals, sortKey, sortDir])
+  }, [visibleDeals, sortKey, sortDir])
 
   /* ── Resolve stages from pipeline-config (supports custom stage labels/colors) ── */
   const configStages = useMemo(() => {
@@ -730,52 +787,39 @@ function DealsPageInner() {
     } finally { setAddLoading(false) }
   }
 
-  function toggleRow(id: string) {
-    setSelectedIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
+  function replacePipelineParams(updater: (params: URLSearchParams) => void) {
+    const params = new URLSearchParams(searchParams.toString())
+    updater(params)
+    const next = params.toString()
+    router.replace(next ? `${pathname}?${next}` : pathname, { scroll: false })
+  }
+
+  function handleTabChange(nextTab: Tab) {
+    setTab(nextTab)
+    replacePipelineParams(params => {
+      if (nextTab === 'active') params.delete('view')
+      else if (nextTab === 'pipeline') params.set('view', 'board')
+      else params.set('view', 'closed')
     })
   }
 
-  function toggleAll() {
-    if (selectedIds.size === sortedDeals.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(sortedDeals.map(d => d.id)))
-    }
+  function clearFocusFilter() {
+    setActiveFocus(null)
+    replacePipelineParams(params => {
+      params.delete('focus')
+    })
   }
 
-  /* ── Breadcrumb pills ── */
-  const breadcrumbs = (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 20 }}>
-      <span style={{
-        background: 'var(--surface-2)',
-        borderRadius: 5,
-        padding: '3px 10px',
-        fontSize: 12,
-        color: 'var(--text-tertiary)',
-        fontWeight: 400,
-      }}>Pipeline</span>
-      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>/</span>
-      <span style={{
-        background: 'var(--surface-2)',
-        borderRadius: 5,
-        padding: '3px 10px',
-        fontSize: 12,
-        color: 'var(--text-secondary)',
-        fontWeight: 500,
-      }}>Revenue workspace</span>
-    </div>
-  )
+  function clearPipelineFilters() {
+    setSearch('')
+    setQuickFilter('all')
+    clearFocusFilter()
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
 
       {dbError && <SetupBanner context="Add a DATABASE_URL to start logging deals and tracking your win rate." />}
-
-      {breadcrumbs}
 
       {/* ── Focus zone banner ── */}
       {activeFocus && (
@@ -799,7 +843,7 @@ function DealsPageInner() {
             </span>
           </div>
           <button
-            onClick={() => setActiveFocus(null)}
+            onClick={clearFocusFilter}
             style={{
               background: 'none',
               border: 'none',
@@ -831,7 +875,7 @@ function DealsPageInner() {
             Pipeline
           </h1>
           <p style={{ fontSize: 14, color: 'var(--text-tertiary)', margin: 0 }}>
-            Prioritise what to move now, then work the board with a clean forecast.
+            A cleaner, notes-first pipeline workspace. Work the list when you need focus, then switch to the board for stage and forecast control.
           </p>
         </div>
         <button
@@ -917,13 +961,13 @@ function DealsPageInner() {
         marginBottom: 16,
       }}>
         {([
-          { id: 'active' as Tab,   label: 'Focus queue', icon: '◉' },
-          { id: 'pipeline' as Tab, label: 'Stage board', icon: '▦' },
+          { id: 'active' as Tab,   label: 'Focus list', icon: '◉' },
+          { id: 'pipeline' as Tab, label: 'Board', icon: '▦' },
           { id: 'archived' as Tab, label: 'Closed',      icon: '▣' },
         ] as const).map(t => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => handleTabChange(t.id)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -948,9 +992,8 @@ function DealsPageInner() {
 
       {/* ── Search + filter bar ── */}
       {tab !== 'pipeline' && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gap: 10, marginBottom: 16 }}>
           <div style={{
-            flex: 1,
             display: 'flex',
             alignItems: 'center',
             gap: 8,
@@ -988,78 +1031,72 @@ function DealsPageInner() {
               </button>
             )}
           </div>
-          <button
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '9px 16px',
-              border: '1px solid var(--border-default)',
-              borderRadius: 9,
-              background: 'var(--surface-1)',
-              fontSize: 14,
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'border-color 100ms, color 100ms',
-            }}
-            onMouseEnter={e => {
-              const el = e.currentTarget as HTMLElement
-              el.style.borderColor = 'var(--border-strong)'
-              el.style.color = 'var(--text-primary)'
-            }}
-            onMouseLeave={e => {
-              const el = e.currentTarget as HTMLElement
-              el.style.borderColor = 'var(--border-default)'
-              el.style.color = 'var(--text-secondary)'
-            }}
-          >
-            <SlidersHorizontal size={14} />
-            Refine
-          </button>
-        </div>
-      )}
-
-      {/* ── Bulk action bar ── */}
-      {selectedIds.size > 0 && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '8px 16px',
-          background: 'var(--color-green-bg)',
-          border: '1px solid rgba(29,184,106,0.24)',
-          borderRadius: 8,
-          marginBottom: 8,
-        }}>
-          <span style={{ fontSize: 13, color: 'var(--color-green)', fontWeight: 500 }}>
-            {selectedIds.size} selected
-          </span>
-          <div style={{ width: 1, height: 16, background: 'rgba(29,184,106,0.30)' }} />
-          {['Change Stage', 'Archive', 'Delete'].map(action => (
-            <button key={action} style={{
-              fontSize: 12.5,
-              color: 'var(--color-green)',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: 500,
-              padding: '2px 8px',
-              borderRadius: 5,
-              transition: 'background 100ms',
-            }}
-            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'rgba(29,184,106,0.10)'}
-            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'none'}
-            >
-              {action}
-            </button>
-          ))}
-          <button
-            onClick={() => setSelectedIds(new Set())}
-            style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', display: 'flex' }}
-          >
-            <X size={14} />
-          </button>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 10,
+            flexWrap: 'wrap',
+          }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {(['all', 'at_risk', 'late_stage', 'high_value', 'needs_context', 'stale'] as QuickFilter[]).map(filter => {
+                const active = quickFilter === filter
+                const count = quickFilterCounts[filter]
+                return (
+                  <button
+                    key={filter}
+                    onClick={() => setQuickFilter(filter)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 7,
+                      padding: '8px 11px',
+                      borderRadius: 999,
+                      border: `1px solid ${active ? 'var(--text-primary)' : 'var(--border-default)'}`,
+                      background: active ? 'var(--text-primary)' : 'var(--surface-1)',
+                      color: active ? 'var(--text-inverse)' : 'var(--text-secondary)',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      transition: 'all 100ms',
+                    }}
+                  >
+                    <span>{QUICK_FILTER_LABELS[filter]}</span>
+                    <span style={{
+                      padding: '1px 6px',
+                      borderRadius: 999,
+                      fontSize: 10.5,
+                      fontFamily: 'var(--font-mono)',
+                      background: active ? 'rgba(255,255,255,0.14)' : 'var(--surface-3)',
+                      color: active ? 'var(--text-inverse)' : 'var(--text-tertiary)',
+                    }}>
+                      {count}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+            {(search.trim() || quickFilter !== 'all' || activeFocus) ? (
+              <button
+                onClick={clearPipelineFilters}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '8px 10px',
+                  borderRadius: 999,
+                  border: '1px solid var(--border-default)',
+                  background: 'transparent',
+                  color: 'var(--text-secondary)',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={12} />
+                Clear filters
+              </button>
+            ) : null}
+          </div>
         </div>
       )}
 
@@ -1081,27 +1118,17 @@ function DealsPageInner() {
           {/* Table header */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '36px 1fr minmax(110px,190px) minmax(80px,110px) minmax(90px,130px) 72px minmax(130px,220px)',
+            gridTemplateColumns: LIST_GRID_TEMPLATE,
             gap: 8,
             padding: '11px 18px',
             borderBottom: '1px solid var(--border-default)',
             background: 'var(--surface-2)',
           }}>
-            {/* Select all checkbox */}
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-              <input
-                type="checkbox"
-                checked={sortedDeals.length > 0 && selectedIds.size === sortedDeals.length}
-                onChange={toggleAll}
-                style={{ accentColor: '#1DB86A', width: 15, height: 15, cursor: 'pointer' }}
-              />
-            </div>
-            <SortHeader label="Contact" icon="👤" sortKey="contact" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-            <SortHeader label="Organization" icon="🏢" sortKey="org" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-            <SortHeader label="Value" icon="£" sortKey="value" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} align="right" />
+            <SortHeader label="Deal" icon="◉" sortKey="contact" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+            <SortHeader label="Commercial" icon="£" sortKey="value" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
             <SortHeader label="Stage" icon="◆" sortKey="stage" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-            <SortHeader label="Score" icon="●" sortKey="score" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} align="center" />
-            <SortHeader label="Halvex View" sortKey="health" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+            <SortHeader label="Health" icon="●" sortKey="score" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} align="center" />
+            <SortHeader label="Latest Signal" sortKey="activity" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
           </div>
 
           {/* Rows */}
@@ -1115,7 +1142,6 @@ function DealsPageInner() {
             sortedDeals.map((deal: DealLog) => {
               const name = contactName(deal)
               const org = deal.prospectCompany ?? ''
-              const selected = selectedIds.has(deal.id)
               const stale = staleDealIds.has(deal.id)
               const urgentReason = urgentDealMap.get(deal.id)
               const score = deal.conversionScore as number | null
@@ -1133,36 +1159,23 @@ function DealsPageInner() {
                   key={deal.id}
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '36px 1fr minmax(110px,190px) minmax(80px,110px) minmax(90px,130px) 72px minmax(130px,220px)',
+                    gridTemplateColumns: LIST_GRID_TEMPLATE,
                     gap: 8,
                     padding: '14px 18px',
                     borderBottom: '1px solid var(--border-subtle)',
                     alignItems: 'center',
-                    background: selected ? 'var(--color-green-bg)' : 'transparent',
+                    background: 'transparent',
                     transition: 'background 100ms',
                     cursor: 'pointer',
                   }}
                   onMouseEnter={e => {
-                    if (!selected) (e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'
+                    ;(e.currentTarget as HTMLElement).style.background = 'var(--surface-hover)'
                   }}
                   onMouseLeave={e => {
-                    if (!selected) (e.currentTarget as HTMLElement).style.background = 'transparent'
+                    ;(e.currentTarget as HTMLElement).style.background = 'transparent'
                   }}
                 >
-                  {/* Checkbox */}
-                  <div
-                    style={{ display: 'flex', alignItems: 'center' }}
-                    onClick={e => { e.stopPropagation(); toggleRow(deal.id) }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected}
-                      onChange={() => toggleRow(deal.id)}
-                      style={{ accentColor: '#1DB86A', width: 15, height: 15, cursor: 'pointer' }}
-                    />
-                  </div>
-
-                  {/* Contact */}
+                  {/* Deal */}
                   <Link href={`/deals/${deal.id}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                     <GradientAvatar name={name} size={34} />
                     <div style={{ minWidth: 0 }}>
@@ -1180,7 +1193,12 @@ function DealsPageInner() {
                       </div>
                       {name && name !== deal.dealName && (
                         <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {name}
+                          {org ? `${org} · ${name}` : name}
+                        </div>
+                      )}
+                      {org && (!name || name === deal.dealName) && (
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {org}
                         </div>
                       )}
                       {snapshotPending ? (
@@ -1209,47 +1227,39 @@ function DealsPageInner() {
                     </div>
                   </Link>
 
-                  {/* Organization */}
-                  <Link href={`/deals/${deal.id}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                    {org ? (
-                      <>
-                        <OrgLogo name={org} size={22} />
-                        <span style={{
-                          fontSize: 13.5,
-                          color: 'var(--text-secondary)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}>
-                          {org}
-                        </span>
-                      </>
-                    ) : (
-                      <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>—</span>
-                    )}
-                  </Link>
-
-                  {/* Value */}
-                  <Link href={`/deals/${deal.id}`} style={{
-                    textDecoration: 'none',
-                    fontSize: 13.5,
-                    fontWeight: 500,
-                    color: Number(deal.dealValue) > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
-                    textAlign: 'right',
-                    fontFamily: 'var(--font-mono)',
-                    letterSpacing: '-0.03em',
-                    display: 'block',
-                  }}>
-                    {formatVal(deal.dealValue, currencySymbol)}
+                  {/* Commercial */}
+                  <Link href={`/deals/${deal.id}`} style={{ textDecoration: 'none', display: 'grid', gap: 6, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 13.5,
+                      fontWeight: 500,
+                      color: Number(deal.dealValue) > 0 ? 'var(--text-primary)' : 'var(--text-muted)',
+                      fontFamily: 'var(--font-mono)',
+                      letterSpacing: '-0.03em',
+                    }}>
+                      {formatVal(deal.dealValue, currencySymbol)}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      {org ? <OrgLogo name={org} size={20} /> : null}
+                      <ForecastPill
+                        dealId={deal.id}
+                        current={deal.forecastCategory ?? null}
+                        onChanged={handleForecastChange}
+                      />
+                    </div>
                   </Link>
 
                   {/* Stage */}
-                  <Link href={`/deals/${deal.id}`} style={{ textDecoration: 'none' }}>
+                  <Link href={`/deals/${deal.id}`} style={{ textDecoration: 'none', display: 'grid', gap: 6, justifyItems: 'start' }}>
                     <StageBadge stage={deal.stage} />
+                    <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                      {deal.closeDate
+                        ? `Close ${new Date(deal.closeDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+                        : `Updated ${relativeTime(deal.updatedAt)}`}
+                    </span>
                   </Link>
 
-                  {/* Score */}
-                  <Link href={`/deals/${deal.id}`} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {/* Health */}
+                  <Link href={`/deals/${deal.id}`} style={{ textDecoration: 'none', display: 'grid', gap: 6, justifyItems: 'center' }}>
                     {score != null ? (
                       <div style={{
                         display: 'flex', alignItems: 'center', gap: 5,
@@ -1265,9 +1275,12 @@ function DealsPageInner() {
                     ) : (
                       <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>—</span>
                     )}
+                    <span style={{ fontSize: 11, color: urgentReason ? 'var(--color-red)' : stale ? 'var(--color-amber)' : 'var(--text-tertiary)' }}>
+                      {urgentReason ? 'Needs action' : stale ? 'Cooling' : getDealHealth(deal)}
+                    </span>
                   </Link>
 
-                  {/* AI Intel — snapshot or topRisk fallback */}
+                  {/* Signal */}
                   <Link href={`/deals/${deal.id}`} style={{ textDecoration: 'none', display: 'block', minWidth: 0 }}>
                     {snapshotPending ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -1302,6 +1315,9 @@ function DealsPageInner() {
                         {topRisk ?? '—'}
                       </span>
                     )}
+                    <div style={{ marginTop: 5, fontSize: 11, color: 'var(--text-tertiary)' }}>
+                      {relativeTime(deal.updatedAt)}
+                    </div>
                   </Link>
                 </div>
               )

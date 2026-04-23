@@ -855,6 +855,13 @@ select.glass-input:focus {
   z-index: 15;
 }
 
+.topbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
 .crumbs {
   display: flex;
   align-items: center;
@@ -876,6 +883,21 @@ select.glass-input:focus {
 .crumb-current {
   color: var(--ink);
   font-weight: 600;
+}
+
+.topbar-context-pill {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  box-shadow: var(--glass-pill-shadow);
 }
 
 .topbar-actions {
@@ -2106,6 +2128,11 @@ select.glass-input:focus {
     gap: 10px;
   }
 
+  .topbar-meta {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+  }
+
   .crumbs {
     flex: 1 1 260px;
     min-width: 0;
@@ -2188,10 +2215,19 @@ select.glass-input:focus {
     gap: 10px;
   }
 
+  .topbar-context-pill {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+
   .topbar-actions {
     gap: 6px;
     flex-wrap: wrap;
     justify-content: flex-start;
+  }
+
+  .topbar-aux-action {
+    display: none;
   }
 
   .deal-header,

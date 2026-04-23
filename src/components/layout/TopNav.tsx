@@ -1,24 +1,75 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { ArrowRight, Ellipsis, Menu, PanelLeftClose, PanelLeftOpen, Send, Share2 } from 'lucide-react'
+import { ArrowRight, Menu, PanelLeftClose, PanelLeftOpen, Send, Share2, Sparkles } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 
-const PAGE_LABELS: Record<string, string> = {
-  '/dashboard': 'Enterprise Pipeline',
-  '/deals': 'Pipeline',
-  '/pipeline': 'Pipeline',
-  '/analytics': 'Intelligence',
-  '/intelligence': 'Intelligence',
-  '/connections': 'Conversations',
-  '/contacts': 'Contacts',
-  '/company': 'Accounts',
-  '/automations': 'Automations',
-  '/tasks': 'Tasks',
-  '/workflows': 'Automations',
-  '/settings': 'Settings',
-  '/calendar': 'Calendar',
+type PageMeta = {
+  match: string[]
+  label: string
+  context: string
+  askLabel: string
+  askPrompt: string
+  actionLabel: string
+  actionPrompt: string
 }
+
+const PAGE_META: PageMeta[] = [
+  {
+    match: ['/dashboard'],
+    label: 'Overview',
+    context: 'Daily operating view',
+    askLabel: 'Ask Halvex',
+    askPrompt: 'Summarise the current workspace, what changed most recently, and what the team should focus on first.',
+    actionLabel: 'Plan my focus',
+    actionPrompt: 'Turn the current overview into a ranked plan for today with the top 3 commercial moves.',
+  },
+  {
+    match: ['/deals', '/pipeline'],
+    label: 'Pipeline',
+    context: 'Notes-first revenue workspace',
+    askLabel: 'Ask Halvex',
+    askPrompt: 'Summarise the current pipeline and identify the deals that deserve immediate attention.',
+    actionLabel: 'Prioritise deals',
+    actionPrompt: 'Rank the most important deals to work next and explain why each matters now.',
+  },
+  {
+    match: ['/analytics', '/intelligence'],
+    label: 'Intelligence',
+    context: 'Signals and patterns',
+    askLabel: 'Ask Halvex',
+    askPrompt: 'Explain the strongest pattern, risk, or signal in this intelligence view.',
+    actionLabel: 'Explain signal',
+    actionPrompt: 'Tell me the single most important signal in the pipeline and how it should change my behaviour.',
+  },
+  {
+    match: ['/tasks'],
+    label: 'Tasks',
+    context: 'Execution lane',
+    askLabel: 'Ask Halvex',
+    askPrompt: 'Review the current execution lane and explain which tasks are most commercially important.',
+    actionLabel: 'Rank today',
+    actionPrompt: 'Rank my open tasks in the best order to do them today and explain the tradeoffs.',
+  },
+  {
+    match: ['/company'],
+    label: 'Accounts',
+    context: 'Customer context',
+    askLabel: 'Ask Halvex',
+    askPrompt: 'Summarise the most important account changes and commercial risks in this view.',
+    actionLabel: 'Review accounts',
+    actionPrompt: 'Tell me which accounts need attention next and what I should do with them.',
+  },
+  {
+    match: ['/contacts', '/connections', '/automations', '/calendar', '/settings', '/workflows'],
+    label: 'Workspace',
+    context: 'Connected workspace',
+    askLabel: 'Ask Halvex',
+    askPrompt: 'Summarise what matters on this page and what I should pay attention to next.',
+    actionLabel: 'Brief this page',
+    actionPrompt: 'Turn this page into a concise action brief for the next 30 minutes.',
+  },
+]
 
 type TopNavProps = {
   variant?: 'global' | 'workspace'
@@ -31,11 +82,17 @@ export default function TopNav({ variant = 'global' }: TopNavProps) {
 
   if (variant === 'global' && isDealPage) return null
 
-  const base = Object.entries(PAGE_LABELS).find(([route]) => pathname === route || pathname.startsWith(`${route}/`))
+  const pageMeta = PAGE_META.find(item =>
+    item.match.some(route => pathname === route || pathname.startsWith(`${route}/`)),
+  )
   const breadcrumb =
     variant === 'workspace' && activeDeal
       ? ['Deals', 'Enterprise Pipeline', activeDeal.company]
-      : ['Halvex', base?.[1] ?? 'Workspace']
+      : ['Halvex', pageMeta?.label ?? 'Workspace']
+  const contextPill =
+    variant === 'workspace'
+      ? activeDeal?.stage?.replace(/_/g, ' ') ?? 'Live deal workspace'
+      : pageMeta?.context ?? 'Connected workspace'
 
   return (
     <header className={variant === 'global' ? 'topbar topbar-global' : 'topbar'}>
@@ -53,43 +110,64 @@ export default function TopNav({ variant = 'global' }: TopNavProps) {
         </button>
       )}
 
-      <div className="crumbs">
-        {breadcrumb.map((crumb, index) => (
-          <div key={`${crumb}-${index}`} style={{ display: 'contents' }}>
-            {index > 0 ? <span className="crumb-sep">/</span> : null}
-            <span className={index === breadcrumb.length - 1 ? 'crumb-current' : undefined}>{crumb}</span>
-          </div>
-        ))}
+      <div className="topbar-meta">
+        <div className="crumbs">
+          {breadcrumb.map((crumb, index) => (
+            <div key={`${crumb}-${index}`} style={{ display: 'contents' }}>
+              {index > 0 ? <span className="crumb-sep">/</span> : null}
+              <span className={index === breadcrumb.length - 1 ? 'crumb-current' : undefined}>{crumb}</span>
+            </div>
+          ))}
+        </div>
+        <span className="topbar-context-pill">{contextPill}</span>
       </div>
 
       <div className="topbar-actions">
-        <button
-          className="icon-btn"
-          onClick={async () => {
-            await navigator.clipboard.writeText(window.location.href)
-          }}
-          aria-label="Share"
-        >
-          <Share2 size={14} strokeWidth={1.8} />
-        </button>
-        <button
-          className="icon-btn"
-          onClick={() => sendToCopilot(`Summarise what matters most on ${activeDeal?.name ?? 'this page'}.`)}
-          aria-label="More"
-        >
-          <Ellipsis size={14} strokeWidth={1.8} />
-        </button>
-        <button className="btn" onClick={() => sendToCopilot(`Log activity for ${activeDeal?.name ?? 'this account'}.`)}>
-          <Send size={13} strokeWidth={2} />
-          {variant === 'workspace' ? 'Log activity' : 'Ask Halvex'}
-        </button>
-        <button
-          className="btn btn-primary"
-          onClick={() => sendToCopilot(`Advance ${activeDeal?.name ?? 'this deal'} to the next best action.`)}
-        >
-          <ArrowRight size={13} strokeWidth={2} />
-          {variant === 'workspace' ? 'Advance stage' : 'Next action'}
-        </button>
+        {variant === 'workspace' ? (
+          <>
+            <button
+              className="icon-btn"
+              onClick={async () => {
+                await navigator.clipboard.writeText(window.location.href)
+              }}
+              aria-label="Share"
+            >
+              <Share2 size={14} strokeWidth={1.8} />
+            </button>
+            <button
+              className="btn topbar-aux-action"
+              onClick={() => sendToCopilot(`Summarise the current state of ${activeDeal?.name ?? 'this deal'} using the latest notes and tell me what matters most.`)}
+            >
+              <Sparkles size={13} strokeWidth={2} />
+              Brief me
+            </button>
+            <button className="btn" onClick={() => sendToCopilot(`Log activity for ${activeDeal?.name ?? 'this account'}.`)}>
+              <Send size={13} strokeWidth={2} />
+              Log activity
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => sendToCopilot(`What is the single next best move on ${activeDeal?.name ?? 'this deal'} and why?`)}
+            >
+              <ArrowRight size={13} strokeWidth={2} />
+              Next move
+            </button>
+          </>
+        ) : (
+          <>
+            <button className="btn" onClick={() => sendToCopilot(pageMeta?.askPrompt ?? 'Summarise what matters most on this page.')}>
+              <Sparkles size={13} strokeWidth={2} />
+              {pageMeta?.askLabel ?? 'Ask Halvex'}
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => sendToCopilot(pageMeta?.actionPrompt ?? 'Turn this page into a ranked action plan.')}
+            >
+              <ArrowRight size={13} strokeWidth={2} />
+              {pageMeta?.actionLabel ?? 'Next action'}
+            </button>
+          </>
+        )}
       </div>
     </header>
   )
