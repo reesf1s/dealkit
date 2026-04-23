@@ -22,6 +22,8 @@ import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { gptMini } from '@/lib/ai/client'
 import { generateText } from 'ai'
+import { getManualBriefOverride } from '@/lib/brief-override'
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
 
 const CLOSED = ['closed_won', 'closed_lost'] as const
 
@@ -67,6 +69,7 @@ export async function GET(req: NextRequest) {
       nextSteps: dealLogs.nextSteps,
       contacts: dealLogs.contacts,
       aiSummary: dealLogs.aiSummary,
+      dealReview: dealLogs.dealReview,
     }).from(dealLogs).where(
       and(
         eq(dealLogs.workspaceId, workspaceId),
@@ -78,19 +81,20 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ snapshots: {} })
     }
 
-    // Build result — use cached aiSummary where available
+    // Build result — use the same summary users see elsewhere when available.
     const result: Record<string, string> = {}
     const health: Record<string, 'improving' | 'at_risk' | 'stable' | 'new'> = {}
 
     const needsGeneration = force
-      ? openDeals
-      : openDeals.filter(d => !d.aiSummary)
+      ? openDeals.filter(d => !getManualBriefOverride(d.dealReview as Record<string, unknown> | null | undefined))
+      : openDeals.filter(d => !getEffectiveDealSummary(d))
 
     for (const d of openDeals) {
       const stale = daysStale(d.updatedAt)
       health[d.id] = scoreToHealth(d.conversionScore, stale)
-      if (d.aiSummary && !force) {
-        result[d.id] = d.aiSummary
+      const effectiveSummary = getEffectiveDealSummary(d)
+      if (effectiveSummary) {
+        result[d.id] = effectiveSummary
       }
     }
 

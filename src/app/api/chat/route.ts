@@ -19,6 +19,7 @@ import { requestBrainRebuild } from '@/lib/brain-rebuild'
 import type { WorkspaceBrain } from '@/lib/workspace-brain'
 import { ensureLinksColumn } from '@/lib/api-helpers'
 import { upsertCollateral } from '@/lib/collateral-helpers'
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
 
 
 // ── Scoring grounding rules — included in every system prompt referencing deal scores ──
@@ -790,7 +791,7 @@ Request: ${text.slice(0, 600)}`,
   if (!dealContext) {
     const dealRows = await db.select({
       id: dealLogs.id, dealName: dealLogs.dealName, prospectCompany: dealLogs.prospectCompany,
-      stage: dealLogs.stage, dealRisks: dealLogs.dealRisks, aiSummary: dealLogs.aiSummary,
+      stage: dealLogs.stage, dealRisks: dealLogs.dealRisks, aiSummary: dealLogs.aiSummary, dealReview: dealLogs.dealReview,
       dealValue: dealLogs.dealValue, competitors: dealLogs.competitors,
     }).from(dealLogs).where(and(eq(dealLogs.workspaceId, workspaceId), sql`${dealLogs.stage} NOT IN ('closed_won', 'closed_lost')`)).limit(20)
 
@@ -802,11 +803,12 @@ Request: ${text.slice(0, 600)}`,
       sourceDealLogId = matchedDeal.id
       const risks = (matchedDeal.dealRisks as string[]) ?? []
       const comps = (matchedDeal.competitors as string[]) ?? []
+      const effectiveSummary = getEffectiveDealSummary(matchedDeal)
       dealContext = [
         `Prospect: ${matchedDeal.prospectCompany}`,
         `Stage: ${matchedDeal.stage?.replace(/_/g, ' ')}`,
         comps.length ? `Competitors: ${comps.join(', ')}` : '',
-        matchedDeal.aiSummary ? `Deal summary: ${matchedDeal.aiSummary}` : '',
+        effectiveSummary ? `Deal summary: ${effectiveSummary}` : '',
         risks.length ? `Active risks: ${risks.join('; ')}` : '',
         matchedDeal.dealValue ? `Deal value: £${matchedDeal.dealValue.toLocaleString()}` : '',
         extracted.targetAudience ? `Target audience: ${extracted.targetAudience}` : '',
@@ -2089,6 +2091,7 @@ ${products.length > 0 ? `Products:\n${products.map((p: any) => `  - ${p.name}: $
       const projectPlan = fullActiveDeal.projectPlan as any
       const brainDeal = brain?.deals?.find(d => d.id === activeDealId)
 
+      const effectiveSummary = getEffectiveDealSummary(fullActiveDeal)
       activeDealSection = `\n\n## ═══ CURRENTLY VIEWING DEAL: ${fullActiveDeal.prospectCompany} ═══
 Deal name: "${fullActiveDeal.dealName}"
 Prospect company: ${fullActiveDeal.prospectCompany}
@@ -2103,7 +2106,7 @@ ${contacts.length > 0 ? contacts.map((c: any) => `  • ${c.name}${c.title ? ` �
 
 COMPETITORS ON THIS DEAL: ${dealComps.length > 0 ? dealComps.join(', ') : 'none'}
 ACTIVE RISKS: ${risks.length > 0 ? risks.join(' | ') : 'none identified'}
-AI SUMMARY: ${fullActiveDeal.aiSummary ?? 'not generated yet'}
+AI SUMMARY: ${effectiveSummary ?? 'not generated yet'}
 NEXT STEPS: ${(fullActiveDeal as any).nextSteps ?? 'not set'}
 
 PENDING TODOS (${pendingTodos.length}):

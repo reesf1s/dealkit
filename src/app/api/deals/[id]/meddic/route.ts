@@ -9,6 +9,7 @@ import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
 
 export type MeddicSignal = { score: 0 | 0.5 | 1; note: string | null }
 export type MeddicScore = {
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       meetingNotes:    dealLogs.meetingNotes,
       nextSteps:       dealLogs.nextSteps,
       aiSummary:       dealLogs.aiSummary,
+      dealReview:      dealLogs.dealReview,
       dealRisks:       dealLogs.dealRisks,
       stage:           dealLogs.stage,
     }).from(dealLogs)
@@ -50,12 +52,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     const contacts = (deal.contacts as Array<{ name: string; title?: string }>) ?? []
+    const effectiveSummary = getEffectiveDealSummary(deal)
 
     const contextParts = [
       deal.meetingNotes
         ? `Meeting notes:\n${String(deal.meetingNotes).slice(-3000)}`
         : 'No meeting notes.',
-      deal.aiSummary    ? `Deal summary: ${deal.aiSummary}` : '',
+      effectiveSummary  ? `Deal summary: ${effectiveSummary}` : '',
       (deal.dealRisks as string[])?.length
         ? `Known risks: ${(deal.dealRisks as string[]).join(', ')}`
         : '',

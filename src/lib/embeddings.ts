@@ -21,6 +21,8 @@
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
+
 /** Total embedding dimensions: TF-IDF hash buckets + signal features + n-gram hash */
 const TFIDF_DIMS = 256
 const SIGNAL_DIMS = 16
@@ -293,7 +295,7 @@ export function embedDeal(deal: {
     deal.dealName,
     deal.prospectCompany,
     deal.description ?? '',
-    deal.aiSummary ?? '',
+    getEffectiveDealSummary(deal) ?? '',
     deal.nextSteps ?? '',
     deal.lostReason ?? '',
     ...(deal.dealRisks ?? []),

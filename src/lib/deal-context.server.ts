@@ -7,6 +7,7 @@ import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { parseMeetingEntries } from '@/lib/text-signals'
+import { getEffectiveDealSummarySnippet } from './effective-deal-summary'
 import { getScoreColor, type DealContext } from './deal-context'
 
 export { type DealContext } from './deal-context'
@@ -112,7 +113,7 @@ function serverDealToContext(deal: any): DealContext {
     momentum,
     noteCount,
     lastNoteDate,
-    lastNoteSummary: deal.aiSummary ? String(deal.aiSummary).slice(0, 200) : null,
+    lastNoteSummary: getEffectiveDealSummarySnippet(deal, 200),
     openActionCount: openActions.length,
     completedActionCount: completedActions.length,
     recentCompletedActions: completedActions.slice(-5).map((t: any) => t.text || ''),

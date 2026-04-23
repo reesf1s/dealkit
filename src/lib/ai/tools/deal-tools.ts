@@ -22,6 +22,7 @@ import { computeCompositeScore } from '@/lib/deal-ml'
 import { buildDealBriefing, scoreNarrationPrompt } from '@/lib/brain-narrator'
 import { generateCollateral, generateFreeformCollateral } from '@/lib/ai/generate'
 import { clearManualBriefOverride, setManualBriefOverride } from '@/lib/brief-override'
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
 import { upsertCollateral } from '@/lib/collateral-helpers'
 import { executeWithVerification } from '@/lib/ai/tool-wrapper'
 import type { ToolContext, ToolResult } from './types'
@@ -47,6 +48,7 @@ function normalize(s: string): string {
 }
 
 function formatDealSummary(deal: any, stageLabels?: Record<string, string>): string {
+  const effectiveSummary = getEffectiveDealSummary(deal)
   const lines = [
     `**${deal.dealName}** (${deal.prospectCompany}) — ID: \`${deal.id}\``,
     `- Stage: ${stageLabels?.[deal.stage] ?? deal.stage}`,
@@ -54,11 +56,12 @@ function formatDealSummary(deal: any, stageLabels?: Record<string, string>): str
   if (deal.dealValue != null) lines.push(`- Value: $${deal.dealValue.toLocaleString()}`)
   if (deal.conversionScore != null) lines.push(`- Score: ${deal.conversionScore}%`)
   if (deal.closeDate) lines.push(`- Close date: ${new Date(deal.closeDate).toLocaleDateString()}`)
-  if (deal.aiSummary) lines.push(`- Summary: ${deal.aiSummary}`)
+  if (effectiveSummary) lines.push(`- Summary: ${effectiveSummary}`)
   return lines.join('\n')
 }
 
 function formatDealDetailed(deal: any, stageLabels?: Record<string, string>): string {
+  const effectiveSummary = getEffectiveDealSummary(deal)
   const lines = [
     `# ${deal.dealName}`,
     `**Company:** ${deal.prospectCompany}`,
@@ -69,7 +72,7 @@ function formatDealDetailed(deal: any, stageLabels?: Record<string, string>): st
   if (deal.prospectName) lines.push(`**Contact:** ${deal.prospectName}${deal.prospectTitle ? ` (${deal.prospectTitle})` : ''}`)
   if (deal.closeDate) lines.push(`**Close Date:** ${new Date(deal.closeDate).toLocaleDateString()}`)
   if (deal.nextSteps) lines.push(`**Next Steps:** ${deal.nextSteps}`)
-  if (deal.aiSummary) lines.push(`\n**AI Summary:** ${deal.aiSummary}`)
+  if (effectiveSummary) lines.push(`\n**AI Summary:** ${effectiveSummary}`)
   if (deal.notes) lines.push(`\n**Notes:** ${deal.notes}`)
 
   const risks = (deal.dealRisks as string[]) ?? []
@@ -284,7 +287,7 @@ async function processMeetingNotesHelper(
   const compressedHistory = compressMeetingHistory(deal.meetingNotes as string | null)
   const previousContext = [
     compressedHistory ? `MEETING HISTORY (last 5 updates):\n${compressedHistory}` : '',
-    deal.aiSummary ? `CURRENT DEAL SUMMARY: ${deal.aiSummary}` : '',
+    getEffectiveDealSummary(deal) ? `CURRENT DEAL SUMMARY: ${getEffectiveDealSummary(deal)}` : '',
     (deal.dealRisks as string[])?.length ? `KNOWN RISKS: ${(deal.dealRisks as string[]).join('; ')}` : '',
   ].filter(Boolean).join('\n\n')
 
@@ -1194,7 +1197,7 @@ export const update_deal = {
     if (!c.addNote && !c.resetConversionScore && c.replaceConversionScore === undefined) {
       if (!(deal as any).conversionScorePinned && (c.setStage || c.appendNotes || c.addTodo)) {
         try {
-          const allText = [deal.notes, deal.meetingNotes, deal.aiSummary].filter(Boolean).join('\n')
+          const allText = [deal.notes, deal.meetingNotes, getEffectiveDealSummary(deal)].filter(Boolean).join('\n')
           await computeAndUpdateScore(dealId, ctx.workspaceId, allText, deal.createdAt ?? new Date(), (c.setStage ?? deal.stage), ctx)
         } catch { /* non-fatal */ }
       }
@@ -1365,7 +1368,8 @@ async function buildDealContext(dealId: string, workspaceId: string): Promise<st
     `Stage: ${deal.stage}`,
   ]
   if (deal.dealValue) lines.push(`Value: $${deal.dealValue.toLocaleString()}`)
-  if (deal.aiSummary) lines.push(`Summary: ${deal.aiSummary}`)
+  const effectiveSummary = getEffectiveDealSummary(deal)
+  if (effectiveSummary) lines.push(`Summary: ${effectiveSummary}`)
   const risks = (deal.dealRisks as string[]) ?? []
   if (risks.length > 0) lines.push(`Risks: ${risks.join('; ')}`)
   const comps = (deal.competitors as string[]) ?? []

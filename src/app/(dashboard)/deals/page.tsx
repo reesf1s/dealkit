@@ -17,6 +17,7 @@ import { HealthDot } from '@/components/shared/HealthDot'
 import { StageBadge } from '@/components/shared/StageBadge'
 import { MiniBarChart } from '@/components/shared/MiniBarChart'
 import { fetcher, isDbNotConfigured } from '@/lib/fetcher'
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
 import type { DealLog } from '@/types'
 
 /* ── Types ── */
@@ -102,7 +103,8 @@ function contactName(deal: DealLog): string {
 
 function dealInsight(deal: DealLog): string | null {
   // Use real AI analysis from meeting notes first — specific over generic
-  if (deal.aiSummary) return deal.aiSummary
+  const summary = getEffectiveDealSummary(deal)
+  if (summary) return summary
   const insights = deal.conversionInsights as string[] | undefined
   if (insights?.length) return insights[0]
   if (deal.nextSteps) return deal.nextSteps
@@ -439,7 +441,7 @@ function KanbanView({
               {(dealsByStage[stage.id] ?? []).map((deal: DealLog) => {
                 const health = getDealHealth(deal)
                 const insight = dealInsight(deal)
-                const hasAI = !!(deal.aiSummary || (deal.conversionInsights as string[])?.length)
+                const hasAI = !!(getEffectiveDealSummary(deal) || (deal.conversionInsights as string[])?.length)
                 const insightColor = hasAI ? 'var(--text-secondary)' : 'var(--text-tertiary)'
                 return (
                   <Link key={deal.id} href={`/deals/${deal.id}`} style={{ textDecoration: 'none', display: 'block' }}>

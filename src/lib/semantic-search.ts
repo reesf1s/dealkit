@@ -26,6 +26,7 @@ import {
   EMBEDDING_DIMS,
 } from '@/lib/embeddings'
 import type { TextSignals } from '@/lib/text-signals'
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -143,7 +144,8 @@ export async function embedWorkspaceEntities(workspaceId: string): Promise<{
   // Embed deals
   const dealEmbeddings: EmbeddingCache['deals'] = []
   for (const d of deals) {
-    const hashInput = `${d.dealName}|${d.prospectCompany}|${d.aiSummary ?? ''}|${d.meetingNotes ?? ''}|${d.description ?? ''}`
+    const effectiveSummary = getEffectiveDealSummary(d)
+    const hashInput = `${d.dealName}|${d.prospectCompany}|${effectiveSummary ?? ''}|${d.meetingNotes ?? ''}|${d.description ?? ''}`
     const hash = contentHash(hashInput)
 
     // Reuse cached embedding if content unchanged
@@ -166,7 +168,7 @@ export async function embedWorkspaceEntities(workspaceId: string): Promise<{
       dealName: d.dealName,
       prospectCompany: d.prospectCompany,
       description: d.description,
-      aiSummary: d.aiSummary,
+      aiSummary: effectiveSummary,
       meetingNotes: d.meetingNotes,
       notes: d.notes,
       nextSteps: d.nextSteps,

@@ -148,6 +148,7 @@ export interface DealLog {
   conversionScore?: number | null
   conversionInsights?: string[]
   aiSummary?: string | null
+  dealReview?: Record<string, unknown> | null
   dealRisks?: string[]
   assignedRepId?: string | null
   forecastCategory?: 'commit' | 'upside' | 'pipeline' | 'omit' | null

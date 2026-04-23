@@ -15,6 +15,7 @@ import {
   buildNoteCentricBrainContext,
   formatDatedNote,
 } from '@/lib/note-intelligence'
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
 
 function getFirstText(content: Array<{ type: string; text?: string }>): string {
   const part = content.find(item => item.type === 'text' && typeof item.text === 'string')
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       getWorkspaceBrain(workspaceId),
     ])
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    const effectiveSummary = getEffectiveDealSummary(deal)
     const dealComps = comps.filter(c => (deal.competitors as string[])?.includes(c.name))
     const brainContext = buildNoteCentricBrainContext(
       brain,
@@ -94,7 +96,7 @@ If a note says "tomorrow", "next week", or a weekday, interpret it relative to t
 Use the last two dated notes as the current truth. Only bring in older note context if it is explicitly older outstanding context and still unresolved. Never surface older delivered, implemented, scheduled, confirmed, or "on track" work as if it is still active.
 
 DEAL: ${deal.dealName} | ${deal.prospectName ?? 'Unknown'} at ${deal.prospectCompany} | Stage: ${deal.stage}${deal.dealValue ? ` | Value: £${deal.dealValue.toLocaleString()}` : ''}
-${!latestMeetingNote && !recentEvidence && !outstandingOlderContext && deal.aiSummary ? `Status fallback: ${deal.aiSummary}` : ''}
+${!latestMeetingNote && !recentEvidence && !outstandingOlderContext && effectiveSummary ? `Status fallback: ${effectiveSummary}` : ''}
 ${mlSection ? `\nML SIGNALS:\n${mlSection}` : ''}
 ${latestMeetingNote ? `\nLatest note:\n${latestMeetingNote}` : ''}
 ${recentEvidence ? `\nPrimary note evidence — use these last two dated notes as current truth:\n${recentEvidence}` : ''}

@@ -11,6 +11,7 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getWorkspaceBrain } from '@/lib/workspace-brain'
 import { buildDealBriefing } from '@/lib/brain-narrator'
 import { ensureLinksColumn } from '@/lib/api-helpers'
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
 
 
 export type RiskKit = {
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     ])
 
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    const effectiveSummary = getEffectiveDealSummary(deal)
 
     const dealComps = comps.filter(c => (deal.competitors as string[])?.includes(c.name))
 
@@ -70,7 +72,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const prompt = `You are a senior B2B sales strategist generating a deal re-engagement kit for a stalled or at-risk deal.
 
 DEAL: ${deal.dealName} | ${deal.prospectName ?? 'Unknown'} at ${deal.prospectCompany} | Stage: ${deal.stage}${deal.dealValue ? ` | Value: £${deal.dealValue.toLocaleString()}` : ''}
-${deal.aiSummary ? `Status: ${deal.aiSummary}` : ''}
+${effectiveSummary ? `Status: ${effectiveSummary}` : ''}
 ${churnRisk != null ? `Churn risk: ${churnRisk}% — ${mlPred?.churnDaysOverdue ? `${mlPred.churnDaysOverdue}d overdue for follow-up` : 'follow-up overdue'}` : ''}
 ${winProb != null ? `Win probability: ${Math.round(winProb * 100)}%` : ''}
 ${(deal.dealRisks as string[])?.length ? `Known risks: ${(deal.dealRisks as string[]).join('; ')}` : ''}

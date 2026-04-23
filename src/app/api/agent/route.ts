@@ -22,6 +22,7 @@ import { allTools } from '@/lib/ai/tools'
 import { normaliseParams } from '@/lib/ai/tool-wrapper'
 import { sendAgentGradeTranscript } from '@/lib/agentgrade'
 import { MINI } from '@/lib/ai/models'
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -121,8 +122,9 @@ function buildActiveDealContext(
   }
 
   // Current AI summary
-  if (fullDeal?.aiSummary) {
-    lines.push(`\nSummary: ${fullDeal.aiSummary}`)
+  const dealSummary = getEffectiveDealSummary(fullDeal)
+  if (dealSummary) {
+    lines.push(`\nSummary: ${dealSummary}`)
   }
 
   // Recent meeting history (last 5 entries from meetingNotes — structured, dated)

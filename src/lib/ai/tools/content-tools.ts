@@ -7,6 +7,7 @@ import { anthropic } from '@/lib/ai/client'
 import { generateCollateral, generateFreeformCollateral } from '@/lib/ai/generate'
 import { requestBrainRebuild } from '@/lib/brain-rebuild'
 import { upsertCollateral } from '@/lib/collateral-helpers'
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
 import type { ToolContext, ToolResult } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -28,7 +29,8 @@ async function buildDealContext(dealId: string, workspaceId: string): Promise<st
     `Stage: ${deal.stage}`,
   ]
   if (deal.dealValue) lines.push(`Value: $${deal.dealValue.toLocaleString()}`)
-  if (deal.aiSummary) lines.push(`Summary: ${deal.aiSummary}`)
+  const effectiveSummary = getEffectiveDealSummary(deal)
+  if (effectiveSummary) lines.push(`Summary: ${effectiveSummary}`)
 
   const risks = (deal.dealRisks as string[]) ?? []
   if (risks.length > 0) lines.push(`Risks: ${risks.join('; ')}`)

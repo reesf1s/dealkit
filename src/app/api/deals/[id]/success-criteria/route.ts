@@ -11,6 +11,7 @@ import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { getWorkspaceBrain, formatBrainContext } from '@/lib/workspace-brain'
 import { requestBrainRebuild } from '@/lib/brain-rebuild'
 import { ensureLinksColumn } from '@/lib/api-helpers'
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
 
 
 // POST — parse raw success criteria text into structured items
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       getWorkspaceBrain(workspaceId),
     ])
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    const effectiveSummary = getEffectiveDealSummary(deal)
 
     let brainContext = ''
     if (brain) {
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       (profile?.knownCapabilities as string[])?.length
         ? `Confirmed capabilities (already supported — do NOT flag as missing): ${(profile.knownCapabilities as string[]).join(', ')}`
         : '',
-      deal.aiSummary ? `Deal summary: ${deal.aiSummary}` : '',
+      effectiveSummary ? `Deal summary: ${effectiveSummary}` : '',
       brainContext,
     ].filter(Boolean).join('\n')
 

@@ -9,6 +9,7 @@ import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
 
 export interface AiTaskItem {
   id: string
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       meetingNotes:       dealLogs.meetingNotes,
       nextSteps:          dealLogs.nextSteps,
       aiSummary:          dealLogs.aiSummary,
+      dealReview:         dealLogs.dealReview,
       dealRisks:          dealLogs.dealRisks,
       conversionInsights: dealLogs.conversionInsights,
       todos:              dealLogs.todos,
@@ -46,11 +48,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .limit(1)
 
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    const effectiveSummary = getEffectiveDealSummary(deal)
 
     const contextLines = [
       `Deal: ${deal.dealName || deal.prospectCompany}`,
       `Stage: ${deal.stage?.replace(/_/g, ' ')}`,
-      deal.aiSummary?.trim() ? `AI summary: ${deal.aiSummary.trim()}` : '',
+      effectiveSummary ? `AI summary: ${effectiveSummary}` : '',
       deal.nextSteps?.trim() ? `Agreed next steps: ${deal.nextSteps.trim()}` : '',
       (deal.dealRisks as string[] | null)?.length
         ? `Risks: ${(deal.dealRisks as string[]).join('; ')}`

@@ -3,6 +3,8 @@
 // NO server imports (db, drizzle, fs, net) — safe for browser bundles
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { getEffectiveDealSummarySnippet } from './effective-deal-summary'
+
 export interface DealContext {
   // Core
   id: string
@@ -157,7 +159,7 @@ export function rawDealToContext(deal: any): DealContext {
     momentum,
     noteCount: 0, // Not available client-side without parsing
     lastNoteDate,
-    lastNoteSummary: deal.aiSummary ? String(deal.aiSummary).slice(0, 200) : null,
+    lastNoteSummary: getEffectiveDealSummarySnippet(deal, 200),
     openActionCount: openActions.length,
     completedActionCount: completedActions.length,
     recentCompletedActions: completedActions.slice(-5).map((t: any) => t.text || ''),

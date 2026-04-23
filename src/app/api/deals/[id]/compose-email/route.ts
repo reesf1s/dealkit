@@ -9,6 +9,7 @@ import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       meetingNotes:      dealLogs.meetingNotes,
       nextSteps:         dealLogs.nextSteps,
       aiSummary:         dealLogs.aiSummary,
+      dealReview:        dealLogs.dealReview,
       dealRisks:         dealLogs.dealRisks,
       dealType:          dealLogs.dealType,
       recurringInterval: dealLogs.recurringInterval,
@@ -57,6 +59,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const valueStr = deal.dealValue
       ? `£${Number(deal.dealValue).toLocaleString()}${deal.dealType === 'recurring' ? ` ${deal.recurringInterval ?? 'recurring'}` : ''}`
       : null
+    const effectiveSummary = getEffectiveDealSummary(deal)
 
     const contextLines = [
       `Deal: ${deal.dealName || deal.prospectCompany}`,
@@ -65,7 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       `Stage: ${deal.stage?.replace(/_/g, ' ')}`,
       valueStr ? `Value: ${valueStr}` : '',
       deal.nextSteps?.trim() ? `Agreed next steps: ${deal.nextSteps.trim()}` : '',
-      deal.aiSummary?.trim() ? `Deal summary: ${deal.aiSummary.trim()}` : '',
+      effectiveSummary ? `Deal summary: ${effectiveSummary}` : '',
       deal.meetingNotes
         ? `Recent meeting notes:\n${String(deal.meetingNotes).slice(-1800)}`
         : '',

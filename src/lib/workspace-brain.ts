@@ -22,6 +22,7 @@ import { BRAIN_VERSION } from '@/lib/brain-constants'
 export { BRAIN_VERSION } from '@/lib/brain-constants'
 import { getActiveGlobalModel, getGlobalConsent, extractContributions, contributeToGlobalPool } from '@/lib/global-pool'
 import { computeUrgencyScore } from '@/lib/ml/urgency'
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
 
 export interface DealSignalSummary {
   momentum:         number    // 0–1 sentiment momentum (>0.5 = building)
@@ -743,6 +744,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown')
       dealCompetitors: dealLogs.competitors,
       todos: dealLogs.todos,
       aiSummary: dealLogs.aiSummary,
+      dealReview: dealLogs.dealReview,
       updatedAt: dealLogs.updatedAt,
       closeDate: dealLogs.closeDate,
       projectPlan: dealLogs.projectPlan,
@@ -884,7 +886,7 @@ async function _doRebuildWorkspaceBrain(workspaceId: string, reason = 'unknown')
       dealValue: d.dealValue,
       risks: (d.dealRisks as string[]) ?? [],
       pendingTodos: pending.slice(0, 8),
-      summary: d.aiSummary,
+      summary: getEffectiveDealSummary(d),
       lastUpdated: d.updatedAt
         ? new Date(d.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
         : '',

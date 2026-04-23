@@ -13,6 +13,7 @@ import { dbErrResponse, ensureLinksColumn } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 import { upsertCollateral } from '@/lib/collateral-helpers'
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
 
 async function logEvent(workspaceId: string, userId: string, type: string, metadata: Record<string, unknown>) {
   await db.insert(events).values({ workspaceId, userId, type, metadata, createdAt: new Date() })
@@ -86,11 +87,12 @@ export async function POST(req: NextRequest) {
 
         const risks = (dealRow.dealRisks as string[]) ?? []
         const dealComps = (dealRow.competitors as string[]) ?? []
+        const effectiveSummary = getEffectiveDealSummary(dealRow)
         dealContext = [
           `Prospect: ${dealRow.prospectCompany}${dealRow.prospectName ? ` — ${dealRow.prospectName}` : ''}${dealRow.prospectTitle ? ` (${dealRow.prospectTitle})` : ''}`,
           `Stage: ${dealRow.stage?.replace(/_/g, ' ')}`,
           dealComps.length ? `Competing against: ${dealComps.join(', ')}` : '',
-          dealRow.aiSummary ? `Deal summary: ${dealRow.aiSummary}` : '',
+          effectiveSummary ? `Deal summary: ${effectiveSummary}` : '',
           risks.length ? `Active deal risks: ${risks.join('; ')}` : '',
           dealRow.dealValue ? `Deal value: $${dealRow.dealValue.toLocaleString()}` : '',
         ].filter(Boolean).join('\n')

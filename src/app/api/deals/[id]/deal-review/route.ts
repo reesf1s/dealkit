@@ -9,6 +9,7 @@ import { db } from '@/lib/db'
 import { dealLogs } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
+import { getEffectiveDealSummary } from '@/lib/effective-deal-summary'
 
 export interface DealReviewCriterion {
   name: string
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       meetingNotes:       dealLogs.meetingNotes,
       nextSteps:          dealLogs.nextSteps,
       aiSummary:          dealLogs.aiSummary,
+      dealReview:         dealLogs.dealReview,
       dealRisks:          dealLogs.dealRisks,
       conversionInsights: dealLogs.conversionInsights,
       conversionScore:    dealLogs.conversionScore,
@@ -70,6 +72,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .limit(1)
 
     if (!deal) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    const effectiveSummary = getEffectiveDealSummary(deal)
 
     const contextLines = [
       `Deal: ${deal.dealName || deal.prospectCompany}`,
@@ -91,7 +94,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       (deal.conversionInsights as string[])?.length
         ? `AI insights: ${(deal.conversionInsights as string[]).slice(0, 4).join('; ')}`
         : '',
-      deal.aiSummary?.trim() ? `Summary: ${deal.aiSummary.trim()}` : '',
+      effectiveSummary ? `Summary: ${effectiveSummary}` : '',
       deal.meetingNotes
         ? `Meeting notes:\n${String(deal.meetingNotes).slice(-3500)}`
         : '',
