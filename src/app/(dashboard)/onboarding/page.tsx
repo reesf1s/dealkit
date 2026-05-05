@@ -165,9 +165,9 @@ function OnboardingInner() {
                   width: '30px', height: '30px', borderRadius: '50%',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '12px', fontWeight: 700, flexShrink: 0,
-                  background: done ? '#1DB86A' : active ? 'var(--surface-2, #f5f5f5)' : 'var(--surface-2, #f5f5f5)',
-                  border: done ? 'none' : active ? '2px solid #1DB86A' : '1px solid var(--border-default, #eee)',
-                  color: done ? '#fff' : active ? '#1DB86A' : 'var(--text-tertiary, #aaa)',
+                  background: done ? 'var(--brand)' : active ? 'var(--surface-2, #f5f5f5)' : 'var(--surface-2, #f5f5f5)',
+                  border: done ? 'none' : active ? '2px solid var(--brand)' : '1px solid var(--border-default, var(--border-default))',
+                  color: done ? '#fff' : active ? 'var(--brand)' : 'var(--text-tertiary, #aaa)',
                   transition: 'all 0.3s',
                 }}>
                   {done ? <CheckCircle size={14} /> : num}
@@ -182,7 +182,7 @@ function OnboardingInner() {
               {i < steps.length - 1 && (
                 <div style={{
                   width: '32px', height: '2px', margin: '0 12px',
-                  background: done ? '#1DB86A' : 'var(--border-default, #eee)',
+                  background: done ? 'var(--brand)' : 'var(--border-default, var(--border-default))',
                   borderRadius: '1px', transition: 'background 0.3s',
                 }} />
               )}
@@ -197,14 +197,14 @@ function OnboardingInner() {
           <div style={{ textAlign: 'center', paddingTop: '12px' }}>
             <div style={{
               width: '56px', height: '56px', borderRadius: '16px',
-              background: 'linear-gradient(135deg, #1DB86A 0%, #19a45e 100%)',
+              background: 'var(--brand)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               margin: '0 auto 20px',
               boxShadow: '0 4px 16px rgba(29,184,106,0.25)',
             }}>
               <span style={{ fontSize: '24px', fontWeight: 800, color: '#fff' }}>H</span>
             </div>
-            <h1 style={{ fontSize: '28px', fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--text-primary, #1a1a1a)', marginBottom: '10px' }}>
+            <h1 style={{ fontSize: '28px', fontWeight: 800, letterSpacing: 0, color: 'var(--text-primary, #1a1a1a)', marginBottom: '10px' }}>
               Welcome to Halvex
             </h1>
             <p style={{ fontSize: '15px', color: 'var(--text-secondary, #777)', lineHeight: 1.7, maxWidth: '420px', margin: '0 auto' }}>
@@ -213,7 +213,7 @@ function OnboardingInner() {
           </div>
 
           <div style={{
-            background: 'var(--surface-1, #fff)', border: '1px solid var(--border-default, #eee)',
+            background: 'var(--surface-1, #fff)', border: '1px solid var(--border-default, var(--border-default))',
             borderRadius: '14px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '20px',
             boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
           }}>
@@ -230,13 +230,13 @@ function OnboardingInner() {
                 autoFocus
                 style={{
                   width: '100%', height: '46px', padding: '0 16px',
-                  background: 'var(--surface-2, #f5f5f5)', border: '1px solid var(--border-default, #eee)',
+                  background: 'var(--surface-2, #f5f5f5)', border: '1px solid var(--border-default, var(--border-default))',
                   borderRadius: '10px', color: 'var(--text-primary, #1a1a1a)',
                   fontSize: '14px', outline: 'none', fontFamily: 'inherit',
                   transition: 'border-color 0.15s',
                 }}
-                onFocus={e => e.target.style.borderColor = '#1DB86A'}
-                onBlur={e => e.target.style.borderColor = 'var(--border-default, #eee)'}
+                onFocus={e => e.target.style.borderColor = 'var(--brand)'}
+                onBlur={e => e.target.style.borderColor = 'var(--border-default, var(--border-default))'}
               />
             </div>
 
@@ -255,9 +255,9 @@ function OnboardingInner() {
                     onClick={() => setTeamSize(opt.value)}
                     style={{
                       padding: '12px', borderRadius: '10px', cursor: 'pointer',
-                      background: teamSize === opt.value ? '#1DB86A10' : 'var(--surface-2, #f5f5f5)',
-                      border: teamSize === opt.value ? '2px solid #1DB86A' : '1px solid var(--border-default, #eee)',
-                      color: teamSize === opt.value ? '#1DB86A' : 'var(--text-secondary, #777)',
+                      background: teamSize === opt.value ? 'var(--brand)10' : 'var(--surface-2, #f5f5f5)',
+                      border: teamSize === opt.value ? '2px solid var(--brand)' : '1px solid var(--border-default, var(--border-default))',
+                      color: teamSize === opt.value ? 'var(--brand)' : 'var(--text-secondary, #777)',
                       fontSize: '13px', fontWeight: 600, fontFamily: 'inherit',
                       transition: 'all 0.15s',
                     }}
@@ -276,11 +276,11 @@ function OnboardingInner() {
             {[
               { icon: <Target size={16} />, label: 'Deal scoring', color: '#3b82f6' },
               { icon: <Sparkles size={16} />, label: 'AI briefings', color: '#8b5cf6' },
-              { icon: <TrendingUp size={16} />, label: 'Pipeline intel', color: '#1DB86A' },
+              { icon: <TrendingUp size={16} />, label: 'Pipeline intel', color: 'var(--brand)' },
             ].map(f => (
               <div key={f.label} style={{
                 padding: '14px 12px', borderRadius: '10px', textAlign: 'center',
-                background: 'var(--surface-1, #fff)', border: '1px solid var(--border-default, #eee)',
+                background: 'var(--surface-1, #fff)', border: '1px solid var(--border-default, var(--border-default))',
               }}>
                 <div style={{ color: f.color, marginBottom: '6px', display: 'flex', justifyContent: 'center' }}>{f.icon}</div>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary, #777)' }}>{f.label}</div>
@@ -294,7 +294,7 @@ function OnboardingInner() {
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
               width: '100%', padding: '14px', borderRadius: '10px', border: 'none',
-              background: companyName.trim() ? '#1DB86A' : 'var(--surface-2, #f5f5f5)',
+              background: companyName.trim() ? 'var(--brand)' : 'var(--surface-2, #f5f5f5)',
               color: companyName.trim() ? '#fff' : 'var(--text-tertiary, #aaa)',
               fontSize: '15px', fontWeight: 700, fontFamily: 'inherit',
               cursor: companyName.trim() ? 'pointer' : 'not-allowed',
@@ -319,7 +319,7 @@ function OnboardingInner() {
             }}>
               <Building2 size={22} color="#3b82f6" />
             </div>
-            <h1 style={{ fontSize: '26px', fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--text-primary, #1a1a1a)', marginBottom: '10px' }}>
+            <h1 style={{ fontSize: '26px', fontWeight: 800, letterSpacing: 0, color: 'var(--text-primary, #1a1a1a)', marginBottom: '10px' }}>
               Add your first deal
             </h1>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary, #777)', lineHeight: 1.7, maxWidth: '420px', margin: '0 auto' }}>
@@ -328,7 +328,7 @@ function OnboardingInner() {
           </div>
 
           <div style={{
-            background: 'var(--surface-1, #fff)', border: '1px solid var(--border-default, #eee)',
+            background: 'var(--surface-1, #fff)', border: '1px solid var(--border-default, var(--border-default))',
             borderRadius: '14px', padding: '28px', display: 'flex', flexDirection: 'column', gap: '18px',
             boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
           }}>
@@ -355,13 +355,13 @@ function OnboardingInner() {
                 autoFocus
                 style={{
                   width: '100%', height: '46px', padding: '0 16px',
-                  background: 'var(--surface-2, #f5f5f5)', border: '1px solid var(--border-default, #eee)',
+                  background: 'var(--surface-2, #f5f5f5)', border: '1px solid var(--border-default, var(--border-default))',
                   borderRadius: '10px', color: 'var(--text-primary, #1a1a1a)',
                   fontSize: '14px', outline: 'none', fontFamily: 'inherit',
                   transition: 'border-color 0.15s',
                 }}
-                onFocus={e => e.target.style.borderColor = '#1DB86A'}
-                onBlur={e => e.target.style.borderColor = 'var(--border-default, #eee)'}
+                onFocus={e => e.target.style.borderColor = 'var(--brand)'}
+                onBlur={e => e.target.style.borderColor = 'var(--border-default, var(--border-default))'}
               />
             </div>
 
@@ -377,13 +377,13 @@ function OnboardingInner() {
                   placeholder="e.g. 50000"
                   style={{
                     width: '100%', height: '46px', padding: '0 16px',
-                    background: 'var(--surface-2, #f5f5f5)', border: '1px solid var(--border-default, #eee)',
+                    background: 'var(--surface-2, #f5f5f5)', border: '1px solid var(--border-default, var(--border-default))',
                     borderRadius: '10px', color: 'var(--text-primary, #1a1a1a)',
                     fontSize: '14px', outline: 'none', fontFamily: 'inherit',
                     transition: 'border-color 0.15s',
                   }}
-                  onFocus={e => e.target.style.borderColor = '#1DB86A'}
-                  onBlur={e => e.target.style.borderColor = 'var(--border-default, #eee)'}
+                  onFocus={e => e.target.style.borderColor = 'var(--brand)'}
+                  onBlur={e => e.target.style.borderColor = 'var(--border-default, var(--border-default))'}
                 />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -395,7 +395,7 @@ function OnboardingInner() {
                   onChange={e => setStage(e.target.value)}
                   style={{
                     width: '100%', height: '46px', padding: '0 16px',
-                    background: 'var(--surface-2, #f5f5f5)', border: '1px solid var(--border-default, #eee)',
+                    background: 'var(--surface-2, #f5f5f5)', border: '1px solid var(--border-default, var(--border-default))',
                     borderRadius: '10px', color: 'var(--text-primary, #1a1a1a)',
                     fontSize: '14px', outline: 'none', fontFamily: 'inherit',
                     cursor: 'pointer', transition: 'border-color 0.15s',
@@ -418,14 +418,14 @@ function OnboardingInner() {
                 placeholder="Paste your latest call notes, email thread, or deal context here. AI will extract risks, next steps, and objections automatically."
                 style={{
                   width: '100%', padding: '14px 16px',
-                  background: 'var(--surface-2, #f5f5f5)', border: '1px solid var(--border-default, #eee)',
+                  background: 'var(--surface-2, #f5f5f5)', border: '1px solid var(--border-default, var(--border-default))',
                   borderRadius: '10px', color: 'var(--text-primary, #1a1a1a)',
                   fontSize: '13px', outline: 'none', fontFamily: 'inherit',
                   resize: 'vertical', minHeight: '100px', lineHeight: 1.7,
                   transition: 'border-color 0.15s',
                 }}
-                onFocus={e => e.target.style.borderColor = '#1DB86A'}
-                onBlur={e => e.target.style.borderColor = 'var(--border-default, #eee)'}
+                onFocus={e => e.target.style.borderColor = 'var(--brand)'}
+                onBlur={e => e.target.style.borderColor = 'var(--border-default, var(--border-default))'}
               />
               <p style={{ fontSize: '11.5px', color: 'var(--text-muted, #ccc)', lineHeight: 1.5 }}>
                 This becomes the intelligence Halvex uses to score, brief, and coach you on this deal.
@@ -439,7 +439,7 @@ function OnboardingInner() {
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
               width: '100%', padding: '14px', borderRadius: '10px', border: 'none',
-              background: !prospect.trim() ? 'var(--surface-2, #f5f5f5)' : '#1DB86A',
+              background: !prospect.trim() ? 'var(--surface-2, #f5f5f5)' : 'var(--brand)',
               color: !prospect.trim() ? 'var(--text-tertiary, #aaa)' : '#fff',
               fontSize: '15px', fontWeight: 700, fontFamily: 'inherit',
               cursor: !prospect.trim() || dealSaving ? 'not-allowed' : 'pointer',
@@ -479,14 +479,14 @@ function OnboardingInner() {
           <div style={{ textAlign: 'center', paddingTop: '12px' }}>
             <div style={{
               width: '56px', height: '56px', borderRadius: '50%',
-              background: '#1DB86A',
+              background: 'var(--brand)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               margin: '0 auto 20px',
               animation: 'pulse-ring 2s ease-out 1',
             }}>
               <CheckCircle size={28} color="#fff" />
             </div>
-            <h1 style={{ fontSize: '26px', fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--text-primary, #1a1a1a)', marginBottom: '10px' }}>
+            <h1 style={{ fontSize: '26px', fontWeight: 800, letterSpacing: 0, color: 'var(--text-primary, #1a1a1a)', marginBottom: '10px' }}>
               You&apos;re all set
             </h1>
             <p style={{ fontSize: '14px', color: 'var(--text-secondary, #777)', lineHeight: 1.7, maxWidth: '420px', margin: '0 auto' }}>
@@ -497,14 +497,14 @@ function OnboardingInner() {
           {/* Deal score card */}
           {dealScore != null && (
             <div style={{
-              background: 'var(--surface-1, #fff)', border: '1px solid var(--border-default, #eee)',
+              background: 'var(--surface-1, #fff)', border: '1px solid var(--border-default, var(--border-default))',
               borderRadius: '14px', padding: '22px 24px',
               display: 'flex', alignItems: 'center', gap: '18px',
               boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
             }}>
               <div style={{
                 width: '56px', height: '56px', borderRadius: '14px',
-                background: dealScore >= 60 ? '#1DB86A' : dealScore >= 40 ? '#f59e0b' : '#3b82f6',
+                background: dealScore >= 60 ? 'var(--brand)' : dealScore >= 40 ? '#f59e0b' : '#3b82f6',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: '22px', fontWeight: 800, color: '#fff', flexShrink: 0,
               }}>
@@ -524,10 +524,10 @@ function OnboardingInner() {
           {/* Extraction result */}
           {extractionResult && (
             <div style={{
-              background: '#1DB86A08', border: '1px solid #1DB86A20',
+              background: 'var(--brand)08', border: '1px solid var(--brand)20',
               borderRadius: '12px', padding: '14px 18px',
               display: 'flex', alignItems: 'center', gap: '10px',
-              fontSize: '13px', color: '#1DB86A', fontWeight: 600,
+              fontSize: '13px', color: 'var(--brand)', fontWeight: 600,
             }}>
               <Sparkles size={15} />
               {extractionResult}
@@ -536,14 +536,14 @@ function OnboardingInner() {
 
           {/* Brain status */}
           <div style={{
-            background: 'var(--surface-1, #fff)', border: '1px solid var(--border-default, #eee)',
+            background: 'var(--surface-1, #fff)', border: '1px solid var(--border-default, var(--border-default))',
             borderRadius: '14px', padding: '20px 24px',
             boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: brainPatterns.length > 0 ? '14px' : 0 }}>
               <div style={{
                 width: '10px', height: '10px', borderRadius: '50%', flexShrink: 0,
-                background: brainStatus === 'live' ? '#1DB86A' : brainStatus === 'polling' ? '#f59e0b' : '#ddd',
+                background: brainStatus === 'live' ? 'var(--brand)' : brainStatus === 'polling' ? '#f59e0b' : '#ddd',
                 transition: 'background 0.3s',
               }} />
               <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary, #1a1a1a)' }}>
@@ -570,7 +570,7 @@ function OnboardingInner() {
 
           {/* What's next */}
           <div style={{
-            background: 'var(--surface-1, #fff)', border: '1px solid var(--border-default, #eee)',
+            background: 'var(--surface-1, #fff)', border: '1px solid var(--border-default, var(--border-default))',
             borderRadius: '14px', padding: '20px 24px',
             boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
           }}>
@@ -606,7 +606,7 @@ function OnboardingInner() {
                 style={{
                   flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                   padding: '14px', borderRadius: '10px',
-                  border: '1px solid var(--border-default, #eee)',
+                  border: '1px solid var(--border-default, var(--border-default))',
                   background: 'var(--surface-1, #fff)', color: 'var(--text-primary, #1a1a1a)',
                   fontSize: '14px', fontWeight: 600, fontFamily: 'inherit',
                   cursor: 'pointer', transition: 'all 0.15s',
@@ -620,7 +620,7 @@ function OnboardingInner() {
               style={{
                 flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                 padding: '14px', borderRadius: '10px', border: 'none',
-                background: '#1DB86A', color: '#fff',
+                background: 'var(--brand)', color: '#fff',
                 fontSize: '14px', fontWeight: 700, fontFamily: 'inherit',
                 cursor: 'pointer', transition: 'all 0.2s',
               }}

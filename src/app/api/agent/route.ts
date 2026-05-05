@@ -5,7 +5,7 @@ import { after } from 'next/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { and, eq } from 'drizzle-orm'
-import { streamText, tool, jsonSchema, convertToCoreMessages } from 'ai'
+import { streamText, tool, jsonSchema, convertToCoreMessages, generateObject } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { z } from 'zod'
 
@@ -212,110 +212,186 @@ function buildActiveDealContext(
   return lines.join('\n')
 }
 
-// ── System prompt builder ────────────────────────────────────────────────────
+// ── System prompt + orchestration planning ──────────────────────────────────
 
-function buildSystemPrompt(brainContext: string, activeDealContext: string, pipelineStageContext: string = ''): string {
-  return `You are Halvex AI — a sales copilot with complete CRM access. You are the interface between the user and their pipeline intelligence brain.
+const OrchestrationPlanSchema = z.object({
+  intents: z.array(z.object({
+    order: z.number().int().positive(),
+    objective: z.string().min(3),
+    suggestedTool: z.string().nullable().optional(),
+    dependsOn: z.array(z.number().int().positive()).default([]),
+  })).max(8).default([]),
+  executionNotes: z.string().optional().default(''),
+  clarificationNeeded: z.array(z.string()).max(2).default([]),
+})
 
-═══ YOUR 6 TOOLS ═══
+type OrchestrationPlan = z.infer<typeof OrchestrationPlanSchema>
 
-You have exactly 6 tools:
-1. **get_deal** — Look up a deal by name or ID. Returns full context: score, stage, contacts, todos, notes, risks, signals.
-2. **create_deal** — Create a new deal. Requires dealName and prospectCompany. Optional: dealValue, stage, contacts, notes, competitors.
-3. **update_deal** — Change ANYTHING on a deal (notes, todos, stage, value, contacts, close date, corrections, project plan, success criteria). Pass ALL changes in one call via the "changes" object. When "addNote" is provided, full meeting notes processing runs automatically.
-4. **search_deals** — Find deals matching a query (name, company, stage).
-5. **generate_content** — Create emails, battlecards, talking points, proposals, timelines, or any freeform content.
-6. **answer_question** — Answer pipeline questions from brain data (forecasts, win rates, trends, performance).
+function summariseToolDescription(description: string): string {
+  const compact = description.replace(/\s+/g, ' ').trim()
+  const firstSentence = compact.split(/[.!?]/)[0]?.trim() ?? compact
+  return firstSentence.length > 140 ? `${firstSentence.slice(0, 137)}...` : firstSentence
+}
 
-═══ TOOL USAGE RULES ═══
+function buildToolCatalog(): string {
+  return Object.entries(allTools)
+    .map(([toolName, toolDef], index) => `${index + 1}. ${toolName} — ${summariseToolDescription(toolDef.description)}`)
+    .join('\n')
+}
 
-- When the user mentions a deal by name, call get_deal first to get the ID, then update_deal with changes.
-- When the user pastes text and says "update [deal]", call update_deal with changes.addNote containing the pasted text.
-- When the user asks to add a todo, call update_deal with changes.addTodo.
-- When the user asks to add a contact, call update_deal with changes.addContact.
-- When the user says "fix this" or "that's wrong", call update_deal with the appropriate replace* fields in changes.
-- When the user mentions something about a deal casually, call update_deal with changes.addNote to log it.
-- NEVER describe what you'll do then wait for confirmation. Execute immediately and report results.
-- After ANY tool call, check the result. If it says "TOOL FAILED", tell the user what went wrong.
-- Keep responses to 1-2 sentences for confirmations.
+function buildFallbackOrchestrationPlan(userText: string): string {
+  const clauses = userText
+    .split(/(?:\n+|,\s+and\s+|\band then\b|\bthen\b|;)/i)
+    .map(part => part.trim())
+    .filter(Boolean)
+    .slice(0, 6)
+  if (clauses.length <= 1) return 'Single-intent request: complete the requested outcome directly; use tools as needed.'
+  return [
+    'Multi-intent request detected. Complete all intents in this order:',
+    ...clauses.map((clause, idx) => `${idx + 1}. ${clause}`),
+  ].join('\n')
+}
 
-═══ CRITICAL: DEAL ID PROTOCOL — READ BEFORE EVERY UPDATE ═══
+function formatOrchestrationPlan(plan: OrchestrationPlan | null, userText: string): string {
+  if (!plan || plan.intents.length === 0) {
+    return buildFallbackOrchestrationPlan(userText)
+  }
 
-Deal IDs are UUID v4 strings like "a1b2c3d4-e5f6-7890-abcd-ef1234567890".
-NEVER invent or guess a deal ID.
+  const lines = [
+    'Derived execution plan (complete all intents unless blocked by missing data):',
+    ...plan.intents
+      .sort((a, b) => a.order - b.order)
+      .map(intent => {
+        const depends = intent.dependsOn.length > 0 ? ` | depends on: ${intent.dependsOn.join(', ')}` : ''
+        const toolHint = intent.suggestedTool ? ` | tool: ${intent.suggestedTool}` : ''
+        return `${intent.order}. ${intent.objective}${toolHint}${depends}`
+      }),
+  ]
+  if (plan.executionNotes) lines.push(`Execution notes: ${plan.executionNotes}`)
+  if (plan.clarificationNeeded.length > 0) {
+    lines.push(`Only ask clarification if blocked. Candidate clarification: ${plan.clarificationNeeded.join(' | ')}`)
+  }
+  return lines.join('\n')
+}
 
-DECISION TREE — follow this EXACTLY when a user asks to update a deal:
+async function buildOrchestrationPlan(
+  openai: ReturnType<typeof createOpenAI>,
+  userText: string,
+  hasActiveDealContext: boolean,
+): Promise<OrchestrationPlan | null> {
+  try {
+    const toolNames = Object.keys(allTools)
+    const trimmedUserText = userText.trim().slice(0, 4000)
+    const { object } = await generateObject({
+      model: openai(MINI),
+      schema: OrchestrationPlanSchema,
+      prompt: `You are an execution planner for a CRM AI agent.
+User message:
+${trimmedUserText}
 
-1. Is there an ACTIVE DEAL in context AND the user is referring to that same deal?
-   → Use the active deal ID directly. Call update_deal immediately. DO NOT call get_deal or search_deals first.
+Active deal context available: ${hasActiveDealContext ? 'yes' : 'no'}
 
-2. Is the user referring to a DIFFERENT deal (by name) that is NOT the active deal?
-   → Call get_deal with the deal name FIRST. Wait for the result. Then call update_deal with the returned ID.
+Available tools:
+${toolNames.join(', ')}
 
-3. NEVER call update_deal and then search_deals — that sequence is always wrong.
-4. NEVER call update_deal with a fabricated, assumed, or placeholder ID.
-5. Once you have a confirmed deal ID from step 1 or 2, do NOT search for it again — use it immediately.
+Plan requirements:
+- Detect all distinct intents in the message, including vague asks.
+- For updates, plan deal lookup before mutation unless a confirmed active deal id is already present in context.
+- For multi-part asks in one message, output all intents and dependencies.
+- Keep intent count <= 8.
+- suggestedTool must be one of the available tools or null.
+- Use clarificationNeeded only when execution is truly blocked.`,
+      providerOptions: {
+        openai: {
+          maxCompletionTokens: 700,
+        },
+      },
+    })
 
-The ONLY valid deal IDs are: (1) the activeDealId shown in ACTIVE DEAL CONTEXT below, or (2) an ID returned by a tool call in this conversation.
+    const plannedObject = OrchestrationPlanSchema.parse(object)
 
-═══ RULE #1: COPY-PASTE USER TEXT, NEVER REPHRASE ═══
+    const sanitizedIntents = plannedObject.intents
+      .filter(intent => intent.objective.trim().length > 0)
+      .map(intent => ({
+        ...intent,
+        suggestedTool: intent.suggestedTool && Object.prototype.hasOwnProperty.call(allTools, intent.suggestedTool)
+          ? intent.suggestedTool
+          : null,
+      }))
+      .sort((a, b) => a.order - b.order)
+      .slice(0, 8)
 
-When the user gives you text to store (requirements, questions, todos, criteria, notes), COPY their exact words into the tool parameters. Do not rewrite, shorten, summarize, or "improve" their wording.
+    return {
+      ...plannedObject,
+      intents: sanitizedIntents,
+    }
+  } catch (err) {
+    console.warn('[agent] orchestration planner failed:', err)
+    return null
+  }
+}
 
-═══ ACTION CHAINS ═══
+function buildSystemPrompt(
+  brainContext: string,
+  activeDealContext: string,
+  toolCatalog: string,
+  orchestrationPlan: string,
+  pipelineStageContext: string = '',
+): string {
+  return `You are Halvex AI — a sales copilot with complete CRM and intelligence access.
 
-"Add X to project plan" → get_deal (if no ID in context) → update_deal with changes.addProjectTasks
-"Add X to success criteria" → get_deal (if no ID in context) → update_deal with changes.addSuccessCriteria
-"Add a contact" → get_deal (if no ID in context) → update_deal with changes.addContact
-"Update this deal / here's an update / user pastes notes" → update_deal with changes.addNote (NOT appendNotes — addNote triggers full LLM extraction + scoring)
-"Fix/correct X" → update_deal with appropriate replace* fields
-"Reset project plan" → update_deal with changes.replaceProjectPlan or changes.clearProjectPlan
-"Create content / draft email" → generate_content
-"How's my pipeline?" → answer_question
+═══ TOOLBOX (FULL ACCESS) ═══
+You can call any of these tools:
+${toolCatalog}
 
-NOTES vs FIELDS — use the right operation:
-- User pastes meeting notes, an update, a call summary, or any free-form text → changes.addNote
-- User explicitly sets a date/value/stage → changes.setCloseDate / setValue / setStage
-- changes.appendNotes is for short factual appends ONLY (not meeting notes processing)
+Tooling policy:
+- Use the smallest set of tools needed to complete the user outcome.
+- For deal mutations, resolve the right deal first, then mutate.
+- For analytics questions, prefer read-only analytics tools before guessing.
+- For multi-step asks, execute the full chain in one response using multiple tool calls when needed.
 
-═══ INFORMATIONAL STATEMENTS ═══
+═══ ORCHESTRATION PRIORITY ═══
+${orchestrationPlan}
 
-When the user makes a simple statement about a deal ("Called Sarah yesterday", "Meeting pushed to next week"):
-1. Acknowledge naturally
-2. Log it via update_deal with changes.addNote — this ensures Deal Intelligence is refreshed
-3. NEVER error on simple statements. If you can't match it to a deal, ask which deal.
+Hard orchestration rules:
+1. Complete every intent in the plan; do not stop after the first successful tool call.
+2. Respect dependencies: lookup/resolve before update, retrieval before content generation.
+3. If intents are independent, call tools in parallel in the same response.
+4. If a tool fails, report the failure clearly and continue remaining intents where possible.
+5. Never fabricate IDs. Use active deal id or IDs returned by tools.
+
+═══ DEAL ID PROTOCOL ═══
+Deal IDs are UUID v4 strings. Never invent them.
+- If active deal context matches user intent: use it directly.
+- If user names another deal: resolve it first with get_deal or search_deals, then update.
+- Never run update_deal with placeholder or guessed IDs.
+
+═══ DATA FIDELITY RULES ═══
+- Copy user-provided source text exactly into mutation fields when logging notes/todos/criteria.
+- Do not infer facts the user did not say.
+- Do not change stage unless explicitly requested or unambiguously instructed.
+- Conversion score is model-driven unless user explicitly overrides with score pinning fields.
+
+═══ ACTION MAPPING ═══
+- Freeform update/call notes/email summaries → update_deal.changes.addNote
+- Fix/correction requests → update_deal replace* fields
+- Todo/contact/project-plan/success-criteria edits → update_deal changes object
+- Competitive intel / pipeline questions / performance / forecasts → analytics tools
+- Competitor/company/case-study/product-gap CRUD → knowledge tools
+- Drafts, battlecards, docs, collateral → generate_content / draft_email / generate_battlecard
 
 ═══ ACTIVE DEAL ═══
-
-${activeDealContext || 'No active deal selected. If the user references a deal, search for it by name/company.'}
-
-${activeDealContext ? 'The active deal ID is available to ALL tools. Use it directly — do not re-search for it.' : ''}
+${activeDealContext || 'No active deal selected. Resolve deal by name/company when needed.'}
+${activeDealContext ? 'Active deal ID is valid for direct tool calls.' : ''}
 
 ═══ WORKSPACE INTELLIGENCE ═══
-
 ${brainContext}
 ${pipelineStageContext}
 
-═══ LEARNING BRAIN ═══
-
-Every deal mutation triggers a brain rebuild. The brain powers ML scoring, deal archetypes, competitor intelligence, stage velocity, churn risk, and objection win maps. Reference ML data when discussing deal health.
-
-═══ BEHAVIOR RULES ═══
-
-1. CONTEXT RETENTION: If a tool call already identified a deal, keep using that ID.
-2. AFTER MUTATIONS: Summarize in 1-2 sentences. Don't repeat all data back.
-3. NATURAL LANGUAGE: Write like a human colleague. "Done — added 3 tasks" not "I have successfully updated..."
-4. RISKS vs PRODUCT GAPS: Risks = will this deal close? Product gaps = our product is missing a feature.
-5. DON'T INFER: Only store what the user explicitly tells you. Never store what you infer.
-6. CORRECTIONS ARE SACRED: When user says "that's wrong" → use update_deal with replace* fields immediately. Never argue. The user is source of truth.
-7. SCORE PINNING: User sets a score → it's pinned. Use changes.replaceConversionScore. Use changes.resetConversionScore to unpin.
-8. NEVER SET CONVERSION SCORE directly. It's computed by ML. Only the user can override via replaceConversionScore.
-9. NEVER INFER DEAL STATUS FROM NOTES. Only change stage if user explicitly says so.
-10. CURRENCY: Always use £ (British pounds).
-11. TASK COMPLETION: After a get_deal or search, always follow through with the actual requested action in the SAME response. Never stop after a lookup without completing the task.
-12. PARALLEL EXECUTION: Call multiple tools in one response when they're independent.
-13. CONFIRMATION HANDLING: "yes", "confirmed", "do it" = confirm previous proposed action. Execute immediately.
-14. DECISIVENESS: "Update RELX with this note" = get_deal("RELX") then update_deal with addNote. One search, one update, done. No hedging, no "could you try again".`
+═══ RESPONSE STYLE ═══
+- Be decisive and execution-first.
+- After tool execution, summarize completed actions and outcomes succinctly.
+- If blocked, ask one crisp clarification question only when necessary.`
 }
 
 function getMessageText(message: { content?: unknown }): string {
@@ -331,6 +407,17 @@ function getMessageText(message: { content?: unknown }): string {
 
 function compactWhitespace(value: string): string {
   return value.replace(/\s+/g, ' ').trim()
+}
+
+function withActiveDealFallback(toolName: string, rawParams: Record<string, unknown>, activeDealId: string | null) {
+  if (!activeDealId) return rawParams
+  if (toolName === 'update_deal' && !rawParams.dealId) {
+    return { ...rawParams, dealId: activeDealId }
+  }
+  if (toolName === 'get_deal' && !rawParams.dealId && !rawParams.dealName) {
+    return { ...rawParams, dealId: activeDealId }
+  }
+  return rawParams
 }
 
 function normaliseIncomingMessages(messages: any[]) {
@@ -579,7 +666,21 @@ export async function POST(req: NextRequest) {
         : 'No workspace data loaded yet.'
     }
 
-    const systemPrompt = buildSystemPrompt(brainContextWithLabels, activeDealContext, pipelineStageContext)
+    const toolCatalog = buildToolCatalog()
+    const derivedPlan = await buildOrchestrationPlan(
+      openai,
+      lastUserText,
+      Boolean(activeDealId && activeDealContext),
+    )
+    const orchestrationPlan = formatOrchestrationPlan(derivedPlan, lastUserText)
+
+    const systemPrompt = buildSystemPrompt(
+      brainContextWithLabels,
+      activeDealContext,
+      toolCatalog,
+      orchestrationPlan,
+      pipelineStageContext,
+    )
 
     // ── Build tool context for tool execute() calls ──────────────────────────
     const toolContext = {
@@ -632,7 +733,11 @@ export async function POST(req: NextRequest) {
           execute: async (params: any) => {
             try {
               // Normalise LLM parameter name mistakes before Zod validation
-              const normalised = normaliseParams(params)
+              const normalised = withActiveDealFallback(
+                name,
+                normaliseParams(params),
+                toolContext.activeDealId ?? null,
+              )
               // Validate params through the original zod schema
               const validated = t.parameters.parse(normalised) as any
               const result = await (t.execute as any)(validated, toolContext)
@@ -664,7 +769,7 @@ export async function POST(req: NextRequest) {
         system: systemPrompt,
         messages: trimmedMessages,
         tools: sdkTools,
-        maxSteps: 8,
+        maxSteps: 20,
         providerOptions: {
           openai: {
             maxCompletionTokens: 4096,

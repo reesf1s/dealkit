@@ -69,7 +69,7 @@ export function ConfirmModal({
                 fontSize: '15px',
                 fontWeight: 600,
                 color: 'var(--text-primary)',
-                letterSpacing: '-0.01em',
+                letterSpacing: 0,
                 margin: 0,
               }}
             >

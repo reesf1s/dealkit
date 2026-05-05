@@ -26,7 +26,7 @@ function StatCard({ label, value, icon: Icon, accentColor, accentRgb, sub, trend
   return (
     <div
       style={{
-        background: `linear-gradient(135deg, rgba(${accentRgb}, 0.06) 0%, var(--surface-1) 100%)`,
+        background: 'var(--surface-1)',
         border: `1px solid rgba(${accentRgb}, 0.14)`,
         borderRadius: '12px',
         padding: '18px',
@@ -55,7 +55,7 @@ function StatCard({ label, value, icon: Icon, accentColor, accentRgb, sub, trend
       <div style={{
         position: 'absolute', top: 0, right: 0,
         width: '80px', height: '80px',
-        background: `radial-gradient(circle at top right, rgba(${accentRgb}, 0.10) 0%, transparent 70%)`,
+        background: 'transparent',
         pointerEvents: 'none',
       }} />
 
@@ -76,7 +76,7 @@ function StatCard({ label, value, icon: Icon, accentColor, accentRgb, sub, trend
           fontSize: '26px',
           fontWeight: 700,
           color: '#37352f',
-          letterSpacing: '-0.04em',
+          letterSpacing: 0,
           lineHeight: 1,
           fontVariantNumeric: 'tabular-nums',
           marginBottom: '5px',
@@ -87,7 +87,7 @@ function StatCard({ label, value, icon: Icon, accentColor, accentRgb, sub, trend
           fontSize: '11.5px',
           color: '#9b9a97',
           fontWeight: 400,
-          letterSpacing: '-0.01em',
+          letterSpacing: 0,
         }}>
           {label}
         </div>
@@ -136,7 +136,7 @@ export function QuickStats({ stats }: QuickStatsProps) {
         label="Deals logged"
         value={String(totalDeals)}
         icon={FileText}
-        accentColor="#5e6ad2"
+        accentColor="var(--brand)"
         accentRgb="94,106,210"
       />
       <StatCard

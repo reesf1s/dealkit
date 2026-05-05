@@ -85,7 +85,7 @@ export default function ROIWidget({ deals, collateralCount, currencySymbol = '£
       sublabel: 'annualised',
       value: !hasDeals ? '—' : openPipeline > 0 ? formatCurrency(openPipeline, currencySymbol) : '—',
       hint: !hasDeals ? 'Log a deal' : `${openDeals.length} open deal${openDeals.length !== 1 ? 's' : ''}`,
-      color: '#5e6ad2',
+      color: 'var(--brand)',
       glow: 'rgba(94,106,210,0.06)',
       border: 'rgba(94,106,210,0.16)',
     },
@@ -117,9 +117,9 @@ export default function ROIWidget({ deals, collateralCount, currencySymbol = '£
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-            <rect x="3" y="12" width="4" height="9" rx="1" fill="#5e6ad2" />
-            <rect x="10" y="7" width="4" height="14" rx="1" fill="#5e6ad2" />
-            <rect x="17" y="3" width="4" height="18" rx="1" fill="#5e6ad2" />
+            <rect x="3" y="12" width="4" height="9" rx="1" fill="var(--brand)" />
+            <rect x="10" y="7" width="4" height="14" rx="1" fill="var(--brand)" />
+            <rect x="17" y="3" width="4" height="18" rx="1" fill="var(--brand)" />
           </svg>
         </div>
         <span style={{ fontSize: '13px', fontWeight: '600', color: '#37352f' }}>Revenue Impact</span>
@@ -145,7 +145,7 @@ export default function ROIWidget({ deals, collateralCount, currencySymbol = '£
               <span style={{ fontSize: '10px', color: '#9b9a97' }}>{sublabel}</span>
             </div>
             <div style={{
-              fontSize: '22px', fontWeight: 800, letterSpacing: '-0.04em',
+              fontSize: '22px', fontWeight: 800, letterSpacing: 0,
               color, lineHeight: 1, marginBottom: '4px',
             }}>{value}</div>
             <div style={{ fontSize: '11px', color: '#9b9a97' }}>{hint}</div>

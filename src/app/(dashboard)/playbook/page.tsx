@@ -35,7 +35,7 @@ function Tooltip({ text, children }: { text: string; children: React.ReactNode }
 }
 
 // ── AnimatedBar ───────────────────────────────────────────────────────────────
-function AnimatedBar({ pct, color = '#5e6ad2', height = 6 }: { pct: number; color?: string; height?: number }) {
+function AnimatedBar({ pct, color = 'var(--brand)', height = 6 }: { pct: number; color?: string; height?: number }) {
   const [width, setWidth] = useState(0)
   useEffect(() => {
     const t = setTimeout(() => setWidth(pct), 80)
@@ -51,7 +51,7 @@ function AnimatedBar({ pct, color = '#5e6ad2', height = 6 }: { pct: number; colo
 // ── ProgressBar (empty state) ─────────────────────────────────────────────────
 function ProgressBar({ current, total }: { current: number; total: number }) {
   const pct = Math.min(100, (current / total) * 100)
-  return <AnimatedBar pct={pct} color="#5e6ad2" height={8} />
+  return <AnimatedBar pct={pct} color="var(--brand)" height={8} />
 }
 
 // ── Section ───────────────────────────────────────────────────────────────────
@@ -67,10 +67,10 @@ function Section({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'var(--surface-1)', border: '1px solid rgba(55,53,47,0.12)', borderRadius: '8px', padding: '20px', boxShadow: '0 1px 3px rgba(55,53,47,0.06)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingBottom: '12px', borderBottom: '1px solid rgba(55,53,47,0.09)' }}>
-        <div style={{ color: '#5e6ad2' }}>{icon}</div>
+        <div style={{ color: 'var(--brand)' }}>{icon}</div>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)', letterSpacing: '-0.01em', margin: 0 }}>{title}</h2>
+            <h2 style={{ fontSize: '15px', fontWeight: '600', color: 'var(--text-primary)', letterSpacing: 0, margin: 0 }}>{title}</h2>
             {tooltip && (
               <Tooltip text={tooltip}>
                 <span style={{ cursor: 'help', color: 'var(--text-tertiary)' }}>
@@ -96,12 +96,12 @@ function FactorRow({ rank, label, value, direction, detail, importance }: {
   detail?: string
   importance?: number
 }) {
-  const rankColor = rank <= 2 ? '#5e6ad2' : '#9b9a97'
+  const rankColor = rank <= 2 ? 'var(--brand)' : '#9b9a97'
   const lineColor = direction === 'positive' ? '#0f7b6c' : direction === 'negative' ? '#e03e3e' : '#787774'
   const barColor = direction === 'positive' ? '#0f7b6c' : direction === 'negative' ? '#e03e3e' : '#787774'
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 14px', background: 'var(--surface-1)', border: '1px solid rgba(55,53,47,0.12)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(55,53,47,0.04)' }}>
-      <div style={{ flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', background: rank <= 2 ? 'rgba(94,106,210,0.08)' : '#f7f6f3', border: `1px solid ${rank <= 2 ? 'rgba(94,106,210,0.20)' : 'rgba(55,53,47,0.09)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '600', color: rankColor }}>
+      <div style={{ flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', background: rank <= 2 ? 'var(--brand-bg)' : '#f7f6f3', border: `1px solid ${rank <= 2 ? 'rgba(94,106,210,0.20)' : 'rgba(55,53,47,0.09)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '600', color: rankColor }}>
         {rank}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -206,8 +206,8 @@ function EmptyState({ totalDeals, winCount, lossCount, recentDeals }: { totalDea
       {/* Header */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'rgba(94,106,210,0.08)', border: '1px solid rgba(94,106,210,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <BookOpen size={20} style={{ color: '#5e6ad2' }} />
+          <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'var(--brand-bg)', border: '1px solid rgba(94,106,210,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <BookOpen size={20} style={{ color: 'var(--brand)' }} />
           </div>
           <div>
             <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1, margin: 0 }} className="font-brand">
@@ -223,7 +223,7 @@ function EmptyState({ totalDeals, winCount, lossCount, recentDeals }: { totalDea
         <div style={{ padding: '20px', borderRadius: '8px', background: 'var(--surface-1)', border: '1px solid rgba(55,53,47,0.12)', boxShadow: '0 1px 3px rgba(55,53,47,0.06)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
             <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>Building your playbook...</span>
-            <span style={{ fontSize: '13px', fontWeight: '600', color: '#5e6ad2' }} className="font-mono">{totalDeals} / 10</span>
+            <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--brand)' }} className="font-mono">{totalDeals} / 10</span>
           </div>
           <ProgressBar current={totalDeals} total={10} />
           {hasFirstDeal ? (
@@ -254,7 +254,7 @@ function EmptyState({ totalDeals, winCount, lossCount, recentDeals }: { totalDea
             title="Your Winning Formula"
             description="The top 5 factors that predict a won deal in YOUR pipeline."
             unlockText="Unlocks at 10 deals"
-            iconColor="#5e6ad2"
+            iconColor="var(--brand)"
             bgTint="rgba(94,106,210,0.04)"
           />
           <LockedCard
@@ -381,7 +381,7 @@ export default function PlaybookPage() {
         {[
           { label: 'Win rate', value: `${wl?.winRate ?? 0}%`, color: '#0f7b6c' },
           { label: 'Avg close time', value: wl?.avgDaysToClose ? `${Math.round(wl.avgDaysToClose)} days` : '—', color: '#2e78c6' },
-          { label: 'Avg won value', value: wl?.avgWonValue ? formatCurrency(Math.round(wl.avgWonValue)) : '—', color: '#5e6ad2' },
+          { label: 'Avg won value', value: wl?.avgWonValue ? formatCurrency(Math.round(wl.avgWonValue)) : '—', color: 'var(--brand)' },
           { label: 'Closed deals', value: String(totalDeals), color: 'var(--text-secondary)' },
         ].map(s => (
           <div key={s.label} style={{ padding: '12px 16px', background: 'var(--surface-1)', border: '1px solid rgba(55,53,47,0.12)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(55,53,47,0.06)', minWidth: '110px' }}>
@@ -515,7 +515,7 @@ export default function PlaybookPage() {
               )
             })}
             <div style={{ textAlign: 'right' }}>
-              <Link href="/competitors" style={{ fontSize: '12px', color: '#5e6ad2', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}>
+              <Link href="/competitors" style={{ fontSize: '12px', color: 'var(--brand)', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}>
                 View full competitive intel <ArrowUpRight size={11} />
               </Link>
             </div>
@@ -581,7 +581,7 @@ export default function PlaybookPage() {
       {/* ── Deal Archetypes ── */}
       {archetypes.length > 0 && (
         <Section
-          icon={<Award size={18} style={{ color: '#5e6ad2' }} />}
+          icon={<Award size={18} style={{ color: 'var(--brand)' }} />}
           title="Deal Archetypes"
           subtitle="Natural deal patterns discovered by ML — each type has distinct close velocity and win conditions"
           tooltip="These clusters were identified by grouping your closed deals by similar characteristics. Understanding which archetype a deal belongs to helps predict outcome."
@@ -602,7 +602,7 @@ export default function PlaybookPage() {
                     <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>{String(a.winningCharacteristic)}</div>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
                       <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', background: 'rgba(55,53,47,0.09)', padding: '2px 7px', borderRadius: '4px' }}>{a.dealCount} closed deals</span>
-                      {a.openDealIds?.length > 0 && <span style={{ fontSize: '10px', color: '#5e6ad2', background: 'rgba(94,106,210,0.08)', padding: '2px 7px', borderRadius: '4px' }}>{a.openDealIds.length} active</span>}
+                      {a.openDealIds?.length > 0 && <span style={{ fontSize: '10px', color: 'var(--brand)', background: 'var(--brand-bg)', padding: '2px 7px', borderRadius: '4px' }}>{a.openDealIds.length} active</span>}
                     </div>
                   </div>
                 </div>
@@ -725,7 +725,7 @@ export default function PlaybookPage() {
                       <div style={{ flex: 1 }}>
                         <AnimatedBar
                           pct={c.aucRoc != null ? c.aucRoc * 100 : (c.accuracy ?? 0)}
-                          color="#5e6ad2"
+                          color="var(--brand)"
                           height={5}
                         />
                       </div>

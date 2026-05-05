@@ -23,11 +23,11 @@ export default function SignUpPage() {
           <div style={{ width: '36px', height: '36px', background: '#37352f', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileText size={17} color="#fff" strokeWidth={2.5} />
           </div>
-          <span style={{ fontWeight: '700', fontSize: '18px', letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>Halvex</span>
+          <span style={{ fontWeight: '700', fontSize: '18px', letterSpacing: 0, color: 'var(--text-primary)' }}>Halvex</span>
         </div>
 
         {/* Headline */}
-        <h1 style={{ fontSize: '36px', fontWeight: '800', letterSpacing: '-0.04em', color: 'var(--text-primary)', marginBottom: '16px', lineHeight: '1.1' }}>
+        <h1 style={{ fontSize: '36px', fontWeight: '800', letterSpacing: 0, color: 'var(--text-primary)', marginBottom: '16px', lineHeight: '1.1' }}>
           Close more deals<br />with AI sales intel
         </h1>
         <p style={{ fontSize: '15px', color: 'var(--text-tertiary)', marginBottom: '48px', lineHeight: '1.7', maxWidth: '360px' }}>
@@ -55,7 +55,7 @@ export default function SignUpPage() {
             &ldquo;I built Halvex because we kept losing deals to competitors we couldn&apos;t track. Two hours of prep per call. I wanted that time back.&rdquo;
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#5e6ad2', border: '1px solid rgba(94,106,210,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff' }}>R</div>
+            <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--brand)', border: '1px solid var(--brand-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff' }}>R</div>
             <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Rees Foulkes · Founder, Halvex</span>
           </div>
         </div>
@@ -65,7 +65,7 @@ export default function SignUpPage() {
       <div style={{ width: '480px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px' }}>
         <div style={{ width: '100%', maxWidth: '400px' }}>
           <div style={{ marginBottom: '28px', textAlign: 'center' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '6px' }}>Create your account</h2>
+            <h2 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: 0, color: 'var(--text-primary)', marginBottom: '6px' }}>Create your account</h2>
             <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>Start closing more deals today</p>
           </div>
           <SignUp
@@ -120,7 +120,7 @@ export default function SignUpPage() {
                 colorInputBackground: 'var(--input-bg)',
                 colorInputText: 'var(--text-primary)',
                 borderRadius: '8px',
-                colorPrimary: '#5e6ad2',
+                colorPrimary: 'var(--brand)',
                 colorDanger: '#e03e3e',
               },
             }}

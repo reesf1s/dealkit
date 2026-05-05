@@ -20,7 +20,7 @@ const TYPE_CONFIG: Partial<Record<CollateralType, { label: string; color: string
   },
   one_pager: {
     label: 'One-Pager',
-    color: '#5e6ad2',
+    color: 'var(--brand)',
     bg: 'rgba(94, 106, 210, 0.08)',
   },
   objection_handler: {
@@ -35,7 +35,7 @@ const TYPE_CONFIG: Partial<Record<CollateralType, { label: string; color: string
   },
   email_sequence: {
     label: 'Email Sequence',
-    color: '#5e6ad2',
+    color: 'var(--brand)',
     bg: 'rgba(94, 106, 210, 0.08)',
   },
 }

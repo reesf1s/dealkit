@@ -105,7 +105,7 @@ export default function AIOverviewCard() {
       <div style={{
         position: 'absolute', top: 0, right: 0,
         width: '300px', height: '200px',
-        background: 'radial-gradient(ellipse at top right, var(--accent-subtle), transparent 65%)',
+        background: 'transparent',
         pointerEvents: 'none',
       }} />
 
@@ -125,7 +125,7 @@ export default function AIOverviewCard() {
           }}>
             <Sparkles size={14} style={{ color: 'var(--text-secondary)' }} />
           </div>
-          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', letterSpacing: 0 }}>
             Brain Briefing
           </span>
           {allDone && (

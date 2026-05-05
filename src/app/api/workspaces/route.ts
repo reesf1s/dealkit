@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { workspaces } from '@/lib/db/schema'
+import { dbErrResponse } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 
 export async function GET() {
@@ -13,10 +14,7 @@ export async function GET() {
     return NextResponse.json({ data: ctx.workspace, role: ctx.role })
   } catch (err) {
     console.error('[GET /api/workspaces]', err)
-    return NextResponse.json(
-      { error: 'Internal server error', details: process.env.NODE_ENV === 'development' ? (err as Error).message : undefined },
-      { status: 500 }
-    )
+    return dbErrResponse(err)
   }
 }
 
@@ -36,9 +34,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ data: updated })
   } catch (err) {
     console.error('[PATCH /api/workspaces]', err)
-    return NextResponse.json(
-      { error: 'Internal server error', details: process.env.NODE_ENV === 'development' ? (err as Error).message : undefined },
-      { status: 500 }
-    )
+    return dbErrResponse(err)
   }
 }

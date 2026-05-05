@@ -92,7 +92,7 @@ export function QuickActions() {
           icon={FileText}
           label="Log a Deal"
           description="Record a won or lost deal with insights"
-          color="#5e6ad2"
+          color="var(--brand)"
           bg="rgba(94, 106, 210, 0.06)"
           hoverBg="#f7f6f3"
         />

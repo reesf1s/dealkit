@@ -11,11 +11,11 @@ export default function SignInPage() {
           <div style={{ width: '32px', height: '32px', background: '#37352f', borderRadius: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileText size={15} color="#fff" strokeWidth={2.5} />
           </div>
-          <span style={{ fontWeight: '700', fontSize: '17px', letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>Halvex</span>
+          <span style={{ fontWeight: '700', fontSize: '17px', letterSpacing: 0, color: 'var(--text-primary)' }}>Halvex</span>
         </div>
 
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: '-0.03em', color: 'var(--text-primary)', marginBottom: '6px' }}>Welcome back</h1>
+          <h1 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: 0, color: 'var(--text-primary)', marginBottom: '6px' }}>Welcome back</h1>
           <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>Sign in to your sales hub</p>
         </div>
 
@@ -70,7 +70,7 @@ export default function SignInPage() {
               colorInputBackground: 'var(--input-bg)',
               colorInputText: 'var(--text-primary)',
               borderRadius: '8px',
-              colorPrimary: '#5e6ad2',
+              colorPrimary: 'var(--brand)',
               colorDanger: '#e03e3e',
             },
           }}

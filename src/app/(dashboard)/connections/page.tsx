@@ -1,16 +1,21 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
-import {
-  MessageSquare, Search, FileText, ChevronRight, ArrowUpRight,
-  Mail, Pencil,
-} from 'lucide-react'
+import { Activity, ArrowUpRight, CheckSquare, Clock3, MessageSquareText, Search } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
+import { OperatorHeader, OperatorKpi, OperatorPage } from '@/components/shared/OperatorUI'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+interface ActivityEvent {
+  id: string
+  type: string
+  metadata: Record<string, unknown>
+  createdAt: string
+  dealName?: string
+  prospectCompany?: string
+}
 
 interface Note {
   id: string
@@ -23,263 +28,184 @@ interface Note {
   source: string
 }
 
-type SourceFilter = 'all' | 'manual' | 'email'
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmtDate(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+function relTime(iso: string): string {
+  const mins = Math.floor((Date.now() - +new Date(iso)) / 60_000)
+  if (mins < 2) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
 }
 
-function stageFmt(s: string): string {
-  return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-}
+function eventLabel(event: ActivityEvent): string {
+  const deal = String(event.metadata?.dealName ?? event.dealName ?? 'Deal')
+  const stage = String(event.metadata?.value ?? event.metadata?.newStage ?? '').replace(/_/g, ' ')
 
-function stageColor(stage: string): string {
-  switch (stage) {
-    case 'negotiation': case 'closed_won': return '#1DB86A'
-    case 'proposal': return '#f59e0b'
-    case 'closed_lost': return '#ef4444'
-    case 'discovery': return '#8b5cf6'
-    case 'qualified': case 'qualification': return '#3b82f6'
-    default: return '#aaa'
+  switch (event.type) {
+    case 'deal_log.created':
+    case 'deal_created':
+      return `${deal} was added to pipeline`
+    case 'deal_log.closed_won':
+    case 'deal_won':
+      return `${deal} was closed won`
+    case 'deal_log.closed_lost':
+    case 'deal_lost':
+      return `${deal} was closed lost`
+    case 'deal_log.updated':
+      if (event.metadata?.field === 'stage' && stage) return `${deal} moved to ${stage}`
+      return `${deal} was updated`
+    case 'note_added':
+    case 'deal_log.note_added':
+      return `Conversation captured for ${deal}`
+    case 'deal_log.ai_scored':
+      return `Intelligence score updated for ${deal}`
+    default:
+      return event.type.replace(/[_.]/g, ' ')
   }
 }
 
-function sourceIcon(source: string) {
-  if (source === 'email') return <Mail size={11} style={{ color: 'var(--text-tertiary)' }} />
-  return <Pencil size={11} style={{ color: 'var(--text-tertiary)' }} />
+function extractAction(note: Note): string | null {
+  const lines = note.content.split('\n').map(l => l.trim()).filter(Boolean)
+  const candidate = lines.find(l => /next step|follow[- ]?up|send|schedule|review|confirm|proposal|security|legal|pricing/i.test(l))
+  if (!candidate) return null
+  return candidate.length > 120 ? `${candidate.slice(0, 120).trim()}…` : candidate
 }
-
-function Skeleton() {
-  return <div style={{ height: 90, borderRadius: 8 }} className="skeleton" />
-}
-
-// ─── Note Card ────────────────────────────────────────────────────────────────
-
-function NoteCard({ note }: { note: Note }) {
-  const [expanded, setExpanded] = useState(false)
-  const preview = note.content.length > 180 && !expanded
-    ? note.content.slice(0, 180).trim() + '…'
-    : note.content
-
-  return (
-    <div style={{
-      background: 'var(--surface-1)',
-      border: '1px solid var(--border-default)',
-      borderRadius: 8,
-      padding: '14px 16px',
-      transition: 'border-color 80ms',
-    }}
-      onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-subtle)'}
-      onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-default)'}
-    >
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-            <span style={{
-              fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {note.dealName}
-            </span>
-            <span style={{
-              fontSize: 10.5, fontWeight: 500,
-              color: stageColor(note.stage),
-              background: `${stageColor(note.stage)}15`,
-              borderRadius: 99, padding: '1px 6px',
-              flexShrink: 0,
-            }}>
-              {stageFmt(note.stage)}
-            </span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{note.prospectCompany}</span>
-            {note.date && (
-              <>
-                <span style={{ fontSize: 11, color: 'var(--border-default)' }}>·</span>
-                <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{fmtDate(note.date)}</span>
-              </>
-            )}
-            <span style={{ fontSize: 11, color: 'var(--border-default)' }}>·</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              {sourceIcon(note.source)}
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{note.source}</span>
-            </span>
-          </div>
-        </div>
-        <Link
-          href={`/deals/${note.dealId}`}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            fontSize: 11, color: '#1DB86A', textDecoration: 'none',
-            padding: '3px 8px', borderRadius: 5,
-            background: 'rgba(29,184,106,0.07)', border: '1px solid rgba(29,184,106,0.16)',
-            flexShrink: 0, marginLeft: 8,
-          }}
-        >
-          Open <ArrowUpRight size={10} />
-        </Link>
-      </div>
-
-      {/* Content */}
-      <p style={{
-        fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.6,
-        margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-      }}>
-        {preview}
-      </p>
-      {note.content.length > 180 && (
-        <button
-          onClick={() => setExpanded(e => !e)}
-          style={{
-            background: 'transparent', border: 'none', cursor: 'pointer',
-            fontSize: 11.5, color: '#1DB86A', padding: '4px 0 0', fontWeight: 500,
-          }}
-        >
-          {expanded ? 'Show less' : 'Show more'}
-        </button>
-      )}
-    </div>
-  )
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ConnectionsPage() {
-  const [search, setSearch] = useState('')
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all')
+  const [query, setQuery] = useState('')
 
-  const { data, isLoading } = useSWR('/api/notes', fetcher, {
+  const { data: activityRes, isLoading: activityLoading } = useSWR<{ data: ActivityEvent[] }>('/api/activity?limit=80', fetcher, {
     revalidateOnFocus: false,
-    dedupingInterval: 30000,
-  })
-  const notes: Note[] = data?.data ?? []
-
-  const filtered = notes.filter(n => {
-    if (sourceFilter !== 'all' && n.source !== sourceFilter) return false
-    if (search) {
-      const q = search.toLowerCase()
-      return (
-        n.dealName.toLowerCase().includes(q) ||
-        n.prospectCompany.toLowerCase().includes(q) ||
-        n.content.toLowerCase().includes(q)
-      )
-    }
-    return true
+    dedupingInterval: 20_000,
   })
 
-  const tabs: Array<{ key: SourceFilter; label: string }> = [
-    { key: 'all', label: 'All' },
-    { key: 'manual', label: 'Manual' },
-    { key: 'email', label: 'Email' },
-  ]
+  const { data: notesRes, isLoading: notesLoading } = useSWR<{ data: Note[] }>('/api/notes', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 30_000,
+  })
+
+  const activity = activityRes?.data ?? []
+  const notes = notesRes?.data ?? []
+
+  const filteredActivity = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return activity
+
+    return activity.filter(item => {
+      const deal = String(item.metadata?.dealName ?? item.dealName ?? '')
+      const company = String(item.metadata?.company ?? item.prospectCompany ?? '')
+      return eventLabel(item).toLowerCase().includes(q) || deal.toLowerCase().includes(q) || company.toLowerCase().includes(q)
+    })
+  }, [activity, query])
+
+  const actionQueue = useMemo(() => {
+    return notes
+      .map(note => ({ note, action: extractAction(note) }))
+      .filter((item): item is { note: Note; action: string } => Boolean(item.action))
+      .slice(0, 10)
+  }, [notes])
+
+  const recentEvents = activity.filter(item => Date.now() - +new Date(item.createdAt) < 24 * 60 * 60 * 1000).length
+  const dealsTouched = new Set(activity.map(item => String(item.metadata?.dealId ?? item.dealName ?? item.id))).size
 
   return (
-    <div style={{ paddingTop: 8 }}>
+    <OperatorPage>
+      <OperatorHeader
+        eyebrow="Activity Console"
+        title="Execution feed and action extraction"
+        description="Review pipeline movement and turn captured notes into concrete follow-ups."
+      />
+
+      <section className="connections-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
+        {[
+          { label: 'Events (24h)', value: String(recentEvents), sub: 'Recent CRM movement', icon: Activity },
+          { label: 'Actionable Notes', value: String(actionQueue.length), sub: 'Conversation-derived actions', icon: CheckSquare },
+          { label: 'Deals Touched', value: String(dealsTouched), sub: 'Unique opportunities with activity', icon: MessageSquareText },
+          { label: 'Total Timeline', value: String(activity.length), sub: 'Events in current window', icon: Clock3 },
+        ].map(card => (
+          <OperatorKpi key={card.label} label={card.label} value={card.value} sub={card.sub} icon={card.icon} />
+        ))}
+      </section>
+
+      <section style={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 10 }}>
+        <article className="notion-panel" style={{ padding: '12px 14px' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, borderRadius: 9, border: '1px solid var(--border-default)', padding: '0 10px', background: 'var(--surface-2)', minWidth: 250, marginBottom: 10 }}>
+            <Search size={13} style={{ color: 'var(--text-tertiary)' }} />
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search activity"
+              style={{ flex: 1, border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }}
+            />
+          </div>
+
+          <h2 style={{ margin: '0 0 8px', textTransform: 'none', fontSize: 15, letterSpacing: 0, color: 'var(--text-primary)' }}>
+            Timeline
+          </h2>
+
+          {activityLoading ? (
+            <div className="skeleton" style={{ height: 240, borderRadius: 10 }} />
+          ) : filteredActivity.length === 0 ? (
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 13 }}>No events found for this filter.</p>
+          ) : (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {filteredActivity.slice(0, 24).map(item => (
+                <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 8 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', marginTop: 5, background: 'var(--brand)', boxShadow: '0 0 0 4px var(--brand-bg)' }} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 12.5, color: 'var(--text-primary)' }}>{eventLabel(item)}</div>
+                    <div style={{ marginTop: 1, fontSize: 11.5, color: 'var(--text-tertiary)' }}>{relTime(item.createdAt)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </article>
+
+        <article className="notion-panel" style={{ padding: '12px 14px' }}>
+          <h2 style={{ margin: '0 0 8px', textTransform: 'none', fontSize: 15, letterSpacing: 0, color: 'var(--text-primary)' }}>
+            Action Queue From Notes
+          </h2>
+
+          {notesLoading ? (
+            <div className="skeleton" style={{ height: 240, borderRadius: 10 }} />
+          ) : actionQueue.length === 0 ? (
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 13 }}>
+              Add meeting notes to let Halvex extract concrete follow-ups.
+            </p>
+          ) : (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {actionQueue.map(item => (
+                <Link key={item.note.id} href={`/deals/${item.note.dealId}`} style={{ textDecoration: 'none' }}>
+                  <div style={{ border: '1px solid var(--border-default)', borderRadius: 10, padding: '10px 11px', background: 'var(--surface-2)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {item.note.prospectCompany}
+                        </div>
+                        <div style={{ marginTop: 2, fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{item.action}</div>
+                      </div>
+                      <ArrowUpRight size={13} style={{ color: 'var(--brand)', flexShrink: 0 }} />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </article>
+      </section>
+
       <style>{`
-        @keyframes shimmer {
-          0% { background-position: -200% 0; }
-          100% { background-position: 200% 0; }
+        @media (max-width: 1120px) {
+          .connections-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        }
+        @media (max-width: 960px) {
+          section[style*='grid-template-columns: 1.35fr 1fr'] { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 760px) {
+          .connections-kpis { grid-template-columns: 1fr !important; }
         }
       `}</style>
-
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', margin: 0 }}>
-            Conversations
-          </h1>
-          <p style={{ fontSize: 13, color: 'var(--text-tertiary)', margin: '3px 0 0', letterSpacing: '-0.01em' }}>
-            Meeting notes and conversations across all your deals.
-          </p>
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-          {filtered.length} note{filtered.length !== 1 ? 's' : ''}
-        </div>
-      </div>
-
-      {/* Search + Filter Row */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
-        <div style={{
-          flex: 1, display: 'flex', alignItems: 'center', gap: 8,
-          background: 'var(--surface-2)', border: '1px solid var(--border-default)', borderRadius: 7,
-          padding: '0 12px', height: 34,
-        }}>
-          <Search size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search notes, deals, companies…"
-            style={{
-              flex: 1, border: 'none', background: 'transparent', outline: 'none',
-              fontSize: 13, color: '#1a1a1a',
-            }}
-          />
-        </div>
-        <div style={{ display: 'flex', gap: 3 }}>
-          {tabs.map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setSourceFilter(tab.key)}
-              style={{
-                padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500,
-                cursor: 'pointer',
-                border: sourceFilter === tab.key ? '1px solid var(--border-default)' : '1px solid transparent',
-                background: sourceFilter === tab.key ? 'var(--surface-1)' : 'transparent',
-                color: sourceFilter === tab.key ? 'var(--text-primary)' : 'var(--text-tertiary)',
-                transition: 'all 80ms',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Notes List */}
-      {isLoading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {[...Array(5)].map((_, i) => <Skeleton key={i} />)}
-        </div>
-      ) : filtered.length === 0 ? (
-        <div style={{
-          textAlign: 'center', padding: '64px 0',
-          border: '1px solid var(--border-subtle)', borderRadius: 10,
-          background: 'var(--surface-2)',
-        }}>
-          <MessageSquare size={24} style={{ color: 'var(--text-muted)', display: 'block', margin: '0 auto 10px' }} />
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)' }}>
-            {search ? 'No matching notes' : 'No notes yet'}
-          </div>
-          <div style={{ fontSize: 12.5, color: 'var(--text-tertiary)', marginTop: 4, marginBottom: 16 }}>
-            {search
-              ? 'Try a different search term'
-              : 'Add meeting notes to your deals to see them here'}
-          </div>
-          {!search && (
-            <Link href="/deals" style={{
-              display: 'inline-flex', alignItems: 'center', gap: 5,
-              fontSize: 12.5, fontWeight: 500, color: '#1DB86A', textDecoration: 'none',
-              padding: '7px 16px', background: 'rgba(29,184,106,0.08)',
-              border: '1px solid rgba(29,184,106,0.2)', borderRadius: 7,
-            }}>
-              <FileText size={12} />
-              Go to Deals
-              <ChevronRight size={11} />
-            </Link>
-          )}
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {filtered.map(note => (
-            <NoteCard key={note.id} note={note} />
-          ))}
-        </div>
-      )}
-    </div>
+    </OperatorPage>
   )
 }

@@ -13,7 +13,7 @@ const COMPANY_JURISDICTION = 'England & Wales'
 
 export default function PrivacyPage() {
   return (
-    <div style={{ minHeight: '100vh', background: '#ffffff', color: '#37352f', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--surface-1)', color: '#37352f', fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
 
       {/* Nav */}
       <nav style={{ borderBottom: '1px solid rgba(55,53,47,0.09)', padding: '0 32px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -28,13 +28,13 @@ export default function PrivacyPage() {
 
       <div style={{ maxWidth: '760px', margin: '0 auto', padding: '60px 32px 80px' }}>
         <div style={{ marginBottom: '40px' }}>
-          <h1 style={{ fontSize: '32px', fontWeight: '800', letterSpacing: '-0.04em', color: '#37352f', marginBottom: '10px' }}>Privacy Policy</h1>
+          <h1 style={{ fontSize: '32px', fontWeight: '800', letterSpacing: 0, color: '#37352f', marginBottom: '10px' }}>Privacy Policy</h1>
           <p style={{ fontSize: '14px', color: '#9b9a97' }}>Effective date: {EFFECTIVE_DATE} · Last updated: {EFFECTIVE_DATE}</p>
         </div>
 
         <Section title="1. Who we are">
           <P>{COMPANY_NAME} (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) operates the Halvex sales intelligence platform at halvex.ai. We are registered in {COMPANY_JURISDICTION}.</P>
-          <P>We act as the <strong>data controller</strong> for personal data processed through our platform. For questions about this policy or to exercise your rights, contact us at <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: '#5e6ad2' }}>{COMPANY_EMAIL}</a>.</P>
+          <P>We act as the <strong>data controller</strong> for personal data processed through our platform. For questions about this policy or to exercise your rights, contact us at <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: 'var(--brand)' }}>{COMPANY_EMAIL}</a>.</P>
         </Section>
 
         <Section title="2. What data we collect">
@@ -91,7 +91,7 @@ export default function PrivacyPage() {
                     <td key={i} style={{ padding: '10px 12px', borderBottom: '1px solid rgba(55,53,47,0.06)', color: '#787774' }}>{val}</td>
                   ))}
                   <td style={{ padding: '10px 12px', borderBottom: '1px solid rgba(55,53,47,0.06)' }}>
-                    <a href={`https://${link}`} target="_blank" rel="noopener noreferrer" style={{ color: '#5e6ad2', fontSize: '12px' }}>{link}</a>
+                    <a href={`https://${link}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand)', fontSize: '12px' }}>{link}</a>
                   </td>
                 </tr>
               ))}
@@ -140,7 +140,7 @@ export default function PrivacyPage() {
           <P>To exercise any of these rights, you can:</P>
           <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', color: '#787774', fontSize: '14px', lineHeight: '1.7' }}>
             <li>Use the <strong style={{ color: '#37352f' }}>Delete Account</strong> or <strong style={{ color: '#37352f' }}>Export My Data</strong> buttons in your account settings</li>
-            <li>Email us at <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: '#5e6ad2' }}>{COMPANY_EMAIL}</a></li>
+            <li>Email us at <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: 'var(--brand)' }}>{COMPANY_EMAIL}</a></li>
           </ul>
           <P>We will respond to verified requests within <strong>30 days</strong> (GDPR) or <strong>45 days</strong> (CCPA).</P>
         </Section>
@@ -178,10 +178,10 @@ export default function PrivacyPage() {
         </Section>
 
         <Section title="13. Contact & supervisory authority">
-          <P>For privacy enquiries: <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: '#5e6ad2' }}>{COMPANY_EMAIL}</a></P>
-          <P><strong>EU/EEA users</strong> may lodge a complaint with their local data protection authority. A list is available at <a href="https://edpb.europa.eu/about-edpb/about-edpb/members_en" target="_blank" rel="noopener noreferrer" style={{ color: '#5e6ad2' }}>edpb.europa.eu</a>.</P>
-          <P><strong>UK users</strong> may complain to the Information Commissioner&apos;s Office (ICO) at <a href="https://ico.org.uk" target="_blank" rel="noopener noreferrer" style={{ color: '#5e6ad2' }}>ico.org.uk</a>.</P>
-          <P><strong>California residents</strong> may contact the California Privacy Protection Agency at <a href="https://cppa.ca.gov" target="_blank" rel="noopener noreferrer" style={{ color: '#5e6ad2' }}>cppa.ca.gov</a>.</P>
+          <P>For privacy enquiries: <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: 'var(--brand)' }}>{COMPANY_EMAIL}</a></P>
+          <P><strong>EU/EEA users</strong> may lodge a complaint with their local data protection authority. A list is available at <a href="https://edpb.europa.eu/about-edpb/about-edpb/members_en" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand)' }}>edpb.europa.eu</a>.</P>
+          <P><strong>UK users</strong> may complain to the Information Commissioner&apos;s Office (ICO) at <a href="https://ico.org.uk" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand)' }}>ico.org.uk</a>.</P>
+          <P><strong>California residents</strong> may contact the California Privacy Protection Agency at <a href="https://cppa.ca.gov" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand)' }}>cppa.ca.gov</a>.</P>
         </Section>
       </div>
     </div>

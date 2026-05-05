@@ -19,6 +19,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
       minHeight: '100vh',
       background: 'var(--page-bg)',
       position: 'relative',
+      overflow: 'auto',
     }}>
       <Sidebar />
       <TopNav />
@@ -31,17 +32,18 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        zIndex: 1,
-        paddingTop: '45px',
+        zIndex: 2,
+        paddingTop: '46px',
         background: 'var(--page-bg)',
         transition: 'margin-left 0.15s cubic-bezier(0.4,0,0.2,1)',
       }}>
         <div style={{
           flex: 1,
-          padding: '8px 40px 36px',
+          padding: '14px 28px 34px',
           width: '100%',
           boxSizing: 'border-box',
-          maxWidth: '1400px',
+          maxWidth: '1500px',
+          margin: '0 auto',
         }}>
           <ErrorBoundary>
             {children}
@@ -54,7 +56,7 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
       <style>{`
         @media (max-width: 900px) {
           main { margin-left: 0 !important; margin-right: 0 !important; }
-          main > div { padding: 20px 16px !important; }
+          main > div { padding: 12px 12px 74px !important; }
         }
       `}</style>
     </div>

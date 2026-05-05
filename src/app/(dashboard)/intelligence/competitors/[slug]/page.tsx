@@ -87,7 +87,7 @@ export default function CompetitorBattlecardPage() {
             }}>
               <Swords size={17} color="#e03e3e" />
             </div>
-            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, letterSpacing: '-0.03em' }}>
+            <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, letterSpacing: 0 }}>
               vs {displayName}
             </h1>
           </div>
@@ -191,7 +191,7 @@ export default function CompetitorBattlecardPage() {
               <Shield size={15} style={{ color: '#787774' }} />
               <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>Profile</span>
             </div>
-            <Link href={`/competitors/${compProfile.id}`} style={{ fontSize: '11px', color: '#5e6ad2', textDecoration: 'none', fontWeight: 500 }}>
+            <Link href={`/competitors/${compProfile.id}`} style={{ fontSize: '11px', color: 'var(--brand)', textDecoration: 'none', fontWeight: 500 }}>
               Edit profile →
             </Link>
           </div>

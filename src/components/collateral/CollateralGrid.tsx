@@ -77,7 +77,7 @@ function CollateralCard({
             fontWeight: 600,
             color: '#37352f',
             margin: 0,
-            letterSpacing: '-0.01em',
+            letterSpacing: 0,
             lineHeight: 1.3,
           }}
         >
@@ -90,8 +90,8 @@ function CollateralCard({
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '3px',
               fontSize: '10px', fontWeight: 600,
-              color: '#5e6ad2',
-              background: 'rgba(94,106,210,0.08)',
+              color: 'var(--brand)',
+              background: 'var(--brand-bg)',
               border: '1px solid rgba(94,106,210,0.20)',
               borderRadius: '4px',
               padding: '1px 6px',
@@ -115,8 +115,8 @@ function CollateralCard({
             <span style={{
               fontSize: '10px',
               fontWeight: 500,
-              color: '#5e6ad2',
-              background: 'rgba(94,106,210,0.08)',
+              color: 'var(--brand)',
+              background: 'var(--brand-bg)',
               border: '1px solid rgba(94,106,210,0.20)',
               borderRadius: '4px',
               padding: '1px 5px',

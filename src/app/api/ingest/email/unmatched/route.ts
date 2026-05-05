@@ -6,6 +6,7 @@ import { auth } from '@clerk/nextjs/server'
 import { and, eq, desc } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { unmatchedEmails, dealLogs } from '@/lib/db/schema'
+import { dbErrResponse } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { requestBrainRebuild } from '@/lib/brain-rebuild'
 
@@ -59,7 +60,7 @@ export async function GET() {
     return NextResponse.json({ data: enriched, pendingCount })
   } catch (err) {
     console.error('[unmatched-emails] GET error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return dbErrResponse(err)
   }
 }
 
@@ -138,7 +139,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true, dealId })
   } catch (err) {
     console.error('[unmatched-emails] PATCH error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return dbErrResponse(err)
   }
 }
 
@@ -179,6 +180,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('[unmatched-emails] DELETE error:', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return dbErrResponse(err)
   }
 }

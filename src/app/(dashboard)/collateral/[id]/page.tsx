@@ -210,9 +210,9 @@ export default function CollateralDetailPage() {
                 <button
                   onClick={handleShare}
                   disabled={shareLoading}
-                  style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, color: item.isShared ? '#5e6ad2' : '#37352f', backgroundColor: item.isShared ? 'rgba(94,106,210,0.08)' : 'rgba(55,53,47,0.06)', border: item.isShared ? '1px solid rgba(94,106,210,0.25)' : '1px solid rgba(55,53,47,0.12)', cursor: shareLoading ? 'not-allowed' : 'pointer', opacity: shareLoading ? 0.6 : 1, transition: 'background-color 0.1s ease' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '6px', height: '34px', padding: '0 14px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, color: item.isShared ? 'var(--brand)' : '#37352f', backgroundColor: item.isShared ? 'var(--brand-bg)' : 'rgba(55,53,47,0.06)', border: item.isShared ? '1px solid var(--brand-border)' : '1px solid rgba(55,53,47,0.12)', cursor: shareLoading ? 'not-allowed' : 'pointer', opacity: shareLoading ? 0.6 : 1, transition: 'background-color 0.1s ease' }}
                   onMouseEnter={(e) => { if (!shareLoading) e.currentTarget.style.backgroundColor = item.isShared ? 'rgba(94,106,210,0.14)' : 'rgba(55,53,47,0.10)' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = item.isShared ? 'rgba(94,106,210,0.08)' : 'rgba(55,53,47,0.06)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = item.isShared ? 'var(--brand-bg)' : 'rgba(55,53,47,0.06)' }}
                 >
                   <Share2 size={13} strokeWidth={2} />
                   {shareLoading ? 'Sharing…' : item.isShared ? 'Shared' : 'Share'}
@@ -270,7 +270,7 @@ export default function CollateralDetailPage() {
           {item.status === 'generating' && (
             <div style={{ padding: '32px', textAlign: 'center', background: '#f7f6f3', border: '1px solid rgba(55,53,47,0.09)', borderRadius: '8px', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '8px' }}>
-                <RefreshCw size={16} style={{ color: '#5e6ad2', animation: 'spin 1s linear infinite' }} />
+                <RefreshCw size={16} style={{ color: 'var(--brand)', animation: 'spin 1s linear infinite' }} />
                 <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Generating content…</span>
               </div>
               <p style={{ fontSize: '13px', color: '#787774', margin: 0 }}>This usually takes 10-30 seconds. Page will update automatically.</p>

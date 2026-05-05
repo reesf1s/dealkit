@@ -50,7 +50,7 @@ function formatDealSummary(deal: any, stageLabels?: Record<string, string>): str
     `**${deal.dealName}** (${deal.prospectCompany}) — ID: \`${deal.id}\``,
     `- Stage: ${stageLabels?.[deal.stage] ?? deal.stage}`,
   ]
-  if (deal.dealValue != null) lines.push(`- Value: $${deal.dealValue.toLocaleString()}`)
+  if (deal.dealValue != null) lines.push(`- Value: £${deal.dealValue.toLocaleString('en-GB')}`)
   if (deal.conversionScore != null) lines.push(`- Score: ${deal.conversionScore}%`)
   if (deal.closeDate) lines.push(`- Close date: ${new Date(deal.closeDate).toLocaleDateString()}`)
   if (deal.aiSummary) lines.push(`- Summary: ${deal.aiSummary}`)
@@ -63,7 +63,7 @@ function formatDealDetailed(deal: any, stageLabels?: Record<string, string>): st
     `**Company:** ${deal.prospectCompany}`,
     `**Stage:** ${stageLabels?.[deal.stage] ?? deal.stage}`,
   ]
-  if (deal.dealValue != null) lines.push(`**Value:** $${deal.dealValue.toLocaleString()}`)
+  if (deal.dealValue != null) lines.push(`**Value:** £${deal.dealValue.toLocaleString('en-GB')}`)
   if (deal.conversionScore != null) lines.push(`**Conversion Score:** ${deal.conversionScore}%`)
   if (deal.prospectName) lines.push(`**Contact:** ${deal.prospectName}${deal.prospectTitle ? ` (${deal.prospectTitle})` : ''}`)
   if (deal.closeDate) lines.push(`**Close Date:** ${new Date(deal.closeDate).toLocaleDateString()}`)
@@ -945,7 +945,7 @@ export const update_deal = {
     }
     if (c.setValue !== undefined) {
       updateFields.dealValue = c.setValue
-      changesList.push(`Value → $${c.setValue.toLocaleString()}`)
+      changesList.push(`Value → £${c.setValue.toLocaleString('en-GB')}`)
     }
     if (c.setCloseDate) {
       const cd = new Date(c.setCloseDate)
@@ -1267,7 +1267,7 @@ export const create_deal = {
     })
 
     return {
-      result: `Deal **${deal.dealName}** (${deal.prospectCompany}) created successfully.\n\nID: \`${deal.id}\`\nStage: ${deal.stage}\n${deal.dealValue ? `Value: $${deal.dealValue.toLocaleString()}` : ''}`,
+      result: `Deal **${deal.dealName}** (${deal.prospectCompany}) created successfully.\n\nID: \`${deal.id}\`\nStage: ${deal.stage}\n${deal.dealValue ? `Value: £${deal.dealValue.toLocaleString('en-GB')}` : ''}`,
       actions: [{
         type: 'deal_created',
         dealId: deal.id,
@@ -1345,7 +1345,7 @@ async function buildDealContext(dealId: string, workspaceId: string): Promise<st
     `Deal: ${deal.dealName} with ${deal.prospectCompany}`,
     `Stage: ${deal.stage}`,
   ]
-  if (deal.dealValue) lines.push(`Value: $${deal.dealValue.toLocaleString()}`)
+  if (deal.dealValue) lines.push(`Value: £${deal.dealValue.toLocaleString('en-GB')}`)
   if (deal.aiSummary) lines.push(`Summary: ${deal.aiSummary}`)
   const risks = (deal.dealRisks as string[]) ?? []
   if (risks.length > 0) lines.push(`Risks: ${risks.join('; ')}`)
@@ -1505,7 +1505,7 @@ export const answer_question = {
     const contextParts: string[] = []
 
     // Pipeline overview
-    contextParts.push(`Pipeline: ${brain.pipeline.totalActive} active deals, $${brain.pipeline.totalValue.toLocaleString()} total value`)
+    contextParts.push(`Pipeline: ${brain.pipeline.totalActive} active deals, £${brain.pipeline.totalValue.toLocaleString('en-GB')} total value`)
     if (brain.pipeline.avgConversionScore != null) {
       contextParts.push(`Average conversion score: ${brain.pipeline.avgConversionScore}%`)
     }
@@ -1531,7 +1531,7 @@ export const answer_question = {
       for (const d of brain.deals.slice(0, 20)) {
         const parts = [`${d.name} (${d.company}) — ${ctx.stageLabels?.[d.stage] ?? d.stage}`]
         if (d.conversionScore != null) parts.push(`${d.conversionScore}%`)
-        if (d.dealValue != null) parts.push(`$${d.dealValue.toLocaleString()}`)
+        if (d.dealValue != null) parts.push(`£${d.dealValue.toLocaleString('en-GB')}`)
         if (d.risks.length > 0) parts.push(`Risks: ${d.risks.join(', ')}`)
         contextParts.push(`- ${parts.join(' | ')}`)
       }

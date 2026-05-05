@@ -44,9 +44,9 @@ const EVENT_CONFIG: Record<string, {
   demo:            { label: 'Demo',             color: '#0f7b6c', icon: Zap },
   deadline:        { label: 'Deadline',         color: '#e03e3e', icon: AlertCircle },
   review:          { label: 'Review',           color: '#2e78c6', icon: CheckSquare },
-  decision:        { label: 'Decision',         color: '#5e6ad2', icon: Target },
-  predicted_close: { label: 'Predicted Close',  color: '#5e6ad2', borderStyle: 'dashed', icon: Target },
-  close:           { label: 'Expected Close',   color: '#5e6ad2', borderStyle: 'dashed', icon: Target },
+  decision:        { label: 'Decision',         color: 'var(--brand)', icon: Target },
+  predicted_close: { label: 'Predicted Close',  color: 'var(--brand)', borderStyle: 'dashed', icon: Target },
+  close:           { label: 'Expected Close',   color: 'var(--brand)', borderStyle: 'dashed', icon: Target },
   contract_start:  { label: 'Contract Start',   color: '#0f7b6c', icon: FileText },
   contract_end:    { label: 'Contract Renewal',  color: '#0f7b6c', icon: RefreshCw },
   task:            { label: 'Task Due',          color: '#cb6c2c', icon: CheckSquare },
@@ -455,7 +455,7 @@ function EventPopover({
               padding: '8px 12px', borderRadius: '8px',
               background: 'var(--surface-2)',
               border: '1px solid rgba(55,53,47,0.12)',
-              color: '#5e6ad2', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+              color: 'var(--brand)', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
             }}
           >
             <Sparkles size={11} />
@@ -569,7 +569,7 @@ export default function CalendarPage() {
       <div style={{ marginBottom: '24px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'stretch' : 'center', justifyContent: 'space-between', gap: '12px' }}>
         <div>
           <h1 className="font-brand" style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Calendar size={isMobile ? 20 : 22} style={{ color: '#5e6ad2' }} />
+            <Calendar size={isMobile ? 20 : 22} style={{ color: 'var(--brand)' }} />
             Calendar
           </h1>
           {!isMobile && (
@@ -606,9 +606,9 @@ export default function CalendarPage() {
           style={{
             display: 'flex', alignItems: 'center', gap: '5px',
             padding: '5px 12px', borderRadius: '20px', flexShrink: 0,
-            border: `1.5px solid ${typeFilter === 'all' ? '#5e6ad2' : 'rgba(55,53,47,0.16)'}`,
-            background: typeFilter === 'all' ? 'rgba(94,106,210,0.08)' : '#ffffff',
-            color: typeFilter === 'all' ? '#5e6ad2' : '#787774',
+            border: `1.5px solid ${typeFilter === 'all' ? 'var(--brand)' : 'rgba(55,53,47,0.16)'}`,
+            background: typeFilter === 'all' ? 'var(--brand-bg)' : '#ffffff',
+            color: typeFilter === 'all' ? 'var(--brand)' : '#787774',
             fontSize: '12px', fontWeight: 500, cursor: 'pointer',
             transition: 'all 0.15s',
           }}
@@ -616,7 +616,7 @@ export default function CalendarPage() {
           All
           {monthEvents.length > 0 && (
             <span style={{
-              background: typeFilter === 'all' ? '#5e6ad2' : 'rgba(55,53,47,0.09)',
+              background: typeFilter === 'all' ? 'var(--brand)' : 'rgba(55,53,47,0.09)',
               color: typeFilter === 'all' ? '#fff' : '#787774',
               borderRadius: '8px', padding: '0 6px', fontSize: '11px', fontWeight: 600,
             }}>
@@ -708,7 +708,7 @@ export default function CalendarPage() {
                       width: isMobile ? '20px' : '26px', height: isMobile ? '20px' : '26px',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       borderRadius: '50%',
-                      background: isToday ? '#5e6ad2' : 'transparent',
+                      background: isToday ? 'var(--brand)' : 'transparent',
                       color: isToday ? '#fff' : isPastDay ? '#9b9a97' : '#37352f',
                       fontSize: isMobile ? '11px' : '13px', fontWeight: isToday ? 700 : 400,
                       marginBottom: isMobile ? '2px' : '4px',
@@ -805,7 +805,7 @@ export default function CalendarPage() {
                         padding: '5px 10px', borderRadius: '6px',
                         background: 'var(--surface-2)',
                         border: '1px solid rgba(55,53,47,0.12)',
-                        color: '#5e6ad2', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
+                        color: 'var(--brand)', fontSize: '11px', fontWeight: 600, cursor: 'pointer',
                       }}
                     >
                       <Sparkles size={10} />

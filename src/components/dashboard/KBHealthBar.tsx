@@ -54,7 +54,7 @@ export function KBHealthBar({
   const percentage = Math.round((completedCount / items.length) * 100)
 
   const barColor =
-    percentage === 100 ? '#0f7b6c' : percentage >= 50 ? '#5e6ad2' : '#cb6c2c'
+    percentage === 100 ? '#0f7b6c' : percentage >= 50 ? 'var(--brand)' : '#cb6c2c'
 
   return (
     <div
@@ -143,7 +143,7 @@ export function KBHealthBar({
                 href={item.ctaHref}
                 style={{
                   fontSize: '13px',
-                  color: '#5e6ad2',
+                  color: 'var(--brand)',
                   textDecoration: 'none',
                   display: 'flex',
                   alignItems: 'center',
@@ -154,7 +154,7 @@ export function KBHealthBar({
                   e.currentTarget.style.color = '#37352f'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.color = '#5e6ad2'
+                  e.currentTarget.style.color = 'var(--brand)'
                 }}
               >
                 {item.ctaLabel}

@@ -3,6 +3,10 @@ import { sql } from 'drizzle-orm'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
+  if (process.env.NODE_ENV !== 'development') {
+    return new Response('Not found', { status: 404 })
+  }
+
   try {
     const keyPresent = !!process.env.OPENAI_API_KEY
     const keyPrefix = process.env.OPENAI_API_KEY?.slice(0, 8) || 'NOT SET'

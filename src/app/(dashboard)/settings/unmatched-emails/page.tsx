@@ -186,7 +186,7 @@ export default function UnmatchedEmailsPage() {
                       disabled={assigningId === email.id}
                       style={{
                         height: '22px', padding: '0 8px', borderRadius: '5px', fontSize: '11px', fontWeight: 500,
-                        color: '#5e6ad2', background: 'rgba(94,106,210,0.08)',
+                        color: 'var(--brand)', background: 'var(--brand-bg)',
                         border: '1px solid rgba(94,106,210,0.20)', cursor: 'pointer',
                         opacity: assigningId === email.id ? 0.6 : 1,
                       }}

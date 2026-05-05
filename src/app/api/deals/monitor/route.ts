@@ -3,9 +3,10 @@ import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { eq, and, notInArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { dealLogs } from '@/lib/db/schema'
+import { dealLogs, workspaces } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { dbErrResponse } from '@/lib/api-helpers'
+import { isAutomationEnabled } from '@/lib/automation-policy'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -14,10 +15,13 @@ import { dbErrResponse } from '@/lib/api-helpers'
 type AlertType =
   | 'stale'
   | 'at_risk'
+  | 'risk_signal'
+  | 'competitor_signal'
   | 'missing_next_steps'
   | 'single_threaded'
   | 'overdue_close'
   | 'follow_up_due'
+  | 'stage_suggestion'
 
 type Severity = 'critical' | 'warning' | 'info'
 
@@ -54,6 +58,22 @@ export async function GET() {
 
     const { workspaceId } = await getWorkspaceContext(userId)
 
+    const [workspace] = await db
+      .select({ pipelineConfig: workspaces.pipelineConfig })
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId))
+      .limit(1)
+
+    const pipelineConfig = workspace?.pipelineConfig
+    const staleAlertsEnabled = isAutomationEnabled(pipelineConfig, 'stale_alerts')
+    const decayAlertsEnabled = isAutomationEnabled(pipelineConfig, 'deal_decay_alerts')
+    const riskDetectionEnabled = isAutomationEnabled(pipelineConfig, 'risk_detection')
+    const followUpEnabled = isAutomationEnabled(pipelineConfig, 'follow_up_reminders')
+    const championTrackingEnabled = isAutomationEnabled(pipelineConfig, 'champion_tracking')
+    const closeDateMonitoringEnabled = isAutomationEnabled(pipelineConfig, 'close_date_monitoring')
+    const competitorAlertsEnabled = isAutomationEnabled(pipelineConfig, 'competitor_alerts')
+    const stageHintsEnabled = isAutomationEnabled(pipelineConfig, 'auto_stage_suggestions')
+
     // Fetch all active deals (not closed_won or closed_lost)
     const activeDeals = await db
       .select()
@@ -76,7 +96,7 @@ export async function GET() {
 
       // 1. Stale deals — no update in 7+ days
       const staleDays = daysSince(deal.updatedAt)
-      if (staleDays >= 7) {
+      if (staleAlertsEnabled && staleDays >= 7) {
         alerts.push({
           ...base,
           type: 'stale',
@@ -87,7 +107,7 @@ export async function GET() {
       }
 
       // 2. At-risk deals — conversion score below 40
-      if (deal.conversionScore !== null && deal.conversionScore < 40) {
+      if (decayAlertsEnabled && deal.conversionScore !== null && deal.conversionScore < 40) {
         alerts.push({
           ...base,
           type: 'at_risk',
@@ -97,8 +117,32 @@ export async function GET() {
         })
       }
 
+      // 2b. Risk detection from extracted risk signals
+      if (riskDetectionEnabled && Array.isArray(deal.dealRisks) && deal.dealRisks.length > 0) {
+        const topRisk = String(deal.dealRisks[0] ?? '').trim()
+        alerts.push({
+          ...base,
+          type: 'risk_signal',
+          severity: deal.stage === 'negotiation' ? 'critical' : 'warning',
+          message: topRisk || 'Risk signal detected on this deal',
+          suggestedAction: 'Address this blocker in the next customer touchpoint and log a mitigation update.',
+        })
+      }
+
+      // 2c. Competitor signal monitoring
+      if (competitorAlertsEnabled && Array.isArray(deal.competitors) && deal.competitors.length > 0) {
+        const competitors = deal.competitors.slice(0, 2).join(', ')
+        alerts.push({
+          ...base,
+          type: 'competitor_signal',
+          severity: deal.stage === 'negotiation' ? 'warning' : 'info',
+          message: `Competitor pressure: ${competitors}`,
+          suggestedAction: 'Run competitor positioning for the next call and reinforce differentiation in writing.',
+        })
+      }
+
       // 3. Missing next steps
-      if (!deal.nextSteps || deal.nextSteps.trim().length === 0) {
+      if (followUpEnabled && (!deal.nextSteps || deal.nextSteps.trim().length === 0)) {
         alerts.push({
           ...base,
           type: 'missing_next_steps',
@@ -112,6 +156,7 @@ export async function GET() {
       const multiThreadStages = new Set(['discovery', 'proposal', 'negotiation'])
       const contacts = deal.contacts as unknown[]
       if (
+        championTrackingEnabled &&
         multiThreadStages.has(deal.stage) &&
         (!Array.isArray(contacts) || contacts.length <= 1)
       ) {
@@ -125,7 +170,7 @@ export async function GET() {
       }
 
       // 5. Overdue close — close date is in the past
-      if (deal.closeDate && new Date(deal.closeDate) < new Date()) {
+      if (closeDateMonitoringEnabled && deal.closeDate && new Date(deal.closeDate) < new Date()) {
         const overdueDays = daysSince(deal.closeDate)
         alerts.push({
           ...base,
@@ -138,14 +183,42 @@ export async function GET() {
 
       // 6. Follow-up due — qualification/discovery with no activity in 3+ days
       const followUpStages = new Set(['qualification', 'discovery'])
-      if (followUpStages.has(deal.stage) && daysSince(deal.updatedAt) >= 3) {
+      if (followUpEnabled && followUpStages.has(deal.stage) && staleDays >= 3) {
         alerts.push({
           ...base,
           type: 'follow_up_due',
           severity: 'info',
-          message: `No activity in ${daysSince(deal.updatedAt)} days during ${deal.stage}`,
+          message: `No activity in ${staleDays} days during ${deal.stage}`,
           suggestedAction: 'Send a follow-up to maintain momentum in early-stage engagement.',
         })
+      }
+
+      // 7. Stage progression hints (optional automation)
+      if (stageHintsEnabled && deal.conversionScore !== null) {
+        if (
+          ['qualification', 'discovery'].includes(deal.stage) &&
+          deal.conversionScore >= 75 &&
+          staleDays <= 5
+        ) {
+          alerts.push({
+            ...base,
+            type: 'stage_suggestion',
+            severity: 'info',
+            message: `High confidence (${deal.conversionScore}/100) suggests this can move to the next stage`,
+            suggestedAction: 'Review latest activity and advance the deal stage if milestones are met.',
+          })
+        } else if (
+          ['proposal', 'negotiation'].includes(deal.stage) &&
+          deal.conversionScore <= 30
+        ) {
+          alerts.push({
+            ...base,
+            type: 'stage_suggestion',
+            severity: 'warning',
+            message: `Low confidence (${deal.conversionScore}/100) in late stage`,
+            suggestedAction: 'Re-qualify the deal and confirm blockers before keeping it in late stage.',
+          })
+        }
       }
     }
 

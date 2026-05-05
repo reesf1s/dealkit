@@ -43,7 +43,7 @@ export function linearStatusToLoopStatus(linearStatus: string | null): string {
   if (!linearStatus) return 'identified'
   const s = linearStatus.toLowerCase()
   if (s === 'done' || s === 'completed') return 'shipped'
-  if (s === 'cancelled' || s === 'canceled') return 'cancelled'
+  if (s === 'cancelled' || s === 'canceled') return 'shipped'
   if (s === 'in progress' || s === 'in qa' || s === 'rfqa' || s === 'started') return 'in_progress'
   if (s === 'in review') return 'in_review'
   // Todo, Backlog, Triage = identified (not yet being worked on)
@@ -177,7 +177,7 @@ const CONCEPT_PHRASES: [RegExp, string][] = [
 function applyConceptPhrases(text: string): string {
   let result = text
   for (const [pattern, replacement] of CONCEPT_PHRASES) {
-    result = result.replace(pattern, replacement)
+    result = result.replace(pattern, (match) => `${match} ${replacement}`)
   }
   return result
 }
@@ -451,7 +451,7 @@ export async function smartMatchDeal(
   } catch { /* non-fatal */ }
 
   // 2. Extract product gaps from multiple sources
-  let productGaps: ProductGap[] = []
+  const productGaps: ProductGap[] = []
 
   // Source A: note_signals_json (extracted by meeting notes processing)
   try {

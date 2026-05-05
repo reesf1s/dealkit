@@ -4,11 +4,12 @@
  */
 export const dynamic = 'force-dynamic'
 import { auth } from '@clerk/nextjs/server'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { getHubspotIntegration, ensureHubspotSchema } from '@/lib/hubspot'
+import { dbErrResponse } from '@/lib/api-helpers'
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -29,7 +30,6 @@ export async function GET(_req: NextRequest) {
       },
     })
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Unknown error'
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return dbErrResponse(e)
   }
 }

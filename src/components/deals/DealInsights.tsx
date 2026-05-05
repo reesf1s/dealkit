@@ -36,7 +36,7 @@ const CARD_HEADER_STYLE: React.CSSProperties = {
 }
 
 const CARD_TITLE_STYLE: React.CSSProperties = {
-  fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em',
+  fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: 0,
 }
 
 const DIVIDER_STYLE: React.CSSProperties = {
@@ -67,7 +67,7 @@ function WinRateGauge({ rate }: { rate: number }) {
           />
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', fontVariantNumeric: 'tabular-nums' }}>
+          <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 0, fontVariantNumeric: 'tabular-nums' }}>
             {Math.round(rate)}%
           </span>
         </div>

@@ -29,7 +29,7 @@ export default async function LandingPage() {
   }
 
   return (
-    <div style={{
+    <div className="landing-surface" style={{
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
       fontSize: '14px',
       lineHeight: '1.6',
@@ -39,6 +39,23 @@ export default async function LandingPage() {
       MozOsxFontSmoothing: 'grayscale',
     }}>
       <style>{`
+        .landing-surface {
+          --page-bg: #f6f8fb;
+          --surface-1: #ffffff;
+          --surface-2: #f3f5f8;
+          --surface-hover: #eef3f8;
+          --border-subtle: #edf1f6;
+          --border-default: #e1e7ef;
+          --border-strong: #d2dae5;
+          --text-primary: #101828;
+          --text-secondary: #475467;
+          --text-tertiary: #667085;
+          --text-muted: #98a2b3;
+          --brand: #1DB86A;
+          --brand-light: #22c55e;
+          --brand-bg: #f0fdf4;
+          --brand-border: rgba(29, 184, 106, 0.24);
+        }
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         a { color: inherit; text-decoration: none; }
 
@@ -55,45 +72,45 @@ export default async function LandingPage() {
           50% { background-position: 100% 50%; }
         }
 
-        .lp-nav-link { color: rgba(255,255,255,0.6); transition: color 0.15s; }
-        .lp-nav-link:hover { color: #ffffff; }
+        .lp-nav-link { color: var(--text-secondary); transition: color 0.15s; }
+        .lp-nav-link:hover { color: var(--text-primary); }
         .lp-cta-primary {
           display: inline-flex; align-items: center; gap: 8px;
-          padding: 14px 28px; border-radius: 10px; border: none;
-          background: #1DB86A; color: #ffffff;
+          padding: 14px 28px; border-radius: 8px; border: 1px solid var(--brand);
+          background: var(--brand); color: var(--surface-1);
           font-size: 15px; font-weight: 700; font-family: inherit;
           cursor: pointer; transition: all 0.2s; text-decoration: none;
         }
-        .lp-cta-primary:hover { background: #19a45e; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(29,184,106,0.3); }
+        .lp-cta-primary:hover { background: var(--brand-light); border-color: var(--brand-light); }
         .lp-cta-secondary {
           display: inline-flex; align-items: center; gap: 8px;
-          padding: 14px 28px; border-radius: 10px;
-          border: 1px solid rgba(255,255,255,0.15);
-          background: rgba(255,255,255,0.05); color: #ffffff;
+          padding: 14px 28px; border-radius: 8px;
+          border: 1px solid var(--border-default);
+          background: var(--surface-1); color: var(--text-primary);
           font-size: 15px; font-weight: 600; font-family: inherit;
           cursor: pointer; transition: all 0.2s; text-decoration: none;
         }
-        .lp-cta-secondary:hover { background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.25); }
+        .lp-cta-secondary:hover { background: var(--surface-hover); border-color: var(--border-strong); }
         .lp-cta-dark {
           display: inline-flex; align-items: center; gap: 8px;
-          padding: 14px 32px; border-radius: 10px; border: none;
-          background: #0f0f0f; color: #ffffff;
+          padding: 14px 32px; border-radius: 8px; border: 1px solid var(--text-primary);
+          background: var(--text-primary); color: var(--surface-1);
           font-size: 15px; font-weight: 700; font-family: inherit;
           cursor: pointer; transition: all 0.2s; text-decoration: none;
         }
-        .lp-cta-dark:hover { background: #1a1a1a; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+        .lp-cta-dark:hover { opacity: 0.88; }
         .lp-feature-card {
-          background: #ffffff; border: 1px solid #eee;
-          border-radius: 14px; padding: 32px;
+          background: var(--surface-1); border: 1px solid var(--border-default);
+          border-radius: 8px; padding: 28px;
           transition: all 0.25s;
         }
-        .lp-feature-card:hover { border-color: #ddd; box-shadow: 0 8px 32px rgba(0,0,0,0.06); transform: translateY(-2px); }
+        .lp-feature-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-card-hover); }
         .lp-step-card {
-          background: #ffffff; border: 1px solid #eee;
-          border-radius: 14px; padding: 28px 24px;
+          background: var(--surface-1); border: 1px solid var(--border-default);
+          border-radius: 8px; padding: 24px;
           text-align: center; transition: all 0.25s;
         }
-        .lp-step-card:hover { border-color: #ddd; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+        .lp-step-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-card); }
 
         @media (max-width: 768px) {
           .lp-hero-h1 { font-size: 36px !important; }
@@ -111,9 +128,9 @@ export default async function LandingPage() {
       {/* ── Nav ──────────────────────────────────────────────────────────── */}
       <nav style={{
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
-        background: 'rgba(10,10,10,0.85)',
-        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        background: 'var(--topnav-bg)',
+        backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+        borderBottom: '1px solid var(--border-subtle)',
         padding: '0 32px', height: '60px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
@@ -121,11 +138,11 @@ export default async function LandingPage() {
           <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{
               width: '28px', height: '28px', borderRadius: '8px',
-              background: '#1DB86A',
+              background: 'var(--brand)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '14px', fontWeight: 800, color: '#ffffff',
+              fontSize: '14px', fontWeight: 800, color: 'var(--surface-1)',
             }}>H</div>
-            <span style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '0.04em', color: '#ffffff' }}>HALVEX</span>
+            <span style={{ fontSize: '15px', fontWeight: 700, letterSpacing: 0, color: 'var(--text-primary)' }}>HALVEX</span>
           </Link>
           <div className="lp-nav-links" style={{ display: 'flex', gap: '28px' }}>
             {['Features', 'How it works', 'Pricing'].map(item => (
@@ -148,57 +165,43 @@ export default async function LandingPage() {
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section style={{
-        background: 'linear-gradient(135deg, #0a0a0a 0%, #111827 50%, #0a0a0a 100%)',
-        color: '#ffffff',
-        paddingTop: '140px', paddingBottom: '100px',
+        background: 'var(--page-bg)',
+        color: 'var(--text-primary)',
+        paddingTop: '112px', paddingBottom: '76px',
         position: 'relative', overflow: 'hidden',
       }}>
-        {/* Subtle gradient orb */}
-        <div style={{
-          position: 'absolute', top: '-200px', right: '-100px',
-          width: '600px', height: '600px', borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(29,184,106,0.08) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }} />
-        <div style={{
-          position: 'absolute', bottom: '-150px', left: '-50px',
-          width: '400px', height: '400px', borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(59,130,246,0.06) 0%, transparent 70%)',
-          pointerEvents: 'none',
-        }} />
-
-        <div style={{ maxWidth: '900px', margin: '0 auto', padding: '0 32px', textAlign: 'center', position: 'relative' }}>
+        <div style={{ maxWidth: '1040px', margin: '0 auto', padding: '0 32px', textAlign: 'left', position: 'relative' }}>
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: '8px',
             padding: '6px 16px', borderRadius: '999px',
-            background: 'rgba(29,184,106,0.1)', border: '1px solid rgba(29,184,106,0.2)',
-            fontSize: '12px', fontWeight: 600, color: '#1DB86A',
-            marginBottom: '28px',
+            background: 'var(--brand-bg)', border: '1px solid var(--brand-border)',
+            fontSize: '12px', fontWeight: 600, color: 'var(--brand)',
+            marginBottom: '20px',
             animation: 'fade-in 0.6s ease-out',
           }}>
-            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#1DB86A', animation: 'pulse-dot 2s ease-in-out infinite' }} />
+            <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--brand)', animation: 'pulse-dot 2s ease-in-out infinite' }} />
             AI-powered deal intelligence
           </div>
 
           <h1 className="lp-hero-h1" style={{
-            fontSize: '56px', fontWeight: 800, letterSpacing: '-0.035em',
-            lineHeight: 1.1, marginBottom: '24px',
+            fontSize: '52px', fontWeight: 800, letterSpacing: 0,
+            lineHeight: 1.08, marginBottom: '20px', maxWidth: 780,
             animation: 'fade-in 0.6s ease-out 0.1s both',
           }}>
             Your AI knows every deal.<br />
-            <span style={{ color: 'rgba(255,255,255,0.4)' }}>You just decide what to close.</span>
+            <span style={{ color: 'var(--text-secondary)' }}>You just decide what to close.</span>
           </h1>
 
           <p className="lp-hero-sub" style={{
-            fontSize: '18px', color: 'rgba(255,255,255,0.55)',
-            lineHeight: 1.7, maxWidth: '600px', margin: '0 auto 40px',
+            fontSize: '17px', color: 'var(--text-secondary)',
+            lineHeight: 1.65, maxWidth: '640px', margin: '0 0 32px',
             animation: 'fade-in 0.6s ease-out 0.2s both',
           }}>
             Halvex reads your meeting notes, scores every deal, and generates a daily briefing telling you exactly who to call, what to say, and which deals need saving.
           </p>
 
           <div className="lp-hero-ctas" style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px',
+            display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '12px',
             animation: 'fade-in 0.6s ease-out 0.3s both',
           }}>
             <Link href="/sign-up" className="lp-cta-primary" style={{ padding: '16px 32px', fontSize: '15px' }}>
@@ -212,37 +215,37 @@ export default async function LandingPage() {
 
         {/* Briefing mockup */}
         <div className="lp-briefing-mockup" style={{
-          maxWidth: '680px', margin: '64px auto 0', padding: '0 32px',
+          maxWidth: '1040px', margin: '42px auto 0', padding: '0 32px',
           animation: 'fade-in 0.8s ease-out 0.5s both',
         }}>
           <div style={{
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            borderRadius: '16px', padding: '28px 32px',
-            backdropFilter: 'blur(20px)',
+            background: 'var(--surface-1)',
+            border: '1px solid var(--border-default)',
+            borderRadius: '8px', padding: '20px 22px',
+            boxShadow: 'var(--shadow-card)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '18px' }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#8b5cf6' }} />
-              <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(255,255,255,0.4)' }}>
+              <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-tertiary)' }}>
                 Daily Focus
               </span>
-              <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)', marginLeft: 'auto' }}>generated 2 min ago</span>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: 'auto' }}>generated 2 min ago</span>
             </div>
-            <div style={{ fontSize: '13px', lineHeight: 1.9, color: 'rgba(255,255,255,0.7)' }}>
+            <div style={{ fontSize: '13px', lineHeight: 1.9, color: 'var(--text-secondary)' }}>
               <div style={{ marginBottom: '12px' }}>
-                <span style={{ color: '#ef4444' }}>&#x1F534;</span> <strong style={{ color: 'rgba(255,255,255,0.9)' }}>Urgent</strong>
+                <span style={{ color: '#ef4444' }}>&#x1F534;</span> <strong style={{ color: 'var(--text-primary)' }}>Urgent</strong>
               </div>
               <div style={{ paddingLeft: '8px', marginBottom: '6px' }}>
-                1. <strong style={{ color: 'rgba(255,255,255,0.85)' }}>Acme Corp</strong> (£180k) — Chase Sarah on the stalled security review; contract expires Friday.
+                1. <strong style={{ color: 'var(--text-primary)' }}>Acme Corp</strong> (£180k) — Chase Sarah on the stalled security review; contract expires Friday.
               </div>
               <div style={{ paddingLeft: '8px', marginBottom: '16px' }}>
-                2. <strong style={{ color: 'rgba(255,255,255,0.85)' }}>GlobalTech</strong> (£95k) — Re-engage Mike after his budget objection; offer the phased rollout.
+                2. <strong style={{ color: 'var(--text-primary)' }}>GlobalTech</strong> (£95k) — Re-engage Mike after his budget objection; offer the phased rollout.
               </div>
               <div style={{ marginBottom: '12px' }}>
-                <span style={{ color: '#f59e0b' }}>&#x1F7E1;</span> <strong style={{ color: 'rgba(255,255,255,0.9)' }}>Push Forward</strong>
+                <span style={{ color: '#f59e0b' }}>&#x1F7E1;</span> <strong style={{ color: 'var(--text-primary)' }}>Push Forward</strong>
               </div>
               <div style={{ paddingLeft: '8px' }}>
-                3. <strong style={{ color: 'rgba(255,255,255,0.85)' }}>DataFlow Inc</strong> (£220k) — Send the updated proposal to James; he needs it before Thursday board meeting.
+                3. <strong style={{ color: 'var(--text-primary)' }}>DataFlow Inc</strong> (£220k) — Send the updated proposal to James; he needs it before Thursday board meeting.
               </div>
             </div>
           </div>
@@ -250,14 +253,14 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Logos / Trust ────────────────────────────────────────────────── */}
-      <section style={{ background: '#fafafa', borderBottom: '1px solid #eee', padding: '32px 32px' }}>
+      <section style={{ background: 'var(--page-bg)', borderBottom: '1px solid var(--border-default)', padding: '32px 32px' }}>
         <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
-          <p style={{ fontSize: '12px', fontWeight: 600, color: '#999', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '20px' }}>
+          <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '20px' }}>
             Built on
           </p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '48px', flexWrap: 'wrap', opacity: 0.5 }}>
             {['Next.js', 'Claude AI', 'Supabase', 'Vercel', 'HubSpot'].map(name => (
-              <span key={name} style={{ fontSize: '14px', fontWeight: 700, color: '#666', letterSpacing: '0.02em' }}>
+              <span key={name} style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.02em' }}>
                 {name}
               </span>
             ))}
@@ -266,16 +269,16 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Features ─────────────────────────────────────────────────────── */}
-      <section id="features" style={{ background: '#ffffff', padding: '100px 32px' }}>
+      <section id="features" style={{ background: 'var(--surface-1)', padding: '100px 32px' }}>
         <div style={{ maxWidth: '1080px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '64px' }}>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: '#1DB86A', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--brand)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>
               Features
             </p>
-            <h2 style={{ fontSize: '38px', fontWeight: 800, color: '#0f0f0f', letterSpacing: '-0.03em', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '38px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: 0, marginBottom: '16px' }}>
               Everything your pipeline needs
             </h2>
-            <p style={{ fontSize: '16px', color: '#777', maxWidth: '540px', margin: '0 auto', lineHeight: 1.7 }}>
+            <p style={{ fontSize: '16px', color: 'var(--text-secondary)', maxWidth: '540px', margin: '0 auto', lineHeight: 1.7 }}>
               From the first meeting note to closed-won, Halvex extracts intelligence and turns it into action.
             </p>
           </div>
@@ -298,7 +301,7 @@ export default async function LandingPage() {
                 icon: '&#x1F399;',
                 title: 'Meeting Intelligence',
                 desc: 'Paste your call notes and AI extracts objections, competitors, product gaps, and next steps. Deal records update automatically.',
-                color: '#1DB86A',
+                color: 'var(--brand)',
               },
               {
                 icon: '&#x1F6A8;',
@@ -326,10 +329,10 @@ export default async function LandingPage() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '20px', marginBottom: '20px',
                 }} dangerouslySetInnerHTML={{ __html: f.icon }} />
-                <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#0f0f0f', marginBottom: '10px' }}>
+                <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px' }}>
                   {f.title}
                 </h3>
-                <p style={{ fontSize: '14px', color: '#777', lineHeight: 1.7 }}>
+                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
                   {f.desc}
                 </p>
               </div>
@@ -339,16 +342,16 @@ export default async function LandingPage() {
       </section>
 
       {/* ── How it works ─────────────────────────────────────────────────── */}
-      <section id="how-it-works" style={{ background: '#fafafa', padding: '100px 32px', borderTop: '1px solid #eee', borderBottom: '1px solid #eee' }}>
+      <section id="how-it-works" style={{ background: 'var(--page-bg)', padding: '100px 32px', borderTop: '1px solid var(--border-default)', borderBottom: '1px solid var(--border-default)' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: '64px' }}>
-            <p style={{ fontSize: '12px', fontWeight: 700, color: '#1DB86A', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>
+            <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--brand)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>
               How it works
             </p>
-            <h2 style={{ fontSize: '38px', fontWeight: 800, color: '#0f0f0f', letterSpacing: '-0.03em', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '38px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: 0, marginBottom: '16px' }}>
               Three steps to pipeline intelligence
             </h2>
-            <p style={{ fontSize: '16px', color: '#777', maxWidth: '500px', margin: '0 auto', lineHeight: 1.7 }}>
+            <p style={{ fontSize: '16px', color: 'var(--text-secondary)', maxWidth: '500px', margin: '0 auto', lineHeight: 1.7 }}>
               Set up in under five minutes. No integrations required to start.
             </p>
           </div>
@@ -365,7 +368,7 @@ export default async function LandingPage() {
                 num: '02',
                 title: 'Update with notes',
                 desc: 'After every call, paste your notes. AI extracts objections, risks, competitors, and next steps automatically.',
-                color: '#1DB86A',
+                color: 'var(--brand)',
               },
               {
                 num: '03',
@@ -384,10 +387,10 @@ export default async function LandingPage() {
                 }}>
                   {s.num}
                 </div>
-                <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#0f0f0f', marginBottom: '10px' }}>
+                <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '10px' }}>
                   {s.title}
                 </h3>
-                <p style={{ fontSize: '14px', color: '#777', lineHeight: 1.7 }}>
+                <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
                   {s.desc}
                 </p>
               </div>
@@ -397,16 +400,16 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Intelligence showcase ────────────────────────────────────────── */}
-      <section style={{ background: '#ffffff', padding: '100px 32px' }}>
+      <section style={{ background: 'var(--surface-1)', padding: '100px 32px' }}>
         <div className="lp-two-col" style={{ maxWidth: '1000px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '64px', alignItems: 'center' }}>
           <div>
             <p style={{ fontSize: '12px', fontWeight: 700, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>
               The brain
             </p>
-            <h2 style={{ fontSize: '34px', fontWeight: 800, color: '#0f0f0f', letterSpacing: '-0.03em', marginBottom: '16px', lineHeight: 1.2 }}>
+            <h2 style={{ fontSize: '34px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: 0, marginBottom: '16px', lineHeight: 1.2 }}>
               AI that actually knows your deals
             </h2>
-            <p style={{ fontSize: '15px', color: '#777', lineHeight: 1.8, marginBottom: '28px' }}>
+            <p style={{ fontSize: '15px', color: 'var(--text-secondary)', lineHeight: 1.8, marginBottom: '28px' }}>
               Every deal update, meeting note, and stage change feeds into your workspace brain. It learns what winning looks like for your team and applies that intelligence across your entire pipeline.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -416,9 +419,9 @@ export default async function LandingPage() {
                 'Pattern detection across objections and competitors',
                 'Forecast accuracy tracking with confidence intervals',
               ].map(item => (
-                <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: '#555' }}>
-                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#1DB86A15', border: '1px solid #1DB86A30', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <div style={{ color: '#1DB86A', fontSize: '11px', fontWeight: 800 }}>&#x2713;</div>
+                <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: 'var(--text-secondary)' }}>
+                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: 'var(--brand)15', border: '1px solid var(--brand)30', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ color: 'var(--brand)', fontSize: '11px', fontWeight: 800 }}>&#x2713;</div>
                   </div>
                   {item}
                 </div>
@@ -426,12 +429,12 @@ export default async function LandingPage() {
             </div>
           </div>
           <div style={{
-            background: '#fafafa', border: '1px solid #eee', borderRadius: '16px',
+            background: 'var(--page-bg)', border: '1px solid var(--border-default)', borderRadius: '16px',
             padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#1DB86A' }} />
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Intelligence</span>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--brand)' }} />
+              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Intelligence</span>
             </div>
             {[
               { label: 'Win Rate', value: '34%', delta: '+6% vs last quarter', positive: true },
@@ -440,14 +443,14 @@ export default async function LandingPage() {
               { label: 'At Risk', value: '3 deals', delta: '£340k exposure', positive: false },
             ].map(m => (
               <div key={m.label} style={{
-                background: '#ffffff', border: '1px solid #eee', borderRadius: '10px',
+                background: 'var(--surface-1)', border: '1px solid var(--border-default)', borderRadius: '10px',
                 padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{m.label}</div>
-                  <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f0f0f', marginTop: '2px' }}>{m.value}</div>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{m.label}</div>
+                  <div style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>{m.value}</div>
                 </div>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: m.positive ? '#1DB86A' : '#ef4444', textAlign: 'right' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: m.positive ? 'var(--brand)' : '#ef4444', textAlign: 'right' }}>
                   {m.delta}
                 </div>
               </div>
@@ -457,12 +460,12 @@ export default async function LandingPage() {
       </section>
 
       {/* ── For Sales / For Product ──────────────────────────────────────── */}
-      <section style={{ background: '#fafafa', padding: '100px 32px', borderTop: '1px solid #eee', borderBottom: '1px solid #eee' }}>
+      <section style={{ background: 'var(--page-bg)', padding: '100px 32px', borderTop: '1px solid var(--border-default)', borderBottom: '1px solid var(--border-default)' }}>
         <div className="lp-two-col" style={{ maxWidth: '900px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
           {[
             {
               title: 'For sales teams',
-              color: '#1DB86A',
+              color: 'var(--brand)',
               items: [
                 'Daily AI briefing with exact names and actions',
                 'Deal scoring that predicts close probability',
@@ -484,12 +487,12 @@ export default async function LandingPage() {
             },
           ].map(col => (
             <div key={col.title} className="lp-feature-card" style={{ padding: '36px' }}>
-              <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#0f0f0f', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '20px' }}>
                 {col.title}
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {col.items.map(item => (
-                  <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: '#555' }}>
+                  <div key={item} style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', color: 'var(--text-secondary)' }}>
                     <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: col.color, flexShrink: 0 }} />
                     {item}
                   </div>
@@ -501,31 +504,31 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Pricing ──────────────────────────────────────────────────────── */}
-      <section id="pricing" style={{ background: '#ffffff', padding: '100px 32px' }}>
+      <section id="pricing" style={{ background: 'var(--surface-1)', padding: '100px 32px' }}>
         <div style={{ maxWidth: '480px', margin: '0 auto', textAlign: 'center' }}>
-          <p style={{ fontSize: '12px', fontWeight: 700, color: '#1DB86A', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>
+          <p style={{ fontSize: '12px', fontWeight: 700, color: 'var(--brand)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '14px' }}>
             Pricing
           </p>
-          <h2 style={{ fontSize: '38px', fontWeight: 800, color: '#0f0f0f', letterSpacing: '-0.03em', marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '38px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: 0, marginBottom: '16px' }}>
             Simple, transparent pricing
           </h2>
-          <p style={{ fontSize: '15px', color: '#777', lineHeight: 1.7, marginBottom: '40px' }}>
+          <p style={{ fontSize: '15px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '40px' }}>
             Start free. Upgrade when Halvex is closing deals for you.
           </p>
 
           <div style={{
-            background: '#ffffff', border: '2px solid #1DB86A', borderRadius: '16px',
+            background: 'var(--surface-1)', border: '2px solid var(--brand)', borderRadius: '16px',
             padding: '40px 32px', textAlign: 'center',
             boxShadow: '0 0 0 4px rgba(29,184,106,0.08)',
           }}>
-            <div style={{ fontSize: '12px', fontWeight: 700, color: '#1DB86A', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--brand)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px' }}>
               Pro
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: '4px', marginBottom: '8px' }}>
-              <span style={{ fontSize: '48px', fontWeight: 800, color: '#0f0f0f' }}>£79</span>
-              <span style={{ fontSize: '16px', color: '#999', fontWeight: 500 }}>/month</span>
+              <span style={{ fontSize: '48px', fontWeight: 800, color: 'var(--text-primary)' }}>£79</span>
+              <span style={{ fontSize: '16px', color: 'var(--text-tertiary)', fontWeight: 500 }}>/month</span>
             </div>
-            <p style={{ fontSize: '14px', color: '#777', marginBottom: '28px' }}>per workspace</p>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '28px' }}>per workspace</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left', marginBottom: '32px' }}>
               {[
@@ -537,8 +540,8 @@ export default async function LandingPage() {
                 'HubSpot integration',
                 'MCP server for Claude',
               ].map(f => (
-                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: '#555' }}>
-                  <span style={{ color: '#1DB86A', fontWeight: 700 }}>&#x2713;</span>
+                <div key={f} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-secondary)' }}>
+                  <span style={{ color: 'var(--brand)', fontWeight: 700 }}>&#x2713;</span>
                   {f}
                 </div>
               ))}
@@ -547,21 +550,22 @@ export default async function LandingPage() {
             <Link href="/sign-up" className="lp-cta-primary" style={{ width: '100%', justifyContent: 'center', padding: '16px' }}>
               Start free trial
             </Link>
-            <p style={{ fontSize: '12px', color: '#999', marginTop: '12px' }}>14-day free trial. No credit card required.</p>
+            <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '12px' }}>14-day free trial. No credit card required.</p>
           </div>
         </div>
       </section>
 
       {/* ── Final CTA ────────────────────────────────────────────────────── */}
       <section style={{
-        background: 'linear-gradient(135deg, #0a0a0a 0%, #111827 100%)',
-        padding: '100px 32px', textAlign: 'center', color: '#ffffff',
+        background: 'var(--surface-1)',
+        borderTop: '1px solid var(--border-default)',
+        padding: '88px 32px', textAlign: 'center', color: 'var(--text-primary)',
       }}>
         <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-          <h2 style={{ fontSize: '36px', fontWeight: 800, letterSpacing: '-0.03em', marginBottom: '16px', lineHeight: 1.2 }}>
+          <h2 style={{ fontSize: '36px', fontWeight: 800, letterSpacing: 0, marginBottom: '16px', lineHeight: 1.2 }}>
             Stop guessing.<br />Start closing.
           </h2>
-          <p style={{ fontSize: '16px', color: 'rgba(255,255,255,0.5)', lineHeight: 1.7, marginBottom: '36px' }}>
+          <p style={{ fontSize: '16px', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '32px' }}>
             Join revenue teams using Halvex to turn pipeline chaos into closed deals.
           </p>
           <Link href="/sign-up" className="lp-cta-primary" style={{ padding: '16px 36px', fontSize: '16px' }}>
@@ -571,18 +575,18 @@ export default async function LandingPage() {
       </section>
 
       {/* ── Footer ───────────────────────────────────────────────────────── */}
-      <footer style={{ background: '#0a0a0a', borderTop: '1px solid rgba(255,255,255,0.06)', padding: '32px' }}>
+      <footer style={{ background: 'var(--page-bg)', borderTop: '1px solid var(--border-default)', padding: '32px' }}>
         <div className="lp-footer-inner" style={{
           maxWidth: '1080px', margin: '0 auto',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{
-              width: '20px', height: '20px', borderRadius: '6px', background: '#1DB86A',
+              width: '20px', height: '20px', borderRadius: '6px', background: 'var(--brand)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: '10px', fontWeight: 800, color: '#fff',
             }}>H</div>
-            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
               &copy; {new Date().getFullYear()} Halvex
             </span>
           </div>
@@ -592,7 +596,7 @@ export default async function LandingPage() {
               { label: 'Terms', href: '/terms' },
               { label: 'Sign in', href: '/sign-in' },
             ].map(l => (
-              <Link key={l.label} href={l.href} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', transition: 'color 0.15s' }}
+              <Link key={l.label} href={l.href} style={{ fontSize: '12px', color: 'var(--text-tertiary)', transition: 'color 0.15s' }}
                 className="lp-nav-link">
                 {l.label}
               </Link>

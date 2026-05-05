@@ -90,7 +90,7 @@ export default function ROICalc() {
         <h2 style={{
           fontSize: '32px',
           fontWeight: 700,
-          letterSpacing: '-0.03em',
+          letterSpacing: 0,
           color: '#37352f',
           marginBottom: '12px',
         }}>
@@ -184,13 +184,13 @@ export default function ROICalc() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '8px' }}>
           <div style={{ background: '#f7f6f3', borderRadius: '6px', padding: '12px' }}>
             <div style={{ fontSize: '11px', color: '#9b9a97', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Deals won/mo</div>
-            <div style={{ fontSize: '20px', fontWeight: 700, letterSpacing: '-0.03em', color: '#37352f' }}>
+            <div style={{ fontSize: '20px', fontWeight: 700, letterSpacing: 0, color: '#37352f' }}>
               {dealsWonPerMonth.toFixed(1)}
             </div>
           </div>
           <div style={{ background: '#f7f6f3', borderRadius: '6px', padding: '12px' }}>
             <div style={{ fontSize: '11px', color: '#9b9a97', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Revenue won/mo</div>
-            <div style={{ fontSize: '20px', fontWeight: 700, letterSpacing: '-0.03em', color: '#37352f' }}>
+            <div style={{ fontSize: '20px', fontWeight: 700, letterSpacing: 0, color: '#37352f' }}>
               {formatCurrency(revenueWonPerMonth)}
             </div>
           </div>
@@ -208,7 +208,7 @@ export default function ROICalc() {
           <div style={{
             fontSize: '32px',
             fontWeight: 700,
-            letterSpacing: '-0.04em',
+            letterSpacing: 0,
             color: '#0f7b6c',
             marginBottom: '6px',
             lineHeight: 1,
@@ -223,7 +223,7 @@ export default function ROICalc() {
           <div style={{
             fontSize: '32px',
             fontWeight: 700,
-            letterSpacing: '-0.04em',
+            letterSpacing: 0,
             color: '#37352f',
             marginBottom: '6px',
             lineHeight: 1,
@@ -238,7 +238,7 @@ export default function ROICalc() {
           <div style={{
             fontSize: '32px',
             fontWeight: 700,
-            letterSpacing: '-0.04em',
+            letterSpacing: 0,
             color: '#37352f',
             marginBottom: '6px',
             lineHeight: 1,

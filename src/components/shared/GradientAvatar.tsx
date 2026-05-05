@@ -10,7 +10,7 @@ const GRADIENT_PAIRS = [
   ['#f97316', '#dc2626'],  // orange/red
   ['#ef4444', '#fb7185'],  // red/rose
   ['#22c55e', '#10b981'],  // green/emerald
-  ['#3b82f6', '#6366f1'],  // blue/indigo
+  ['#3b82f6', 'var(--brand)'],  // blue/indigo
   ['#eab308', '#f59e0b'],  // yellow/amber
   ['#14b8a6', '#06b6d4'],  // teal/cyan
   ['#ec4899', '#d946ef'],  // pink/fuchsia
@@ -63,7 +63,7 @@ export function GradientAvatar({ name, size = 34, fontSize }: GradientAvatarProp
           fontWeight: 600,
           color: '#ffffff',
           lineHeight: 1,
-          letterSpacing: '-0.02em',
+          letterSpacing: 0,
         }}
       >
         {initials}

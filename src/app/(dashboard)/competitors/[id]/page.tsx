@@ -107,7 +107,7 @@ export default function CompetitorDetailPage() {
               {competitor.name}
             </h1>
             {competitor.website && (
-              <a href={competitor.website} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: '#5e6ad2', textDecoration: 'none' }}>
+              <a href={competitor.website} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: 'var(--brand)', textDecoration: 'none' }}>
                 {competitor.website}
               </a>
             )}

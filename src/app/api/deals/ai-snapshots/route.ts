@@ -45,6 +45,16 @@ function scoreToHealth(score: number | null, stale: number): 'improving' | 'at_r
   return 'stable'
 }
 
+function heuristicSnapshot(deal: {
+  updatedAt: string | Date
+  nextSteps: string | null
+}): string {
+  const stale = daysStale(deal.updatedAt)
+  if (stale > 14) return `No contact in ${stale} days — follow up to keep this moving.`
+  if (deal.nextSteps) return deal.nextSteps.slice(0, 110)
+  return 'No notes yet — log your first call update.'
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { userId } = await auth()
@@ -96,6 +106,13 @@ export async function GET(req: NextRequest) {
 
     // Generate for deals that need it
     if (needsGeneration.length > 0) {
+      if (!gptMini) {
+        for (const d of needsGeneration) {
+          result[d.id] = heuristicSnapshot(d)
+        }
+        return NextResponse.json({ snapshots: result, health })
+      }
+
       const dealData = needsGeneration.map(d => {
         const stale = daysStale(d.updatedAt)
         const latestNote = extractLatestNote(d.meetingNotes)
@@ -182,29 +199,13 @@ ${JSON.stringify(dealData, null, 2)}`,
           if (generated[d.id]) {
             result[d.id] = generated[d.id]
           } else {
-            // Fallback for deals where generation failed
-            const stale = daysStale(d.updatedAt)
-            if (stale > 14) {
-              result[d.id] = `No contact in ${stale} days — follow up to keep this moving.`
-            } else if (d.nextSteps) {
-              result[d.id] = d.nextSteps.slice(0, 110)
-            } else {
-              result[d.id] = 'No notes yet — log your first call update.'
-            }
+            result[d.id] = heuristicSnapshot(d)
           }
         }
       } catch (err) {
         console.error('[ai-snapshots] generation error:', err)
-        // Fallback: compute simple heuristic summaries
         for (const d of needsGeneration) {
-          const stale = daysStale(d.updatedAt)
-          if (stale > 14) {
-            result[d.id] = `No contact in ${stale} days — follow up to keep this moving.`
-          } else if (d.nextSteps) {
-            result[d.id] = d.nextSteps.slice(0, 110)
-          } else {
-            result[d.id] = 'Add meeting notes to get AI deal intelligence.'
-          }
+          result[d.id] = heuristicSnapshot(d)
         }
       }
     }
