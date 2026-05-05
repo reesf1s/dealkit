@@ -413,7 +413,7 @@ export default function CopilotPanel() {
           }}
         >
           <Sparkles size={13} />
-          <span style={{ letterSpacing: '-0.01em' }}>
+          <span style={{ letterSpacing: 0 }}>
             Ask AI
             <span style={{ opacity: 0.65, fontSize: '11px', fontWeight: 500, marginLeft: '5px' }}>⌘K</span>
           </span>
@@ -476,7 +476,7 @@ export default function CopilotPanel() {
           </div>
           <span style={{
             fontSize: '13.5px', fontWeight: 700, color: '#1a1a1a',
-            letterSpacing: '-0.01em', flex: 1,
+            letterSpacing: 0, flex: 1,
           }}>
             Ask AI
           </span>
@@ -662,7 +662,10 @@ export default function CopilotPanel() {
                 lineHeight: '1.7',
               }}>
                 <span style={{ color: '#1DB86A', fontWeight: 600 }}>Ask anything:</span>{' '}
-                pipeline overview &middot; deal analysis &middot; competitor intel &middot; generate assets &middot; manage todos &middot; process updates &middot; update deals
+                pipeline status &middot; forecasts & score trends &middot; deal updates & todos &middot; competitor intel &middot; product gaps & case studies &middot; draft emails & battlecards
+                <div style={{ marginTop: '4px' }}>
+                  You can send multiple instructions in one message, and I&apos;ll execute them in order.
+                </div>
               </div>
             </div>
           )}

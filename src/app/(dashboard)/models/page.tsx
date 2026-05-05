@@ -55,7 +55,7 @@ function InfoButton({ text }: { text: string }) {
 }
 
 // ── Mini bar chart component ──────────────────────────────────────────────────
-function BarChart({ value, max, color = '#5e6ad2' }: { value: number; max: number; color?: string }) {
+function BarChart({ value, max, color = 'var(--brand)' }: { value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0
   return (
     <div style={{ height: '6px', borderRadius: '3px', background: 'rgba(55,53,47,0.09)', overflow: 'hidden', flex: 1 }}>
@@ -153,7 +153,7 @@ function MilestoneRoadmap({ trainingSize }: { trainingSize: number }) {
                 <div style={{
                   width: '32px', height: '32px', borderRadius: '50%',
                   background: isPast ? '#0f7b6c' : '#ffffff',
-                  border: `2px solid ${isPast ? '#0f7b6c' : isCurrent ? '#5e6ad2' : 'rgba(55,53,47,0.16)'}`,
+                  border: `2px solid ${isPast ? '#0f7b6c' : isCurrent ? 'var(--brand)' : 'rgba(55,53,47,0.16)'}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   transition: 'all 0.1s ease',
                   flexShrink: 0,
@@ -161,7 +161,7 @@ function MilestoneRoadmap({ trainingSize }: { trainingSize: number }) {
                   {isPast && idx > 0
                     ? <CheckCircle size={14} style={{ color: '#fff' }} />
                     : idx === 0
-                      ? <span style={{ fontSize: '10px', fontWeight: '600', color: trainingSize >= 10 ? '#fff' : '#5e6ad2' }}>{trainingSize}</span>
+                      ? <span style={{ fontSize: '10px', fontWeight: '600', color: trainingSize >= 10 ? '#fff' : 'var(--brand)' }}>{trainingSize}</span>
                       : <Lock size={12} style={{ color: 'var(--text-tertiary)' }} />
                   }
                 </div>
@@ -184,7 +184,7 @@ function MilestoneRoadmap({ trainingSize }: { trainingSize: number }) {
               border: `1px solid ${isCurrent ? 'rgba(94,106,210,0.16)' : isPast ? 'rgba(15,123,108,0.16)' : 'rgba(55,53,47,0.09)'}`,
               opacity: (!isCurrent && !isPast) ? 0.6 : 1,
             }}>
-              <div style={{ fontSize: '10px', fontWeight: '600', color: isCurrent ? '#5e6ad2' : isPast ? '#0f7b6c' : '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>
+              <div style={{ fontSize: '10px', fontWeight: '600', color: isCurrent ? 'var(--brand)' : isPast ? '#0f7b6c' : '#9b9a97', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '4px' }}>
                 {m.label}
               </div>
               <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '6px' }}>
@@ -193,7 +193,7 @@ function MilestoneRoadmap({ trainingSize }: { trainingSize: number }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                 {m.bullets.map((b, bi) => (
                   <div key={bi} style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
-                    <span style={{ color: isCurrent ? '#5e6ad2' : isPast ? '#0f7b6c' : '#9b9a97', marginTop: '1px' }}>•</span>
+                    <span style={{ color: isCurrent ? 'var(--brand)' : isPast ? '#0f7b6c' : '#9b9a97', marginTop: '1px' }}>•</span>
                     {b}
                   </div>
                 ))}
@@ -292,7 +292,7 @@ function ModelGrid({ trainingSize, brainData }: { trainingSize: number; brainDat
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <div style={{ color: status === 'active' ? '#5e6ad2' : '#9b9a97' }}>
+                <div style={{ color: status === 'active' ? 'var(--brand)' : '#9b9a97' }}>
                   {model.icon}
                 </div>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)' }}>
@@ -400,7 +400,7 @@ function CalibrationBucketChart({ buckets }: { buckets: BucketData[] }) {
             </div>
             <div style={{ flex: 1, position: 'relative', height: '20px', borderRadius: '4px', background: 'rgba(55,53,47,0.07)', overflow: 'hidden' }}>
               <div style={{ position: 'absolute', inset: 0, width: `${barPct}%`, background: 'rgba(94,106,210,0.15)', transition: 'width 0.6s ease-out' }} />
-              <div style={{ position: 'absolute', inset: 0, width: `${wonPct}%`, background: b.predicted > 0 ? '#5e6ad2' : 'transparent', opacity: 0.9, transition: 'width 0.6s ease-out' }} />
+              <div style={{ position: 'absolute', inset: 0, width: `${wonPct}%`, background: b.predicted > 0 ? 'var(--brand)' : 'transparent', opacity: 0.9, transition: 'width 0.6s ease-out' }} />
             </div>
             <div style={{ width: '72px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)', flexShrink: 0, fontFamily: 'var(--font-mono, monospace)' }}>
               {b.predicted > 0 ? `${wonPct}% won` : '—'}
@@ -439,11 +439,11 @@ function ForecastCalibrationChart({ points }: { points: CalibrationMonth[] }) {
       <svg width={w} height={h} style={{ overflow: 'visible', display: 'block' }}>
         <line x1={padX} y1={h - padY} x2={w - padX} y2={h - padY} stroke="rgba(55,53,47,0.09)" strokeWidth="1" />
         <path d={toPath(predictedYs)} fill="none" stroke="#9b9a97" strokeWidth="1.5" strokeDasharray="4 3" strokeLinecap="round" strokeLinejoin="round" />
-        <path d={toPath(actualYs)} fill="none" stroke="#5e6ad2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={toPath(actualYs)} fill="none" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         {points.map((p, i) => (
           <g key={i}>
             <circle cx={xs[i]} cy={predictedYs[i]} r="3" fill="#ffffff" stroke="#9b9a97" strokeWidth="1.5" />
-            <circle cx={xs[i]} cy={actualYs[i]} r="3" fill="#5e6ad2" />
+            <circle cx={xs[i]} cy={actualYs[i]} r="3" fill="var(--brand)" />
           </g>
         ))}
         {[0, Math.floor((points.length - 1) / 2), points.length - 1]
@@ -460,7 +460,7 @@ function ForecastCalibrationChart({ points }: { points: CalibrationMonth[] }) {
           Avg predicted score
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--text-secondary)' }}>
-          <div style={{ width: '20px', height: '2px', background: '#5e6ad2' }} />
+          <div style={{ width: '20px', height: '2px', background: 'var(--brand)' }} />
           Actual win rate ×100
         </div>
       </div>
@@ -483,7 +483,7 @@ function CalibrationChart({ points }: { points: { discrimination?: number; month
   return (
     <svg width={w} height={h} style={{ overflow: 'visible' }}>
       <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="rgba(55,53,47,0.09)" strokeWidth="1" />
-      <path d={pathD} fill="none" stroke="#5e6ad2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={pathD} fill="none" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       {pts.map((p, i) => (
         <circle key={i} cx={p.x} cy={p.y} r="3" fill={p.val >= 0 ? '#0f7b6c' : '#e03e3e'} />
       ))}
@@ -610,7 +610,7 @@ function GlobalBenchmarksCard({
       {/* Opt-in note */}
       <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', lineHeight: 1.5 }}>
         Manage benchmark participation in{' '}
-        <Link href="/settings" style={{ color: '#5e6ad2', textDecoration: 'none', fontWeight: '500' }}>
+        <Link href="/settings" style={{ color: 'var(--brand)', textDecoration: 'none', fontWeight: '500' }}>
           Settings &rarr; Industry Intelligence
         </Link>
       </div>
@@ -743,8 +743,8 @@ export default function ModelsPage() {
       {/* ── Header ── */}
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'rgba(94,106,210,0.08)', border: '1px solid rgba(94,106,210,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Brain size={20} style={{ color: '#5e6ad2' }} />
+          <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: 'var(--brand-bg)', border: '1px solid rgba(94,106,210,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Brain size={20} style={{ color: 'var(--brand)' }} />
           </div>
           <div>
             <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1, margin: 0 }} className="font-brand">
@@ -885,12 +885,12 @@ export default function ModelsPage() {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{totalClosed} deals total</div>
-                    {totalClosed < 100 && <div style={{ fontSize: '11px', color: '#5e6ad2' }}>Next: {next.label} at {next.n}</div>}
+                    {totalClosed < 100 && <div style={{ fontSize: '11px', color: 'var(--brand)' }}>Next: {next.label} at {next.n}</div>}
                   </div>
                   {/* Bar with milestone tick marks */}
                   <div style={{ position: 'relative', height: '8px' }}>
                     <div style={{ height: '6px', marginTop: '1px', borderRadius: '3px', background: 'rgba(55,53,47,0.09)', overflow: 'hidden', position: 'relative' }}>
-                      <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, #5e6ad2, #2e78c6)', borderRadius: '3px', transition: 'width 0.6s ease-out' }} />
+                      <div style={{ height: '100%', width: `${pct}%`, background: 'var(--brand)', borderRadius: '3px', transition: 'width 0.6s ease-out' }} />
                     </div>
                     {/* Milestone ticks at 10, 20, 50 — relative to segment */}
                     {[10, 20, 50].map(threshold => {
@@ -1038,7 +1038,7 @@ export default function ModelsPage() {
                   style={{
                     textAlign: 'left', padding: '16px', borderRadius: '8px', cursor: 'pointer',
                     background: isSelected ? 'rgba(94,106,210,0.06)' : '#f7f6f3',
-                    border: `1px solid ${isSelected ? '#5e6ad2' : 'rgba(55,53,47,0.12)'}`,
+                    border: `1px solid ${isSelected ? 'var(--brand)' : 'rgba(55,53,47,0.12)'}`,
                     transition: 'all 0.15s',
                   }}
                 >
@@ -1052,7 +1052,7 @@ export default function ModelsPage() {
                       {a.dealCount} deals
                     </span>
                     {(a.openDealIds?.length ?? 0) > 0 && (
-                      <span style={{ fontSize: '10px', color: '#5e6ad2', background: 'rgba(94,106,210,0.08)', padding: '2px 6px', borderRadius: '4px' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--brand)', background: 'var(--brand-bg)', padding: '2px 6px', borderRadius: '4px' }}>
                         {a.openDealIds?.length} active
                       </span>
                     )}
@@ -1206,7 +1206,7 @@ export default function ModelsPage() {
                   <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-primary)' }}>{a.company}</div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{a.stage} · {a.currentAgeDays}d (expected &lt;{a.expectedMaxDays}d)</div>
                 </div>
-                <Link href={`/deals`} style={{ fontSize: '11px', color: '#5e6ad2', display: 'flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
+                <Link href={`/deals`} style={{ fontSize: '11px', color: 'var(--brand)', display: 'flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
                   View <ArrowUpRight size={10} />
                 </Link>
               </div>

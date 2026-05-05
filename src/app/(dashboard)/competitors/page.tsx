@@ -113,8 +113,8 @@ export default function CompetitorsPage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '28px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-            <div style={{ width: '32px', height: '32px', background: 'rgba(94,106,210,0.08)', border: '1px solid rgba(94,106,210,0.20)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Swords size={15} color="#5e6ad2" />
+            <div style={{ width: '32px', height: '32px', background: 'var(--brand-bg)', border: '1px solid rgba(94,106,210,0.20)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Swords size={15} color="var(--brand)" />
             </div>
             <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
               Competitors

@@ -10,7 +10,7 @@ const TABS = [
     icon: Sparkles,
     headline: 'Sales docs that write themselves',
     subline: 'Six types of collateral generated from your actual deal data — not templates.',
-    color: '#5e6ad2',
+    color: 'var(--brand)',
     accentBg: 'rgba(94,106,210,0.06)',
     accentBorder: 'rgba(94,106,210,0.20)',
     preview: {
@@ -40,7 +40,7 @@ const TABS = [
       badgeColor: '#0f7b6c',
       items: [
         { label: 'Acme Corp', value: '£32k · Negotiation · Score: 82', color: '#e03e3e' },
-        { label: 'Stripe', value: '£18k · Discovery · Score: 61', color: '#5e6ad2' },
+        { label: 'Stripe', value: '£18k · Discovery · Score: 61', color: 'var(--brand)' },
         { label: 'Issue link', value: '£12k · Proposal · Score: 55', color: '#cb6c2c' },
         { label: 'Vercel', value: '£9k · Qualification · Score: 40', color: '#2e78c6' },
       ],
@@ -73,13 +73,13 @@ const TABS = [
     icon: Brain,
     headline: 'Every loss makes you stronger',
     subline: 'Log case studies from wins. Track product gaps from losses. The AI gets smarter with every deal.',
-    color: '#5e6ad2',
+    color: 'var(--brand)',
     accentBg: 'rgba(94,106,210,0.06)',
     accentBorder: 'rgba(94,106,210,0.2)',
     preview: {
       title: 'Win Intelligence',
       badge: 'Updated today',
-      badgeColor: '#5e6ad2',
+      badgeColor: 'var(--brand)',
       items: [
         { label: 'Win rate', value: '68% (up from 41% at launch)', color: '#0f7b6c' },
         { label: 'Top loss reason', value: 'Pricing objection (7 deals) — objection handler ready', color: '#e03e3e' },
@@ -97,7 +97,7 @@ export default function FeaturesTab() {
   return (
     <section id="features" style={{ position: 'relative', zIndex: 1, maxWidth: '960px', margin: '0 auto', padding: '0 32px 100px' }}>
       <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-        <h2 style={{ fontSize: '32px', fontWeight: '800', letterSpacing: '-0.04em', marginBottom: '12px', color: '#37352f' }}>
+        <h2 style={{ fontSize: '32px', fontWeight: '800', letterSpacing: 0, marginBottom: '12px', color: '#37352f' }}>
           Everything in one place
         </h2>
         <p style={{ color: '#787774', fontSize: '15px' }}>
@@ -138,7 +138,7 @@ export default function FeaturesTab() {
             <tab.icon size={11} />
             {tab.label}
           </div>
-          <h3 style={{ fontSize: '26px', fontWeight: '800', letterSpacing: '-0.04em', color: '#37352f', marginBottom: '14px', lineHeight: '1.15' }}>
+          <h3 style={{ fontSize: '26px', fontWeight: '800', letterSpacing: 0, color: '#37352f', marginBottom: '14px', lineHeight: '1.15' }}>
             {tab.headline}
           </h3>
           <p style={{ fontSize: '15px', color: '#787774', lineHeight: '1.7', marginBottom: '28px' }}>

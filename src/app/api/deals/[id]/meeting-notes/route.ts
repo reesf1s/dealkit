@@ -86,13 +86,10 @@ export async function POST(
     }
     if (mergedCompetitors.length > 0) patch.competitors = mergedCompetitors
     if (mergedRisks.length > 0) patch.dealRisks = mergedRisks
-    // Always update next_steps — use extraction if available, otherwise synthesise from the raw notes
+    // Update next_steps only when extraction produced a concrete next step.
+    // Avoid dumping raw transcript text into next_steps — it pollutes Overview actions.
     if (extraction.nextSteps) {
       patch.nextSteps = extraction.nextSteps
-    } else {
-      // Fallback: use the raw notes as a brief summary so next_steps never goes stale
-      const fallback = notes.trim().slice(0, 300)
-      if (fallback) patch.nextSteps = fallback
     }
 
     await db

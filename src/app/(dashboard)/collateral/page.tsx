@@ -373,8 +373,8 @@ function CollateralPageInner() {
                         gap: '6px',
                         padding: '12px',
                         borderRadius: '8px',
-                        backgroundColor: selectedType === type ? 'rgba(94,106,210,0.08)' : '#f7f6f3',
-                        border: selectedType === type ? '1px solid rgba(94,106,210,0.25)' : '1px solid rgba(55,53,47,0.09)',
+                        backgroundColor: selectedType === type ? 'var(--brand-bg)' : '#f7f6f3',
+                        border: selectedType === type ? '1px solid var(--brand-border)' : '1px solid rgba(55,53,47,0.09)',
                         cursor: 'pointer',
                         transition: 'background 0.1s ease',
                         textAlign: 'left',
@@ -500,7 +500,7 @@ function CollateralPageInner() {
                     ))}
                   </select>
                   {selectedDealId && (
-                    <p style={{ fontSize: '11px', color: '#5e6ad2', margin: '4px 0 0' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--brand)', margin: '4px 0 0' }}>
                       AI will use this deal&apos;s context, risks, and competitors to tailor the output.
                     </p>
                   )}

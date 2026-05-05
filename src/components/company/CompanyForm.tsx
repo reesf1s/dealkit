@@ -236,8 +236,8 @@ function StringListEditor({
           transition: 'border-color 150ms ease, color 150ms ease',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = '#5e6ad2'
-          e.currentTarget.style.color = '#5e6ad2'
+          e.currentTarget.style.borderColor = 'var(--brand)'
+          e.currentTarget.style.color = 'var(--brand)'
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.borderColor = 'rgba(55,53,47,0.18)'
@@ -602,8 +602,8 @@ export function CompanyForm({ initialData, onSave }: CompanyFormProps) {
               transition: 'border-color 150ms ease, color 150ms ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#5e6ad2'
-              e.currentTarget.style.color = '#5e6ad2'
+              e.currentTarget.style.borderColor = 'var(--brand)'
+              e.currentTarget.style.color = 'var(--brand)'
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.borderColor = 'rgba(55,53,47,0.18)'

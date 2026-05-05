@@ -114,7 +114,7 @@ export function CompetitorTable({ competitors, collateral, onDelete, onGenerateB
                 <Link
                   href={`/competitors/${competitor.id}`}
                   style={{ fontSize: '13px', fontWeight: 500, color: '#37352f', textDecoration: 'none' }}
-                  onMouseEnter={(e) => { e.currentTarget.style.color = '#5e6ad2' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--brand)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.color = '#37352f' }}
                 >
                   {competitor.name}

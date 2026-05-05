@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { db } from '@/lib/db'
 import { sql } from 'drizzle-orm'
+import { dbErrResponse } from '@/lib/api-helpers'
 import { setGlobalConsent, getGlobalConsent } from '@/lib/global-pool'
 
 export async function GET() {
@@ -27,10 +28,7 @@ export async function GET() {
     return NextResponse.json({ consented })
   } catch (err) {
     console.error('[GET /api/global/consent]', err)
-    return NextResponse.json(
-      { error: 'Internal server error', details: process.env.NODE_ENV === 'development' ? (err as Error).message : undefined },
-      { status: 500 }
-    )
+    return dbErrResponse(err)
   }
 }
 
@@ -63,9 +61,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, consented })
   } catch (err) {
     console.error('[POST /api/global/consent]', err)
-    return NextResponse.json(
-      { error: 'Internal server error', details: process.env.NODE_ENV === 'development' ? (err as Error).message : undefined },
-      { status: 500 }
-    )
+    return dbErrResponse(err)
   }
 }

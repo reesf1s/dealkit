@@ -11,6 +11,7 @@ import {
   ToggleLeft, ToggleRight, Activity, Bell,
 } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
+import { useToast } from '@/components/shared/Toast'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,14 @@ interface Automation {
   alwaysOn: boolean
 }
 
+interface AutomationResponse {
+  data: Automation[]
+  meta?: {
+    canEdit?: boolean
+    role?: string
+  }
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtTime(dateStr: string): string {
@@ -101,7 +110,7 @@ const AUTOMATION_ICONS: Record<string, { icon: React.ElementType; color: string 
   auto_stage_suggestions: { icon: TrendingDown, color: '#0ea5e9' },
   champion_tracking:      { icon: Users, color: '#ec4899' },
   deal_decay_alerts:      { icon: Activity, color: '#f97316' },
-  competitor_alerts:      { icon: Swords, color: '#6366f1' },
+  competitor_alerts:      { icon: Swords, color: 'var(--brand)' },
   close_date_monitoring:  { icon: Calendar, color: '#14b8a6' },
 }
 
@@ -177,9 +186,12 @@ function IntegrationCard({
 // ─── Automation Toggle Row ───────────────────────────────────────────────────
 
 function AutomationToggleRow({
-  automation, onToggle, toggling,
+  automation, onToggle, toggling, canEdit,
 }: {
-  automation: Automation; onToggle: (id: string, enabled: boolean) => void; toggling: string | null
+  automation: Automation
+  onToggle: (id: string, enabled: boolean) => void
+  toggling: string | null
+  canEdit: boolean
 }) {
   const iconInfo = AUTOMATION_ICONS[automation.id] ?? { icon: Zap, color: '#1DB86A' }
   const Icon = iconInfo.icon
@@ -223,11 +235,11 @@ function AutomationToggleRow({
         )}
         <button
           onClick={() => !automation.alwaysOn && onToggle(automation.id, !automation.enabled)}
-          disabled={automation.alwaysOn || isToggling}
+          disabled={automation.alwaysOn || isToggling || !canEdit}
           style={{
             background: 'transparent',
             border: 'none',
-            cursor: automation.alwaysOn ? 'default' : 'pointer',
+            cursor: automation.alwaysOn || !canEdit ? 'default' : 'pointer',
             padding: 0,
             display: 'flex',
             alignItems: 'center',
@@ -284,7 +296,7 @@ function DealMonitorCard() {
               { label: 'At risk', value: summary.criticalCount + summary.warningCount, color: summary.criticalCount > 0 ? 'var(--color-red)' : 'var(--color-amber)' },
             ].map((s, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ fontSize: '15px', fontWeight: 700, color: s.color, letterSpacing: '-0.02em' }}>{s.value}</span>
+                <span style={{ fontSize: '15px', fontWeight: 700, color: s.color, letterSpacing: 0 }}>{s.value}</span>
                 <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontWeight: 500 }}>{s.label}</span>
               </div>
             ))}
@@ -441,7 +453,7 @@ function IntelligenceHealthCard() {
             <div style={{ fontSize: '9.5px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-tertiary)', marginBottom: '4px' }}>
               {stat.label}
             </div>
-            <div style={{ fontSize: '16px', fontWeight: 700, color: stat.color ?? 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+            <div style={{ fontSize: '16px', fontWeight: 700, color: stat.color ?? 'var(--text-primary)', letterSpacing: 0 }}>
               {stat.value}
             </div>
           </div>
@@ -518,15 +530,17 @@ function UnmatchedEmailsCard() {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function WorkflowsPage() {
+  const { toast } = useToast()
   const { data: hubspotRes } = useSWR('/api/integrations/hubspot/status', fetcher, {
     revalidateOnFocus: false, dedupingInterval: 60000,
   })
   const hubspot: HubSpotStatus = hubspotRes?.data ?? { connected: false }
 
-  const { data: automationsRes, mutate: mutateAutomations } = useSWR<{ data: Automation[] }>('/api/automations', fetcher, {
+  const { data: automationsRes, mutate: mutateAutomations } = useSWR<AutomationResponse>('/api/automations', fetcher, {
     revalidateOnFocus: false, dedupingInterval: 30000,
   })
   const automations = automationsRes?.data ?? []
+  const canEdit = automationsRes?.meta?.canEdit ?? true
   const [toggling, setToggling] = useState<string | null>(null)
 
   const grouped = useMemo(() => {
@@ -537,14 +551,27 @@ export default function WorkflowsPage() {
   }, [automations])
 
   async function handleToggle(id: string, enabled: boolean) {
+    if (!canEdit) {
+      toast('Only workspace owners/admins can change automation policy.', 'warning')
+      return
+    }
     setToggling(id)
     try {
-      await fetch('/api/automations', {
+      const res = await fetch('/api/automations', {
         method: 'PATCH',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ automationId: id, enabled }),
       })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error ?? 'Unable to update automation')
+      }
       await mutateAutomations()
+      const item = automations.find(a => a.id === id)
+      if (item) toast(`${item.name} ${enabled ? 'enabled' : 'disabled'}.`, 'success')
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Unable to update automation', 'error')
     } finally {
       setToggling(null)
     }
@@ -558,13 +585,16 @@ export default function WorkflowsPage() {
 
       {/* ── Page header ── */}
       <div>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 4px', letterSpacing: '-0.04em' }}>
+        <h1 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 4px', letterSpacing: 0 }}>
           Sequences & Automations
         </h1>
         <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', margin: 0, lineHeight: 1.5 }}>
           Your CRM intelligence layer — deals are scored, signals are detected, and actions are surfaced automatically.
           {enabledCount > 0 && (
             <span style={{ color: '#1DB86A', fontWeight: 500 }}> {enabledCount} automations active.</span>
+          )}
+          {!canEdit && (
+            <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}> Read-only mode for non-admin users.</span>
           )}
         </p>
       </div>
@@ -583,7 +613,7 @@ export default function WorkflowsPage() {
         <div style={sectionLabel}>Intelligence automations</div>
         <div style={{ ...card, overflow: 'hidden' }}>
           {grouped.intelligence.map(a => (
-            <AutomationToggleRow key={a.id} automation={a} onToggle={handleToggle} toggling={toggling} />
+            <AutomationToggleRow key={a.id} automation={a} onToggle={handleToggle} toggling={toggling} canEdit={canEdit} />
           ))}
         </div>
       </div>
@@ -592,7 +622,7 @@ export default function WorkflowsPage() {
         <div style={sectionLabel}>Alert automations</div>
         <div style={{ ...card, overflow: 'hidden' }}>
           {grouped.alerts.map(a => (
-            <AutomationToggleRow key={a.id} automation={a} onToggle={handleToggle} toggling={toggling} />
+            <AutomationToggleRow key={a.id} automation={a} onToggle={handleToggle} toggling={toggling} canEdit={canEdit} />
           ))}
         </div>
       </div>
@@ -601,7 +631,7 @@ export default function WorkflowsPage() {
         <div style={sectionLabel}>Workflow automations</div>
         <div style={{ ...card, overflow: 'hidden' }}>
           {grouped.automation.map(a => (
-            <AutomationToggleRow key={a.id} automation={a} onToggle={handleToggle} toggling={toggling} />
+            <AutomationToggleRow key={a.id} automation={a} onToggle={handleToggle} toggling={toggling} canEdit={canEdit} />
           ))}
         </div>
       </div>

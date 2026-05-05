@@ -7,6 +7,7 @@ import { eq, desc } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { workspaces, dealLogs, unmatchedEmails } from '@/lib/db/schema'
 import { requestBrainRebuild } from '@/lib/brain-rebuild'
+import { isAutomationEnabled } from '@/lib/automation-policy'
 
 // ── Email body cleaning ─────────────────────────────────────────────────────
 
@@ -193,11 +194,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Resolve workspace — try direct UUID first, then token lookup
-    let workspace: { id: string } | undefined
+    let workspace: { id: string; pipelineConfig: unknown } | undefined
     if (workspaceIdentifier.length === 36 && workspaceIdentifier.includes('-')) {
       // UUID format — direct workspace ID lookup
       const [ws] = await db
-        .select({ id: workspaces.id })
+        .select({ id: workspaces.id, pipelineConfig: workspaces.pipelineConfig })
         .from(workspaces)
         .where(eq(workspaces.id, workspaceIdentifier))
         .limit(1)
@@ -206,7 +207,7 @@ export async function POST(req: NextRequest) {
     if (!workspace) {
       // Token format — lookup by inbound_email_token
       const [ws] = await db
-        .select({ id: workspaces.id })
+        .select({ id: workspaces.id, pipelineConfig: workspaces.pipelineConfig })
         .from(workspaces)
         .where(eq(workspaces.inboundEmailToken, workspaceIdentifier))
         .limit(1)
@@ -216,6 +217,10 @@ export async function POST(req: NextRequest) {
     if (!workspace) {
       console.log('[ingest/email] No workspace found for identifier:', workspaceIdentifier)
       return NextResponse.json({ ok: true, note: 'workspace_not_found' })
+    }
+
+    if (!isAutomationEnabled(workspace.pipelineConfig, 'email_ingestion')) {
+      return NextResponse.json({ ok: true, matched: false, note: 'email_ingestion_disabled' })
     }
 
     const { email: fromEmail, name: fromName } = parseSenderInfo(from)

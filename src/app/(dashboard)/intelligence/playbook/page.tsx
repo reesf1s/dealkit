@@ -88,7 +88,7 @@ export default function PlaybookPage() {
             { title: 'Your Winning Formula', desc: 'Top 5 signals that predict a won deal.', color: '#0f7b6c' },
             { title: 'Your Losing Pattern', desc: 'Top 5 signals that predict a lost deal.', color: '#e03e3e' },
             { title: 'Per-Competitor Playbook', desc: 'Win conditions vs each rival.', color: '#cb6c2c' },
-            { title: 'Objection Effectiveness', desc: 'Which objections your team handles well.', color: '#5e6ad2' },
+            { title: 'Objection Effectiveness', desc: 'Which objections your team handles well.', color: 'var(--brand)' },
           ].map(item => (
             <div key={item.title} style={{ ...card, opacity: 0.55 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '6px' }}>
@@ -109,7 +109,7 @@ export default function PlaybookPage() {
       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         {[
           { label: 'Win rate', value: `${Math.round((wl?.winRate ?? 0) * 100)}%`, color: '#0f7b6c' },
-          { label: 'Avg close time', value: wl?.avgDaysToClose ? `${Math.round(wl.avgDaysToClose)}d` : '—', color: '#5e6ad2' },
+          { label: 'Avg close time', value: wl?.avgDaysToClose ? `${Math.round(wl.avgDaysToClose)}d` : '—', color: 'var(--brand)' },
           { label: 'Avg won value', value: wl?.avgWonValue ? formatCurrency(Math.round(wl.avgWonValue)) : '—', color: 'var(--text-primary)' },
           { label: 'Closed deals', value: String(totalDeals), color: '#787774' },
         ].map(s => (
@@ -151,7 +151,7 @@ export default function PlaybookPage() {
         {objectionMap.length > 0 && (
           <div style={card}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-              <BookOpen size={15} style={{ color: '#5e6ad2' }} />
+              <BookOpen size={15} style={{ color: 'var(--brand)' }} />
               <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Objection Effectiveness</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

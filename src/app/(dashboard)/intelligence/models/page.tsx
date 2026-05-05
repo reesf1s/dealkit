@@ -33,7 +33,7 @@ export default function ModelsPage() {
       {/* Win Probability Model */}
       <div style={card}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-          <BarChart2 size={15} style={{ color: '#5e6ad2' }} />
+          <BarChart2 size={15} style={{ color: 'var(--brand)' }} />
           <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Win Probability Model</span>
         </div>
         {isLoading ? (
@@ -46,7 +46,7 @@ export default function ModelsPage() {
           }}>
             {mlAccuracy != null ? (
               <div>
-                <div style={{ fontSize: '48px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+                <div style={{ fontSize: '48px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: 0, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                   {Math.round(mlAccuracy * 100)}%
                 </div>
                 <div style={{ fontSize: '13px', color: '#787774', marginTop: '12px', lineHeight: 1.6 }}>
@@ -79,7 +79,7 @@ export default function ModelsPage() {
             background: 'rgba(15,123,108,0.08)',
             border: '1px solid rgba(15,123,108,0.20)',
           }}>
-            <div style={{ fontSize: '48px', fontWeight: 700, color: '#0f7b6c', letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
+            <div style={{ fontSize: '48px', fontWeight: 700, color: '#0f7b6c', letterSpacing: 0, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
               {Math.round(forecastAccuracy * 100)}%
             </div>
             <div style={{ fontSize: '13px', color: '#787774', marginTop: '12px', lineHeight: 1.6 }}>
@@ -119,7 +119,7 @@ export default function ModelsPage() {
                     <span style={{ fontSize: '11px', color: 'var(--text-primary)', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{(importance * 100).toFixed(1)}%</span>
                   </div>
                   <div style={{ height: '3px', borderRadius: '2px', background: 'rgba(55,53,47,0.09)', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, background: '#5e6ad2', borderRadius: '2px' }} />
+                    <div style={{ height: '100%', width: `${pct}%`, background: 'var(--brand)', borderRadius: '2px' }} />
                   </div>
                 </div>
               )

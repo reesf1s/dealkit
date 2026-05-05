@@ -45,8 +45,8 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
           style={{
             fontSize: '15px',
             fontWeight: 600,
-            color: '#1d1d1f',
-            letterSpacing: '-0.01em',
+            color: 'var(--text-primary)',
+            letterSpacing: 0,
             margin: 0,
           }}
         >
@@ -55,7 +55,7 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
         <p
           style={{
             fontSize: '13px',
-            color: '#6e6e73',
+            color: 'var(--text-tertiary)',
             lineHeight: 1.6,
             margin: 0,
           }}
@@ -74,20 +74,20 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
             borderRadius: '8px',
             fontSize: '13px',
             fontWeight: 600,
-            background: '#1a1a1a',
+            background: 'var(--text-primary)',
             color: '#ffffff',
-            border: '1px solid #f0f0f0',
+            border: '1px solid var(--text-primary)',
             cursor: 'pointer',
             transition: 'all 150ms ease',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+            boxShadow: 'var(--shadow-card)',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-1px)'
-            e.currentTarget.style.boxShadow = '0 3px 8px #dddddd'
+            e.currentTarget.style.background = 'var(--brand)'
+            e.currentTarget.style.borderColor = 'var(--brand)'
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)'
+            e.currentTarget.style.background = 'var(--text-primary)'
+            e.currentTarget.style.borderColor = 'var(--text-primary)'
           }}
         >
           {action.label}

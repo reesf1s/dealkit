@@ -8,7 +8,7 @@
  * for the same issue+deal combination unless explicitly requested.
  */
 
-import { anthropic } from '@/lib/ai/client'
+import { anthropic, hasLlmApiKey } from '@/lib/ai/client'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -60,8 +60,9 @@ Rules:
 export async function generateScopedIssue(
   input: ScopeGeneratorInput,
 ): Promise<ScopedIssue> {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) throw new Error('OPENAI_API_KEY env var is not set')
+  if (!hasLlmApiKey()) {
+    throw new Error('No LLM API key is configured')
+  }
 
   const riskContext = input.dealRisks.length > 0
     ? `\nDeal risks this should address: ${input.dealRisks.slice(0, 3).join('; ')}`

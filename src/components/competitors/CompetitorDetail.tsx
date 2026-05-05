@@ -99,9 +99,9 @@ export function CompetitorDetail({ competitor, collateral, linkedDeals, onSave, 
             <button
               onClick={handleGenerate}
               disabled={generating}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', height: '32px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#ffffff', backgroundColor: generating ? 'rgba(55,53,47,0.25)' : '#5e6ad2', border: 'none', cursor: generating ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', height: '32px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, color: '#ffffff', backgroundColor: generating ? 'rgba(55,53,47,0.25)' : 'var(--brand)', border: 'none', cursor: generating ? 'not-allowed' : 'pointer', transition: 'background-color 150ms ease' }}
               onMouseEnter={(e) => { if (!generating) e.currentTarget.style.backgroundColor = '#4f5ab8' }}
-              onMouseLeave={(e) => { if (!generating) e.currentTarget.style.backgroundColor = '#5e6ad2' }}
+              onMouseLeave={(e) => { if (!generating) e.currentTarget.style.backgroundColor = 'var(--brand)' }}
             >
               {generating ? (
                 <><RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> Generating…</>

@@ -65,7 +65,7 @@ const statusConfig: Record<GapStatus, { label: string; color: string; bg: string
   open:       { label: 'Open',        color: '#cb6c2c',          bg: 'rgba(203,108,44,0.08)',   icon: <AlertTriangle size={10} /> },
   on_roadmap: { label: 'On Roadmap',  color: '#2e78c6',          bg: 'rgba(46,120,198,0.08)',   icon: <Clock size={10} /> },
   shipped:    { label: 'Shipped',     color: '#0f7b6c',          bg: 'rgba(15,123,108,0.08)',   icon: <CheckCircle size={10} /> },
-  in_review:  { label: 'In Review',   color: '#5e6ad2',          bg: 'rgba(94,106,210,0.08)',   icon: <Info size={10} /> },
+  in_review:  { label: 'In Review',   color: 'var(--brand)',          bg: 'var(--brand-bg)',   icon: <Info size={10} /> },
 }
 
 const statusOrder: GapStatus[] = ['open', 'in_review', 'on_roadmap', 'shipped']
@@ -166,12 +166,23 @@ export default function ProductGapsPage() {
 
   const handleDeleteGap = async (id: string) => {
     if (!confirm('Delete this product gap? This cannot be undone.')) return
+
+    const reasonInput = window.prompt(
+      'Optional: why should this no longer be considered a product gap? (Saved to workspace knowledge to prevent repeat flags)',
+      ''
+    )
+    const reason = reasonInput?.trim()
+
     setDeletingId(id)
     // Optimistically remove from local state immediately — prevents ghost item from reappearing
     // via the brain cache while the SWR re-fetch and brain rebuild are in flight
     setLocalDeletedIds(prev => new Set([...prev, id]))
     try {
-      const res = await fetch(`/api/product-gaps/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/product-gaps/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: reason ? JSON.stringify({ reason }) : undefined,
+      })
       if (res.ok) {
         // Update SWR cache optimistically then revalidate
         mutateGaps(
@@ -340,7 +351,7 @@ export default function ProductGapsPage() {
             background: 'var(--surface-2)', color: 'var(--text-primary)',
             transition: 'all 0.12s',
           }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = '#5e6ad2'; (e.currentTarget as HTMLButtonElement).style.color = '#5e6ad2' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--brand)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--brand)' }}
           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(55,53,47,0.12)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-primary)' }}
         >
           <Download size={13} />
@@ -483,7 +494,7 @@ export default function ProductGapsPage() {
                   {/* Title + badges */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-primary)', lineHeight: 1.35 }}>
                         {gap.title ?? 'Unnamed gap'}
                       </div>
                       {/* Status badge */}
@@ -496,7 +507,7 @@ export default function ProductGapsPage() {
                       </div>
                     </div>
                     {gap.description && !isExpanded && (
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px', lineHeight: 1.45 }}>
                         {gap.description}
                       </div>
                     )}
@@ -593,7 +604,7 @@ export default function ProductGapsPage() {
                             <ChevronDown size={11} style={{ color: 'var(--text-tertiary)', transform: showAll ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s' }} />
                           </div>
 
-                          {(showAll || true) && visibleDeals.length > 0 && (
+                          {visibleDeals.length > 0 && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                               {visibleDeals.map((dealId: string) => {
                                 // Try to find deal info from brain
@@ -602,7 +613,7 @@ export default function ProductGapsPage() {
                                   <div key={dealId} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', background: '#f7f6f3', borderRadius: '6px', border: '1px solid rgba(55,53,47,0.09)' }}>
                                     <ScoreBadge score={dealSnap?.conversionScore} />
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      <div style={{ fontSize: '12px', fontWeight: '500', color: 'var(--text-primary)', lineHeight: 1.35 }}>
                                         {dealSnap?.name ?? dealId.slice(0, 8) + '…'}
                                       </div>
                                       {dealSnap?.stage && (
@@ -615,7 +626,7 @@ export default function ProductGapsPage() {
                               {!showAll && sourceDeals.length > 5 && (
                                 <button
                                   onClick={e => { e.stopPropagation(); setShowMoreMap(prev => ({ ...prev, [gap.id]: true })) }}
-                                  style={{ fontSize: '11px', color: '#5e6ad2', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '4px 0' }}
+                                  style={{ fontSize: '11px', color: 'var(--brand)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '4px 0' }}
                                 >
                                   + {sourceDeals.length - 5} more deals
                                 </button>

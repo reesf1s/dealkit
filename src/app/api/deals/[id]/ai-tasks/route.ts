@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { anthropic } from '@/lib/ai/client'
 import { db } from '@/lib/db'
-import { dealLogs } from '@/lib/db/schema'
+import { dealLogs, dealTodos } from '@/lib/db/schema'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit'
 
@@ -17,6 +17,10 @@ export interface AiTaskItem {
   source: 'ai'
   priority?: 'low' | 'normal' | 'high'
   createdAt: string
+}
+
+function normalizeTaskText(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 80)
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -83,7 +87,7 @@ Respond ONLY with this JSON (no markdown fences):
 {"tasks":[{"text":"...","priority":"high|normal|low"},...]}`
 
     const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5',
+      model: 'gpt-5.4-mini',
       max_tokens: 600,
       messages: [{ role: 'user', content: prompt }],
     })
@@ -97,18 +101,42 @@ Respond ONLY with this JSON (no markdown fences):
       return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 500 })
     }
 
+    const existing = (deal.todos as AiTaskItem[] | null) ?? []
+    const existingKeys = new Set(existing.map(t => normalizeTaskText(t.text ?? '')))
+
     const now = new Date().toISOString()
-    const newTasks: AiTaskItem[] = rawTasks.slice(0, 5).map(t => ({
+    const dedupedTasks = rawTasks
+      .map(t => ({ text: t.text?.trim() ?? '', priority: t.priority }))
+      .filter(t => t.text.length >= 10)
+      .filter(t => !existingKeys.has(normalizeTaskText(t.text)))
+      .slice(0, 5)
+
+    const newTasks: AiTaskItem[] = dedupedTasks.map(t => ({
       id: crypto.randomUUID(),
-      text: t.text.trim(),
+      text: t.text,
       done: false as const,
       source: 'ai' as const,
       priority: (t.priority as AiTaskItem['priority']) ?? 'normal',
       createdAt: now,
     }))
 
+    if (newTasks.length > 0) {
+      await db.insert(dealTodos).values(
+        newTasks.map(task => ({
+          id: task.id,
+          workspaceId,
+          dealId: id,
+          text: task.text,
+          done: false,
+          priority: task.priority ?? 'normal',
+          createdBy: userId,
+          createdAt: new Date(task.createdAt),
+          updatedAt: new Date(task.createdAt),
+        }))
+      )
+    }
+
     // Prepend AI tasks to existing todos JSONB array
-    const existing = (deal.todos as AiTaskItem[] | null) ?? []
     const updated = [...newTasks, ...existing]
 
     await db.update(dealLogs)
@@ -116,8 +144,9 @@ Respond ONLY with this JSON (no markdown fences):
       .where(and(eq(dealLogs.id, id), eq(dealLogs.workspaceId, workspaceId)))
 
     return NextResponse.json({ data: newTasks })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[ai-tasks]', err)
-    return NextResponse.json({ error: err.message ?? 'Internal error' }, { status: 500 })
+    const message = err instanceof Error ? err.message : 'Internal error'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

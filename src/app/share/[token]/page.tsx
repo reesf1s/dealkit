@@ -32,7 +32,7 @@ export default async function SharePage({ params }: SharePageProps) {
       <div
         style={{
           minHeight: '100vh',
-          backgroundColor: '#ffffff',
+          backgroundColor: 'var(--surface-1)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -56,7 +56,7 @@ export default async function SharePage({ params }: SharePageProps) {
     <div
       style={{
         minHeight: '100vh',
-        backgroundColor: '#ffffff',
+        backgroundColor: 'var(--surface-1)',
         fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         color: '#37352f',
       }}
@@ -82,7 +82,7 @@ export default async function SharePage({ params }: SharePageProps) {
               fontSize: '16px',
               fontWeight: 700,
               color: '#37352f',
-              letterSpacing: '-0.03em',
+              letterSpacing: 0,
             }}
           >
             Halvex
@@ -115,7 +115,7 @@ export default async function SharePage({ params }: SharePageProps) {
               fontSize: '28px',
               fontWeight: 700,
               color: '#37352f',
-              letterSpacing: '-0.03em',
+              letterSpacing: 0,
               margin: '0 0 8px',
               lineHeight: 1.2,
             }}
@@ -152,7 +152,7 @@ export default async function SharePage({ params }: SharePageProps) {
               href="https://halvex.ai"
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: '#5e6ad2', textDecoration: 'none' }}
+              style={{ color: 'var(--brand)', textDecoration: 'none' }}
             >
               halvex.ai
             </a>

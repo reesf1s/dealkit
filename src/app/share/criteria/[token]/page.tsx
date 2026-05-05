@@ -17,7 +17,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   Reporting: '#787774',
   Performance: '#cb6c2c',
   Compliance: '#0f7b6c',
-  Onboarding: '#5e6ad2',
+  Onboarding: 'var(--brand)',
   General: '#9b9a97',
 }
 
@@ -44,7 +44,7 @@ export default async function ShareCriteriaPage({ params }: Props) {
     return (
       <div style={{
         minHeight: '100vh',
-        backgroundColor: '#ffffff',
+        backgroundColor: 'var(--surface-1)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -66,7 +66,7 @@ export default async function ShareCriteriaPage({ params }: Props) {
   return (
     <div style={{
       minHeight: '100vh',
-      backgroundColor: '#ffffff',
+      backgroundColor: 'var(--surface-1)',
       fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       color: '#37352f',
     }}>
@@ -74,7 +74,7 @@ export default async function ShareCriteriaPage({ params }: Props) {
 
         {/* Top bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '48px' }}>
-          <span style={{ fontSize: '16px', fontWeight: 700, color: '#37352f', letterSpacing: '-0.03em' }}>Halvex</span>
+          <span style={{ fontSize: '16px', fontWeight: 700, color: '#37352f', letterSpacing: 0 }}>Halvex</span>
           <span style={{
             display: 'inline-flex', alignItems: 'center', height: '22px', padding: '0 10px',
             borderRadius: '4px', fontSize: '11px', fontWeight: 600, color: '#9b9a97',
@@ -94,7 +94,7 @@ export default async function ShareCriteriaPage({ params }: Props) {
           }}>
             Success Criteria
           </div>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#37352f', letterSpacing: '-0.03em', margin: '0 0 6px', lineHeight: 1.2 }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#37352f', letterSpacing: 0, margin: '0 0 6px', lineHeight: 1.2 }}>
             {deal.dealName}
           </h1>
           {deal.prospectCompany && (
@@ -109,7 +109,7 @@ export default async function ShareCriteriaPage({ params }: Props) {
         {/* Progress */}
         {criteria.length > 0 && (
           <div style={{
-            background: '#ffffff',
+            background: 'var(--surface-1)',
             border: '1px solid rgba(55,53,47,0.09)',
             borderRadius: '10px',
             padding: '16px',
@@ -134,7 +134,7 @@ export default async function ShareCriteriaPage({ params }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {categories.map(cat => (
               <div key={cat} style={{
-                background: '#ffffff',
+                background: 'var(--surface-1)',
                 border: '1px solid rgba(55,53,47,0.09)',
                 borderRadius: '10px',
                 padding: '16px',
@@ -155,7 +155,7 @@ export default async function ShareCriteriaPage({ params }: Props) {
                         }}>
                           {c.achieved && (
                             <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
-                              <path d="M1 4L3.5 6.5L9 1" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              <path d="M1 4L3.5 6.5L9 1" stroke="var(--surface-1)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                           )}
                         </div>
@@ -184,7 +184,7 @@ export default async function ShareCriteriaPage({ params }: Props) {
         <div style={{ marginTop: '64px', paddingTop: '24px', borderTop: '1px solid rgba(55,53,47,0.09)', textAlign: 'center' }}>
           <p style={{ fontSize: '12px', color: '#9b9a97', margin: 0 }}>
             Track your deals with AI at{' '}
-            <a href="https://halvex.ai" target="_blank" rel="noopener noreferrer" style={{ color: '#5e6ad2', textDecoration: 'none' }}>
+            <a href="https://halvex.ai" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand)', textDecoration: 'none' }}>
               halvex.ai
             </a>
           </p>

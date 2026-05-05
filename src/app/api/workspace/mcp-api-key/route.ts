@@ -7,13 +7,13 @@ import { getWorkspaceContext } from '@/lib/workspace'
 import { dbErrResponse } from '@/lib/api-helpers'
 import crypto from 'crypto'
 
-/** GET — return the workspace MCP API key, generating one on first call */
+/** GET — return MCP key availability and management permissions without revealing the secret */
 export async function GET() {
   try {
     const { userId } = await auth()
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { workspaceId } = await getWorkspaceContext(userId)
+    const { workspaceId, role } = await getWorkspaceContext(userId)
 
     const [ws] = await db
       .select({ mcpApiKey: workspaces.mcpApiKey })
@@ -21,17 +21,17 @@ export async function GET() {
       .where(eq(workspaces.id, workspaceId))
       .limit(1)
 
-    let key = ws?.mcpApiKey
+    const key = ws?.mcpApiKey ?? null
+    const canManage = role === 'owner' || role === 'admin'
+    const keyPreview = key && canManage ? `${key.slice(0, 8)}...${key.slice(-4)}` : null
 
-    if (!key) {
-      key = crypto.randomUUID()
-      await db
-        .update(workspaces)
-        .set({ mcpApiKey: key, updatedAt: new Date() })
-        .where(eq(workspaces.id, workspaceId))
-    }
-
-    return NextResponse.json({ data: { mcpApiKey: key } })
+    return NextResponse.json({
+      data: {
+        canManage,
+        hasKey: Boolean(key),
+        keyPreview,
+      },
+    })
   } catch (err) {
     return dbErrResponse(err)
   }
@@ -55,7 +55,14 @@ export async function POST() {
       .set({ mcpApiKey: key, updatedAt: new Date() })
       .where(eq(workspaces.id, workspaceId))
 
-    return NextResponse.json({ data: { mcpApiKey: key } })
+    return NextResponse.json({
+      data: {
+        canManage: true,
+        hasKey: true,
+        keyPreview: `${key.slice(0, 8)}...${key.slice(-4)}`,
+        mcpApiKey: key,
+      },
+    })
   } catch (err) {
     return dbErrResponse(err)
   }

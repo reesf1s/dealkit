@@ -3,7 +3,7 @@ import type { Config } from 'tailwindcss'
 // Note: This project uses Tailwind v4. The canonical design tokens live in
 // src/app/globals.css inside the @theme block. This file is kept for editor
 // intellisense and any tooling that still reads tailwind.config.ts.
-// Colors aligned with Linear-style design system (design-system.css).
+// Colors aligned with the quiet operator UI tokens in globals.css.
 const config: Config = {
   darkMode: 'class',
   content: [
@@ -15,24 +15,24 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // ── Backgrounds (dark design system — #171717 base) ──────────
-        background: '#171717',
-        surface: 'rgba(255,255,255,0.03)',
-        elevated: 'rgba(255,255,255,0.06)',
-        overlay: 'rgba(255,255,255,0.09)',
+        // ── Quiet operator UI tokens ─────────────────────────────────
+        background: 'var(--page-bg)',
+        surface: 'var(--surface-1)',
+        elevated: 'var(--surface-2)',
+        overlay: 'var(--surface-active)',
 
-        // ── Text (white opacity on dark) ─────────────────────────────
-        'text-primary': 'rgba(255,255,255,0.92)',
-        'text-secondary': 'rgba(255,255,255,0.50)',
-        'text-tertiary': 'rgba(255,255,255,0.28)',
-        'text-disabled': 'rgba(255,255,255,0.18)',
+        // ── Text ─────────────────────────────────────────────────────
+        'text-primary': 'var(--text-primary)',
+        'text-secondary': 'var(--text-secondary)',
+        'text-tertiary': 'var(--text-tertiary)',
+        'text-disabled': 'var(--text-muted)',
 
-        // ── Accent (indigo) ──────────────────────────────────────────
+        // ── Accent ───────────────────────────────────────────────────
         accent: {
-          DEFAULT: '#6366f1',
-          hover: '#818cf8',
-          muted: 'rgba(99,102,241,0.12)',
-          subtle: 'rgba(99,102,241,0.06)',
+          DEFAULT: 'var(--brand)',
+          hover: 'var(--brand-light)',
+          muted: 'var(--brand-bg)',
+          subtle: 'var(--brand-bg)',
         },
 
         // ── Semantic (brighter on dark) ───────────────────────────────
@@ -55,10 +55,10 @@ const config: Config = {
 
         // ── Borders (white opacity on dark) ──────────────────────────
         border: {
-          DEFAULT: 'rgba(255,255,255,0.08)',
-          subtle: 'rgba(255,255,255,0.04)',
-          strong: 'rgba(255,255,255,0.14)',
-          accent: 'rgba(99,102,241,0.25)',
+          DEFAULT: 'var(--border-default)',
+          subtle: 'var(--border-subtle)',
+          strong: 'var(--border-strong)',
+          accent: 'var(--brand-border)',
         },
       },
       fontFamily: {
@@ -125,14 +125,14 @@ const config: Config = {
         96: '384px',
       },
       boxShadow: {
-        sm: '0 1px 4px rgba(0,0,0,0.30)',
-        DEFAULT: '0 2px 12px rgba(0,0,0,0.40)',
-        md: '0 4px 20px rgba(0,0,0,0.50)',
-        lg: '0 8px 40px rgba(0,0,0,0.60)',
-        xl: '0 16px 60px rgba(0,0,0,0.70)',
-        accent: '0 0 0 2px rgba(99,102,241,0.40)',
+        sm: 'var(--shadow-card)',
+        DEFAULT: 'var(--shadow-card)',
+        md: 'var(--shadow-popover)',
+        lg: 'var(--shadow-modal)',
+        xl: 'var(--shadow-modal)',
+        accent: '0 0 0 2px var(--brand-border)',
         'inset-border': 'inset 0 0 0 1px rgba(255,255,255,0.08)',
-        glow: '0 0 20px rgba(99,102,241,0.30)',
+        glow: '0 0 20px var(--brand-border)',
       },
       animation: {
         'skeleton-pulse': 'skeleton-pulse 1.5s ease-in-out infinite',

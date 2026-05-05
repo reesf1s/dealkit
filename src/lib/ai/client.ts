@@ -2,6 +2,10 @@ import { generateText, streamText } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { MINI } from './models'
 
+export function hasLlmApiKey(): boolean {
+  return Boolean(process.env.OPENAI_API_KEY)
+}
+
 function getOpenAIProvider() {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
@@ -11,7 +15,7 @@ function getOpenAIProvider() {
 }
 
 /** Vercel AI SDK model — use for streamText / generateText calls */
-export const gptMini = getOpenAIProvider()(MINI)
+export const gptMini = hasLlmApiKey() ? getOpenAIProvider()(MINI) : null
 
 type MessageParam = { role: 'user' | 'assistant'; content: string }
 
@@ -43,10 +47,14 @@ export const anthropic = {
     async create(params: CreateParams) {
       const openaiProvider = getOpenAIProvider()
       const providerOptions = buildOpenAIProviderOptions(params.max_tokens)
+      const messages = params.messages.map(message => ({
+        role: message.role,
+        content: message.content,
+      }))
       const { text } = await generateText({
         model: openaiProvider(MINI),
         system: params.system,
-        messages: params.messages as any,
+        messages,
         ...(providerOptions ? { providerOptions } : {}),
       })
       return {
@@ -57,13 +65,17 @@ export const anthropic = {
     stream(params: CreateParams) {
       const openaiProvider = getOpenAIProvider()
       const providerOptions = buildOpenAIProviderOptions(params.max_tokens)
+      const messages = params.messages.map(message => ({
+        role: message.role,
+        content: message.content,
+      }))
       // Returns an async iterable that yields Anthropic-compatible SSE events
       // so existing `for await (const event of stream)` loops work unchanged.
       return (async function* () {
         const result = streamText({
           model: openaiProvider(MINI),
           system: params.system,
-          messages: params.messages as any,
+          messages,
           ...(providerOptions ? { providerOptions } : {}),
         })
 

@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { workspaces } from '@/lib/db/schema'
 import { getWorkspaceBrain } from '@/lib/workspace-brain'
+import { isAutomationEnabled } from '@/lib/automation-policy'
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET
@@ -23,13 +24,19 @@ export async function GET(req: NextRequest) {
 
   try {
     // Load all workspaces — cheap: we only read the brain JSONB field
-    const allWorkspaces = await db.select({ id: workspaces.id }).from(workspaces)
+    const allWorkspaces = await db
+      .select({ id: workspaces.id, pipelineConfig: workspaces.pipelineConfig })
+      .from(workspaces)
 
     let notified = 0
     let skipped = 0
 
     for (const ws of allWorkspaces) {
       try {
+        if (!isAutomationEnabled(ws.pipelineConfig, 'stale_alerts')) {
+          skipped++
+          continue
+        }
         const brain = await getWorkspaceBrain(ws.id)
         if (!brain?.staleDeals?.length) { skipped++; continue }
 

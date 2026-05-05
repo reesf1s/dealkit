@@ -4,8 +4,12 @@ import { sql } from 'drizzle-orm'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
-// Temporary endpoint to seed demo data. DELETE AFTER USE.
+// Dev-only endpoint to seed local demo data.
 export async function GET() {
+  if (process.env.NODE_ENV !== 'development') {
+    return new Response('Not found', { status: 404 })
+  }
+
   try {
     const sqlContent = readFileSync(
       join(process.cwd(), 'scripts', 'demo-data.sql'),

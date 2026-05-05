@@ -368,12 +368,12 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
               onClick={addContact}
               style={{
                 display: 'flex', alignItems: 'center', gap: '4px',
-                fontSize: '11px', color: '#5e6ad2', background: 'none', border: 'none',
+                fontSize: '11px', color: 'var(--brand)', background: 'none', border: 'none',
                 cursor: 'pointer', padding: '0 0 6px', fontWeight: 600,
                 marginTop: '-4px',
               }}
               onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#4a56c0' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#5e6ad2' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--brand)' }}
             >
               <Plus size={11} /> Add contact
             </button>
@@ -383,7 +383,7 @@ export function DealForm({ onSubmit, loading = false }: DealFormProps) {
               onClick={addContact}
               style={{
                 display: 'flex', alignItems: 'center', gap: '4px',
-                fontSize: '11px', color: '#5e6ad2', background: 'none', border: 'none',
+                fontSize: '11px', color: 'var(--brand)', background: 'none', border: 'none',
                 cursor: 'pointer', padding: '0 0 6px', fontWeight: 600,
                 marginTop: '-4px',
               }}

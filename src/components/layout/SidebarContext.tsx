@@ -1,6 +1,7 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import { useMediaQuery } from '@/lib/use-media-query'
 
 export interface ActiveDeal {
   id: string
@@ -54,24 +55,16 @@ const Ctx = createContext<SidebarCtx>({
 })
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.localStorage.getItem('sidebar-collapsed') === 'true'
+  })
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
+  const isMobile = useMediaQuery('(max-width: 768px)')
   const [copilotOpen, setCopilotOpen] = useState(false)
   const [copilotPrefill, setCopilotPrefill] = useState<string | null>(null)
   const [copilotAutoSend, setCopilotAutoSend] = useState<string | null>(null)
   const [activeDeal, setActiveDeal] = useState<ActiveDeal | null>(null)
-
-  useEffect(() => {
-    const stored = localStorage.getItem('sidebar-collapsed')
-    if (stored === 'true') setCollapsed(true)
-
-    const mq = window.matchMedia('(max-width: 768px)')
-    setIsMobile(mq.matches)
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [])
 
   const toggleCollapsed = () => {
     setCollapsed(p => {

@@ -57,7 +57,7 @@ export default async function DealSharePage({ params }: Props) {
     return (
       <div style={{
         minHeight: '100vh',
-        backgroundColor: '#ffffff',
+        backgroundColor: 'var(--surface-1)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -77,7 +77,7 @@ export default async function DealSharePage({ params }: Props) {
   return (
     <div style={{
       minHeight: '100vh',
-      backgroundColor: '#ffffff',
+      backgroundColor: 'var(--surface-1)',
       color: '#37352f',
       fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     }}>
@@ -85,7 +85,7 @@ export default async function DealSharePage({ params }: Props) {
 
         {/* Header bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '56px' }}>
-          <span style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '-0.03em', color: '#37352f' }}>Halvex</span>
+          <span style={{ fontSize: '15px', fontWeight: 700, letterSpacing: 0, color: '#37352f' }}>Halvex</span>
           <span style={{
             fontSize: '11px', fontWeight: 600, color: '#9b9a97',
             background: 'rgba(55,53,47,0.05)', border: '1px solid rgba(55,53,47,0.10)',
@@ -109,7 +109,7 @@ export default async function DealSharePage({ params }: Props) {
               <span style={{ fontSize: '12px', color: '#9b9a97' }}>{fmt(deal.dealValue)}</span>
             )}
           </div>
-          <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#37352f', margin: '0 0 6px', letterSpacing: '-0.04em', lineHeight: 1.15 }}>
+          <h1 style={{ fontSize: '32px', fontWeight: 700, color: '#37352f', margin: '0 0 6px', letterSpacing: 0, lineHeight: 1.15 }}>
             {deal.dealName}
           </h1>
           <p style={{ fontSize: '14px', color: '#9b9a97', margin: 0 }}>
@@ -126,7 +126,7 @@ export default async function DealSharePage({ params }: Props) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '40px' }}>
           {fmtDate(deal.closeDate) && (
             <div style={{
-              background: '#ffffff',
+              background: 'var(--surface-1)',
               border: '1px solid rgba(55,53,47,0.09)',
               borderRadius: '10px',
               padding: '16px 20px',
@@ -136,7 +136,7 @@ export default async function DealSharePage({ params }: Props) {
             </div>
           )}
           <div style={{
-            background: '#ffffff',
+            background: 'var(--surface-1)',
             border: '1px solid rgba(55,53,47,0.09)',
             borderRadius: '10px',
             padding: '16px 20px',
@@ -192,7 +192,7 @@ export default async function DealSharePage({ params }: Props) {
               href="https://halvex.ai"
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: '#5e6ad2', textDecoration: 'none', fontWeight: 600 }}
+              style={{ color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}
             >
               Halvex
             </a>

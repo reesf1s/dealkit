@@ -68,8 +68,8 @@ function CaseStudyCard({ caseStudy }: { caseStudy: CaseStudy }) {
                 borderRadius: '9999px',
                 fontSize: '11px',
                 fontWeight: 500,
-                color: '#5e6ad2',
-                backgroundColor: 'rgba(94,106,210,0.08)',
+                color: 'var(--brand)',
+                backgroundColor: 'var(--brand-bg)',
                 border: '1px solid rgba(94,106,210,0.20)',
               }}
             >
@@ -88,7 +88,7 @@ function CaseStudyCard({ caseStudy }: { caseStudy: CaseStudy }) {
               color: '#37352f',
               margin: 0,
               marginBottom: '4px',
-              letterSpacing: '-0.01em',
+              letterSpacing: 0,
             }}
           >
             {caseStudy.customerName}

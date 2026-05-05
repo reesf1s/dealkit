@@ -24,7 +24,7 @@ const ALL_ITEMS: CommandItem[] = [
   { id: 'deals',          label: 'Opportunities',        section: 'navigate', icon: TrendingUp,      href: '/deals' },
   { id: 'contacts',       label: 'Contacts',             section: 'navigate', icon: Users,           href: '/contacts' },
   { id: 'analytics',      label: 'Analytics',            section: 'navigate', icon: BarChart2,       href: '/analytics' },
-  { id: 'intelligence',   label: 'Signals',              section: 'navigate', icon: Brain,           href: '/intelligence' },
+  { id: 'intelligence',   label: 'Signals',              section: 'navigate', icon: Brain,           href: '/automations' },
   { id: 'competitors',    label: 'Competitors',          section: 'navigate', icon: Swords,          href: '/competitors' },
   { id: 'case-studies',   label: 'Case Studies',         section: 'navigate', icon: BookOpen,        href: '/case-studies' },
   { id: 'collateral',     label: 'Collateral',           section: 'navigate', icon: FileText,        href: '/collateral' },
@@ -354,7 +354,7 @@ export default function CommandPalette() {
               }}
             >
               <Icon size={16} color="var(--text-tertiary)" strokeWidth={1.5} />
-              <span style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+              <span style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)', letterSpacing: 0 }}>
                 {item.label}
               </span>
               {item.shortcut && (
@@ -406,7 +406,7 @@ export default function CommandPalette() {
           }}>
             <Sparkles size={13} color="#1DB86A" />
           </div>
-          <span style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+          <span style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)', letterSpacing: 0 }}>
             {atTop
               ? <><span style={{ color: 'var(--text-secondary)' }}>{query}</span></>
               : <>Ask AI: <span style={{ color: 'var(--text-secondary)' }}>{query}</span></>
@@ -483,7 +483,7 @@ export default function CommandPalette() {
               backgroundColor: 'transparent',
               border: 'none', outline: 'none',
               padding: '0 16px 0 42px',
-              letterSpacing: '-0.02em',
+              letterSpacing: 0,
               boxSizing: 'border-box',
               caretColor: 'var(--accent)',
             }}
@@ -514,7 +514,7 @@ export default function CommandPalette() {
               style={{
                 position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)',
                 fontSize: '11px', color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer',
-                letterSpacing: '-0.01em',
+                letterSpacing: 0,
               }}
             >
               New question
@@ -540,7 +540,7 @@ export default function CommandPalette() {
             {aiAnswer && (
               <div style={{
                 fontSize: '13px', color: 'var(--text-primary)',
-                lineHeight: '1.65', letterSpacing: '-0.01em', whiteSpace: 'pre-wrap',
+                lineHeight: '1.65', letterSpacing: 0, whiteSpace: 'pre-wrap',
               }}>
                 {renderMarkdown(aiAnswer)}
                 {!aiDone && (
@@ -610,7 +610,7 @@ export default function CommandPalette() {
               close
             </span>
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', letterSpacing: '-0.01em' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', letterSpacing: 0 }}>
             Halvex AI
           </div>
         </div>

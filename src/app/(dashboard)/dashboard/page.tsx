@@ -1,58 +1,74 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import { useState } from 'react'
-import { useUser } from '@clerk/nextjs'
-import useSWR from 'swr'
 import Link from 'next/link'
-import {
-  TrendingUp, Target, ArrowRight,
-  RefreshCw, CheckCircle2, Zap,
-} from 'lucide-react'
+import useSWR from 'swr'
+import { useUser } from '@clerk/nextjs'
+import { AlertTriangle, ArrowRight, Bot, CalendarClock, CheckCircle2, Clock3, PoundSterling, TrendingUp } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
+import type { DealLog } from '@/types'
+import { OperatorHeader, OperatorInsightCard, OperatorKpi, OperatorMetricGrid, OperatorPage, OperatorPanel, OperatorSectionHeader } from '@/components/shared/OperatorUI'
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+interface SummaryDeal {
+  id: string
+  name: string
+  company: string
+  value: number
+  stage: string
+  urgencyScore: number
+  topAction: string
+  riskLevel: 'high' | 'medium' | 'low'
+  daysStale: number
+  primaryBlocker?: string | null
+  latestSnapshot?: string | null
+  previousSnapshot?: string | null
+  latestAction?: string | null
+  statusSummary?: string | null
+  latestActivityAt?: string
+}
 
-interface BrainData {
-  dailyBriefing?: string
-  dailyBriefingGeneratedAt?: string
-  urgentDeals?: Array<{
-    dealId: string
-    dealName?: string
-    company: string
-    reason: string
-    topAction?: string
-    dealValue?: number | null
-    score?: number | null
-  }>
-  staleDeals?: Array<{
-    dealId: string
-    dealName?: string
-    company: string
-    dealValue?: number | null
-    daysSinceUpdate: number
-    score?: number | null
-    stage?: string
-  }>
-  keyPatterns?: Array<{
-    label: string
-    dealIds: string[]
-    companies: string[]
-    dealNames?: string[]
-  }>
-  winLossIntel?: {
-    winRate: number
-    winCount: number
-    lossCount: number
-  }
-  pipeline?: {
-    totalValue: number
-    activeDeals: number
-    stageBreakdown?: Record<string, { count: number; value: number }>
-  }
-  pipelineHealthIndex?: number
-  updatedAt?: string
+interface DashboardSummary {
+  revenueAtRisk: number
+  dealsAtRisk: number
+  staleDeals?: number
+  executionGaps?: number
+  topDeals: SummaryDeal[]
+  focusBullets: string[]
+  focusItems?: FocusItem[]
+  dataQuality?: DataQuality
+  hygieneQueue?: HygieneItem[]
+  generatedAt?: string
+}
+
+interface DataQuality {
+  missingNextStep: number
+  missingCloseDate: number
+  missingPrimaryContact: number
+  missingDealValue: number
+}
+
+interface FocusItem {
+  dealId: string
+  company: string
   status?: string
+  action: string
+  blocker?: string | null
+  latestSnapshot?: string | null
+  previousSnapshot?: string | null
+  why: string
+  dueLabel: string
+  riskLevel: 'high' | 'medium' | 'low'
+  daysStale: number
+  latestActivityAt?: string
+}
+
+interface HygieneItem {
+  dealId: string
+  company: string
+  missing: string[]
+  daysStale: number
+  latestActivityAt: string
+  value: number
 }
 
 interface ActivityEvent {
@@ -61,20 +77,35 @@ interface ActivityEvent {
   metadata: Record<string, unknown>
   createdAt: string
   dealName?: string
-  prospectCompany?: string
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function fmtCurrency(n: number | null | undefined, sym = '£'): string {
-  if (!n && n !== 0) return '—'
-  if (n >= 1_000_000) return `${sym}${(n / 1_000_000).toFixed(1)}m`
-  if (n >= 1_000) return `${sym}${Math.round(n / 1_000)}k`
-  return `${sym}${Math.round(n)}`
+interface AutomationItem {
+  id: string
+  name: string
+  category: 'intelligence' | 'alerts' | 'automation'
+  enabled: boolean
+  alwaysOn: boolean
 }
 
-function relativeTime(iso: string): string {
-  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+const CLOSED_STAGES = new Set(['closed_won', 'closed_lost'])
+function cleanFocusLine(line: string): string {
+  return line.replace(/^\s*[-*•\d.)]+\s*/, '').trim()
+}
+
+function currency(value: number | null | undefined): string {
+  if (!value && value !== 0) return '—'
+  if (value >= 1_000_000) return `£${(value / 1_000_000).toFixed(1)}m`
+  if (value >= 1_000) return `£${Math.round(value / 1_000)}k`
+  return `£${Math.round(value)}`
+}
+
+function stageLabel(stage: string): string {
+  return stage.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+function relTime(iso: string): string {
+  const delta = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(delta / 60_000)
   if (mins < 2) return 'just now'
   if (mins < 60) return `${mins}m ago`
   const hrs = Math.floor(mins / 60)
@@ -82,597 +113,402 @@ function relativeTime(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
-function todayLabel(): string {
-  return new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-}
+function eventLabel(event: ActivityEvent): string {
+  const deal = String(event.metadata?.dealName ?? event.dealName ?? 'Deal')
+  const stage = String(event.metadata?.value ?? event.metadata?.newStage ?? '').replace(/_/g, ' ')
 
-function eventLabel(type: string, meta: Record<string, unknown>, enrichedDealName?: string): string {
-  const deal = (meta?.dealName ?? enrichedDealName ?? meta?.customerName ?? 'Unknown') as string
-  const stage = String(meta?.value ?? meta?.newStage ?? meta?.stage ?? '').replace(/_/g, ' ')
-  switch (type) {
-    case 'deal_log.created':   return `${deal} added to pipeline`
+  switch (event.type) {
+    case 'deal_log.created':
+    case 'deal_created':
+      return `${deal} was added to the pipeline`
+    case 'deal_log.closed_won':
+    case 'deal_won':
+      return `${deal} was marked closed won`
+    case 'deal_log.closed_lost':
+    case 'deal_lost':
+      return `${deal} was marked closed lost`
     case 'deal_log.updated':
-      if (meta?.field === 'stage' && stage) return `${deal} moved to ${stage}`
-      return `${deal} updated`
-    case 'deal_log.deleted':   return `${deal} removed`
-    case 'deal_log.closed_won':  return `${deal} won`
-    case 'deal_log.closed_lost': return `${deal} lost`
-    case 'deal_log.todos_updated': return `${deal} todos updated`
-    case 'note_added':         return `Note added to ${deal}`
-    case 'deal_log.note_added': return `Note added to ${deal}`
-    case 'ai_analysis':        return `AI analysed ${deal}`
-    case 'deal_log.ai_scored': return `AI scored ${deal}`
-    case 'collateral.generated': return `${String(meta?.collateralType ?? 'Collateral').replace(/_/g, ' ')} generated`
-    case 'collateral.archived':  return 'Collateral archived'
-    case 'competitor.created':  return `Competitor added — ${deal}`
-    case 'competitor.updated':  return `Competitor updated — ${deal}`
-    case 'company_profile.updated': return 'Company profile updated'
-    case 'case_study.created':  return `Case study — ${deal}`
-    case 'case_study.updated':  return `Case study updated — ${deal}`
-    case 'plan.upgraded':   return 'Plan upgraded'
-    case 'plan.downgraded': return 'Plan downgraded'
-    case 'deal_created': return `${deal} added to pipeline`
-    case 'deal_stage_changed': return `${deal} moved to ${stage}`
-    case 'deal_won': return `${deal} won`
-    case 'deal_lost': return `${deal} lost`
-    default: return type.replace(/[_.]/g, ' ')
+      if (event.metadata?.field === 'stage' && stage) return `${deal} moved to ${stage}`
+      return `${deal} was updated`
+    case 'note_added':
+    case 'deal_log.note_added':
+      return `Notes were added on ${deal}`
+    case 'deal_log.ai_scored':
+      return `Deal intelligence rescored ${deal}`
+    default:
+      return event.type.replace(/[_.]/g, ' ')
   }
 }
 
-function eventDotColor(type: string): string {
-  if (['deal_log.created', 'deal_log.closed_won', 'deal_created', 'deal_won', 'case_study.created', 'collateral.generated'].includes(type)) return '#1DB86A'
-  if (['deal_log.closed_lost', 'deal_log.deleted', 'deal_lost'].includes(type)) return '#ef4444'
-  if (['ai_analysis', 'deal_log.ai_scored', 'deal_log.todos_updated'].includes(type)) return '#f59e0b'
-  if (['collateral.archived', 'plan.downgraded'].includes(type)) return '#aaa'
-  return '#3b82f6'
+function inferredDailyFocus(deals: DealLog[]): string[] {
+  const open = deals.filter(d => !CLOSED_STAGES.has(d.stage))
+
+  const stale = [...open]
+    .sort((a, b) => +new Date(a.updatedAt) - +new Date(b.updatedAt))
+    .slice(0, 2)
+    .map(d => `Re-engage ${d.prospectCompany}; no recent movement and value ${currency(d.dealValue)}`)
+
+  const noNext = open
+    .filter(d => !d.nextSteps)
+    .slice(0, 2)
+    .map(d => `Define a concrete next step for ${d.dealName} to avoid stall risk`)
+
+  const highValue = [...open]
+    .sort((a, b) => (b.dealValue ?? 0) - (a.dealValue ?? 0))
+    .slice(0, 1)
+    .map(d => `Protect ${d.prospectCompany} (${currency(d.dealValue)}) with a same-day exec touchpoint`)
+
+  return [...highValue, ...stale, ...noNext].slice(0, 4)
 }
 
-// ─── Sub-components ─────────────────────────────────────────────────────────
-
-function Skeleton({ h = 80 }: { h?: number }) {
-  return (
-    <div style={{ height: h, borderRadius: 8 }} className="skeleton" />
-  )
+function riskColor(level: SummaryDeal['riskLevel']): string {
+  if (level === 'high') return '#fb7185'
+  if (level === 'medium') return '#fbbf24'
+  return '#4ade80'
 }
 
-const STAGE_LABELS: Record<string, string> = {
-  prospecting: 'Prospecting', qualification: 'Qualification', discovery: 'Discovery',
-  demo: 'Demo', proposal: 'Proposal', negotiation: 'Negotiation',
-}
-
-interface TodayAction {
-  dealId: string
-  dealName: string
-  stage: string
-  action: string
-  context: string
-  value?: number | null
-  score?: number | null
-  priority: 'high' | 'medium' | 'low'
-  daysSinceUpdate?: number
-}
-
-function buildTodayActions(
-  deals: Array<{ id: string; dealName: string; prospectCompany: string; stage: string; dealValue: number | null; conversionScore: number | null; aiSummary: string | null; nextSteps: string | null; conversionInsights: string[]; updatedAt: string }>,
-  brain: BrainData
-): TodayAction[] {
-  const actions: TodayAction[] = []
-  const seen = new Set<string>()
-
-  const openDeals = deals.filter(d => !['closed_won', 'closed_lost'].includes(d.stage))
-
-  const daysSince = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
-
-  // 1. Deals with explicit nextSteps — most specific, direct instructions
-  const withNextSteps = openDeals
-    .filter(d => d.nextSteps?.trim())
-    .sort((a, b) => (a.conversionScore ?? 50) - (b.conversionScore ?? 50))
-
-  for (const deal of withNextSteps) {
-    if (actions.length >= 5) break
-    if (seen.has(deal.id)) continue
-    const score = deal.conversionScore
-    const priority: TodayAction['priority'] = score != null && score < 40 ? 'high' : score != null && score < 65 ? 'medium' : 'low'
-    const context = deal.aiSummary?.slice(0, 120) ?? deal.conversionInsights?.[0]?.slice(0, 120) ?? ''
-    actions.push({ dealId: deal.id, dealName: deal.dealName || deal.prospectCompany, stage: deal.stage, action: deal.nextSteps!.trim(), context, value: deal.dealValue, score, priority, daysSinceUpdate: daysSince(deal.updatedAt) })
-    seen.add(deal.id)
+function stagePillColor(stage: string): string {
+  switch (stage) {
+    case 'negotiation': return 'rgba(251, 113, 133, 0.16)'
+    case 'proposal': return 'rgba(251, 191, 36, 0.16)'
+    case 'discovery': return 'rgba(167, 139, 250, 0.18)'
+    case 'qualification': return 'rgba(96, 165, 250, 0.16)'
+    default: return 'rgba(148, 163, 184, 0.16)'
   }
-
-  // 2. Top-up: deals with AI insights but no nextSteps
-  if (actions.length < 5) {
-    const withInsights = openDeals
-      .filter(d => !seen.has(d.id) && (d.aiSummary || d.conversionInsights?.length))
-      .sort((a, b) => (a.conversionScore ?? 50) - (b.conversionScore ?? 50))
-
-    for (const deal of withInsights) {
-      if (actions.length >= 5) break
-      const insights = deal.conversionInsights ?? []
-      const bestInsight = [...insights].sort((a, b) => b.length - a.length)[0]
-      const action = bestInsight || deal.aiSummary?.split('.')[0] || ''
-      if (!action || action.length < 20) continue
-      const score = deal.conversionScore
-      const priority: TodayAction['priority'] = score != null && score < 40 ? 'high' : score != null && score < 65 ? 'medium' : 'low'
-      const context = deal.aiSummary?.slice(0, 120) ?? insights[1]?.slice(0, 120) ?? ''
-      actions.push({ dealId: deal.id, dealName: deal.dealName || deal.prospectCompany, stage: deal.stage, action, context, value: deal.dealValue, score, priority, daysSinceUpdate: daysSince(deal.updatedAt) })
-      seen.add(deal.id)
-    }
-  }
-
-  // 3. Brain urgent/stale deals as fallback
-  for (const d of (brain.urgentDeals ?? [])) {
-    if (actions.length >= 5) break
-    if (seen.has(d.dealId)) continue
-    actions.push({ dealId: d.dealId, dealName: d.dealName ?? d.company, stage: '', action: d.topAction ?? d.reason ?? 'Address this deal urgently', context: d.reason ?? '', value: d.dealValue, score: d.score, priority: 'high' })
-    seen.add(d.dealId)
-  }
-  for (const d of (brain.staleDeals ?? [])) {
-    if (actions.length >= 5) break
-    if (seen.has(d.dealId)) continue
-    actions.push({ dealId: d.dealId, dealName: d.dealName ?? d.company, stage: d.stage ?? '', action: `Re-engage — no contact in ${d.daysSinceUpdate} days`, context: d.stage ? `In ${d.stage.replace(/_/g, ' ')}` : '', value: d.dealValue, score: d.score, priority: d.daysSinceUpdate > 14 ? 'high' : 'medium', daysSinceUpdate: d.daysSinceUpdate })
-    seen.add(d.dealId)
-  }
-
-  return actions.slice(0, 5)
 }
 
-function TodayActionCard({ item }: { item: TodayAction }) {
-  const isHigh = item.priority === 'high'
-  const isMed  = item.priority === 'medium'
-  const accentColor = isHigh ? '#ef4444' : isMed ? '#f59e0b' : '#1DB86A'
-  const staleFlag = item.daysSinceUpdate != null && item.daysSinceUpdate >= 7
-
-  return (
-    <Link href={`/deals/${item.dealId}`} style={{ textDecoration: 'none' }}>
-      <div
-        style={{
-          padding: '13px 16px', borderRadius: 9,
-          border: '1px solid var(--border-default)',
-          background: 'var(--surface-2)',
-          cursor: 'pointer', transition: 'border-color 80ms, background 80ms',
-          display: 'flex', gap: 12, alignItems: 'flex-start',
-          borderLeft: `3px solid ${accentColor}`,
-        }}
-        onMouseEnter={e => {
-          const el = e.currentTarget as HTMLElement
-          el.style.borderColor = 'var(--border-strong)'
-          el.style.background = 'var(--surface-hover)'
-        }}
-        onMouseLeave={e => {
-          const el = e.currentTarget as HTMLElement
-          el.style.borderColor = 'var(--border-default)'
-          el.style.background = 'var(--surface-2)'
-        }}
-      >
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Top row: company + metadata chips */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 5 }}>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-              {item.dealName}
-            </span>
-            {item.stage && STAGE_LABELS[item.stage] && (
-              <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-tertiary)', background: 'var(--surface-3)', border: '1px solid var(--border-subtle)', borderRadius: 4, padding: '1px 6px' }}>
-                {STAGE_LABELS[item.stage]}
-              </span>
-            )}
-            {item.value != null && item.value > 0 && (
-              <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--brand)', fontFamily: "'Geist Mono', monospace" }}>
-                {fmtCurrency(item.value)}
-              </span>
-            )}
-            {item.score != null && (
-              <span style={{ fontSize: 10, fontWeight: 700, color: accentColor }}>
-                {Math.round(item.score)}
-              </span>
-            )}
-            {staleFlag && (
-              <span style={{ fontSize: 10, color: 'var(--color-amber)', fontWeight: 500 }}>
-                · {item.daysSinceUpdate}d ago
-              </span>
-            )}
-          </div>
-          {/* Action — the key thing to do */}
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.45 }}>
-            {item.action}
-          </div>
-          {/* Context — why */}
-          {item.context && (
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3, lineHeight: 1.5 }}>
-              {item.context}
-            </div>
-          )}
-        </div>
-        <ArrowRight size={12} style={{ color: 'var(--text-muted)', flexShrink: 0, marginTop: 2 }} />
-      </div>
-    </Link>
-  )
+function focusRiskColor(level: FocusItem['riskLevel']): string {
+  if (level === 'high') return '#fb7185'
+  if (level === 'medium') return '#fbbf24'
+  return '#60a5fa'
 }
 
-function ActivityRow({ event }: { event: ActivityEvent }) {
-  const dot = eventDotColor(event.type)
-  const label = eventLabel(event.type, event.metadata, event.dealName)
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border-subtle)' }}>
-      <div style={{
-        width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-        background: dot, boxShadow: `0 0 0 3px ${dot}20`,
-      }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {label}
-        </div>
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', flexShrink: 0 }}>{relativeTime(event.createdAt)}</div>
-    </div>
-  )
+function focusRiskLabel(level: FocusItem['riskLevel']): string {
+  if (level === 'high') return 'Priority'
+  if (level === 'medium') return 'Important'
+  return 'Monitor'
 }
-
-// ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const { user } = useUser()
 
-  const { data: brainRes, isLoading: brainLoading, mutate: mutateBrain } = useSWR('/api/brain', fetcher, {
+  const { data: dealsRes, isLoading: dealsLoading } = useSWR<{ data: DealLog[] }>('/api/deals', fetcher, {
     revalidateOnFocus: false,
-    dedupingInterval: 60000,
+    dedupingInterval: 45_000,
   })
-  const { data: activityRes, isLoading: actLoading } = useSWR('/api/activity?limit=20', fetcher, {
-    revalidateOnFocus: false,
-    dedupingInterval: 30000,
-  })
-  const { data: dealsRes } = useSWR('/api/deals', fetcher, {
-    revalidateOnFocus: false,
-    dedupingInterval: 60000,
-  })
-  const brain: BrainData = brainRes?.data ?? {}
-  const activity: ActivityEvent[] = activityRes?.data ?? []
-  const deals: Array<{
-    id: string
-    dealName: string
-    prospectCompany: string
-    stage: string
-    dealValue: number | null
-    conversionScore: number | null
-    aiSummary: string | null
-    nextSteps: string | null
-    conversionInsights: string[]
-    updatedAt: string
-    forecastCategory?: 'commit' | 'upside' | 'pipeline' | 'omit' | null
-  }> = dealsRes?.data ?? []
 
-  const openDeals = deals.filter(d => !['closed_won', 'closed_lost'].includes(d.stage))
-  const pipelineValue = openDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
+  const { data: summaryRes, isLoading: summaryLoading } = useSWR<{ data: DashboardSummary }>('/api/dashboard/summary', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 15_000,
+  })
 
-  // ── Forecast buckets ──────────────────────────────────────────────────────
-  const commitDeals  = openDeals.filter(d => d.forecastCategory === 'commit')
-  const upsideDeals  = openDeals.filter(d => d.forecastCategory === 'upside')
-  const pipelineDeals= openDeals.filter(d => d.forecastCategory === 'pipeline')
-  const uncategorised= openDeals.filter(d => !d.forecastCategory || d.forecastCategory === null)
-  const commitValue  = commitDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
-  const upsideValue  = upsideDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
-  const pipelineCatValue = pipelineDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0)
-  const hasForecast  = commitDeals.length + upsideDeals.length + pipelineDeals.length > 0
-  // Weighted: commit=90%, upside=50%, pipeline/uncategorised=score-based or 20%
-  const weightedForecast = Math.round(
-    commitValue  * 0.90 +
-    upsideValue  * 0.50 +
-    pipelineCatValue * 0.20 +
-    uncategorised.reduce((s, d) => s + (d.dealValue ?? 0) * ((d.conversionScore ?? 30) / 100) * 0.5, 0)
+  const { data: activityRes, isLoading: activityLoading } = useSWR<{ data: ActivityEvent[] }>('/api/activity?limit=12', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 30_000,
+  })
+
+  const { data: automationsRes } = useSWR<{ data: AutomationItem[] }>('/api/automations', fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 45_000,
+  })
+
+  const deals = dealsRes?.data ?? []
+  const openDeals = deals.filter(d => !CLOSED_STAGES.has(d.stage))
+  const summary = summaryRes?.data
+  const activity = activityRes?.data ?? []
+  const automations = automationsRes?.data ?? []
+
+  const pipelineValue = openDeals.reduce((sum, deal) => sum + (deal.dealValue ?? 0), 0)
+  const staleDealsCount = summary?.staleDeals ?? 0
+  const missingNextStepCount = summary?.executionGaps ?? 0
+  const dataQuality = summary?.dataQuality
+  const hygieneQueue = summary?.hygieneQueue ?? []
+  const totalQualityGaps =
+    (dataQuality?.missingNextStep ?? 0) +
+    (dataQuality?.missingCloseDate ?? 0) +
+    (dataQuality?.missingPrimaryContact ?? 0) +
+    (dataQuality?.missingDealValue ?? 0)
+  const focusBullets = (summary?.focusBullets?.length ? summary.focusBullets : inferredDailyFocus(deals))
+    .map(cleanFocusLine)
+    .filter(Boolean)
+    .slice(0, 4)
+  const focusItems = [...(summary?.focusItems ?? [])]
+    .sort((a, b) => {
+      const aTs = a.latestActivityAt ? new Date(a.latestActivityAt).getTime() : 0
+      const bTs = b.latestActivityAt ? new Date(b.latestActivityAt).getTime() : 0
+      if (aTs !== bTs) return bTs - aTs
+      return a.daysStale - b.daysStale
+    })
+    .slice(0, 4)
+
+  const enabledAutomations = automations.filter(item => item.enabled)
+  const alwaysOnAutomations = automations.filter(item => item.alwaysOn)
+  const alertAutomations = enabledAutomations.filter(item => item.category === 'alerts')
+
+  const rawTopDeals = (summary?.topDeals?.length ? [...summary.topDeals] : [])
+    .sort((a, b) => {
+      const aTs = a.latestActivityAt ? new Date(a.latestActivityAt).getTime() : 0
+      const bTs = b.latestActivityAt ? new Date(b.latestActivityAt).getTime() : 0
+      if (aTs !== bTs) return bTs - aTs
+      return a.daysStale - b.daysStale
+    })
+  const filteredTopDeals = rawTopDeals.filter(item =>
+    item.riskLevel !== 'low' ||
+    item.daysStale >= 7 ||
+    item.value >= 100_000 ||
+    Boolean(item.primaryBlocker),
   )
-  const bestCase = commitValue + upsideValue
-  const atRisk = openDeals.filter(d => (d.conversionScore ?? 50) < 40).length
-  const onTrack = openDeals.filter(d => (d.conversionScore ?? 50) >= 60).length
-  const staleCount = (brain.staleDeals ?? []).length
-  const wonCount = brain.winLossIntel?.winCount ?? 0
-  const avgScore = openDeals.length > 0
-    ? Math.round(openDeals.reduce((s, d) => s + (d.conversionScore ?? 50), 0) / openDeals.length)
-    : null
-  const winRate = brain.winLossIntel ? Math.round(brain.winLossIntel.winRate * 100) : null
-
-  const todayActions = buildTodayActions(deals, brain)
-
-  const isBrainBuilding = brainRes?.status === 'building'
-  const brainAge = brain.updatedAt
-    ? (() => {
-        const mins = Math.floor((Date.now() - new Date(brain.updatedAt).getTime()) / 60000)
-        if (mins < 2) return 'live'
-        if (mins < 60) return `${mins}m ago`
-        return `${Math.floor(mins / 60)}h ago`
-      })()
-    : null
-
-  const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
+  const topRiskDeals = (filteredTopDeals.length > 0 ? filteredTopDeals : rawTopDeals).slice(0, 6)
 
   return (
-    <div style={{ paddingTop: 4, maxWidth: 1100 }}>
-      <style>{`
-        @keyframes shimmer {
-          0%   { background-position: -200% 0; }
-          100% { background-position:  200% 0; }
-        }
-      `}</style>
+    <OperatorPage>
+      <OperatorHeader
+        eyebrow="Revenue command center"
+        title={user?.firstName ? `${user.firstName}, here is today's focus` : 'Today\'s commercial focus'}
+        description="A quiet read on the pipeline: who needs attention, where momentum is fading, and which actions matter next."
+        meta={(
+          <>
+            <span className="notion-chip"><CalendarClock size={12} /> Live workspace</span>
+            <span className="notion-chip">{openDeals.length} open opportunities</span>
+            <span className="notion-chip">{enabledAutomations.length} automations listening</span>
+          </>
+        )}
+      />
 
-      {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 4 }}>
-            {todayLabel()}
-          </div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', margin: 0 }}>
-            {user?.firstName ? `Good ${greeting}, ${user.firstName}` : 'Today'}
-          </h1>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {(brainAge || isBrainBuilding) && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '4px 10px', borderRadius: 100,
-              background: isBrainBuilding ? 'var(--color-amber-bg)' : 'var(--color-green-bg)',
-              border: `1px solid ${isBrainBuilding ? 'rgba(251,191,36,0.30)' : 'rgba(29,184,106,0.20)'}`,
-            }}>
-              <div style={{
-                width: 5, height: 5, borderRadius: '50%',
-                background: isBrainBuilding ? '#f59e0b' : '#1DB86A',
-              }} />
-              <span style={{ fontSize: 11, fontWeight: 500, color: isBrainBuilding ? 'var(--color-amber)' : 'var(--color-green)' }}>
-                {isBrainBuilding ? 'Analysing…' : `Updated ${brainAge}`}
-              </span>
-            </div>
-          )}
-          <button
-            onClick={() => mutateBrain()}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '5px 11px', borderRadius: 6, fontSize: 12, fontWeight: 500,
-              background: 'var(--surface-2)', border: '1px solid var(--border-default)', color: 'var(--text-secondary)',
-              cursor: 'pointer',
-            }}
-          >
-            <RefreshCw size={10} />
-            Refresh
-          </button>
-        </div>
-      </div>
+      <OperatorMetricGrid className="dashboard-kpis">
+        {[
+          { label: 'Open Pipeline', value: currency(pipelineValue), sub: `${openDeals.length} open deals`, icon: PoundSterling, tone: 'green' as const },
+          { label: 'Revenue At Risk', value: currency(summary?.revenueAtRisk ?? 0), sub: `${summary?.dealsAtRisk ?? 0} deals flagged`, icon: AlertTriangle, tone: 'red' as const },
+          { label: 'Stale Opportunities', value: String(staleDealsCount), sub: 'No movement in 10+ days', icon: Clock3, tone: 'amber' as const },
+          { label: 'Execution Gaps', value: String(missingNextStepCount), sub: 'Deals missing explicit next step', icon: TrendingUp, tone: 'blue' as const },
+        ].map(card => (
+          <OperatorKpi key={card.label} label={card.label} value={card.value} sub={card.sub} icon={card.icon} tone={card.tone} />
+        ))}
+      </OperatorMetricGrid>
 
-      {/* ── TODAY'S 5 ACTIONS ── */}
-      <div style={{
-        background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-        borderRadius: 12, marginBottom: 16, overflow: 'hidden',
-      }}>
-        <div style={{
-          padding: '14px 22px', borderBottom: '1px solid var(--border-subtle)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{
-              width: 20, height: 20, borderRadius: 5,
-              background: todayActions.length > 0 ? 'var(--color-red-bg)' : 'var(--color-green-bg)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Zap size={10} style={{ color: todayActions.length > 0 ? '#ef4444' : '#1DB86A' }} />
-            </div>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-secondary)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-              5 Things To Do Today
-            </span>
-            {todayActions.length > 0 && (
-              <span style={{
-                fontSize: 10, fontWeight: 700, color: '#ef4444',
-                background: 'var(--color-red-bg)', border: '1px solid rgba(248,113,113,0.30)',
-                borderRadius: 99, padding: '1px 6px',
-              }}>{todayActions.length}</span>
+      <section className="dashboard-focus" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 8 }}>
+        <OperatorPanel>
+          <OperatorSectionHeader
+            title="Today Execution Queue"
+            description="Sequenced by risk, silence, and value."
+            action={(
+            <Link href="/pipeline?view=kanban" style={{ fontSize: 11.5, color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              Open pipeline <ArrowRight size={11} />
+            </Link>
             )}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>AI-identified from your pipeline</span>
-            <Link href="/deals" style={{ fontSize: 11, color: 'var(--text-tertiary)', textDecoration: 'none' }}>All deals →</Link>
-          </div>
-        </div>
-
-        <div style={{ padding: '16px 22px' }}>
-          {brainLoading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Skeleton h={66} /><Skeleton h={66} /><Skeleton h={66} />
-            </div>
-          ) : todayActions.length === 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0' }}>
-              <CheckCircle2 size={20} style={{ color: '#1DB86A', flexShrink: 0 }} />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Pipeline is clear</div>
-                <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                  {openDeals.length === 0
-                    ? 'Add your first deal to start tracking intelligence.'
-                    : 'No urgent actions or stale deals right now. Great work!'}
-                </div>
-              </div>
-            </div>
+          />
+	          {summaryLoading && dealsLoading ? (
+	            <div className="skeleton" style={{ height: 112, borderRadius: 10 }} />
+	          ) : focusItems.length > 0 ? (
+	            <div style={{ display: 'grid', gap: 8 }}>
+	              {focusItems.map((item, i) => (
+                <OperatorInsightCard
+                  key={`${item.dealId}-${i}`}
+                  href={`/deals/${item.dealId}`}
+                  title={(
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.company}</span>
+                      <span style={{ fontSize: 10.5, color: focusRiskColor(item.riskLevel), fontWeight: 750, textTransform: 'uppercase' }}>{focusRiskLabel(item.riskLevel)}</span>
+                    </span>
+                  )}
+                  meta={<span>{item.dueLabel}</span>}
+                  tone={item.riskLevel === 'high' ? 'red' : item.riskLevel === 'medium' ? 'amber' : 'green'}
+                >
+                  <div>
+                    <div>
+	                      Latest: {item.latestSnapshot ?? 'No recent activity yet.'}
+	                    </div>
+	                    {item.blocker && (
+	                      <div style={{ marginTop: 2, color: 'var(--text-tertiary)' }}>
+	                        Blocker: {item.blocker}
+	                      </div>
+	                    )}
+                    <div style={{ marginTop: 2, color: 'var(--text-tertiary)' }}>{item.daysStale > 0 ? `${item.daysStale}d idle` : 'updated today'}</div>
+                  </div>
+                </OperatorInsightCard>
+	              ))}
+	            </div>
+          ) : focusBullets.length === 0 ? (
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 13 }}>Add deals to generate a structured daily execution plan.</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              {todayActions.map((item) => (
-                <TodayActionCard key={item.dealId} item={item} />
+            <ol style={{ margin: 0, paddingLeft: 18, display: 'grid', gap: 10 }}>
+              {focusBullets.map((item, i) => (
+                <li key={`${item}-${i}`} style={{ color: 'var(--text-primary)', lineHeight: 1.5, fontSize: 12.5 }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>{item}</span>
+                </li>
               ))}
+            </ol>
+          )}
+          {summary?.generatedAt && (
+            <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-tertiary)' }}>
+              Intelligence generated {relTime(summary.generatedAt)}.
             </div>
           )}
-        </div>
-      </div>
+        </OperatorPanel>
 
-      {/* ── Pipeline + Forecast (merged) ── */}
-      <div style={{
-        background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-        borderRadius: 12, marginBottom: 16, overflow: 'hidden',
-      }}>
-        {/* Top: pipeline stats */}
-        <div style={{ padding: '16px 22px', display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 22, flexShrink: 0 }}>
-            <TrendingUp size={11} style={{ color: '#1DB86A' }} />
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Pipeline
-            </span>
+        <OperatorPanel title="Silent Automations" description="Background systems currently watching the workspace." icon={Bot}>
+
+          <div style={{ display: 'grid', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--text-secondary)' }}>
+              <span>Enabled</span>
+              <strong style={{ color: 'var(--text-primary)' }}>{enabledAutomations.length}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--text-secondary)' }}>
+              <span>Always-on intelligence</span>
+              <strong style={{ color: 'var(--text-primary)' }}>{alwaysOnAutomations.length}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--text-secondary)' }}>
+              <span>Live alerts</span>
+              <strong style={{ color: 'var(--text-primary)' }}>{alertAutomations.length}</strong>
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'stretch', flex: 1 }}>
-            {[
-              { value: fmtCurrency(pipelineValue), label: 'value' },
-              { value: String(openDeals.length), label: 'deals' },
-              { value: avgScore != null ? String(avgScore) : '—', label: 'avg score' },
-              { value: winRate != null ? `${winRate}%` : '—', label: 'win rate' },
-            ].map((item, i) => (
-              <div key={i} style={{
-                padding: '2px 18px',
-                borderRight: i < 3 ? '1px solid var(--border-subtle)' : 'none',
-                display: 'flex', flexDirection: 'column', gap: 1, justifyContent: 'center',
-              }}>
-                <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>
-                  {item.value}
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{item.label}</div>
+
+          <div style={{ marginTop: 10, display: 'grid', gap: 6 }}>
+            {enabledAutomations.slice(0, 3).map(a => (
+              <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--text-secondary)' }}>
+                <CheckCircle2 size={12} style={{ color: '#4ade80', flexShrink: 0 }} />
+                <span>{a.name}</span>
               </div>
             ))}
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 14, paddingLeft: 18, flexWrap: 'wrap' }}>
-              {[
-                { count: atRisk,    label: 'at risk',  color: '#ef4444' },
-                { count: onTrack,   label: 'on track', color: '#1DB86A' },
-                { count: staleCount,label: 'stale',    color: '#f59e0b' },
-                { count: wonCount,  label: 'won',      color: '#3b82f6' },
-              ].map((s, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: s.color }} />
-                  <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                    {s.count} {s.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom: forecast */}
-        <div style={{ padding: '14px 22px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: hasForecast ? 12 : 0 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Forecast
-            </span>
-            {!hasForecast && (
-              <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-                Tag deals as <strong style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Commit</strong>, <strong style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Upside</strong> or <strong style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Pipeline</strong> to unlock
-              </span>
-            )}
-            <Link href="/deals" style={{ fontSize: 11, color: 'var(--text-tertiary)', textDecoration: 'none' }}>
-              Deals →
-            </Link>
-          </div>
-          {hasForecast && (
-            <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
-              {[
-                { label: 'Commit',   value: commitValue,        color: '#1DB86A',          count: commitDeals.length,  sub: '90% confidence' },
-                { label: 'Upside',   value: upsideValue,        color: '#3b82f6',          count: upsideDeals.length,  sub: '50% confidence' },
-                { label: 'Best case',value: bestCase,           color: '#f59e0b',          count: null,                sub: 'Commit + Upside' },
-                { label: 'Weighted', value: weightedForecast,   color: 'var(--text-tertiary)', count: null,            sub: 'Probability-adjusted' },
-              ].map((item, i) => (
-                <div key={i} style={{
-                  flex: 1,
-                  paddingLeft: i > 0 ? 20 : 0,
-                  paddingRight: i < 3 ? 20 : 0,
-                  borderRight: i < 3 ? '1px solid var(--border-subtle)' : 'none',
-                }}>
-                  <div style={{ fontSize: 10, color: item.color, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 3 }}>{item.label}</div>
-                  <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--text-primary)', lineHeight: 1.1 }}>{fmtCurrency(item.value)}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                    {item.count != null ? `${item.count} deal${item.count !== 1 ? 's' : ''} · ` : ''}{item.sub}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Bottom: Intelligence + Activity ── */}
-      <div className="dash-bottom-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 14 }}>
-        <style>{`@media (max-width: 900px) { .dash-bottom-grid { grid-template-columns: 1fr !important; } }`}</style>
-
-        {/* Intelligence / Patterns */}
-        <div style={{
-          background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-          borderRadius: 12, padding: '18px 22px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <TrendingUp size={11} style={{ color: '#1DB86A' }} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Win Patterns
-              </span>
-            </div>
-            <Link href="/intelligence" style={{ fontSize: 11, color: 'var(--text-tertiary)', textDecoration: 'none' }}>All signals →</Link>
+            {enabledAutomations.length === 0 && <div style={{ fontSize: 12.5, color: 'var(--text-tertiary)' }}>No optional automations enabled yet.</div>}
           </div>
 
-          {brainLoading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Skeleton h={48} /><Skeleton h={48} /><Skeleton h={48} />
-            </div>
-          ) : (brain.keyPatterns ?? []).length === 0 ? (
-            <div style={{ padding: '20px 0', textAlign: 'center' }}>
-              <Target size={20} style={{ color: 'var(--border-strong)', display: 'block', margin: '0 auto 10px' }} />
-              <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 8 }}>Patterns emerge after AI analysis on deals.</div>
-              <Link href="/deals" style={{ fontSize: 12, color: '#1DB86A', textDecoration: 'none', fontWeight: 600 }}>
-                Analyse a deal →
-              </Link>
-            </div>
-          ) : (
-            <>
-              {brain.dailyBriefing && (
-                <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid var(--border-subtle)' }}>
-                  {brain.dailyBriefing}
-                </div>
-              )}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {(brain.keyPatterns ?? []).slice(0, 6).map((p, i) => (
-                  <div key={i} style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '10px 14px', borderRadius: 8,
-                    background: 'var(--surface-2)', border: '1px solid var(--border-subtle)',
-                  }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.label}</div>
-                      {(p.dealNames ?? []).length > 0 && (
-                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {p.dealNames!.slice(0, 3).join(' · ')}
-                        </div>
-                      )}
-                    </div>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#1DB86A', background: 'rgba(29,184,106,0.10)', border: '1px solid rgba(29,184,106,0.20)', borderRadius: 99, padding: '2px 8px', flexShrink: 0 }}>
-                      {p.dealIds.length} deal{p.dealIds.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                ))}
+          <Link href="/automations" style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--text-secondary)' }}>
+            Manage automation policy <ArrowRight size={11} />
+          </Link>
+        </OperatorPanel>
+      </section>
+
+      <section>
+        <OperatorPanel>
+          <OperatorSectionHeader
+            title="CRM Hygiene Queue"
+            description="Small data repairs that make the pipeline easier to trust."
+            action={<span className="notion-chip">{totalQualityGaps} field gaps across open pipeline</span>}
+          />
+
+          <div className="hygiene-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, marginBottom: 10 }}>
+            {[
+              { label: 'Missing next step', value: dataQuality?.missingNextStep ?? 0 },
+              { label: 'Missing close date', value: dataQuality?.missingCloseDate ?? 0 },
+              { label: 'Missing primary contact', value: dataQuality?.missingPrimaryContact ?? 0 },
+              { label: 'Missing deal value', value: dataQuality?.missingDealValue ?? 0 },
+            ].map(item => (
+              <div key={item.label} style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, background: 'var(--surface-1)', padding: '8px 10px' }}>
+                <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1 }}>{item.value}</div>
+                <div style={{ marginTop: 3, fontSize: 11.5, color: 'var(--text-secondary)' }}>{item.label}</div>
               </div>
-            </>
-          )}
-        </div>
-
-        {/* Activity Feed */}
-        <div style={{
-          background: 'var(--surface-1)', border: '1px solid var(--border-default)',
-          borderRadius: 12, padding: '18px 20px', alignSelf: 'start',
-        }}>
-          <div style={{ marginBottom: 12 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              Recent Activity
-            </span>
+            ))}
           </div>
 
-          {actLoading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {[...Array(5)].map((_, i) => <Skeleton key={i} h={28} />)}
-            </div>
-          ) : activity.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <Target size={18} style={{ color: 'var(--border-default)', display: 'block', margin: '0 auto 6px' }} />
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>No activity yet</div>
-            </div>
+          {summaryLoading ? (
+            <div className="skeleton" style={{ height: 96, borderRadius: 10 }} />
+          ) : hygieneQueue.length === 0 ? (
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 12.5 }}>
+              Data hygiene is clean across open deals.
+            </p>
           ) : (
-            <div>{activity.slice(0, 12).map(event => <ActivityRow key={event.id} event={event} />)}</div>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {hygieneQueue.slice(0, 5).map(item => (
+                <Link key={item.dealId} href={`/deals/${item.dealId}`} style={{ textDecoration: 'none' }}>
+                  <div style={{ border: '1px solid var(--border-default)', borderRadius: 8, padding: '8px 10px', background: 'var(--surface-1)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)' }}>{item.company}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                        {item.daysStale > 0 ? `${item.daysStale}d idle` : 'updated today'}
+                      </span>
+                    </div>
+                    <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      {item.missing.map(field => (
+                        <span key={`${item.dealId}-${field}`} className="notion-chip" style={{ fontSize: 10.5 }}>
+                          {field}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
           )}
-        </div>
-      </div>
-    </div>
+        </OperatorPanel>
+      </section>
+
+      <section style={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 8 }}>
+        <OperatorPanel>
+          <OperatorSectionHeader title="Risk Queue" description="Top opportunities needing intervention." action={<span className="notion-chip">Live signals</span>} />
+
+          {summaryLoading ? (
+            <div className="skeleton" style={{ height: 180, borderRadius: 10 }} />
+          ) : topRiskDeals.length === 0 ? (
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 13 }}>No risk signals yet. Your queue updates automatically as deals progress.</p>
+          ) : (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {topRiskDeals.map(item => (
+                <Link key={item.id} href={`/deals/${item.id}`} style={{ textDecoration: 'none' }}>
+                  <div style={{ border: '1px solid var(--border-default)', borderRadius: 9, padding: '8px 10px', background: 'var(--surface-1)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+	                      <div style={{ minWidth: 0 }}>
+	                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+	                          <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: 13 }}>{item.company}</span>
+	                          <span style={{ fontSize: 10.5, borderRadius: 999, padding: '2px 7px', color: 'var(--text-secondary)', background: stagePillColor(item.stage) }}>
+	                            {stageLabel(item.stage)}
+	                          </span>
+	                          <span style={{ fontSize: 10.5, color: riskColor(item.riskLevel), fontWeight: 700, textTransform: 'uppercase' }}>{item.riskLevel}</span>
+	                        </div>
+	                        <div style={{ marginTop: 3, fontSize: 12.5, color: 'var(--text-secondary)' }}>
+	                          Latest: {item.latestSnapshot ?? 'No recent activity yet.'}
+	                        </div>
+	                        {item.primaryBlocker && (
+	                          <div style={{ marginTop: 1, fontSize: 11.5, color: 'var(--text-tertiary)' }}>
+	                            Blocker: {item.primaryBlocker}
+	                          </div>
+	                        )}
+	                      </div>
+	                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+	                        <div style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 700 }}>{currency(item.value)}</div>
+	                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{item.daysStale}d stale</div>
+	                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </OperatorPanel>
+
+        <OperatorPanel title="Execution Feed" description={`${activity.length} events in the current workspace.`}>
+
+          {activityLoading ? (
+            <div className="skeleton" style={{ height: 180, borderRadius: 10 }} />
+          ) : activity.length === 0 ? (
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 13 }}>Activity will appear as your team updates deals.</p>
+          ) : (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {activity.slice(0, 8).map(item => (
+                <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 8 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', marginTop: 5, background: 'var(--text-tertiary)', boxShadow: '0 0 0 4px var(--surface-2)' }} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 12.5, color: 'var(--text-primary)' }}>{eventLabel(item)}</div>
+                    <div style={{ marginTop: 1, fontSize: 11.5, color: 'var(--text-tertiary)' }}>{relTime(item.createdAt)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </OperatorPanel>
+      </section>
+
+      <style>{`
+        @media (max-width: 1120px) {
+          .dashboard-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          .dashboard-focus { grid-template-columns: 1fr !important; }
+          .hygiene-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        }
+        @media (max-width: 900px) {
+          .dashboard-kpis { grid-template-columns: 1fr !important; }
+          .hygiene-kpis { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
+    </OperatorPage>
   )
 }

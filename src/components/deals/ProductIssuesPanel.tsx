@@ -112,7 +112,7 @@ export function ProductIssuesPanel({ dealId }: Props) {
         }}
       >
         <div>
-          <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.03em' }}>
+          <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: 0 }}>
             Linked product issues
           </div>
           <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px', lineHeight: 1.6 }}>
@@ -187,7 +187,7 @@ export function ProductIssuesPanel({ dealId }: Props) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                color: '#5e6ad2',
+                color: 'var(--brand)',
               }}
             >
               <Sparkles size={15} />
@@ -233,8 +233,8 @@ export function ProductIssuesPanel({ dealId }: Props) {
                   color: '#ffffff',
                   padding: '10px 14px',
                   borderRadius: '999px',
-                  background: '#5e6ad2',
-                  border: '1px solid rgba(94,106,210,0.30)',
+                  background: 'var(--brand)',
+                  border: '1px solid var(--brand-border)',
                   cursor: 'pointer',
                 }}
               >

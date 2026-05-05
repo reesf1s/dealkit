@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { workspaces, dealLogs } from '@/lib/db/schema'
 import crypto from 'crypto'
+import { isAutomationEnabled } from '@/lib/automation-policy'
 
 function extractTextBody(body: Record<string, unknown>): string {
   // Resend inbound: body.text / body.html
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest) {
 
     // Look up workspace by token
     const [workspace] = await db
-      .select({ id: workspaces.id })
+      .select({ id: workspaces.id, pipelineConfig: workspaces.pipelineConfig })
       .from(workspaces)
       .where(eq(workspaces.inboundEmailToken, token))
       .limit(1)
@@ -115,6 +116,10 @@ export async function POST(req: NextRequest) {
     if (!workspace) {
       console.log('[inbound-email] No workspace found for token:', token)
       return NextResponse.json({ ok: true, note: 'workspace_not_found' })
+    }
+
+    if (!isAutomationEnabled(workspace.pipelineConfig, 'email_ingestion')) {
+      return NextResponse.json({ ok: true, matched: false, note: 'email_ingestion_disabled' })
     }
 
     const fromEmail = extractFrom(body)

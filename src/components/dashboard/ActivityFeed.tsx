@@ -38,7 +38,7 @@ const EVENT_CONFIG: Partial<Record<EventType, EventConfig>> = {
   },
   'deal_log.created': {
     icon: FileText,
-    color: '#5e6ad2',
+    color: 'var(--brand)',
     bg: 'rgba(94, 106, 210, 0.10)',
     label: (m) => `New deal logged: ${m.dealName ?? 'Unknown deal'}`,
   },
@@ -68,7 +68,7 @@ const EVENT_CONFIG: Partial<Record<EventType, EventConfig>> = {
   },
   'collateral.generated': {
     icon: FileText,
-    color: '#5e6ad2',
+    color: 'var(--brand)',
     bg: 'rgba(94, 106, 210, 0.10)',
     label: (m) => `Collateral generated: ${m.title ?? m.collateralType ?? 'Unknown'}`,
   },
@@ -98,7 +98,7 @@ const EVENT_CONFIG: Partial<Record<EventType, EventConfig>> = {
   },
   'company_profile.updated': {
     icon: Building2,
-    color: '#5e6ad2',
+    color: 'var(--brand)',
     bg: 'rgba(94, 106, 210, 0.10)',
     label: (m) => `Company profile updated: ${m.companyName ?? ''}`,
   },

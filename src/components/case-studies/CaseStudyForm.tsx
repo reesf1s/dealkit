@@ -246,7 +246,7 @@ export function CaseStudyForm({ initialData, onSubmit, onGenerateDocument, submi
             onMouseEnter={(e) => { if (!generating) e.currentTarget.style.backgroundColor = 'rgba(55,53,47,0.10)' }}
             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(55,53,47,0.06)' }}
           >
-            <Sparkles size={13} strokeWidth={2} style={{ color: '#5e6ad2' }} />
+            <Sparkles size={13} strokeWidth={2} style={{ color: 'var(--brand)' }} />
             {generating ? 'Generating…' : 'Generate Document'}
           </button>
         )}

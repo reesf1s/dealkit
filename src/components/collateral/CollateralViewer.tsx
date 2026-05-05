@@ -167,7 +167,7 @@ function CaseStudyDocViewer({ content }: { content: CaseStudyDocContent }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Hero */}
       <Card style={{ backgroundColor: '#f7f6f3', borderColor: 'rgba(55,53,47,0.12)' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#37352f', letterSpacing: '-0.03em', margin: '0 0 6px' }}>{content.headline}</h1>
+        <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#37352f', letterSpacing: 0, margin: '0 0 6px' }}>{content.headline}</h1>
         <p style={{ fontSize: '15px', color: '#787774', margin: '0 0 12px', lineHeight: 1.5 }}>{content.subheadline}</p>
         <p style={{ fontSize: '13px', color: '#37352f', margin: 0, fontWeight: 500 }}>{content.customerName} — {content.customerDescription}</p>
       </Card>
@@ -177,7 +177,7 @@ function CaseStudyDocViewer({ content }: { content: CaseStudyDocContent }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px' }}>
           {content.metrics.map((m, i) => (
             <Card key={i} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '28px', fontWeight: 700, color: '#0f7b6c', letterSpacing: '-0.04em' }}>{m.value}</div>
+              <div style={{ fontSize: '28px', fontWeight: 700, color: '#0f7b6c', letterSpacing: 0 }}>{m.value}</div>
               <div style={{ fontSize: '12px', color: '#787774', marginTop: '4px' }}>{m.label}</div>
               {m.description && <div style={{ fontSize: '11px', color: '#9b9a97', marginTop: '2px' }}>{m.description}</div>}
             </Card>
@@ -222,7 +222,7 @@ function OnePagerViewer({ content }: { content: OnePagerContent }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       <Card style={{ backgroundColor: '#f7f6f3', borderColor: 'rgba(55,53,47,0.12)' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#37352f', letterSpacing: '-0.03em', margin: '0 0 6px' }}>{content.headline}</h1>
+        <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#37352f', letterSpacing: 0, margin: '0 0 6px' }}>{content.headline}</h1>
         <p style={{ fontSize: '15px', color: '#787774', margin: 0 }}>{content.subheadline}</p>
       </Card>
 
@@ -297,9 +297,9 @@ const CATEGORY_COLORS: Record<ObjectionCategory, { color: string; bg: string }> 
   price: { color: '#e03e3e', bg: 'rgba(224,62,62,0.08)' },
   competitor: { color: '#cb6c2c', bg: 'rgba(203,108,44,0.08)' },
   timing: { color: '#0f7b6c', bg: 'rgba(15,123,108,0.08)' },
-  authority: { color: '#5e6ad2', bg: 'rgba(94,106,210,0.08)' },
+  authority: { color: 'var(--brand)', bg: 'var(--brand-bg)' },
   need: { color: '#0f7b6c', bg: 'rgba(15,123,108,0.08)' },
-  trust: { color: '#5e6ad2', bg: 'rgba(94,106,210,0.08)' },
+  trust: { color: 'var(--brand)', bg: 'var(--brand-bg)' },
   other: { color: '#787774', bg: 'rgba(55,53,47,0.06)' },
 }
 
@@ -466,7 +466,7 @@ function EmailSequenceViewer({ content }: { content: EmailSequenceContent }) {
       {content.emails.map((email) => (
         <div key={email.stepNumber} style={{ background: 'var(--surface-1)', border: '1px solid rgba(55,53,47,0.12)', borderRadius: '8px', boxShadow: '0 1px 3px rgba(55,53,47,0.06)', overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 16px', borderBottom: '1px solid rgba(55,53,47,0.09)', backgroundColor: '#f7f6f3' }}>
-            <span style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: 'rgba(94,106,210,0.12)', color: '#5e6ad2', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <span style={{ width: '24px', height: '24px', borderRadius: '50%', backgroundColor: 'var(--brand-bg)', color: 'var(--brand)', fontSize: '12px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               {email.stepNumber}
             </span>
             <div style={{ flex: 1 }}>
