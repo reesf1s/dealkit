@@ -86,17 +86,17 @@ export default function TopNav() {
 	      top: 0,
 	      left: `${sidebarWidth}px`,
 	      right: 0,
-	      height: 46,
+	      height: 52,
 	      zIndex: 30,
 	      background: 'var(--topnav-bg)',
 	      backdropFilter: 'blur(16px)',
 	      WebkitBackdropFilter: 'blur(16px)',
-	      borderBottom: '1px solid var(--border-subtle)',
+	      borderBottom: '1px solid var(--border-default)',
 	      display: 'flex',
 	      alignItems: 'center',
 	      justifyContent: 'space-between',
       gap: 12,
-      padding: '0 12px',
+      padding: '0 14px',
       transition: 'left 0.15s cubic-bezier(0.4,0,0.2,1)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
@@ -105,8 +105,8 @@ export default function TopNav() {
           className="mobile-menu-btn"
           style={{
             display: 'none',
-            width: 28,
-            height: 28,
+            width: 30,
+            height: 30,
             borderRadius: 7,
             border: '1px solid var(--border-default)',
             background: 'var(--surface-2)',
@@ -120,9 +120,21 @@ export default function TopNav() {
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-          <Icon size={13} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
           <span style={{
-            fontSize: 12.5,
+            width: 24,
+            height: 24,
+            borderRadius: 7,
+            border: '1px solid var(--border-subtle)',
+            background: 'var(--surface-1)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <Icon size={13} style={{ color: 'var(--text-secondary)' }} />
+          </span>
+          <span style={{
+            fontSize: 12.75,
             fontWeight: 700,
             color: 'var(--text-primary)',
             whiteSpace: 'nowrap',
@@ -137,44 +149,46 @@ export default function TopNav() {
 	      <button
 	        onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
 	        style={{
-	          flex: '0 1 340px',
-	          height: 27,
+	          flex: '0 1 420px',
+	          height: 32,
 	          borderRadius: 7,
 	          border: '1px solid var(--border-default)',
-	          background: 'var(--surface-2)',
+	          background: 'var(--surface-1)',
 	          color: 'var(--text-tertiary)',
 	          display: 'flex',
           alignItems: 'center',
           gap: 7,
-          padding: '0 10px',
+          padding: '0 11px',
           cursor: 'pointer',
           minWidth: 180,
         }}
         aria-label="Open command palette"
       >
-        <Search size={11} />
-        <span style={{ flex: 1, textAlign: 'left', fontSize: 11.5 }}>Search deals, contacts, or notes</span>
+        <Search size={12} />
+        <span style={{ flex: 1, textAlign: 'left', fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+          Search deals, contacts, notes, commands
+        </span>
         <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>⌘P</span>
       </button>
 
       <div className="topnav-status" style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
         <div className="notion-chip" style={{ color: 'var(--text-primary)' }}>
-          {openDeals.length} open · {formatCurrency(pipelineValue)}
+          Pipeline {openDeals.length} · {formatCurrency(pipelineValue)}
         </div>
 
         <div className="notion-chip">
-          {automationStats.enabled} automations · {automationStats.alerts} alerts
+          Signals {automationStats.alerts} · Auto {automationStats.enabled}
         </div>
 
         <button
           onClick={toggleCopilot}
           style={{
-            height: 27,
-            padding: '0 11px',
+            height: 32,
+            padding: '0 12px',
             borderRadius: 7,
-            border: '1px solid var(--border-default)',
-            background: 'transparent',
-            color: 'var(--text-secondary)',
+            border: '1px solid var(--brand-border)',
+            background: 'var(--brand-bg)',
+            color: 'var(--text-primary)',
             display: 'flex',
             alignItems: 'center',
             gap: 6,

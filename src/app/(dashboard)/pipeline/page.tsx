@@ -18,7 +18,7 @@ import { fetcher } from '@/lib/fetcher'
 import { useToast } from '@/components/shared/Toast'
 import type { PipelineConfig, PipelineStageConfig } from '@/types'
 import { buildDealSnapshot } from '@/lib/deal-snapshot'
-import { OperatorHeader, OperatorKpi, OperatorPage } from '@/components/shared/OperatorUI'
+import { OperatorHeader, OperatorKpi, OperatorMetricGrid, OperatorPage, OperatorSegmentedControl, OperatorSectionHeader } from '@/components/shared/OperatorUI'
 
 type ViewMode = 'kanban' | 'focus' | 'funnel'
 type SortMode = 'score_desc' | 'value_desc' | 'recent' | 'name'
@@ -362,9 +362,16 @@ export default function PipelinePage() {
   return (
     <OperatorPage>
       <OperatorHeader
-        eyebrow="Pipeline Operating System"
-        title="Enterprise sales pipeline control"
-        description="Stage flow, risk visibility, and deal execution in one compact workspace."
+        eyebrow="Pipeline operating room"
+        title="Deal flow, without the noise"
+        description="A compact workspace for inspecting risk, changing stages, and keeping every opportunity moving."
+        meta={(
+          <>
+            <span className="notion-chip">{visibleStages.length} active stages</span>
+            <span className="notion-chip">{openDeals.length} open deals</span>
+            <span className="notion-chip">{staleDealsCount} stale signals</span>
+          </>
+        )}
         actions={(
           <Link href="/deals" className="operator-button operator-button-primary">
             <Plus size={14} /> Add Deal
@@ -372,26 +379,29 @@ export default function PipelinePage() {
         )}
       />
 
-      <section className="pipeline-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
+      <OperatorMetricGrid className="pipeline-kpis">
         {[
-          { label: 'Open Pipeline', value: formatMoney(openPipelineValue, currencySymbol), sub: `${openDeals.length} active deals`, icon: Target },
-          { label: 'Weighted Forecast', value: formatMoney(weightedPipelineValue, currencySymbol), sub: 'Value adjusted by score confidence', icon: Sparkles },
-          { label: 'Stale Opportunities', value: String(staleDealsCount), sub: 'No movement in 14+ days', icon: AlertTriangle },
-          { label: 'Missing Next Step', value: String(noNextStepCount), sub: 'No explicit action logged', icon: CalendarClock },
+          { label: 'Open Pipeline', value: formatMoney(openPipelineValue, currencySymbol), sub: `${openDeals.length} active deals`, icon: Target, tone: 'green' as const },
+          { label: 'Weighted Forecast', value: formatMoney(weightedPipelineValue, currencySymbol), sub: 'Value adjusted by confidence', icon: Sparkles, tone: 'blue' as const },
+          { label: 'Stale Opportunities', value: String(staleDealsCount), sub: 'No movement in 14+ days', icon: AlertTriangle, tone: 'red' as const },
+          { label: 'Missing Next Step', value: String(noNextStepCount), sub: 'No explicit action logged', icon: CalendarClock, tone: 'amber' as const },
         ].map(metric => (
-          <OperatorKpi key={metric.label} label={metric.label} value={metric.value} sub={metric.sub} icon={metric.icon} />
+          <OperatorKpi key={metric.label} label={metric.label} value={metric.value} sub={metric.sub} icon={metric.icon} tone={metric.tone} />
         ))}
-      </section>
+      </OperatorMetricGrid>
 
       <section className="notion-panel" style={{ padding: '12px 14px' }}>
+        <OperatorSectionHeader
+          title="Pipeline Workspace"
+          description="Filter the board, switch views, and drag deals between stages."
+        />
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, borderRadius: 9, border: '1px solid var(--border-default)', padding: '0 10px', background: 'var(--surface-2)', minWidth: 240 }}>
+          <div className="operator-search">
             <Search size={13} style={{ color: 'var(--text-tertiary)' }} />
             <input
               value={search}
               onChange={event => setSearch(event.target.value)}
               placeholder="Search company, deal, or next step"
-              style={{ flex: 1, border: 'none', background: 'transparent', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }}
             />
           </div>
 
@@ -416,35 +426,15 @@ export default function PipelinePage() {
           </select>
 
           <div style={{ display: 'inline-flex', gap: 6, marginLeft: 'auto' }}>
-            {([
+            <OperatorSegmentedControl
+              value={view}
+              onChange={setView}
+              items={([
               { id: 'kanban', label: 'Kanban', icon: Kanban },
               { id: 'focus', label: 'Focus', icon: Target },
               { id: 'funnel', label: 'Funnel', icon: BarChart3 },
-            ] as Array<{ id: ViewMode; label: string; icon: React.ElementType }>).map(tab => {
-              const active = view === tab.id
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setView(tab.id)}
-                  style={{
-                    height: 32,
-                    padding: '0 10px',
-                    borderRadius: 8,
-                    border: active ? '1px solid var(--border-strong)' : '1px solid var(--border-default)',
-                    background: active ? 'var(--surface-1)' : 'var(--surface-2)',
-                    color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    fontSize: 12,
-                    fontWeight: active ? 700 : 600,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                  }}
-                >
-                  <tab.icon size={12} />
-                  {tab.label}
-                </button>
-              )
-            })}
+            ] as Array<{ id: ViewMode; label: string; icon: typeof Kanban }>)}
+            />
           </div>
         </div>
 
@@ -523,6 +513,19 @@ export default function PipelinePage() {
                           {stageDealList.length} deals · {formatMoney(stageValue, currencySymbol)}
                         </div>
                       </div>
+                      <span className="notion-chip" style={{ background: 'var(--surface-1)' }}>
+                        {stageDealList.length}
+                      </span>
+                    </div>
+                    <div className="stage-health-track">
+                      <div
+                        className="stage-health-fill"
+                        style={{
+                          width: `${Math.min(100, Math.max(8, stageDealList.length * 18))}%`,
+                          background: stage.color,
+                          opacity: 0.8,
+                        }}
+                      />
                     </div>
 
                     <div style={{ display: 'grid', gap: 8 }}>
@@ -547,17 +550,21 @@ export default function PipelinePage() {
                               onDragEnd={() => setDraggedDealId(null)}
                               style={{
                                 textDecoration: 'none',
-                                borderRadius: 10,
+                                borderRadius: 8,
                                 border: '1px solid var(--border-subtle)',
                                 background: 'var(--surface-1)',
                                 padding: '10px 10px 9px',
                                 display: 'grid',
                                 gap: 8,
+                                boxShadow: '0 1px 1px rgba(16, 24, 40, 0.03)',
                               }}
                             >
 	                              <div style={{ minWidth: 0 }}>
-	                                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.35 }}>
+	                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                    <div style={{ fontSize: 12.5, fontWeight: 750, color: 'var(--text-primary)', lineHeight: 1.35, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
 	                                  {deal.prospectCompany}
+                                    </div>
+                                    <span style={{ width: 7, height: 7, borderRadius: 999, background: risk.color, flexShrink: 0 }} />
 	                                </div>
 	                                <div style={{ marginTop: 1, fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.35 }}>
 	                                  {deal.dealName}
@@ -573,6 +580,10 @@ export default function PipelinePage() {
                                     </div>
                                   )}
 	                              </div>
+
+                              <div className="stage-health-track" aria-hidden="true">
+                                <div className="stage-health-fill" style={{ width: `${Math.max(4, score)}%`, background: dealScoreColor }} />
+                              </div>
 
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                                 <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-primary)' }}>{formatMoney(annualizedValue(deal), currencySymbol)}</span>

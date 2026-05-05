@@ -7,7 +7,7 @@ import { useUser } from '@clerk/nextjs'
 import { AlertTriangle, ArrowRight, Bot, CalendarClock, CheckCircle2, Clock3, PoundSterling, TrendingUp } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
 import type { DealLog } from '@/types'
-import { OperatorHeader, OperatorKpi, OperatorPage } from '@/components/shared/OperatorUI'
+import { OperatorHeader, OperatorInsightCard, OperatorKpi, OperatorMetricGrid, OperatorPage, OperatorPanel, OperatorSectionHeader } from '@/components/shared/OperatorUI'
 
 interface SummaryDeal {
   id: string
@@ -263,58 +263,69 @@ export default function DashboardPage() {
   return (
     <OperatorPage>
       <OperatorHeader
-        eyebrow="Revenue Command Center"
+        eyebrow="Revenue command center"
         title={user?.firstName ? `${user.firstName}, here is today's focus` : 'Today\'s commercial focus'}
-        description="Latest customer activity first, with blockers and next interventions surfaced for action."
-        actions={<div className="notion-chip"><CalendarClock size={12} /> Live view</div>}
+        description="A quiet read on the pipeline: who needs attention, where momentum is fading, and which actions matter next."
+        meta={(
+          <>
+            <span className="notion-chip"><CalendarClock size={12} /> Live workspace</span>
+            <span className="notion-chip">{openDeals.length} open opportunities</span>
+            <span className="notion-chip">{enabledAutomations.length} automations listening</span>
+          </>
+        )}
       />
 
-      <section className="dashboard-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8 }}>
+      <OperatorMetricGrid className="dashboard-kpis">
         {[
-          { label: 'Open Pipeline', value: currency(pipelineValue), sub: `${openDeals.length} open deals`, icon: PoundSterling },
-          { label: 'Revenue At Risk', value: currency(summary?.revenueAtRisk ?? 0), sub: `${summary?.dealsAtRisk ?? 0} deals flagged`, icon: AlertTriangle },
-          { label: 'Stale Opportunities', value: String(staleDealsCount), sub: 'No movement in 10+ days', icon: Clock3 },
-          { label: 'Execution Gaps', value: String(missingNextStepCount), sub: 'Deals missing explicit next step', icon: TrendingUp },
+          { label: 'Open Pipeline', value: currency(pipelineValue), sub: `${openDeals.length} open deals`, icon: PoundSterling, tone: 'green' as const },
+          { label: 'Revenue At Risk', value: currency(summary?.revenueAtRisk ?? 0), sub: `${summary?.dealsAtRisk ?? 0} deals flagged`, icon: AlertTriangle, tone: 'red' as const },
+          { label: 'Stale Opportunities', value: String(staleDealsCount), sub: 'No movement in 10+ days', icon: Clock3, tone: 'amber' as const },
+          { label: 'Execution Gaps', value: String(missingNextStepCount), sub: 'Deals missing explicit next step', icon: TrendingUp, tone: 'blue' as const },
         ].map(card => (
-          <OperatorKpi key={card.label} label={card.label} value={card.value} sub={card.sub} icon={card.icon} />
+          <OperatorKpi key={card.label} label={card.label} value={card.value} sub={card.sub} icon={card.icon} tone={card.tone} />
         ))}
-      </section>
+      </OperatorMetricGrid>
 
       <section className="dashboard-focus" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 8 }}>
-        <article className="notion-panel" style={{ padding: '12px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: 14, letterSpacing: 0, textTransform: 'none' }}>Today Execution Queue</h2>
+        <OperatorPanel>
+          <OperatorSectionHeader
+            title="Today Execution Queue"
+            description="Sequenced by risk, silence, and value."
+            action={(
             <Link href="/pipeline?view=kanban" style={{ fontSize: 11.5, color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               Open pipeline <ArrowRight size={11} />
             </Link>
-          </div>
+            )}
+          />
 	          {summaryLoading && dealsLoading ? (
 	            <div className="skeleton" style={{ height: 112, borderRadius: 10 }} />
 	          ) : focusItems.length > 0 ? (
 	            <div style={{ display: 'grid', gap: 8 }}>
 	              {focusItems.map((item, i) => (
-                <Link key={`${item.dealId}-${i}`} href={`/deals/${item.dealId}`} style={{ textDecoration: 'none' }}>
-                  <div style={{ border: '1px solid var(--border-default)', borderRadius: 8, padding: '8px 10px', background: 'var(--surface-1)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-                        <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.company}</span>
-                        <span style={{ fontSize: 10.5, color: focusRiskColor(item.riskLevel), fontWeight: 700, textTransform: 'uppercase' }}>{focusRiskLabel(item.riskLevel)}</span>
-                      </div>
-                      <span className="notion-chip">{item.dueLabel}</span>
-                    </div>
-	                    <div style={{ marginTop: 4, fontSize: 12.5, color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                <OperatorInsightCard
+                  key={`${item.dealId}-${i}`}
+                  href={`/deals/${item.dealId}`}
+                  title={(
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.company}</span>
+                      <span style={{ fontSize: 10.5, color: focusRiskColor(item.riskLevel), fontWeight: 750, textTransform: 'uppercase' }}>{focusRiskLabel(item.riskLevel)}</span>
+                    </span>
+                  )}
+                  meta={<span>{item.dueLabel}</span>}
+                  tone={item.riskLevel === 'high' ? 'red' : item.riskLevel === 'medium' ? 'amber' : 'green'}
+                >
+                  <div>
+                    <div>
 	                      Latest: {item.latestSnapshot ?? 'No recent activity yet.'}
 	                    </div>
 	                    {item.blocker && (
-	                      <div style={{ marginTop: 1, fontSize: 11.5, color: 'var(--text-tertiary)' }}>
+	                      <div style={{ marginTop: 2, color: 'var(--text-tertiary)' }}>
 	                        Blocker: {item.blocker}
 	                      </div>
 	                    )}
-	                    <div style={{ marginTop: 2, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-	                      <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{item.daysStale > 0 ? `${item.daysStale}d idle` : 'updated today'}</span>
-	                    </div>
-	                  </div>
-	                </Link>
+                    <div style={{ marginTop: 2, color: 'var(--text-tertiary)' }}>{item.daysStale > 0 ? `${item.daysStale}d idle` : 'updated today'}</div>
+                  </div>
+                </OperatorInsightCard>
 	              ))}
 	            </div>
           ) : focusBullets.length === 0 ? (
@@ -333,13 +344,9 @@ export default function DashboardPage() {
               Intelligence generated {relTime(summary.generatedAt)}.
             </div>
           )}
-        </article>
+        </OperatorPanel>
 
-        <article className="notion-panel" style={{ padding: '12px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: 14, letterSpacing: 0, textTransform: 'none' }}>Silent Automations</h2>
-            <Bot size={13} style={{ color: 'var(--text-secondary)' }} />
-          </div>
+        <OperatorPanel title="Silent Automations" description="Background systems currently watching the workspace." icon={Bot}>
 
           <div style={{ display: 'grid', gap: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--text-secondary)' }}>
@@ -369,17 +376,16 @@ export default function DashboardPage() {
           <Link href="/automations" style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--text-secondary)' }}>
             Manage automation policy <ArrowRight size={11} />
           </Link>
-        </article>
+        </OperatorPanel>
       </section>
 
       <section>
-        <article className="notion-panel" style={{ padding: '12px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 10, flexWrap: 'wrap' }}>
-            <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: 14, letterSpacing: 0, textTransform: 'none' }}>
-              CRM Hygiene Queue
-            </h2>
-            <span className="notion-chip">{totalQualityGaps} field gaps across open pipeline</span>
-          </div>
+        <OperatorPanel>
+          <OperatorSectionHeader
+            title="CRM Hygiene Queue"
+            description="Small data repairs that make the pipeline easier to trust."
+            action={<span className="notion-chip">{totalQualityGaps} field gaps across open pipeline</span>}
+          />
 
           <div className="hygiene-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 8, marginBottom: 10 }}>
             {[
@@ -424,15 +430,12 @@ export default function DashboardPage() {
               ))}
             </div>
           )}
-        </article>
+        </OperatorPanel>
       </section>
 
       <section style={{ display: 'grid', gridTemplateColumns: '1.35fr 1fr', gap: 8 }}>
-        <article className="notion-panel" style={{ padding: '12px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: 14, letterSpacing: 0, textTransform: 'none' }}>Risk Queue</h2>
-            <span className="notion-chip">Top opportunities needing intervention</span>
-          </div>
+        <OperatorPanel>
+          <OperatorSectionHeader title="Risk Queue" description="Top opportunities needing intervention." action={<span className="notion-chip">Live signals</span>} />
 
           {summaryLoading ? (
             <div className="skeleton" style={{ height: 180, borderRadius: 10 }} />
@@ -471,13 +474,9 @@ export default function DashboardPage() {
               ))}
             </div>
           )}
-        </article>
+        </OperatorPanel>
 
-        <article className="notion-panel" style={{ padding: '12px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <h2 style={{ margin: 0, color: 'var(--text-primary)', fontSize: 14, letterSpacing: 0, textTransform: 'none' }}>Execution Feed</h2>
-            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{activity.length} events</span>
-          </div>
+        <OperatorPanel title="Execution Feed" description={`${activity.length} events in the current workspace.`}>
 
           {activityLoading ? (
             <div className="skeleton" style={{ height: 180, borderRadius: 10 }} />
@@ -496,7 +495,7 @@ export default function DashboardPage() {
               ))}
             </div>
           )}
-        </article>
+        </OperatorPanel>
       </section>
 
       <style>{`

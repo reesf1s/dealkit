@@ -2,6 +2,7 @@ import type { ComponentType, CSSProperties, ReactNode } from 'react'
 import Link from 'next/link'
 
 type IconComponent = ComponentType<{ size?: number; strokeWidth?: number; style?: CSSProperties }>
+type Tone = 'neutral' | 'green' | 'amber' | 'red' | 'blue'
 
 export function OperatorPage({ children, maxWidth }: { children: ReactNode; maxWidth?: number | string }) {
   return (
@@ -16,21 +17,24 @@ export function OperatorHeader({
   title,
   description,
   actions,
+  meta,
 }: {
   eyebrow?: ReactNode
   title: ReactNode
   description?: ReactNode
   actions?: ReactNode
+  meta?: ReactNode
 }) {
   return (
     <section className="operator-header">
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-        <div style={{ minWidth: 0 }}>
+      <div className="operator-header-grid">
+        <div className="operator-header-copy">
           {eyebrow && <div className="operator-eyebrow">{eyebrow}</div>}
           <h1 className="operator-title">{title}</h1>
           {description && <p className="operator-subtitle">{description}</p>}
+          {meta && <div className="operator-header-meta">{meta}</div>}
         </div>
-        {actions && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{actions}</div>}
+        {actions && <div className="operator-header-actions">{actions}</div>}
       </div>
     </section>
   )
@@ -52,14 +56,14 @@ export function OperatorPanel({
   style?: CSSProperties
 }) {
   return (
-    <section className="notion-panel" style={{ padding: 14, ...style }}>
+    <section className="notion-panel operator-panel" style={style}>
       {(title || description || Icon || action) && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
+        <div className="operator-section-head">
+          <div className="operator-section-title-wrap">
             {Icon && <Icon size={14} style={{ color: 'var(--text-tertiary)', marginTop: 2, flexShrink: 0 }} />}
-            <div style={{ minWidth: 0 }}>
-              {title && <h2 style={{ margin: 0, textTransform: 'none', fontSize: 14, letterSpacing: 0, color: 'var(--text-primary)' }}>{title}</h2>}
-              {description && <p style={{ margin: '2px 0 0', color: 'var(--text-tertiary)', fontSize: 11.5, lineHeight: 1.45 }}>{description}</p>}
+            <div className="operator-section-copy">
+              {title && <h2>{title}</h2>}
+              {description && <p>{description}</p>}
             </div>
           </div>
           {action}
@@ -75,21 +79,113 @@ export function OperatorKpi({
   value,
   sub,
   icon: Icon,
+  tone = 'neutral',
 }: {
   label: string
   value: ReactNode
   sub?: ReactNode
   icon?: IconComponent
+  tone?: Tone
 }) {
   return (
-    <article className="notion-kpi" style={{ padding: '12px 13px' }}>
+    <article className={`notion-kpi operator-kpi operator-tone-${tone}`}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
         <span className="operator-eyebrow">{label}</span>
         {Icon && <Icon size={13} style={{ color: 'var(--text-tertiary)' }} />}
       </div>
-      <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: 0, lineHeight: 1.1, color: 'var(--text-primary)' }}>{value}</div>
-      {sub && <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-secondary)' }}>{sub}</div>}
+      <div className="operator-kpi-value">{value}</div>
+      {sub && <div className="operator-kpi-sub">{sub}</div>}
     </article>
+  )
+}
+
+export function OperatorMetricGrid({ children, className }: { children: ReactNode; className?: string }) {
+  return <section className={`operator-metric-grid${className ? ` ${className}` : ''}`}>{children}</section>
+}
+
+export function OperatorSectionHeader({
+  title,
+  description,
+  action,
+}: {
+  title: ReactNode
+  description?: ReactNode
+  action?: ReactNode
+}) {
+  return (
+    <div className="operator-section-head">
+      <div className="operator-section-copy">
+        <h2>{title}</h2>
+        {description && <p>{description}</p>}
+      </div>
+      {action}
+    </div>
+  )
+}
+
+export function OperatorInsightCard({
+  title,
+  children,
+  meta,
+  tone = 'neutral',
+  href,
+}: {
+  title: ReactNode
+  children?: ReactNode
+  meta?: ReactNode
+  tone?: Tone
+  href?: string
+}) {
+  const content = (
+    <div className={`operator-insight operator-tone-${tone}`}>
+      <div className="operator-insight-main">
+        <div className="operator-insight-title">{title}</div>
+        {children && <div className="operator-insight-body">{children}</div>}
+      </div>
+      {meta && <div className="operator-insight-meta">{meta}</div>}
+    </div>
+  )
+
+  if (href) {
+    return (
+      <Link href={href} className="operator-insight-link">
+        {content}
+      </Link>
+    )
+  }
+
+  return content
+}
+
+export function OperatorSegmentedControl<T extends string>({
+  items,
+  value,
+  onChange,
+}: {
+  items: Array<{ id: T; label: string; icon?: IconComponent }>
+  value: T
+  onChange: (next: T) => void
+}) {
+  return (
+    <div className="operator-segmented" role="tablist">
+      {items.map(item => {
+        const Icon = item.icon
+        const active = item.id === value
+        return (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            className={active ? 'active' : undefined}
+            onClick={() => onChange(item.id)}
+          >
+            {Icon && <Icon size={12} />}
+            {item.label}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 

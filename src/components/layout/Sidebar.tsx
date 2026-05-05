@@ -87,21 +87,22 @@ function NavItem({
       onClick={onClick}
       title={collapsed ? label : undefined}
       style={{
+        position: 'relative',
         display: 'flex',
         alignItems: 'center',
         gap: 8,
-        height: 30,
-        padding: collapsed ? '0' : '0 10px',
+        height: 32,
+        padding: collapsed ? '0' : '0 10px 0 12px',
         justifyContent: collapsed ? 'center' : 'flex-start',
         borderRadius: 7,
-        marginBottom: 2,
+        marginBottom: 3,
         textDecoration: 'none',
         fontSize: 11.5,
-        fontWeight: active ? 600 : 500,
+        fontWeight: active ? 700 : 550,
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
         background: active ? 'var(--surface-selected)' : 'transparent',
-        border: active ? '1px solid var(--border-subtle)' : '1px solid transparent',
-        width: collapsed ? 34 : '100%',
+        border: active ? '1px solid var(--brand-border)' : '1px solid transparent',
+        width: collapsed ? 36 : '100%',
         marginLeft: collapsed ? 'auto' : 0,
         marginRight: collapsed ? 'auto' : 0,
         transition: 'all 120ms ease',
@@ -121,6 +122,9 @@ function NavItem({
         }
       }}
     >
+      {active && !collapsed && (
+        <span style={{ position: 'absolute', left: 5, top: 8, bottom: 8, width: 2, borderRadius: 999, background: 'var(--brand)' }} />
+      )}
       <Icon size={15} style={{ color: active ? 'var(--text-primary)' : 'var(--text-tertiary)', flexShrink: 0 }} />
       {!collapsed && <span style={{ flex: 1, minWidth: 0 }}>{label}</span>}
       {!collapsed && typeof count === 'number' && count > 0 && (
@@ -170,7 +174,7 @@ export default function Sidebar() {
     return paths.some(p => pathname === p || pathname.startsWith(`${p}/`))
   }
 
-  const width = collapsed ? 50 : 204
+  const width = collapsed ? 54 : 216
 
   const sidebarBody = (
     <aside style={{
@@ -189,32 +193,32 @@ export default function Sidebar() {
       transition: 'width 0.15s cubic-bezier(0.4,0,0.2,1)',
     }}>
       <div style={{
-        padding: collapsed ? '10px 8px 8px' : '10px 10px 8px',
+        padding: collapsed ? '12px 8px 10px' : '12px 12px 10px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: collapsed ? 'center' : 'space-between',
         gap: 8,
       }}>
         {!collapsed ? (
-          <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', minWidth: 0 }}>
+          <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', minWidth: 0 }}>
             <div style={{
-              width: 26,
-              height: 26,
+              width: 28,
+              height: 28,
               borderRadius: 7,
-              background: 'var(--surface-2)',
-              border: '1px solid var(--border-default)',
+              background: 'var(--text-primary)',
+              border: '1px solid var(--text-primary)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'var(--brand)',
+              color: '#fff',
               fontWeight: 800,
               fontSize: 12,
             }}>
               H
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1 }}>Halvex CRM</div>
-              <div style={{ fontSize: 10.5, color: 'var(--text-tertiary)', marginTop: 1 }}>Enterprise pipeline</div>
+              <div style={{ fontSize: 13, fontWeight: 760, color: 'var(--text-primary)', lineHeight: 1.1 }}>Halvex</div>
+              <div style={{ fontSize: 10.5, color: 'var(--text-tertiary)', marginTop: 2 }}>Revenue workspace</div>
             </div>
           </Link>
         ) : (
@@ -222,12 +226,12 @@ export default function Sidebar() {
             width: 26,
             height: 26,
             borderRadius: 7,
-            background: 'var(--surface-2)',
-            border: '1px solid var(--border-default)',
+            background: 'var(--text-primary)',
+            border: '1px solid var(--text-primary)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: 'var(--brand)',
+            color: '#fff',
             fontWeight: 800,
             fontSize: 12,
           }}>H</div>
@@ -239,11 +243,11 @@ export default function Sidebar() {
             else toggleCollapsed()
           }}
           style={{
-            width: 20,
-            height: 20,
+            width: 22,
+            height: 22,
             borderRadius: 6,
             border: '1px solid var(--border-default)',
-            background: 'transparent',
+            background: 'var(--surface-1)',
             color: 'var(--text-tertiary)',
             display: 'flex',
             alignItems: 'center',
@@ -257,7 +261,33 @@ export default function Sidebar() {
         </button>
       </div>
 
-      <nav style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '0 8px' : '0 10px' }}>
+      {!collapsed && (
+        <div style={{ padding: '0 12px 8px' }}>
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('openCommandPalette'))}
+            style={{
+              width: '100%',
+              height: 30,
+              borderRadius: 7,
+              border: '1px solid var(--border-default)',
+              background: 'var(--surface-1)',
+              color: 'var(--text-tertiary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0 8px',
+              cursor: 'pointer',
+              fontSize: 11.5,
+              fontWeight: 600,
+            }}
+          >
+            <span>Find anything</span>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>⌘P</span>
+          </button>
+        </div>
+      )}
+
+      <nav style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '0 9px' : '0 12px' }}>
         <SectionLabel label="Sales" collapsed={collapsed} />
         {PRIMARY_NAV.map(item => (
           <NavItem
@@ -286,26 +316,27 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div style={{ padding: collapsed ? '8px' : '8px 10px', borderTop: '1px solid var(--border-subtle)' }}>
+      <div style={{ padding: collapsed ? '9px' : '10px 12px', borderTop: '1px solid var(--border-subtle)' }}>
         {!collapsed ? (
           <div style={{
             display: 'flex',
             alignItems: 'center',
             gap: 8,
-            padding: '6px 8px',
+            padding: '7px 8px',
             borderRadius: 7,
-            background: 'var(--surface-2)',
+            background: 'var(--surface-1)',
             border: '1px solid var(--border-subtle)',
           }}>
             <div style={{
               width: 26,
               height: 26,
               borderRadius: '50%',
-              background: 'var(--brand)',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border-default)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#fff',
+              color: 'var(--text-primary)',
               fontWeight: 700,
               fontSize: 10.5,
               flexShrink: 0,
@@ -382,7 +413,7 @@ export default function Sidebar() {
           left: 0,
           top: 0,
           bottom: 0,
-          width: 204,
+          width: 216,
           zIndex: 40,
           transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)',
           transition: 'transform 0.15s cubic-bezier(0.4,0,0.2,1)',
@@ -399,6 +430,7 @@ export default function Sidebar() {
         height: 58,
         background: 'var(--surface-1)',
         borderTop: '1px solid var(--border-default)',
+        boxShadow: '0 -10px 28px rgba(16, 24, 40, 0.08)',
         display: 'none',
         alignItems: 'center',
         justifyContent: 'space-around',
