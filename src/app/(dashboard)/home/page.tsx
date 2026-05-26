@@ -1,7 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import useSWR from 'swr'
-import { CalendarDays, CheckCircle2, LayoutGrid, Plus, Sparkles } from 'lucide-react'
+import { CalendarDays, CheckCircle2, LayoutGrid, Loader2, Plus, Sparkles } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
 import {
   ActionCard,
@@ -29,15 +30,31 @@ type HomeData = {
 }
 
 export default function HomePage() {
-  const { data, isLoading } = useSWR<{ data: HomeData }>('/api/crm/today', fetcher, { revalidateOnFocus: false })
+  const { data, isLoading, mutate } = useSWR<{ data: HomeData }>('/api/crm/today', fetcher, { revalidateOnFocus: false })
   const { data: googleData } = useSWR('/api/integrations/google/status', fetcher, { revalidateOnFocus: false })
   const googleConfigured = googleData?.data?.configured !== false
+  const [completingPriorityId, setCompletingPriorityId] = useState<string | null>(null)
   const home = data?.data
   const priorities = home?.priorities ?? []
   const meetings = home?.upcomingMeetings ?? []
   const activeDeals = [...(home?.dealIntelligence ?? []), ...(home?.likelyClosers ?? []), ...(home?.atRiskDeals ?? []), ...(home?.staleDeals ?? [])]
     .filter((deal, index, all) => all.findIndex(item => item.id === deal.id) === index)
     .slice(0, 6)
+
+  async function completePriority(priority: HomeData['priorities'][number]) {
+    if (priority.linkedType !== 'task') return
+    setCompletingPriorityId(priority.id)
+    try {
+      await fetch('/api/crm/tasks', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: priority.linkedId, action: 'complete' }),
+      })
+      await mutate()
+    } finally {
+      setCompletingPriorityId(null)
+    }
+  }
 
   return (
     <div className="v2-page">
@@ -103,9 +120,10 @@ export default function HomePage() {
                 key={priority.id}
                 title={priority.title}
                 reason={priority.reason}
-                href={priority.dealId ? `/deals/${priority.dealId}` : undefined}
-                source={priority.confidence === 'high' ? 'High confidence' : 'AI suggested'}
-                action={<CheckCircle2 size={18} />}
+                href={priority.linkedType === 'task' ? undefined : priority.dealId ? `/deals/${priority.dealId}` : undefined}
+                onClick={priority.linkedType === 'task' ? () => completePriority(priority) : undefined}
+                source={priority.linkedType === 'task' ? 'Task' : priority.confidence === 'high' ? 'High confidence' : 'AI suggested'}
+                action={completingPriorityId === priority.id ? <Loader2 size={18} className="v2-spin" /> : <CheckCircle2 size={18} />}
               />
             )) : (
               <EmptyStateV2 title="No busywork yet">
