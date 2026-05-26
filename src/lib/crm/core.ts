@@ -441,6 +441,8 @@ export async function listToday(workspaceId: string, userId: string) {
   const now = new Date()
   const soon = new Date(now.getTime() + 7 * 86_400_000)
   const staleCutoff = new Date(now.getTime() - 14 * 86_400_000)
+  const nowIso = now.toISOString()
+  const soonIso = soon.toISOString()
 
   const { deals } = await listPipeline(workspaceId, userId)
   const openDeals = deals.filter(deal => !CLOSED_STATUSES.has(deal.status))
@@ -476,8 +478,8 @@ export async function listToday(workspaceId: string, userId: string) {
     .leftJoin(crmCompanies, eq(crmCompanies.id, crmCalendarEvents.companyId))
     .where(and(
       eq(crmCalendarEvents.workspaceId, workspaceId),
-      sql`${crmCalendarEvents.startsAt} >= ${now}`,
-      sql`${crmCalendarEvents.startsAt} <= ${soon}`,
+      sql`${crmCalendarEvents.startsAt} >= ${nowIso}`,
+      sql`${crmCalendarEvents.startsAt} <= ${soonIso}`,
     ))
     .orderBy(asc(crmCalendarEvents.startsAt))
     .limit(10)
