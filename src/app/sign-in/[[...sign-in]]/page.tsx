@@ -20,7 +20,7 @@ export default function SignInPage() {
         </div>
 
         <SignIn
-          fallbackRedirectUrl="/today"
+          fallbackRedirectUrl="/home"
           appearance={{
             elements: {
               rootBox: { width: '100%' },

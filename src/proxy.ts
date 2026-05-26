@@ -11,19 +11,18 @@ const isPublicRoute = createRouteMatcher([
 ])
 
 const legacyDashboardRedirects: Array<[RegExp, string]> = [
-  [/^\/analytics(?:\/.*)?$/, '/today'],
+  [/^\/analytics(?:\/.*)?$/, '/home'],
   [/^\/automations(?:\/.*)?$/, '/settings'],
-  [/^\/calendar(?:\/.*)?$/, '/today'],
   [/^\/case-studies(?:\/.*)?$/, '/companies'],
   [/^\/chat(?:\/.*)?$/, '/assistant'],
   [/^\/collateral(?:\/.*)?$/, '/deals'],
   [/^\/company(?:\/.*)?$/, '/companies'],
   [/^\/competitors(?:\/.*)?$/, '/assistant'],
   [/^\/connections(?:\/.*)?$/, '/settings'],
-  [/^\/dashboard(?:\/.*)?$/, '/today'],
+  [/^\/dashboard(?:\/.*)?$/, '/home'],
   [/^\/intelligence(?:\/.*)?$/, '/assistant'],
   [/^\/models(?:\/.*)?$/, '/assistant'],
-  [/^\/onboarding(?:\/.*)?$/, '/today'],
+  [/^\/onboarding(?:\/.*)?$/, '/home'],
   [/^\/playbook(?:\/.*)?$/, '/assistant'],
   [/^\/product-gaps(?:\/.*)?$/, '/assistant'],
   [/^\/settings\/unmatched-emails(?:\/.*)?$/, '/settings'],

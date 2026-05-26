@@ -69,7 +69,7 @@ export default function SignUpPage() {
             <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>Start with a CRM that tells you what matters</p>
           </div>
           <SignUp
-            fallbackRedirectUrl="/today"
+            fallbackRedirectUrl="/home"
             appearance={{
               elements: {
                 rootBox: { width: '100%' },

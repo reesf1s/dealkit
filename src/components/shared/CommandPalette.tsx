@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  CalendarCheck, TrendingUp,
+  CalendarCheck, TrendingUp, Home,
   Building2, Settings, Plus,
   Sparkles, CornerDownLeft, Loader2,
-  Users, GitBranch, MessageSquare, Bot, CheckSquare2,
+  Users, GitBranch, Bot, CheckSquare2,
 } from 'lucide-react'
 
 interface CommandItem {
@@ -19,13 +19,13 @@ interface CommandItem {
 }
 
 const ALL_ITEMS: CommandItem[] = [
-  { id: 'today',          label: 'Today',                section: 'navigate', icon: CalendarCheck,   href: '/today' },
+  { id: 'home',           label: 'Home',                 section: 'navigate', icon: Home,            href: '/home' },
+  { id: 'calendar',       label: 'Calendar',             section: 'navigate', icon: CalendarCheck,   href: '/calendar' },
   { id: 'pipeline',       label: 'Pipeline',             section: 'navigate', icon: GitBranch,       href: '/pipeline',     shortcut: '↩' },
   { id: 'deals',          label: 'Deals',                section: 'navigate', icon: TrendingUp,      href: '/deals' },
-  { id: 'companies',      label: 'Companies',            section: 'navigate', icon: Building2,       href: '/companies' },
   { id: 'contacts',       label: 'Contacts',             section: 'navigate', icon: Users,           href: '/contacts' },
+  { id: 'companies',      label: 'Companies',            section: 'navigate', icon: Building2,       href: '/companies' },
   { id: 'tasks',          label: 'Tasks',                section: 'navigate', icon: CheckSquare2,    href: '/tasks' },
-  { id: 'activity',       label: 'Activity',             section: 'navigate', icon: MessageSquare,   href: '/activity' },
   { id: 'assistant',      label: 'Assistant',            section: 'navigate', icon: Bot,             href: '/assistant' },
   { id: 'settings',       label: 'Settings',             section: 'navigate', icon: Settings,        href: '/settings' },
   { id: 'log-deal',       label: 'Log deal',             section: 'actions',  icon: Plus,            href: '/deals' },
@@ -87,14 +87,16 @@ export default function CommandPalette() {
   // Classify intent on every query change
   const intent = useMemo(() => classifyIntent(query), [query])
 
-  const filtered = query.trim() === ''
-    ? ALL_ITEMS
-    : ALL_ITEMS.filter(item =>
-        item.label.toLowerCase().includes(query.toLowerCase())
-      )
+  const filtered = useMemo(() => (
+    query.trim() === ''
+      ? ALL_ITEMS
+      : ALL_ITEMS.filter(item =>
+          item.label.toLowerCase().includes(query.toLowerCase())
+        )
+  ), [query])
 
-  const navigateItems = filtered.filter(i => i.section === 'navigate')
-  const actionItems   = filtered.filter(i => i.section === 'actions')
+  const navigateItems = useMemo(() => filtered.filter(i => i.section === 'navigate'), [filtered])
+  const actionItems = useMemo(() => filtered.filter(i => i.section === 'actions'), [filtered])
 
   // When intent is AI: show Ask AI row first, then any nav matches below
   // When intent is nav: show nav items first, Ask AI last
@@ -103,7 +105,7 @@ export default function CommandPalette() {
   // In AI-intent mode: Ask AI is index 0, nav items follow
   // In nav-intent mode: nav items first, Ask AI is last
   const askAIFirst = intent === 'ai' && showAskAI
-  const navFlat = [...navigateItems, ...actionItems]
+  const navFlat = useMemo(() => [...navigateItems, ...actionItems], [navigateItems, actionItems])
 
   let totalItems: number
   let askAIIndex: number

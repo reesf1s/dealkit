@@ -3,9 +3,30 @@
 import Link from 'next/link'
 import useSWR from 'swr'
 import { useParams } from 'next/navigation'
-import { AlertTriangle, Bot, CheckCircle2, RefreshCw } from 'lucide-react'
+import {
+  Bot,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  MailPlus,
+  RefreshCw,
+  Sparkles,
+  Users,
+} from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { OperatorHeader, OperatorKpi, OperatorMetricGrid, OperatorPage, OperatorPanel } from '@/components/shared/OperatorUI'
+import {
+  CrmButton,
+  CrmEmptyAction,
+  CrmHero,
+  CrmMeetingCard,
+  CrmPageShell,
+  CrmPanel,
+  CrmPill,
+  CrmPriorityCard,
+  CrmScoreBadge,
+  CrmTimeline,
+  CrmTimelineItem,
+} from '@/components/crm/CrmDesignSystem'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,16 +55,70 @@ type DealContext = {
   meetings: Array<{ id: string; title: string; startsAt: string; meetingUrl: string | null }>
 }
 
+const concernTerms = [
+  'concern',
+  'blocked',
+  'blocker',
+  'procurement',
+  'legal',
+  'compliance',
+  'security',
+  'disagree',
+  'alignment',
+  'uncertain',
+  'issue',
+  'risk',
+  'delay',
+]
+
 function money(value: number | null) {
-  if (!value) return '—'
+  if (!value || value <= 0) return 'Value missing'
   if (value >= 1_000_000) return `£${(value / 1_000_000).toFixed(1)}m`
   if (value >= 1_000) return `£${Math.round(value / 1_000)}k`
   return `£${value}`
 }
 
 function dt(value: string | null) {
-  if (!value) return '—'
+  if (!value) return 'Missing'
   return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+}
+
+function day(value: string | null) {
+  if (!value) return 'Close date missing'
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value))
+}
+
+function trustAdjusted(context: DealContext | undefined) {
+  const deal = context?.deal
+  if (!deal) return { score: null, confidence: null, risk: 'unknown', reasons: [] as string[] }
+
+  const evidence = [
+    deal.aiSummary,
+    deal.aiNextAction,
+    ...(context?.latestActivities ?? []).flatMap(activity => [activity.title, activity.summary, activity.body]),
+    ...(context?.signals ?? []).map(signal => signal.explanation),
+  ].filter(Boolean).join(' ').toLowerCase()
+
+  const reasons: string[] = []
+  if (!deal.valueAmount || deal.valueAmount <= 0) reasons.push('Value is missing, so forecast confidence is limited.')
+  if (!deal.expectedCloseDate) reasons.push('Close date is missing, so timing confidence is limited.')
+  if (!deal.aiNextAction && (context?.openTasks.length ?? 0) === 0) reasons.push('No next action is recorded.')
+  if (concernTerms.some(term => evidence.includes(term))) reasons.push('Recent context contains unresolved concerns or risk language.')
+  for (const signal of context?.signals ?? []) {
+    if (signal.direction === 'negative' && reasons.length < 5) reasons.push(signal.explanation)
+  }
+
+  let score = deal.aiScore
+  let confidence = deal.aiConfidence
+  let risk = deal.aiRiskLevel
+
+  if (reasons.length > 0) {
+    confidence = Math.min(confidence ?? 55, 68)
+    if (risk === 'low') risk = 'medium'
+    if (typeof score === 'number' && score > 82) score = 82
+  }
+
+  return { score, confidence, risk, reasons: Array.from(new Set(reasons)).slice(0, 5) }
 }
 
 export default function DealPage() {
@@ -53,6 +128,7 @@ export default function DealPage() {
   })
   const context = data?.data
   const deal = context?.deal
+  const adjusted = trustAdjusted(context)
 
   async function refresh() {
     if (!params?.id) return
@@ -62,103 +138,135 @@ export default function DealPage() {
 
   if (!deal && !isLoading) {
     return (
-      <OperatorPage>
-        <OperatorPanel><div className="empty-state">Deal not found.</div></OperatorPanel>
-      </OperatorPage>
+      <CrmPageShell>
+        <CrmPanel>
+          <CrmEmptyAction title="Deal not found" description="This deal may have moved, been archived, or be outside your workspace." />
+        </CrmPanel>
+      </CrmPageShell>
     )
   }
 
   return (
-    <OperatorPage>
-      <OperatorHeader
-        eyebrow={<Link href="/deals">Deals</Link>}
+    <CrmPageShell>
+      <CrmHero
+        eyebrow={<Link href="/deals" style={{ color: 'inherit', textDecoration: 'none' }}>Deal workspace</Link>}
         title={deal?.title ?? 'Loading deal'}
-        description={context?.company.name ?? 'Native CRM deal record'}
-        actions={<button className="operator-button" onClick={refresh}><RefreshCw size={14} /> Refresh intelligence</button>}
+        brief={deal?.companyName ? `${deal.companyName} · ${deal.stageName ?? 'No stage'} · ${adjusted.risk} risk` : 'A calm workspace for deal context, risk, tasks, meetings, and next actions.'}
+        primary={<CrmButton onClick={refresh} variant="primary"><RefreshCw size={15} /> Refresh intelligence</CrmButton>}
+        secondary={<CrmButton href="/assistant" variant="secondary"><Bot size={15} /> Ask Halvex</CrmButton>}
+        meta={
+          <div className="crm-mini-brief">
+            <strong>Trust layer</strong>
+            Score and risk are adjusted when evidence mentions blockers, uncertainty, missing value, or no next step.
+          </div>
+        }
       />
 
-      <OperatorMetricGrid>
-        <OperatorKpi label="Value" value={money(deal?.valueAmount ?? null)} />
-        <OperatorKpi label="Stage" value={deal?.stageName ?? '—'} />
-        <OperatorKpi label="Score" value={deal?.aiScore === null || deal?.aiScore === undefined ? '—' : `${deal.aiScore}%`} />
-        <OperatorKpi label="Risk" value={deal?.aiRiskLevel ?? 'unknown'} tone={deal?.aiRiskLevel === 'high' ? 'red' : deal?.aiRiskLevel === 'medium' ? 'amber' : 'green'} />
-      </OperatorMetricGrid>
+      <section className="crm-deal-header-grid">
+        <div className="crm-deal-fact"><span>Company</span><strong>{deal?.companyName ?? context?.company.name ?? 'Missing'}</strong></div>
+        <div className="crm-deal-fact"><span>Value</span><strong>{money(deal?.valueAmount ?? null)}</strong></div>
+        <div className="crm-deal-fact"><span>Stage</span><strong>{deal?.stageName ?? 'Missing'}</strong></div>
+        <div className="crm-deal-fact"><span>Close date</span><strong>{day(deal?.expectedCloseDate ?? null)}</strong></div>
+        <div className="crm-deal-fact"><span>Next action</span><strong>{deal?.aiNextAction ? 'Set' : 'Missing'}</strong></div>
+      </section>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(320px, 0.8fr)', gap: 16, alignItems: 'start' }}>
-        <div style={{ display: 'grid', gap: 16 }}>
-          <OperatorPanel title="AI deal brief" icon={Bot} action={<span className="crm-pill">Evidence-backed</span>}>
-            <p className="crm-brief">{deal?.aiSummary ?? context?.previousAiSummaries[0]?.content ?? 'No AI summary yet. Refresh intelligence after adding activity, meetings, or notes.'}</p>
-            <div className="crm-next-action">
-              <strong>Next best action</strong>
-              <span>{deal?.aiNextAction ?? 'Create a concrete next step for this deal.'}</span>
-            </div>
-          </OperatorPanel>
+      <div className="crm-record-layout">
+        <div style={{ display: 'grid', gap: 18 }}>
+          <CrmPanel
+            title="AI deal brief"
+            description="Short, evidence-aware, and honest about weak context."
+            icon={Sparkles}
+            action={<CrmPill tone={adjusted.confidence && adjusted.confidence >= 70 ? 'good' : 'watch'}>Confidence {adjusted.confidence ?? 'limited'}</CrmPill>}
+          >
+            <p className="crm-brief-reset">
+              {deal?.aiSummary ?? context?.previousAiSummaries[0]?.content ?? 'No deal brief yet. Add activity, meetings, notes, or tasks and refresh intelligence.'}
+            </p>
+            <CrmPriorityCard
+              title="Next best action"
+              reason={deal?.aiNextAction ?? 'No concrete next action is recorded for this deal.'}
+              action={deal?.aiNextAction ? 'Turn this into a task or draft a follow-up from the latest context.' : 'Create a dated next step before treating this deal as healthy.'}
+              tone={deal?.aiNextAction ? 'blue' : 'watch'}
+            />
+          </CrmPanel>
 
-          <OperatorPanel title="Activity timeline">
-            <div className="crm-timeline">
+          <CrmPanel title="Timeline" description="Recent activity that Halvex can cite." icon={Clock3}>
+            <CrmTimeline>
               {(context?.latestActivities ?? []).map(activity => (
-                <article key={activity.id}>
-                  <div>
-                    <strong>{activity.title}</strong>
-                    <p>{activity.summary ?? activity.body ?? activity.type}</p>
-                  </div>
-                  <time>{dt(activity.occurredAt)}</time>
-                </article>
+                <CrmTimelineItem
+                  key={activity.id}
+                  title={activity.title}
+                  body={activity.summary ?? activity.body}
+                  time={dt(activity.occurredAt)}
+                  type={activity.type}
+                />
               ))}
-              {!isLoading && (context?.latestActivities.length ?? 0) === 0 && <div className="empty-state">No activity yet.</div>}
-            </div>
-          </OperatorPanel>
+              {!isLoading && (context?.latestActivities.length ?? 0) === 0 && (
+                <CrmEmptyAction title="No activity yet" description="Add notes, tasks, or synced meetings so Halvex has evidence to reason from." />
+              )}
+            </CrmTimeline>
+          </CrmPanel>
         </div>
 
-        <div style={{ display: 'grid', gap: 16 }}>
-          <OperatorPanel title="Risk explanation" icon={AlertTriangle}>
-            <div style={{ display: 'grid', gap: 8 }}>
-              {(context?.signals ?? []).slice(0, 5).map(signal => (
-                <div key={signal.id} className="crm-signal">
-                  <strong>{signal.type.replace(/_/g, ' ')}</strong>
-                  <span>{signal.explanation}</span>
-                </div>
+        <div style={{ display: 'grid', gap: 18 }}>
+          <CrmPanel title="Deal intelligence" description="Score, confidence, risk, and why." icon={Bot}>
+            <CrmScoreBadge score={adjusted.score} confidence={adjusted.confidence} risk={adjusted.risk} />
+            <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
+              {(adjusted.reasons.length > 0 ? adjusted.reasons : ['No major risk drivers found in the available context.']).map(reason => (
+                <CrmPriorityCard
+                  key={reason}
+                  title={adjusted.reasons.length > 0 ? 'Risk driver' : 'Current read'}
+                  reason={reason}
+                  action={adjusted.reasons.length > 0 ? 'Resolve or add evidence before trusting the forecast.' : 'Keep activity and next steps current.'}
+                  tone={adjusted.reasons.length > 0 ? 'watch' : 'good'}
+                />
               ))}
-              {!isLoading && (context?.signals.length ?? 0) === 0 && <div className="empty-state">No risk signals found.</div>}
             </div>
-          </OperatorPanel>
+          </CrmPanel>
 
-          <OperatorPanel title="Open tasks" icon={CheckCircle2}>
-            <div style={{ display: 'grid', gap: 8 }}>
-              {(context?.openTasks ?? []).map(task => (
-                <div key={task.id} className="crm-row-link">
-                  <span>{task.title}</span>
-                  <small>{task.priority} · {dt(task.dueAt)}</small>
-                </div>
-              ))}
-              {!isLoading && (context?.openTasks.length ?? 0) === 0 && <div className="empty-state">No open tasks.</div>}
-            </div>
-          </OperatorPanel>
+          <CrmPanel title="Open tasks" icon={CheckCircle2}>
+            {(context?.openTasks ?? []).map(task => (
+              <div key={task.id} className="crm-pulse-row">
+                <strong>{task.title}</strong>
+                <span>{task.priority} · {dt(task.dueAt)}</span>
+              </div>
+            ))}
+            {!isLoading && (context?.openTasks.length ?? 0) === 0 && (
+              <CrmEmptyAction title="No tasks" description="Create one from the next action so this deal has an owner and date." />
+            )}
+          </CrmPanel>
 
-          <OperatorPanel title="Contacts">
-            <div style={{ display: 'grid', gap: 8 }}>
-              {(context?.contacts ?? []).map(contact => (
-                <div key={contact.id} className="crm-row-link">
-                  <span>{contact.fullName}</span>
-                  <small>{contact.jobTitle ?? 'Contact'} · {contact.email ?? 'No email'}</small>
-                </div>
-              ))}
-            </div>
-          </OperatorPanel>
+          <CrmPanel title="Meetings" icon={CalendarDays}>
+            {(context?.meetings ?? []).map(meeting => (
+              <CrmMeetingCard
+                key={meeting.id}
+                title={meeting.title}
+                time={dt(meeting.startsAt)}
+                company={deal?.companyName}
+                dealHref={null}
+                prep="Use this deal brief and risk panel before the meeting."
+              />
+            ))}
+            {!isLoading && (context?.meetings.length ?? 0) === 0 && (
+              <CrmEmptyAction title="No linked meetings" description="Connect Google Calendar to surface meeting prep and follow-up tasks here." />
+            )}
+          </CrmPanel>
 
-          <OperatorPanel title="Meetings">
-            <div style={{ display: 'grid', gap: 8 }}>
-              {(context?.meetings ?? []).map(meeting => (
-                <a key={meeting.id} className="crm-row-link" href={meeting.meetingUrl ?? '#'} target={meeting.meetingUrl ? '_blank' : undefined}>
-                  <span>{meeting.title}</span>
-                  <small>{dt(meeting.startsAt)}</small>
-                </a>
-              ))}
-              {!isLoading && (context?.meetings.length ?? 0) === 0 && <div className="empty-state">No linked meetings.</div>}
-            </div>
-          </OperatorPanel>
+          <CrmPanel title="Contacts" icon={Users}>
+            {(context?.contacts ?? []).map(contact => (
+              <div key={contact.id} className="crm-pulse-row">
+                <strong>{contact.fullName}</strong>
+                <span>{contact.jobTitle ?? contact.email ?? 'Contact'}</span>
+              </div>
+            ))}
+            {(context?.contacts.length ?? 0) === 0 && <CrmEmptyAction title="No contacts linked" description="Link contacts so Halvex can prep meetings and draft better follow-ups." />}
+          </CrmPanel>
+
+          <CrmPanel title="Assistant shortcuts" icon={MailPlus}>
+            <CrmPriorityCard title="Draft follow-up" reason="Use latest activity and next action." action="Open Assistant and ask for a concise follow-up." href="/assistant" tone="blue" />
+            <CrmPriorityCard title="Prep me for the next meeting" reason="Summarise blockers, people, and likely objections." action="Use this before customer calls." href="/assistant" tone="blue" />
+          </CrmPanel>
         </div>
       </div>
-    </OperatorPage>
+    </CrmPageShell>
   )
 }

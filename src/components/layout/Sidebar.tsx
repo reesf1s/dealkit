@@ -7,9 +7,9 @@ import { useClerk, useUser } from '@clerk/nextjs'
 import { useTheme } from 'next-themes'
 import {
   CalendarCheck,
+  Home,
   Kanban,
   Users,
-  MessageSquare,
   Building2,
   Bot,
   BriefcaseBusiness,
@@ -33,13 +33,13 @@ interface NavItemDef {
 }
 
 const PRIMARY_NAV: NavItemDef[] = [
-  { href: '/today', label: 'Today', icon: CalendarCheck, matchPaths: ['/today', '/dashboard'] },
+  { href: '/home', label: 'Home', icon: Home, matchPaths: ['/home', '/today', '/dashboard'] },
+  { href: '/calendar', label: 'Calendar', icon: CalendarCheck, matchPaths: ['/calendar'] },
   { href: '/pipeline', label: 'Pipeline', icon: Kanban, matchPaths: ['/pipeline'] },
   { href: '/deals', label: 'Deals', icon: BriefcaseBusiness, matchPaths: ['/deals'] },
-  { href: '/companies', label: 'Companies', icon: Building2, matchPaths: ['/companies'] },
   { href: '/contacts', label: 'Contacts', icon: Users, matchPaths: ['/contacts'] },
+  { href: '/companies', label: 'Companies', icon: Building2, matchPaths: ['/companies'] },
   { href: '/tasks', label: 'Tasks', icon: CheckSquare2, matchPaths: ['/tasks'] },
-  { href: '/activity', label: 'Activity', icon: MessageSquare, matchPaths: ['/activity', '/connections'] },
   { href: '/assistant', label: 'Assistant', icon: Bot, matchPaths: ['/assistant', '/chat'] },
 ]
 
@@ -191,7 +191,7 @@ export default function Sidebar() {
         gap: 8,
       }}>
         {!collapsed ? (
-          <Link href="/today" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', minWidth: 0 }}>
+          <Link href="/home" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', minWidth: 0 }}>
             <div style={{
               width: 28,
               height: 28,

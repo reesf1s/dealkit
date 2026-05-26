@@ -3,9 +3,16 @@
 import Link from 'next/link'
 import useSWR from 'swr'
 import { useMemo, useState } from 'react'
-import { AlertTriangle, Plus, Search } from 'lucide-react'
+import { AlertTriangle, CalendarClock, Search, Sparkles } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { OperatorHeader, OperatorKpi, OperatorMetricGrid, OperatorPage, OperatorPanel } from '@/components/shared/OperatorUI'
+import {
+  CrmButton,
+  CrmEmptyAction,
+  CrmHero,
+  CrmPageShell,
+  CrmPanel,
+  CrmPill,
+} from '@/components/crm/CrmDesignSystem'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +21,6 @@ type Deal = {
   id: string
   title: string
   valueAmount: number | null
-  valueCurrency: string
   expectedCloseDate: string | null
   status: string
   aiScore: number | null
@@ -24,26 +30,35 @@ type Deal = {
   nextStepDueAt: string | null
   companyName: string | null
   stageId: string | null
-  ownerEmail: string | null
 }
 type PipelineData = { stages: Stage[]; deals: Deal[] }
 
 function money(value: number | null | undefined) {
-  const v = value ?? 0
-  if (v >= 1_000_000) return `£${(v / 1_000_000).toFixed(1)}m`
-  if (v >= 1_000) return `£${Math.round(v / 1_000)}k`
-  return `£${v}`
+  if (!value || value <= 0) return 'Value missing'
+  if (value >= 1_000_000) return `£${(value / 1_000_000).toFixed(1)}m`
+  if (value >= 1_000) return `£${Math.round(value / 1_000)}k`
+  return `£${value}`
 }
 
-function relDate(value: string | null) {
-  if (!value) return 'No close date'
+function dateLabel(value: string | null) {
+  if (!value) return 'Close date missing'
   return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date(value))
 }
 
-function riskTone(risk: string, score: number | null) {
-  if (risk === 'high' || (score ?? 100) < 45) return '#ef4444'
-  if (risk === 'medium' || (score ?? 100) < 65) return '#f59e0b'
-  return '#22c55e'
+function riskTone(deal: Deal) {
+  if (deal.aiRiskLevel === 'high' || (deal.aiScore ?? 100) < 50) return 'risk' as const
+  if (deal.aiRiskLevel === 'medium' || (deal.aiScore ?? 100) < 75) return 'watch' as const
+  if (deal.aiRiskLevel === 'low') return 'good' as const
+  return 'neutral' as const
+}
+
+function insight(deal: Deal) {
+  if (!deal.valueAmount || deal.valueAmount <= 0) return 'Value is missing, so forecast confidence should stay limited.'
+  if (!deal.expectedCloseDate) return 'Close date missing. Add one before trusting forecast timing.'
+  if (!deal.aiNextAction && !deal.nextStepDueAt) return 'No next step. This needs a clear owner action.'
+  if (deal.aiRiskLevel === 'high') return 'Risk is elevated. Review blockers before moving this forward.'
+  if (deal.aiNextAction) return deal.aiNextAction
+  return 'Next step is set. Keep momentum by logging the next customer touch.'
 }
 
 export default function PipelinePage() {
@@ -67,8 +82,8 @@ export default function PipelinePage() {
   }, [pipeline?.deals, query, risk])
 
   const openDeals = deals.filter(deal => deal.status === 'open')
-  const pipelineValue = openDeals.reduce((sum, deal) => sum + (deal.valueAmount ?? 0), 0)
-  const weighted = openDeals.reduce((sum, deal) => sum + (deal.valueAmount ?? 0) * ((deal.aiScore ?? 45) / 100), 0)
+  const pipelineValue = openDeals.reduce((sum, deal) => sum + Math.max(0, deal.valueAmount ?? 0), 0)
+  const missingNextStep = openDeals.filter(deal => !deal.aiNextAction && !deal.nextStepDueAt).length
 
   async function moveDeal(dealId: string, stageId: string) {
     await fetch(`/api/crm/deals/${dealId}/stage`, {
@@ -97,84 +112,104 @@ export default function PipelinePage() {
   }
 
   return (
-    <OperatorPage maxWidth="none">
-      <OperatorHeader
+    <CrmPageShell wide>
+      <CrmHero
         eyebrow="Pipeline"
-        title="Native CRM pipeline"
-        description="Drag deals between stages, keep next actions visible, and let Halvex flag risk without extra admin."
+        title="A calmer way to see what is real."
+        brief={`There are ${openDeals.length} open deals, ${money(pipelineValue)} in known value, and ${missingNextStep} deals missing a next step.`}
+        primary={<CrmButton href="/home" variant="primary">Review priorities</CrmButton>}
+        secondary={<CrmButton href="/deals" variant="secondary">Deal list</CrmButton>}
+        meta={
+          <div className="crm-mini-brief">
+            <strong>AI pipeline read</strong>
+            Missing value, missing close dates, and unresolved risk reduce confidence. Halvex keeps those visible instead of pretending the forecast is perfect.
+          </div>
+        }
       />
 
-      <OperatorMetricGrid>
-        <OperatorKpi label="Open deals" value={openDeals.length} />
-        <OperatorKpi label="Pipeline value" value={money(pipelineValue)} />
-        <OperatorKpi label="Weighted value" value={money(Math.round(weighted))} />
-        <OperatorKpi label="High risk" value={openDeals.filter(deal => deal.aiRiskLevel === 'high').length} tone="red" icon={AlertTriangle} />
-      </OperatorMetricGrid>
-
-      <OperatorPanel>
-        <form onSubmit={addDeal} className="crm-toolbar">
-          <label className="crm-search">
-            <Search size={14} />
-            <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search deals, companies, next actions" />
+      <CrmPanel>
+        <form onSubmit={addDeal} className="crm-pipeline-toolbar">
+          <label style={{ position: 'relative', flex: '1 1 280px' }}>
+            <Search size={14} style={{ position: 'absolute', left: 13, top: 12, color: '#788177' }} />
+            <input
+              className="crm-reset-input"
+              value={query}
+              onChange={event => setQuery(event.target.value)}
+              placeholder="Search deals, companies, next actions"
+              style={{ width: '100%', paddingLeft: 34 }}
+            />
           </label>
-          <select value={risk} onChange={event => setRisk(event.target.value)} className="crm-select">
+          <select value={risk} onChange={event => setRisk(event.target.value)} className="crm-reset-select">
             <option value="all">All risk</option>
             <option value="high">High risk</option>
             <option value="medium">Medium risk</option>
             <option value="low">Low risk</option>
             <option value="unknown">Unknown</option>
           </select>
-          <input className="crm-input" value={quickAdd.title} onChange={event => setQuickAdd({ ...quickAdd, title: event.target.value })} placeholder="Deal name" />
-          <input className="crm-input" value={quickAdd.companyName} onChange={event => setQuickAdd({ ...quickAdd, companyName: event.target.value })} placeholder="Company" />
-          <input className="crm-input small" value={quickAdd.valueAmount} onChange={event => setQuickAdd({ ...quickAdd, valueAmount: event.target.value })} placeholder="Value" inputMode="numeric" />
-          <button className="operator-button operator-button-primary" type="submit"><Plus size={14} /> Add</button>
+          <input className="crm-reset-input" value={quickAdd.title} onChange={event => setQuickAdd({ ...quickAdd, title: event.target.value })} placeholder="Deal name" />
+          <input className="crm-reset-input" value={quickAdd.companyName} onChange={event => setQuickAdd({ ...quickAdd, companyName: event.target.value })} placeholder="Company" />
+          <input className="crm-reset-input" value={quickAdd.valueAmount} onChange={event => setQuickAdd({ ...quickAdd, valueAmount: event.target.value })} placeholder="Value" inputMode="numeric" style={{ width: 118 }} />
+          <CrmButton variant="primary" type="submit">Add deal</CrmButton>
         </form>
-      </OperatorPanel>
+      </CrmPanel>
 
-      <div className="crm-kanban">
+      <div className="crm-reset-kanban">
         {(pipeline?.stages ?? []).map(stage => {
           const stageDeals = deals.filter(deal => deal.stageId === stage.id)
-          const total = stageDeals.reduce((sum, deal) => sum + (deal.valueAmount ?? 0), 0)
+          const total = stageDeals.reduce((sum, deal) => sum + Math.max(0, deal.valueAmount ?? 0), 0)
           return (
             <section
               key={stage.id}
-              className="crm-kanban-column"
+              className="crm-stage-column"
               onDragOver={event => event.preventDefault()}
               onDrop={() => draggedId && moveDeal(draggedId, stage.id)}
             >
               <header>
-                <span style={{ background: stage.color }} />
-                <strong>{stage.name}</strong>
-                <small>{stageDeals.length} · {money(total)}</small>
+                <div>
+                  <h2>{stage.name}</h2>
+                  <small>{stageDeals.length} deals</small>
+                </div>
+                <div className="crm-stage-total">
+                  <strong>{money(total)}</strong>
+                  <br />
+                  <span>{stage.probability}% default</span>
+                </div>
               </header>
-              <div className="crm-kanban-cards">
-                {stageDeals.map(deal => (
-                  <Link
-                    key={deal.id}
-                    href={`/deals/${deal.id}`}
-                    className="crm-deal-card"
-                    draggable
-                    onDragStart={() => setDraggedId(deal.id)}
-                  >
-                    <div className="crm-deal-card-head">
+
+              {stageDeals.map(deal => (
+                <Link
+                  key={deal.id}
+                  href={`/deals/${deal.id}`}
+                  draggable
+                  onDragStart={() => setDraggedId(deal.id)}
+                  className="crm-reset-deal-card"
+                >
+                  <div className="crm-reset-deal-head">
+                    <div>
                       <strong>{deal.title}</strong>
-                      <span style={{ background: riskTone(deal.aiRiskLevel, deal.aiScore) }} />
+                      <p>{deal.companyName ?? 'Company missing'}</p>
                     </div>
-                    <p>{deal.companyName ?? 'No company'}</p>
-                    <div className="crm-deal-card-meta">
-                      <span>{money(deal.valueAmount)}</span>
-                      <span>{relDate(deal.expectedCloseDate)}</span>
-                      <span>{deal.aiScore ?? 'n/a'}%</span>
-                    </div>
-                    <small>{deal.aiNextAction || deal.nextStepDueAt ? 'Next step set' : 'No next step'}</small>
-                  </Link>
-                ))}
-                {!isLoading && stageDeals.length === 0 && <div className="crm-empty-column">Drop deals here</div>}
-              </div>
+                    <CrmPill tone={riskTone(deal)}>{deal.aiScore ?? '—'}</CrmPill>
+                  </div>
+                  <div className="crm-deal-value-row">
+                    <CrmPill tone={!deal.valueAmount || deal.valueAmount <= 0 ? 'watch' : 'neutral'}>{money(deal.valueAmount)}</CrmPill>
+                    <CrmPill tone={!deal.expectedCloseDate ? 'watch' : 'neutral'}><CalendarClock size={12} /> {dateLabel(deal.expectedCloseDate)}</CrmPill>
+                    <CrmPill tone={riskTone(deal)}>{deal.aiRiskLevel} risk</CrmPill>
+                  </div>
+                  <div className="crm-ai-line">
+                    {riskTone(deal) === 'risk' ? <AlertTriangle size={13} /> : <Sparkles size={13} />}
+                    <span>{insight(deal)}</span>
+                  </div>
+                </Link>
+              ))}
+
+              {!isLoading && stageDeals.length === 0 && (
+                <CrmEmptyAction title="Ready for deals" description="Drop deals here or add one above when this stage becomes part of your sales motion." />
+              )}
             </section>
           )
         })}
       </div>
-    </OperatorPage>
+    </CrmPageShell>
   )
 }

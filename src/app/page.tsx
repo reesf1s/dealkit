@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 export default async function LandingPage() {
   try {
     const { userId } = await auth()
-    if (userId) redirect('/today')
+    if (userId) redirect('/home')
   } catch {
     // Clerk may be unset in local static previews.
   }
@@ -48,10 +48,10 @@ export default async function LandingPage() {
 
       <section className="landing-grid">
         {[
-          ['Today first', 'Open the app and see stale deals, overdue tasks, upcoming meetings, and AI-prioritized actions.'],
+          ['Home first', 'Open the app and see stale deals, overdue tasks, upcoming meetings, and AI-prioritized actions.'],
           ['Native pipeline', 'A fast visual CRM pipeline with companies, contacts, activities, tasks, and deal pages as first-class records.'],
           ['Evidence-backed AI', 'Deal summaries, risk signals, and next actions cite real CRM activity instead of generic chatbot guesses.'],
-          ['Calendar aware', 'Google Calendar sync brings meetings into Today and links them to relevant contacts and deals.'],
+          ['Calendar aware', 'Google Calendar sync brings meetings into Home and links them to relevant contacts and deals.'],
         ].map(([title, body]) => (
           <article key={title}>
             <h2>{title}</h2>

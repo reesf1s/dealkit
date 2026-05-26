@@ -5,10 +5,10 @@ import { usePathname } from 'next/navigation'
 import useSWR from 'swr'
 import {
   CalendarCheck,
+  Home,
   Target,
   Kanban,
   Users,
-  MessageSquare,
   Building2,
   Bot,
   Settings,
@@ -21,14 +21,15 @@ import { fetcher } from '@/lib/fetcher'
 type NavMeta = { label: string; icon: React.ElementType }
 
 const PAGE_MAP: Record<string, NavMeta> = {
-  '/today': { label: 'Today', icon: CalendarCheck },
-  '/dashboard': { label: 'Today', icon: CalendarCheck },
-  '/deals': { label: 'Deal Workspace', icon: Target },
-  '/pipeline': { label: 'Pipeline Kanban', icon: Kanban },
+  '/home': { label: 'Home', icon: Home },
+  '/today': { label: 'Home', icon: Home },
+  '/dashboard': { label: 'Home', icon: Home },
+  '/calendar': { label: 'Calendar', icon: CalendarCheck },
+  '/deals': { label: 'Deals', icon: Target },
+  '/pipeline': { label: 'Pipeline', icon: Kanban },
   '/companies': { label: 'Companies', icon: Building2 },
   '/contacts': { label: 'Contacts', icon: Users },
   '/tasks': { label: 'Tasks', icon: Target },
-  '/activity': { label: 'Activity', icon: MessageSquare },
   '/assistant': { label: 'Assistant', icon: Bot },
   '/settings': { label: 'Settings', icon: Settings },
 }
