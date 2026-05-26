@@ -25,6 +25,7 @@ type HomeData = {
   overdueTasks: Array<{ id: string; title: string; dueAt: string | null; dealId: string | null; dealTitle: string | null; companyName: string | null }>
   openPipelineValue: number
   likelyClosers: Array<any>
+  dealIntelligence: Array<any>
 }
 
 export default function HomePage() {
@@ -32,9 +33,9 @@ export default function HomePage() {
   const home = data?.data
   const priorities = home?.priorities ?? []
   const meetings = home?.upcomingMeetings ?? []
-  const activeDeals = [...(home?.likelyClosers ?? []), ...(home?.atRiskDeals ?? []), ...(home?.staleDeals ?? [])]
+  const activeDeals = [...(home?.dealIntelligence ?? []), ...(home?.likelyClosers ?? []), ...(home?.atRiskDeals ?? []), ...(home?.staleDeals ?? [])]
     .filter((deal, index, all) => all.findIndex(item => item.id === deal.id) === index)
-    .slice(0, 4)
+    .slice(0, 6)
 
   return (
     <div className="v2-page">

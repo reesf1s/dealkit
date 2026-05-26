@@ -922,6 +922,27 @@ button.v2-action-card {
   line-height: 1.55;
 }
 
+.v2-evidence-callout {
+  display: grid;
+  gap: 7px;
+  border: 1px solid rgba(23, 32, 24, 0.08);
+  border-radius: 18px;
+  background: rgba(23, 32, 24, 0.035);
+  padding: 14px;
+  margin: 14px 0;
+}
+
+.v2-evidence-callout strong {
+  color: rgba(23, 32, 24, 0.84);
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.v2-evidence-callout span {
+  color: rgba(23, 32, 24, 0.68);
+  line-height: 1.5;
+}
+
 .v2-timeline {
   display: grid;
   gap: 14px;

@@ -84,17 +84,24 @@ export async function proposeDealUpdateWithAI(note: string, context: NativeDealC
     currentIntelligence: intelligence,
   }
 
-  const { text } = await generateText({
-    model: openai()(selectHalvexModel(plan)),
-    system: [
-      'You are Halvex, a calm AI deal operator for a small-team CRM.',
-      'Use only the CRM context and the user note. Do not invent facts.',
-      'Turn the note into proposed CRM updates. Important fields are suggestions only; the user approves before saving.',
-      'Return only compact JSON with keys: blocker, risk, nextAction, task, summary, confidence, evidence.',
-    ].join(' '),
-    prompt: JSON.stringify({ crmContext: promptContext, userNote: note }),
-    providerOptions: { openai: { maxCompletionTokens: 700 } },
-  })
+  let text = ''
+  try {
+    const result = await generateText({
+      model: openai()(selectHalvexModel(plan)),
+      system: [
+        'You are Halvex, a calm AI deal operator for a small-team CRM.',
+        'Use only the CRM context and the user note. Do not invent facts.',
+        'Turn the note into proposed CRM updates. Important fields are suggestions only; the user approves before saving.',
+        'Return only compact JSON with keys: blocker, risk, nextAction, task, summary, confidence, evidence.',
+      ].join(' '),
+      prompt: JSON.stringify({ crmContext: promptContext, userNote: note }),
+      providerOptions: { openai: { maxCompletionTokens: 700 } },
+    })
+    text = result.text
+  } catch (error) {
+    console.warn('[crm] deal update AI unavailable, using deterministic proposal', error)
+    return fallback
+  }
 
   const parsed = parseJsonObject<ProposedDealUpdate>(text, fallback)
   return {
@@ -114,28 +121,36 @@ export async function answerAssistantWithAI(input: {
   today: unknown
   pipeline: unknown
   activity: unknown
+  dealContext?: unknown
   fallbackAnswer: string
 }) {
   if (!hasOpenAiKey()) return input.fallbackAnswer
 
-  const { text } = await generateText({
-    model: openai()(selectHalvexModel(input.plan, { premium: true })),
-    system: [
-      'You are Halvex, a concise AI CRM assistant for founders and small sales teams.',
-      'Use only the provided CRM data. Never pretend missing data exists.',
-      'Always separate what happened, what it means, and what to do next.',
-      'Mention confidence limits when evidence is thin. Keep the answer under 160 words.',
-    ].join(' '),
-    prompt: JSON.stringify({
-      question: input.message,
-      today: input.today,
-      pipeline: input.pipeline,
-      recentActivity: input.activity,
-    }),
-    providerOptions: { openai: { maxCompletionTokens: 900 } },
-  })
+  try {
+    const { text } = await generateText({
+      model: openai()(selectHalvexModel(input.plan, { premium: true })),
+      system: [
+        'You are Halvex, a concise AI CRM assistant for founders and small sales teams.',
+        'Use only the provided CRM data. Never pretend missing data exists.',
+        'Always separate what happened, what it means, and what to do next.',
+        'Use specific deal names, newest activity, risk drivers, next actions, and links described in the data.',
+        'Mention confidence limits when evidence is thin. Keep the answer under 160 words.',
+      ].join(' '),
+      prompt: JSON.stringify({
+        question: input.message,
+        today: input.today,
+        pipeline: input.pipeline,
+        recentActivity: input.activity,
+        dealContext: input.dealContext,
+      }),
+      providerOptions: { openai: { maxCompletionTokens: 900 } },
+    })
 
-  return text.trim() || input.fallbackAnswer
+    return text.trim() || input.fallbackAnswer
+  } catch (error) {
+    console.warn('[crm] assistant AI unavailable, using deterministic answer', error)
+    return input.fallbackAnswer
+  }
 }
 
 export async function generateDealBriefWithAI(context: NativeDealContext | null, plan?: Plan | null) {
@@ -143,25 +158,34 @@ export async function generateDealBriefWithAI(context: NativeDealContext | null,
   const fallback = deriveDealIntelligence(context)
   if (!hasOpenAiKey()) return fallback
 
-  const { text } = await generateText({
-    model: openai()(selectHalvexModel(plan, { premium: true })),
-    system: [
-      'You are the Halvex deal intelligence engine.',
-      'Analyse only the CRM context provided. Do not invent facts.',
-      'Return compact JSON with keys: summary, nextAction, riskDrivers, positiveSignals, missingData, confidence.',
-      'Score is computed deterministically elsewhere; explain evidence, risk, and next action.',
-    ].join(' '),
-    prompt: JSON.stringify({
-      deal: context.deal,
-      company: context.company,
-      contacts: context.contacts,
-      openTasks: context.openTasks,
-      meetings: context.meetings,
-      evidenceText: dealEvidenceText(context),
-      deterministicIntelligence: fallback,
-    }),
-    providerOptions: { openai: { maxCompletionTokens: 800 } },
-  })
+  let text = ''
+  try {
+    const result = await generateText({
+      model: openai()(selectHalvexModel(plan, { premium: true })),
+      system: [
+        'You are the Halvex deal intelligence engine.',
+        'Analyse only the CRM context provided. Do not invent facts.',
+        'Prioritise the newest substantive evidence over generic field-change records.',
+        'Always explain what happened, what it means, what to do next, and confidence.',
+        'Return compact JSON with keys: summary, nextAction, riskDrivers, positiveSignals, missingData, confidence.',
+        'Score and risk are computed deterministically elsewhere; do not make the deal sound safer than the evidence.',
+      ].join(' '),
+      prompt: JSON.stringify({
+        deal: context.deal,
+        company: context.company,
+        contacts: context.contacts,
+        openTasks: context.openTasks,
+        meetings: context.meetings,
+        evidenceText: dealEvidenceText(context),
+        deterministicIntelligence: fallback,
+      }),
+      providerOptions: { openai: { maxCompletionTokens: 800 } },
+    })
+    text = result.text
+  } catch (error) {
+    console.warn('[crm] deal brief AI unavailable, using deterministic brief', error)
+    return fallback
+  }
 
   const parsed = parseJsonObject<{
     summary?: string

@@ -29,6 +29,9 @@ export default function DealWorkspacePage() {
   const context = data?.data
   const deal = context?.deal
   const concerns = trustReasons(context)
+  const intelligence = context?.intelligence
+  const displaySummary = intelligence?.summary || deal?.aiSummary
+  const displayNextAction = intelligence?.nextAction || deal?.aiNextAction
 
   async function updateField(field: string, value: string) {
     await fetch(`/api/crm/deals/${params.id}`, {
@@ -52,11 +55,11 @@ export default function DealWorkspacePage() {
       <RecordHero
         eyebrow="Deal workspace"
         title={deal.title}
-        subtitle={deal.aiSummary || 'Add recent context and Halvex will keep the deal brief, risks, and next action current.'}
+        subtitle={displaySummary || 'Add recent context and Halvex will keep the deal brief, risks, and next action current.'}
         meta={(
           <>
-            <RiskBadge risk={concerns.risk ?? deal.aiRiskLevel} />
-            <ConfidenceBadge value={concerns.confidence ?? deal.aiConfidence} />
+            <RiskBadge risk={intelligence?.riskLevel ?? concerns.risk ?? deal.aiRiskLevel} />
+            <ConfidenceBadge value={intelligence?.confidence ?? concerns.confidence ?? deal.aiConfidence} />
             {context.company?.id ? <ObjectLinkChip href={`/companies/${context.company.id}`}>{context.company.name ?? 'Company'}</ObjectLinkChip> : null}
           </>
         )}
@@ -64,9 +67,11 @@ export default function DealWorkspacePage() {
           <>
             <ButtonV2 tone="dark" onClick={() => document.getElementById('add-update')?.scrollIntoView({ behavior: 'smooth' })}><Sparkles size={16} /> Add update</ButtonV2>
             <ButtonV2 onClick={() => {
-              window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: `Summarise ${deal.title}` } }))
+              window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: `Summarise ${deal.title}`, dealId: deal.id } }))
             }}><Bot size={16} /> Ask Halvex</ButtonV2>
-            <ButtonV2><MailPlus size={16} /> Draft follow-up</ButtonV2>
+            <ButtonV2 onClick={() => {
+              window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: `Draft a concise follow-up for ${deal.title}`, dealId: deal.id } }))
+            }}><MailPlus size={16} /> Draft follow-up</ButtonV2>
           </>
         )}
       />
@@ -78,7 +83,7 @@ export default function DealWorkspacePage() {
         <div className="v2-grid-3">
           <InlineEditableField label="Value" value={deal.valueAmount ? String(deal.valueAmount) : ''} type="number" onSave={value => updateField('valueAmount', value)} />
           <InlineEditableField label="Close date" value={deal.expectedCloseDate ? new Date(deal.expectedCloseDate).toISOString().slice(0, 10) : ''} type="date" onSave={value => updateField('expectedCloseDate', value)} />
-          <InlineEditableField label="Next action" value={deal.aiNextAction ?? ''} onSave={value => updateField('aiNextAction', value)} />
+          <InlineEditableField label="Next action" value={displayNextAction ?? ''} onSave={value => updateField('aiNextAction', value)} />
         </div>
       </PanelV2>
 
@@ -89,7 +94,13 @@ export default function DealWorkspacePage() {
               A short answer to what happened, what it means, and what to do next.
             </SectionHeader>
             <div className="v2-brief">
-              <p>{deal.aiSummary || 'Context is limited. Add an update, meeting note, email, or task to generate a stronger brief.'}</p>
+              <p>{displaySummary || 'Context is limited. Add an update, meeting note, email, or task to generate a stronger brief.'}</p>
+              {intelligence?.latestEvidence ? (
+                <div className="v2-evidence-callout">
+                  <strong>Latest useful evidence</strong>
+                  <span>{intelligence.latestEvidence.text}</span>
+                </div>
+              ) : null}
               <div className="v2-deal-facts">
                 <span>{money(deal.valueAmount)}</span>
                 <span>{shortDate(deal.expectedCloseDate) ?? 'Close date missing'}</span>
@@ -111,7 +122,16 @@ export default function DealWorkspacePage() {
         </div>
 
         <div className="v2-page">
-          <IntelligencePanel deal={{ ...deal, aiRiskLevel: concerns.risk ?? deal.aiRiskLevel, aiConfidence: concerns.confidence ?? deal.aiConfidence }} signals={context.signals ?? []} reasons={concerns.reasons} />
+          <IntelligencePanel
+            deal={{
+              ...deal,
+              aiScore: intelligence?.score ?? deal.aiScore,
+              aiRiskLevel: intelligence?.riskLevel ?? concerns.risk ?? deal.aiRiskLevel,
+              aiConfidence: intelligence?.confidence ?? concerns.confidence ?? deal.aiConfidence,
+            }}
+            signals={context.signals ?? []}
+            reasons={concerns.reasons}
+          />
           <PanelV2>
             <SectionHeader title="Next meetings" icon={<CalendarDays size={18} />} action={<ButtonV2 href="/calendar">Calendar</ButtonV2>}>
               Calendar context keeps the deal memory current.
@@ -145,10 +165,11 @@ function trustReasons(context: any) {
     const reasons = [
       ...(context.intelligence.riskDrivers ?? []),
       ...(context.intelligence.missingData ?? []).map((item: string) => `${item}, so confidence stays limited.`),
+      ...(context.intelligence.positiveSignals ?? []).slice(0, 2).map((item: string) => `Positive signal: ${item}`),
     ].slice(0, 6)
     return {
       reasons,
-      risk: context.intelligence.riskLevel === deal.aiRiskLevel ? null : context.intelligence.riskLevel,
+      risk: context.intelligence.riskLevel,
       confidence: context.intelligence.confidence,
     }
   }

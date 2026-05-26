@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import {
   crmActivities,
@@ -385,6 +385,32 @@ export async function listPipeline(workspaceId: string, userId: string) {
     .where(eq(crmDeals.workspaceId, workspaceId))
     .orderBy(desc(crmDeals.updatedAt))
 
+  const dealIds = rows.map(deal => deal.id)
+  const activityRows = dealIds.length
+    ? await db.select({
+      id: crmActivities.id,
+      dealId: crmActivities.dealId,
+      title: crmActivities.title,
+      body: crmActivities.body,
+      summary: crmActivities.summary,
+      occurredAt: crmActivities.occurredAt,
+      source: crmActivities.source,
+      type: crmActivities.type,
+    })
+      .from(crmActivities)
+      .where(and(eq(crmActivities.workspaceId, workspaceId), inArray(crmActivities.dealId, dealIds)))
+      .orderBy(desc(crmActivities.occurredAt))
+    : []
+  const activitiesByDeal = new Map<string, typeof activityRows>()
+  for (const activity of activityRows) {
+    if (!activity.dealId) continue
+    const existing = activitiesByDeal.get(activity.dealId) ?? []
+    if (existing.length < 6) {
+      existing.push(activity)
+      activitiesByDeal.set(activity.dealId, existing)
+    }
+  }
+
   const deals = rows.map(deal => {
     const intelligence = deriveDealIntelligence({
       deal: {
@@ -392,7 +418,7 @@ export async function listPipeline(workspaceId: string, userId: string) {
         companyName: deal.companyName,
         stageName: deal.stageName,
       },
-      latestActivities: deal.lastActivityAt ? [{ id: `last-${deal.id}`, title: 'Last activity', occurredAt: deal.lastActivityAt }] : [],
+      latestActivities: activitiesByDeal.get(deal.id) ?? [],
       openTasks: deal.nextStepDueAt || deal.aiNextAction ? [{ id: `next-${deal.id}`, title: deal.aiNextAction ?? 'Next step', dueAt: deal.nextStepDueAt }] : [],
       contacts: [],
       meetings: [],
@@ -473,6 +499,21 @@ export async function listToday(workspaceId: string, userId: string) {
         confidence: 'high',
       })),
     ...openDeals
+      .filter(deal => deal.intelligence?.riskDrivers?.length || deal.aiRiskLevel === 'high')
+      .slice(0, 5)
+      .map(deal => ({
+        id: `risk-${deal.id}`,
+        title: `Review ${deal.companyName ?? deal.title}`,
+        reason: deal.intelligence?.riskDrivers?.[0] ?? 'Deal is showing elevated risk.',
+        linkedType: 'deal',
+        linkedId: deal.id,
+        dealId: deal.id,
+        companyName: deal.companyName,
+        suggestedAction: deal.intelligence?.nextAction ?? deal.aiNextAction ?? 'Review the latest evidence and agree a concrete next step.',
+        dueAt: null,
+        confidence: deal.aiConfidence && deal.aiConfidence >= 70 ? 'high' : 'medium',
+      })),
+    ...openDeals
       .filter(deal => !deal.nextStepDueAt)
       .slice(0, 5)
       .map(deal => ({
@@ -504,6 +545,19 @@ export async function listToday(workspaceId: string, userId: string) {
       })),
   ].slice(0, 10)
 
+  const dealIntelligence = openDeals
+    .slice()
+    .sort((a, b) => {
+      const aRisk = a.aiRiskLevel === 'high' ? 2 : a.aiRiskLevel === 'medium' ? 1 : 0
+      const bRisk = b.aiRiskLevel === 'high' ? 2 : b.aiRiskLevel === 'medium' ? 1 : 0
+      if (bRisk !== aRisk) return bRisk - aRisk
+      const aReasons = a.intelligence?.riskDrivers?.length ?? 0
+      const bReasons = b.intelligence?.riskDrivers?.length ?? 0
+      if (bReasons !== aReasons) return bReasons - aReasons
+      return (b.lastActivityAt?.getTime?.() ?? 0) - (a.lastActivityAt?.getTime?.() ?? 0)
+    })
+    .slice(0, 12)
+
   return {
     priorities,
     atRiskDeals: openDeals.filter(deal => deal.aiRiskLevel === 'high' || (deal.aiScore ?? 50) < 45).slice(0, 8),
@@ -512,6 +566,7 @@ export async function listToday(workspaceId: string, userId: string) {
     overdueTasks: tasks.filter(task => task.dueAt && task.dueAt < now).slice(0, 8),
     openPipelineValue: openDeals.reduce((sum, deal) => sum + (deal.valueAmount ?? 0), 0),
     likelyClosers: openDeals.filter(deal => deal.expectedCloseDate && deal.expectedCloseDate <= soon && (deal.aiScore ?? 0) >= 60).slice(0, 6),
+    dealIntelligence,
   }
 }
 

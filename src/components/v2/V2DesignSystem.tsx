@@ -52,6 +52,7 @@ export function AppShellV2({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [commandOpen, setCommandOpen] = useState(false)
+  const [assistantContextDealId, setAssistantContextDealId] = useState<string | null>(null)
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -66,7 +67,8 @@ export function AppShellV2({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handler = (event: Event) => {
-      const detail = (event as CustomEvent<{ query?: string }>).detail
+      const detail = (event as CustomEvent<{ query?: string; dealId?: string | null }>).detail
+      setAssistantContextDealId(detail?.dealId ?? null)
       setAssistantOpen(true)
       if (detail?.query) {
         window.dispatchEvent(new CustomEvent('halvex-assistant-query', { detail }))
@@ -131,7 +133,7 @@ export function AppShellV2({ children }: { children: React.ReactNode }) {
       </div>
 
       <MobileNavV2 pathname={pathname} />
-      <AssistantDrawer open={assistantOpen} onClose={() => setAssistantOpen(false)} />
+      <AssistantDrawer open={assistantOpen} onClose={() => setAssistantOpen(false)} contextDealId={assistantContextDealId} />
       <CommandMenuV2 open={commandOpen} onClose={() => setCommandOpen(false)} />
     </div>
   )
@@ -202,14 +204,14 @@ function CommandMenuV2({ open, onClose }: { open: boolean; onClose: () => void }
   )
 }
 
-function AssistantDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+function AssistantDrawer({ open, onClose, contextDealId }: { open: boolean; onClose: () => void; contextDealId?: string | null }) {
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string; links?: Array<{ label: string; href: string }> }>>([
     { role: 'assistant', text: 'I can prioritise your day, explain deal risk, prep meetings, draft follow-ups, or turn a raw note into proposed CRM updates.' },
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const submit = useCallback(async (value = input) => {
+  const submit = useCallback(async (value = input, dealIdOverride?: string | null) => {
     const message = value.trim()
     if (!message || loading) return
     setInput('')
@@ -219,12 +221,12 @@ function AssistantDrawer({ open, onClose }: { open: boolean; onClose: () => void
       const response = await fetch('/api/crm/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, dealId: dealIdOverride ?? contextDealId ?? undefined }),
       })
       const payload = await response.json()
       setMessages(prev => [...prev, {
         role: 'assistant',
-        text: payload?.data?.answer ?? 'I could not answer that yet.',
+        text: payload?.data?.answer ?? payload?.error ?? 'I could not answer that yet.',
         links: payload?.data?.links ?? [],
       }])
     } catch {
@@ -232,19 +234,20 @@ function AssistantDrawer({ open, onClose }: { open: boolean; onClose: () => void
     } finally {
       setLoading(false)
     }
-  }, [input, loading])
+  }, [contextDealId, input, loading])
 
   useEffect(() => {
     const handler = (event: Event) => {
-      const query = (event as CustomEvent<{ query?: string }>).detail?.query
+      const detail = (event as CustomEvent<{ query?: string; dealId?: string | null }>).detail
+      const query = detail?.query
       if (query) {
         setInput(query)
-        setTimeout(() => submit(query), 0)
+        setTimeout(() => submit(query, detail?.dealId ?? contextDealId), 0)
       }
     }
     window.addEventListener('halvex-assistant-query', handler)
     return () => window.removeEventListener('halvex-assistant-query', handler)
-  }, [submit])
+  }, [contextDealId, submit])
 
   return (
     <aside className={`v2-assistant-drawer ${open ? 'open' : ''}`} aria-hidden={!open}>
