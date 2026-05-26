@@ -1,15 +1,14 @@
 'use client'
 
-import { useMemo } from 'react'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import useSWR from 'swr'
 import {
-  LayoutDashboard,
+  CalendarCheck,
   Target,
   Kanban,
   Users,
   MessageSquare,
-  BarChart3,
   Building2,
   Bot,
   Settings,
@@ -22,15 +21,15 @@ import { fetcher } from '@/lib/fetcher'
 type NavMeta = { label: string; icon: React.ElementType }
 
 const PAGE_MAP: Record<string, NavMeta> = {
-  '/dashboard': { label: 'Sales Overview', icon: LayoutDashboard },
+  '/today': { label: 'Today', icon: CalendarCheck },
+  '/dashboard': { label: 'Today', icon: CalendarCheck },
   '/deals': { label: 'Deal Workspace', icon: Target },
   '/pipeline': { label: 'Pipeline Kanban', icon: Kanban },
+  '/companies': { label: 'Companies', icon: Building2 },
   '/contacts': { label: 'Contacts', icon: Users },
-  '/connections': { label: 'Activity', icon: MessageSquare },
-  '/analytics': { label: 'Reports', icon: BarChart3 },
-  '/company': { label: 'Company', icon: Building2 },
-  '/intelligence': { label: 'Automations', icon: Bot },
-  '/automations': { label: 'Automations', icon: Bot },
+  '/tasks': { label: 'Tasks', icon: Target },
+  '/activity': { label: 'Activity', icon: MessageSquare },
+  '/assistant': { label: 'Assistant', icon: Bot },
   '/settings': { label: 'Settings', icon: Settings },
 }
 
@@ -39,7 +38,7 @@ function resolvePage(pathname: string): NavMeta {
   for (const [key, value] of Object.entries(PAGE_MAP)) {
     if (pathname.startsWith(`${key}/`)) return value
   }
-  return { label: 'Halvex CRM', icon: LayoutDashboard }
+  return { label: 'Halvex CRM', icon: CalendarCheck }
 }
 
 function formatCurrency(value: number): string {
@@ -50,35 +49,18 @@ function formatCurrency(value: number): string {
 
 export default function TopNav() {
   const pathname = usePathname()
-  const { sidebarWidth, openMobile, toggleCopilot } = useSidebar()
+  const { sidebarWidth, openMobile } = useSidebar()
 
-  const { data: dealsRes } = useSWR('/api/deals', fetcher, {
-    revalidateOnFocus: false,
-    dedupingInterval: 45000,
-  })
-
-  const { data: automationsRes } = useSWR('/api/automations', fetcher, {
+  const { data: todayRes } = useSWR('/api/crm/today', fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 45000,
   })
 
   const { label, icon: Icon } = resolvePage(pathname)
-
-  const openDeals = useMemo(() => {
-    const deals = dealsRes?.data
-    if (!Array.isArray(deals)) return []
-    return deals.filter((deal: { stage?: string }) => deal.stage !== 'closed_won' && deal.stage !== 'closed_lost')
-  }, [dealsRes?.data])
-
-  const pipelineValue = useMemo(() => openDeals.reduce((sum: number, deal: { dealValue?: number | null }) => sum + (deal.dealValue ?? 0), 0), [openDeals])
-
-  const automationStats = useMemo(() => {
-    const list = automationsRes?.data
-    if (!Array.isArray(list)) return { enabled: 0, alerts: 0 }
-    const enabled = list.filter((a: { enabled: boolean }) => a.enabled)
-    const alerts = enabled.filter((a: { category?: string }) => a.category === 'alerts').length
-    return { enabled: enabled.length, alerts }
-  }, [automationsRes?.data])
+  const today = todayRes?.data
+  const pipelineValue = Number(today?.openPipelineValue ?? 0)
+  const priorityCount = Array.isArray(today?.priorities) ? today.priorities.length : 0
+  const riskCount = Array.isArray(today?.atRiskDeals) ? today.atRiskDeals.length : 0
 
   return (
 	    <header style={{
@@ -173,15 +155,15 @@ export default function TopNav() {
 
       <div className="topnav-status" style={{ display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
         <div className="notion-chip" style={{ color: 'var(--text-primary)' }}>
-          Pipeline {openDeals.length} · {formatCurrency(pipelineValue)}
+          Pipeline {formatCurrency(pipelineValue)}
         </div>
 
         <div className="notion-chip">
-          Signals {automationStats.alerts} · Auto {automationStats.enabled}
+          Priorities {priorityCount} · Risk {riskCount}
         </div>
 
-        <button
-          onClick={toggleCopilot}
+        <Link
+          href="/assistant"
           style={{
             height: 32,
             padding: '0 12px',
@@ -195,11 +177,12 @@ export default function TopNav() {
             fontSize: 11,
             fontWeight: 600,
             cursor: 'pointer',
+            textDecoration: 'none',
           }}
         >
           <Bot size={11} />
           Assistant
-        </button>
+        </Link>
       </div>
 
       <style>{`

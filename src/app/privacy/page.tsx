@@ -21,7 +21,7 @@ export default function PrivacyPage() {
           <div style={{ width: '28px', height: '28px', background: '#37352f', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileText size={13} color="#fff" />
           </div>
-          <span style={{ fontWeight: '700', fontSize: '14px', color: '#37352f' }}>Halvex</span>
+          <span style={{ fontWeight: '700', fontSize: '14px', color: '#37352f' }}>Halvex CRM</span>
         </Link>
         <Link href="/" style={{ fontSize: '13px', color: '#9b9a97', textDecoration: 'none' }}>← Back to home</Link>
       </nav>
@@ -33,13 +33,13 @@ export default function PrivacyPage() {
         </div>
 
         <Section title="1. Who we are">
-          <P>{COMPANY_NAME} (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) operates the Halvex sales intelligence platform at halvex.ai. We are registered in {COMPANY_JURISDICTION}.</P>
+          <P>{COMPANY_NAME} (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) operates the Halvex CRM platform at halvex.ai. We are registered in {COMPANY_JURISDICTION}.</P>
           <P>We act as the <strong>data controller</strong> for personal data processed through our platform. For questions about this policy or to exercise your rights, contact us at <a href={`mailto:${COMPANY_EMAIL}`} style={{ color: 'var(--brand)' }}>{COMPANY_EMAIL}</a>.</P>
         </Section>
 
         <Section title="2. What data we collect">
           <P><strong>Account data</strong> — name, email address, and authentication credentials collected when you sign up via Clerk (our authentication provider).</P>
-          <P><strong>Company & sales data</strong> — information you enter about your company, competitors, deals, case studies, and product gaps. This data is stored in our database and used solely to power the features you use.</P>
+          <P><strong>Company & sales data</strong> — information you enter about workspaces, companies, contacts, deals, tasks, notes, activity, calendar events, and sales workflows. This data is stored in our database and used solely to power the features you use.</P>
           <P><strong>Usage data</strong> — page views, feature usage events, and interaction logs collected to improve the product and for security purposes.</P>
           <P><strong>Payment data</strong> — billing information is handled entirely by Stripe. We never store card numbers or bank details. We receive only a Stripe customer ID and subscription status.</P>
           <P><strong>AI-generated content</strong> — text you paste into AI features (meeting notes, company descriptions) is sent to Anthropic&apos;s API to generate responses. Anthropic processes this data subject to their privacy policy.</P>
@@ -58,7 +58,7 @@ export default function PrivacyPage() {
         <Section title="4. How we use your data">
           <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', color: '#787774', fontSize: '14px', lineHeight: '1.7' }}>
             <li>Provide and operate the Halvex platform</li>
-            <li>Generate AI-powered sales collateral, meeting prep, and deal scoring</li>
+            <li>Generate AI-powered deal summaries, next actions, meeting prep, and deal scoring</li>
             <li>Process subscription payments and manage your billing</li>
             <li>Send transactional emails (account confirmation, invoices, password reset)</li>
             <li>Detect and prevent security incidents</li>

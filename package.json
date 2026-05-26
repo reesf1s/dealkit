@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "seed:crm:dev": "node scripts/seed-native-crm-dev.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.0",

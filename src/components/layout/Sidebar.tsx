@@ -5,15 +5,15 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useClerk, useUser } from '@clerk/nextjs'
 import { useTheme } from 'next-themes'
-import useSWR from 'swr'
 import {
-  LayoutDashboard,
+  CalendarCheck,
   Kanban,
   Users,
   MessageSquare,
-  BarChart3,
   Building2,
   Bot,
+  BriefcaseBusiness,
+  CheckSquare2,
   Settings,
   LogOut,
   ChevronLeft,
@@ -24,7 +24,6 @@ import {
 } from 'lucide-react'
 import { useSidebar } from './SidebarContext'
 import { identify } from '@/lib/analytics'
-import { fetcher } from '@/lib/fetcher'
 
 interface NavItemDef {
   href: string
@@ -34,16 +33,17 @@ interface NavItemDef {
 }
 
 const PRIMARY_NAV: NavItemDef[] = [
-  { href: '/dashboard', label: 'Overview', icon: LayoutDashboard, matchPaths: ['/dashboard'] },
+  { href: '/today', label: 'Today', icon: CalendarCheck, matchPaths: ['/today', '/dashboard'] },
   { href: '/pipeline', label: 'Pipeline', icon: Kanban, matchPaths: ['/pipeline'] },
+  { href: '/deals', label: 'Deals', icon: BriefcaseBusiness, matchPaths: ['/deals'] },
+  { href: '/companies', label: 'Companies', icon: Building2, matchPaths: ['/companies'] },
   { href: '/contacts', label: 'Contacts', icon: Users, matchPaths: ['/contacts'] },
-  { href: '/connections', label: 'Activity', icon: MessageSquare, matchPaths: ['/connections', '/chat'] },
-  { href: '/analytics', label: 'Reports', icon: BarChart3, matchPaths: ['/analytics'] },
+  { href: '/tasks', label: 'Tasks', icon: CheckSquare2, matchPaths: ['/tasks'] },
+  { href: '/activity', label: 'Activity', icon: MessageSquare, matchPaths: ['/activity', '/connections'] },
+  { href: '/assistant', label: 'Assistant', icon: Bot, matchPaths: ['/assistant', '/chat'] },
 ]
 
 const OPERATIONS_NAV: NavItemDef[] = [
-  { href: '/company', label: 'Company', icon: Building2, matchPaths: ['/company', '/onboarding'] },
-  { href: '/automations', label: 'Automations', icon: Bot, matchPaths: ['/automations', '/intelligence', '/workflows'] },
   { href: '/settings', label: 'Settings', icon: Settings, matchPaths: ['/settings'] },
 ]
 
@@ -148,16 +148,7 @@ export default function Sidebar() {
   const { signOut } = useClerk()
   const { user } = useUser()
   const { theme, setTheme } = useTheme()
-  const { collapsed, mobileOpen, toggleCollapsed, closeMobile, toggleCopilot } = useSidebar()
-
-  const { data: automationsRes } = useSWR('/api/automations', fetcher, {
-    revalidateOnFocus: false,
-    dedupingInterval: 45000,
-  })
-
-  const enabledAutomations = Array.isArray(automationsRes?.data)
-    ? automationsRes.data.filter((a: { enabled: boolean }) => a.enabled).length
-    : 0
+  const { collapsed, mobileOpen, toggleCollapsed, closeMobile } = useSidebar()
 
   useEffect(() => {
     if (user) {
@@ -200,7 +191,7 @@ export default function Sidebar() {
         gap: 8,
       }}>
         {!collapsed ? (
-          <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', minWidth: 0 }}>
+          <Link href="/today" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', minWidth: 0 }}>
             <div style={{
               width: 28,
               height: 28,
@@ -217,8 +208,8 @@ export default function Sidebar() {
               H
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 760, color: 'var(--text-primary)', lineHeight: 1.1 }}>Halvex</div>
-              <div style={{ fontSize: 10.5, color: 'var(--text-tertiary)', marginTop: 2 }}>Revenue workspace</div>
+              <div style={{ fontSize: 13, fontWeight: 760, color: 'var(--text-primary)', lineHeight: 1.1 }}>Halvex CRM</div>
+              <div style={{ fontSize: 10.5, color: 'var(--text-tertiary)', marginTop: 2 }}>Sales workspace</div>
             </div>
           </Link>
         ) : (
@@ -311,7 +302,6 @@ export default function Sidebar() {
             collapsed={collapsed}
             active={isActive(item.href, item.matchPaths)}
             onClick={closeMobile}
-            count={item.href === '/automations' ? enabledAutomations : undefined}
           />
         ))}
       </nav>
@@ -389,10 +379,10 @@ export default function Sidebar() {
   )
 
   const mobileTabs = [
-    { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
+    { href: '/today', label: 'Today', icon: CalendarCheck },
     { href: '/pipeline', label: 'Pipeline', icon: Kanban },
-    { href: '/contacts', label: 'Contacts', icon: Users },
-    { href: '/connections', label: 'Activity', icon: MessageSquare },
+    { href: '/deals', label: 'Deals', icon: BriefcaseBusiness },
+    { href: '/tasks', label: 'Tasks', icon: CheckSquare2 },
   ]
 
   return (
@@ -459,13 +449,14 @@ export default function Sidebar() {
             </Link>
           )
         })}
-        <button
-          onClick={toggleCopilot}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, minWidth: 56 }}
+        <Link
+          href="/assistant"
+          onClick={closeMobile}
+          style={{ textDecoration: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, minWidth: 56 }}
         >
           <Bot size={19} style={{ color: 'var(--brand)' }} />
           <span style={{ fontSize: 10, color: 'var(--brand)', fontWeight: 600 }}>Assistant</span>
-        </button>
+        </Link>
       </nav>
 
       <style>{`

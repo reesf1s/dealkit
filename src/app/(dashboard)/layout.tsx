@@ -1,14 +1,10 @@
 'use client'
 
-import dynamic from 'next/dynamic'
 import Sidebar from '@/components/layout/Sidebar'
 import TopNav from '@/components/layout/TopNav'
 import CommandPalette from '@/components/shared/CommandPalette'
 import ErrorBoundary from '@/components/shared/ErrorBoundary'
 import { SidebarProvider, useSidebar } from '@/components/layout/SidebarContext'
-
-// Lazy-load CopilotPanel — it's heavy and not needed on initial render
-const CopilotPanel = dynamic(() => import('@/components/ai/CopilotPanel'), { ssr: false })
 
 function LayoutShell({ children }: { children: React.ReactNode }) {
   const { sidebarWidth } = useSidebar()
@@ -50,8 +46,6 @@ function LayoutShell({ children }: { children: React.ReactNode }) {
           </ErrorBoundary>
         </div>
       </main>
-
-      <CopilotPanel />
 
       <style>{`
         @media (max-width: 900px) {

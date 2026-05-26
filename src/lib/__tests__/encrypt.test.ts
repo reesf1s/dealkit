@@ -38,7 +38,7 @@ describe('encrypt/decrypt', () => {
     const enc = encrypt('hello', TEST_KEY)
     const parts = enc.split(':')
     // Flip a byte in the auth tag
-    parts[1] = parts[1].slice(0, -2) + '00'
+    parts[1] = parts[1].slice(0, -2) + (parts[1].endsWith('00') ? 'ff' : '00')
     expect(() => decrypt(parts.join(':'), TEST_KEY)).toThrow()
   })
 })

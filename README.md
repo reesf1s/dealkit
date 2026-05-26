@@ -1,68 +1,88 @@
-# Halvex
+# Halvex CRM
 
-AI-powered deal intelligence platform. Halvex is an MCP layer connecting sales and product via Linear, Slack, and HubSpot. It scores live deals, surfaces objection patterns, and closes the loop between what prospects say and what gets built.
+Halvex CRM is an AI-native CRM for small teams who hate CRM admin. It keeps pipeline, contacts, tasks, activity, and deal intelligence in one fast workspace so founders and sales teams can see what changed and what to do next.
 
-## What it does
+## Current Product Direction
 
-- **Deal scores** — composite win-probability (text signals + local ML + global Bayesian prior) on every open deal
-- **Objection engine** — extracts objections from notes, maps them to case studies and battle cards
-- **Product gap loop** — links deal friction to Linear issues and notifies sales on deployment via Slack
-- **Knowledge base** — company profile, competitors, case studies, and collateral kept fresh automatically
+- Native CRM records: companies, contacts, deals, pipelines, activities, tasks, notes, signals, AI summaries, notifications, and calendar events.
+- Today view: priorities, at-risk deals, stale deals, overdue tasks, upcoming meetings, and a daily sales brief foundation.
+- Pipeline: kanban stages, stage totals, quick deal creation, risk indicators, and stage movement activity.
+- Deal intelligence: native deal context, deterministic signals, simple scoring, risk labels, summaries, and evidence references.
+- Migration path: legacy `deal_logs` are shadow-backfilled into native CRM tables. Legacy tables are preserved until an explicit production deletion decision.
+- Google Calendar: OAuth connection and upcoming-event sync for meeting visibility.
 
-## Local setup
+## Local Setup
 
 **1. Install**
 ```bash
 npm install
 ```
 
-**2. Environment variables** — copy `.env.example` to `.env.local`:
+**2. Environment variables** — copy `.env.example` to `.env.local`.
+
+Required for core app:
 
 | Variable | Required | Description |
 |---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | ✓ | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✓ | Supabase service role key |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | ✓ | Clerk key (`pk_test_…` dev / `pk_live_…` prod) |
-| `CLERK_SECRET_KEY` | ✓ | Clerk secret key |
-| `ANTHROPIC_API_KEY` | ✓ | Anthropic API key |
-| `STRIPE_SECRET_KEY` | ✓ | Stripe secret key |
-| `STRIPE_WEBHOOK_SECRET` | ✓ | Stripe webhook signing secret |
-| `SENTRY_DSN` | — | Sentry DSN — omit to disable error tracking |
+| `NEXT_PUBLIC_SUPABASE_URL` | yes | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes | Supabase service role key |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | yes | Clerk publishable key |
+| `CLERK_SECRET_KEY` | yes | Clerk secret key |
+| `ANTHROPIC_API_KEY` | yes | Anthropic API key |
+| `ENCRYPTION_KEY` | yes | 64-char hex key for OAuth token encryption |
+| `GOOGLE_CLIENT_ID` | calendar | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | calendar | Google OAuth client secret |
+| `STRIPE_SECRET_KEY` | billing | Stripe secret key |
+| `STRIPE_WEBHOOK_SECRET` | billing | Stripe webhook signing secret |
+| `SENTRY_DSN` | no | Sentry DSN |
 
-**3. Run migrations** (Supabase is source of truth for schema):
+**3. Run migrations**
 ```bash
-npx supabase db push        # against remote
-# or: npx supabase db reset  # local dev
+npx supabase db push
 ```
 
-**4. Start dev server**
+The native CRM schema lives in `supabase/migrations/010_native_crm_rebuild.sql` and is mirrored in `src/lib/db/schema.ts`.
+
+**4. Start the app**
 ```bash
 npm run dev
 ```
 
+**5. Seed local CRM demo data**
+```bash
+HALVEX_ALLOW_DEV_SEED=true npm run seed:crm:dev
+```
+
+The seed command is blocked in production environments.
+
+## Production Migration Flow
+
+1. Apply the native CRM migration to staging.
+2. Run the idempotent CRM backfill from Settings or `POST /api/crm/backfill`.
+3. Validate migration health through Settings or `GET /api/crm/backfill/validate`.
+4. Confirm native deal count, mapped legacy deals, company fallbacks, and workspace scoping.
+5. Switch customer workflows to native CRM routes only after validation is clear.
+
+## Useful Commands
+
+```bash
+npm test
+npx tsc --noEmit
+npm run build
+```
+
+`npm run lint` still includes legacy/generated surfaces and should be cleaned separately before making lint a release gate.
+
 ## Architecture
 
-```
-src/app/           Next.js App Router pages + API routes
-src/components/    React UI (deals, pipeline, dashboard)
-src/lib/
-  db/              Drizzle schema + typed DB client
-  ml/              Composite score, text-signal extraction
-  deal-ml.ts       Per-workspace logistic regression
-  global-model.ts  Cross-workspace Bayesian prior (nightly cron)
-  workspace-brain.ts  RAG knowledge compression
-  slack-agent.ts   Slack MCP event handlers
-supabase/migrations/  SQL migrations — schema source of truth
+```text
+src/app/                    Next.js App Router pages and API routes
+src/app/api/crm/            Native CRM API surface
+src/app/api/integrations/   Google Calendar and retained integration endpoints
+src/components/             Shared app UI
+src/lib/crm/                CRM services, migration backfill, scoring, signals, calendar sync
+src/lib/db/                 Drizzle schema and DB client
+supabase/migrations/        SQL migrations
 ```
 
-### Score model
-
-Win-probability blends three components: text signals (always on), local ML logistic regression (activates at 10 closed deals), and a global cross-workspace Bayesian prior (blends down as local data grows, requires 50 pool deals to train). See `src/lib/ml/composite-score.ts` and `src/lib/global-model.ts`.
-
-### Migration workflow
-
-`supabase/migrations/` is the schema source of truth. The Drizzle schema in `src/lib/db/schema.ts` is kept in sync manually for TypeScript type generation only — do not run `drizzle-kit push` against production. See `CONTRIBUTING.md`.
-
-## Integrations
-
-Clerk (auth), Supabase + pgvector (DB + embeddings), Anthropic Claude (AI), Linear MCP (product gaps), Slack MCP (closed-loop delivery), HubSpot (CRM sync), Stripe (billing).
+See `MIGRATION_NOTES.md` and `TODO_ROADMAP.md` for the rebuild audit, preserved infrastructure, cutover plan, and remaining launch hardening work.

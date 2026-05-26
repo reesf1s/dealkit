@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  LayoutDashboard, Swords, BookOpen, TrendingUp,
-  FileText, Building2, Settings, Plus, Zap,
+  CalendarCheck, TrendingUp,
+  Building2, Settings, Plus,
   Sparkles, CornerDownLeft, Loader2,
-  BarChart2, Users, Brain, AlertTriangle, GitBranch, MessageSquare, Plug,
+  Users, GitBranch, MessageSquare, Bot, CheckSquare2,
 } from 'lucide-react'
 
 interface CommandItem {
@@ -19,25 +19,16 @@ interface CommandItem {
 }
 
 const ALL_ITEMS: CommandItem[] = [
-  { id: 'dashboard',      label: 'Dashboard',            section: 'navigate', icon: LayoutDashboard, href: '/dashboard' },
-  { id: 'pipeline',       label: 'Pipeline Map',         section: 'navigate', icon: GitBranch,       href: '/pipeline',     shortcut: '↩' },
-  { id: 'deals',          label: 'Opportunities',        section: 'navigate', icon: TrendingUp,      href: '/deals' },
+  { id: 'today',          label: 'Today',                section: 'navigate', icon: CalendarCheck,   href: '/today' },
+  { id: 'pipeline',       label: 'Pipeline',             section: 'navigate', icon: GitBranch,       href: '/pipeline',     shortcut: '↩' },
+  { id: 'deals',          label: 'Deals',                section: 'navigate', icon: TrendingUp,      href: '/deals' },
+  { id: 'companies',      label: 'Companies',            section: 'navigate', icon: Building2,       href: '/companies' },
   { id: 'contacts',       label: 'Contacts',             section: 'navigate', icon: Users,           href: '/contacts' },
-  { id: 'analytics',      label: 'Analytics',            section: 'navigate', icon: BarChart2,       href: '/analytics' },
-  { id: 'intelligence',   label: 'Signals',              section: 'navigate', icon: Brain,           href: '/automations' },
-  { id: 'competitors',    label: 'Competitors',          section: 'navigate', icon: Swords,          href: '/competitors' },
-  { id: 'case-studies',   label: 'Case Studies',         section: 'navigate', icon: BookOpen,        href: '/case-studies' },
-  { id: 'collateral',     label: 'Collateral',           section: 'navigate', icon: FileText,        href: '/collateral' },
-  { id: 'product-gaps',   label: 'Product Gaps',         section: 'navigate', icon: AlertTriangle,   href: '/product-gaps' },
-  { id: 'workflows',      label: 'Sequences',            section: 'navigate', icon: Zap,             href: '/workflows' },
-  { id: 'playbook',       label: 'Win Playbook',         section: 'navigate', icon: BookOpen,        href: '/playbook' },
-  { id: 'models',         label: 'ML Models',            section: 'navigate', icon: Brain,           href: '/models' },
-  { id: 'company',        label: 'Integrations',         section: 'navigate', icon: Plug,            href: '/company' },
+  { id: 'tasks',          label: 'Tasks',                section: 'navigate', icon: CheckSquare2,    href: '/tasks' },
+  { id: 'activity',       label: 'Activity',             section: 'navigate', icon: MessageSquare,   href: '/activity' },
+  { id: 'assistant',      label: 'Assistant',            section: 'navigate', icon: Bot,             href: '/assistant' },
   { id: 'settings',       label: 'Settings',             section: 'navigate', icon: Settings,        href: '/settings' },
   { id: 'log-deal',       label: 'Log deal',             section: 'actions',  icon: Plus,            href: '/deals' },
-  { id: 'add-competitor', label: 'Add competitor',       section: 'actions',  icon: Plus,            href: '/competitors' },
-  { id: 'add-case-study', label: 'Add case study',       section: 'actions',  icon: Plus,            href: '/case-studies' },
-  { id: 'gen-collateral', label: 'Generate collateral',  section: 'actions',  icon: Zap,             href: '/collateral' },
 ]
 
 // ── Intent classifier ─────────────────────────────────────────────────────────
@@ -48,7 +39,7 @@ const AI_PREFIXES = [
   'is ', 'are ', 'can ', 'should ', 'will ', 'do i', 'does',
   'help', 'tell ', 'explain', 'analyze', 'analyse', 'summarize',
   'show me', 'find my', 'give me', 'list my', 'compare',
-  'battlecard', 'draft', 'write me', 'create a report',
+  'draft', 'write me', 'create a report',
 ]
 
 function classifyIntent(q: string): 'ai' | 'nav' {
@@ -152,7 +143,7 @@ export default function CommandPalette() {
     closePalette()
   }, [router, closePalette])
 
-  // Ask the AI — hits the fast palette endpoint (brain snapshot only, ~1 DB query)
+  // Ask the CRM assistant — workspace-scoped answers with linked records.
   const askAI = useCallback(async (question: string) => {
     if (!question.trim()) return
     abortRef.current?.abort()
@@ -164,49 +155,21 @@ export default function CommandPalette() {
     setAiDone(false)
 
     try {
-      const res = await fetch('/api/chat/palette', {
+      const res = await fetch('/api/crm/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question }),
+        body: JSON.stringify({ message: question }),
         signal: abortRef.current.signal,
       })
 
-      if (!res.ok || !res.body) {
+      if (!res.ok) {
         setAiAnswer('Something went wrong. Try again.')
         setAiDone(true)
         setAiLoading(false)
         return
       }
-
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          try {
-            const payload = JSON.parse(line.slice(6))
-            if (payload.t) {
-              setAiAnswer(prev => prev + payload.t)
-              requestAnimationFrame(() => {
-                if (answerRef.current) {
-                  answerRef.current.scrollTop = answerRef.current.scrollHeight
-                }
-              })
-            }
-            if (payload.done) {
-              setAiDone(true)
-              setAiLoading(false)
-            }
-          } catch { /* skip malformed */ }
-        }
-      }
+      const payload = await res.json()
+      setAiAnswer(payload?.data?.answer ?? 'No answer returned.')
       setAiDone(true)
       setAiLoading(false)
     } catch (err: any) {

@@ -56,6 +56,56 @@ export const productGapStatusEnum = pgEnum('product_gap_status', [
   'shipped',
 ])
 
+export const businessTypeEnum = pgEnum('business_type', [
+  'saas',
+  'agency',
+  'consultancy',
+  'recruitment',
+  'services',
+  'other_b2b',
+])
+
+export const crmDealStatusEnum = pgEnum('crm_deal_status', ['open', 'won', 'lost', 'archived'])
+export const crmRiskLevelEnum = pgEnum('crm_risk_level', ['low', 'medium', 'high', 'unknown'])
+export const crmActivityTypeEnum = pgEnum('crm_activity_type', [
+  'email',
+  'meeting',
+  'call',
+  'note',
+  'task',
+  'stage_change',
+  'ai_insight',
+  'import',
+])
+export const crmTaskStatusEnum = pgEnum('crm_task_status', ['todo', 'done', 'cancelled'])
+export const crmTaskPriorityEnum = pgEnum('crm_task_priority', ['low', 'normal', 'high', 'urgent'])
+export const crmSignalDirectionEnum = pgEnum('crm_signal_direction', ['positive', 'negative', 'neutral'])
+export const crmSignalTypeEnum = pgEnum('crm_signal_type', [
+  'stale_deal',
+  'no_next_step',
+  'positive_sentiment',
+  'negative_sentiment',
+  'champion_engaged',
+  'champion_inactive',
+  'close_date_slipped',
+  'value_changed',
+  'stage_advanced',
+  'response_delay',
+  'meeting_booked',
+  'pricing_mentioned',
+  'competitor_mentioned',
+  'legal_or_procurement_mentioned',
+  'close_date_overdue',
+  'stage_stagnant',
+])
+export const crmNotificationTypeEnum = pgEnum('crm_notification_type', [
+  'daily_brief',
+  'risk_alert',
+  'task_due',
+  'meeting_prep',
+  'import_complete',
+])
+
 // ─────────────────────────────────────────────────────────────────────────────
 // users  (authentication identity only — billing lives on workspace)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -110,6 +160,257 @@ export const workspaceMemberships = pgTable('workspace_memberships', {
   // Migration: 008_roles_and_pending_actions.sql
   appRole: text('app_role').notNull().default('sales'),  // 'sales' | 'product' | 'admin'
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.workspaceId, t.userId)])
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Native CRM foundation (parallel to legacy deal_logs during rebuild)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const crmCompanies = pgTable('crm_companies', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  domain: text('domain'),
+  website: text('website'),
+  industry: text('industry'),
+  sizeLabel: text('size_label'),
+  description: text('description'),
+  source: text('source').notNull().default('manual'),
+  ownerId: text('owner_id').references(() => users.id, { onDelete: 'set null' }),
+  legacyProspectCompany: text('legacy_prospect_company'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [
+  unique().on(t.workspaceId, t.domain),
+  unique().on(t.workspaceId, t.name),
+])
+
+export const crmContacts = pgTable('crm_contacts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  companyId: uuid('company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+  firstName: text('first_name'),
+  lastName: text('last_name'),
+  fullName: text('full_name').notNull(),
+  email: text('email'),
+  phone: text('phone'),
+  jobTitle: text('job_title'),
+  linkedinUrl: text('linkedin_url'),
+  source: text('source').notNull().default('manual'),
+  ownerId: text('owner_id').references(() => users.id, { onDelete: 'set null' }),
+  lastContactedAt: timestamp('last_contacted_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.workspaceId, t.email)])
+
+export const crmPipelines = pgTable('crm_pipelines', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  name: text('name').notNull().default('Sales pipeline'),
+  businessType: businessTypeEnum('business_type').notNull().default('other_b2b'),
+  isDefault: boolean('is_default').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.workspaceId, t.name)])
+
+export const crmPipelineStages = pgTable('crm_pipeline_stages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  pipelineId: uuid('pipeline_id').notNull().references(() => crmPipelines.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  key: text('key').notNull(),
+  color: text('color').notNull().default('#64748b'),
+  position: integer('position').notNull().default(0),
+  probability: integer('probability').notNull().default(20),
+  isClosed: boolean('is_closed').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.pipelineId, t.key)])
+
+export const crmDeals = pgTable('crm_deals', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  companyId: uuid('company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+  pipelineId: uuid('pipeline_id').references(() => crmPipelines.id, { onDelete: 'set null' }),
+  stageId: uuid('stage_id').references(() => crmPipelineStages.id, { onDelete: 'set null' }),
+  ownerId: text('owner_id').references(() => users.id, { onDelete: 'set null' }),
+  title: text('title').notNull(),
+  valueAmount: integer('value_amount'),
+  valueCurrency: text('value_currency').notNull().default('GBP'),
+  expectedCloseDate: timestamp('expected_close_date', { withTimezone: true }),
+  probability: integer('probability'),
+  status: crmDealStatusEnum('status').notNull().default('open'),
+  source: text('source').notNull().default('manual'),
+  aiScore: integer('ai_score'),
+  aiConfidence: integer('ai_confidence'),
+  aiRiskLevel: crmRiskLevelEnum('ai_risk_level').notNull().default('unknown'),
+  aiSummary: text('ai_summary'),
+  aiNextAction: text('ai_next_action'),
+  lastActivityAt: timestamp('last_activity_at', { withTimezone: true }),
+  nextStepDueAt: timestamp('next_step_due_at', { withTimezone: true }),
+  legacyDealLogId: uuid('legacy_deal_log_id').references(() => dealLogs.id, { onDelete: 'set null' }).unique(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const crmDealParticipants = pgTable('crm_deal_participants', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  dealId: uuid('deal_id').notNull().references(() => crmDeals.id, { onDelete: 'cascade' }),
+  contactId: uuid('contact_id').notNull().references(() => crmContacts.id, { onDelete: 'cascade' }),
+  role: text('role'),
+  isPrimary: boolean('is_primary').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.dealId, t.contactId)])
+
+export const crmActivities = pgTable('crm_activities', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  dealId: uuid('deal_id').references(() => crmDeals.id, { onDelete: 'cascade' }),
+  companyId: uuid('company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+  contactId: uuid('contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
+  type: crmActivityTypeEnum('type').notNull(),
+  source: text('source').notNull().default('manual'),
+  title: text('title').notNull(),
+  body: text('body'),
+  summary: text('summary'),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+  createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+  externalId: text('external_id'),
+  metadata: jsonb('metadata').notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.workspaceId, t.source, t.externalId)])
+
+export const crmTasks = pgTable('crm_tasks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  dealId: uuid('deal_id').references(() => crmDeals.id, { onDelete: 'cascade' }),
+  companyId: uuid('company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+  contactId: uuid('contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
+  assignedTo: text('assigned_to').references(() => users.id, { onDelete: 'set null' }),
+  title: text('title').notNull(),
+  description: text('description'),
+  dueAt: timestamp('due_at', { withTimezone: true }),
+  status: crmTaskStatusEnum('status').notNull().default('todo'),
+  priority: crmTaskPriorityEnum('priority').notNull().default('normal'),
+  source: text('source').notNull().default('manual'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const crmNotes = pgTable('crm_notes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  dealId: uuid('deal_id').references(() => crmDeals.id, { onDelete: 'cascade' }),
+  companyId: uuid('company_id').references(() => crmCompanies.id, { onDelete: 'cascade' }),
+  contactId: uuid('contact_id').references(() => crmContacts.id, { onDelete: 'cascade' }),
+  body: text('body').notNull(),
+  createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const crmEmailThreads = pgTable('crm_email_threads', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  dealId: uuid('deal_id').references(() => crmDeals.id, { onDelete: 'set null' }),
+  companyId: uuid('company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+  contactId: uuid('contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
+  provider: text('provider').notNull().default('manual'),
+  externalThreadId: text('external_thread_id'),
+  subject: text('subject'),
+  snippet: text('snippet'),
+  summary: text('summary'),
+  lastMessageAt: timestamp('last_message_at', { withTimezone: true }),
+  metadata: jsonb('metadata').notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.workspaceId, t.provider, t.externalThreadId)])
+
+export const crmCalendarEvents = pgTable('crm_calendar_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  dealId: uuid('deal_id').references(() => crmDeals.id, { onDelete: 'set null' }),
+  companyId: uuid('company_id').references(() => crmCompanies.id, { onDelete: 'set null' }),
+  contactId: uuid('contact_id').references(() => crmContacts.id, { onDelete: 'set null' }),
+  provider: text('provider').notNull().default('manual'),
+  externalId: text('external_id'),
+  title: text('title').notNull(),
+  description: text('description'),
+  startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+  endsAt: timestamp('ends_at', { withTimezone: true }),
+  attendees: jsonb('attendees').notNull().default([]),
+  meetingUrl: text('meeting_url'),
+  source: text('source').notNull().default('manual'),
+  metadata: jsonb('metadata').notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.workspaceId, t.provider, t.externalId)])
+
+export const crmAiSummaries = pgTable('crm_ai_summaries', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  dealId: uuid('deal_id').references(() => crmDeals.id, { onDelete: 'cascade' }),
+  summaryType: text('summary_type').notNull().default('deal_brief'),
+  content: text('content').notNull(),
+  evidence: jsonb('evidence').notNull().default([]),
+  confidence: integer('confidence'),
+  generatedBy: text('generated_by').notNull().default('ai'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const crmSignals = pgTable('crm_signals', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  dealId: uuid('deal_id').references(() => crmDeals.id, { onDelete: 'cascade' }),
+  type: crmSignalTypeEnum('type').notNull(),
+  strength: integer('strength').notNull().default(50),
+  direction: crmSignalDirectionEnum('direction').notNull().default('neutral'),
+  explanation: text('explanation').notNull(),
+  evidenceActivityIds: jsonb('evidence_activity_ids').notNull().default([]),
+  confidence: integer('confidence').notNull().default(80),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const crmNotifications = pgTable('crm_notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  userId: text('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  type: crmNotificationTypeEnum('type').notNull(),
+  title: text('title').notNull(),
+  body: text('body'),
+  linkedRecordType: text('linked_record_type'),
+  linkedRecordId: uuid('linked_record_id'),
+  readAt: timestamp('read_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const workspaceInvites = pgTable('workspace_invites', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  role: workspaceRoleEnum('role').notNull().default('member'),
+  token: text('token').notNull().unique(),
+  invitedBy: text('invited_by').references(() => users.id, { onDelete: 'set null' }),
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.workspaceId, t.email)])
+
+export const googleConnections = pgTable('google_connections', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  googleAccountEmail: text('google_account_email'),
+  accessTokenEnc: text('access_token_enc').notNull(),
+  refreshTokenEnc: text('refresh_token_enc'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  scopes: jsonb('scopes').notNull().default([]),
+  calendarSyncToken: text('calendar_sync_token'),
+  lastCalendarSyncAt: timestamp('last_calendar_sync_at', { withTimezone: true }),
+  syncError: text('sync_error'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [unique().on(t.workspaceId, t.userId)])
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -432,6 +733,11 @@ export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
   competitors: many(competitors),
   caseStudies: many(caseStudies),
   dealLogs: many(dealLogs),
+  crmCompanies: many(crmCompanies),
+  crmContacts: many(crmContacts),
+  crmDeals: many(crmDeals),
+  crmTasks: many(crmTasks),
+  crmActivities: many(crmActivities),
   collateral: many(collateral),
   events: many(events),
   productGaps: many(productGaps),
@@ -440,6 +746,72 @@ export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
 export const workspaceMembershipsRelations = relations(workspaceMemberships, ({ one }) => ({
   workspace: one(workspaces, { fields: [workspaceMemberships.workspaceId], references: [workspaces.id] }),
   user: one(users, { fields: [workspaceMemberships.userId], references: [users.id] }),
+}))
+
+export const crmCompaniesRelations = relations(crmCompanies, ({ one, many }) => ({
+  workspace: one(workspaces, { fields: [crmCompanies.workspaceId], references: [workspaces.id] }),
+  owner: one(users, { fields: [crmCompanies.ownerId], references: [users.id] }),
+  contacts: many(crmContacts),
+  deals: many(crmDeals),
+  activities: many(crmActivities),
+}))
+
+export const crmContactsRelations = relations(crmContacts, ({ one, many }) => ({
+  workspace: one(workspaces, { fields: [crmContacts.workspaceId], references: [workspaces.id] }),
+  company: one(crmCompanies, { fields: [crmContacts.companyId], references: [crmCompanies.id] }),
+  dealParticipants: many(crmDealParticipants),
+  activities: many(crmActivities),
+  tasks: many(crmTasks),
+}))
+
+export const crmPipelinesRelations = relations(crmPipelines, ({ one, many }) => ({
+  workspace: one(workspaces, { fields: [crmPipelines.workspaceId], references: [workspaces.id] }),
+  stages: many(crmPipelineStages),
+  deals: many(crmDeals),
+}))
+
+export const crmPipelineStagesRelations = relations(crmPipelineStages, ({ one, many }) => ({
+  workspace: one(workspaces, { fields: [crmPipelineStages.workspaceId], references: [workspaces.id] }),
+  pipeline: one(crmPipelines, { fields: [crmPipelineStages.pipelineId], references: [crmPipelines.id] }),
+  deals: many(crmDeals),
+}))
+
+export const crmDealsRelations = relations(crmDeals, ({ one, many }) => ({
+  workspace: one(workspaces, { fields: [crmDeals.workspaceId], references: [workspaces.id] }),
+  company: one(crmCompanies, { fields: [crmDeals.companyId], references: [crmCompanies.id] }),
+  pipeline: one(crmPipelines, { fields: [crmDeals.pipelineId], references: [crmPipelines.id] }),
+  stage: one(crmPipelineStages, { fields: [crmDeals.stageId], references: [crmPipelineStages.id] }),
+  owner: one(users, { fields: [crmDeals.ownerId], references: [users.id] }),
+  participants: many(crmDealParticipants),
+  activities: many(crmActivities),
+  tasks: many(crmTasks),
+  signals: many(crmSignals),
+  aiSummaries: many(crmAiSummaries),
+}))
+
+export const crmDealParticipantsRelations = relations(crmDealParticipants, ({ one }) => ({
+  workspace: one(workspaces, { fields: [crmDealParticipants.workspaceId], references: [workspaces.id] }),
+  deal: one(crmDeals, { fields: [crmDealParticipants.dealId], references: [crmDeals.id] }),
+  contact: one(crmContacts, { fields: [crmDealParticipants.contactId], references: [crmContacts.id] }),
+}))
+
+export const crmActivitiesRelations = relations(crmActivities, ({ one }) => ({
+  workspace: one(workspaces, { fields: [crmActivities.workspaceId], references: [workspaces.id] }),
+  deal: one(crmDeals, { fields: [crmActivities.dealId], references: [crmDeals.id] }),
+  company: one(crmCompanies, { fields: [crmActivities.companyId], references: [crmCompanies.id] }),
+  contact: one(crmContacts, { fields: [crmActivities.contactId], references: [crmContacts.id] }),
+}))
+
+export const crmTasksRelations = relations(crmTasks, ({ one }) => ({
+  workspace: one(workspaces, { fields: [crmTasks.workspaceId], references: [workspaces.id] }),
+  deal: one(crmDeals, { fields: [crmTasks.dealId], references: [crmDeals.id] }),
+  company: one(crmCompanies, { fields: [crmTasks.companyId], references: [crmCompanies.id] }),
+  contact: one(crmContacts, { fields: [crmTasks.contactId], references: [crmContacts.id] }),
+}))
+
+export const crmSignalsRelations = relations(crmSignals, ({ one }) => ({
+  workspace: one(workspaces, { fields: [crmSignals.workspaceId], references: [workspaces.id] }),
+  deal: one(crmDeals, { fields: [crmSignals.dealId], references: [crmDeals.id] }),
 }))
 
 export const companyProfilesRelations = relations(companyProfiles, ({ one }) => ({
@@ -807,6 +1179,39 @@ export type NewWorkspaceRow = typeof workspaces.$inferInsert
 
 export type WorkspaceMembershipRow = typeof workspaceMemberships.$inferSelect
 export type NewWorkspaceMembershipRow = typeof workspaceMemberships.$inferInsert
+
+export type CrmCompanyRow = typeof crmCompanies.$inferSelect
+export type NewCrmCompanyRow = typeof crmCompanies.$inferInsert
+export type CrmContactRow = typeof crmContacts.$inferSelect
+export type NewCrmContactRow = typeof crmContacts.$inferInsert
+export type CrmPipelineRow = typeof crmPipelines.$inferSelect
+export type NewCrmPipelineRow = typeof crmPipelines.$inferInsert
+export type CrmPipelineStageRow = typeof crmPipelineStages.$inferSelect
+export type NewCrmPipelineStageRow = typeof crmPipelineStages.$inferInsert
+export type CrmDealRow = typeof crmDeals.$inferSelect
+export type NewCrmDealRow = typeof crmDeals.$inferInsert
+export type CrmDealParticipantRow = typeof crmDealParticipants.$inferSelect
+export type NewCrmDealParticipantRow = typeof crmDealParticipants.$inferInsert
+export type CrmActivityRow = typeof crmActivities.$inferSelect
+export type NewCrmActivityRow = typeof crmActivities.$inferInsert
+export type CrmTaskRow = typeof crmTasks.$inferSelect
+export type NewCrmTaskRow = typeof crmTasks.$inferInsert
+export type CrmNoteRow = typeof crmNotes.$inferSelect
+export type NewCrmNoteRow = typeof crmNotes.$inferInsert
+export type CrmEmailThreadRow = typeof crmEmailThreads.$inferSelect
+export type NewCrmEmailThreadRow = typeof crmEmailThreads.$inferInsert
+export type CrmCalendarEventRow = typeof crmCalendarEvents.$inferSelect
+export type NewCrmCalendarEventRow = typeof crmCalendarEvents.$inferInsert
+export type CrmAiSummaryRow = typeof crmAiSummaries.$inferSelect
+export type NewCrmAiSummaryRow = typeof crmAiSummaries.$inferInsert
+export type CrmSignalRow = typeof crmSignals.$inferSelect
+export type NewCrmSignalRow = typeof crmSignals.$inferInsert
+export type CrmNotificationRow = typeof crmNotifications.$inferSelect
+export type NewCrmNotificationRow = typeof crmNotifications.$inferInsert
+export type WorkspaceInviteRow = typeof workspaceInvites.$inferSelect
+export type NewWorkspaceInviteRow = typeof workspaceInvites.$inferInsert
+export type GoogleConnectionRow = typeof googleConnections.$inferSelect
+export type NewGoogleConnectionRow = typeof googleConnections.$inferInsert
 
 export type CompanyProfileRow = typeof companyProfiles.$inferSelect
 export type NewCompanyProfileRow = typeof companyProfiles.$inferInsert

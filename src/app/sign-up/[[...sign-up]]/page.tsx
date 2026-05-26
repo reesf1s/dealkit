@@ -2,9 +2,9 @@ import { SignUp } from '@clerk/nextjs'
 import { FileText, Sparkles, BarChart3, Zap } from 'lucide-react'
 
 const features = [
-  { icon: Sparkles, label: 'AI-generated battlecards', desc: 'Beat any competitor with real-time intel' },
-  { icon: BarChart3, label: 'Deal win tracking', desc: 'Understand why you win and lose' },
-  { icon: Zap, label: 'Instant collateral', desc: 'One-pagers, emails & exec briefs in seconds' },
+  { icon: Sparkles, label: 'AI-native pipeline', desc: 'See what changed, what slipped, and what needs attention' },
+  { icon: BarChart3, label: 'Self-updating CRM', desc: 'Deals, contacts, tasks, and activity in one clean workspace' },
+  { icon: Zap, label: 'Next best actions', desc: 'Follow-ups and priorities ready when the day starts' },
 ]
 
 export default function SignUpPage() {
@@ -23,15 +23,15 @@ export default function SignUpPage() {
           <div style={{ width: '36px', height: '36px', background: '#37352f', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileText size={17} color="#fff" strokeWidth={2.5} />
           </div>
-          <span style={{ fontWeight: '700', fontSize: '18px', letterSpacing: 0, color: 'var(--text-primary)' }}>Halvex</span>
+          <span style={{ fontWeight: '700', fontSize: '18px', letterSpacing: 0, color: 'var(--text-primary)' }}>Halvex CRM</span>
         </div>
 
         {/* Headline */}
         <h1 style={{ fontSize: '36px', fontWeight: '800', letterSpacing: 0, color: 'var(--text-primary)', marginBottom: '16px', lineHeight: '1.1' }}>
-          Close more deals<br />with AI sales intel
+          Your CRM should<br />do the admin
         </h1>
         <p style={{ fontSize: '15px', color: 'var(--text-tertiary)', marginBottom: '48px', lineHeight: '1.7', maxWidth: '360px' }}>
-          Turn every competitor insight, case study, and deal outcome into polished sales collateral in seconds.
+          Halvex keeps your pipeline current, spots risk, and tells small sales teams what to do next.
         </p>
 
         {/* Features */}
@@ -52,7 +52,7 @@ export default function SignUpPage() {
         {/* Founder note */}
         <div style={{ marginTop: '48px', padding: '16px 20px', background: 'var(--accent-subtle)', border: '1px solid var(--border)', borderRadius: '10px', maxWidth: '360px' }}>
           <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontStyle: 'italic', lineHeight: '1.6', marginBottom: '10px' }}>
-            &ldquo;I built Halvex because we kept losing deals to competitors we couldn&apos;t track. Two hours of prep per call. I wanted that time back.&rdquo;
+            &ldquo;Halvex is for teams who need the discipline of a CRM without hiring a RevOps function just to keep it useful.&rdquo;
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: 'var(--brand)', border: '1px solid var(--brand-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#fff' }}>R</div>
@@ -66,10 +66,10 @@ export default function SignUpPage() {
         <div style={{ width: '100%', maxWidth: '400px' }}>
           <div style={{ marginBottom: '28px', textAlign: 'center' }}>
             <h2 style={{ fontSize: '20px', fontWeight: '700', letterSpacing: 0, color: 'var(--text-primary)', marginBottom: '6px' }}>Create your account</h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>Start closing more deals today</p>
+            <p style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>Start with a CRM that tells you what matters</p>
           </div>
           <SignUp
-            fallbackRedirectUrl="/dashboard"
+            fallbackRedirectUrl="/today"
             appearance={{
               elements: {
                 rootBox: { width: '100%' },

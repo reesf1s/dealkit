@@ -1,413 +1,267 @@
 'use client'
+
+import useSWR from 'swr'
+import { useState } from 'react'
+import { CalendarClock, Database, Upload, Users } from 'lucide-react'
+import { fetcher } from '@/lib/fetcher'
+import { OperatorHeader, OperatorPage, OperatorPanel } from '@/components/shared/OperatorUI'
+
 export const dynamic = 'force-dynamic'
 
-import { useMemo, useState } from 'react'
-import { useUser } from '@clerk/nextjs'
-import useSWR from 'swr'
-import { Building2, Cog, Globe2, Shield, Users } from 'lucide-react'
-import { useToast } from '@/components/shared/Toast'
-
-const fetcher = (url: string) => fetch(url).then(r => {
-  if (!r.ok) throw new Error('Failed to fetch')
-  return r.json()
-})
-
-type DbUser = {
-  id: string
-  email: string
-  plan: 'free' | 'starter' | 'pro'
-  workspaceId: string
-  workspaceName: string
-  workspaceSlug: string
-  role: 'owner' | 'admin' | 'member'
+type GoogleStatus = {
+  connected: boolean
+  connection: null | {
+    googleAccountEmail: string | null
+    lastCalendarSyncAt: string | null
+    syncError: string | null
+  }
 }
 
-type Workspace = {
-  id: string
-  name: string
-  emailDigestEnabled: boolean
+type BackfillValidation = {
+  legacyDeals: number
+  nativeDeals: number
+  mappedLegacyDeals: number
+  unmappedLegacyDeals: number
+  nativeDealsMissingCompany: number
+  nativeDealsWrongWorkspace: number
+  activities: number
+  tasks: number
+  contacts: number
+  companies: number
+  readyForCutover: boolean
+  issues: string[]
+}
+
+type ImportPreview = {
+  headers: string[]
+  mapping: Record<string, string>
+  totalRows: number
+  validRows: number
+  failedRows: number
+  sampleRows: Array<{ rowNumber: number; valid: boolean; errors: string[] }>
+  importedRows?: number
+  failed?: Array<{ rowNumber: number; errors: string[] }>
 }
 
 type Member = {
-  id: string
   userId: string
   email: string
-  role: 'owner' | 'admin' | 'member'
-  appRole: 'sales' | 'product' | 'admin'
+  role: string
+  appRole: string
 }
 
-type PipelineConfig = {
-  currency?: string
-  valueDisplay?: 'arr' | 'mrr'
+type Invite = {
+  id: string
+  email: string
+  role: string
+  token: string
+  expiresAt: string
 }
 
-function Section({
-  icon: Icon,
-  title,
-  description,
-  children,
-}: {
-  icon: React.ElementType
-  title: string
-  description: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className="notion-panel" style={{ padding: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <Icon size={14} style={{ color: 'var(--brand)' }} />
-        <div>
-          <h2 style={{ margin: 0, textTransform: 'none', fontSize: 15, letterSpacing: 0, color: 'var(--text-primary)' }}>{title}</h2>
-          <p style={{ margin: 0, fontSize: 11.5, color: 'var(--text-tertiary)' }}>{description}</p>
-        </div>
-      </div>
-      {children}
-    </section>
-  )
+function format(value: string | null | undefined) {
+  if (!value) return 'Never'
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
 }
 
 export default function SettingsPage() {
-  const { user } = useUser()
-  const { toast } = useToast()
+  const { data, mutate } = useSWR<{ data: GoogleStatus }>('/api/integrations/google/status', fetcher, { revalidateOnFocus: false })
+  const { data: validationData, mutate: mutateValidation } = useSWR<{ data: BackfillValidation }>('/api/crm/backfill/validate', fetcher, { revalidateOnFocus: false })
+  const { data: membersData } = useSWR<{ data: Member[] }>('/api/workspace/members', fetcher, { revalidateOnFocus: false })
+  const { data: invitesData, mutate: mutateInvites } = useSWR<{ data: Invite[] }>('/api/crm/invites', fetcher, { revalidateOnFocus: false })
+  const [runningBackfill, setRunningBackfill] = useState(false)
+  const [importType, setImportType] = useState<'companies' | 'contacts' | 'deals'>('contacts')
+  const [csv, setCsv] = useState('')
+  const [preview, setPreview] = useState<ImportPreview | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<'member' | 'admin'>('member')
+  const [inviteMessage, setInviteMessage] = useState('')
+  const google = data?.data
+  const validation = validationData?.data
+  const members = membersData?.data ?? []
+  const invites = invitesData?.data ?? []
 
-  const { data: userRes } = useSWR<{ data: DbUser }>('/api/user', fetcher)
-  const { data: workspaceRes, mutate: mutateWorkspace } = useSWR<{ data: Workspace, role: DbUser['role'] }>('/api/workspaces', fetcher)
-  const { data: membersRes, mutate: mutateMembers } = useSWR<{ data: Member[] }>('/api/workspaces/members', fetcher)
-  const { data: configRes, mutate: mutateConfig } = useSWR<{ data: PipelineConfig }>('/api/pipeline-config', fetcher)
-  const { data: consentRes, mutate: mutateConsent } = useSWR<{ consented: boolean }>('/api/global/consent', fetcher)
+  async function sync() {
+    await fetch('/api/integrations/google/sync', { method: 'POST' })
+    mutate()
+  }
 
-  const dbUser = userRes?.data
-  const workspace = workspaceRes?.data
-  const members = membersRes?.data ?? []
-
-  const [workspaceName, setWorkspaceName] = useState('')
-  const [currency, setCurrency] = useState(configRes?.data?.currency ?? '£')
-  const [valueDisplay, setValueDisplay] = useState<'arr' | 'mrr'>(configRes?.data?.valueDisplay ?? 'arr')
-  const [savingWorkspace, setSavingWorkspace] = useState(false)
-  const [savingConfig, setSavingConfig] = useState(false)
-  const [savingPolicy, setSavingPolicy] = useState(false)
-
-  const isAdmin = dbUser?.role === 'owner' || dbUser?.role === 'admin'
-
-  useMemo(() => {
-    if (workspace?.name && !workspaceName) setWorkspaceName(workspace.name)
-  }, [workspace?.name, workspaceName])
-
-  useMemo(() => {
-    if (configRes?.data?.currency) setCurrency(configRes.data.currency)
-    if (configRes?.data?.valueDisplay) setValueDisplay(configRes.data.valueDisplay)
-  }, [configRes?.data?.currency, configRes?.data?.valueDisplay])
-
-  async function saveWorkspaceName() {
-    if (!workspaceName.trim()) return
-    setSavingWorkspace(true)
+  async function backfill() {
+    setRunningBackfill(true)
     try {
-      const res = await fetch('/api/workspaces', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: workspaceName.trim() }),
-      })
-      if (!res.ok) throw new Error('Could not save workspace')
-      await mutateWorkspace()
-      toast('Workspace updated', 'success')
-    } catch {
-      toast('Failed to save workspace name', 'error')
+      await fetch('/api/crm/backfill', { method: 'POST' })
+      await mutateValidation()
     } finally {
-      setSavingWorkspace(false)
+      setRunningBackfill(false)
     }
   }
 
-  async function savePipelineConfig() {
-    setSavingConfig(true)
-    try {
-      const res = await fetch('/api/pipeline-config', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currency, valueDisplay }),
-      })
-      if (!res.ok) throw new Error('Could not save defaults')
-      await mutateConfig()
-      toast('Commercial defaults updated', 'success')
-    } catch {
-      toast('Failed to save commercial defaults', 'error')
-    } finally {
-      setSavingConfig(false)
-    }
+  async function handleCsvFile(file?: File | null) {
+    if (!file) return
+    const text = await file.text()
+    setCsv(text)
+    setPreview(null)
   }
 
-  async function setGlobalConsent(consented: boolean) {
-    if (!dbUser?.workspaceId) return
-    setSavingPolicy(true)
+  async function runImport(dryRun: boolean) {
+    if (!csv.trim()) return
+    setImporting(true)
     try {
-      const res = await fetch('/api/global/consent', {
+      const res = await fetch('/api/crm/import', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId: dbUser.workspaceId, consented }),
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: importType, csv, dryRun }),
       })
-      if (!res.ok) throw new Error('Could not update policy')
-      await mutateConsent()
-      toast('Intelligence policy updated', 'success')
-    } catch {
-      toast('Failed to update policy', 'error')
+      const json = await res.json()
+      if (!res.ok) {
+        setPreview({
+          headers: [],
+          mapping: {},
+          totalRows: 0,
+          validRows: 0,
+          failedRows: 1,
+          sampleRows: [{ rowNumber: 0, valid: false, errors: [json.error ?? 'Import failed'] }],
+        })
+        return
+      }
+      setPreview(json.data)
     } finally {
-      setSavingPolicy(false)
+      setImporting(false)
     }
   }
 
-  async function setEmailDigest(enabled: boolean) {
-    setSavingPolicy(true)
-    try {
-      const res = await fetch('/api/workspaces', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emailDigestEnabled: enabled }),
-      })
-      if (!res.ok) throw new Error('Could not update digest')
-      await mutateWorkspace()
-      toast('Digest policy updated', 'success')
-    } catch {
-      toast('Failed to update digest policy', 'error')
-    } finally {
-      setSavingPolicy(false)
+  async function createInvite(event: React.FormEvent) {
+    event.preventDefault()
+    if (!inviteEmail.trim()) return
+    const res = await fetch('/api/crm/invites', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+    })
+    const json = await res.json()
+    if (!res.ok) {
+      setInviteMessage(json.error ?? 'Invite failed')
+      return
     }
-  }
-
-  async function setAppRole(targetUserId: string, appRole: Member['appRole']) {
-    try {
-      const res = await fetch('/api/workspaces/members', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUserId, appRole }),
-      })
-      if (!res.ok) throw new Error('Could not update role')
-      await mutateMembers()
-      toast('Member role updated', 'success')
-    } catch {
-      toast('Failed to update role', 'error')
-    }
-  }
-
-  async function removeMember(targetUserId: string) {
-    try {
-      const res = await fetch('/api/workspaces/members', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUserId }),
-      })
-      if (!res.ok) throw new Error('Could not remove member')
-      await mutateMembers()
-      toast('Member removed', 'success')
-    } catch {
-      toast('Failed to remove member', 'error')
-    }
+    setInviteEmail('')
+    setInviteRole('member')
+    setInviteMessage(`Invite ready: ${json.data.acceptUrl}`)
+    mutateInvites()
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 980 }}>
-      <section className="notion-panel" style={{ padding: '16px 18px' }}>
-        <div style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-tertiary)' }}>
-          Workspace Administration
-        </div>
-        <h1 style={{ margin: '6px 0 0', fontSize: 22, letterSpacing: 0 }}>Enterprise controls and governance</h1>
-        <p style={{ margin: '7px 0 0', color: 'var(--text-secondary)', fontSize: 13.5, maxWidth: 860 }}>
-          Manage the workspace identity, commercial defaults, team access, and how global intelligence features are allowed to learn from your account.
-        </p>
-      </section>
+    <OperatorPage>
+      <OperatorHeader eyebrow="Settings" title="Workspace settings" description="Keep the CRM clean, connected, and safely migrated." />
 
-      <Section icon={Building2} title="Workspace" description="Identity and billing context">
-        <div style={{ display: 'grid', gap: 10 }}>
-          <label style={{ fontSize: 11.5, color: 'var(--text-secondary)', display: 'grid', gap: 5 }}>
-            Workspace name
-            <input
-              value={workspaceName}
-              onChange={e => setWorkspaceName(e.target.value)}
-              style={{ height: 34, borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--surface-2)', color: 'var(--text-primary)', padding: '0 10px', outline: 'none' }}
-            />
-          </label>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: 12 }}>
-            <div className="notion-kpi" style={{ padding: '10px 12px' }}>
-              <div style={{ color: 'var(--text-tertiary)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Plan</div>
-              <div style={{ marginTop: 3, color: 'var(--text-primary)', fontWeight: 700 }}>{dbUser?.plan ?? '—'}</div>
+      <div style={{ display: 'grid', gap: 16 }}>
+        <OperatorPanel title="Google Calendar" description="Sync upcoming meetings and link them to contacts, companies, and open deals." icon={CalendarClock}>
+          <div className="crm-settings-row">
+            <div>
+              <strong>{google?.connected ? google.connection?.googleAccountEmail ?? 'Connected' : 'Not connected'}</strong>
+              <p>{google?.connected ? `Last sync: ${format(google.connection?.lastCalendarSyncAt)}` : 'Connect Google Calendar to populate Today with meeting prep.'}</p>
+              {google?.connection?.syncError && <p style={{ color: 'var(--color-red)' }}>{google.connection.syncError}</p>}
             </div>
-            <div className="notion-kpi" style={{ padding: '10px 12px' }}>
-              <div style={{ color: 'var(--text-tertiary)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Role</div>
-              <div style={{ marginTop: 3, color: 'var(--text-primary)', fontWeight: 700 }}>{dbUser?.role ?? '—'}</div>
-            </div>
-            <div className="notion-kpi" style={{ padding: '10px 12px' }}>
-              <div style={{ color: 'var(--text-tertiary)', fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Workspace</div>
-              <div style={{ marginTop: 3, color: 'var(--text-primary)', fontWeight: 700 }}>{workspace?.name ?? dbUser?.workspaceName ?? '—'}</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {google?.connected ? (
+                <button className="operator-button" onClick={sync}>Sync now</button>
+              ) : (
+                <a className="operator-button operator-button-primary" href="/api/integrations/google/auth">Connect</a>
+              )}
             </div>
           </div>
+        </OperatorPanel>
 
-          <button
-            onClick={saveWorkspaceName}
-            disabled={!isAdmin || savingWorkspace}
-            style={{
-              height: 32,
-              width: 170,
-              borderRadius: 8,
-              border: '1px solid var(--brand-border)',
-              background: 'var(--brand-bg)',
-              color: 'var(--brand)',
-              fontSize: 12,
-              fontWeight: 700,
-              opacity: !isAdmin ? 0.5 : 1,
-            }}
-          >
-            {savingWorkspace ? 'Saving…' : 'Save workspace'}
-          </button>
-        </div>
-      </Section>
-
-      <Section icon={Cog} title="Commercial Defaults" description="How pipeline value is shown across the app">
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <label style={{ fontSize: 11.5, color: 'var(--text-secondary)', display: 'grid', gap: 5 }}>
-            Currency
-            <select
-              value={currency}
-              onChange={e => setCurrency(e.target.value)}
-              style={{ height: 34, minWidth: 120, borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--surface-2)', color: 'var(--text-primary)', padding: '0 10px', outline: 'none' }}
-            >
-              {['£', '$', '€', '¥', 'A$', 'C$', 'CHF', 'kr', 'R', '₹'].map(symbol => (
-                <option key={symbol} value={symbol}>{symbol}</option>
-              ))}
-            </select>
-          </label>
-
-          <label style={{ fontSize: 11.5, color: 'var(--text-secondary)', display: 'grid', gap: 5 }}>
-            Recurring value mode
-            <select
-              value={valueDisplay}
-              onChange={e => setValueDisplay(e.target.value as 'arr' | 'mrr')}
-              style={{ height: 34, minWidth: 130, borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--surface-2)', color: 'var(--text-primary)', padding: '0 10px', outline: 'none' }}
-            >
-              <option value="arr">ARR</option>
-              <option value="mrr">MRR</option>
-            </select>
-          </label>
-
-          <button
-            onClick={savePipelineConfig}
-            disabled={!isAdmin || savingConfig}
-            style={{
-              height: 32,
-              padding: '0 12px',
-              borderRadius: 8,
-              border: '1px solid var(--brand-border)',
-              background: 'var(--brand-bg)',
-              color: 'var(--brand)',
-              fontSize: 12,
-              fontWeight: 700,
-              opacity: !isAdmin ? 0.5 : 1,
-            }}
-          >
-            {savingConfig ? 'Saving…' : 'Save defaults'}
-          </button>
-        </div>
-      </Section>
-
-      <Section icon={Globe2} title="Intelligence Policy" description="Global learning and digest behavior">
-        <div style={{ display: 'grid', gap: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+        <OperatorPanel title="Data migration" description="Legacy deal data is shadow-backfilled into native CRM tables without deleting old records." icon={Database}>
+          <div className="crm-settings-row">
             <div>
-              <div style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 700 }}>Contribute anonymized outcomes to global intelligence</div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>Improves benchmark quality across all tenants.</div>
+              <strong>Native CRM backfill</strong>
+              <p>
+                {validation
+                  ? validation.readyForCutover
+                    ? `${validation.mappedLegacyDeals}/${validation.legacyDeals} legacy deals mapped. Cutover checks are clear.`
+                    : `${validation.mappedLegacyDeals}/${validation.legacyDeals} legacy deals mapped. ${validation.issues[0] ?? 'Review migration issues.'}`
+                  : 'Run validation before route cutover or after new legacy imports.'}
+              </p>
             </div>
-            <button
-              onClick={() => setGlobalConsent(!(consentRes?.consented ?? false))}
-              disabled={!isAdmin || savingPolicy}
-              style={{
-                width: 86,
-                height: 30,
-                borderRadius: 999,
-                border: (consentRes?.consented ?? false) ? '1px solid rgba(74, 222, 128, 0.36)' : '1px solid var(--border-default)',
-                background: (consentRes?.consented ?? false) ? 'rgba(74, 222, 128, 0.16)' : 'var(--surface-2)',
-                color: (consentRes?.consented ?? false) ? '#4ade80' : 'var(--text-secondary)',
-                fontSize: 11.5,
-                fontWeight: 700,
-                opacity: !isAdmin ? 0.5 : 1,
-              }}
-            >
-              {(consentRes?.consented ?? false) ? 'Enabled' : 'Disabled'}
+            <button className="operator-button" onClick={backfill} disabled={runningBackfill}>
+              {runningBackfill ? 'Running...' : 'Run backfill'}
             </button>
           </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-            <div>
-              <div style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 700 }}>Daily email digest</div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>Send daily pipeline summary to workspace members.</div>
+          {validation && (
+            <div className="crm-validation-grid">
+              <span>Native deals <strong>{validation.nativeDeals}</strong></span>
+              <span>Companies <strong>{validation.companies}</strong></span>
+              <span>Contacts <strong>{validation.contacts}</strong></span>
+              <span>Activities <strong>{validation.activities}</strong></span>
+              <span>Tasks <strong>{validation.tasks}</strong></span>
+              <span>Status <strong>{validation.readyForCutover ? 'Ready' : 'Needs review'}</strong></span>
             </div>
-            <button
-              onClick={() => setEmailDigest(!(workspace?.emailDigestEnabled ?? true))}
-              disabled={!isAdmin || savingPolicy}
-              style={{
-                width: 86,
-                height: 30,
-                borderRadius: 999,
-                border: (workspace?.emailDigestEnabled ?? true) ? '1px solid rgba(74, 222, 128, 0.36)' : '1px solid var(--border-default)',
-                background: (workspace?.emailDigestEnabled ?? true) ? 'rgba(74, 222, 128, 0.16)' : 'var(--surface-2)',
-                color: (workspace?.emailDigestEnabled ?? true) ? '#4ade80' : 'var(--text-secondary)',
-                fontSize: 11.5,
-                fontWeight: 700,
-                opacity: !isAdmin ? 0.5 : 1,
-              }}
-            >
-              {(workspace?.emailDigestEnabled ?? true) ? 'Enabled' : 'Disabled'}
-            </button>
-          </div>
-        </div>
-      </Section>
+          )}
+        </OperatorPanel>
 
-      <Section icon={Users} title="Team Access" description="Workspace membership and app-level role controls">
-        <div style={{ display: 'grid', gap: 8 }}>
-          {members.map(member => {
-            const isMe = member.userId === user?.id
-            return (
-              <div key={member.id} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 90px', gap: 8, alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: 8 }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{member.email}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>{member.role}{isMe ? ' · you' : ''}</div>
-                </div>
-
-                <select
-                  value={member.appRole}
-                  onChange={e => setAppRole(member.userId, e.target.value as Member['appRole'])}
-                  disabled={!isAdmin}
-                  style={{ height: 30, borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--surface-2)', color: 'var(--text-primary)', padding: '0 8px', outline: 'none', opacity: !isAdmin ? 0.5 : 1 }}
-                >
-                  <option value="sales">Sales</option>
-                  <option value="product">Product</option>
-                  <option value="admin">Admin</option>
-                </select>
-
-                <button
-                  onClick={() => removeMember(member.userId)}
-                  disabled={!isAdmin || isMe}
-                  style={{
-                    height: 30,
-                    borderRadius: 8,
-                    border: '1px solid rgba(251, 113, 133, 0.38)',
-                    background: 'rgba(251, 113, 133, 0.14)',
-                    color: '#fb7185',
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                    opacity: !isAdmin || isMe ? 0.4 : 1,
-                  }}
-                >
-                  Remove
-                </button>
+        <OperatorPanel title="CSV import" description="Bring in companies, contacts, or deals without relying on integrations." icon={Upload}>
+          <div className="crm-import-panel">
+            <div className="crm-record-form compact">
+              <select className="crm-select" value={importType} onChange={event => { setImportType(event.target.value as typeof importType); setPreview(null) }}>
+                <option value="contacts">Contacts</option>
+                <option value="companies">Companies</option>
+                <option value="deals">Deals</option>
+              </select>
+              <input className="crm-input" type="file" accept=".csv,text/csv" onChange={event => handleCsvFile(event.target.files?.[0])} />
+              <button className="operator-button" type="button" disabled={!csv || importing} onClick={() => runImport(true)}>
+                {importing ? 'Checking...' : 'Preview'}
+              </button>
+              <button className="operator-button operator-button-primary" type="button" disabled={!preview || preview.validRows === 0 || importing} onClick={() => runImport(false)}>
+                Import valid rows
+              </button>
+            </div>
+            {preview && (
+              <div className="crm-validation-grid">
+                <span>Total rows <strong>{preview.totalRows}</strong></span>
+                <span>Ready <strong>{preview.validRows}</strong></span>
+                <span>Failed <strong>{preview.failedRows}</strong></span>
+                <span>Imported <strong>{preview.importedRows ?? 0}</strong></span>
+                <span>Columns <strong>{preview.headers.length}</strong></span>
+                <span>Mapped fields <strong>{Object.keys(preview.mapping).length}</strong></span>
               </div>
-            )
-          })}
-        </div>
-      </Section>
+            )}
+            {preview?.sampleRows.some(row => !row.valid) && (
+              <div className="crm-import-errors">
+                {preview.sampleRows.filter(row => !row.valid).slice(0, 3).map(row => (
+                  <p key={row.rowNumber}>Row {row.rowNumber}: {row.errors.join(' ')}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        </OperatorPanel>
 
-      <Section icon={Shield} title="Security Note" description="Principle of least privilege">
-        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 12.5, lineHeight: 1.6 }}>
-          Keep only operations staff on `admin` app-role. Sales users should remain on `sales` and operate through core CRM pages; this reduces accidental policy drift in production.
-        </p>
-      </Section>
-    </div>
+        <OperatorPanel title="Members" description="Invite teammates and review who has access to this workspace." icon={Users}>
+          <form onSubmit={createInvite} className="crm-record-form compact">
+            <input className="crm-input" value={inviteEmail} onChange={event => setInviteEmail(event.target.value)} placeholder="teammate@company.com" />
+            <select className="crm-select" value={inviteRole} onChange={event => setInviteRole(event.target.value as typeof inviteRole)}>
+              <option value="member">Member</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button className="operator-button operator-button-primary" type="submit">Create invite</button>
+          </form>
+          {inviteMessage && <div className="crm-copy-line">{inviteMessage}</div>}
+          <div className="crm-member-list">
+            {members.map(member => (
+              <div key={member.userId} className="crm-member-row">
+                <strong>{member.email}</strong>
+                <span>{member.role} · {member.appRole}</span>
+              </div>
+            ))}
+            {invites.map(invite => (
+              <div key={invite.id} className="crm-member-row">
+                <strong>{invite.email}</strong>
+                <span>Pending {invite.role} · expires {format(invite.expiresAt)}</span>
+              </div>
+            ))}
+            {members.length === 0 && invites.length === 0 && <div className="empty-state">No members loaded yet.</div>}
+          </div>
+        </OperatorPanel>
+      </div>
+    </OperatorPage>
   )
 }

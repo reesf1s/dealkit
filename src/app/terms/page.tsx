@@ -19,7 +19,7 @@ export default function TermsPage() {
           <div style={{ width: '28px', height: '28px', background: '#37352f', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FileText size={13} color="#fff" />
           </div>
-          <span style={{ fontWeight: '700', fontSize: '14px', color: '#37352f' }}>Halvex</span>
+          <span style={{ fontWeight: '700', fontSize: '14px', color: '#37352f' }}>Halvex CRM</span>
         </Link>
         <Link href="/" style={{ fontSize: '13px', color: '#9b9a97', textDecoration: 'none' }}>← Back to home</Link>
       </nav>
@@ -32,7 +32,7 @@ export default function TermsPage() {
 
         <div style={{ background: 'rgba(55,53,47,0.03)', border: '1px solid rgba(55,53,47,0.09)', borderRadius: '10px', padding: '16px 20px', marginBottom: '32px' }}>
           <p style={{ fontSize: '13px', color: '#787774', lineHeight: '1.7' }}>
-            <strong>Summary:</strong> By using Halvex you agree to these terms. We provide a sales intelligence platform on a subscription basis. You own your data. We may suspend accounts that violate these terms. You can cancel any time.
+            <strong>Summary:</strong> By using Halvex you agree to these terms. We provide an AI-native CRM on a subscription basis. You own your data. We may suspend accounts that violate these terms. You can cancel any time.
           </p>
         </div>
 
@@ -42,7 +42,7 @@ export default function TermsPage() {
         </Section>
 
         <Section title="2. Description of service">
-          <P>Halvex is a B2B sales intelligence platform that provides AI-powered sales collateral generation, competitor tracking, deal management, meeting preparation, and related tools for sales teams.</P>
+          <P>Halvex is a B2B CRM platform that provides pipeline management, contact and company records, tasks, activity timelines, meeting preparation, deal scoring, AI-generated summaries, and next-action recommendations for small sales teams.</P>
           <P>We reserve the right to modify, suspend, or discontinue any part of the Service with reasonable notice. We will provide at least 30 days&apos; notice before discontinuing the Service entirely.</P>
         </Section>
 
@@ -77,12 +77,12 @@ export default function TermsPage() {
 
         <Section title="6. Your content and data">
           <P>You retain all ownership rights to the data and content you upload to Halvex (&quot;Your Content&quot;). By using the Service, you grant us a limited, non-exclusive licence to process Your Content solely to provide and improve the Service.</P>
-          <P>You are responsible for ensuring you have the right to upload and process any data you enter into the Service, including data about third parties (prospects, competitors, etc.).</P>
+          <P>You are responsible for ensuring you have the right to upload and process any data you enter into the Service, including data about third parties such as prospects, customers, contacts, and meeting attendees.</P>
           <P>We will not use Your Content to train AI models or share it with third parties except as described in our Privacy Policy and as strictly necessary to provide the Service.</P>
         </Section>
 
         <Section title="7. AI-generated content">
-          <P>Halvex uses AI (powered by Anthropic&apos;s Claude) to generate sales materials, analyses, and recommendations. You acknowledge that:</P>
+          <P>Halvex uses AI to generate deal summaries, analyses, drafts, and recommendations. You acknowledge that:</P>
           <ul style={{ paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px', color: '#787774', fontSize: '14px', lineHeight: '1.7' }}>
             <li>AI-generated content may contain inaccuracies and should be reviewed before use</li>
             <li>You are responsible for verifying the accuracy of AI-generated content</li>
