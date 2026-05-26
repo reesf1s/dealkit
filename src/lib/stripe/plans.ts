@@ -85,7 +85,7 @@ export const PLANS: Record<Plan, PlanDefinition> = {
       'Unlimited AI-generated collateral',
       'All collateral types',
       'Export to DOCX & PDF',
-      'Priority AI generation',
+      'Premium GPT-5.5 reasoning for deeper deal intelligence',
       'Dedicated Slack support',
       'Early access to new features',
     ],

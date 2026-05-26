@@ -35,6 +35,13 @@ const navItems = [
   { href: '/assistant', label: 'Assistant', icon: Bot },
 ]
 
+const assistantSuggestions = [
+  'What needs attention today?',
+  'Which deals have no next step?',
+  'Which deals are slipping?',
+  'Prep me for my next meeting',
+]
+
 function isActive(pathname: string, href: string) {
   if (href === '/home') return pathname === '/home'
   return pathname === href || pathname.startsWith(`${href}/`)
@@ -197,7 +204,7 @@ function CommandMenuV2({ open, onClose }: { open: boolean; onClose: () => void }
 
 function AssistantDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string; links?: Array<{ label: string; href: string }> }>>([
-    { role: 'assistant', text: 'Ask me what changed, which deals need attention, or paste a deal update and I will turn it into proposed CRM changes.' },
+    { role: 'assistant', text: 'I can prioritise your day, explain deal risk, prep meetings, draft follow-ups, or turn a raw note into proposed CRM updates.' },
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -249,6 +256,13 @@ function AssistantDrawer({ open, onClose }: { open: boolean; onClose: () => void
         <button type="button" onClick={onClose}><X size={18} /></button>
       </div>
       <div className="v2-drawer-body">
+        <div className="v2-assistant-suggestions">
+          {assistantSuggestions.map(suggestion => (
+            <button key={suggestion} type="button" onClick={() => submit(suggestion)}>
+              {suggestion}
+            </button>
+          ))}
+        </div>
         {messages.map((message, index) => (
           <div key={`${message.role}-${index}`} className={`v2-assistant-message ${message.role}`}>
             <p>{message.text}</p>
@@ -374,6 +388,7 @@ export function ActionCard({
   source,
   action,
   tone = 'neutral',
+  onClick,
 }: {
   title: string
   reason: string
@@ -381,6 +396,7 @@ export function ActionCard({
   source?: string
   action?: React.ReactNode
   tone?: Tone
+  onClick?: () => void
 }) {
   const content = (
     <>
@@ -394,6 +410,7 @@ export function ActionCard({
     </>
   )
   if (href) return <Link href={href} className={`v2-action-card ${tone}`}>{content}</Link>
+  if (onClick) return <button type="button" onClick={onClick} className={`v2-action-card ${tone}`}>{content}</button>
   return <div className={`v2-action-card ${tone}`}>{content}</div>
 }
 
@@ -501,12 +518,25 @@ export function InlineEditableField({ label, value, onSave, type = 'text' }: { l
 
 export function AddUpdateComposer({ dealId, onSaved }: { dealId: string; onSaved?: () => void }) {
   const [note, setNote] = useState('')
-  const [proposed, setProposed] = useState<null | ReturnType<typeof proposeChanges>>(null)
+  const [proposed, setProposed] = useState<null | ProposedDealUpdate>(null)
   const [saving, setSaving] = useState(false)
 
-  function review() {
+  async function review() {
     if (!note.trim()) return
-    setProposed(proposeChanges(note))
+    setSaving(true)
+    try {
+      const response = await fetch(`/api/crm/deals/${dealId}/updates/propose`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note }),
+      })
+      const payload = await response.json()
+      setProposed(payload?.data ?? proposeChanges(note))
+    } catch {
+      setProposed(proposeChanges(note))
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function save(mode: 'note' | 'approved') {
@@ -539,15 +569,27 @@ export function AddUpdateComposer({ dealId, onSaved }: { dealId: string; onSaved
   )
 }
 
-function SuggestedChangeReview({ changes }: { changes: ReturnType<typeof proposeChanges> }) {
+type ProposedDealUpdate = {
+  blocker?: string | null
+  risk?: string | null
+  nextAction?: string | null
+  task?: string | null
+  summary: string
+  confidence?: number | null
+  evidence?: string[]
+}
+
+function SuggestedChangeReview({ changes }: { changes: ProposedDealUpdate }) {
   return (
     <div className="v2-review">
       <strong>Here is what Halvex thinks changed</strong>
+      {changes.confidence ? <p><span>Confidence</span>{changes.confidence}% based on this note and linked deal context</p> : null}
       {changes.blocker ? <p><span>Blocker</span>{changes.blocker}</p> : null}
       {changes.risk ? <p><span>Risk</span>{changes.risk}</p> : null}
       {changes.nextAction ? <p><span>Next action</span>{changes.nextAction}</p> : null}
       {changes.task ? <p><span>Task</span>{changes.task}</p> : null}
       <p><span>Summary</span>{changes.summary}</p>
+      {changes.evidence?.length ? <p><span>Evidence</span>{changes.evidence.slice(0, 2).join(' · ')}</p> : null}
     </div>
   )
 }
@@ -606,6 +648,8 @@ function proposeChanges(note: string) {
     nextAction,
     task,
     summary: note.length > 180 ? `${note.slice(0, 177)}...` : note,
+    confidence: blocker ? 62 : 52,
+    evidence: [note.length > 180 ? `${note.slice(0, 177)}...` : note],
   }
 }
 

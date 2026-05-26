@@ -26,6 +26,8 @@ import {
   splitName,
   titleCaseName,
 } from '@/lib/crm/rules'
+import { deriveDealIntelligence } from '@/lib/crm/intelligence'
+import { generateDealBriefWithAI } from '@/lib/crm/ai'
 
 export const CRM_STAGE_TEMPLATES = [
   { key: 'lead_in', name: 'Lead in', color: '#64748b', probability: 10, isClosed: false },
@@ -362,6 +364,7 @@ export async function listPipeline(workspaceId: string, userId: string) {
       expectedCloseDate: crmDeals.expectedCloseDate,
       status: crmDeals.status,
       aiScore: crmDeals.aiScore,
+      aiConfidence: crmDeals.aiConfidence,
       aiRiskLevel: crmDeals.aiRiskLevel,
       aiNextAction: crmDeals.aiNextAction,
       lastActivityAt: crmDeals.lastActivityAt,
@@ -382,7 +385,29 @@ export async function listPipeline(workspaceId: string, userId: string) {
     .where(eq(crmDeals.workspaceId, workspaceId))
     .orderBy(desc(crmDeals.updatedAt))
 
-  return { pipeline, stages, deals: rows }
+  const deals = rows.map(deal => {
+    const intelligence = deriveDealIntelligence({
+      deal: {
+        ...deal,
+        companyName: deal.companyName,
+        stageName: deal.stageName,
+      },
+      latestActivities: deal.lastActivityAt ? [{ id: `last-${deal.id}`, title: 'Last activity', occurredAt: deal.lastActivityAt }] : [],
+      openTasks: deal.nextStepDueAt || deal.aiNextAction ? [{ id: `next-${deal.id}`, title: deal.aiNextAction ?? 'Next step', dueAt: deal.nextStepDueAt }] : [],
+      contacts: [],
+      meetings: [],
+    })
+    return {
+      ...deal,
+      aiScore: intelligence.score,
+      aiConfidence: intelligence.confidence,
+      aiRiskLevel: intelligence.riskLevel,
+      aiNextAction: deal.aiNextAction ?? intelligence.nextAction,
+      intelligence,
+    }
+  })
+
+  return { pipeline, stages, deals }
 }
 
 export async function listToday(workspaceId: string, userId: string) {
@@ -559,7 +584,7 @@ export async function getDealContextNative(dealId: string, workspaceId: string) 
       .limit(10),
   ])
 
-  return {
+  const context = {
     deal,
     company: {
       id: deal.companyId,
@@ -579,6 +604,10 @@ export async function getDealContextNative(dealId: string, workspaceId: string) 
       ...openTasks.map(task => ({ type: 'task', id: task.id, label: task.title })),
       ...signals.map(signal => ({ type: 'signal', id: signal.id, label: signal.type })),
     ],
+  }
+  return {
+    ...context,
+    intelligence: deriveDealIntelligence(context),
   }
 }
 
@@ -936,9 +965,6 @@ export async function refreshDealSignals(workspaceId: string, dealId: string) {
   const nowMs = now.getTime()
   const deal = context.deal
   const activityIds = context.latestActivities.map(activity => activity.id).slice(0, 5)
-  const lastActivityDays = deal.lastActivityAt
-    ? Math.floor((nowMs - deal.lastActivityAt.getTime()) / 86_400_000)
-    : 999
 
   const signals: Array<typeof crmSignals.$inferInsert> = extractDeterministicSignals({
     status: deal.status,
@@ -953,22 +979,71 @@ export async function refreshDealSignals(workspaceId: string, dealId: string) {
     now,
   }).map(signal => ({ ...signal, workspaceId, dealId }))
 
+  const derived = deriveDealIntelligence(context)
+  if (derived.riskDrivers.some(reason => /procurement|legal|compliance|security/i.test(reason))) {
+    signals.push({
+      workspaceId,
+      dealId,
+      type: 'legal_or_procurement_mentioned',
+      strength: 75,
+      direction: 'negative',
+      explanation: derived.riskDrivers.find(reason => /procurement|legal|compliance|security/i.test(reason)) ?? 'Procurement, legal, compliance, or security risk appears in recent context.',
+      evidenceActivityIds: derived.evidenceActivityIds,
+      confidence: 80,
+    })
+  }
+  if (derived.riskDrivers.some(reason => /pricing|budget/i.test(reason))) {
+    signals.push({
+      workspaceId,
+      dealId,
+      type: 'pricing_mentioned',
+      strength: 70,
+      direction: 'negative',
+      explanation: derived.riskDrivers.find(reason => /pricing|budget/i.test(reason)) ?? 'Pricing or budget concern appears in recent context.',
+      evidenceActivityIds: derived.evidenceActivityIds,
+      confidence: 76,
+    })
+  }
+  if (derived.riskDrivers.some(reason => /blocked|concern|issue|alignment|uncertain|stalled|delay/i.test(reason))) {
+    signals.push({
+      workspaceId,
+      dealId,
+      type: 'negative_sentiment',
+      strength: 74,
+      direction: 'negative',
+      explanation: derived.riskDrivers.find(reason => /blocked|concern|issue|alignment|uncertain|stalled|delay/i.test(reason)) ?? 'Recent context contains unresolved concern.',
+      evidenceActivityIds: derived.evidenceActivityIds,
+      confidence: 74,
+    })
+  }
+
   if (signals.length > 0) await db.insert(crmSignals).values(signals)
 
-  const score = scoreDeal({
-    status: deal.status,
-    probability: deal.probability,
-    lastActivityAt: deal.lastActivityAt,
-    nextStepDueAt: context.openTasks[0]?.dueAt ?? null,
-    expectedCloseDate: deal.expectedCloseDate,
-  })
-  const risk = riskFromScore(score, lastActivityDays)
+  let brief = derived
+  try {
+    brief = await generateDealBriefWithAI(context) ?? derived
+  } catch (error) {
+    console.warn('[crm] AI deal brief unavailable, using deterministic intelligence', error)
+  }
+
   await db.update(crmDeals).set({
-    aiScore: score,
-    aiRiskLevel: risk,
-    aiConfidence: signals.length ? 75 : 55,
+    aiScore: derived.score,
+    aiRiskLevel: derived.riskLevel,
+    aiConfidence: brief.confidence,
+    aiSummary: brief.summary,
+    aiNextAction: brief.nextAction,
     updatedAt: new Date(),
   }).where(and(eq(crmDeals.id, dealId), eq(crmDeals.workspaceId, workspaceId)))
+
+  await db.insert(crmAiSummaries).values({
+    workspaceId,
+    dealId,
+    summaryType: 'deal_brief',
+    content: brief.summary,
+    evidence: derived.evidenceActivityIds,
+    confidence: brief.confidence,
+    generatedBy: process.env.OPENAI_API_KEY ? 'openai' : 'deterministic',
+  })
 
   return signals
 }

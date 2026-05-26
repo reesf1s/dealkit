@@ -42,20 +42,20 @@ function DealsContent() {
     <div className="v2-page">
       <HeroPanel
         eyebrow="Deals"
-        title="A simpler way to see what is real."
+        title="Deals"
         actions={<><ButtonV2 tone="dark"><Plus size={16} /> Add deal</ButtonV2><ButtonV2 onClick={() => {
           window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'Which deals are slipping?' } }))
         }}><Bot size={16} /> Ask Halvex</ButtonV2></>}
         aside={<div className="v2-glass-card"><strong>Pipeline read</strong><span>{money(openValue)} open · {noNext.length} missing next step · {deals.length} total deals</span></div>}
       >
-        Pipeline, list, and intelligence live together. Missing value, no close date, and weak evidence stay visible.
+        Pipeline, list, and intelligence in one workspace. Missing data and weak evidence stay visible.
       </HeroPanel>
 
       <PanelV2>
         <div className="v2-section-head">
           <div>
-            <h2><LayoutGrid size={18} /> Sales workspace</h2>
-            <p>Switch views without leaving the Deals workspace.</p>
+            <h2><LayoutGrid size={18} /> Workspace</h2>
+            <p>Move from pipeline shape to evidence, risk, and next steps without changing products.</p>
           </div>
           <div className="v2-segmented">
             <Link className={view === 'pipeline' ? 'active' : ''} href="/deals?view=pipeline">Pipeline</Link>

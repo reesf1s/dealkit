@@ -42,7 +42,7 @@ export default function PrivacyPage() {
           <P><strong>Company & sales data</strong> — information you enter about workspaces, companies, contacts, deals, tasks, notes, activity, calendar events, and sales workflows. This data is stored in our database and used solely to power the features you use.</P>
           <P><strong>Usage data</strong> — page views, feature usage events, and interaction logs collected to improve the product and for security purposes.</P>
           <P><strong>Payment data</strong> — billing information is handled entirely by Stripe. We never store card numbers or bank details. We receive only a Stripe customer ID and subscription status.</P>
-          <P><strong>AI-generated content</strong> — text you paste into AI features (meeting notes, company descriptions) is sent to Anthropic&apos;s API to generate responses. Anthropic processes this data subject to their privacy policy.</P>
+          <P><strong>AI-generated content</strong> — text you paste into AI features (meeting notes, company descriptions) is sent to OpenAI&apos;s API to generate responses. OpenAI processes this data subject to their privacy policy.</P>
         </Section>
 
         <Section title="3. Legal basis for processing (GDPR — EU/EEA users)">
@@ -82,7 +82,7 @@ export default function PrivacyPage() {
               {[
                 ['Clerk', 'Authentication & user management', 'US (SOC 2)', 'clerk.com/legal/privacy'],
                 ['Supabase', 'Database hosting', 'AWS US-East-1', 'supabase.com/privacy'],
-                ['Anthropic', 'AI text generation', 'US', 'anthropic.com/privacy'],
+                ['OpenAI', 'AI text generation', 'US', 'openai.com/policies/privacy-policy'],
                 ['Stripe', 'Payment processing', 'US/EU (PCI-DSS)', 'stripe.com/privacy'],
                 ['Vercel', 'Hosting & CDN', 'US/Global', 'vercel.com/legal/privacy'],
               ].map(([sp, purpose, loc, link]) => (

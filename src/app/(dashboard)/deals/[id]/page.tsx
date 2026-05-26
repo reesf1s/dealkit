@@ -141,6 +141,17 @@ export default function DealWorkspacePage() {
 function trustReasons(context: any) {
   const deal = context?.deal
   if (!deal) return { reasons: [] as string[], risk: null as string | null, confidence: null as number | null }
+  if (context.intelligence) {
+    const reasons = [
+      ...(context.intelligence.riskDrivers ?? []),
+      ...(context.intelligence.missingData ?? []).map((item: string) => `${item}, so confidence stays limited.`),
+    ].slice(0, 6)
+    return {
+      reasons,
+      risk: context.intelligence.riskLevel === deal.aiRiskLevel ? null : context.intelligence.riskLevel,
+      confidence: context.intelligence.confidence,
+    }
+  }
   const evidence = [
     deal.aiSummary,
     deal.aiNextAction,

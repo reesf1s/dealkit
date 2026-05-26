@@ -15,7 +15,7 @@ export default function SettingsPage() {
     <div className="v2-page">
       <HeroPanel
         eyebrow="Settings"
-        title="Quiet controls for the CRM."
+        title="Settings"
         actions={googleConnected ? <ButtonV2 href="/calendar">Open Calendar</ButtonV2> : <ButtonV2 tone="dark" href="/api/integrations/google/auth"><CalendarDays size={16} /> Connect Google Calendar</ButtonV2>}
         aside={<div className="v2-glass-card"><strong>Keep settings out of the workflow</strong><span>Workspace, members, pipeline, imports, integrations, and billing live here.</span></div>}
       >

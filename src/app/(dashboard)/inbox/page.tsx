@@ -21,11 +21,11 @@ export default function InboxPage() {
     <div className="v2-page">
       <HeroPanel
         eyebrow="Inbox"
-        title="Sort the new information before it becomes CRM admin."
+        title="Triage"
         actions={<><ButtonV2 tone="dark"><Sparkles size={16} /> Review suggestions</ButtonV2><ButtonV2 href="/calendar">Open Calendar</ButtonV2></>}
         aside={<div className="v2-glass-card"><strong>Triage loop</strong><span>Attach, update, create follow-up, or dismiss. Halvex proposes; you approve.</span></div>}
       >
-        Inbox is where meeting notes, missing fields, follow-ups, and AI suggestions become clean CRM updates.
+        New notes, missing fields, follow-ups, and AI suggestions become reviewed CRM updates here.
       </HeroPanel>
 
       <div className="v2-grid-2">

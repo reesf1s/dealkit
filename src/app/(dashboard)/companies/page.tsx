@@ -16,11 +16,11 @@ export default function CompaniesPage() {
     <div className="v2-page">
       <HeroPanel
         eyebrow="Companies"
-        title="Account memory that connects people, deals, and meetings."
+        title="Companies"
         actions={<><ButtonV2 tone="dark"><Plus size={16} /> Add company</ButtonV2><ButtonV2 href="/people">People</ButtonV2></>}
         aside={<div className="v2-glass-card"><strong>Company context</strong><span>Open deals, risk, last activity, and next action belong together.</span></div>}
       >
-        Companies are not a static directory. They are the shared memory for every account relationship.
+        The shared memory for people, meetings, open deals, risk, and account momentum.
       </HeroPanel>
 
       <PanelV2>

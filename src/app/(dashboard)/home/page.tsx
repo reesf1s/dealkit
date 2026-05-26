@@ -40,7 +40,7 @@ export default function HomePage() {
     <div className="v2-page">
       <HeroPanel
         eyebrow="Home"
-        title="Your revenue day, already organized."
+        title="Today"
         actions={(
           <>
             <ButtonV2 tone="dark" onClick={() => {
@@ -64,7 +64,7 @@ export default function HomePage() {
           </>
         )}
       >
-        Halvex turns meetings, follow-ups, deal changes, and risk signals into one calm daily plan.
+        Meetings, follow-ups, deal changes, and risk signals, already sorted into a calm daily plan.
       </HeroPanel>
 
       <div className="v2-grid-2">
@@ -111,8 +111,8 @@ export default function HomePage() {
       </div>
 
       <PanelV2>
-        <SectionHeader title="Deals that need attention" icon={<LayoutGrid size={18} />} action={<ButtonV2 href="/deals?view=intelligence">Open intelligence</ButtonV2>}>
-          Likely closers, slipping deals, and missing-data records in one place.
+        <SectionHeader title="Deal intelligence" icon={<LayoutGrid size={18} />} action={<ButtonV2 href="/deals?view=intelligence">Open intelligence</ButtonV2>}>
+          What Halvex believes is moving, slipping, or missing enough evidence.
         </SectionHeader>
         {isLoading ? <EmptyStateV2 title="Loading CRM context">Reading your workspace records.</EmptyStateV2> : activeDeals.length ? (
           <div className="v2-grid-3">

@@ -16,11 +16,11 @@ export default function PeoplePage() {
     <div className="v2-page">
       <HeroPanel
         eyebrow="People"
-        title="Relationship memory, without the database feeling."
+        title="People"
         actions={<><ButtonV2 tone="dark"><Plus size={16} /> Add person</ButtonV2><ButtonV2 href="/companies">Companies</ButtonV2></>}
         aside={<div className="v2-glass-card"><strong>People drive deals</strong><span>Meetings, notes, emails, and tasks should attach to the humans involved.</span></div>}
       >
-        Know who you are talking to, what they care about, and what the next touch should be.
+        Who you are talking to, what they care about, and what the next touch should be.
       </HeroPanel>
 
       <PanelV2>

@@ -19,13 +19,13 @@ export default function AssistantPage() {
     <div className="v2-page">
       <HeroPanel
         eyebrow="Assistant"
-        title="The natural language interface to your CRM."
+        title="Ask Halvex"
         actions={<ButtonV2 tone="dark" onClick={() => {
           window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'What should I do today?' } }))
         }}><Bot size={16} /> Open assistant</ButtonV2>}
         aside={<div className="v2-glass-card"><strong>Not a separate chatbot</strong><span>The assistant works best when it is attached to deals, people, companies, and meetings.</span></div>}
       >
-        Ask Halvex to understand, draft, update, and reason over the CRM. Important changes require approval.
+        Understand, draft, update, and reason over the CRM. Important changes require approval.
       </HeroPanel>
 
       <div className="v2-grid-2">
@@ -34,7 +34,18 @@ export default function AssistantPage() {
             Start with operational questions that move revenue.
           </SectionHeader>
           <div className="v2-stack">
-            {prompts.map(prompt => <ActionCard key={prompt} title={prompt} reason="Opens the assistant drawer with current workspace context." source="Ask Halvex" action={<Bot size={17} />} />)}
+            {prompts.map(prompt => (
+              <ActionCard
+                key={prompt}
+                title={prompt}
+                reason="Opens the assistant drawer with current workspace context."
+                source="Ask Halvex"
+                action={<Bot size={17} />}
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: prompt } }))
+                }}
+              />
+            ))}
           </div>
         </PanelV2>
         <PanelV2>

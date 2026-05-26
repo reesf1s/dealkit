@@ -30,7 +30,7 @@ export default function CalendarPage() {
     <div className="v2-page">
       <HeroPanel
         eyebrow="Calendar"
-        title="Meetings are where the CRM should start."
+        title="Meetings"
         actions={(
           <>
             {connected ? <ButtonV2 tone="dark" onClick={sync}><RefreshCw size={16} /> Sync Calendar</ButtonV2> : <ButtonV2 tone="dark" href="/api/integrations/google/auth"><CalendarDays size={16} /> Connect Google Calendar</ButtonV2>}
@@ -44,7 +44,7 @@ export default function CalendarPage() {
           </div>
         )}
       >
-        Halvex matches attendees to people, companies, and deals so every meeting can create useful context.
+        Prep before the call, add notes after, and let Halvex propose the CRM updates.
       </HeroPanel>
 
       <div className="v2-grid-2">

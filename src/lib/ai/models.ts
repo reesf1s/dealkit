@@ -1,14 +1,15 @@
 /**
  * OpenAI model name constants.
  *
- * All generation uses GPT-5.4 mini unless a specific override is needed.
+ * V2 customer-product generation uses GPT-5.4 mini by default.
  * Routing policy:
- *   MINI   — everything: intent classification, extraction, analysis, generation
- *            GPT-5.4 mini is fast, tool-capable, and strong enough for the
- *            assistant and extraction workloads in Halvex.
+ *   MINI   — everything: intent classification, extraction, analysis, generation.
+ *            Override with HALVEX_AI_MODEL if we need a pinned snapshot.
+ *   FRONTIER — premium/top-plan upgrade path for heavier reasoning.
  */
 
-export const MINI = 'gpt-5.4-mini' as const
+export const MINI = process.env.HALVEX_AI_MODEL || 'gpt-5.4-mini'
+export const FRONTIER = process.env.HALVEX_PREMIUM_AI_MODEL || 'gpt-5.5'
 
 /** Aliases kept so existing callers that import HAIKU/SONNET still compile */
 export const HAIKU = MINI
