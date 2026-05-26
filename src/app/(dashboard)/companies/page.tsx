@@ -1,70 +1,50 @@
 'use client'
 
 import useSWR from 'swr'
-import { useState } from 'react'
-import { Building2 } from 'lucide-react'
+import Link from 'next/link'
+import { Building2, Plus } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { OperatorHeader, OperatorPage, OperatorPanel } from '@/components/shared/OperatorUI'
+import { ButtonV2, EmptyStateV2, HeroPanel, money, PanelV2, RiskBadge, SectionHeader, shortDate } from '@/components/v2/V2DesignSystem'
 
 export const dynamic = 'force-dynamic'
 
-type Company = {
-  id: string
-  name: string
-  domain: string | null
-  openDeals: number
-  pipelineValue: number
-  lastActivityAt: string | null
-  riskCount: number
-}
-
-function money(value: number) {
-  if (value >= 1_000_000) return `£${(value / 1_000_000).toFixed(1)}m`
-  if (value >= 1_000) return `£${Math.round(value / 1_000)}k`
-  return `£${value}`
-}
-
 export default function CompaniesPage() {
-  const { data, isLoading, mutate } = useSWR<{ data: Company[] }>('/api/crm/companies', fetcher, { revalidateOnFocus: false })
-  const [form, setForm] = useState({ name: '', domain: '', industry: '' })
+  const { data, isLoading } = useSWR('/api/crm/companies', fetcher, { revalidateOnFocus: false })
   const companies = data?.data ?? []
 
-  async function addCompany(event: React.FormEvent) {
-    event.preventDefault()
-    if (!form.name.trim()) return
-    await fetch('/api/crm/companies', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-    setForm({ name: '', domain: '', industry: '' })
-    mutate()
-  }
-
   return (
-    <OperatorPage>
-      <OperatorHeader eyebrow="Companies" title="Accounts" description="Companies inferred from legacy deals and native CRM records." />
-      <OperatorPanel icon={Building2}>
-        <form onSubmit={addCompany} className="crm-record-form">
-          <input className="crm-input" value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} placeholder="Company name" />
-          <input className="crm-input" value={form.domain} onChange={event => setForm({ ...form, domain: event.target.value })} placeholder="Domain" />
-          <input className="crm-input" value={form.industry} onChange={event => setForm({ ...form, industry: event.target.value })} placeholder="Industry" />
-          <button className="operator-button operator-button-primary" type="submit">Add</button>
-        </form>
-        <div className="crm-table companies">
-          <div className="crm-table-head"><span>Company</span><span>Domain</span><span>Open deals</span><span>Pipeline</span><span>Risk</span></div>
-          {companies.map(company => (
-            <div key={company.id} className="crm-table-row">
-              <span><strong>{company.name}</strong></span>
-              <span>{company.domain ?? '—'}</span>
-              <span>{company.openDeals}</span>
-              <span>{money(company.pipelineValue ?? 0)}</span>
-              <span>{company.riskCount > 0 ? `${company.riskCount} high risk` : 'Clear'}</span>
-            </div>
+    <div className="v2-page">
+      <HeroPanel
+        eyebrow="Companies"
+        title="Account memory that connects people, deals, and meetings."
+        actions={<><ButtonV2 tone="dark"><Plus size={16} /> Add company</ButtonV2><ButtonV2 href="/people">People</ButtonV2></>}
+        aside={<div className="v2-glass-card"><strong>Company context</strong><span>Open deals, risk, last activity, and next action belong together.</span></div>}
+      >
+        Companies are not a static directory. They are the shared memory for every account relationship.
+      </HeroPanel>
+
+      <PanelV2>
+        <SectionHeader title="Companies" icon={<Building2 size={18} />}>
+          Account records should show relationship state and active revenue.
+        </SectionHeader>
+        {isLoading ? <EmptyStateV2 title="Loading companies">Reading account records.</EmptyStateV2> : null}
+        {!isLoading && !companies.length ? <EmptyStateV2 title="No companies yet" action={<ButtonV2 href="/settings?section=imports" tone="dark">Import companies</ButtonV2>}>Import accounts or add the first company from a deal.</EmptyStateV2> : null}
+        <div className="v2-grid-3">
+          {companies.map((company: any) => (
+            <Link key={company.id} href={`/companies/${company.id}`} className="v2-company-card">
+              <div className="v2-card-icon"><Building2 size={16} /></div>
+              <div>
+                <strong>{company.name}</strong>
+                <p>{company.domain ?? 'No domain'} · {company.openDeals} open deals · {money(company.pipelineValue)}</p>
+                <div className="v2-deal-facts">
+                  <span>{company.lastActivityAt ? `Last ${shortDate(company.lastActivityAt)}` : 'No activity'}</span>
+                  {company.riskCount ? <RiskBadge risk="high" /> : <RiskBadge risk="unknown" />}
+                </div>
+              </div>
+            </Link>
           ))}
-          {!isLoading && companies.length === 0 && <div className="empty-state">No companies yet.</div>}
         </div>
-      </OperatorPanel>
-    </OperatorPage>
+      </PanelV2>
+    </div>
   )
 }

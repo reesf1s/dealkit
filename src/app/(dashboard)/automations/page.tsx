@@ -1,4 +1,5 @@
-import IntelligencePage from '../intelligence/page'
+import { redirect } from 'next/navigation'
 
-export default IntelligencePage
-
+export default function AutomationsRedirect() {
+  redirect('/home')
+}

@@ -12,29 +12,35 @@ const isPublicRoute = createRouteMatcher([
 
 const legacyDashboardRedirects: Array<[RegExp, string]> = [
   [/^\/analytics(?:\/.*)?$/, '/home'],
-  [/^\/automations(?:\/.*)?$/, '/settings'],
-  [/^\/case-studies(?:\/.*)?$/, '/companies'],
+  [/^\/activity(?:\/.*)?$/, '/inbox'],
+  [/^\/automations(?:\/.*)?$/, '/home'],
+  [/^\/case-studies(?:\/.*)?$/, '/home'],
   [/^\/chat(?:\/.*)?$/, '/assistant'],
-  [/^\/collateral(?:\/.*)?$/, '/deals'],
+  [/^\/collateral(?:\/.*)?$/, '/home'],
   [/^\/company(?:\/.*)?$/, '/companies'],
-  [/^\/competitors(?:\/.*)?$/, '/assistant'],
-  [/^\/connections(?:\/.*)?$/, '/settings'],
+  [/^\/competitors(?:\/.*)?$/, '/home'],
+  [/^\/connections(?:\/.*)?$/, '/settings?section=integrations'],
+  [/^\/contacts(?:\/.*)?$/, '/people'],
   [/^\/dashboard(?:\/.*)?$/, '/home'],
-  [/^\/intelligence(?:\/.*)?$/, '/assistant'],
-  [/^\/models(?:\/.*)?$/, '/assistant'],
+  [/^\/intelligence(?:\/.*)?$/, '/deals?view=intelligence'],
+  [/^\/models(?:\/.*)?$/, '/home'],
   [/^\/onboarding(?:\/.*)?$/, '/home'],
-  [/^\/playbook(?:\/.*)?$/, '/assistant'],
-  [/^\/product-gaps(?:\/.*)?$/, '/assistant'],
-  [/^\/settings\/unmatched-emails(?:\/.*)?$/, '/settings'],
-  [/^\/workflows(?:\/.*)?$/, '/settings'],
+  [/^\/pipeline(?:\/.*)?$/, '/deals?view=pipeline'],
+  [/^\/playbook(?:\/.*)?$/, '/home'],
+  [/^\/product-gaps(?:\/.*)?$/, '/home'],
+  [/^\/settings\/unmatched-emails(?:\/.*)?$/, '/inbox'],
+  [/^\/tasks(?:\/.*)?$/, '/home'],
+  [/^\/today(?:\/.*)?$/, '/home'],
+  [/^\/workflows(?:\/.*)?$/, '/home'],
 ]
 
 function redirectedLegacyUrl(request: Request) {
   const url = new URL(request.url)
   const match = legacyDashboardRedirects.find(([pattern]) => pattern.test(url.pathname))
   if (!match) return null
-  url.pathname = match[1]
-  url.search = ''
+  const target = new URL(match[1], url.origin)
+  url.pathname = target.pathname
+  url.search = target.search
   return url
 }
 

@@ -8,6 +8,7 @@ import {
   crmContacts,
   crmDealParticipants,
   crmDeals,
+  crmNotes,
   crmPipelineStages,
   crmPipelines,
   crmSignals,
@@ -817,6 +818,112 @@ export async function createNativeTask(input: {
 
   if (task.dealId) await refreshDealSignals(input.workspaceId, task.dealId)
   return task
+}
+
+export async function updateNativeDeal(input: {
+  workspaceId: string
+  userId: string
+  dealId: string
+  valueAmount?: number | null
+  expectedCloseDate?: Date | null
+  aiNextAction?: string | null
+}) {
+  const patch: Partial<typeof crmDeals.$inferInsert> = { updatedAt: new Date() }
+  if ('valueAmount' in input) patch.valueAmount = input.valueAmount
+  if ('expectedCloseDate' in input) patch.expectedCloseDate = input.expectedCloseDate
+  if ('aiNextAction' in input) patch.aiNextAction = input.aiNextAction
+
+  const [deal] = await db.update(crmDeals).set(patch)
+    .where(and(eq(crmDeals.id, input.dealId), eq(crmDeals.workspaceId, input.workspaceId)))
+    .returning()
+  if (!deal) return null
+
+  await db.insert(crmActivities).values({
+    workspaceId: input.workspaceId,
+    dealId: deal.id,
+    companyId: deal.companyId,
+    type: 'note',
+    source: 'manual',
+    title: 'Updated deal facts',
+    body: 'Deal facts were updated inline.',
+    occurredAt: new Date(),
+    createdBy: input.userId,
+    metadata: { fields: Object.keys(patch).filter(key => key !== 'updatedAt') },
+  })
+  await refreshDealSignals(input.workspaceId, deal.id)
+  return deal
+}
+
+export async function addDealUpdate(input: {
+  workspaceId: string
+  userId: string
+  dealId: string
+  note: string
+  mode: 'note' | 'approved'
+  proposedChanges?: {
+    blocker?: string | null
+    risk?: string | null
+    nextAction?: string | null
+    task?: string | null
+    summary?: string | null
+  } | null
+}) {
+  const [deal] = await db.select({ id: crmDeals.id, companyId: crmDeals.companyId, aiRiskLevel: crmDeals.aiRiskLevel })
+    .from(crmDeals)
+    .where(and(eq(crmDeals.id, input.dealId), eq(crmDeals.workspaceId, input.workspaceId)))
+    .limit(1)
+  if (!deal) return null
+
+  const now = new Date()
+  const proposed = input.proposedChanges ?? null
+  await db.insert(crmNotes).values({
+    workspaceId: input.workspaceId,
+    dealId: deal.id,
+    companyId: deal.companyId,
+    body: input.note,
+    createdBy: input.userId,
+  })
+  await db.insert(crmActivities).values({
+    workspaceId: input.workspaceId,
+    dealId: deal.id,
+    companyId: deal.companyId,
+    type: 'note',
+    source: input.mode === 'approved' ? 'ai_assisted_update' : 'manual',
+    title: input.mode === 'approved' ? 'Approved deal update' : 'Deal note added',
+    body: input.note,
+    summary: proposed?.summary ?? null,
+    occurredAt: now,
+    createdBy: input.userId,
+    metadata: { proposedChanges: proposed, approvalMode: input.mode },
+  })
+
+  if (input.mode === 'approved') {
+    if (proposed?.task) {
+      await db.insert(crmTasks).values({
+        workspaceId: input.workspaceId,
+        dealId: deal.id,
+        companyId: deal.companyId,
+        assignedTo: input.userId,
+        title: proposed.task,
+        priority: proposed.blocker ? 'high' : 'normal',
+        source: 'ai_suggested',
+      })
+    }
+    const update: Partial<typeof crmDeals.$inferInsert> = {
+      aiNextAction: proposed?.nextAction ?? proposed?.task ?? null,
+      aiSummary: proposed?.summary ?? input.note,
+      aiConfidence: proposed?.blocker ? 62 : 70,
+      aiRiskLevel: proposed?.blocker ? 'medium' : deal.aiRiskLevel,
+      lastActivityAt: now,
+      updatedAt: now,
+    }
+    await db.update(crmDeals).set(update).where(and(eq(crmDeals.id, deal.id), eq(crmDeals.workspaceId, input.workspaceId)))
+  } else {
+    await db.update(crmDeals).set({ lastActivityAt: now, updatedAt: now }).where(and(eq(crmDeals.id, deal.id), eq(crmDeals.workspaceId, input.workspaceId)))
+  }
+
+  await refreshDealSignals(input.workspaceId, deal.id)
+  return getDealContextNative(deal.id, input.workspaceId)
 }
 
 export async function refreshDealSignals(workspaceId: string, dealId: string) {

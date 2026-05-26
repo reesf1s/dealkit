@@ -1,236 +1,129 @@
 'use client'
 
-import Link from 'next/link'
 import useSWR from 'swr'
-import {
-  AlertTriangle,
-  ArrowRight,
-  CalendarDays,
-  CheckCircle2,
-  CircleDollarSign,
-  Plus,
-  Sparkles,
-} from 'lucide-react'
+import { CalendarDays, CheckCircle2, LayoutGrid, Plus, Sparkles } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
 import {
-  CrmButton,
-  CrmEmptyAction,
-  CrmHero,
-  CrmMeetingCard,
-  CrmPageShell,
-  CrmPanel,
-  CrmPill,
-  CrmPriorityCard,
-} from '@/components/crm/CrmDesignSystem'
+  ActionCard,
+  ButtonV2,
+  DealCardV2,
+  EmptyStateV2,
+  HeroPanel,
+  MeetingCard,
+  money,
+  PanelV2,
+  SectionHeader,
+} from '@/components/v2/V2DesignSystem'
 
 export const dynamic = 'force-dynamic'
 
 type HomeData = {
-  priorities: Array<{
-    id: string
-    title: string
-    reason: string
-    linkedType: string
-    linkedId: string
-    dealId?: string | null
-    suggestedAction: string
-    confidence: string
-  }>
-  atRiskDeals: Array<{ id: string; title: string; companyName: string | null; valueAmount: number | null; aiScore: number | null; aiRiskLevel: string }>
-  staleDeals: Array<{ id: string; title: string; companyName: string | null; lastActivityAt: string | null }>
+  priorities: Array<{ id: string; title: string; reason: string; linkedType: string; linkedId: string; dealId?: string | null; suggestedAction: string; confidence: string }>
+  atRiskDeals: Array<any>
+  staleDeals: Array<any>
   upcomingMeetings: Array<{ id: string; title: string; startsAt: string; dealId: string | null; dealTitle: string | null; companyName: string | null }>
   overdueTasks: Array<{ id: string; title: string; dueAt: string | null; dealId: string | null; dealTitle: string | null; companyName: string | null }>
   openPipelineValue: number
-  likelyClosers: Array<{ id: string; title: string; companyName: string | null; valueAmount: number | null }>
-}
-
-function money(value: number | null | undefined) {
-  if (value === null || value === undefined) return 'Value missing'
-  if (value >= 1_000_000) return `£${(value / 1_000_000).toFixed(1)}m`
-  if (value >= 1_000) return `£${Math.round(value / 1_000)}k`
-  return `£${value}`
-}
-
-function time(value: string | null | undefined) {
-  if (!value) return 'No time'
-  return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(new Date(value))
-}
-
-function dateShort(value: string | null | undefined) {
-  if (!value) return 'No date'
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date(value))
-}
-
-function priorityTone(reason: string) {
-  const lower = reason.toLowerCase()
-  if (lower.includes('risk') || lower.includes('overdue') || lower.includes('stale')) return 'risk' as const
-  if (lower.includes('no next') || lower.includes('follow')) return 'watch' as const
-  return 'neutral' as const
+  likelyClosers: Array<any>
 }
 
 export default function HomePage() {
-  const { data, isLoading, mutate } = useSWR<{ data: HomeData }>('/api/crm/today', fetcher, {
-    revalidateOnFocus: false,
-    dedupingInterval: 20_000,
-  })
+  const { data, isLoading } = useSWR<{ data: HomeData }>('/api/crm/today', fetcher, { revalidateOnFocus: false })
   const home = data?.data
   const priorities = home?.priorities ?? []
   const meetings = home?.upcomingMeetings ?? []
-  const hasWork = priorities.length > 0 || meetings.length > 0 || (home?.atRiskDeals.length ?? 0) > 0
-
-  async function completeTask(taskId: string) {
-    await fetch('/api/crm/tasks', {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ taskId, action: 'complete' }),
-    })
-    mutate()
-  }
+  const activeDeals = [...(home?.likelyClosers ?? []), ...(home?.atRiskDeals ?? []), ...(home?.staleDeals ?? [])]
+    .filter((deal, index, all) => all.findIndex(item => item.id === deal.id) === index)
+    .slice(0, 4)
 
   return (
-    <CrmPageShell>
-      <CrmHero
+    <div className="v2-page">
+      <HeroPanel
         eyebrow="Home"
         title="Your revenue day, already organized."
-        brief={
-          hasWork
-            ? `Halvex found ${priorities.length} priority actions, ${meetings.length} upcoming meetings, and ${(home?.atRiskDeals.length ?? 0)} deals that need a closer look.`
-            : 'Connect Calendar or add your first deals and Halvex will turn your meetings, follow-ups, and risks into a clear daily plan.'
-        }
-        primary={<CrmButton href="/calendar" variant="primary"><CalendarDays size={15} /> Review my day</CrmButton>}
-        secondary={<CrmButton href="/pipeline" variant="secondary"><Plus size={15} /> Add deal</CrmButton>}
-        meta={
+        actions={(
           <>
-            <div className="crm-mini-brief">
+            <ButtonV2 tone="dark" onClick={() => {
+              window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'What should I do today?' } }))
+            }}>
+              <CalendarDays size={16} /> Review my day
+            </ButtonV2>
+            <ButtonV2 href="/deals"><Plus size={16} /> Add deal</ButtonV2>
+          </>
+        )}
+        aside={(
+          <>
+            <div className="v2-glass-card">
               <strong>AI daily brief</strong>
-              {hasWork
-                ? 'Start with meetings, then clear overdue follow-ups and review any deals with no next step.'
-                : 'Your daily brief will appear here once Halvex has meetings, deals, or tasks to reason over.'}
+              <span>{priorities.length ? `${priorities.length} actions need attention. Start with ${priorities[0].title}.` : 'Connect Calendar or add deal context and Halvex will build a daily plan.'}</span>
             </div>
-            <div className="crm-mini-brief">
+            <div className="v2-glass-card">
               <strong>Pipeline pulse</strong>
-              {money(home?.openPipelineValue ?? 0)} open pipeline · {(home?.likelyClosers.length ?? 0)} likely closers
+              <span>{money(home?.openPipelineValue ?? 0)} open pipeline · {(home?.likelyClosers ?? []).length} likely closers</span>
             </div>
           </>
-        }
-      />
+        )}
+      >
+        Halvex turns meetings, follow-ups, deal changes, and risk signals into one calm daily plan.
+      </HeroPanel>
 
-      <div className="crm-page-grid">
-        <CrmPanel
-          title="Today’s meetings"
-          description="Calendar-led selling with linked deals, context, and prep."
-          icon={CalendarDays}
-          action={<CrmButton href="/calendar" variant="ghost">Calendar <ArrowRight size={14} /></CrmButton>}
-        >
-          {meetings.slice(0, 5).map(meeting => (
-            <CrmMeetingCard
-              key={meeting.id}
-              title={meeting.title}
-              time={time(meeting.startsAt)}
-              company={meeting.companyName ?? meeting.dealTitle}
-              dealHref={meeting.dealId ? `/deals/${meeting.dealId}` : null}
-              prep={meeting.dealId ? 'Prep available from linked deal context.' : 'Link this meeting to a deal for AI prep.'}
-            />
-          ))}
+      <div className="v2-grid-2">
+        <PanelV2>
+          <SectionHeader title="Today's meetings" icon={<CalendarDays size={18} />}>
+            Meeting prep should start from your people, companies, deals, and timeline.
+          </SectionHeader>
+          <div className="v2-stack">
+            {meetings.length ? meetings.map(meeting => (
+              <MeetingCard
+                key={meeting.id}
+                meeting={meeting}
+                action={<ButtonV2 href={meeting.dealId ? `/deals/${meeting.dealId}` : '/calendar'}>Prep me</ButtonV2>}
+              />
+            )) : (
+              <EmptyStateV2 title="Bring your meetings into Halvex" action={<ButtonV2 href="/api/integrations/google/auth" tone="dark">Connect Google Calendar</ButtonV2>}>
+                Calendar becomes the front door for prep, notes, follow-up, and deal updates.
+              </EmptyStateV2>
+            )}
+          </div>
+        </PanelV2>
 
-          {!isLoading && meetings.length === 0 && (
-            <CrmEmptyAction
-              icon={CalendarDays}
-              title="Bring your sales day into Halvex"
-              description="Connect Google Calendar so meetings show here with linked contacts, deals, and AI prep."
-              action={<CrmButton href="/settings" variant="primary">Connect Google Calendar</CrmButton>}
-            />
-          )}
-        </CrmPanel>
-
-        <CrmPanel
-          title="Priority actions"
-          description="The work Halvex thinks will move revenue today."
-          icon={Sparkles}
-        >
-          {priorities.slice(0, 7).map(priority => (
-            <div key={priority.id}>
-              <CrmPriorityCard
+        <PanelV2>
+          <SectionHeader title="Priority actions" icon={<Sparkles size={18} />}>
+            The work Halvex thinks will move revenue today.
+          </SectionHeader>
+          <div className="v2-stack">
+            {priorities.length ? priorities.slice(0, 6).map(priority => (
+              <ActionCard
+                key={priority.id}
                 title={priority.title}
                 reason={priority.reason}
-                action={priority.suggestedAction}
-                tone={priorityTone(priority.reason)}
                 href={priority.dealId ? `/deals/${priority.dealId}` : undefined}
-                meta={<CrmPill>{priority.confidence}</CrmPill>}
+                source={priority.confidence === 'high' ? 'High confidence' : 'AI suggested'}
+                action={<CheckCircle2 size={18} />}
               />
-              {priority.linkedType === 'task' && (
-                <button
-                  className="crm-action-button ghost"
-                  type="button"
-                  onClick={() => completeTask(priority.linkedId)}
-                  style={{ margin: '-2px 0 10px 8px' }}
-                >
-                  <CheckCircle2 size={14} /> Mark done
-                </button>
-              )}
-            </div>
-          ))}
-
-          {!isLoading && priorities.length === 0 && (
-            <CrmEmptyAction
-              title="No busywork yet"
-              description="Import deals or add next steps and Halvex will turn them into a daily action list."
-              action={<CrmButton href="/settings" variant="primary">Import deals</CrmButton>}
-            />
-          )}
-        </CrmPanel>
+            )) : (
+              <EmptyStateV2 title="No busywork yet">
+                Add deals, connect Calendar, or import relationships. Halvex will turn activity into clear actions.
+              </EmptyStateV2>
+            )}
+          </div>
+        </PanelV2>
       </div>
 
-      <section className="crm-home-lower">
-        <CrmPanel title="Pipeline pulse" icon={CircleDollarSign}>
-          <div className="crm-pulse-row">
-            <strong>Open pipeline</strong>
-            <span>{money(home?.openPipelineValue ?? 0)}</span>
+      <PanelV2>
+        <SectionHeader title="Deals that need attention" icon={<LayoutGrid size={18} />} action={<ButtonV2 href="/deals?view=intelligence">Open intelligence</ButtonV2>}>
+          Likely closers, slipping deals, and missing-data records in one place.
+        </SectionHeader>
+        {isLoading ? <EmptyStateV2 title="Loading CRM context">Reading your workspace records.</EmptyStateV2> : activeDeals.length ? (
+          <div className="v2-grid-3">
+            {activeDeals.map(deal => <DealCardV2 key={deal.id} deal={deal} />)}
           </div>
-          <div className="crm-pulse-row">
-            <strong>Likely to close</strong>
-            <span>{home?.likelyClosers.length ?? 0} deals</span>
-          </div>
-          <div className="crm-pulse-row">
-            <strong>At risk</strong>
-            <span>{home?.atRiskDeals.length ?? 0} deals</span>
-          </div>
-        </CrmPanel>
-
-        <CrmPanel title="Likely closers" icon={CheckCircle2}>
-          {(home?.likelyClosers ?? []).slice(0, 4).map(deal => (
-            <Link href={`/deals/${deal.id}`} key={deal.id} className="crm-card-link">
-              <div className="crm-pulse-row">
-                <strong>{deal.companyName ?? deal.title}</strong>
-                <span>{money(deal.valueAmount)}</span>
-              </div>
-            </Link>
-          ))}
-          {!isLoading && (home?.likelyClosers.length ?? 0) === 0 && <CrmEmptyAction title="No close candidates yet" description="Set values, close dates, and next steps to build a believable close list." />}
-        </CrmPanel>
-
-        <CrmPanel title="Slipping or stuck" icon={AlertTriangle}>
-          {(home?.atRiskDeals ?? []).slice(0, 3).map(deal => (
-            <Link href={`/deals/${deal.id}`} key={deal.id} className="crm-card-link">
-              <div className="crm-pulse-row">
-                <strong>{deal.companyName ?? deal.title}</strong>
-                <span>{deal.aiScore ?? '—'} score</span>
-              </div>
-            </Link>
-          ))}
-          {(home?.staleDeals ?? []).slice(0, 2).map(deal => (
-            <Link href={`/deals/${deal.id}`} key={deal.id} className="crm-card-link">
-              <div className="crm-pulse-row">
-                <strong>{deal.companyName ?? deal.title}</strong>
-                <span>{dateShort(deal.lastActivityAt)}</span>
-              </div>
-            </Link>
-          ))}
-          {!isLoading && (home?.atRiskDeals.length ?? 0) === 0 && (home?.staleDeals.length ?? 0) === 0 && (
-            <CrmEmptyAction title="Nothing is slipping" description="Halvex will call out stale deals, overdue close dates, and missing next steps here." />
-          )}
-        </CrmPanel>
-      </section>
-    </CrmPageShell>
+        ) : (
+          <EmptyStateV2 title="Add or import deals to see the daily cockpit" action={<ButtonV2 href="/deals" tone="dark">Open Deals</ButtonV2>}>
+            V2 is designed to be useful before the database is perfect, but it needs at least a few opportunities to reason over.
+          </EmptyStateV2>
+        )}
+      </PanelV2>
+    </div>
   )
 }

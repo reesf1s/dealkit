@@ -1,66 +1,12 @@
 'use client'
 
-import Sidebar from '@/components/layout/Sidebar'
-import TopNav from '@/components/layout/TopNav'
-import CommandPalette from '@/components/shared/CommandPalette'
 import ErrorBoundary from '@/components/shared/ErrorBoundary'
-import { SidebarProvider, useSidebar } from '@/components/layout/SidebarContext'
-
-function LayoutShell({ children }: { children: React.ReactNode }) {
-  const { sidebarWidth } = useSidebar()
-
-  return (
-    <div style={{
-      display: 'flex',
-      minHeight: '100vh',
-      background: 'var(--page-bg)',
-      position: 'relative',
-      overflow: 'auto',
-    }}>
-      <Sidebar />
-      <TopNav />
-      <CommandPalette />
-      <main style={{
-        flex: 1,
-        minWidth: 0,
-        marginLeft: `${sidebarWidth}px`,
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-        zIndex: 2,
-        paddingTop: '46px',
-        background: 'var(--page-bg)',
-        transition: 'margin-left 0.15s cubic-bezier(0.4,0,0.2,1)',
-      }}>
-        <div style={{
-          flex: 1,
-          padding: '14px 28px 34px',
-          width: '100%',
-          boxSizing: 'border-box',
-          maxWidth: '1500px',
-          margin: '0 auto',
-        }}>
-          <ErrorBoundary>
-            {children}
-          </ErrorBoundary>
-        </div>
-      </main>
-
-      <style>{`
-        @media (max-width: 900px) {
-          main { margin-left: 0 !important; margin-right: 0 !important; }
-          main > div { padding: 12px 12px 74px !important; }
-        }
-      `}</style>
-    </div>
-  )
-}
+import { AppShellV2 } from '@/components/v2/V2DesignSystem'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SidebarProvider>
-      <LayoutShell>{children}</LayoutShell>
-    </SidebarProvider>
+    <AppShellV2>
+      <ErrorBoundary>{children}</ErrorBoundary>
+    </AppShellV2>
   )
 }

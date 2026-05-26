@@ -1,57 +1,54 @@
 'use client'
 
-import Link from 'next/link'
-import { useState } from 'react'
-import { Bot, Send } from 'lucide-react'
-import { OperatorHeader, OperatorPage, OperatorPanel } from '@/components/shared/OperatorUI'
+import { Bot, MailPlus, Sparkles } from 'lucide-react'
+import { ActionCard, ButtonV2, HeroPanel, PanelV2, SectionHeader } from '@/components/v2/V2DesignSystem'
 
 export const dynamic = 'force-dynamic'
 
-type Reply = { answer: string; links: Array<{ label: string; href: string }> }
+const prompts = [
+  'What should I do today?',
+  'Which deals are slipping?',
+  'Which deals have no next step?',
+  'Prep me for my next meeting.',
+  'Draft a follow-up for BOE.',
+  'What changed this week?',
+]
 
 export default function AssistantPage() {
-  const [message, setMessage] = useState('What should I do today?')
-  const [replies, setReplies] = useState<Reply[]>([])
-  const [loading, setLoading] = useState(false)
-
-  async function ask(event: React.FormEvent) {
-    event.preventDefault()
-    if (!message.trim()) return
-    setLoading(true)
-    const res = await fetch('/api/crm/assistant', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ message }),
-    })
-    const json = await res.json()
-    setReplies(prev => [...prev, json.data])
-    setLoading(false)
-  }
-
   return (
-    <OperatorPage>
-      <OperatorHeader eyebrow="Assistant" title="Ask Halvex" description="Workspace-scoped CRM answers with links back to records." />
-      <OperatorPanel icon={Bot}>
-        <div className="crm-assistant">
-          <div className="crm-assistant-messages">
-            {replies.map((reply, index) => (
-              <article key={index}>
-                <p>{reply.answer}</p>
-                {reply.links.length > 0 && (
-                  <div>
-                    {reply.links.map(link => <Link key={link.href} href={link.href}>{link.label}</Link>)}
-                  </div>
-                )}
-              </article>
-            ))}
-            {replies.length === 0 && <div className="empty-state">Try “What should I do today?”, “Which deals are at risk?”, or “Which deals are likely to close?”</div>}
+    <div className="v2-page">
+      <HeroPanel
+        eyebrow="Assistant"
+        title="The natural language interface to your CRM."
+        actions={<ButtonV2 tone="dark" onClick={() => {
+          window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'What should I do today?' } }))
+        }}><Bot size={16} /> Open assistant</ButtonV2>}
+        aside={<div className="v2-glass-card"><strong>Not a separate chatbot</strong><span>The assistant works best when it is attached to deals, people, companies, and meetings.</span></div>}
+      >
+        Ask Halvex to understand, draft, update, and reason over the CRM. Important changes require approval.
+      </HeroPanel>
+
+      <div className="v2-grid-2">
+        <PanelV2>
+          <SectionHeader title="Useful questions" icon={<Sparkles size={18} />}>
+            Start with operational questions that move revenue.
+          </SectionHeader>
+          <div className="v2-stack">
+            {prompts.map(prompt => <ActionCard key={prompt} title={prompt} reason="Opens the assistant drawer with current workspace context." source="Ask Halvex" action={<Bot size={17} />} />)}
           </div>
-          <form onSubmit={ask} className="crm-assistant-input">
-            <input value={message} onChange={event => setMessage(event.target.value)} />
-            <button className="operator-button operator-button-primary" disabled={loading}><Send size={14} /> Ask</button>
-          </form>
-        </div>
-      </OperatorPanel>
-    </OperatorPage>
+        </PanelV2>
+        <PanelV2>
+          <SectionHeader title="What Halvex can do" icon={<MailPlus size={18} />}>
+            Answers should include records, evidence, and proposed actions.
+          </SectionHeader>
+          <div className="v2-stack">
+            <ActionCard title="Summarise" reason="Explain a deal, person, company, or weekly sales state with links to records." />
+            <ActionCard title="Draft" reason="Write follow-ups from real context, ready for review." />
+            <ActionCard title="Propose updates" reason="Turn notes into blockers, next actions, tasks, and summary updates for approval." />
+            <ActionCard title="Prioritise" reason="Tell the team what needs attention today and why." />
+          </div>
+        </PanelV2>
+      </div>
+    </div>
   )
 }

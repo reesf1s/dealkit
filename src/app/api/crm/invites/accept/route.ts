@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
     if (!token) return NextResponse.redirect(new URL('/sign-in', req.url))
     const result = await accept(token)
     if ('error' in result) return NextResponse.json({ error: result.error }, { status: result.status })
-    return NextResponse.redirect(new URL('/today', req.url))
+    return NextResponse.redirect(new URL('/home', req.url))
   } catch (err) {
     return dbErrResponse(err)
   }
