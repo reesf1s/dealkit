@@ -523,10 +523,12 @@ export function AddUpdateComposer({ dealId, onSaved }: { dealId: string; onSaved
   const [note, setNote] = useState('')
   const [proposed, setProposed] = useState<null | ProposedDealUpdate>(null)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   async function review() {
     if (!note.trim()) return
     setSaving(true)
+    setError('')
     try {
       const response = await fetch(`/api/crm/deals/${dealId}/updates/propose`, {
         method: 'POST',
@@ -534,9 +536,11 @@ export function AddUpdateComposer({ dealId, onSaved }: { dealId: string; onSaved
         body: JSON.stringify({ note }),
       })
       const payload = await response.json()
+      if (!response.ok) throw new Error(payload?.error ?? 'Could not review this update')
       setProposed(payload?.data ?? proposeChanges(note))
     } catch {
       setProposed(proposeChanges(note))
+      setError('AI review was unavailable, so Halvex used its local deal rules instead.')
     } finally {
       setSaving(false)
     }
@@ -545,15 +549,23 @@ export function AddUpdateComposer({ dealId, onSaved }: { dealId: string; onSaved
   async function save(mode: 'note' | 'approved') {
     if (!note.trim()) return
     setSaving(true)
-    await fetch(`/api/crm/deals/${dealId}/updates`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ note, proposedChanges: proposed, mode }),
-    })
-    setNote('')
-    setProposed(null)
-    setSaving(false)
-    onSaved?.()
+    setError('')
+    try {
+      const response = await fetch(`/api/crm/deals/${dealId}/updates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note, proposedChanges: proposed, mode }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload?.error ?? 'Could not save this update')
+      setNote('')
+      setProposed(null)
+      onSaved?.()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save this update')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -563,6 +575,7 @@ export function AddUpdateComposer({ dealId, onSaved }: { dealId: string; onSaved
       </SectionHeader>
       <textarea value={note} onChange={event => setNote(event.target.value)} placeholder="Spoke to Darren. They like the product but are blocked on data alignment. Need to send revised requirements by Friday." />
       {proposed ? <SuggestedChangeReview changes={proposed} /> : null}
+      {error ? <p className="v2-form-note">{error}</p> : null}
       <div className="v2-composer-actions">
         <ButtonV2 onClick={review} disabled={!note.trim() || saving}>Review changes</ButtonV2>
         <ButtonV2 onClick={() => save('note')} disabled={!note.trim() || saving}>Save as note only</ButtonV2>

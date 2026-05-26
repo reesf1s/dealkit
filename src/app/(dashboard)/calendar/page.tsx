@@ -20,6 +20,7 @@ export default function CalendarPage() {
   const { data: googleData } = useSWR('/api/integrations/google/status', fetcher, { revalidateOnFocus: false })
   const meetings = todayData?.data?.upcomingMeetings ?? []
   const connected = Boolean(googleData?.data?.connected)
+  const googleConfigured = googleData?.data?.configured !== false
 
   async function sync() {
     await fetch('/api/integrations/google/sync', { method: 'POST' })
@@ -33,7 +34,7 @@ export default function CalendarPage() {
         title="Meetings"
         actions={(
           <>
-            {connected ? <ButtonV2 tone="dark" onClick={sync}><RefreshCw size={16} /> Sync Calendar</ButtonV2> : <ButtonV2 tone="dark" href="/api/integrations/google/auth"><CalendarDays size={16} /> Connect Google Calendar</ButtonV2>}
+            {connected ? <ButtonV2 tone="dark" onClick={sync}><RefreshCw size={16} /> Sync Calendar</ButtonV2> : <ButtonV2 tone="dark" href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'}><CalendarDays size={16} /> {googleConfigured ? 'Connect Google Calendar' : 'Set up Google Calendar'}</ButtonV2>}
             <ButtonV2 href="/home">Back Home</ButtonV2>
           </>
         )}
@@ -60,8 +61,11 @@ export default function CalendarPage() {
                 action={<ButtonV2 href={meeting.dealId ? `/deals/${meeting.dealId}` : '/inbox'}>Prep me</ButtonV2>}
               />
             )) : (
-              <EmptyStateV2 title={connected ? 'No upcoming matched meetings' : 'Connect Calendar to unlock the daily flow'} action={!connected ? <ButtonV2 href="/api/integrations/google/auth" tone="dark">Connect Google</ButtonV2> : undefined}>
-                {connected ? 'When meetings are found, Halvex will match attendees to people, companies, and deals.' : 'Calendar is the fastest way to make Halvex feel alive.'}
+              <EmptyStateV2
+                title={connected ? 'No upcoming matched meetings' : googleConfigured ? 'Connect Calendar to unlock the daily flow' : 'Google Calendar needs production credentials'}
+                action={!connected ? <ButtonV2 href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'} tone="dark">{googleConfigured ? 'Connect Google' : 'Open integration settings'}</ButtonV2> : undefined}
+              >
+                {connected ? 'When meetings are found, Halvex will match attendees to people, companies, and deals.' : googleConfigured ? 'Calendar is the fastest way to make Halvex feel alive.' : 'Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Vercel, then redeploy to enable OAuth.'}
               </EmptyStateV2>
             )}
           </div>

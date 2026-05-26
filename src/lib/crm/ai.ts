@@ -95,7 +95,7 @@ export async function proposeDealUpdateWithAI(note: string, context: NativeDealC
         'Return only compact JSON with keys: blocker, risk, nextAction, task, summary, confidence, evidence.',
       ].join(' '),
       prompt: JSON.stringify({ crmContext: promptContext, userNote: note }),
-      providerOptions: { openai: { maxCompletionTokens: 700 } },
+      maxTokens: 700,
     })
     text = result.text
   } catch (error) {
@@ -143,7 +143,7 @@ export async function answerAssistantWithAI(input: {
         recentActivity: input.activity,
         dealContext: input.dealContext,
       }),
-      providerOptions: { openai: { maxCompletionTokens: 900 } },
+      maxTokens: 900,
     })
 
     return text.trim() || input.fallbackAnswer
@@ -179,7 +179,7 @@ export async function generateDealBriefWithAI(context: NativeDealContext | null,
         evidenceText: dealEvidenceText(context),
         deterministicIntelligence: fallback,
       }),
-      providerOptions: { openai: { maxCompletionTokens: 800 } },
+      maxTokens: 800,
     })
     text = result.text
   } catch (error) {

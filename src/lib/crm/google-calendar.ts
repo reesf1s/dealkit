@@ -32,6 +32,10 @@ function googleClient() {
   return { clientId, clientSecret }
 }
 
+export function isGoogleCalendarConfigured() {
+  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
+}
+
 function signState(payload: Record<string, string>) {
   const secret = process.env.CLERK_SECRET_KEY ?? process.env.ENCRYPTION_KEY ?? 'dev-state-secret'
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url')
@@ -220,7 +224,11 @@ export async function listGoogleStatus(workspaceId: string, userId: string) {
     .from(googleConnections)
     .where(and(eq(googleConnections.workspaceId, workspaceId), eq(googleConnections.userId, userId)))
     .limit(1)
-  return { connected: Boolean(connection), connection: connection ?? null }
+  return {
+    configured: isGoogleCalendarConfigured(),
+    connected: Boolean(connection),
+    connection: connection ?? null,
+  }
 }
 
 export async function disconnectGoogle(workspaceId: string, userId: string) {

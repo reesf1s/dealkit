@@ -1031,6 +1031,12 @@ button.v2-action-card {
   margin-top: 12px;
 }
 
+.v2-form-note {
+  margin: 12px 0 0;
+  color: rgba(88, 59, 18, 0.78);
+  font-weight: 700;
+}
+
 .v2-review {
   margin-top: 14px;
   border-radius: 20px;

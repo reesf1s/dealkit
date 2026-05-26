@@ -111,7 +111,7 @@ export function buildDealEvidence(context: DealContextLike, now = new Date()): E
       const occurredAt = asDate(activity.occurredAt)
       const ageDays = occurredAt ? daysSince(occurredAt, now) : null
       const generic = isGenericActivity(activity)
-      const weight = (generic ? 0 : 20)
+      const weight = generic ? 0 : 20
         + (ageDays == null ? 0 : Math.max(0, 18 - Math.min(ageDays, 18)))
         + (activity.source === 'ai_assisted_update' ? 8 : 0)
         + (activity.type === 'meeting' ? 6 : 0)

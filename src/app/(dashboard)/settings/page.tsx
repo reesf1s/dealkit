@@ -45,13 +45,14 @@ function SettingsContent() {
   const active = sections.some(section => section.key === requestedSection) ? requestedSection as SettingsSection : 'workspace'
   const { data: googleData } = useSWR('/api/integrations/google/status', fetcher, { revalidateOnFocus: false })
   const googleConnected = Boolean(googleData?.data?.connected)
+  const googleConfigured = googleData?.data?.configured !== false
 
   return (
     <div className="v2-page">
       <HeroPanel
         eyebrow="Settings"
         title="Settings"
-        actions={googleConnected ? <ButtonV2 href="/calendar">Open Calendar</ButtonV2> : <ButtonV2 tone="dark" href="/api/integrations/google/auth"><CalendarDays size={16} /> Connect Google Calendar</ButtonV2>}
+        actions={googleConnected ? <ButtonV2 href="/calendar">Open Calendar</ButtonV2> : <ButtonV2 tone="dark" href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'}><CalendarDays size={16} /> {googleConfigured ? 'Connect Google Calendar' : 'Set up Google Calendar'}</ButtonV2>}
         aside={<div className="v2-glass-card"><strong>Live controls</strong><span>Workspace, members, pipeline, imports, integrations, and billing are now actionable from here.</span></div>}
       >
         Quiet controls for the CRM. Nothing here should feel like a dead card.
@@ -69,7 +70,7 @@ function SettingsContent() {
       {active === 'members' ? <MembersSection /> : null}
       {active === 'pipelines' ? <PipelinesSection /> : null}
       {active === 'imports' ? <ImportsSection /> : null}
-      {active === 'integrations' ? <IntegrationsSection googleConnected={googleConnected} /> : null}
+      {active === 'integrations' ? <IntegrationsSection googleConnected={googleConnected} googleConfigured={googleConfigured} /> : null}
       {active === 'billing' ? <BillingSection /> : null}
     </div>
   )
@@ -284,7 +285,7 @@ function ImportsSection() {
   )
 }
 
-function IntegrationsSection({ googleConnected }: { googleConnected: boolean }) {
+function IntegrationsSection({ googleConnected, googleConfigured }: { googleConnected: boolean; googleConfigured: boolean }) {
   const { mutate } = useSWR('/api/integrations/google/status', fetcher, { revalidateOnFocus: false })
   const [message, setMessage] = useState('')
 
@@ -305,9 +306,13 @@ function IntegrationsSection({ googleConnected }: { googleConnected: boolean }) 
         Google Calendar powers meetings, prep, and post-call updates in V2.
       </SectionHeader>
       <div className="v2-stack">
-        <ActionCard title="Google Calendar" reason={googleConnected ? 'Connected. Sync upcoming meetings into Home, Calendar, and deal workspaces.' : 'Not connected. Connect it to make the CRM meeting-led.'} source={googleConnected ? 'Connected' : 'Not connected'} />
+        <ActionCard
+          title="Google Calendar"
+          reason={googleConnected ? 'Connected. Sync upcoming meetings into Home, Calendar, and deal workspaces.' : googleConfigured ? 'Not connected. Connect it to make the CRM meeting-led.' : 'OAuth credentials are missing in production. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Vercel to enable this.'}
+          source={googleConnected ? 'Connected' : googleConfigured ? 'Not connected' : 'Needs setup'}
+        />
         <div className="v2-settings-actions">
-          {googleConnected ? <ButtonV2 tone="dark" onClick={sync}>Sync now</ButtonV2> : <ButtonV2 tone="dark" href="/api/integrations/google/auth">Connect Google</ButtonV2>}
+          {googleConnected ? <ButtonV2 tone="dark" onClick={sync}>Sync now</ButtonV2> : <ButtonV2 tone="dark" href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'}>{googleConfigured ? 'Connect Google' : 'Waiting for credentials'}</ButtonV2>}
           {googleConnected ? <ButtonV2 onClick={disconnect}>Disconnect</ButtonV2> : null}
           {message ? <span>{message}</span> : null}
         </div>

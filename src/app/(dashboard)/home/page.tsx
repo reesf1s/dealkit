@@ -30,6 +30,8 @@ type HomeData = {
 
 export default function HomePage() {
   const { data, isLoading } = useSWR<{ data: HomeData }>('/api/crm/today', fetcher, { revalidateOnFocus: false })
+  const { data: googleData } = useSWR('/api/integrations/google/status', fetcher, { revalidateOnFocus: false })
+  const googleConfigured = googleData?.data?.configured !== false
   const home = data?.data
   const priorities = home?.priorities ?? []
   const meetings = home?.upcomingMeetings ?? []
@@ -81,8 +83,11 @@ export default function HomePage() {
                 action={<ButtonV2 href={meeting.dealId ? `/deals/${meeting.dealId}` : '/calendar'}>Prep me</ButtonV2>}
               />
             )) : (
-              <EmptyStateV2 title="Bring your meetings into Halvex" action={<ButtonV2 href="/api/integrations/google/auth" tone="dark">Connect Google Calendar</ButtonV2>}>
-                Calendar becomes the front door for prep, notes, follow-up, and deal updates.
+              <EmptyStateV2
+                title="Bring your meetings into Halvex"
+                action={<ButtonV2 href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'} tone="dark">{googleConfigured ? 'Connect Google Calendar' : 'Set up Google Calendar'}</ButtonV2>}
+              >
+                {googleConfigured ? 'Calendar becomes the front door for prep, notes, follow-up, and deal updates.' : 'Google Calendar is designed in, but production OAuth credentials still need to be added before users can connect.'}
               </EmptyStateV2>
             )}
           </div>
