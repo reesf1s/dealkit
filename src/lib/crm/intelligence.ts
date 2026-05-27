@@ -245,6 +245,10 @@ export function dealEvidenceText(context: DealContextLike, now = new Date()) {
 export function deriveDealIntelligence(context: DealContextLike, now = new Date()) {
   const deal = context.deal
   const closed = isClosedStatus(deal.status)
+  const closedStageMismatch = closed && (
+    (deal.status === 'won' && /lost/i.test(cleanText(deal.stageName))) ||
+    (deal.status === 'lost' && /won/i.test(cleanText(deal.stageName)))
+  )
   const open = !closed
   const evidence = buildDealEvidence(context, now)
   const latestSubstantive = evidence
@@ -306,7 +310,8 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
   ]).slice(0, 6)
 
   let score = typeof deal.probability === 'number' ? deal.probability : 42
-  if (deal.status === 'won') score = 100
+  if (closedStageMismatch) score = 35
+  else if (deal.status === 'won') score = 100
   else if (deal.status === 'lost') score = 0
   else {
     if (lastActivityDays != null && lastActivityDays <= 3) score += 9
@@ -332,12 +337,14 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
   if (staleOpenTasks.length) confidence -= Math.min(18, staleOpenTasks.length * 4)
   if (riskMatches.length) confidence -= Math.min(12, riskMatches.length * 3)
   if (latestSubstantive?.ageDays != null && latestSubstantive.ageDays <= 7) confidence += 6
-  if (deal.status === 'won' || deal.status === 'lost') confidence = Math.max(confidence, 86)
-  confidence = Math.max(18, Math.min(deal.status === 'won' ? 100 : 88, Math.round(confidence)))
+  if ((deal.status === 'won' || deal.status === 'lost') && !closedStageMismatch) confidence = Math.max(confidence, 86)
+  if (closedStageMismatch) confidence -= 30
+  confidence = Math.max(18, Math.min(deal.status === 'won' && !closedStageMismatch ? 100 : 88, Math.round(confidence)))
 
   const highRiskMatches = riskMatches.filter(match => match.term.severity === 'high')
   let riskLevel: RiskLevel = 'low'
-  if (deal.status === 'won') riskLevel = 'low'
+  if (closedStageMismatch) riskLevel = 'high'
+  else if (deal.status === 'won') riskLevel = 'low'
   else if (deal.status === 'lost') riskLevel = 'high'
   else if (highRiskMatches.length || overdueTasks.length >= 2 || staleOpenTasks.length >= 3 || riskDrivers.length >= 3 || score < 42) riskLevel = 'high'
   else if (riskMatches.length || riskDrivers.length || missingData.length >= 2 || score < 64) riskLevel = 'medium'

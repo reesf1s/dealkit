@@ -147,4 +147,44 @@ describe('deriveDealIntelligence', () => {
     expect(intelligence.summary).not.toContain('Completed task: old setup action')
     expect(intelligence.confidence).toBeLessThan(70)
   })
+
+  it('does not trust a closed deal when status and stage conflict', () => {
+    const intelligence = deriveDealIntelligence({
+      deal: {
+        id: 'deal-irs',
+        title: 'IRS',
+        companyName: 'GSA',
+        stageName: 'Closed lost',
+        status: 'won',
+        probability: 92,
+        valueAmount: 100000,
+        expectedCloseDate: new Date('2026-04-10T00:00:00Z'),
+        lastActivityAt: new Date('2026-04-10T00:00:00Z'),
+      },
+      latestActivities: [
+        {
+          id: 'meeting-note',
+          title: 'Meeting notes',
+          body: 'The workshop showed useful pilot results, but the record is inconsistent about whether this was won or lost.',
+          source: 'legacy_backfill',
+          type: 'note',
+          occurredAt: new Date('2026-04-10T00:00:00Z'),
+        },
+      ],
+      openTasks: [
+        {
+          id: 'old-task',
+          title: 'Prepare expansion brief',
+          dueAt: new Date('2026-03-12T12:00:00Z'),
+        },
+      ],
+      contacts: [],
+      meetings: [],
+    }, new Date('2026-05-27T10:00:00Z'))
+
+    expect(intelligence.score).toBeLessThan(60)
+    expect(intelligence.riskLevel).toBe('high')
+    expect(intelligence.confidence).toBeLessThan(70)
+    expect(intelligence.riskDrivers.join(' ')).toContain('status is won but the stage label says closed lost')
+  })
 })
