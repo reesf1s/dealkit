@@ -454,16 +454,22 @@ export async function listToday(workspaceId: string, userId: string) {
       dueAt: crmTasks.dueAt,
       priority: crmTasks.priority,
       status: crmTasks.status,
+      source: crmTasks.source,
       dealId: crmDeals.id,
       dealTitle: crmDeals.title,
+      dealStatus: crmDeals.status,
       companyName: crmCompanies.name,
     })
     .from(crmTasks)
     .leftJoin(crmDeals, eq(crmDeals.id, crmTasks.dealId))
     .leftJoin(crmCompanies, eq(crmCompanies.id, crmTasks.companyId))
-    .where(and(eq(crmTasks.workspaceId, workspaceId), eq(crmTasks.status, 'todo')))
+    .where(and(
+      eq(crmTasks.workspaceId, workspaceId),
+      eq(crmTasks.status, 'todo'),
+      sql`(${crmDeals.status} is null or ${crmDeals.status} not in ('won', 'lost', 'archived'))`,
+    ))
     .orderBy(asc(crmTasks.dueAt))
-    .limit(20)
+    .limit(80)
 
   const meetings = await db
     .select({
@@ -485,8 +491,36 @@ export async function listToday(workspaceId: string, userId: string) {
     .orderBy(asc(crmCalendarEvents.startsAt))
     .limit(10)
 
+  const isOldTask = (task: { dueAt: Date | null; source?: string | null }) => {
+    if (!task.dueAt) return false
+    const ageDays = Math.floor((now.getTime() - task.dueAt.getTime()) / 86_400_000)
+    return ageDays > 30 || (task.source ?? '').startsWith('legacy')
+  }
+  const currentTasks = tasks.filter(task => !isOldTask(task)).slice(0, 8)
+  const oldTaskGroups = tasks
+    .filter(isOldTask)
+    .reduce<Array<{ dealId: string | null; title: string; companyName: string | null; count: number; oldestDueAt: Date | null }>>((groups, task) => {
+      const key = task.dealId ?? `task-${task.id}`
+      let group = groups.find(item => (item.dealId ?? item.title) === key)
+      if (!group) {
+        group = {
+          dealId: task.dealId,
+          title: task.dealTitle ?? task.title,
+          companyName: task.companyName,
+          count: 0,
+          oldestDueAt: task.dueAt,
+        }
+        groups.push(group)
+      }
+      group.count += 1
+      if (task.dueAt && (!group.oldestDueAt || task.dueAt < group.oldestDueAt)) group.oldestDueAt = task.dueAt
+      return groups
+    }, [])
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3)
+
   const priorities = [
-    ...tasks
+    ...currentTasks
       .filter(task => !task.dueAt || task.dueAt <= soon)
       .slice(0, 5)
       .map(task => ({
@@ -501,6 +535,18 @@ export async function listToday(workspaceId: string, userId: string) {
         dueAt: task.dueAt,
         confidence: 'high',
       })),
+    ...oldTaskGroups.map(group => ({
+      id: `old-tasks-${group.dealId ?? group.title}`,
+      title: `Review old actions for ${group.companyName ?? group.title}`,
+      reason: `${group.count} imported action${group.count === 1 ? '' : 's'} may already be done or out of date.`,
+      linkedType: 'deal',
+      linkedId: group.dealId ?? '',
+      dealId: group.dealId,
+      companyName: group.companyName,
+      suggestedAction: 'Open the deal and mark stale actions done, snooze them, or replace them with one current next step.',
+      dueAt: group.oldestDueAt,
+      confidence: 'medium',
+    })),
     ...openDeals
       .filter(deal => deal.intelligence?.riskDrivers?.length || deal.aiRiskLevel === 'high')
       .slice(0, 5)
@@ -1027,21 +1073,22 @@ export async function refreshDealSignals(workspaceId: string, dealId: string) {
   const nowMs = now.getTime()
   const deal = context.deal
   const activityIds = context.latestActivities.map(activity => activity.id).slice(0, 5)
+  const derived = deriveDealIntelligence(context)
+  const hasCurrentNextAction = !derived.missingData.includes('No current next action recorded')
 
   const signals: Array<typeof crmSignals.$inferInsert> = extractDeterministicSignals({
     status: deal.status,
     probability: deal.probability,
     lastActivityAt: deal.lastActivityAt,
-    nextStepDueAt: context.openTasks[0]?.dueAt ?? null,
+    nextStepDueAt: hasCurrentNextAction ? (context.openTasks.find(task => task.dueAt && task.dueAt.getTime() >= nowMs)?.dueAt ?? null) : null,
     expectedCloseDate: deal.expectedCloseDate,
-    hasOpenTasks: context.openTasks.length > 0,
-    hasNextAction: Boolean(deal.aiNextAction),
+    hasOpenTasks: hasCurrentNextAction,
+    hasNextAction: hasCurrentNextAction,
     hasUpcomingMeeting: context.meetings.some(meeting => meeting.startsAt.getTime() >= nowMs),
     evidenceActivityIds: activityIds,
     now,
   }).map(signal => ({ ...signal, workspaceId, dealId }))
 
-  const derived = deriveDealIntelligence(context)
   if (derived.riskDrivers.some(reason => /procurement|legal|compliance|security/i.test(reason))) {
     signals.push({
       workspaceId,

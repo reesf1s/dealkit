@@ -95,4 +95,56 @@ describe('deriveDealIntelligence', () => {
     expect(intelligence.riskLevel).not.toBe('low')
     expect(intelligence.confidence).toBeLessThan(82)
   })
+
+  it('treats old imported tasks as cleanup context, not current next actions', () => {
+    const intelligence = deriveDealIntelligence({
+      deal: {
+        id: 'deal-legacy',
+        title: 'Atlassian',
+        companyName: 'Atlassian',
+        stageName: 'Negotiation',
+        status: 'open',
+        probability: 70,
+        valueAmount: 138000,
+        expectedCloseDate: null,
+        aiNextAction: '[17 Mar 2026] Follow up with Morgan about feature access.',
+        lastActivityAt: new Date('2026-05-27T08:52:00Z'),
+      },
+      latestActivities: [
+        {
+          id: 'completed-no-body',
+          title: 'Completed task: old setup action',
+          body: null,
+          summary: null,
+          source: 'crm',
+          type: 'task',
+          occurredAt: new Date('2026-05-27T08:52:00Z'),
+        },
+        {
+          id: 'legacy-note',
+          title: 'Legacy notes',
+          body: 'A product demo was conducted with Morgan. Follow-up depends on confirming feature access and setup.',
+          source: 'legacy_backfill',
+          type: 'note',
+          occurredAt: new Date('2026-03-17T10:00:00Z'),
+        },
+      ],
+      openTasks: [
+        {
+          id: 'old-task',
+          title: 'Initiate access approval process with Atlassian IT stakeholder',
+          dueAt: new Date('2026-03-17T11:00:00Z'),
+        },
+      ],
+      contacts: [{ id: 'contact-1', fullName: 'Morgan' }],
+      meetings: [],
+    }, new Date('2026-05-27T10:00:00Z'))
+
+    expect(intelligence.nextAction).toContain('Add a concrete next action')
+    expect(intelligence.missingData).toContain('No current next action recorded')
+    expect(intelligence.missingData).toContain('Old open tasks need review')
+    expect(intelligence.riskDrivers.join(' ')).toContain('old open task')
+    expect(intelligence.summary).not.toContain('Completed task: old setup action')
+    expect(intelligence.confidence).toBeLessThan(70)
+  })
 })

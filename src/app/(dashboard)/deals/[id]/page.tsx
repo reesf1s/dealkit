@@ -169,7 +169,8 @@ function IntelligenceReliability({ context }: { context: any }) {
   const hasOverdueTaskSignal = (intelligence?.riskDrivers ?? []).some((reason: string) => /next action is overdue/i.test(reason))
   const improvementActions = [
     missing.includes('No substantive timeline evidence yet') ? 'Add a recent meeting note or customer email so Halvex has something real to reason from.' : null,
-    missing.includes('No next action recorded') ? 'Set a dated next action, or create a follow-up task from the update composer.' : null,
+    missing.includes('No current next action recorded') ? 'Set one current dated next action, or replace old imported tasks from the update composer.' : null,
+    missing.includes('Old open tasks need review') ? 'Review old imported tasks. Mark done, snooze, or replace them with one current next step.' : null,
     missing.includes('Value is missing') ? 'Add deal value so pipeline and score confidence are not guessing.' : null,
     missing.includes('Close date is missing') ? 'Add the expected close date so timing risk can be judged honestly.' : null,
     hasOverdueTaskSignal ? 'Complete or reschedule overdue tasks so old actions do not keep dragging this deal into Home priorities.' : null,
