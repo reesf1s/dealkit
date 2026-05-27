@@ -133,6 +133,7 @@ function cleanText(value?: string | null) {
 function isGenericActivity(activity: NonNullable<DealContextLike['latestActivities']>[number]) {
   const title = cleanText(activity.title).toLowerCase()
   const body = cleanText(activity.body || activity.summary).toLowerCase()
+  if (activity.source === 'system_cleanup') return true
   if (title === 'updated deal facts' && (!body || body === 'deal facts were updated inline.')) return true
   if (/^legacy stage:/.test(title) && (!body || body === 'no extra detail saved.')) return true
   if (title === 'deal imported from csv' || title === 'deal created') return true
@@ -160,7 +161,7 @@ function buildIgnoredEvidence(context: DealContextLike): IgnoredEvidenceItem[] {
         return {
           id: activity.id,
           title: cleanText(activity.title) || 'Activity',
-          reason: 'Generic field-change or import record',
+          reason: activity.source === 'system_cleanup' ? 'System cleanup audit record' : 'Generic field-change or import record',
           occurredAt,
         }
       }

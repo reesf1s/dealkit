@@ -492,9 +492,9 @@ export async function listToday(workspaceId: string, userId: string) {
     .limit(10)
 
   const isOldTask = (task: { dueAt: Date | null; source?: string | null }) => {
-    if (!task.dueAt) return false
+    if (!task.dueAt) return (task.source ?? '') === 'legacy_backfill'
     const ageDays = Math.floor((now.getTime() - task.dueAt.getTime()) / 86_400_000)
-    return ageDays > 30 || (task.source ?? '').startsWith('legacy')
+    return ageDays > 30
   }
   const currentTasks = tasks.filter(task => !isOldTask(task)).slice(0, 8)
   const oldTaskGroups = tasks

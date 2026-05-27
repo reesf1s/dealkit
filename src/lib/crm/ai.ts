@@ -261,6 +261,10 @@ export async function generateDealBriefWithAI(context: NativeDealContext | null,
     missingData?: string[]
     confidence?: number
   }>(text, {})
+  const parsedConfidence = Number(parsed.confidence ?? fallback.confidence)
+  const confidence = context.deal.status === 'won' && fallback.riskLevel === 'low'
+    ? Math.max(86, Math.min(100, Number.isFinite(parsedConfidence) ? parsedConfidence : fallback.confidence))
+    : Math.max(10, Math.min(88, Number.isFinite(parsedConfidence) ? parsedConfidence : fallback.confidence))
 
   return {
     ...fallback,
@@ -269,6 +273,6 @@ export async function generateDealBriefWithAI(context: NativeDealContext | null,
     riskDrivers: Array.isArray(parsed.riskDrivers) ? parsed.riskDrivers : fallback.riskDrivers,
     positiveSignals: Array.isArray(parsed.positiveSignals) ? parsed.positiveSignals : fallback.positiveSignals,
     missingData: Array.isArray(parsed.missingData) ? parsed.missingData : fallback.missingData,
-    confidence: Math.max(10, Math.min(88, Number(parsed.confidence ?? fallback.confidence))),
+    confidence,
   }
 }

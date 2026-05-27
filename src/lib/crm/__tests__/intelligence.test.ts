@@ -187,4 +187,45 @@ describe('deriveDealIntelligence', () => {
     expect(intelligence.confidence).toBeLessThan(70)
     expect(intelligence.riskDrivers.join(' ')).toContain('status is won but the stage label says closed lost')
   })
+
+  it('does not use cleanup audit rows as customer evidence', () => {
+    const intelligence = deriveDealIntelligence({
+      deal: {
+        id: 'deal-cleanup',
+        title: 'RELX',
+        companyName: 'RELX',
+        stageName: 'Negotiation',
+        status: 'open',
+        probability: 50,
+        valueAmount: 44000,
+        expectedCloseDate: new Date('2026-06-10T00:00:00Z'),
+        lastActivityAt: new Date('2026-05-27T11:00:00Z'),
+      },
+      latestActivities: [
+        {
+          id: 'cleanup',
+          title: 'Stale legacy tasks archived',
+          body: '14 old imported tasks were marked cancelled so Halvex no longer treats them as current next steps.',
+          source: 'system_cleanup',
+          type: 'note',
+          occurredAt: new Date('2026-05-27T11:00:00Z'),
+        },
+        {
+          id: 'customer-note',
+          title: 'Meeting notes',
+          body: 'RELX has gone quiet after move packs were delivered and Drew is trying to convert the POC.',
+          source: 'legacy_backfill',
+          type: 'note',
+          occurredAt: new Date('2026-05-05T09:00:00Z'),
+        },
+      ],
+      openTasks: [],
+      contacts: [{ id: 'contact-1', fullName: 'Drew' }],
+      meetings: [],
+    }, new Date('2026-05-27T12:00:00Z'))
+
+    expect(intelligence.latestEvidence?.id).toBe('customer-note')
+    expect(intelligence.summary).not.toContain('old imported tasks were marked cancelled')
+    expect(intelligence.ignoredEvidence.map(item => item.reason)).toContain('System cleanup audit record')
+  })
 })
