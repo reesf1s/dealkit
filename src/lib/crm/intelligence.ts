@@ -40,6 +40,13 @@ type EvidenceItem = {
   ageDays: number | null
 }
 
+type IgnoredEvidenceItem = {
+  id: string
+  title: string
+  reason: string
+  occurredAt: Date | null
+}
+
 type TermMatch = {
   label: string
   pattern: RegExp
@@ -102,6 +109,32 @@ function isGenericActivity(activity: NonNullable<DealContextLike['latestActiviti
 
 function activityText(activity: NonNullable<DealContextLike['latestActivities']>[number]) {
   return [activity.summary, activity.body].map(cleanText).filter(Boolean).join(' ')
+}
+
+function buildIgnoredEvidence(context: DealContextLike): IgnoredEvidenceItem[] {
+  return (context.latestActivities ?? [])
+    .map(activity => {
+      const text = activityText(activity)
+      const occurredAt = asDate(activity.occurredAt)
+      if (!text) {
+        return {
+          id: activity.id,
+          title: cleanText(activity.title) || 'Activity',
+          reason: 'No readable evidence text',
+          occurredAt,
+        }
+      }
+      if (isGenericActivity(activity)) {
+        return {
+          id: activity.id,
+          title: cleanText(activity.title) || 'Activity',
+          reason: 'Generic field-change or import record',
+          occurredAt,
+        }
+      }
+      return null
+    })
+    .filter(Boolean) as IgnoredEvidenceItem[]
 }
 
 export function buildDealEvidence(context: DealContextLike, now = new Date()): EvidenceItem[] {
@@ -184,8 +217,13 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
     return startsAt ? startsAt.getTime() >= now.getTime() : false
   })
   const hasNextAction = Boolean(cleanText(deal.aiNextAction) || (context.openTasks ?? []).length)
+  const overdueTasks = (context.openTasks ?? []).filter(task => {
+    const dueAt = asDate(task.dueAt)
+    return dueAt ? dueAt.getTime() < now.getTime() : false
+  })
   const riskMatches = findMatches(evidence, RISK_TERMS)
   const positiveMatches = findMatches(evidence, POSITIVE_TERMS)
+  const ignoredEvidence = buildIgnoredEvidence(context).slice(0, 8)
 
   const missingData: string[] = []
   if (!deal.valueAmount) missingData.push('Value is missing')
@@ -199,6 +237,11 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
     open && lastActivityDays != null && lastActivityDays >= 14 ? `No activity in ${lastActivityDays} days` : '',
     open && closeDays != null && closeDays < 0 ? 'Close date has passed while the deal is still open' : '',
     open && !hasNextAction ? 'No concrete next step is attached' : '',
+    ...overdueTasks.slice(0, 3).map(task => {
+      const dueAt = asDate(task.dueAt)
+      const overdueDays = dueAt ? Math.max(1, Math.ceil((now.getTime() - dueAt.getTime()) / 86_400_000)) : null
+      return `Next action is overdue${overdueDays ? ` by ${overdueDays} days` : ''}: ${cleanText(task.title)}`
+    }),
     ...riskMatches.map(match => match.term.explanation(match.evidence)),
     !deal.valueAmount ? 'Forecast value is missing' : '',
     !deal.expectedCloseDate ? 'Close date is missing' : '',
@@ -206,7 +249,7 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
 
   const positiveSignals = unique([
     hasUpcomingMeeting ? 'Upcoming meeting is linked' : '',
-    hasNextAction ? `Next action is explicit: ${cleanText(deal.aiNextAction) || cleanText(context.openTasks?.[0]?.title)}` : '',
+    hasNextAction && !overdueTasks.length ? `Next action is explicit: ${cleanText(deal.aiNextAction) || cleanText(context.openTasks?.[0]?.title)}` : '',
     lastActivityDays != null && lastActivityDays <= 7 ? 'Recent activity is present' : '',
     ...positiveMatches.map(match => match.term.explanation(match.evidence)),
   ]).slice(0, 6)
@@ -219,6 +262,7 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
     if (lastActivityDays != null && lastActivityDays >= 14) score -= 16
     if (hasNextAction) score += 8
     else score -= 14
+    score -= Math.min(18, overdueTasks.length * 9)
     if (hasUpcomingMeeting) score += 7
     if (closeDays != null && closeDays < 0) score -= 18
     for (const match of riskMatches) score -= match.term.severity === 'high' ? 11 : match.term.severity === 'medium' ? 7 : 4
@@ -232,6 +276,7 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
   confidence -= missingData.length * 7
   if (evidence.length < 2) confidence -= 16
   if (lastActivityDays == null || lastActivityDays >= 30) confidence -= 12
+  if (overdueTasks.length) confidence -= Math.min(14, overdueTasks.length * 5)
   if (riskMatches.length) confidence -= Math.min(12, riskMatches.length * 3)
   if (latestSubstantive?.ageDays != null && latestSubstantive.ageDays <= 7) confidence += 6
   if (deal.status === 'won' || deal.status === 'lost') confidence = Math.max(confidence, 86)
@@ -241,7 +286,7 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
   let riskLevel: RiskLevel = 'low'
   if (deal.status === 'won') riskLevel = 'low'
   else if (deal.status === 'lost') riskLevel = 'high'
-  else if (highRiskMatches.length || riskDrivers.length >= 3 || score < 42) riskLevel = 'high'
+  else if (highRiskMatches.length || overdueTasks.length >= 2 || riskDrivers.length >= 3 || score < 42) riskLevel = 'high'
   else if (riskMatches.length || riskDrivers.length || missingData.length >= 2 || score < 64) riskLevel = 'medium'
 
   const nextAction = cleanText(deal.aiNextAction)
@@ -286,6 +331,14 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
       source: item.source,
     })),
     evidenceActivityIds: evidence.slice(0, 5).map(activity => activity.id),
+    ignoredEvidence,
+    inferenceSteps: [
+      evidence.length ? `Used ${evidence.length} substantive timeline item${evidence.length === 1 ? '' : 's'} as evidence.` : 'Found no substantive timeline evidence.',
+      ignoredEvidence.length ? `Ignored ${ignoredEvidence.length} generic or empty timeline item${ignoredEvidence.length === 1 ? '' : 's'} so they do not distort the brief.` : 'No generic timeline items had to be ignored.',
+      riskDrivers.length ? `Risk is driven by: ${riskDrivers.slice(0, 2).join(' / ')}` : 'No material risk driver was detected from current evidence.',
+      positiveSignals.length ? `Positive signals include: ${positiveSignals.slice(0, 2).join(' / ')}` : 'Positive signal evidence is limited.',
+      missingData.length ? `Confidence is reduced by missing data: ${missingData.join(' / ')}` : 'Core deal facts are present.',
+    ],
   }
 }
 

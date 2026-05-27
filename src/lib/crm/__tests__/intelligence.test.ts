@@ -55,4 +55,44 @@ describe('deriveDealIntelligence', () => {
     expect(intelligence.confidence).toBeLessThan(88)
     expect(intelligence.riskDrivers.join(' ')).toMatch(/clarification|data|requirements|unresolved/i)
   })
+
+  it('treats overdue next actions as risk instead of healthy momentum', () => {
+    const intelligence = deriveDealIntelligence({
+      deal: {
+        id: 'deal-overdue',
+        title: 'Cedar Finance rollout',
+        companyName: 'Cedar Finance',
+        stageName: 'Proposal',
+        status: 'open',
+        probability: 72,
+        valueAmount: 64000,
+        expectedCloseDate: new Date('2026-06-12T00:00:00Z'),
+        lastActivityAt: new Date('2026-05-25T09:00:00Z'),
+      },
+      latestActivities: [
+        {
+          id: 'meeting-note',
+          title: 'Meeting notes',
+          body: 'Cedar liked the proposal, but procurement wants a clearer implementation timeline before approval.',
+          source: 'manual',
+          type: 'meeting',
+          occurredAt: new Date('2026-05-25T09:00:00Z'),
+        },
+      ],
+      openTasks: [
+        {
+          id: 'task-overdue',
+          title: 'Send revised implementation timeline',
+          dueAt: new Date('2026-05-24T17:00:00Z'),
+        },
+      ],
+      contacts: [{ id: 'contact-1', fullName: 'Amelia Ross' }],
+      meetings: [],
+    }, new Date('2026-05-27T09:00:00Z'))
+
+    expect(intelligence.riskDrivers.join(' ')).toContain('Next action is overdue')
+    expect(intelligence.positiveSignals.join(' ')).not.toContain('Next action is explicit')
+    expect(intelligence.riskLevel).not.toBe('low')
+    expect(intelligence.confidence).toBeLessThan(82)
+  })
 })

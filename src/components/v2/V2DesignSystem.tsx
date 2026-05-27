@@ -261,7 +261,7 @@ function AssistantDrawer({ open, onClose, contextDealId }: { open: boolean; onCl
       <div className="v2-drawer-body">
         <div className="v2-assistant-suggestions">
           {assistantSuggestions.map(suggestion => (
-            <button key={suggestion} type="button" onClick={() => submit(suggestion)}>
+            <button key={suggestion} type="button" disabled={loading} onClick={() => submit(suggestion)}>
               {suggestion}
             </button>
           ))}
@@ -276,10 +276,16 @@ function AssistantDrawer({ open, onClose, contextDealId }: { open: boolean; onCl
             ) : null}
           </div>
         ))}
+        {loading ? (
+          <div className="v2-assistant-message assistant thinking" aria-live="polite">
+            <div className="v2-typing" aria-hidden="true"><span /><span /><span /></div>
+            <p>Thinking through your CRM context. Larger workspaces can take a moment.</p>
+          </div>
+        ) : null}
       </div>
       <form className="v2-drawer-composer" onSubmit={event => { event.preventDefault(); submit() }}>
-        <textarea value={input} onChange={event => setInput(event.target.value)} placeholder="Ask Halvex or paste an update..." />
-        <button type="submit" disabled={loading || !input.trim()}><Send size={16} /></button>
+        <textarea value={input} disabled={loading} onChange={event => setInput(event.target.value)} placeholder={loading ? 'Halvex is working...' : 'Ask Halvex or paste an update...'} />
+        <button type="submit" disabled={loading || !input.trim()}>{loading ? <span className="v2-mini-spinner" /> : <Send size={16} />}</button>
       </form>
     </aside>
   )
@@ -504,17 +510,34 @@ export function TimelineV2({ items }: { items: Array<{ id: string; title: string
 export function InlineEditableField({ label, value, onSave, type = 'text' }: { label: string; value: string; onSave: (value: string) => Promise<void> | void; type?: string }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function submit() {
+    setSaving(true)
+    setError('')
+    try {
+      await onSave(draft)
+      setEditing(false)
+    } catch {
+      setError('Could not save. Try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
-    <div className="v2-inline-field">
+    <div className={`v2-inline-field ${saving ? 'saving' : ''}`}>
       <small>{label}</small>
       {editing ? (
-        <form onSubmit={async event => { event.preventDefault(); await onSave(draft); setEditing(false) }}>
-          <input type={type} value={draft} onChange={event => setDraft(event.target.value)} autoFocus />
-          <button type="submit"><Check size={14} /></button>
+        <form onSubmit={async event => { event.preventDefault(); await submit() }}>
+          <input type={type} value={draft} disabled={saving} onChange={event => setDraft(event.target.value)} autoFocus />
+          <button type="submit" disabled={saving}>{saving ? <span className="v2-mini-spinner dark" /> : <Check size={14} />}</button>
         </form>
       ) : (
         <button type="button" onClick={() => { setDraft(value); setEditing(true) }}>{value || 'Missing'}</button>
       )}
+      {error ? <em>{error}</em> : null}
     </div>
   )
 }

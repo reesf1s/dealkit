@@ -2,7 +2,7 @@
 
 import useSWR from 'swr'
 import { useParams } from 'next/navigation'
-import { Bot, CalendarDays, MailPlus, RefreshCw, Sparkles } from 'lucide-react'
+import { Bot, CalendarDays, CheckCircle2, EyeOff, MailPlus, RefreshCw, Sparkles } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
 import {
   AddUpdateComposer,
@@ -109,6 +109,8 @@ export default function DealWorkspacePage() {
             </div>
           </PanelV2>
 
+          <IntelligenceReliability context={context} />
+
           <div id="add-update">
             <AddUpdateComposer dealId={deal.id} onSaved={mutate} />
           </div>
@@ -148,7 +150,7 @@ export default function DealWorkspacePage() {
           </PanelV2>
           <PanelV2>
             <SectionHeader title="Recalculate" icon={<RefreshCw size={18} />}>
-              Refresh deterministic signals after a material update.
+              Refresh signals after a material update, completed task, or newly linked meeting.
             </SectionHeader>
             <ButtonV2 onClick={refresh} tone="dark"><RefreshCw size={16} /> Recalculate intelligence</ButtonV2>
           </PanelV2>
@@ -156,6 +158,58 @@ export default function DealWorkspacePage() {
       </div>
     </div>
   )
+}
+
+function IntelligenceReliability({ context }: { context: any }) {
+  const intelligence = context?.intelligence
+  const evidence = intelligence?.evidence ?? []
+  const ignored = intelligence?.ignoredEvidence ?? []
+  const missing = intelligence?.missingData ?? []
+  const steps = intelligence?.inferenceSteps ?? []
+  const hasOverdueTaskSignal = (intelligence?.riskDrivers ?? []).some((reason: string) => /next action is overdue/i.test(reason))
+  const improvementActions = [
+    missing.includes('No substantive timeline evidence yet') ? 'Add a recent meeting note or customer email so Halvex has something real to reason from.' : null,
+    missing.includes('No next action recorded') ? 'Set a dated next action, or create a follow-up task from the update composer.' : null,
+    missing.includes('Value is missing') ? 'Add deal value so pipeline and score confidence are not guessing.' : null,
+    missing.includes('Close date is missing') ? 'Add the expected close date so timing risk can be judged honestly.' : null,
+    hasOverdueTaskSignal ? 'Complete or reschedule overdue tasks so old actions do not keep dragging this deal into Home priorities.' : null,
+  ].filter(Boolean) as string[]
+
+  return (
+    <PanelV2>
+      <SectionHeader title="How Halvex inferred this" icon={<Sparkles size={18} />}>
+        A reliability check for the brief, score, confidence, and risk. This keeps legacy imports and generic edits from pretending to be fresh sales evidence.
+      </SectionHeader>
+      <div className="v2-reliability-grid">
+        <div className="v2-reliability-card">
+          <strong><CheckCircle2 size={16} /> Evidence used</strong>
+          {evidence.length ? evidence.slice(0, 3).map((item: any) => (
+            <p key={item.id}>{item.title}: {truncate(item.text, 180)}</p>
+          )) : <p>No substantive timeline evidence is available yet.</p>}
+        </div>
+        <div className="v2-reliability-card muted">
+          <strong><EyeOff size={16} /> Evidence ignored</strong>
+          {ignored.length ? ignored.slice(0, 3).map((item: any) => (
+            <p key={item.id}>{item.title}: {item.reason}</p>
+          )) : <p>No generic or empty timeline rows were ignored.</p>}
+        </div>
+      </div>
+      <div className="v2-inference-steps">
+        {steps.map((step: string, index: number) => <p key={`${step}-${index}`}>{step}</p>)}
+      </div>
+      <div className="v2-improve-box">
+        <strong>To improve the intelligence</strong>
+        {improvementActions.length ? improvementActions.map((action: string, index: number) => (
+          <span key={`${action}-${index}`}>{action}</span>
+        )) : <span>The core deal facts are present. Add a fresh customer update when something changes.</span>}
+      </div>
+    </PanelV2>
+  )
+}
+
+function truncate(value: string, max: number) {
+  if (!value || value.length <= max) return value
+  return `${value.slice(0, max - 3).trim()}...`
 }
 
 function trustReasons(context: any) {
