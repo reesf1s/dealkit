@@ -400,6 +400,7 @@ export async function listPipeline(workspaceId: string, userId: string) {
       .from(crmActivities)
       .where(and(eq(crmActivities.workspaceId, workspaceId), inArray(crmActivities.dealId, dealIds)))
       .orderBy(desc(crmActivities.occurredAt))
+      .limit(Math.min(600, Math.max(80, dealIds.length * 6)))
     : []
   const activitiesByDeal = new Map<string, typeof activityRows>()
   for (const activity of activityRows) {

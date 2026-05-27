@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense } from 'react'
+import { Suspense, useMemo } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -75,23 +75,45 @@ function DealsContent() {
 }
 
 function PipelineView({ stages, deals }: { stages: any[]; deals: any[] }) {
+  const dealsByStage = useMemo(() => {
+    const groups = new Map<string, any[]>()
+    for (const deal of deals) {
+      const key = deal.stageId ?? 'unstaged'
+      const group = groups.get(key) ?? []
+      group.push(deal)
+      groups.set(key, group)
+    }
+    return groups
+  }, [deals])
+
   return (
-    <div className="v2-pipeline">
+    <div className="v2-pipeline-shell">
+      <div className="v2-pipeline-summary">
+        <strong>{deals.length} deals</strong>
+        <span>{stages.length} stages</span>
+        <span>{deals.filter(deal => deal.aiRiskLevel === 'high').length} high risk</span>
+        <span>{deals.filter(deal => !deal.aiNextAction && !deal.nextStepDueAt).length} no next step</span>
+      </div>
+      <div className="v2-pipeline">
       {stages.map(stage => {
-        const stageDeals = deals.filter(deal => deal.stageId === stage.id)
+        const stageDeals = dealsByStage.get(stage.id) ?? []
         const value = stageDeals.reduce((sum, deal) => sum + (deal.valueAmount ?? 0), 0)
+        const highRisk = stageDeals.filter(deal => deal.aiRiskLevel === 'high').length
         return (
           <section key={stage.id} className="v2-stage">
             <div className="v2-stage-head">
               <div>
                 <h3>{stage.name}</h3>
-                <p>{stageDeals.length} deals · {money(value)}</p>
+                <p>{stageDeals.length} deals · {money(value)}{highRisk ? ` · ${highRisk} risk` : ''}</p>
               </div>
             </div>
-            {stageDeals.length ? stageDeals.map(deal => <DealCardV2 key={deal.id} deal={deal} />) : <EmptyStateV2 title="No deals here">This stage is clear.</EmptyStateV2>}
+            <div className="v2-stage-scroll">
+              {stageDeals.length ? stageDeals.map(deal => <DealCardV2 key={deal.id} deal={deal} />) : <EmptyStateV2 title="No deals here">This stage is clear.</EmptyStateV2>}
+            </div>
           </section>
         )
       })}
+      </div>
     </div>
   )
 }

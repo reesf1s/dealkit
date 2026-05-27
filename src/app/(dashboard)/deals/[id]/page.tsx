@@ -55,7 +55,7 @@ export default function DealWorkspacePage() {
       <RecordHero
         eyebrow="Deal workspace"
         title={deal.title}
-        subtitle={displaySummary || 'Add recent context and Halvex will keep the deal brief, risks, and next action current.'}
+        subtitle={compactHeroInsight(displaySummary || intelligence?.nextAction || deal?.aiNextAction) || 'Add recent context and Halvex will keep the deal brief, risks, and next action current.'}
         meta={(
           <>
             <RiskBadge risk={intelligence?.riskLevel ?? concerns.risk ?? deal.aiRiskLevel} />
@@ -210,6 +210,18 @@ function IntelligenceReliability({ context }: { context: any }) {
 function truncate(value: string, max: number) {
   if (!value || value.length <= max) return value
   return `${value.slice(0, max - 3).trim()}...`
+}
+
+function compactHeroInsight(value?: string | null) {
+  if (!value) return ''
+  const cleaned = String(value)
+    .replace(/^Latest evidence:\s*/i, '')
+    .replace(/^Meaning:\s*/i, '')
+    .replace(/^Next:\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const sentences = cleaned.split(/(?<=[.!?])\s+/).filter(Boolean)
+  return truncate(sentences.slice(0, 2).join(' '), 190)
 }
 
 function trustReasons(context: any) {

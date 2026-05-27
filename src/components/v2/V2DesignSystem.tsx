@@ -8,6 +8,7 @@ import {
   Building2,
   CalendarDays,
   Check,
+  ChevronLeft,
   ChevronRight,
   Circle,
   Command,
@@ -53,6 +54,19 @@ export function AppShellV2({ children }: { children: React.ReactNode }) {
   const [assistantOpen, setAssistantOpen] = useState(false)
   const [commandOpen, setCommandOpen] = useState(false)
   const [assistantContextDealId, setAssistantContextDealId] = useState<string | null>(null)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
+  useEffect(() => {
+    setSidebarCollapsed(window.localStorage.getItem('halvex-sidebar-collapsed') === 'true')
+  }, [])
+
+  function toggleSidebar() {
+    setSidebarCollapsed(value => {
+      const next = !value
+      window.localStorage.setItem('halvex-sidebar-collapsed', String(next))
+      return next
+    })
+  }
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -79,11 +93,11 @@ export function AppShellV2({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <div className="v2-app">
+    <div className={`v2-app ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <aside className="v2-sidebar">
         <Link href="/home" className="v2-brand">
           <span className="v2-brand-mark">H</span>
-          <span>
+          <span className="v2-sidebar-label">
             <strong>Halvex</strong>
             <small>AI CRM</small>
           </span>
@@ -96,20 +110,24 @@ export function AppShellV2({ children }: { children: React.ReactNode }) {
             return (
               <Link key={item.href} href={item.href} className={`v2-nav-item ${active ? 'active' : ''}`}>
                 <Icon size={17} />
-                <span>{item.label}</span>
+                <span className="v2-sidebar-label">{item.label}</span>
               </Link>
             )
           })}
         </nav>
 
         <div className="v2-sidebar-bottom">
+          <button className="v2-collapse-button" type="button" onClick={toggleSidebar} aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+            {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+            <span className="v2-sidebar-label">{sidebarCollapsed ? 'Expand' : 'Collapse'}</span>
+          </button>
           <Link href="/settings" className={`v2-nav-item ${isActive(pathname, '/settings') ? 'active' : ''}`}>
             <Settings size={17} />
-            <span>Settings</span>
+            <span className="v2-sidebar-label">Settings</span>
           </Link>
           <button className="v2-sidebar-user" type="button" onClick={() => router.push('/settings')}>
             <span className="v2-user-dot">R</span>
-            <span>
+            <span className="v2-sidebar-label">
               <strong>Workspace</strong>
               <small>Sales team</small>
             </span>
@@ -443,6 +461,7 @@ export function MeetingCard({ meeting, action }: { meeting: { title: string; sta
 
 export function DealCardV2({ deal }: { deal: any }) {
   const risk = normalizeRisk(deal.aiRiskLevel)
+  const insight = compactDealInsight(deal)
   return (
     <Link href={`/deals/${deal.id}`} className="v2-deal-card">
       <div className="v2-deal-card-top">
@@ -455,9 +474,9 @@ export function DealCardV2({ deal }: { deal: any }) {
       <div className="v2-deal-facts">
         <span>{money(deal.valueAmount)}</span>
         <span>{shortDate(deal.expectedCloseDate) ?? 'Close date missing'}</span>
-        <span>{deal.aiConfidence ? `${deal.aiConfidence}% confidence` : 'Confidence missing'}</span>
+        <span>{deal.aiConfidence ? `${deal.aiConfidence}% conf.` : 'Conf. missing'}</span>
       </div>
-      <p className="v2-deal-insight">{deal.aiNextAction || missingInsight(deal)}</p>
+      <p className="v2-deal-insight">{insight}</p>
     </Link>
   )
 }
@@ -668,10 +687,30 @@ export function normalizeRisk(value?: string | null) {
 }
 
 function missingInsight(deal: any) {
-  if (!deal.valueAmount) return 'Value is missing. Add it to improve forecast confidence.'
-  if (!deal.expectedCloseDate) return 'Close date is missing. Halvex will keep confidence limited.'
-  if (!deal.aiNextAction) return 'No next step recorded. Add a concrete follow-up.'
-  return 'Open deal. Add recent context to improve intelligence.'
+  if (!deal.valueAmount) return 'Value missing'
+  if (!deal.expectedCloseDate) return 'Close date missing'
+  if (!deal.aiNextAction) return 'No next step'
+  return 'Needs fresh context'
+}
+
+function compactDealInsight(deal: any) {
+  const source = deal.intelligence?.riskDrivers?.[0] || deal.aiNextAction || missingInsight(deal)
+  return truncateWords(cleanInsight(source), 11)
+}
+
+function cleanInsight(value: string) {
+  return String(value ?? '')
+    .replace(/^Next:\s*/i, '')
+    .replace(/^Meaning:\s*/i, '')
+    .replace(/^Latest evidence:\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function truncateWords(value: string, maxWords: number) {
+  const words = value.split(/\s+/).filter(Boolean)
+  if (words.length <= maxWords) return value
+  return `${words.slice(0, maxWords).join(' ')}...`
 }
 
 function proposeChanges(note: string) {
