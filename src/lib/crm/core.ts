@@ -903,7 +903,11 @@ export async function createNativeTask(input: {
     metadata: { taskId: task.id },
   })
 
-  if (task.dealId) await refreshDealSignals(input.workspaceId, task.dealId)
+  if (task.dealId) {
+    refreshDealSignals(input.workspaceId, task.dealId).catch(error => {
+      console.warn('[crm] background signal refresh failed after task create', error)
+    })
+  }
   return task
 }
 
@@ -1199,9 +1203,11 @@ export async function listContacts(workspaceId: string, userId: string) {
 
 export async function listTasks(workspaceId: string, userId: string, status?: 'todo' | 'done' | 'cancelled') {
   await ensureNativeCrmReady(workspaceId, userId)
+  const now = new Date()
+  const staleCutoff = new Date(now.getTime() - 21 * 86_400_000)
   const conditions = [eq(crmTasks.workspaceId, workspaceId)]
   if (status) conditions.push(eq(crmTasks.status, status))
-  return db
+  const rows = await db
     .select({
       id: crmTasks.id,
       title: crmTasks.title,
@@ -1219,6 +1225,13 @@ export async function listTasks(workspaceId: string, userId: string, status?: 't
     .leftJoin(crmCompanies, eq(crmCompanies.id, crmTasks.companyId))
     .where(and(...conditions))
     .orderBy(asc(crmTasks.dueAt), desc(crmTasks.createdAt))
+    .limit(status === 'done' ? 80 : 140)
+
+  return rows.map(task => ({
+    ...task,
+    isStale: Boolean(task.status === 'todo' && task.dueAt && task.dueAt < staleCutoff),
+    isOverdue: Boolean(task.status === 'todo' && task.dueAt && task.dueAt < now),
+  }))
 }
 
 export async function completeTask(workspaceId: string, userId: string, taskId: string) {
@@ -1239,7 +1252,11 @@ export async function completeTask(workspaceId: string, userId: string, taskId: 
     createdBy: userId,
     metadata: { taskId },
   })
-  if (task.dealId) await refreshDealSignals(workspaceId, task.dealId)
+  if (task.dealId) {
+    refreshDealSignals(workspaceId, task.dealId).catch(error => {
+      console.warn('[crm] background signal refresh failed after task complete', error)
+    })
+  }
   return task
 }
 

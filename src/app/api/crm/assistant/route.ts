@@ -4,6 +4,7 @@ import { dbErrResponse } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { getDealContextNative, listActivity, listPipeline, listToday } from '@/lib/crm/core'
 import { answerAssistantWithAI } from '@/lib/crm/ai'
+import { compactAssistantText, findMentionedDeal, isStaleDate, looksDealSpecific, makeDealPromptContext } from '@/lib/crm/assistant-context'
 
 export const dynamic = 'force-dynamic'
 
@@ -133,6 +134,7 @@ export async function POST(req: NextRequest) {
     }
 
     const scopedDeals = dealScoped ? intelligenceDeals.filter(deal => deal.id === dealContext?.deal.id) : intelligenceDeals.slice(0, 30)
+    const promptDealContext = dealContext ? makeDealPromptContext(dealContext) : null
     const answer = await answerAssistantWithAI({
       message: rawMessage,
       plan,
@@ -156,15 +158,8 @@ export async function POST(req: NextRequest) {
           positiveSignals: deal.positiveSignals,
         })),
       },
-      activity: dealScoped ? (dealContext?.latestActivities ?? []).slice(0, 8) : activity.slice(0, 12),
-      dealContext: dealContext ? {
-        deal: dealContext.deal,
-        company: dealContext.company,
-        contacts: dealContext.contacts,
-        openTasks: dealContext.openTasks,
-        latestActivities: dealContext.latestActivities.slice(0, 8),
-        intelligence: dealContext.intelligence,
-      } : null,
+      activity: dealScoped ? (promptDealContext?.latestActivities ?? []) : activity.slice(0, 12),
+      dealContext: promptDealContext,
       fallbackAnswer,
     })
 
@@ -191,7 +186,7 @@ function answerDealScoped(lower: string, dealContext: any) {
       'Hi,',
       '',
       latestEvidence?.text
-        ? `Thanks again for the recent context. My understanding is: ${compact(latestEvidence.text, 240)}`
+        ? `Thanks again for the recent context. My understanding is: ${compactAssistantText(latestEvidence.text, 240)}`
         : 'Thanks again for the recent conversation.',
       '',
       dealContext.intelligence?.nextAction ?? 'Could you confirm the best next step and timing from your side?',
@@ -216,48 +211,4 @@ function explainDeal(deal: any) {
   if (reasons.length) return `${deal.companyName ?? deal.title}: ${reasons[0]}`
   if (deal.aiNextAction) return `${deal.companyName ?? deal.title} has a next action, but the evidence should be checked before trusting the forecast.`
   return `${deal.companyName ?? deal.title} has limited evidence, so Halvex cannot be confident yet.`
-}
-
-function normalizeText(value?: string | null) {
-  return String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
-}
-
-function findMentionedDeal(message: string, deals: any[]) {
-  const normalizedMessage = normalizeText(message)
-  const target = normalizeText(message.match(/\b(?:for|on|about)\s+(.+?)(?:[.?]|$)/i)?.[1])
-  const candidates = deals
-    .map(deal => {
-      const title = normalizeText(deal.title)
-      const company = normalizeText(deal.companyName)
-      const score = [
-        title && normalizedMessage.includes(title) ? 4 : 0,
-        company && normalizedMessage.includes(company) ? 4 : 0,
-        target && title && target.includes(title) ? 3 : 0,
-        target && company && target.includes(company) ? 3 : 0,
-      ].reduce((sum, item) => sum + item, 0)
-      return { deal, score }
-    })
-    .filter(item => item.score > 0)
-    .sort((a, b) => b.score - a.score)
-
-  if (!candidates.length) return null
-  if (candidates.length > 1 && candidates[0].score === candidates[1].score) return null
-  return candidates[0].deal
-}
-
-function looksDealSpecific(lower: string) {
-  return /\b(draft|summaris|summariz|prep|follow.?up|email)\b/.test(lower) && /\b(for|on|about)\b/.test(lower)
-}
-
-function isStaleDate(value: unknown, days: number) {
-  if (!value) return false
-  const date = new Date(String(value))
-  if (Number.isNaN(date.getTime())) return false
-  return Date.now() - date.getTime() > days * 86_400_000
-}
-
-function compact(value: string, max: number) {
-  const text = String(value ?? '').replace(/\s+/g, ' ').trim()
-  if (text.length <= max) return text
-  return `${text.slice(0, max - 3).trim()}...`
 }
