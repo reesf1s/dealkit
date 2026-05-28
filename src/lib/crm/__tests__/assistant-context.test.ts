@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { findMentionedDeal, makeDealPromptContext } from '../assistant-context'
+import {
+  answerMentionsOtherDeal,
+  classifyAssistantIntent,
+  enforceAssistantStructure,
+  findMentionedDeal,
+  makeDealPromptContext,
+} from '../assistant-context'
 
 vi.mock('server-only', () => ({}))
 
@@ -12,6 +18,16 @@ describe('assistant deal context', () => {
 
     expect(findMentionedDeal('Draft a follow-up for BOE.', deals)?.id).toBe('boe')
     expect(findMentionedDeal('Draft a follow-up for GSA.', deals)?.id).toBe('gsa')
+  })
+
+  it('matches account acronyms when the title is the full company name', () => {
+    const deals = [
+      { id: 'boe', title: 'Bank of England implementation', companyName: 'Bank of England' },
+      { id: 'gsa', title: 'GSA pilot', companyName: 'General Services Administration' },
+    ]
+
+    expect(findMentionedDeal('Draft a follow-up for BOE.', deals)?.id).toBe('boe')
+    expect(findMentionedDeal('Summarise the GSA deal.', deals)?.id).toBe('gsa')
   })
 
   it('separates current context from stale tasks and old activity', () => {
@@ -34,5 +50,33 @@ describe('assistant deal context', () => {
     expect(context.staleOpenTasks.map((task: any) => task.id)).toEqual(['old-task'])
     expect(context.latestActivities.map((activity: any) => activity.id)).toEqual(['fresh'])
     expect(context.staleActivities.map((activity: any) => activity.id)).toEqual(['old'])
+  })
+
+  it('classifies deal-required assistant intents before using workspace context', () => {
+    expect(classifyAssistantIntent('Draft a follow-up for BOE')).toEqual({
+      intent: 'draft_follow_up',
+      requiresDeal: true,
+    })
+    expect(classifyAssistantIntent('Which deals are slipping?')).toEqual({
+      intent: 'pipeline_risk',
+      requiresDeal: false,
+    })
+  })
+
+  it('rejects deal-scoped answers that mention another account', () => {
+    const deals = [
+      { id: 'boe', title: 'BOE', companyName: 'Bank of England' },
+      { id: 'gsa', title: 'GSA pilot', companyName: 'GSA' },
+    ]
+
+    expect(answerMentionsOtherDeal('Next: draft a note for GSA.', deals[0], deals)).toBe(true)
+    expect(answerMentionsOtherDeal('Next: follow up with BOE.', deals[0], deals)).toBe(false)
+  })
+
+  it('requires assistant answers to keep a readable CRM structure', () => {
+    const fallback = 'What happened: fallback.\nWhat it means: safer.\nNext: clarify.'
+    expect(enforceAssistantStructure('BOE looks risky.', fallback)).toBe(fallback)
+    expect(enforceAssistantStructure('What happened: BOE replied.\nWhat it means: risk is lower.\nNext: send a note.', fallback))
+      .toBe('What happened: BOE replied. What it means: risk is lower. Next: send a note.')
   })
 })

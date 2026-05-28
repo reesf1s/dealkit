@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bot,
   Building2,
   CalendarDays,
   Check,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Circle,
@@ -28,19 +29,19 @@ type Tone = 'neutral' | 'good' | 'watch' | 'risk' | 'dark'
 
 const navItems = [
   { href: '/home', label: 'Home', icon: Home },
-  { href: '/inbox', label: 'Inbox', icon: Inbox },
-  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/deals', label: 'Deals', icon: LayoutGrid },
+  { href: '/tasks', label: 'Tasks', icon: CheckCircle2 },
   { href: '/people', label: 'People', icon: UsersRound },
   { href: '/companies', label: 'Companies', icon: Building2 },
+  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/assistant', label: 'Assistant', icon: Bot },
 ]
 
 const assistantSuggestions = [
-  'What needs attention today?',
-  'Which deals have no next step?',
-  'Which deals are slipping?',
-  'Prep me for my next meeting',
+  'Find a deal',
+  'Summarise this week',
+  'Which tasks are overdue?',
+  'Draft a follow-up',
 ]
 
 function isActive(pathname: string, href: string) {
@@ -99,7 +100,7 @@ export function AppShellV2({ children }: { children: React.ReactNode }) {
           <span className="v2-brand-mark">H</span>
           <span className="v2-sidebar-label">
             <strong>Halvex</strong>
-            <small>AI CRM</small>
+            <small>CRM + deal intelligence</small>
           </span>
         </Link>
 
@@ -108,7 +109,7 @@ export function AppShellV2({ children }: { children: React.ReactNode }) {
             const Icon = item.icon
             const active = isActive(pathname, item.href)
             return (
-              <Link key={item.href} href={item.href} className={`v2-nav-item ${active ? 'active' : ''}`}>
+              <Link key={item.href} href={item.href} className={`v2-nav-item ${active ? 'active' : ''}`} title={item.label}>
                 <Icon size={17} />
                 <span className="v2-sidebar-label">{item.label}</span>
               </Link>
@@ -117,11 +118,11 @@ export function AppShellV2({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="v2-sidebar-bottom">
-          <button className="v2-collapse-button" type="button" onClick={toggleSidebar} aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+          <button className="v2-collapse-button" type="button" onClick={toggleSidebar} aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
             {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
             <span className="v2-sidebar-label">{sidebarCollapsed ? 'Expand' : 'Collapse'}</span>
           </button>
-          <Link href="/settings" className={`v2-nav-item ${isActive(pathname, '/settings') ? 'active' : ''}`}>
+          <Link href="/settings" className={`v2-nav-item ${isActive(pathname, '/settings') ? 'active' : ''}`} title="Settings">
             <Settings size={17} />
             <span className="v2-sidebar-label">Settings</span>
           </Link>
@@ -137,9 +138,9 @@ export function AppShellV2({ children }: { children: React.ReactNode }) {
 
       <div className="v2-main">
         <header className="v2-topbar">
-          <button className="v2-command" type="button" onClick={() => setCommandOpen(true)}>
+          <button className="v2-command" type="button" onClick={() => setCommandOpen(true)} aria-label="Search or ask Halvex">
             <Search size={16} />
-            <span>Search or ask Halvex...</span>
+            <span>Search CRM or ask Halvex...</span>
             <kbd>⌘K</kbd>
           </button>
           <button className="v2-assistant-button" type="button" onClick={() => setAssistantOpen(true)}>
@@ -177,6 +178,12 @@ function CommandMenuV2({ open, onClose }: { open: boolean; onClose: () => void }
   const router = useRouter()
   const [query, setQuery] = useState('')
   const items = useMemo(() => navItems.filter(item => item.label.toLowerCase().includes(query.toLowerCase())), [query])
+  const quickActions = [
+    { label: 'Add deal', href: '/deals?quick=deal', icon: Plus },
+    { label: 'Add task', href: '/tasks?quick=task', icon: CheckCircle2 },
+    { label: 'Import CRM data', href: '/settings?section=imports', icon: Inbox },
+    { label: 'Connect Calendar', href: '/settings?section=integrations', icon: CalendarDays },
+  ]
 
   if (!open) return null
   return (
@@ -188,7 +195,7 @@ function CommandMenuV2({ open, onClose }: { open: boolean; onClose: () => void }
             autoFocus
             value={query}
             onChange={event => setQuery(event.target.value)}
-            placeholder="Search pages or ask Halvex..."
+            placeholder="Search records, jump pages, or ask Halvex..."
             onKeyDown={event => {
               if (event.key === 'Escape') onClose()
               if (event.key === 'Enter' && query.trim().length > 2) {
@@ -199,6 +206,16 @@ function CommandMenuV2({ open, onClose }: { open: boolean; onClose: () => void }
           />
         </div>
         <div className="v2-command-list">
+          {!query.trim() ? quickActions.map(item => {
+            const Icon = item.icon
+            return (
+              <button key={item.href} type="button" onClick={() => { router.push(item.href); onClose() }}>
+                <Icon size={16} />
+                <span>{item.label}</span>
+                <ChevronRight size={15} />
+              </button>
+            )
+          }) : null}
           {items.map(item => {
             const Icon = item.icon
             return (
@@ -224,10 +241,16 @@ function CommandMenuV2({ open, onClose }: { open: boolean; onClose: () => void }
 
 function AssistantDrawer({ open, onClose, contextDealId }: { open: boolean; onClose: () => void; contextDealId?: string | null }) {
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string; links?: Array<{ label: string; href: string }> }>>([
-    { role: 'assistant', text: 'I can prioritise your day, explain deal risk, prep meetings, draft follow-ups, or turn a raw note into proposed CRM updates.' },
+    { role: 'assistant', text: 'I can help search your CRM, explain deal health, draft follow-ups, and answer questions. I will suggest changes, not make them for you.' },
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const bodyRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+    bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: 'smooth' })
+  }, [messages, loading, open])
 
   const submit = useCallback(async (value = input, dealIdOverride?: string | null) => {
     const message = value.trim()
@@ -268,15 +291,16 @@ function AssistantDrawer({ open, onClose, contextDealId }: { open: boolean; onCl
   }, [contextDealId, submit])
 
   return (
-    <aside className={`v2-assistant-drawer ${open ? 'open' : ''}`} aria-hidden={!open}>
+    <aside className={`v2-assistant-drawer ${open ? 'open' : ''}`} aria-hidden={!open} aria-label="Halvex assistant">
       <div className="v2-drawer-head">
         <div>
           <span>Halvex assistant</span>
-          <strong>Ask, update, draft, reason.</strong>
+          <strong>Search, summarise, draft.</strong>
         </div>
         <button type="button" onClick={onClose}><X size={18} /></button>
       </div>
-      <div className="v2-drawer-body">
+      <div className="v2-drawer-body" ref={bodyRef}>
+        {contextDealId ? <div className="v2-context-pill">Answering from this deal first</div> : null}
         <div className="v2-assistant-suggestions">
           {assistantSuggestions.map(suggestion => (
             <button key={suggestion} type="button" disabled={loading} onClick={() => submit(suggestion)}>
@@ -297,12 +321,12 @@ function AssistantDrawer({ open, onClose, contextDealId }: { open: boolean; onCl
         {loading ? (
           <div className="v2-assistant-message assistant thinking" aria-live="polite">
             <div className="v2-typing" aria-hidden="true"><span /><span /><span /></div>
-            <p>Thinking through your CRM context. Larger workspaces can take a moment.</p>
+            <p>Reading the relevant CRM records and recent evidence.</p>
           </div>
         ) : null}
       </div>
       <form className="v2-drawer-composer" onSubmit={event => { event.preventDefault(); submit() }}>
-        <textarea value={input} disabled={loading} onChange={event => setInput(event.target.value)} placeholder={loading ? 'Halvex is working...' : 'Ask Halvex or paste an update...'} />
+        <textarea value={input} disabled={loading} onChange={event => setInput(event.target.value)} placeholder={loading ? 'Halvex is working...' : 'Ask about deals, tasks, people, or drafts...'} />
         <button type="submit" disabled={loading || !input.trim()}>{loading ? <span className="v2-mini-spinner" /> : <Send size={16} />}</button>
       </form>
     </aside>
@@ -408,6 +432,79 @@ export function EmptyStateV2({ title, children, action }: { title: string; child
   )
 }
 
+export function CrmPageSkeleton({ kind = 'dashboard' }: { kind?: 'dashboard' | 'pipeline' | 'record' | 'grid' | 'list' }) {
+  if (kind === 'record') {
+    return (
+      <div className="v2-page v2-skeleton-page">
+        <div className="v2-skeleton-hero" />
+        <div className="v2-deal-record-layout">
+          <div className="v2-skeleton-stack">
+            <SkeletonPanel rows={3} />
+            <SkeletonPanel rows={4} />
+            <SkeletonPanel rows={5} />
+          </div>
+          <div className="v2-skeleton-stack">
+            <SkeletonPanel rows={5} compact />
+            <SkeletonPanel rows={3} compact />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (kind === 'pipeline') {
+    return (
+      <div className="v2-skeleton-stack">
+        <div className="v2-skeleton-toolbar">
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="v2-skeleton-pipeline">
+          {Array.from({ length: 5 }).map((_, stageIndex) => (
+            <div key={stageIndex} className="v2-skeleton-stage">
+              <i />
+              {Array.from({ length: stageIndex === 0 ? 3 : 4 }).map((__, cardIndex) => <b key={cardIndex} />)}
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (kind === 'grid') {
+    return (
+      <div className="v2-grid-3">
+        {Array.from({ length: 9 }).map((_, index) => <div key={index} className="v2-skeleton-card" />)}
+      </div>
+    )
+  }
+
+  if (kind === 'list') {
+    return (
+      <div className="v2-skeleton-stack">
+        {Array.from({ length: 4 }).map((_, index) => <div key={index} className="v2-skeleton-list-row" />)}
+      </div>
+    )
+  }
+
+  return (
+    <div className="v2-grid-2">
+      <SkeletonPanel rows={4} />
+      <SkeletonPanel rows={4} />
+    </div>
+  )
+}
+
+function SkeletonPanel({ rows = 3, compact = false }: { rows?: number; compact?: boolean }) {
+  return (
+    <PanelV2 className={`v2-skeleton-panel ${compact ? 'compact' : ''}`}>
+      <div className="v2-skeleton-line title" />
+      {Array.from({ length: rows }).map((_, index) => <div key={index} className="v2-skeleton-line" />)}
+    </PanelV2>
+  )
+}
+
 export function ActionCard({
   title,
   reason,
@@ -416,6 +513,8 @@ export function ActionCard({
   action,
   tone = 'neutral',
   onClick,
+  compact = false,
+  actionLabel,
 }: {
   title: string
   reason: string
@@ -424,16 +523,18 @@ export function ActionCard({
   action?: React.ReactNode
   tone?: Tone
   onClick?: () => void
+  compact?: boolean
+  actionLabel?: string
 }) {
   const content = (
     <>
       <div className="v2-card-icon"><Sparkles size={16} /></div>
       <div>
         <strong>{title}</strong>
-        <p>{reason}</p>
+        <p>{compact ? truncateWords(cleanInsight(reason), 18) : reason}</p>
         {source ? <span className="v2-source">{source}</span> : null}
       </div>
-      {action ? <div className="v2-card-action">{action}</div> : null}
+      {action ? <div className="v2-card-action" aria-label={actionLabel}>{action}</div> : null}
     </>
   )
   if (href) return <Link href={href} className={`v2-action-card ${tone}`}>{content}</Link>
@@ -452,7 +553,7 @@ export function MeetingCard({ meeting, action }: { meeting: { title: string; sta
       <div>
         <strong>{meeting.title}</strong>
         <p>{meeting.companyName ?? 'Company not matched'}{meeting.dealTitle ? ` · ${meeting.dealTitle}` : ''}</p>
-        <span>AI prep uses the linked people, deal, and latest timeline context.</span>
+        <span>{meeting.dealTitle ? 'Linked to a deal record.' : 'Match this meeting to a person, company, or deal.'}</span>
       </div>
       {action}
     </div>
@@ -465,18 +566,18 @@ export function DealCardV2({ deal }: { deal: any }) {
   return (
     <Link href={`/deals/${deal.id}`} className="v2-deal-card">
       <div className="v2-deal-card-top">
-        <div>
+        <div className="v2-deal-card-title">
           <strong>{deal.title}</strong>
           <p>{deal.companyName ?? 'Unknown company'}</p>
         </div>
         <RiskBadge risk={risk} />
       </div>
-      <div className="v2-deal-facts">
+      <div className="v2-deal-card-facts">
         <span>{money(deal.valueAmount)}</span>
         <span>{shortDate(deal.expectedCloseDate) ?? 'Close date missing'}</span>
-        <span>{deal.aiConfidence ? `${deal.aiConfidence}% conf.` : 'Conf. missing'}</span>
+        <span>{deal.aiNextAction ? 'Next step set' : 'No next step'}</span>
       </div>
-      <p className="v2-deal-insight">{insight}</p>
+      <p className="v2-deal-insight" title={insight}>{insight}</p>
     </Link>
   )
 }
@@ -497,7 +598,7 @@ export function IntelligencePanel({ deal, signals = [], reasons = [] }: { deal?:
       </div>
       <div className="v2-intel-list">
         {(reasons.length ? reasons : signals.map(signal => signal.explanation)).slice(0, 5).map((reason, index) => (
-          <p key={`${reason}-${index}`}><Circle size={8} />{reason}</p>
+          <p key={`${reason}-${index}`}><Circle size={8} />{truncateWords(cleanInsight(reason), 20)}</p>
         ))}
         {!reasons.length && !signals.length ? <p><Circle size={8} />Add recent activity to improve confidence.</p> : null}
       </div>
@@ -509,19 +610,22 @@ export function TimelineV2({ items }: { items: Array<{ id: string; title: string
   if (!items.length) return <EmptyStateV2 title="No timeline yet">Add an update, connect Calendar, or import history to build the deal memory.</EmptyStateV2>
   return (
     <div className="v2-timeline">
-      {items.map(item => (
-        <article key={item.id} className="v2-timeline-item">
+      {items.map(item => {
+        const source = item.source ?? item.type ?? 'manual'
+        const quiet = /system_cleanup|legacy_backfill/i.test(source)
+        return (
+        <article key={item.id} className={`v2-timeline-item ${quiet ? 'quiet' : ''}`}>
           <div className="v2-timeline-dot" />
           <div>
             <div className="v2-timeline-head">
               <strong>{item.title}</strong>
-              <SourceBadge source={item.source ?? item.type ?? 'manual'} />
+              <SourceBadge source={source} />
             </div>
-            <p>{item.summary || item.body || 'No extra detail saved.'}</p>
+            <p>{item.summary || item.body || (quiet ? 'Imported or maintenance context. Kept for audit, not treated as fresh sales evidence.' : 'No extra detail saved.')}</p>
             {item.occurredAt ? <small>{new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(item.occurredAt))}</small> : null}
           </div>
         </article>
-      ))}
+      )})}
     </div>
   )
 }
@@ -561,7 +665,7 @@ export function InlineEditableField({ label, value, onSave, type = 'text' }: { l
   )
 }
 
-export function AddUpdateComposer({ dealId, onSaved }: { dealId: string; onSaved?: () => void }) {
+export function AddUpdateComposer({ dealId, onSaved, onTaskCreated }: { dealId: string; onSaved?: () => void; onTaskCreated?: () => void }) {
   const [note, setNote] = useState('')
   const [proposed, setProposed] = useState<null | ProposedDealUpdate>(null)
   const [saving, setSaving] = useState(false)
@@ -610,18 +714,42 @@ export function AddUpdateComposer({ dealId, onSaved }: { dealId: string; onSaved
     }
   }
 
+  async function createRecommendedTask() {
+    if (!proposed?.task) return
+    setSaving(true)
+    setError('')
+    try {
+      const response = await fetch('/api/crm/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: proposed.task,
+          dealId,
+          priority: proposed.blocker ? 'high' : 'normal',
+        }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload?.error ?? 'Could not create task')
+      onTaskCreated?.()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create task')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <PanelV2 className="v2-composer-panel">
-      <SectionHeader title="Add update" icon={<Plus size={18} />}>
-        Feed Halvex a meeting note, blocker, customer update, or next step. Important changes are proposed first.
+      <SectionHeader title="Upload deal evidence" icon={<Plus size={18} />}>
+        Add a meeting note, email snippet, blocker, customer update, or next step. Halvex recommends changes; you decide what gets saved.
       </SectionHeader>
       <textarea value={note} onChange={event => setNote(event.target.value)} placeholder="Spoke to Darren. They like the product but are blocked on data alignment. Need to send revised requirements by Friday." />
-      {proposed ? <SuggestedChangeReview changes={proposed} /> : null}
+      {proposed ? <SuggestedChangeReview changes={proposed} action={proposed.task ? <ButtonV2 onClick={createRecommendedTask} disabled={saving}>Create recommended task</ButtonV2> : null} /> : null}
       {error ? <p className="v2-form-note">{error}</p> : null}
       <div className="v2-composer-actions">
         <ButtonV2 onClick={review} disabled={!note.trim() || saving}>Review changes</ButtonV2>
         <ButtonV2 onClick={() => save('note')} disabled={!note.trim() || saving}>Save as note only</ButtonV2>
-        <ButtonV2 tone="dark" onClick={() => save('approved')} disabled={!proposed || saving}>Approve suggested update</ButtonV2>
+        <ButtonV2 tone="dark" onClick={() => save('approved')} disabled={!proposed || saving}>Approve insight update</ButtonV2>
       </div>
     </PanelV2>
   )
@@ -637,7 +765,7 @@ type ProposedDealUpdate = {
   evidence?: string[]
 }
 
-function SuggestedChangeReview({ changes }: { changes: ProposedDealUpdate }) {
+function SuggestedChangeReview({ changes, action }: { changes: ProposedDealUpdate; action?: React.ReactNode }) {
   return (
     <div className="v2-review">
       <strong>Here is what Halvex thinks changed</strong>
@@ -645,9 +773,10 @@ function SuggestedChangeReview({ changes }: { changes: ProposedDealUpdate }) {
       {changes.blocker ? <p><span>Blocker</span>{changes.blocker}</p> : null}
       {changes.risk ? <p><span>Risk</span>{changes.risk}</p> : null}
       {changes.nextAction ? <p><span>Next action</span>{changes.nextAction}</p> : null}
-      {changes.task ? <p><span>Task</span>{changes.task}</p> : null}
+      {changes.task ? <p><span>Recommended task</span>{changes.task} <em>Not created unless you choose to create it.</em></p> : null}
       <p><span>Summary</span>{changes.summary}</p>
       {changes.evidence?.length ? <p><span>Evidence</span>{changes.evidence.slice(0, 2).join(' · ')}</p> : null}
+      {action ? <div className="v2-review-action">{action}</div> : null}
     </div>
   )
 }
@@ -695,7 +824,7 @@ function missingInsight(deal: any) {
 
 function compactDealInsight(deal: any) {
   const source = deal.intelligence?.riskDrivers?.[0] || deal.aiNextAction || missingInsight(deal)
-  return truncateWords(cleanInsight(source), 11)
+  return truncateWords(cleanInsight(source), 7)
 }
 
 function cleanInsight(value: string) {

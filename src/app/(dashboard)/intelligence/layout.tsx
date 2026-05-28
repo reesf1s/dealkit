@@ -1,7 +1,5 @@
-export default function IntelligenceLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ maxWidth: '1040px' }}>
-      {children}
-    </div>
-  )
+import type { ReactNode } from 'react'
+
+export default function IntelligenceLayout({ children }: { children: ReactNode }) {
+  return children
 }

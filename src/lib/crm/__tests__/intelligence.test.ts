@@ -228,4 +228,38 @@ describe('deriveDealIntelligence', () => {
     expect(intelligence.summary).not.toContain('old imported tasks were marked cancelled')
     expect(intelligence.ignoredEvidence.map(item => item.reason)).toContain('System cleanup audit record')
   })
+
+  it('downgrades old risk evidence to review context when newer evidence is absent', () => {
+    const intelligence = deriveDealIntelligence({
+      deal: {
+        id: 'deal-old-risk',
+        title: 'Northstar renewal',
+        companyName: 'Northstar',
+        stageName: 'Proposal',
+        status: 'open',
+        probability: 58,
+        valueAmount: 42000,
+        expectedCloseDate: new Date('2026-07-30T00:00:00Z'),
+        lastActivityAt: new Date('2026-02-01T09:00:00Z'),
+      },
+      latestActivities: [
+        {
+          id: 'old-procurement',
+          title: 'Legacy notes',
+          body: 'Procurement and legal review were mentioned during early scoping.',
+          source: 'legacy_backfill',
+          type: 'note',
+          occurredAt: new Date('2026-02-01T09:00:00Z'),
+        },
+      ],
+      openTasks: [],
+      contacts: [{ id: 'contact-1', fullName: 'Jess' }],
+      meetings: [],
+    }, new Date('2026-05-27T10:00:00Z'))
+
+    expect(intelligence.riskDrivers.join(' ')).toContain('Older context mentions')
+    expect(intelligence.cleanupItems.join(' ')).toContain('ask whether it is still true')
+    expect(intelligence.inferenceSteps.join(' ')).toContain('downgraded')
+    expect(intelligence.summary).toContain('stale evidence')
+  })
 })

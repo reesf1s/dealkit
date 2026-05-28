@@ -46,10 +46,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const { workspaceId } = await getWorkspaceContext(userId)
     const { id } = await params
     const body = await req.json()
+    const status = ['open', 'won', 'lost', 'archived'].includes(body.status) ? body.status : undefined
     const data = await updateNativeDeal({
       workspaceId,
       userId,
       dealId: id,
+      title: body.title === undefined ? undefined : (body.title ? String(body.title) : null),
+      stageId: body.stageId === undefined ? undefined : (body.stageId ? String(body.stageId) : null),
+      status,
       valueAmount: body.valueAmount === undefined ? undefined : (body.valueAmount ? Number(body.valueAmount) : null),
       expectedCloseDate: body.expectedCloseDate === undefined ? undefined : (body.expectedCloseDate ? new Date(body.expectedCloseDate) : null),
       aiNextAction: body.aiNextAction === undefined ? undefined : (body.aiNextAction ? String(body.aiNextAction) : null),

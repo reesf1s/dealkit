@@ -4,7 +4,16 @@ import { dbErrResponse } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
 import { getDealContextNative, listActivity, listPipeline, listToday } from '@/lib/crm/core'
 import { answerAssistantWithAI } from '@/lib/crm/ai'
-import { compactAssistantText, findMentionedDeal, isStaleDate, looksDealSpecific, makeDealPromptContext } from '@/lib/crm/assistant-context'
+import { planAssistantActions } from '@/lib/crm/assistant-actions'
+import {
+  answerMentionsOtherDeal,
+  classifyAssistantIntent,
+  compactAssistantText,
+  enforceAssistantStructure,
+  findMentionedDeal,
+  isStaleDate,
+  makeDealPromptContext,
+} from '@/lib/crm/assistant-context'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,8 +26,17 @@ export async function POST(req: NextRequest) {
     const { message, dealId } = await req.json()
     const rawMessage = String(message ?? '')
     const lower = rawMessage.toLowerCase()
+    const intent = classifyAssistantIntent(rawMessage)
 
     const pipeline = await listPipeline(workspaceId, userId)
+    const actionPlan = await planAssistantActions({
+      message: rawMessage,
+      workspaceId,
+      userId,
+      dealId,
+      plan,
+      pipeline,
+    })
     const matchedDeal = typeof dealId === 'string' && dealId ? null : findMentionedDeal(rawMessage, pipeline.deals)
     const resolvedDealId = typeof dealId === 'string' && dealId ? dealId : matchedDeal?.id
     const dealContext = resolvedDealId ? await getDealContextNative(resolvedDealId, workspaceId) : null
@@ -50,12 +68,22 @@ export async function POST(req: NextRequest) {
     let fallbackAnswer = ''
     const links: Array<{ label: string; href: string }> = []
 
-    if (dealContext) {
+    if (actionPlan.clarification) {
+      fallbackAnswer = actionPlan.clarification
+      links.push(...actionPlan.links)
+    } else if (actionPlan.actions.length) {
+      fallbackAnswer = [
+        `Here’s what I’ll change: ${actionPlan.actions.map(action => action.description).join(' ')}`,
+        'What it means: I will not change CRM data until you confirm.',
+        'Next: review the confirmation card and choose Confirm or Cancel.',
+      ].join('\n')
+      links.push(...actionPlan.links)
+    } else if (dealContext) {
       fallbackAnswer = answerDealScoped(lower, dealContext)
       links.push({ label: dealContext.company?.name ?? dealContext.deal.title, href: `/deals/${dealContext.deal.id}` })
-    } else if (lower.includes('draft') && (lower.includes('follow') || lower.includes('email'))) {
+    } else if (intent.intent === 'draft_follow_up') {
       fallbackAnswer = 'Which deal should I draft this for? I do not want to mix workspace context into a customer email.'
-    } else if (looksDealSpecific(lower)) {
+    } else if (intent.requiresDeal) {
       fallbackAnswer = 'I could not confidently match that to one deal. Open the deal first or include the exact deal/company name so I do not pull context from the wrong account.'
     } else if (lower.includes('no next') || lower.includes('next step')) {
       fallbackAnswer = noNextStepDeals.length
@@ -109,7 +137,7 @@ export async function POST(req: NextRequest) {
         ? [
             `What happened: your next matched meeting is ${today.upcomingMeetings[0].title}.`,
             'What it means: prep should start from the linked company, deal, last touch, and open tasks.',
-            'Next: open the meeting or linked deal and add notes after the call so Halvex can propose updates.',
+            'Next: open the meeting or linked deal, then add notes and create any follow-up task after the call.',
           ].join('\n')
         : 'No upcoming matched meetings are visible yet. Connect Google Calendar or add meetings to build prep context.'
       links.push(...(today?.upcomingMeetings ?? []).slice(0, 5).map(meeting => ({ label: meeting.title, href: meeting.dealId ? `/deals/${meeting.dealId}` : '/calendar' })))
@@ -135,7 +163,8 @@ export async function POST(req: NextRequest) {
 
     const scopedDeals = dealScoped ? intelligenceDeals.filter(deal => deal.id === dealContext?.deal.id) : intelligenceDeals.slice(0, 30)
     const promptDealContext = dealContext ? makeDealPromptContext(dealContext) : null
-    const answer = await answerAssistantWithAI({
+    const shouldBypassAi = Boolean(actionPlan.clarification) || actionPlan.actions.length > 0 || (intent.requiresDeal && !dealContext)
+    const aiAnswer = shouldBypassAi ? fallbackAnswer : await answerAssistantWithAI({
       message: rawMessage,
       plan,
       today: dealScoped ? { scope: 'deal_only', note: 'Do not use workspace priorities for this answer.' } : today,
@@ -162,11 +191,34 @@ export async function POST(req: NextRequest) {
       dealContext: promptDealContext,
       fallbackAnswer,
     })
+    let answer = enforceAssistantStructure(aiAnswer, fallbackAnswer, {
+      draft: intent.intent === 'draft_follow_up' && Boolean(dealContext),
+    })
+    if (dealScoped && dealContext && answerMentionsOtherDeal(answer, dealContext.deal, pipeline.deals)) {
+      answer = fallbackAnswer
+    }
 
-    return NextResponse.json({ data: { answer, links } })
+    const mergedLinks = uniqueLinks([...links, ...actionPlan.links])
+    return NextResponse.json({
+      data: {
+        answer,
+        links: mergedLinks,
+        proposedActions: actionPlan.actions,
+        requiresConfirmation: actionPlan.actions.some(action => action.requiresConfirmation),
+      },
+    })
   } catch (err) {
     return dbErrResponse(err)
   }
+}
+
+function uniqueLinks(links: Array<{ label: string; href: string }>) {
+  const seen = new Set<string>()
+  return links.filter(link => {
+    if (seen.has(link.href)) return false
+    seen.add(link.href)
+    return true
+  })
 }
 
 function answerDealScoped(lower: string, dealContext: any) {

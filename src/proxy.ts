@@ -12,7 +12,7 @@ const isPublicRoute = createRouteMatcher([
 
 const legacyDashboardRedirects: Array<[RegExp, string]> = [
   [/^\/analytics(?:\/.*)?$/, '/home'],
-  [/^\/activity(?:\/.*)?$/, '/inbox'],
+  [/^\/activity(?:\/.*)?$/, '/home'],
   [/^\/automations(?:\/.*)?$/, '/home'],
   [/^\/case-studies(?:\/.*)?$/, '/home'],
   [/^\/chat(?:\/.*)?$/, '/assistant'],
@@ -23,13 +23,13 @@ const legacyDashboardRedirects: Array<[RegExp, string]> = [
   [/^\/contacts(?:\/.*)?$/, '/people'],
   [/^\/dashboard(?:\/.*)?$/, '/home'],
   [/^\/intelligence(?:\/.*)?$/, '/deals?view=intelligence'],
+  [/^\/inbox(?:\/.*)?$/, '/home'],
   [/^\/models(?:\/.*)?$/, '/home'],
   [/^\/onboarding(?:\/.*)?$/, '/home'],
   [/^\/pipeline(?:\/.*)?$/, '/deals?view=pipeline'],
   [/^\/playbook(?:\/.*)?$/, '/home'],
   [/^\/product-gaps(?:\/.*)?$/, '/home'],
-  [/^\/settings\/unmatched-emails(?:\/.*)?$/, '/inbox'],
-  [/^\/tasks(?:\/.*)?$/, '/home'],
+  [/^\/settings\/unmatched-emails(?:\/.*)?$/, '/home'],
   [/^\/today(?:\/.*)?$/, '/home'],
   [/^\/workflows(?:\/.*)?$/, '/home'],
 ]

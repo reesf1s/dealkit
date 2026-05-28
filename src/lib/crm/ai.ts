@@ -43,7 +43,50 @@ function extractResponseText(payload: any): string {
     .trim()
 }
 
+function limitWords(value: unknown, maxWords: number) {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim()
+  if (!text) return ''
+  const words = text.split(' ')
+  if (words.length <= maxWords) return text
+  return `${words.slice(0, maxWords).join(' ')}...`
+}
+
+function cleanGeneratedList(value: unknown, fallback: string[], maxItems: number, maxWords: number) {
+  const source = Array.isArray(value) ? value : fallback
+  const cleaned = source
+    .map(item => limitWords(item, maxWords))
+    .filter(Boolean)
+  return cleaned.length ? cleaned.slice(0, maxItems) : fallback.slice(0, maxItems)
+}
+
 async function generateHalvexText(input: {
+  model: string
+  system: string
+  prompt: string
+  maxOutputTokens: number
+  effort?: 'none' | 'low' | 'medium' | 'high' | 'xhigh'
+}) {
+  const candidateModels = [
+    input.model,
+    input.model === HALVEX_DEFAULT_MODEL ? null : HALVEX_DEFAULT_MODEL,
+    'gpt-4.1-mini',
+  ].filter((model, index, all): model is string => Boolean(model) && all.indexOf(model) === index)
+
+  let lastError: Error | null = null
+  for (const model of candidateModels) {
+    try {
+      return await callOpenAiResponses({ ...input, model })
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('OpenAI request failed')
+      const message = lastError.message.toLowerCase()
+      if (!/model|not found|does not exist|invalid|unsupported|404/.test(message)) throw lastError
+      console.warn(`[crm] OpenAI model ${model} unavailable, trying fallback`, lastError.message)
+    }
+  }
+  throw lastError ?? new Error('OpenAI request failed')
+}
+
+async function callOpenAiResponses(input: {
   model: string
   system: string
   prompt: string
@@ -151,7 +194,8 @@ export async function proposeDealUpdateWithAI(note: string, context: NativeDealC
       system: [
         'You are Halvex, a calm AI deal operator for a small-team CRM.',
         'Use only the CRM context and the user note. Do not invent facts.',
-        'Turn the note into proposed CRM updates. Important fields are suggestions only; the user approves before saving.',
+        'Turn the note into proposed CRM insight updates. Important fields are suggestions only; the user approves before saving.',
+        'If there is a useful follow-up, put it in task as a recommended task only. The system will not create it unless the user explicitly chooses to.',
         'Return only compact JSON with keys: blocker, risk, nextAction, task, summary, confidence, evidence.',
       ].join(' '),
       prompt: JSON.stringify({ crmContext: promptContext, userNote: note }),
@@ -195,7 +239,8 @@ export async function answerAssistantWithAI(input: {
         'If dealContext is provided, answer only about that deal. Do not use other deals, priorities, or activity unless they are explicitly included inside dealContext.',
         'If dealContext.contextPolicy exists, obey it over all other CRM data.',
         'Prioritise dealContext.latestActivities and current openTasks. Treat staleOpenTasks and staleActivities as historical context that may need user confirmation.',
-        'Always separate what happened, what it means, and what to do next.',
+        'For normal answers, use exactly these labels: What happened:, What it means:, Next:.',
+        'For follow-up email drafts, use only Subject: and Body:.',
         'Use specific deal names, newest activity, risk drivers, next actions, and links described in the data.',
         'Treat old open tasks as items to verify with the user, not as fresh instructions.',
         'Mention confidence limits when evidence is thin. Keep the answer under 160 words.',
@@ -218,6 +263,125 @@ export async function answerAssistantWithAI(input: {
   }
 }
 
+export type AssistantToolPlan = {
+  answer?: string
+  clarification?: string
+  actions?: Array<{
+    type:
+      | 'create_deal'
+      | 'update_deal'
+      | 'move_deal_stage'
+      | 'add_deal_note'
+      | 'create_task'
+      | 'edit_task'
+      | 'complete_task'
+      | 'snooze_task'
+      | 'cancel_task'
+      | 'create_company'
+      | 'create_contact'
+      | 'draft_follow_up'
+      | 'open_record'
+    target?: string | null
+    fields?: Record<string, unknown>
+    note?: string | null
+    title?: string | null
+    dueAt?: string | null
+    priority?: 'low' | 'normal' | 'high' | 'urgent' | null
+    stage?: string | null
+  }>
+}
+
+export async function planAssistantToolsWithAI(input: {
+  message: string
+  plan?: Plan | null
+  crm: {
+    currentDealId?: string | null
+    stages: Array<{ id: string; name: string; key?: string | null }>
+    deals: Array<{
+      id: string
+      title: string
+      companyName?: string | null
+      stageName?: string | null
+      status?: string | null
+      valueAmount?: number | null
+      expectedCloseDate?: Date | string | null
+      aiNextAction?: string | null
+    }>
+    tasks: Array<{
+      id: string
+      title: string
+      status?: string | null
+      dueAt?: Date | string | null
+      dealId?: string | null
+      dealTitle?: string | null
+      companyName?: string | null
+    }>
+    companies: Array<{ id: string; name: string; domain?: string | null }>
+    contacts: Array<{ id: string; fullName: string; email?: string | null; companyName?: string | null }>
+  }
+}): Promise<AssistantToolPlan | null> {
+  if (!hasOpenAiKey()) return null
+
+  const toolContract = {
+    rule: 'Return compact JSON only. Never execute. Mutating actions will be shown to the user for confirmation.',
+    allowedActions: [
+      'create_deal',
+      'update_deal',
+      'move_deal_stage',
+      'add_deal_note',
+      'create_task',
+      'edit_task',
+      'complete_task',
+      'snooze_task',
+      'cancel_task',
+      'create_company',
+      'create_contact',
+      'draft_follow_up',
+      'open_record',
+    ],
+    updateDealFields: ['title', 'stage', 'status', 'valueAmount', 'expectedCloseDate', 'aiNextAction'],
+    taskFields: ['title', 'dueAt', 'priority'],
+    safety: [
+      'If the user asks for raw SQL, schema changes, destructive deletes, billing changes, or data outside the CRM, return a clarification explaining this assistant only uses CRM tools.',
+      'If a record target is ambiguous or missing, return clarification instead of guessing.',
+      'Deal-scoped requests must stay on currentDealId when provided unless the user explicitly names a different record.',
+      'For draft_follow_up, do not create or send email.',
+      'For broad requests, propose up to 5 concrete actions.',
+    ],
+  }
+
+  try {
+    const text = await generateHalvexText({
+      model: selectHalvexModel(input.plan, { premium: true }),
+      system: [
+        'You are the Halvex CRM tool planner.',
+        'Translate natural language into safe internal CRM tool proposals.',
+        'You can help with any CRM workflow only through the allowed action types.',
+        'Do not invent records, IDs, stages, dates, values, people, or companies.',
+        'When uncertain, ask a concise clarification.',
+        'Return JSON with keys: answer, clarification, actions.',
+      ].join(' '),
+      prompt: JSON.stringify({
+        userMessage: input.message,
+        toolContract,
+        crm: input.crm,
+      }),
+      maxOutputTokens: 1400,
+      effort: 'low',
+    })
+    const parsed = parseJsonObject<AssistantToolPlan | null>(text, null)
+    if (!parsed || typeof parsed !== 'object') return null
+    return {
+      answer: typeof parsed.answer === 'string' ? parsed.answer : undefined,
+      clarification: typeof parsed.clarification === 'string' ? parsed.clarification : undefined,
+      actions: Array.isArray(parsed.actions) ? parsed.actions.slice(0, 5) : [],
+    }
+  } catch (error) {
+    console.warn('[crm] assistant tool planner unavailable, using deterministic planner', error)
+    return null
+  }
+}
+
 export async function generateDealBriefWithAI(context: NativeDealContext | null, plan?: Plan | null) {
   if (!context) return null
   const fallback = deriveDealIntelligence(context)
@@ -231,8 +395,11 @@ export async function generateDealBriefWithAI(context: NativeDealContext | null,
         'You are the Halvex deal intelligence engine.',
         'Analyse only the CRM context provided. Do not invent facts.',
         'Prioritise the newest substantive evidence over generic field-change records.',
+        'Separate current evidence from older/historical evidence. If older evidence may be stale, ask the user to verify it rather than presenting it as current truth.',
         'Treat stale imported tasks and old dated next actions as historical clean-up items unless they are confirmed by recent evidence.',
+        'Write in a useful CRM style: direct, specific, and concise. Avoid generic sales optimism.',
         'Always explain what happened, what it means, what to do next, and confidence.',
+        'Keep summary under 55 words. Keep nextAction under 28 words. Each risk driver must be short and actionable.',
         'Return compact JSON with keys: summary, nextAction, riskDrivers, positiveSignals, missingData, confidence.',
         'Score and risk are computed deterministically elsewhere; do not make the deal sound safer than the evidence.',
       ].join(' '),
@@ -262,17 +429,21 @@ export async function generateDealBriefWithAI(context: NativeDealContext | null,
     confidence?: number
   }>(text, {})
   const parsedConfidence = Number(parsed.confidence ?? fallback.confidence)
+  const confidenceCeiling = context.deal.status === 'won' && fallback.riskLevel === 'low'
+    ? 100
+    : Math.min(88, fallback.confidence + 8)
+  const confidenceFloor = Math.max(10, fallback.confidence - 18)
   const confidence = context.deal.status === 'won' && fallback.riskLevel === 'low'
     ? Math.max(86, Math.min(100, Number.isFinite(parsedConfidence) ? parsedConfidence : fallback.confidence))
-    : Math.max(10, Math.min(88, Number.isFinite(parsedConfidence) ? parsedConfidence : fallback.confidence))
+    : Math.max(confidenceFloor, Math.min(confidenceCeiling, Number.isFinite(parsedConfidence) ? parsedConfidence : fallback.confidence))
 
   return {
     ...fallback,
-    summary: parsed.summary || fallback.summary,
-    nextAction: parsed.nextAction || fallback.nextAction,
-    riskDrivers: Array.isArray(parsed.riskDrivers) ? parsed.riskDrivers : fallback.riskDrivers,
-    positiveSignals: Array.isArray(parsed.positiveSignals) ? parsed.positiveSignals : fallback.positiveSignals,
-    missingData: Array.isArray(parsed.missingData) ? parsed.missingData : fallback.missingData,
+    summary: limitWords(parsed.summary, 55) || limitWords(fallback.summary, 55),
+    nextAction: limitWords(parsed.nextAction, 28) || limitWords(fallback.nextAction, 28),
+    riskDrivers: cleanGeneratedList(parsed.riskDrivers, fallback.riskDrivers, 4, 22),
+    positiveSignals: cleanGeneratedList(parsed.positiveSignals, fallback.positiveSignals, 4, 20),
+    missingData: cleanGeneratedList(parsed.missingData, fallback.missingData, 4, 12),
     confidence,
   }
 }

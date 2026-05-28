@@ -1,49 +1,54 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useState } from 'react'
 import useSWR from 'swr'
-import { CalendarDays, CheckCircle2, LayoutGrid, Loader2, Plus, Sparkles } from 'lucide-react'
+import Link from 'next/link'
+import { CalendarDays, CheckCircle2, Clock3, LayoutGrid, Plus } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
 import {
-  ActionCard,
-  ButtonV2,
-  DealCardV2,
-  EmptyStateV2,
-  HeroPanel,
-  MeetingCard,
+  CrmButton,
+  ClampedText,
+  CompactDealCard,
+  CrmEmpty,
+  CrmPage,
+  CrmPanel,
+  CrmSectionHeader,
+  CrmSkeleton,
+  CrmStat,
+  PageIntent,
+  ScenicPanel,
   money,
-  PanelV2,
-  SectionHeader,
-} from '@/components/v2/V2DesignSystem'
+  shortDate,
+} from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
 type HomeData = {
-  priorities: Array<{ id: string; title: string; reason: string; linkedType: string; linkedId: string; dealId?: string | null; suggestedAction: string; confidence: string }>
-  atRiskDeals: Array<any>
-  staleDeals: Array<any>
+  priorities: Array<{ id: string; title: string; reason: string; linkedType: string; linkedId: string; dealId?: string | null; suggestedAction?: string | null; confidence?: string }>
   upcomingMeetings: Array<{ id: string; title: string; startsAt: string; dealId: string | null; dealTitle: string | null; companyName: string | null }>
-  overdueTasks: Array<{ id: string; title: string; dueAt: string | null; dealId: string | null; dealTitle: string | null; companyName: string | null }>
   openPipelineValue: number
   likelyClosers: Array<any>
+  atRiskDeals: Array<any>
+  staleDeals: Array<any>
   dealIntelligence: Array<any>
 }
 
 export default function HomePage() {
   const { data, isLoading, mutate } = useSWR<{ data: HomeData }>('/api/crm/today', fetcher, { revalidateOnFocus: false })
   const { data: googleData } = useSWR('/api/integrations/google/status', fetcher, { revalidateOnFocus: false })
-  const googleConfigured = googleData?.data?.configured !== false
-  const [completingPriorityId, setCompletingPriorityId] = useState<string | null>(null)
+  const [completingId, setCompletingId] = useState<string | null>(null)
   const home = data?.data
   const priorities = home?.priorities ?? []
   const meetings = home?.upcomingMeetings ?? []
-  const activeDeals = [...(home?.dealIntelligence ?? []), ...(home?.likelyClosers ?? []), ...(home?.atRiskDeals ?? []), ...(home?.staleDeals ?? [])]
+  const activeDeals = [...(home?.likelyClosers ?? []), ...(home?.atRiskDeals ?? []), ...(home?.staleDeals ?? []), ...(home?.dealIntelligence ?? [])]
     .filter((deal, index, all) => all.findIndex(item => item.id === deal.id) === index)
     .slice(0, 6)
+  const calendarConfigured = googleData?.data?.configured !== false
 
   async function completePriority(priority: HomeData['priorities'][number]) {
     if (priority.linkedType !== 'task') return
-    setCompletingPriorityId(priority.id)
+    setCompletingId(priority.id)
     try {
       await fetch('/api/crm/tasks', {
         method: 'PATCH',
@@ -52,102 +57,124 @@ export default function HomePage() {
       })
       await mutate()
     } finally {
-      setCompletingPriorityId(null)
+      setCompletingId(null)
     }
   }
 
   return (
-    <div className="v2-page">
-      <HeroPanel
+    <CrmPage>
+      <ScenicPanel
         eyebrow="Home"
-        title="Today"
-        actions={(
-          <>
-            <ButtonV2 tone="dark" onClick={() => {
-              window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'What should I do today?' } }))
-            }}>
-              <CalendarDays size={16} /> Review my day
-            </ButtonV2>
-            <ButtonV2 href="/deals"><Plus size={16} /> Add deal</ButtonV2>
-          </>
-        )}
-        aside={(
-          <>
-            <div className="v2-glass-card">
-              <strong>AI daily brief</strong>
-              <span>{priorities.length ? `${priorities.length} actions need attention. Start with ${priorities[0].title}.` : 'Connect Calendar or add deal context and Halvex will build a daily plan.'}</span>
-            </div>
-            <div className="v2-glass-card">
-              <strong>Pipeline pulse</strong>
-              <span>{money(home?.openPipelineValue ?? 0)} open pipeline · {(home?.likelyClosers ?? []).length} likely closers</span>
-            </div>
-          </>
-        )}
+        title="What needs attention today?"
+        description="Tasks, meetings, active deals, and Halvex suggestions arranged into one calm revenue desk."
+        actions={<><CrmButton href="/tasks?quick=task" tone="primary"><Plus size={16} /> Add task</CrmButton><CrmButton href="/deals?quick=deal"><Plus size={16} /> Add deal</CrmButton></>}
+        compact
       >
-        Meetings, follow-ups, deal changes, and risk signals, already sorted into a calm daily plan.
-      </HeroPanel>
+        <CrmStat label="Tasks due" value={priorities.length} hint={priorities.length ? 'Review or complete' : 'Clear'} />
+        <CrmStat label="Meetings" value={meetings.length} hint="Next 7 days" />
+        <CrmStat label="Open pipeline" value={money(home?.openPipelineValue ?? 0)} />
+        <CrmStat label="Likely closers" value={(home?.likelyClosers ?? []).length} />
+      </ScenicPanel>
 
-      <div className="v2-grid-2">
-        <PanelV2>
-          <SectionHeader title="Today's meetings" icon={<CalendarDays size={18} />}>
-            Meeting prep should start from your people, companies, deals, and timeline.
-          </SectionHeader>
-          <div className="v2-stack">
-            {meetings.length ? meetings.map(meeting => (
-              <MeetingCard
-                key={meeting.id}
-                meeting={meeting}
-                action={<ButtonV2 href={meeting.dealId ? `/deals/${meeting.dealId}` : '/calendar'}>Prep me</ButtonV2>}
-              />
+      <PageIntent items={[
+        { label: 'Start here', title: 'Finish today’s commitments', text: 'Tasks are the main operating list. Complete, snooze, or open the linked record before adding more work.', action: <CrmButton href="/tasks">Open tasks</CrmButton> },
+        { label: 'Then', title: 'Prepare for meetings', text: 'Calendar items should lead you to the right person, company, or deal before the call.', action: <CrmButton href="/calendar">Open calendar</CrmButton> },
+        { label: 'Finally', title: 'Review deal health', text: 'Halvex highlights missing fields and risk, but the CRM record remains manually owned.', action: <CrmButton href="/deals?view=health">Review health</CrmButton> },
+      ]} />
+
+      <div className="crm-home-desk">
+        <CrmPanel className="crm-home-primary">
+          <CrmSectionHeader title="Tasks due" description="The practical work list. Complete tasks here or open the linked record." action={<CrmButton href="/tasks">All tasks</CrmButton>} />
+          <div className="crm-stack">
+            {isLoading ? <CrmSkeleton rows={4} /> : priorities.length ? priorities.slice(0, 6).map(priority => (
+              <article key={priority.id} className="crm-work-row">
+                <span className="crm-icon"><CheckCircle2 size={17} /></span>
+                <div>
+                  <strong><ClampedText lines={2} title={priority.title}>{priority.title}</ClampedText></strong>
+                  <p><ClampedText lines={2}>{priority.reason}</ClampedText></p>
+                </div>
+                <div className="crm-form-actions">
+                  {priority.dealId ? <CrmButton href={`/deals/${priority.dealId}`} tone="ghost">Open</CrmButton> : null}
+                  {priority.linkedType === 'task' ? <CrmButton onClick={() => completePriority(priority)} disabled={completingId === priority.id}>Done</CrmButton> : null}
+                </div>
+              </article>
             )) : (
-              <EmptyStateV2
-                title="Bring your meetings into Halvex"
-                action={<ButtonV2 href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'} tone="dark">{googleConfigured ? 'Connect Google Calendar' : 'Set up Google Calendar'}</ButtonV2>}
+              <CrmEmpty title="No tasks due" action={<CrmButton href="/tasks?quick=task" tone="primary">Add task</CrmButton>}>
+                Create follow-ups from deals, meetings, or relationship work.
+              </CrmEmpty>
+            )}
+          </div>
+        </CrmPanel>
+
+        <CrmPanel className="crm-home-side">
+          <CrmSectionHeader title="Meetings" description="Calendar is a CRM workflow: open the record, take notes, create follow-up." action={<CrmButton href="/calendar">Calendar</CrmButton>} />
+          <div className="crm-stack">
+            {isLoading ? <CrmSkeleton rows={3} /> : meetings.length ? meetings.slice(0, 5).map(meeting => (
+              <article key={meeting.id} className="crm-work-row compact">
+                <span className="crm-icon"><CalendarDays size={17} /></span>
+                <div>
+                  <strong><ClampedText lines={2}>{meeting.title}</ClampedText></strong>
+                  <p><ClampedText lines={1}>{shortDate(meeting.startsAt)} · {meeting.companyName ?? 'No company matched'}{meeting.dealTitle ? ` · ${meeting.dealTitle}` : ''}</ClampedText></p>
+                </div>
+                <CrmButton href={meeting.dealId ? `/deals/${meeting.dealId}` : '/calendar'} tone="ghost">{meeting.dealId ? 'Open deal' : 'Open'}</CrmButton>
+              </article>
+            )) : (
+              <CrmEmpty
+                title="No meetings connected"
+                action={<CrmButton href={calendarConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'} tone="primary">Connect Calendar</CrmButton>}
               >
-                {googleConfigured ? 'Calendar becomes the front door for prep, notes, follow-up, and deal updates.' : 'Google Calendar is designed in, but production OAuth credentials still need to be added before users can connect.'}
-              </EmptyStateV2>
+                Bring Google Calendar in so meetings link back to people, companies, and deals.
+              </CrmEmpty>
             )}
           </div>
-        </PanelV2>
-
-        <PanelV2>
-          <SectionHeader title="Priority actions" icon={<Sparkles size={18} />}>
-            The work Halvex thinks will move revenue today.
-          </SectionHeader>
-          <div className="v2-stack">
-            {priorities.length ? priorities.slice(0, 6).map(priority => (
-              <ActionCard
-                key={priority.id}
-                title={priority.title}
-                reason={priority.reason}
-                href={priority.linkedType === 'task' ? undefined : priority.dealId ? `/deals/${priority.dealId}` : undefined}
-                onClick={priority.linkedType === 'task' ? () => completePriority(priority) : undefined}
-                source={priority.linkedType === 'task' ? 'Task' : priority.confidence === 'high' ? 'High confidence' : 'AI suggested'}
-                action={completingPriorityId === priority.id ? <Loader2 size={18} className="v2-spin" /> : <CheckCircle2 size={18} />}
-              />
-            )) : (
-              <EmptyStateV2 title="No busywork yet">
-                Add deals, connect Calendar, or import relationships. Halvex will turn activity into clear actions.
-              </EmptyStateV2>
-            )}
-          </div>
-        </PanelV2>
+        </CrmPanel>
       </div>
 
-      <PanelV2>
-        <SectionHeader title="Deal intelligence" icon={<LayoutGrid size={18} />} action={<ButtonV2 href="/deals?view=intelligence">Open intelligence</ButtonV2>}>
-          What Halvex believes is moving, slipping, or missing enough evidence.
-        </SectionHeader>
-        {isLoading ? <EmptyStateV2 title="Loading CRM context">Reading your workspace records.</EmptyStateV2> : activeDeals.length ? (
-          <div className="v2-grid-3">
-            {activeDeals.map(deal => <DealCardV2 key={deal.id} deal={deal} />)}
+      <CrmPanel className="crm-home-deals">
+        <CrmSectionHeader title="Active deals" description="A CRM view first. Deal health appears only as concise context." action={<CrmButton href="/deals"><LayoutGrid size={16} /> Deals</CrmButton>} />
+        {isLoading ? <CrmSkeleton rows={5} /> : activeDeals.length ? (
+          <div className="crm-grid-3">
+            {activeDeals.map(deal => <CompactDealCard key={deal.id} deal={deal} />)}
           </div>
         ) : (
-          <EmptyStateV2 title="Add or import deals to see the daily cockpit" action={<ButtonV2 href="/deals" tone="dark">Open Deals</ButtonV2>}>
-            V2 is designed to be useful before the database is perfect, but it needs at least a few opportunities to reason over.
-          </EmptyStateV2>
+          <CrmEmpty title="Add your first opportunities" action={<CrmButton href="/deals?quick=deal" tone="primary">Add deal</CrmButton>}>
+            Halvex becomes useful once you track deals, people, tasks, and meetings in one place.
+          </CrmEmpty>
         )}
-      </PanelV2>
-    </div>
+      </CrmPanel>
+
+      <CrmPanel>
+        <CrmSectionHeader title="Continue where you left off" description="Recently relevant records from your current pipeline, so the CRM feels like a workspace instead of a report." />
+        {activeDeals.length ? (
+          <div className="crm-continuation-strip">
+            {activeDeals.slice(0, 5).map(deal => (
+              <Link key={deal.id} href={`/deals/${deal.id}`} className="crm-continuation-card">
+                <strong><ClampedText lines={1}>{deal.title}</ClampedText></strong>
+                <p><ClampedText lines={1}>{deal.companyName ?? 'Unknown company'} · {deal.stageName ?? 'No stage'}</ClampedText></p>
+              </Link>
+            ))}
+          </div>
+        ) : <CrmEmpty title="No recent records">Add or import deals to build your working set.</CrmEmpty>}
+      </CrmPanel>
+
+      <CrmPanel className="crm-suggestion-panel">
+        <CrmSectionHeader title="Halvex suggestions" description="Optional intelligence. Nothing changes your CRM unless you choose to act." />
+        <div className="crm-grid-3">
+          <Suggestion href="/deals?view=health" icon={<Clock3 size={17} />} title="Review deal health" text="See records with missing data, stale activity, or unclear next steps." />
+          <Suggestion href="/tasks?view=overdue" icon={<CheckCircle2 size={17} />} title="Clean up old tasks" text="Old imported tasks should be marked done, snoozed, or replaced with current actions." />
+          <Suggestion href="/assistant" icon={<CalendarDays size={17} />} title="Ask for a summary" text="Use the assistant when you need a founder-level read across the CRM." />
+        </div>
+      </CrmPanel>
+    </CrmPage>
+  )
+}
+
+function Suggestion({ href, icon, title, text }: { href: string; icon: ReactNode; title: string; text: string }) {
+  return (
+    <Link href={href} className="crm-record-card">
+      <span className="crm-icon">{icon}</span>
+      <strong>{title}</strong>
+      <p>{text}</p>
+    </Link>
   )
 }

@@ -52,15 +52,16 @@ type TermMatch = {
   pattern: RegExp
   severity: 'low' | 'medium' | 'high'
   explanation: (evidence: EvidenceItem) => string
+  currentWindowDays?: number
 }
 
 const RISK_TERMS: TermMatch[] = [
-  { label: 'blocked', severity: 'high', pattern: /\b(blocked|blocker|blocking|stuck|stalled)\b/i, explanation: evidence => `Latest evidence says the deal is blocked or stuck: "${quoteEvidence(evidence.text)}"` },
-  { label: 'data alignment', severity: 'high', pattern: /\b(data alignment|data accuracy|alignment concern|misalignment|numbers do not align|numbers don't align|disagreeing with numbers|floorplans?|occupancy data|people data|data issue)\b/i, explanation: evidence => `Data or requirements are unresolved: "${quoteEvidence(evidence.text)}"` },
-  { label: 'unconfirmed improvements', severity: 'medium', pattern: /\b(awaiting|waiting|confirm|clarify|specific changes|improvements underway|what these are|need to understand)\b/i, explanation: evidence => `Buyer is waiting on clarification before progressing: "${quoteEvidence(evidence.text)}"` },
-  { label: 'procurement or legal', severity: 'high', pattern: /\b(procurement|legal|compliance|security|contract|redline|dpa|msa|infosec)\b/i, explanation: evidence => `Procurement, legal, security, or contract work is in the path: "${quoteEvidence(evidence.text)}"` },
-  { label: 'budget or pricing', severity: 'medium', pattern: /\b(budget|pricing|price|cost|expensive|commercial|discount)\b/i, explanation: evidence => `Commercial uncertainty appears in the evidence: "${quoteEvidence(evidence.text)}"` },
-  { label: 'uncertainty', severity: 'medium', pattern: /\b(concern|concerns|issue|issues|uncertain|not sure|risk|delay|delayed|slipped|waiting)\b/i, explanation: evidence => `Recent evidence contains unresolved uncertainty: "${quoteEvidence(evidence.text)}"` },
+  { label: 'blocked', severity: 'high', currentWindowDays: 60, pattern: /\b(blocked|blocker|blocking|stuck|stalled|cannot progress|can't progress|on hold)\b/i, explanation: evidence => `Latest evidence says the deal is blocked or stuck: "${quoteEvidence(evidence.text)}"` },
+  { label: 'data alignment', severity: 'high', currentWindowDays: 90, pattern: /\b(data alignment|data accuracy|alignment concern|misalignment|numbers do not align|numbers don't align|disagreeing with numbers|floorplans?|occupancy data|people data|data issue|requirements issue|tsg-ac)\b/i, explanation: evidence => `Data or requirements are unresolved: "${quoteEvidence(evidence.text)}"` },
+  { label: 'buyer waiting for clarification', severity: 'medium', currentWindowDays: 45, pattern: /\b(awaiting|waiting for|needs? clarification|clarify|specific changes|improvements underway|what these are|need to understand|needs? confirmation|pending confirmation)\b/i, explanation: evidence => `Buyer is waiting on clarification before progressing: "${quoteEvidence(evidence.text)}"` },
+  { label: 'procurement or legal', severity: 'high', currentWindowDays: 120, pattern: /\b(procurement|legal|compliance|security|contract|redline|dpa|msa|infosec)\b/i, explanation: evidence => `Procurement, legal, security, or contract work is in the path: "${quoteEvidence(evidence.text)}"` },
+  { label: 'budget or pricing', severity: 'medium', currentWindowDays: 75, pattern: /\b(budget|pricing|price|cost|expensive|commercial|discount|roi|business case)\b/i, explanation: evidence => `Commercial uncertainty appears in the evidence: "${quoteEvidence(evidence.text)}"` },
+  { label: 'uncertainty', severity: 'medium', currentWindowDays: 45, pattern: /\b(concern|concerns|issue|issues|uncertain|not sure|risk|delay|delayed|slipped|waiting on|quiet|gone quiet)\b/i, explanation: evidence => `Recent evidence contains unresolved uncertainty: "${quoteEvidence(evidence.text)}"` },
 ]
 
 const POSITIVE_TERMS: TermMatch[] = [
@@ -203,10 +204,16 @@ export function buildDealEvidence(context: DealContextLike, now = new Date()): E
     })
 }
 
-function findMatches(evidence: EvidenceItem[], terms: TermMatch[]) {
+function isCurrentEvidenceForTerm(evidence: EvidenceItem, term: TermMatch) {
+  if (evidence.ageDays == null) return true
+  return evidence.ageDays <= (term.currentWindowDays ?? 60)
+}
+
+function findMatches(evidence: EvidenceItem[], terms: TermMatch[], opts: { currentOnly?: boolean } = {}) {
   const matches: Array<{ term: TermMatch; evidence: EvidenceItem }> = []
   for (const item of evidence) {
     for (const term of terms) {
+      if (opts.currentOnly && !isCurrentEvidenceForTerm(item, term)) continue
       if (term.pattern.test(item.text) && !matches.some(match => match.term.label === term.label)) {
         matches.push({ term, evidence: item })
       }
@@ -221,6 +228,14 @@ function unique(items: string[]) {
 
 function companyLabel(context: DealContextLike) {
   return context.deal.companyName ?? context.deal.title
+}
+
+function evidenceFreshnessLabel(ageDays: number | null) {
+  if (ageDays == null) return 'undated'
+  if (ageDays <= 7) return 'fresh'
+  if (ageDays <= 30) return 'recent'
+  if (ageDays <= 90) return 'aging'
+  return 'stale'
 }
 
 export function dealEvidenceText(context: DealContextLike, now = new Date()) {
@@ -272,7 +287,10 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
     const dueAt = asDate(task.dueAt)
     return dueAt ? dueAt.getTime() < now.getTime() : false
   })
-  const riskMatches = findMatches(evidence, RISK_TERMS)
+  const currentEvidence = evidence.filter(item => item.ageDays == null || item.ageDays <= 90)
+  const staleEvidence = evidence.filter(item => item.ageDays != null && item.ageDays > 90)
+  const riskMatches = findMatches(currentEvidence, RISK_TERMS, { currentOnly: true })
+  const historicalRiskMatches = findMatches(staleEvidence, RISK_TERMS)
   const positiveMatches = findMatches(evidence, POSITIVE_TERMS)
   const ignoredEvidence = buildIgnoredEvidence(context).slice(0, 8)
 
@@ -299,6 +317,7 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
       return `Next action is overdue${overdueDays ? ` by ${overdueDays} days` : ''}: ${cleanText(task.title)}`
     }),
     ...riskMatches.map(match => match.term.explanation(match.evidence)),
+    !riskMatches.length && historicalRiskMatches.length ? `Older context mentions ${historicalRiskMatches[0].term.label}; verify whether it is still true` : '',
     !deal.valueAmount ? 'Forecast value is missing' : '',
     !deal.expectedCloseDate ? 'Close date is missing' : '',
   ]).slice(0, 7)
@@ -307,7 +326,9 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
     hasUpcomingMeeting ? 'Upcoming meeting is linked' : '',
     hasNextAction && !overdueTasks.length ? `Next action is explicit: ${currentStoredNextAction || cleanText(currentOpenTasks[0]?.title)}` : '',
     lastActivityDays != null && lastActivityDays <= 7 ? 'Recent activity is present' : '',
-    ...positiveMatches.map(match => match.term.explanation(match.evidence)),
+    ...positiveMatches
+      .filter(match => match.evidence.ageDays == null || match.evidence.ageDays <= 90)
+      .map(match => match.term.explanation(match.evidence)),
   ]).slice(0, 6)
 
   let score = typeof deal.probability === 'number' ? deal.probability : 42
@@ -324,7 +345,8 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
     if (hasUpcomingMeeting) score += 7
     if (closeDays != null && closeDays < 0) score -= 18
     for (const match of riskMatches) score -= match.term.severity === 'high' ? 11 : match.term.severity === 'medium' ? 7 : 4
-    for (const match of positiveMatches) score += match.term.severity === 'low' ? 4 : 2
+    for (const match of historicalRiskMatches.slice(0, 2)) score -= match.term.severity === 'high' ? 3 : 2
+    for (const match of positiveMatches.filter(match => match.evidence.ageDays == null || match.evidence.ageDays <= 90)) score += match.term.severity === 'low' ? 4 : 2
     if (!deal.valueAmount) score -= 6
     if (!deal.expectedCloseDate) score -= 6
   }
@@ -337,7 +359,9 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
   if (overdueTasks.length) confidence -= Math.min(14, overdueTasks.length * 5)
   if (staleOpenTasks.length) confidence -= Math.min(18, staleOpenTasks.length * 4)
   if (riskMatches.length) confidence -= Math.min(12, riskMatches.length * 3)
+  if (historicalRiskMatches.length && !riskMatches.length) confidence -= 6
   if (latestSubstantive?.ageDays != null && latestSubstantive.ageDays <= 7) confidence += 6
+  if (latestSubstantive?.ageDays != null && latestSubstantive.ageDays > 90) confidence -= 12
   if ((deal.status === 'won' || deal.status === 'lost') && !closedStageMismatch) confidence = Math.max(confidence, 86)
   if (closedStageMismatch) confidence -= 30
   confidence = Math.max(18, Math.min(deal.status === 'won' && !closedStageMismatch ? 100 : 88, Math.round(confidence)))
@@ -347,7 +371,7 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
   if (closedStageMismatch) riskLevel = 'high'
   else if (deal.status === 'won') riskLevel = 'low'
   else if (deal.status === 'lost') riskLevel = 'high'
-  else if (highRiskMatches.length || overdueTasks.length >= 2 || staleOpenTasks.length >= 3 || riskDrivers.length >= 3 || score < 42) riskLevel = 'high'
+  else if (highRiskMatches.length || overdueTasks.length >= 2 || staleOpenTasks.length >= 4 || riskDrivers.filter(driver => !/^Older context/.test(driver)).length >= 3 || score < 42) riskLevel = 'high'
   else if (riskMatches.length || riskDrivers.length || missingData.length >= 2 || score < 64) riskLevel = 'medium'
 
   const nextAction = currentStoredNextAction
@@ -355,7 +379,7 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
     || (riskMatches[0] ? nextActionForRisk(riskMatches[0].term.label, companyLabel(context)) : `Add a concrete next action for ${companyLabel(context)}.`)
 
   const latestLine = latestSubstantive
-    ? `Latest evidence: ${quoteEvidence(latestSubstantive.text)}`
+    ? `Latest ${evidenceFreshnessLabel(latestSubstantive.ageDays)} evidence: ${quoteEvidence(latestSubstantive.text)}`
     : 'Latest evidence is thin.'
   const meaningLine = riskDrivers[0]
     ? `Meaning: ${riskDrivers[0]}`
@@ -369,6 +393,12 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
     `Next: ${nextAction}`,
   ].join(' ')
 
+  const healthReadout = [
+    riskLevel === 'high' ? 'Needs attention' : riskLevel === 'medium' ? 'Worth watching' : 'No immediate blocker detected',
+    latestSubstantive ? `${evidenceFreshnessLabel(latestSubstantive.ageDays)} evidence` : 'thin evidence',
+    hasNextAction ? 'next step exists' : 'no current next step',
+  ].join(' · ')
+
   return {
     score,
     confidence,
@@ -378,6 +408,13 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
     missingData,
     nextAction,
     summary,
+    healthReadout,
+    evidenceFreshness: evidenceFreshnessLabel(latestSubstantive?.ageDays ?? null),
+    cleanupItems: [
+      staleOpenTasks.length ? `${staleOpenTasks.length} old open task${staleOpenTasks.length === 1 ? '' : 's'} should be reviewed, not treated as today’s work` : '',
+      historicalRiskMatches.length && !riskMatches.length ? `Older risk context mentions ${historicalRiskMatches[0].term.label}; ask whether it is still true` : '',
+      ignoredEvidence.length ? `${ignoredEvidence.length} generic activity item${ignoredEvidence.length === 1 ? '' : 's'} ignored` : '',
+    ].filter(Boolean),
     latestEvidence: latestSubstantive ? {
       id: latestSubstantive.id,
       title: latestSubstantive.title,
@@ -399,6 +436,7 @@ export function deriveDealIntelligence(context: DealContextLike, now = new Date(
       riskDrivers.length ? `Risk is driven by: ${riskDrivers.slice(0, 2).join(' / ')}` : 'No material risk driver was detected from current evidence.',
       positiveSignals.length ? `Positive signals include: ${positiveSignals.slice(0, 2).join(' / ')}` : 'Positive signal evidence is limited.',
       missingData.length ? `Confidence is reduced by missing data: ${missingData.join(' / ')}` : 'Core deal facts are present.',
+      historicalRiskMatches.length && !riskMatches.length ? `Older risk evidence was downgraded to a verification item instead of current risk.` : '',
       staleOpenTasks.length ? `Old open tasks are treated as cleanup/verification, not fresh next-step evidence.` : '',
     ].filter(Boolean),
   }

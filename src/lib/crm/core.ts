@@ -340,7 +340,21 @@ export async function backfillLegacyDealLogs(workspaceId: string, userId: string
   }
 }
 
+const nativeCrmReadyByWorkspace = new Map<string, Promise<void>>()
+
 export async function ensureNativeCrmReady(workspaceId: string, userId: string) {
+  const existing = nativeCrmReadyByWorkspace.get(workspaceId)
+  if (existing) return existing
+
+  const ready = ensureNativeCrmReadyUncached(workspaceId, userId).catch(error => {
+    nativeCrmReadyByWorkspace.delete(workspaceId)
+    throw error
+  })
+  nativeCrmReadyByWorkspace.set(workspaceId, ready)
+  return ready
+}
+
+async function ensureNativeCrmReadyUncached(workspaceId: string, userId: string) {
   await ensureDefaultPipeline(workspaceId)
   const [{ nativeCount }] = await db
     .select({ nativeCount: sql<number>`count(*)::int` })
@@ -362,10 +376,12 @@ export async function listPipeline(workspaceId: string, userId: string) {
       valueAmount: crmDeals.valueAmount,
       valueCurrency: crmDeals.valueCurrency,
       expectedCloseDate: crmDeals.expectedCloseDate,
+      probability: crmDeals.probability,
       status: crmDeals.status,
       aiScore: crmDeals.aiScore,
       aiConfidence: crmDeals.aiConfidence,
       aiRiskLevel: crmDeals.aiRiskLevel,
+      aiSummary: crmDeals.aiSummary,
       aiNextAction: crmDeals.aiNextAction,
       lastActivityAt: crmDeals.lastActivityAt,
       nextStepDueAt: crmDeals.nextStepDueAt,
@@ -386,51 +402,89 @@ export async function listPipeline(workspaceId: string, userId: string) {
     .orderBy(desc(crmDeals.updatedAt))
 
   const dealIds = rows.map(deal => deal.id)
-  const activityRows = dealIds.length
-    ? await db.select({
-      id: crmActivities.id,
-      dealId: crmActivities.dealId,
-      title: crmActivities.title,
-      body: crmActivities.body,
-      summary: crmActivities.summary,
-      occurredAt: crmActivities.occurredAt,
-      source: crmActivities.source,
-      type: crmActivities.type,
+  const [signalRows, taskRows] = dealIds.length ? await Promise.all([
+    db.select({
+      id: crmSignals.id,
+      dealId: crmSignals.dealId,
+      type: crmSignals.type,
+      direction: crmSignals.direction,
+      explanation: crmSignals.explanation,
+      confidence: crmSignals.confidence,
+      createdAt: crmSignals.createdAt,
     })
-      .from(crmActivities)
-      .where(and(eq(crmActivities.workspaceId, workspaceId), inArray(crmActivities.dealId, dealIds)))
-      .orderBy(desc(crmActivities.occurredAt))
-      .limit(Math.min(600, Math.max(80, dealIds.length * 6)))
-    : []
-  const activitiesByDeal = new Map<string, typeof activityRows>()
-  for (const activity of activityRows) {
-    if (!activity.dealId) continue
-    const existing = activitiesByDeal.get(activity.dealId) ?? []
-    if (existing.length < 6) {
-      existing.push(activity)
-      activitiesByDeal.set(activity.dealId, existing)
+      .from(crmSignals)
+      .where(and(eq(crmSignals.workspaceId, workspaceId), inArray(crmSignals.dealId, dealIds)))
+      .orderBy(desc(crmSignals.createdAt))
+      .limit(Math.min(360, Math.max(80, dealIds.length * 4))),
+    db.select({
+      id: crmTasks.id,
+      dealId: crmTasks.dealId,
+      title: crmTasks.title,
+      dueAt: crmTasks.dueAt,
+      priority: crmTasks.priority,
+      source: crmTasks.source,
+      status: crmTasks.status,
+    })
+      .from(crmTasks)
+      .where(and(eq(crmTasks.workspaceId, workspaceId), inArray(crmTasks.dealId, dealIds), eq(crmTasks.status, 'todo')))
+      .orderBy(asc(crmTasks.dueAt), desc(crmTasks.updatedAt))
+      .limit(Math.min(500, Math.max(100, dealIds.length * 5))),
+  ]) : [[], []]
+
+  const signalsByDeal = new Map<string, typeof signalRows>()
+  for (const signal of signalRows) {
+    if (!signal.dealId) continue
+    const existing = signalsByDeal.get(signal.dealId) ?? []
+    if (existing.length < 5) {
+      existing.push(signal)
+      signalsByDeal.set(signal.dealId, existing)
     }
   }
 
+  const tasksByDeal = new Map<string, typeof taskRows>()
+  for (const task of taskRows) {
+    if (!task.dealId) continue
+    const existing = tasksByDeal.get(task.dealId) ?? []
+    if (existing.length < 6) {
+      existing.push(task)
+      tasksByDeal.set(task.dealId, existing)
+    }
+  }
+
+  const now = new Date()
   const deals = rows.map(deal => {
-    const intelligence = deriveDealIntelligence({
-      deal: {
-        ...deal,
-        companyName: deal.companyName,
-        stageName: deal.stageName,
-      },
-      latestActivities: activitiesByDeal.get(deal.id) ?? [],
-      openTasks: deal.nextStepDueAt || deal.aiNextAction ? [{ id: `next-${deal.id}`, title: deal.aiNextAction ?? 'Next step', dueAt: deal.nextStepDueAt }] : [],
-      contacts: [],
-      meetings: [],
-    })
+    const signals = signalsByDeal.get(deal.id) ?? []
+    const tasks = tasksByDeal.get(deal.id) ?? []
+    const riskDrivers = signals
+      .filter(signal => signal.direction === 'negative')
+      .map(signal => signal.explanation)
+      .slice(0, 4)
+    const positiveSignals = signals
+      .filter(signal => signal.direction === 'positive')
+      .map(signal => signal.explanation)
+      .slice(0, 3)
+    const missingData = [
+      !deal.valueAmount ? 'Value is missing' : null,
+      !deal.expectedCloseDate ? 'Close date is missing' : null,
+      !deal.aiNextAction && !tasks.length ? 'No current next action recorded' : null,
+    ].filter(Boolean) as string[]
+    const nextTask = tasks.find(task => !task.dueAt || task.dueAt >= now) ?? tasks[0] ?? null
+    const nextAction = deal.aiNextAction ?? nextTask?.title ?? null
+
     return {
       ...deal,
-      aiScore: intelligence.score,
-      aiConfidence: intelligence.confidence,
-      aiRiskLevel: intelligence.riskLevel,
-      aiNextAction: deal.aiNextAction ?? intelligence.nextAction,
-      intelligence,
+      nextStepDueAt: deal.nextStepDueAt ?? nextTask?.dueAt ?? null,
+      aiNextAction: nextAction,
+      intelligence: {
+        score: deal.aiScore ?? deal.probability ?? 50,
+        confidence: deal.aiConfidence ?? 45,
+        riskLevel: deal.aiRiskLevel ?? 'unknown',
+        nextAction,
+        summary: deal.aiSummary ?? null,
+        riskDrivers,
+        positiveSignals,
+        missingData,
+      },
     }
   })
 
@@ -563,7 +617,7 @@ export async function listToday(workspaceId: string, userId: string) {
         confidence: deal.aiConfidence && deal.aiConfidence >= 70 ? 'high' : 'medium',
       })),
     ...openDeals
-      .filter(deal => !deal.nextStepDueAt)
+      .filter(deal => !deal.aiNextAction && !deal.nextStepDueAt)
       .slice(0, 5)
       .map(deal => ({
         id: `next-${deal.id}`,
@@ -916,6 +970,8 @@ export async function createNativeTask(input: {
   dueAt?: Date | null
   priority?: 'low' | 'normal' | 'high' | 'urgent'
   dealId?: string | null
+  companyId?: string | null
+  contactId?: string | null
 }) {
   let deal: { id: string; companyId: string | null } | null = null
   if (input.dealId) {
@@ -925,11 +981,31 @@ export async function createNativeTask(input: {
       .limit(1)
     deal = existing ?? null
   }
+  let companyId = deal?.companyId ?? input.companyId ?? null
+  let contactId = input.contactId ?? null
+
+  if (!deal && companyId) {
+    const [company] = await db.select({ id: crmCompanies.id })
+      .from(crmCompanies)
+      .where(and(eq(crmCompanies.id, companyId), eq(crmCompanies.workspaceId, input.workspaceId)))
+      .limit(1)
+    companyId = company?.id ?? null
+  }
+
+  if (contactId) {
+    const [contact] = await db.select({ id: crmContacts.id, companyId: crmContacts.companyId })
+      .from(crmContacts)
+      .where(and(eq(crmContacts.id, contactId), eq(crmContacts.workspaceId, input.workspaceId)))
+      .limit(1)
+    contactId = contact?.id ?? null
+    companyId = companyId ?? contact?.companyId ?? null
+  }
 
   const [task] = await db.insert(crmTasks).values({
     workspaceId: input.workspaceId,
     dealId: deal?.id ?? null,
-    companyId: deal?.companyId ?? null,
+    companyId,
+    contactId,
     assignedTo: input.userId,
     title: input.title,
     dueAt: input.dueAt ?? null,
@@ -961,14 +1037,28 @@ export async function updateNativeDeal(input: {
   workspaceId: string
   userId: string
   dealId: string
+  title?: string | null
+  stageId?: string | null
+  status?: 'open' | 'won' | 'lost' | 'archived' | null
   valueAmount?: number | null
   expectedCloseDate?: Date | null
   aiNextAction?: string | null
 }) {
   const patch: Partial<typeof crmDeals.$inferInsert> = { updatedAt: new Date() }
+  if (typeof input.title === 'string') patch.title = input.title
+  if ('stageId' in input) patch.stageId = input.stageId
+  if (input.status) patch.status = input.status
   if ('valueAmount' in input) patch.valueAmount = input.valueAmount
   if ('expectedCloseDate' in input) patch.expectedCloseDate = input.expectedCloseDate
   if ('aiNextAction' in input) patch.aiNextAction = input.aiNextAction
+
+  if (input.stageId) {
+    const [stage] = await db.select({ probability: crmPipelineStages.probability })
+      .from(crmPipelineStages)
+      .where(and(eq(crmPipelineStages.id, input.stageId), eq(crmPipelineStages.workspaceId, input.workspaceId)))
+      .limit(1)
+    if (stage) patch.probability = stage.probability
+  }
 
   const [deal] = await db.update(crmDeals).set(patch)
     .where(and(eq(crmDeals.id, input.dealId), eq(crmDeals.workspaceId, input.workspaceId)))
@@ -1035,19 +1125,8 @@ export async function addDealUpdate(input: {
   })
 
   if (input.mode === 'approved') {
-    if (proposed?.task) {
-      await db.insert(crmTasks).values({
-        workspaceId: input.workspaceId,
-        dealId: deal.id,
-        companyId: deal.companyId,
-        assignedTo: input.userId,
-        title: proposed.task,
-        priority: proposed.blocker ? 'high' : 'normal',
-        source: 'ai_suggested',
-      })
-    }
     const update: Partial<typeof crmDeals.$inferInsert> = {
-      aiNextAction: proposed?.nextAction ?? proposed?.task ?? null,
+      aiNextAction: proposed?.nextAction ?? null,
       aiSummary: proposed?.summary ?? input.note,
       aiConfidence: proposed?.blocker ? 62 : 70,
       aiRiskLevel: proposed?.blocker ? 'medium' : deal.aiRiskLevel,
@@ -1282,28 +1361,60 @@ export async function listTasks(workspaceId: string, userId: string, status?: 't
 }
 
 export async function completeTask(workspaceId: string, userId: string, taskId: string) {
-  const [task] = await db.update(crmTasks).set({
-    status: 'done',
-    updatedAt: new Date(),
-  }).where(and(eq(crmTasks.id, taskId), eq(crmTasks.workspaceId, workspaceId))).returning()
+  return updateTask({ workspaceId, userId, taskId, action: 'complete' })
+}
+
+export async function updateTask(input: {
+  workspaceId: string
+  userId: string
+  taskId: string
+  action: 'complete' | 'cancel' | 'snooze' | 'edit'
+  title?: string | null
+  dueAt?: Date | null
+  priority?: 'low' | 'normal' | 'high' | 'urgent' | null
+}) {
+  const patch: Partial<typeof crmTasks.$inferInsert> = { updatedAt: new Date() }
+  if (input.action === 'complete') patch.status = 'done'
+  if (input.action === 'cancel') patch.status = 'cancelled'
+  if (input.action === 'snooze') patch.dueAt = input.dueAt ?? new Date(Date.now() + 86_400_000)
+  if (input.action === 'edit') {
+    if (typeof input.title === 'string') patch.title = input.title
+    if ('dueAt' in input) patch.dueAt = input.dueAt ?? null
+    if (input.priority) patch.priority = input.priority
+  }
+
+  const [task] = await db.update(crmTasks).set(patch)
+    .where(and(eq(crmTasks.id, input.taskId), eq(crmTasks.workspaceId, input.workspaceId)))
+    .returning()
   if (!task) return null
+
+  const verb = input.action === 'complete'
+    ? 'Completed'
+    : input.action === 'cancel'
+      ? 'Cancelled'
+      : input.action === 'snooze'
+        ? 'Snoozed'
+        : 'Updated'
+
   await db.insert(crmActivities).values({
-    workspaceId,
+    workspaceId: input.workspaceId,
     dealId: task.dealId,
     companyId: task.companyId,
     contactId: task.contactId,
     type: 'task',
     source: 'crm',
-    title: `Completed task: ${task.title}`,
+    title: `${verb} task: ${task.title}`,
     occurredAt: new Date(),
-    createdBy: userId,
-    metadata: { taskId },
+    createdBy: input.userId,
+    metadata: { taskId: task.id, action: input.action },
   })
+
   if (task.dealId) {
-    refreshDealSignals(workspaceId, task.dealId).catch(error => {
-      console.warn('[crm] background signal refresh failed after task complete', error)
+    refreshDealSignals(input.workspaceId, task.dealId).catch(error => {
+      console.warn('[crm] background signal refresh failed after task update', error)
     })
   }
+
   return task
 }
 

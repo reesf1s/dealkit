@@ -1,17 +1,10 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import useSWR from 'swr'
-import { CalendarDays, FileText, MailPlus, RefreshCw } from 'lucide-react'
+import { CalendarDays, CheckCircle2, FileText, MailPlus, RefreshCw } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import {
-  ActionCard,
-  ButtonV2,
-  EmptyStateV2,
-  HeroPanel,
-  MeetingCard,
-  PanelV2,
-  SectionHeader,
-} from '@/components/v2/V2DesignSystem'
+import { ClampedText, CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, PageIntent, ScenicPanel, shortDate } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,70 +12,104 @@ export default function CalendarPage() {
   const { data: todayData, mutate } = useSWR('/api/crm/today', fetcher, { revalidateOnFocus: false })
   const { data: googleData } = useSWR('/api/integrations/google/status', fetcher, { revalidateOnFocus: false })
   const meetings = todayData?.data?.upcomingMeetings ?? []
+  const groupedMeetings = groupMeetings(meetings)
   const connected = Boolean(googleData?.data?.connected)
-  const googleConfigured = googleData?.data?.configured !== false
+  const configured = googleData?.data?.configured !== false
 
   async function sync() {
     await fetch('/api/integrations/google/sync', { method: 'POST' })
-    mutate()
+    await mutate()
   }
 
   return (
-    <div className="v2-page">
-      <HeroPanel
+    <CrmPage>
+      <ScenicPanel
         eyebrow="Calendar"
-        title="Meetings"
-        actions={(
-          <>
-            {connected ? <ButtonV2 tone="dark" onClick={sync}><RefreshCw size={16} /> Sync Calendar</ButtonV2> : <ButtonV2 tone="dark" href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'}><CalendarDays size={16} /> {googleConfigured ? 'Connect Google Calendar' : 'Set up Google Calendar'}</ButtonV2>}
-            <ButtonV2 href="/home">Back Home</ButtonV2>
-          </>
-        )}
-        aside={(
-          <div className="v2-glass-card">
-            <strong>Meeting workflow</strong>
-            <span>Prep before the call, add notes after, then approve deal updates without CRM admin.</span>
-          </div>
-        )}
+        title="Who am I meeting, and why?"
+        description="See what is next, open the linked CRM record, save notes, and follow up from one meeting workflow."
+        actions={connected ? <CrmButton onClick={sync} tone="primary"><RefreshCw size={16} /> Sync Calendar</CrmButton> : <CrmButton href={configured ? '/api/integrations/google/auth' : '/settings?section=integrations'} tone="primary"><CalendarDays size={16} /> {configured ? 'Connect Google Calendar' : 'Set up Calendar'}</CrmButton>}
+        compact
       >
-        Prep before the call, add notes after, and let Halvex propose the CRM updates.
-      </HeroPanel>
+        <CrmStat label="Upcoming meetings" value={meetings.length} />
+        <CrmStat label="Calendar status" value={connected ? 'Connected' : 'Not connected'} />
+        <CrmStat label="Matched records" value={meetings.filter((meeting: any) => meeting.dealId).length} />
+      </ScenicPanel>
 
-      <div className="v2-grid-2">
-        <PanelV2>
-          <SectionHeader title="Upcoming sales meetings" icon={<CalendarDays size={18} />}>
-            Each meeting should explain who is attending, what deal it touches, and what needs to happen next.
-          </SectionHeader>
-          <div className="v2-stack">
-            {meetings.length ? meetings.map((meeting: any) => (
-              <MeetingCard
-                key={meeting.id}
-                meeting={meeting}
-                action={<ButtonV2 href={meeting.dealId ? `/deals/${meeting.dealId}` : '/inbox'}>Prep me</ButtonV2>}
-              />
+      <PageIntent items={[
+        { label: 'Before', title: 'Open the linked CRM record', text: 'Meeting prep starts from the deal, person, company, and recent activity.' },
+        { label: 'During', title: 'Capture plain notes', text: 'Notes should live on the relevant record so the relationship history is not lost.' },
+        { label: 'After', title: 'Create the follow-up manually', text: 'Halvex can draft or suggest, but users decide the real task and due date.' },
+      ]} />
+
+      <div className="crm-grid-2">
+        <CrmPanel>
+          <CrmSectionHeader title="Upcoming meetings" description="Open the linked deal before the call. If no deal is matched, find or create the right record." />
+          <div className="crm-stack">
+            {!todayData ? <CrmSkeleton rows={4} /> : meetings.length ? groupedMeetings.map(group => (
+              <section key={group.label} className="crm-meeting-group">
+                <h3>{group.label}</h3>
+                {group.items.map((meeting: any) => (
+                  <article key={meeting.id} className="crm-meeting-card">
+                    <span className="crm-icon"><CalendarDays size={16} /></span>
+                    <div>
+                      <strong><ClampedText lines={2}>{meeting.title}</ClampedText></strong>
+                      <p><ClampedText lines={1}>{shortDate(meeting.startsAt)} · {meeting.companyName ?? 'No company matched'}{meeting.dealTitle ? ` · ${meeting.dealTitle}` : ''}</ClampedText></p>
+                      <small>{meeting.dealId ? 'Matched to CRM record' : 'Needs matching'}</small>
+                    </div>
+                    <div className="crm-form-actions">
+                      <CrmButton href={meeting.dealId ? `/deals/${meeting.dealId}` : '/people'}>{meeting.dealId ? 'Open deal' : 'Find person'}</CrmButton>
+                      <CrmButton href={meeting.dealId ? `/deals/${meeting.dealId}#deal-note` : '/calendar'} tone="ghost">Add note</CrmButton>
+                    </div>
+                  </article>
+                ))}
+              </section>
             )) : (
-              <EmptyStateV2
-                title={connected ? 'No upcoming matched meetings' : googleConfigured ? 'Connect Calendar to unlock the daily flow' : 'Google Calendar needs production credentials'}
-                action={!connected ? <ButtonV2 href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'} tone="dark">{googleConfigured ? 'Connect Google' : 'Open integration settings'}</ButtonV2> : undefined}
-              >
-                {connected ? 'When meetings are found, Halvex will match attendees to people, companies, and deals.' : googleConfigured ? 'Calendar is the fastest way to make Halvex feel alive.' : 'Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Vercel, then redeploy to enable OAuth.'}
-              </EmptyStateV2>
+              <CrmEmpty title={connected ? 'No matched meetings' : 'Connect Calendar'} action={!connected ? <CrmButton href={configured ? '/api/integrations/google/auth' : '/settings?section=integrations'} tone="primary">{configured ? 'Connect Google' : 'Open settings'}</CrmButton> : undefined}>
+                {connected ? 'When meetings are found, Halvex will match attendees to people, companies, and deals.' : 'Calendar makes prep and follow-up part of the CRM.'}
+              </CrmEmpty>
             )}
           </div>
-        </PanelV2>
+        </CrmPanel>
 
-        <PanelV2>
-          <SectionHeader title="Meeting operating loop" icon={<FileText size={18} />}>
-            This is how you give Halvex new information without filling in CRM fields.
-          </SectionHeader>
-          <div className="v2-stack">
-            <ActionCard title="Prep before the call" reason="Halvex reads linked deal context, last touch, risks, and open tasks." source="Before meeting" />
-            <ActionCard title="Add note after the call" reason="Write naturally. Halvex proposes blockers, next actions, tasks, and summary updates." source="After meeting" />
-            <ActionCard title="Approve the CRM changes" reason="Important fields are never silently overwritten. You choose what gets saved." source="User approved" />
-            <ActionCard title="Draft follow-up" reason="Create a concise follow-up from the meeting note and deal context." source="AI draft" action={<MailPlus size={17} />} />
+        <CrmPanel>
+          <CrmSectionHeader title="Meeting routine" description="A simple workflow around every customer conversation." />
+          <div className="crm-stack">
+            <Routine icon={<FileText size={16} />} title="Before" text="Open the linked record and review stage, people, tasks, and recent activity." />
+            <Routine icon={<FileText size={16} />} title="After" text="Save notes on the deal, person, or company timeline." />
+            <Routine icon={<CheckCircle2 size={16} />} title="Follow-up" text="Create the next task manually with a due date." />
+            <Routine icon={<MailPlus size={16} />} title="Optional" text="Ask Halvex to draft an email from the current CRM context." />
           </div>
-        </PanelV2>
+        </CrmPanel>
       </div>
-    </div>
+    </CrmPage>
+  )
+}
+
+function groupMeetings(meetings: any[]) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today.getTime() + 86_400_000)
+  const groups = [
+    { label: 'Today', items: [] as any[] },
+    { label: 'Tomorrow', items: [] as any[] },
+    { label: 'Later this week', items: [] as any[] },
+  ]
+  for (const meeting of meetings) {
+    const date = meeting.startsAt ? new Date(meeting.startsAt) : null
+    const start = date ? new Date(date) : null
+    start?.setHours(0, 0, 0, 0)
+    if (start && start.getTime() === today.getTime()) groups[0].items.push(meeting)
+    else if (start && start.getTime() === tomorrow.getTime()) groups[1].items.push(meeting)
+    else groups[2].items.push(meeting)
+  }
+  return groups.filter(group => group.items.length)
+}
+
+function Routine({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
+  return (
+    <article className="crm-list-row">
+      <span className="crm-icon">{icon}</span>
+      <div><strong>{title}</strong><p>{text}</p></div>
+    </article>
   )
 }

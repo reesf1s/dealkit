@@ -1,11 +1,12 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { Suspense, useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { useSearchParams } from 'next/navigation'
-import { Building2, CalendarDays, Check, Copy, CreditCard, Import, Loader2, Settings, UsersRound } from 'lucide-react'
+import { Building2, CalendarDays, Check, Copy, CreditCard, Loader2, Settings, UsersRound } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { ActionCard, ButtonV2, EmptyStateV2, HeroPanel, PanelV2, SectionHeader } from '@/components/v2/V2DesignSystem'
+import { CrmBadge, CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, PageIntent, ScenicPanel } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +34,7 @@ async function postJson(url: string, body?: unknown, method = 'POST') {
 
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<EmptyStateV2 title="Loading settings">Preparing workspace controls.</EmptyStateV2>}>
+    <Suspense fallback={<CrmPage><CrmSkeleton rows={6} /></CrmPage>}>
       <SettingsContent />
     </Suspense>
   )
@@ -41,30 +42,39 @@ export default function SettingsPage() {
 
 function SettingsContent() {
   const search = useSearchParams()
-  const requestedSection = search.get('section')
-  const active = sections.some(section => section.key === requestedSection) ? requestedSection as SettingsSection : 'workspace'
+  const requested = search.get('section')
+  const active = sections.some(section => section.key === requested) ? requested as SettingsSection : 'workspace'
   const { data: googleData } = useSWR('/api/integrations/google/status', fetcher, { revalidateOnFocus: false })
   const googleConnected = Boolean(googleData?.data?.connected)
   const googleConfigured = googleData?.data?.configured !== false
 
   return (
-    <div className="v2-page">
-      <HeroPanel
+    <CrmPage>
+      <ScenicPanel
         eyebrow="Settings"
-        title="Settings"
-        actions={googleConnected ? <ButtonV2 href="/calendar">Open Calendar</ButtonV2> : <ButtonV2 tone="dark" href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'}><CalendarDays size={16} /> {googleConfigured ? 'Connect Google Calendar' : 'Set up Google Calendar'}</ButtonV2>}
-        aside={<div className="v2-glass-card"><strong>Live controls</strong><span>Workspace, members, pipeline, imports, integrations, and billing are now actionable from here.</span></div>}
+        title="Keep the CRM configured."
+        description="Workspace, team, pipeline, imports, integrations, and billing controls without cluttering daily sales work."
+        actions={googleConnected ? <CrmButton href="/calendar">Open Calendar</CrmButton> : <CrmButton tone="primary" href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'}><CalendarDays size={16} /> {googleConfigured ? 'Connect Google Calendar' : 'Set up Calendar'}</CrmButton>}
+        compact
       >
-        Quiet controls for the CRM. Nothing here should feel like a dead card.
-      </HeroPanel>
+        <CrmStat label="Calendar" value={googleConnected ? 'Connected' : 'Not connected'} />
+        <CrmStat label="Sections" value={sections.length} />
+        <CrmStat label="AI model" value="5.4 mini" hint="Pro can use 5.5" />
+      </ScenicPanel>
 
-      <PanelV2>
-        <div className="v2-settings-tabs">
+      <PageIntent items={[
+        { label: 'Workspace', title: 'Keep setup out of sales work', text: 'Settings holds admin actions so Home, Deals, Tasks, and Calendar stay focused.' },
+        { label: 'Team', title: 'Control access deliberately', text: 'Members and invites should be obvious, auditable, and separate from daily CRM use.' },
+        { label: 'Integrations', title: 'Connect only what adds context', text: 'Calendar and imports improve the CRM, but the product still works manually first.' },
+      ]} />
+
+      <CrmPanel>
+        <div className="crm-view-tabs">
           {sections.map(section => (
             <a key={section.key} href={`/settings?section=${section.key}`} className={active === section.key ? 'active' : ''}>{section.label}</a>
           ))}
         </div>
-      </PanelV2>
+      </CrmPanel>
 
       {active === 'workspace' ? <WorkspaceSection /> : null}
       {active === 'members' ? <MembersSection /> : null}
@@ -72,7 +82,7 @@ function SettingsContent() {
       {active === 'imports' ? <ImportsSection /> : null}
       {active === 'integrations' ? <IntegrationsSection googleConnected={googleConnected} googleConfigured={googleConfigured} /> : null}
       {active === 'billing' ? <BillingSection /> : null}
-    </div>
+    </CrmPage>
   )
 }
 
@@ -95,27 +105,20 @@ function WorkspaceSection() {
   }
 
   return (
-    <PanelV2>
-      <SectionHeader title="Workspace" icon={<Settings size={18} />}>
-        Rename the workspace and check the current plan. Admin-only changes stay protected.
-      </SectionHeader>
-      {isLoading ? <EmptyStateV2 title="Loading workspace">Reading workspace settings.</EmptyStateV2> : (
-        <div className="v2-settings-form">
-          <label>
-            <span>Workspace name</span>
-            <input value={name} onChange={event => setName(event.target.value)} placeholder="Workspace name" />
-          </label>
-          <div className="v2-setting-row">
-            <ActionCard title="Current plan" reason={`${workspace?.plan ?? 'free'} plan. Top plan unlocks premium GPT-5.5 reasoning for heavier deal intelligence.`} source="Billing" />
-            <ActionCard title="Your access" reason={`You are ${role ?? 'member'} in this workspace.`} source="Membership" />
-          </div>
-          <div className="v2-settings-actions">
-            <ButtonV2 tone="dark" onClick={save} disabled={!name.trim() || name === workspace?.name}>Save workspace</ButtonV2>
-            {message ? <span>{message}</span> : null}
+    <CrmPanel>
+      <CrmSectionHeader title="Workspace" description="Rename the workspace and check the current plan. Admin-only changes stay protected." />
+      {isLoading ? <CrmSkeleton rows={4} /> : (
+        <div className="crm-form-grid">
+          <label>Workspace name<input className="crm-input" value={name} onChange={event => setName(event.target.value)} placeholder="Workspace name" /></label>
+          <InfoRow icon={<Settings size={16} />} title="Current plan" text={`${workspace?.plan ?? 'free'} plan. Pro unlocks premium GPT-5.5 reasoning for heavier deal intelligence.`} />
+          <InfoRow icon={<UsersRound size={16} />} title="Your access" text={`You are ${role ?? 'member'} in this workspace.`} />
+          <div className="crm-form-actions">
+            <CrmButton tone="primary" onClick={save} disabled={!name.trim() || name === workspace?.name}>Save workspace</CrmButton>
+            {message ? <CrmBadge tone="good">{message}</CrmBadge> : null}
           </div>
         </div>
       )}
-    </PanelV2>
+    </CrmPanel>
   )
 }
 
@@ -150,59 +153,47 @@ function MembersSection() {
   }
 
   return (
-    <div className="v2-grid-2">
-      <PanelV2>
-        <SectionHeader title="Members" icon={<UsersRound size={18} />}>
-          Invite teammates, copy the invite link, and manage app access.
-        </SectionHeader>
-        <div className="v2-settings-form">
-          <label>
-            <span>Email address</span>
-            <input value={email} onChange={event => setEmail(event.target.value)} placeholder="teammate@company.com" />
-          </label>
-          <label>
-            <span>Workspace role</span>
-            <select value={role} onChange={event => setRole(event.target.value as 'member' | 'admin')}>
-              <option value="member">Member</option>
-              <option value="admin">Admin</option>
-            </select>
-          </label>
-          <div className="v2-settings-actions">
-            <ButtonV2 tone="dark" onClick={invite} disabled={!email.includes('@')}>Create invite</ButtonV2>
-            {message ? <span>{message}</span> : null}
+    <div className="crm-grid-2">
+      <CrmPanel>
+        <CrmSectionHeader title="Invite teammate" description="Create a workspace invite and share the link." />
+        <div className="crm-form-grid">
+          <label>Email address<input className="crm-input" value={email} onChange={event => setEmail(event.target.value)} placeholder="teammate@company.com" /></label>
+          <label>Role<select className="crm-select" value={role} onChange={event => setRole(event.target.value as 'member' | 'admin')}><option value="member">Member</option><option value="admin">Admin</option></select></label>
+          <div className="crm-form-actions">
+            <CrmButton tone="primary" onClick={invite} disabled={!email.includes('@')}>Create invite</CrmButton>
+            {message ? <CrmBadge tone="good">{message}</CrmBadge> : null}
           </div>
-          {inviteUrl ? (
-            <div className="v2-copy-box">
-              <span>{inviteUrl}</span>
-              <button type="button" onClick={() => navigator.clipboard.writeText(inviteUrl)}><Copy size={16} /> Copy</button>
-            </div>
-          ) : null}
+          {inviteUrl ? <div className="crm-list-row"><span className="crm-icon"><Copy size={16} /></span><div><strong>Invite link</strong><p>{inviteUrl}</p></div><CrmButton onClick={() => navigator.clipboard.writeText(inviteUrl)}>Copy</CrmButton></div> : null}
         </div>
-      </PanelV2>
+      </CrmPanel>
 
-      <PanelV2>
-        <SectionHeader title="Team access">Current members and pending invites.</SectionHeader>
-        <div className="v2-stack">
+      <CrmPanel>
+        <CrmSectionHeader title="Team access" description="Current members and pending invites." />
+        <div className="crm-stack">
           {members.map((member: any) => (
-            <div key={member.id} className="v2-setting-row-item">
+            <div key={member.id} className="crm-list-row">
+              <span className="crm-icon"><UsersRound size={16} /></span>
               <div><strong>{member.email}</strong><p>{member.role} workspace role</p></div>
-              <select value={member.appRole} onChange={event => updateAppRole(member.userId, event.target.value)}>
-                <option value="sales">Sales</option>
-                <option value="product">Product</option>
-                <option value="admin">Admin</option>
-              </select>
-              <button type="button" onClick={() => remove(member.userId)}>Remove</button>
+              <div className="crm-form-actions">
+                <select className="crm-select" value={member.appRole} onChange={event => updateAppRole(member.userId, event.target.value)}>
+                  <option value="sales">Sales</option>
+                  <option value="product">Product</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <CrmButton onClick={() => remove(member.userId)} tone="danger">Remove</CrmButton>
+              </div>
             </div>
           ))}
           {invites.map((invite: any) => (
-            <div key={invite.id} className="v2-setting-row-item">
+            <div key={invite.id} className="crm-list-row">
+              <span className="crm-icon"><Copy size={16} /></span>
               <div><strong>{invite.email}</strong><p>Pending {invite.role} invite</p></div>
-              <button type="button" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/api/crm/invites/accept?token=${invite.token}`)}>Copy invite</button>
+              <CrmButton onClick={() => navigator.clipboard.writeText(`${window.location.origin}/api/crm/invites/accept?token=${invite.token}`)}>Copy invite</CrmButton>
             </div>
           ))}
-          {!members.length && !invites.length ? <EmptyStateV2 title="No members found">Invite a teammate to start collaborating.</EmptyStateV2> : null}
+          {!members.length && !invites.length ? <CrmEmpty title="No members found">Invite a teammate to start collaborating.</CrmEmpty> : null}
         </div>
-      </PanelV2>
+      </CrmPanel>
     </div>
   )
 }
@@ -218,26 +209,27 @@ function PipelinesSection() {
   }
 
   return (
-    <PanelV2>
-      <SectionHeader title="Pipeline settings" icon={<Building2 size={18} />} action={<ButtonV2 href="/deals?view=pipeline">Open Deals</ButtonV2>}>
-        Rename stages and adjust default probabilities. Stage moves happen in Deals.
-      </SectionHeader>
-      {isLoading ? <EmptyStateV2 title="Loading pipeline">Reading stages.</EmptyStateV2> : (
-        <div className="v2-stack">
+    <CrmPanel>
+      <CrmSectionHeader title="Pipeline settings" description="Rename stages and adjust default probabilities. Stage movement happens in Deals." action={<CrmButton href="/deals?view=pipeline">Open Deals</CrmButton>} />
+      {isLoading ? <CrmSkeleton rows={5} /> : (
+        <div className="crm-stack">
           {stages.map((stage: any) => {
             const count = deals.filter((deal: any) => deal.stageId === stage.id).length
             return (
-              <div key={stage.id} className="v2-setting-row-item">
-                <input defaultValue={stage.name} onBlur={event => event.currentTarget.value !== stage.name ? saveStage(stage.id, 'name', event.currentTarget.value) : undefined} />
-                <input type="number" min={0} max={100} defaultValue={stage.probability} onBlur={event => Number(event.currentTarget.value) !== stage.probability ? saveStage(stage.id, 'probability', event.currentTarget.value) : undefined} />
-                <span>{count} deals</span>
+              <div key={stage.id} className="crm-list-row">
+                <span className="crm-icon"><Building2 size={16} /></span>
+                <label>Name<input className="crm-input" defaultValue={stage.name} onBlur={event => event.currentTarget.value !== stage.name ? saveStage(stage.id, 'name', event.currentTarget.value) : undefined} /></label>
+                <div className="crm-form-actions">
+                  <input className="crm-input" type="number" min={0} max={100} defaultValue={stage.probability} onBlur={event => Number(event.currentTarget.value) !== stage.probability ? saveStage(stage.id, 'probability', event.currentTarget.value) : undefined} />
+                  <CrmBadge>{count} deals</CrmBadge>
+                </div>
               </div>
             )
           })}
-          {!stages.length ? <EmptyStateV2 title="No pipeline stages">Open Deals once and Halvex will create the default pipeline.</EmptyStateV2> : null}
+          {!stages.length ? <CrmEmpty title="No pipeline stages">Open Deals once and Halvex will create the default pipeline.</CrmEmpty> : null}
         </div>
       )}
-    </PanelV2>
+    </CrmPanel>
   )
 }
 
@@ -258,30 +250,18 @@ function ImportsSection() {
   }
 
   return (
-    <PanelV2>
-      <SectionHeader title="Imports" icon={<Import size={18} />}>
-        Paste CSV for companies, people, or deals. Preview first, then import valid rows.
-      </SectionHeader>
-      <div className="v2-settings-form">
-        <label>
-          <span>Import type</span>
-          <select value={type} onChange={event => setType(event.target.value)}>
-            <option value="deals">Deals</option>
-            <option value="contacts">People</option>
-            <option value="companies">Companies</option>
-          </select>
-        </label>
-        <label>
-          <span>CSV</span>
-          <textarea value={csv} onChange={event => setCsv(event.target.value)} />
-        </label>
-        <div className="v2-settings-actions">
-          <ButtonV2 onClick={() => runImport(true)} disabled={loading || !csv.trim()}>{loading ? <Loader2 size={16} /> : null} Preview</ButtonV2>
-          <ButtonV2 tone="dark" onClick={() => runImport(false)} disabled={loading || !csv.trim()}>Import valid rows</ButtonV2>
+    <CrmPanel>
+      <CrmSectionHeader title="Imports" description="Paste CSV for companies, people, or deals. Preview first, then import valid rows." />
+      <div className="crm-form-grid">
+        <label>Import type<select className="crm-select" value={type} onChange={event => setType(event.target.value)}><option value="deals">Deals</option><option value="contacts">People</option><option value="companies">Companies</option></select></label>
+        <label>CSV<textarea className="crm-textarea" value={csv} onChange={event => setCsv(event.target.value)} /></label>
+        <div className="crm-form-actions">
+          <CrmButton onClick={() => runImport(true)} disabled={loading || !csv.trim()}>{loading ? <Loader2 size={16} /> : null} Preview</CrmButton>
+          <CrmButton tone="primary" onClick={() => runImport(false)} disabled={loading || !csv.trim()}>Import valid rows</CrmButton>
         </div>
-        {result ? <ActionCard title="Import result" reason={`${result.validRows ?? 0} valid rows · ${result.failedRows ?? result.failed?.length ?? 0} failed · ${result.importedRows ?? 0} imported`} source="CSV" action={<Check size={17} />} /> : null}
+        {result ? <InfoRow icon={<Check size={16} />} title="Import result" text={`${result.validRows ?? 0} valid rows · ${result.failedRows ?? result.failed?.length ?? 0} failed · ${result.importedRows ?? 0} imported`} /> : null}
       </div>
-    </PanelV2>
+    </CrmPanel>
   )
 }
 
@@ -301,23 +281,21 @@ function IntegrationsSection({ googleConnected, googleConfigured }: { googleConn
   }
 
   return (
-    <PanelV2>
-      <SectionHeader title="Integrations" icon={<CalendarDays size={18} />}>
-        Google Calendar powers meetings, prep, and post-call updates in V2.
-      </SectionHeader>
-      <div className="v2-stack">
-        <ActionCard
+    <CrmPanel>
+      <CrmSectionHeader title="Integrations" description="Google Calendar powers meeting visibility. Prep and drafts stay optional." />
+      <div className="crm-stack">
+        <InfoRow
+          icon={<CalendarDays size={16} />}
           title="Google Calendar"
-          reason={googleConnected ? 'Connected. Sync upcoming meetings into Home, Calendar, and deal workspaces.' : googleConfigured ? 'Not connected. Connect it to make the CRM meeting-led.' : 'OAuth credentials are missing in production. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Vercel to enable this.'}
-          source={googleConnected ? 'Connected' : googleConfigured ? 'Not connected' : 'Needs setup'}
+          text={googleConnected ? 'Connected. Upcoming meetings appear in Home, Calendar, and linked deal records.' : googleConfigured ? 'Not connected. Connect it to make the CRM meeting-led.' : 'OAuth credentials are missing in production. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Vercel.'}
         />
-        <div className="v2-settings-actions">
-          {googleConnected ? <ButtonV2 tone="dark" onClick={sync}>Sync now</ButtonV2> : <ButtonV2 tone="dark" href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'}>{googleConfigured ? 'Connect Google' : 'Waiting for credentials'}</ButtonV2>}
-          {googleConnected ? <ButtonV2 onClick={disconnect}>Disconnect</ButtonV2> : null}
-          {message ? <span>{message}</span> : null}
+        <div className="crm-form-actions">
+          {googleConnected ? <CrmButton tone="primary" onClick={sync}>Sync now</CrmButton> : <CrmButton tone="primary" href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'}>{googleConfigured ? 'Connect Google' : 'Waiting for credentials'}</CrmButton>}
+          {googleConnected ? <CrmButton onClick={disconnect}>Disconnect</CrmButton> : null}
+          {message ? <CrmBadge tone="good">{message}</CrmBadge> : null}
         </div>
       </div>
-    </PanelV2>
+    </CrmPanel>
   )
 }
 
@@ -347,18 +325,26 @@ function BillingSection() {
   }
 
   return (
-    <PanelV2>
-      <SectionHeader title="Billing" icon={<CreditCard size={18} />}>
-        Upgrade paths are explicit. Pro unlocks premium GPT-5.5 reasoning for heavier intelligence.
-      </SectionHeader>
-      <div className="v2-grid-3">
-        <ActionCard title="Current plan" reason={`You are currently on ${plan}.`} source="Workspace" />
-        <ActionCard title="Starter" reason="Default GPT-5.4 mini AI, CRM core, Calendar, assistant, and deal intelligence." source="Upgrade" action={<ButtonV2 onClick={() => checkout('starter')} disabled={loading === 'starter'}>Choose Starter</ButtonV2>} />
-        <ActionCard title="Pro" reason="Everything in Starter plus premium GPT-5.5 reasoning for heavier deal intelligence." source="Top plan" action={<ButtonV2 tone="dark" onClick={() => checkout('pro')} disabled={loading === 'pro'}>Choose Pro</ButtonV2>} />
+    <CrmPanel>
+      <CrmSectionHeader title="Billing" description="Starter uses GPT-5.4 mini by default. Pro unlocks premium GPT-5.5 reasoning for heavier intelligence." />
+      <div className="crm-grid-3">
+        <InfoRow icon={<CreditCard size={16} />} title="Current plan" text={`You are currently on ${plan}.`} />
+        <InfoRow icon={<CreditCard size={16} />} title="Starter" text="CRM core, Calendar, assistant, deal health, and default GPT-5.4 mini." action={<CrmButton onClick={() => checkout('starter')} disabled={loading === 'starter'}>Choose Starter</CrmButton>} />
+        <InfoRow icon={<CreditCard size={16} />} title="Pro" text="Everything in Starter plus premium GPT-5.5 reasoning for heavier deal intelligence." action={<CrmButton tone="primary" onClick={() => checkout('pro')} disabled={loading === 'pro'}>Choose Pro</CrmButton>} />
       </div>
-      <div className="v2-settings-actions">
-        <ButtonV2 onClick={portal} disabled={loading === 'portal'}>Manage billing</ButtonV2>
+      <div className="crm-form-actions" style={{ marginTop: 14 }}>
+        <CrmButton onClick={portal} disabled={loading === 'portal'}>Manage billing</CrmButton>
       </div>
-    </PanelV2>
+    </CrmPanel>
+  )
+}
+
+function InfoRow({ icon, title, text, action }: { icon: ReactNode; title: string; text: string; action?: ReactNode }) {
+  return (
+    <div className="crm-list-row">
+      <span className="crm-icon">{icon}</span>
+      <div><strong>{title}</strong><p>{text}</p></div>
+      {action}
+    </div>
   )
 }

@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { dbErrResponse } from '@/lib/api-helpers'
 import { getWorkspaceContext } from '@/lib/workspace'
-import { completeTask, createNativeTask, listTasks } from '@/lib/crm/core'
+import { createNativeTask, listTasks, updateTask } from '@/lib/crm/core'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,10 +29,20 @@ export async function PATCH(req: NextRequest) {
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const { workspaceId } = await getWorkspaceContext(userId)
     const body = await req.json()
-    if (!body.taskId || body.action !== 'complete') {
-      return NextResponse.json({ error: 'taskId and action=complete are required' }, { status: 400 })
+    const action = String(body.action ?? '')
+    if (!body.taskId || !['complete', 'cancel', 'snooze', 'edit'].includes(action)) {
+      return NextResponse.json({ error: 'taskId and a supported action are required' }, { status: 400 })
     }
-    const data = await completeTask(workspaceId, userId, String(body.taskId))
+    const priority = ['low', 'normal', 'high', 'urgent'].includes(body.priority) ? body.priority : null
+    const data = await updateTask({
+      workspaceId,
+      userId,
+      taskId: String(body.taskId),
+      action: action as 'complete' | 'cancel' | 'snooze' | 'edit',
+      title: typeof body.title === 'string' ? body.title : null,
+      dueAt: body.dueAt ? new Date(body.dueAt) : null,
+      priority,
+    })
     if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json({ data })
   } catch (err) {
@@ -55,6 +65,8 @@ export async function POST(req: NextRequest) {
       dueAt: body.dueAt ? new Date(body.dueAt) : null,
       priority,
       dealId: body.dealId ? String(body.dealId) : null,
+      companyId: body.companyId ? String(body.companyId) : null,
+      contactId: body.contactId ? String(body.contactId) : null,
     })
     return NextResponse.json({ data }, { status: 201 })
   } catch (err) {
