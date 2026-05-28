@@ -1365,6 +1365,8 @@ export async function listTasks(workspaceId: string, userId: string, status?: 't
       status: crmTasks.status,
       priority: crmTasks.priority,
       source: crmTasks.source,
+      companyId: crmTasks.companyId,
+      contactId: crmTasks.contactId,
       dealId: crmDeals.id,
       dealTitle: crmDeals.title,
       companyName: crmCompanies.name,

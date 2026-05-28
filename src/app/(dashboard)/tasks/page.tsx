@@ -33,6 +33,8 @@ type Task = {
   status: 'todo' | 'done' | 'cancelled'
   priority?: 'low' | 'normal' | 'high' | 'urgent' | null
   dealId?: string | null
+  companyId?: string | null
+  contactId?: string | null
   dealTitle?: string | null
   companyName?: string | null
 }

@@ -3,18 +3,23 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import useSWR from 'swr'
+import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { CheckCircle2, MailPlus, Plus, UsersRound } from 'lucide-react'
+import { Bot, BriefcaseBusiness, CheckCircle2, Clock3, MailPlus, Plus, UsersRound } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, WorkspaceBriefing, shortDate } from '@/components/crm/CrmShell'
+import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmRiskBadge, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, WorkspaceBriefing, money, shortDate } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
 export default function PersonPage() {
   const params = useParams<{ id: string }>()
   const { data, isLoading } = useSWR('/api/crm/contacts', fetcher, { revalidateOnFocus: false })
+  const { data: pipelineData } = useSWR('/api/crm/pipeline', fetcher, { revalidateOnFocus: false })
+  const { data: tasksData, mutate: mutateTasks } = useSWR('/api/crm/tasks?status=todo', fetcher, { revalidateOnFocus: false })
   const { data: notesData, mutate: mutateNotes } = useSWR(params?.id ? `/api/crm/notes?contactId=${params.id}` : null, fetcher, { revalidateOnFocus: false })
   const person = (data?.data ?? []).find((item: any) => item.id === params.id)
+  const deals = (pipelineData?.data?.deals ?? []).filter((deal: any) => (deal.people ?? []).some((linked: any) => linked.contactId === params.id || linked.id === params.id))
+  const tasks = (tasksData?.data ?? []).filter((task: any) => task.contactId === params.id || deals.some((deal: any) => deal.id === task.dealId))
   const notes = notesData?.data ?? []
 
   if (isLoading) return <CrmPage wide><CrmSkeleton rows={6} /></CrmPage>
@@ -26,11 +31,12 @@ export default function PersonPage() {
         object="Person"
         title={person.fullName}
         description={`${person.jobTitle ?? 'Role unknown'}${person.companyName ? ` at ${person.companyName}` : ''}. Keep relationship context attached to the person, not scattered across notes.`}
-        actions={<><CrmButton href="/deals?quick=deal" tone="primary"><Plus size={16} /> Create deal</CrmButton><CrmButton href="/tasks?quick=task"><CheckCircle2 size={16} /> Add task</CrmButton></>}
+        actions={<><CrmButton href="/deals?quick=deal" tone="primary"><Plus size={16} /> Create deal</CrmButton><CrmButton onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: `Summarise ${person.fullName}: company, role, linked deals, open tasks, notes, and suggested next touch.` } }))}><Bot size={16} /> Relationship read</CrmButton></>}
         stats={<>
           <CrmStat label="Company" value={person.companyName ?? 'Missing'} />
           <CrmStat label="Role" value={person.jobTitle ?? 'Missing'} />
-          <CrmStat label="Email" value={person.email ?? 'Missing'} />
+          <CrmStat label="Open deals" value={deals.length} />
+          <CrmStat label="Open tasks" value={tasks.length} />
           <CrmStat label="Last touch" value={person.lastContactedAt ? shortDate(person.lastContactedAt) : 'None'} />
         </>}
       />
@@ -46,15 +52,43 @@ export default function PersonPage() {
             <div className="crm-fact-grid">
               <div className="crm-fact"><small>Email</small><strong>{person.email ?? 'Missing'}</strong></div>
               <div className="crm-fact"><small>Company</small><strong>{person.companyName ?? 'No company linked'}</strong></div>
+              <div className="crm-fact"><small>Role</small><strong>{person.jobTitle ?? 'Missing'}</strong></div>
+              <div className="crm-fact"><small>Open deals</small><strong>{deals.length}</strong></div>
+              <div className="crm-fact"><small>Open tasks</small><strong>{tasks.length}</strong></div>
               <div className="crm-fact"><small>Last touch</small><strong>{person.lastContactedAt ? shortDate(person.lastContactedAt) : 'No recent touch'}</strong></div>
             </div>
           </CrmPanel>
           <CrmPanel>
             <CrmSectionHeader title="Relationship work" description="Create the next manual step or start an opportunity from this person." />
             <div className="crm-grid-3">
-              <CrmButton href="/tasks?quick=task" tone="primary"><CheckCircle2 size={16} /> Add follow-up</CrmButton>
+              <CrmButton onClick={() => document.getElementById('person-task-title')?.focus()} tone="primary"><CheckCircle2 size={16} /> Add follow-up</CrmButton>
               <CrmButton href="/deals?quick=deal"><Plus size={16} /> Create deal</CrmButton>
               <CrmButton onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: `Draft a concise follow-up to ${person.fullName}.` } }))}><MailPlus size={16} /> Draft email</CrmButton>
+            </div>
+          </CrmPanel>
+          <CrmPanel>
+            <CrmSectionHeader title="Linked deals" description="Opportunities where this person is part of the buying context." />
+            <div className="crm-stack">
+              {deals.length ? deals.map((deal: any) => (
+                <Link key={deal.id} href={`/deals/${deal.id}`} className="crm-list-row">
+                  <span className="crm-icon"><BriefcaseBusiness size={16} /></span>
+                  <div><strong><ClampedText lines={1}>{deal.title}</ClampedText></strong><p>{deal.companyName ?? 'No company'} · {deal.stageName ?? 'No stage'} · {money(deal.valueAmount)}</p></div>
+                  <CrmRiskBadge risk={deal.aiRiskLevel} />
+                </Link>
+              )) : <CrmEmpty title="No linked deals">Create or link a deal so this relationship has revenue context.</CrmEmpty>}
+            </div>
+          </CrmPanel>
+          <CrmPanel>
+            <CrmSectionHeader title="Open work" description="Follow-ups tied to this person or to deals where they are involved." />
+            <PersonTaskComposer contactId={person.id} onSaved={mutateTasks} />
+            <div className="crm-stack">
+              {tasks.length ? tasks.map((task: any) => (
+                <article key={task.id} className="crm-list-row">
+                  <span className="crm-icon"><CheckCircle2 size={16} /></span>
+                  <div><strong><ClampedText lines={2}>{task.title}</ClampedText></strong><p><Clock3 size={13} /> {task.dueAt ? shortDate(task.dueAt) : 'No due date'}{task.dealTitle ? ` · ${task.dealTitle}` : ''}</p></div>
+                  <CrmBadge tone={task.isOverdue ? 'danger' : task.priority === 'high' || task.priority === 'urgent' ? 'warn' : 'neutral'}>{task.isOverdue ? 'Overdue' : task.priority ?? 'normal'}</CrmBadge>
+                </article>
+              )) : <CrmEmpty title="No open relationship tasks">Create a follow-up so this contact does not become passive CRM memory.</CrmEmpty>}
             </div>
           </CrmPanel>
           <CrmPanel>
@@ -72,16 +106,65 @@ export default function PersonPage() {
         </main>
         <aside className="crm-record-side">
           <CrmPanel>
-            <CrmSectionHeader title="Relationship notes" description="AI summary can help once meetings, notes, or emails are attached." />
-            <p style={{ color: 'rgba(32,35,30,.62)', lineHeight: 1.5 }}>Use deals, tasks, and calendar notes to build this person&apos;s history. Halvex can summarize the record, but the CRM data stays primary.</p>
+            <CrmSectionHeader title="Relationship quality" description="What makes this person useful inside the CRM." />
+            <div className="crm-stack">
+              <QualityRow label="Company" ok={Boolean(person.companyName)} help="Link this person to an account so history rolls up." />
+              <QualityRow label="Role" ok={Boolean(person.jobTitle)} help="Capture whether they are buyer, champion, evaluator, or blocker." />
+              <QualityRow label="Email" ok={Boolean(person.email)} help="Save a reachable address before drafting follow-up." />
+              <QualityRow label="Work" ok={Boolean(tasks.length || deals.length)} help="Attach a deal or task so the relationship has a next use." />
+            </div>
           </CrmPanel>
           <CrmPanel>
             <CrmSectionHeader title="Halvex" description="Optional sidecar help." />
-            <CrmButton onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: `What should I know about ${person.fullName}?` } }))}><UsersRound size={16} /> Ask about this person</CrmButton>
+            <div className="crm-stack">
+              <CrmButton onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: `What should I know about ${person.fullName}? Include evidence, missing CRM fields, and next touch.` } }))}><UsersRound size={16} /> Ask about this person</CrmButton>
+              <CrmButton onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: `Find missing buyer information for ${person.fullName}.` } }))}>Find buyer gaps</CrmButton>
+              <CrmButton onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: `Draft a concise follow-up to ${person.fullName} using saved CRM context only.` } }))}>Draft follow-up</CrmButton>
+            </div>
           </CrmPanel>
         </aside>
       </div>
     </CrmPage>
+  )
+}
+
+function PersonTaskComposer({ contactId, onSaved }: { contactId: string; onSaved: () => void }) {
+  const [title, setTitle] = useState('')
+  const [dueAt, setDueAt] = useState('')
+  const [saving, setSaving] = useState(false)
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!title.trim()) return
+    setSaving(true)
+    try {
+      await fetch('/api/crm/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId, title: title.trim(), dueAt: dueAt || null, priority: 'normal' }),
+      })
+      setTitle('')
+      setDueAt('')
+      onSaved()
+    } finally {
+      setSaving(false)
+    }
+  }
+  return (
+    <form className="crm-inline-task-form" onSubmit={submit}>
+      <input id="person-task-title" className="crm-input" value={title} onChange={event => setTitle(event.target.value)} placeholder="Add follow-up..." />
+      <input className="crm-input" type="date" value={dueAt} onChange={event => setDueAt(event.target.value)} />
+      <CrmButton type="submit" tone="primary" disabled={saving || !title.trim()}>{saving ? 'Adding...' : 'Add task'}</CrmButton>
+    </form>
+  )
+}
+
+function QualityRow({ label, ok, help }: { label: string; ok: boolean; help: string }) {
+  return (
+    <article className="crm-quality-row">
+      <CheckCircle2 size={16} />
+      <div><strong>{label}</strong><p>{help}</p></div>
+      <CrmBadge tone={ok ? 'good' : 'warn'}>{ok ? 'Set' : 'Missing'}</CrmBadge>
+    </article>
   )
 }
 
