@@ -44,6 +44,7 @@ type DealSavedView = {
 }
 
 const DEAL_SAVED_VIEWS_KEY = 'halvex-deal-saved-views'
+const DEAL_SAVED_VIEWS_API = '/api/crm/saved-views?objectType=deal'
 
 export default function DealsPage() {
   return (
@@ -67,6 +68,7 @@ function DealsContent() {
   const [savedViews, setSavedViews] = useState<DealSavedView[]>([])
   const [saveViewOpen, setSaveViewOpen] = useState(false)
   const { data, isLoading, mutate } = useSWR('/api/crm/pipeline', fetcher, { revalidateOnFocus: false })
+  const { data: savedViewData, mutate: mutateSavedViews } = useSWR(DEAL_SAVED_VIEWS_API, fetcher, { revalidateOnFocus: false })
   const stages = data?.data?.stages ?? []
   const allDeals = useMemo(() => data?.data?.deals ?? [], [data])
   const deals = useMemo(() => {
@@ -106,6 +108,14 @@ function DealsContent() {
     }
   }, [])
 
+  useEffect(() => {
+    const serverViews = savedViewData?.data
+    if (!Array.isArray(serverViews)) return
+    const mapped = serverViews.map((view: any) => ({ id: view.id, label: view.label, ...(view.config ?? {}) })).filter(isDealSavedView).slice(0, 8)
+    setSavedViews(mapped)
+    window.localStorage.setItem(DEAL_SAVED_VIEWS_KEY, JSON.stringify(mapped))
+  }, [savedViewData])
+
   function persistSavedViews(next: DealSavedView[]) {
     setSavedViews(next)
     window.localStorage.setItem(DEAL_SAVED_VIEWS_KEY, JSON.stringify(next))
@@ -120,11 +130,13 @@ function DealsContent() {
     if (savedView.view !== view) router.push(`/deals?view=${savedView.view}`)
   }
 
-  function deleteSavedView(id: string) {
+  async function deleteSavedView(id: string) {
     persistSavedViews(savedViews.filter(savedView => savedView.id !== id))
+    await fetch(`/api/crm/saved-views?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => null)
+    await mutateSavedViews()
   }
 
-  function saveCurrentView(label: string) {
+  async function saveCurrentView(label: string) {
     const nextView: DealSavedView = {
       id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `view-${Date.now()}`,
       label,
@@ -136,6 +148,12 @@ function DealsContent() {
       sortBy,
     }
     persistSavedViews([nextView, ...savedViews.filter(savedView => savedView.label.toLowerCase() !== label.toLowerCase())].slice(0, 8))
+    await fetch('/api/crm/saved-views', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ objectType: 'deal', label, config: { view, query, risk, stageFilter, statusFilter, sortBy } }),
+    }).catch(() => null)
+    await mutateSavedViews()
     setSaveViewOpen(false)
   }
 
@@ -303,6 +321,10 @@ function isSavedViewActive(savedView: DealSavedView, current: Pick<DealSavedView
     && savedView.statusFilter === current.statusFilter
     && savedView.sortBy === current.sortBy
     && savedView.view === current.view
+}
+
+function isDealSavedView(view: any): view is DealSavedView {
+  return Boolean(view?.id && view?.label && typeof view.query === 'string' && typeof view.view === 'string')
 }
 
 function describeSavedView(view: Pick<DealSavedView, 'query' | 'risk' | 'stageFilter' | 'statusFilter' | 'sortBy' | 'view'>) {

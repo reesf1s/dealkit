@@ -55,6 +55,7 @@ type TaskSavedView = {
 }
 
 const TASK_SAVED_VIEWS_KEY = 'halvex-task-saved-views'
+const TASK_SAVED_VIEWS_API = '/api/crm/saved-views?objectType=task'
 
 export default function TasksPage() {
   return (
@@ -78,6 +79,7 @@ function TasksContent() {
   const view: TaskView = rawView === 'upcoming' || rawView === 'overdue' || rawView === 'completed' ? rawView : 'today'
   const { data: todoData, isLoading, mutate: mutateTodo } = useSWR('/api/crm/tasks?status=todo', fetcher, { revalidateOnFocus: false })
   const { data: doneData, mutate: mutateDone } = useSWR('/api/crm/tasks?status=done', fetcher, { revalidateOnFocus: false })
+  const { data: savedViewData, mutate: mutateSavedViews } = useSWR(TASK_SAVED_VIEWS_API, fetcher, { revalidateOnFocus: false })
   const todoTasks: Task[] = useMemo(() => todoData?.data ?? [], [todoData])
   const doneTasks: Task[] = useMemo(() => doneData?.data ?? [], [doneData])
 
@@ -93,6 +95,14 @@ function TasksContent() {
       setSavedViews([])
     }
   }, [])
+
+  useEffect(() => {
+    const serverViews = savedViewData?.data
+    if (!Array.isArray(serverViews)) return
+    const mapped = serverViews.map((view: any) => ({ id: view.id, label: view.label, ...(view.config ?? {}) })).filter(isTaskSavedView).slice(0, 8)
+    setSavedViews(mapped)
+    window.localStorage.setItem(TASK_SAVED_VIEWS_KEY, JSON.stringify(mapped))
+  }, [savedViewData])
 
   async function refresh() {
     await Promise.all([mutateTodo(), mutateDone()])
@@ -135,11 +145,13 @@ function TasksContent() {
     if (savedView.view !== view) router.push(`/tasks?view=${savedView.view}`)
   }
 
-  function deleteSavedView(id: string) {
+  async function deleteSavedView(id: string) {
     persistSavedViews(savedViews.filter(savedView => savedView.id !== id))
+    await fetch(`/api/crm/saved-views?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => null)
+    await mutateSavedViews()
   }
 
-  function saveCurrentView(label: string) {
+  async function saveCurrentView(label: string) {
     const nextView: TaskSavedView = {
       id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `view-${Date.now()}`,
       label,
@@ -149,6 +161,12 @@ function TasksContent() {
       linkFilter,
     }
     persistSavedViews([nextView, ...savedViews.filter(savedView => savedView.label.toLowerCase() !== label.toLowerCase())].slice(0, 8))
+    await fetch('/api/crm/saved-views', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ objectType: 'task', label, config: { view, query, priorityFilter, linkFilter } }),
+    }).catch(() => null)
+    await mutateSavedViews()
     setSaveViewOpen(false)
   }
 
@@ -370,6 +388,10 @@ function isTaskSavedViewActive(savedView: TaskSavedView, current: Pick<TaskSaved
     && savedView.query === current.query
     && savedView.priorityFilter === current.priorityFilter
     && savedView.linkFilter === current.linkFilter
+}
+
+function isTaskSavedView(view: any): view is TaskSavedView {
+  return Boolean(view?.id && view?.label && typeof view.query === 'string' && typeof view.view === 'string')
 }
 
 function describeTaskView(view: Pick<TaskSavedView, 'view' | 'query' | 'priorityFilter' | 'linkFilter'>) {

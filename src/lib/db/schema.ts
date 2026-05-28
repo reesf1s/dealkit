@@ -310,6 +310,18 @@ export const crmNotes = pgTable('crm_notes', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+export const crmSavedViews = pgTable('crm_saved_views', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),
+  createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
+  objectType: text('object_type').notNull(),
+  label: text('label').notNull(),
+  config: jsonb('config').notNull().default({}),
+  position: integer('position').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [unique().on(t.workspaceId, t.objectType, t.label)])
+
 export const crmEmailThreads = pgTable('crm_email_threads', {
   id: uuid('id').primaryKey().defaultRandom(),
   workspaceId: uuid('workspace_id').notNull().references(() => workspaces.id, { onDelete: 'cascade' }),

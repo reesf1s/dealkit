@@ -20,6 +20,7 @@ type CompanySavedView = {
 }
 
 const COMPANY_SAVED_VIEWS_KEY = 'halvex-company-saved-views'
+const COMPANY_SAVED_VIEWS_API = '/api/crm/saved-views?objectType=company'
 
 export default function CompaniesPage() {
   const { data, isLoading, mutate } = useSWR('/api/crm/companies', fetcher, { revalidateOnFocus: false })
@@ -29,6 +30,7 @@ export default function CompaniesPage() {
   const [segment, setSegment] = useState<CompanySegment>('all')
   const [savedViews, setSavedViews] = useState<CompanySavedView[]>([])
   const [saveViewOpen, setSaveViewOpen] = useState(false)
+  const { data: savedViewData, mutate: mutateSavedViews } = useSWR(COMPANY_SAVED_VIEWS_API, fetcher, { revalidateOnFocus: false })
   const [now] = useState(() => Date.now())
   const companies = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -61,6 +63,14 @@ export default function CompaniesPage() {
     }
   }, [])
 
+  useEffect(() => {
+    const serverViews = savedViewData?.data
+    if (!Array.isArray(serverViews)) return
+    const mapped = serverViews.map((view: any) => ({ id: view.id, label: view.label, ...(view.config ?? {}) })).filter(isCompanySavedView).slice(0, 8)
+    setSavedViews(mapped)
+    window.localStorage.setItem(COMPANY_SAVED_VIEWS_KEY, JSON.stringify(mapped))
+  }, [savedViewData])
+
   function persistSavedViews(next: CompanySavedView[]) {
     setSavedViews(next)
     window.localStorage.setItem(COMPANY_SAVED_VIEWS_KEY, JSON.stringify(next))
@@ -71,11 +81,13 @@ export default function CompaniesPage() {
     setSegment(savedView.segment)
   }
 
-  function deleteSavedView(id: string) {
+  async function deleteSavedView(id: string) {
     persistSavedViews(savedViews.filter(savedView => savedView.id !== id))
+    await fetch(`/api/crm/saved-views?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => null)
+    await mutateSavedViews()
   }
 
-  function saveCurrentView(label: string) {
+  async function saveCurrentView(label: string) {
     const nextView: CompanySavedView = {
       id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `view-${Date.now()}`,
       label,
@@ -83,6 +95,12 @@ export default function CompaniesPage() {
       segment,
     }
     persistSavedViews([nextView, ...savedViews.filter(savedView => savedView.label.toLowerCase() !== label.toLowerCase())].slice(0, 8))
+    await fetch('/api/crm/saved-views', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ objectType: 'company', label, config: { query, segment } }),
+    }).catch(() => null)
+    await mutateSavedViews()
     setSaveViewOpen(false)
   }
 
@@ -241,6 +259,10 @@ function describeCompanyView(view: Pick<CompanySavedView, 'query' | 'segment'>) 
     no_next: 'open accounts without next action',
   }
   return [segmentLabel[view.segment], view.query ? `search "${view.query}"` : null].filter(Boolean).join(' · ')
+}
+
+function isCompanySavedView(view: any): view is CompanySavedView {
+  return Boolean(view?.id && view?.label && typeof view.query === 'string' && typeof view.segment === 'string')
 }
 
 function QuickAddCompany({ onCancel, onCreated }: { onCancel: () => void; onCreated: () => void }) {

@@ -20,6 +20,7 @@ type PeopleSavedView = {
 }
 
 const PEOPLE_SAVED_VIEWS_KEY = 'halvex-people-saved-views'
+const PEOPLE_SAVED_VIEWS_API = '/api/crm/saved-views?objectType=person'
 
 export default function PeoplePage() {
   const { data, isLoading, mutate } = useSWR('/api/crm/contacts', fetcher, { revalidateOnFocus: false })
@@ -29,6 +30,7 @@ export default function PeoplePage() {
   const [segment, setSegment] = useState<PeopleSegment>('all')
   const [savedViews, setSavedViews] = useState<PeopleSavedView[]>([])
   const [saveViewOpen, setSaveViewOpen] = useState(false)
+  const { data: savedViewData, mutate: mutateSavedViews } = useSWR(PEOPLE_SAVED_VIEWS_API, fetcher, { revalidateOnFocus: false })
   const [now] = useState(() => Date.now())
   const people = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -61,6 +63,14 @@ export default function PeoplePage() {
     }
   }, [])
 
+  useEffect(() => {
+    const serverViews = savedViewData?.data
+    if (!Array.isArray(serverViews)) return
+    const mapped = serverViews.map((view: any) => ({ id: view.id, label: view.label, ...(view.config ?? {}) })).filter(isPeopleSavedView).slice(0, 8)
+    setSavedViews(mapped)
+    window.localStorage.setItem(PEOPLE_SAVED_VIEWS_KEY, JSON.stringify(mapped))
+  }, [savedViewData])
+
   function persistSavedViews(next: PeopleSavedView[]) {
     setSavedViews(next)
     window.localStorage.setItem(PEOPLE_SAVED_VIEWS_KEY, JSON.stringify(next))
@@ -71,11 +81,13 @@ export default function PeoplePage() {
     setSegment(savedView.segment)
   }
 
-  function deleteSavedView(id: string) {
+  async function deleteSavedView(id: string) {
     persistSavedViews(savedViews.filter(savedView => savedView.id !== id))
+    await fetch(`/api/crm/saved-views?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => null)
+    await mutateSavedViews()
   }
 
-  function saveCurrentView(label: string) {
+  async function saveCurrentView(label: string) {
     const nextView: PeopleSavedView = {
       id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `view-${Date.now()}`,
       label,
@@ -83,6 +95,12 @@ export default function PeoplePage() {
       segment,
     }
     persistSavedViews([nextView, ...savedViews.filter(savedView => savedView.label.toLowerCase() !== label.toLowerCase())].slice(0, 8))
+    await fetch('/api/crm/saved-views', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ objectType: 'person', label, config: { query, segment } }),
+    }).catch(() => null)
+    await mutateSavedViews()
     setSaveViewOpen(false)
   }
 
@@ -239,6 +257,10 @@ function describePeopleView(view: Pick<PeopleSavedView, 'query' | 'segment'>) {
     open: 'people attached to open deals',
   }
   return [segmentLabel[view.segment], view.query ? `search "${view.query}"` : null].filter(Boolean).join(' · ')
+}
+
+function isPeopleSavedView(view: any): view is PeopleSavedView {
+  return Boolean(view?.id && view?.label && typeof view.query === 'string' && typeof view.segment === 'string')
 }
 
 function initials(value?: string | null) {
