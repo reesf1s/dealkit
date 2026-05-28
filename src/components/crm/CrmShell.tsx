@@ -871,6 +871,41 @@ export function CrmEmpty({ title, children, action }: { title: string; children?
   )
 }
 
+export function ObjectStartState({ label, title, description, primaryAction, secondaryAction, steps }: {
+  label: string
+  title: string
+  description: string
+  primaryAction: ReactNode
+  secondaryAction?: ReactNode
+  steps: Array<{ label: string; title: string; text: string }>
+}) {
+  return (
+    <section className="crm-object-start" aria-label={`${label} setup`}>
+      <div className="crm-object-start-copy">
+        <small>{label}</small>
+        <h3>{title}</h3>
+        <p>{description}</p>
+        <div className="crm-object-start-actions">
+          {primaryAction}
+          {secondaryAction}
+        </div>
+      </div>
+      <div className="crm-object-start-steps">
+        {steps.map((step, index) => (
+          <article key={step.title}>
+            <span>{index + 1}</span>
+            <div>
+              <small>{step.label}</small>
+              <strong>{step.title}</strong>
+              <p>{step.text}</p>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 export function CrmSkeleton({ rows = 4 }: { rows?: number }) {
   return <div className="crm-skeleton">{Array.from({ length: rows }).map((_, index) => <i key={index} />)}</div>
 }

@@ -4,18 +4,31 @@ import type { FormEvent } from 'react'
 import { useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
-import { Mail, Plus, Search } from 'lucide-react'
+import { Mail, Plus, Search, SlidersHorizontal } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmSegmentedFilters, FilterBar, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, SavedViewBar, WorkspaceBriefing, shortDate } from '@/components/crm/CrmShell'
+import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmSegmentedFilters, FilterBar, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectStartState, ObjectWorkspaceHeader, SavedViewBar, WorkspaceBriefing, shortDate } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
+
+type PeopleSegment = 'all' | 'recent' | 'missing' | 'cold' | 'no_company' | 'open'
+
+type PeopleSavedView = {
+  id: string
+  label: string
+  query: string
+  segment: PeopleSegment
+}
+
+const PEOPLE_SAVED_VIEWS_KEY = 'halvex-people-saved-views'
 
 export default function PeoplePage() {
   const { data, isLoading, mutate } = useSWR('/api/crm/contacts', fetcher, { revalidateOnFocus: false })
   const allPeople = useMemo(() => data?.data ?? [], [data])
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [query, setQuery] = useState('')
-  const [segment, setSegment] = useState<'all' | 'recent' | 'missing' | 'cold' | 'no_company' | 'open'>('all')
+  const [segment, setSegment] = useState<PeopleSegment>('all')
+  const [savedViews, setSavedViews] = useState<PeopleSavedView[]>([])
+  const [saveViewOpen, setSaveViewOpen] = useState(false)
   const [now] = useState(() => Date.now())
   const people = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -38,6 +51,40 @@ export default function PeoplePage() {
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('quick') === 'person') setQuickAddOpen(true)
   }, [])
+
+  useEffect(() => {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(PEOPLE_SAVED_VIEWS_KEY) || '[]')
+      if (Array.isArray(parsed)) setSavedViews(parsed.filter(Boolean).slice(0, 8))
+    } catch {
+      setSavedViews([])
+    }
+  }, [])
+
+  function persistSavedViews(next: PeopleSavedView[]) {
+    setSavedViews(next)
+    window.localStorage.setItem(PEOPLE_SAVED_VIEWS_KEY, JSON.stringify(next))
+  }
+
+  function applySavedView(savedView: PeopleSavedView) {
+    setQuery(savedView.query)
+    setSegment(savedView.segment)
+  }
+
+  function deleteSavedView(id: string) {
+    persistSavedViews(savedViews.filter(savedView => savedView.id !== id))
+  }
+
+  function saveCurrentView(label: string) {
+    const nextView: PeopleSavedView = {
+      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `view-${Date.now()}`,
+      label,
+      query,
+      segment,
+    }
+    persistSavedViews([nextView, ...savedViews.filter(savedView => savedView.label.toLowerCase() !== label.toLowerCase())].slice(0, 8))
+    setSaveViewOpen(false)
+  }
 
   return (
     <CrmPage wide>
@@ -67,8 +114,20 @@ export default function PeoplePage() {
             { label: 'Cold', active: segment === 'cold', onClick: () => setSegment('cold') },
             { label: 'Missing data', active: segment === 'missing', onClick: () => setSegment('missing') },
             { label: 'No company', active: segment === 'no_company', onClick: () => setSegment('no_company'), count: missingCompany },
+            ...savedViews.map(savedView => ({ label: savedView.label, active: savedView.query === query && savedView.segment === segment, onClick: () => applySavedView(savedView) })),
           ]}
-        />
+        >
+          <button type="button" className="crm-saved-view-save" onClick={() => setSaveViewOpen(prev => !prev)}><SlidersHorizontal size={14} /> Save view</button>
+        </SavedViewBar>
+        {saveViewOpen ? (
+          <PeopleSaveViewPanel
+            onSave={saveCurrentView}
+            onCancel={() => setSaveViewOpen(false)}
+            savedViews={savedViews}
+            onDelete={deleteSavedView}
+            current={{ query, segment }}
+          />
+        ) : null}
         <FilterBar>
           <label className="crm-search-button"><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search people..." /></label>
           <CrmSegmentedFilters
@@ -91,7 +150,24 @@ export default function PeoplePage() {
           <span>Last touch</span>
         </div>
         {isLoading ? <CrmSkeleton rows={8} /> : null}
-        {!isLoading && !people.length ? <CrmEmpty title={query ? 'No matching people' : 'No people yet'} action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary">Add person</CrmButton>}>{query ? 'Try another search.' : 'Add or import contacts to build relationship memory.'}</CrmEmpty> : null}
+        {!isLoading && !people.length ? (
+          query || segment !== 'all' ? (
+            <CrmEmpty title="No matching people" action={<CrmButton onClick={() => { setQuery(''); setSegment('all') }}>Clear filters</CrmButton>}>Try another search or reset the current people lens.</CrmEmpty>
+          ) : (
+            <ObjectStartState
+              label="First relationship"
+              title="Add the person you actually need to follow up with."
+              description="People records keep buyer role, contact details, company context, linked deals, notes, and tasks together so follow-up does not depend on memory."
+              primaryAction={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary">Add person</CrmButton>}
+              secondaryAction={<CrmButton href="/companies?quick=company">Add company</CrmButton>}
+              steps={[
+                { label: 'Identity', title: 'Name, role, and email', text: 'Capture the basics needed for real sales follow-up.' },
+                { label: 'Context', title: 'Connect to company', text: 'Keep every relationship attached to the account it belongs to.' },
+                { label: 'Momentum', title: 'Link deal, note, or task', text: 'Turn the relationship into a next step instead of a static contact.' },
+              ]}
+            />
+          )
+        ) : null}
         {people.length ? (
           <div className="crm-directory-list">
             {people.map((person: any) => (
@@ -114,6 +190,55 @@ export default function PeoplePage() {
       </CrmPanel>
     </CrmPage>
   )
+}
+
+function PeopleSaveViewPanel({ onSave, onCancel, savedViews, onDelete, current }: {
+  onSave: (label: string) => void
+  onCancel: () => void
+  savedViews: PeopleSavedView[]
+  onDelete: (id: string) => void
+  current: Pick<PeopleSavedView, 'query' | 'segment'>
+}) {
+  const [label, setLabel] = useState('')
+  return (
+    <div className="crm-save-view-panel">
+      <form onSubmit={(event) => { event.preventDefault(); if (label.trim()) onSave(label.trim()) }}>
+        <div>
+          <strong>Save this people view</strong>
+          <p>Stores the current relationship segment and search so follow-up work can be revisited quickly.</p>
+        </div>
+        <input className="crm-input" value={label} onChange={event => setLabel(event.target.value)} placeholder="e.g. Cold founders" autoFocus />
+        <CrmButton type="submit" tone="primary" disabled={!label.trim()}>Save view</CrmButton>
+        <CrmButton onClick={onCancel}>Cancel</CrmButton>
+      </form>
+      <div className="crm-save-view-summary">
+        <span>Current lens</span>
+        <p>{describePeopleView(current)}</p>
+      </div>
+      {savedViews.length ? (
+        <div className="crm-save-view-list">
+          {savedViews.map(savedView => (
+            <article key={savedView.id}>
+              <div><strong>{savedView.label}</strong><p>{describePeopleView(savedView)}</p></div>
+              <button type="button" onClick={() => onDelete(savedView.id)}>Remove</button>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function describePeopleView(view: Pick<PeopleSavedView, 'query' | 'segment'>) {
+  const segmentLabel: Record<PeopleSegment, string> = {
+    all: 'all people',
+    recent: 'recent relationships',
+    missing: 'missing relationship data',
+    cold: 'cold relationships',
+    no_company: 'people without company',
+    open: 'people attached to open deals',
+  }
+  return [segmentLabel[view.segment], view.query ? `search "${view.query}"` : null].filter(Boolean).join(' · ')
 }
 
 function initials(value?: string | null) {
