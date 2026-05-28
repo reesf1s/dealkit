@@ -242,6 +242,8 @@ export async function answerAssistantWithAI(input: {
         'For normal answers, use exactly these labels: What happened:, What it means:, Next:.',
         'For follow-up email drafts, use only Subject: and Body:.',
         'Use specific deal names, newest activity, risk drivers, next actions, and links described in the data.',
+        'Avoid generic phrases such as promising opportunity, strong engagement, or high potential unless the provided CRM data proves the claim.',
+        'If recommending action, make it a concrete CRM action: create task, save note, update field, draft follow-up, or open a named record.',
         'Treat old open tasks as items to verify with the user, not as fresh instructions.',
         'Mention confidence limits when evidence is thin. Keep the answer under 160 words.',
       ].join(' '),

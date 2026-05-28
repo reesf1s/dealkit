@@ -406,7 +406,7 @@ function CrmAssistantDrawer({ open, onClose, contextDealId }: { open: boolean; o
       <div className="crm-assistant-body" ref={bodyRef}>
         {messages.map((message, index) => (
           <div key={`${message.role}-${index}`} className={`crm-message ${message.role}`}>
-            <p>{message.text}</p>
+            {message.role === 'assistant' ? <StructuredAssistantText text={message.text} /> : <p>{message.text}</p>}
             {message.links?.length ? (
               <div className="crm-message-links">
                 {message.links.map(link => <Link key={link.href} href={link.href}>{link.label}</Link>)}
@@ -453,6 +453,55 @@ function CrmAssistantDrawer({ open, onClose, contextDealId }: { open: boolean; o
       </form>
     </aside>
   )
+}
+
+function StructuredAssistantText({ text }: { text: string }) {
+  const sections = parseAssistantSections(text)
+  if (!sections.length) return <p>{text}</p>
+
+  return (
+    <div className="crm-message-structured">
+      {sections.map(section => (
+        <section key={section.label}>
+          <small>{section.label}</small>
+          <p>{section.body}</p>
+        </section>
+      ))}
+    </div>
+  )
+}
+
+function parseAssistantSections(text: string) {
+  const labels = new Set(['what happened', 'what it means', 'next', 'check', 'subject', 'body', 'evidence', 'suggested action', 'confidence'])
+  const sections: Array<{ label: string; body: string }> = []
+  let current: { label: string; body: string } | null = null
+  let sawStructuredLabel = false
+
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim()
+    if (!line) {
+      if (current?.body && !current.body.endsWith('\n')) current.body += '\n'
+      continue
+    }
+    const match = line.match(/^([^:]{2,42}):\s*(.*)$/)
+    const label = match?.[1]?.trim().toLowerCase()
+    if (match && label && labels.has(label)) {
+      sawStructuredLabel = true
+      if (current) sections.push({ label: current.label, body: current.body.trim() })
+      current = { label: sentenceCase(match[1].trim()), body: match[2]?.trim() ?? '' }
+      continue
+    }
+    if (!current) current = { label: 'Answer', body: '' }
+    current.body = [current.body, line].filter(Boolean).join(current.body.endsWith('\n') ? '' : '\n')
+  }
+  if (current) sections.push({ label: current.label, body: current.body.trim() })
+  if (!sawStructuredLabel) return []
+  return sections.filter(section => section.body)
+}
+
+function sentenceCase(value: string) {
+  const lower = value.toLowerCase()
+  return lower.charAt(0).toUpperCase() + lower.slice(1)
 }
 
 export function CrmPage({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
