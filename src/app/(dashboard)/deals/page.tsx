@@ -32,6 +32,19 @@ import {
 
 export const dynamic = 'force-dynamic'
 
+type DealSavedView = {
+  id: string
+  label: string
+  view: string
+  query: string
+  risk: 'all' | 'high' | 'medium' | 'low'
+  stageFilter: string
+  statusFilter: 'all' | 'open' | 'won' | 'lost' | 'archived'
+  sortBy: 'updated' | 'value' | 'close' | 'stage'
+}
+
+const DEAL_SAVED_VIEWS_KEY = 'halvex-deal-saved-views'
+
 export default function DealsPage() {
   return (
     <Suspense fallback={<CrmPage><CrmSkeleton rows={6} /></CrmPage>}>
@@ -51,6 +64,8 @@ function DealsContent() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'won' | 'lost' | 'archived'>('open')
   const [sortBy, setSortBy] = useState<'updated' | 'value' | 'close' | 'stage'>('updated')
   const [movingId, setMovingId] = useState<string | null>(null)
+  const [savedViews, setSavedViews] = useState<DealSavedView[]>([])
+  const [saveViewOpen, setSaveViewOpen] = useState(false)
   const { data, isLoading, mutate } = useSWR('/api/crm/pipeline', fetcher, { revalidateOnFocus: false })
   const stages = data?.data?.stages ?? []
   const allDeals = useMemo(() => data?.data?.deals ?? [], [data])
@@ -81,6 +96,48 @@ function DealsContent() {
   useEffect(() => {
     if (search.get('quick') === 'deal') setQuickAddOpen(true)
   }, [search])
+
+  useEffect(() => {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(DEAL_SAVED_VIEWS_KEY) || '[]')
+      if (Array.isArray(parsed)) setSavedViews(parsed.filter(Boolean).slice(0, 8))
+    } catch {
+      setSavedViews([])
+    }
+  }, [])
+
+  function persistSavedViews(next: DealSavedView[]) {
+    setSavedViews(next)
+    window.localStorage.setItem(DEAL_SAVED_VIEWS_KEY, JSON.stringify(next))
+  }
+
+  function applySavedView(savedView: DealSavedView) {
+    setQuery(savedView.query)
+    setRisk(savedView.risk)
+    setStageFilter(savedView.stageFilter)
+    setStatusFilter(savedView.statusFilter)
+    setSortBy(savedView.sortBy)
+    if (savedView.view !== view) router.push(`/deals?view=${savedView.view}`)
+  }
+
+  function deleteSavedView(id: string) {
+    persistSavedViews(savedViews.filter(savedView => savedView.id !== id))
+  }
+
+  function saveCurrentView(label: string) {
+    const nextView: DealSavedView = {
+      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `view-${Date.now()}`,
+      label,
+      view,
+      query,
+      risk,
+      stageFilter,
+      statusFilter,
+      sortBy,
+    }
+    persistSavedViews([nextView, ...savedViews.filter(savedView => savedView.label.toLowerCase() !== label.toLowerCase())].slice(0, 8))
+    setSaveViewOpen(false)
+  }
 
   async function moveDeal(dealId: string, stageId: string) {
     setMovingId(dealId)
@@ -136,10 +193,21 @@ function DealsContent() {
             { label: 'No next step', active: risk === 'all' && statusFilter === 'open' && sortBy === 'updated' && query === 'no-next-step', onClick: () => { setStatusFilter('open'); setQuery('no-next-step') }, count: noNext },
             { label: 'At risk', active: risk === 'high', onClick: () => { setStatusFilter('open'); setRisk('high') }, count: allDeals.filter((deal: any) => deal.aiRiskLevel === 'high').length },
             { label: 'All deals', active: statusFilter === 'all', onClick: () => setStatusFilter('all'), count: allDeals.length },
+            ...savedViews.map(savedView => ({ label: savedView.label, active: isSavedViewActive(savedView, { query, risk, stageFilter, statusFilter, sortBy, view }), onClick: () => applySavedView(savedView) })),
           ]}
         >
-          <span><SlidersHorizontal size={14} /> Views</span>
+          <button type="button" className="crm-saved-view-save" onClick={() => setSaveViewOpen(prev => !prev)}><SlidersHorizontal size={14} /> Save view</button>
         </SavedViewBar>
+
+        {saveViewOpen ? (
+          <SaveDealViewPanel
+            onSave={saveCurrentView}
+            onCancel={() => setSaveViewOpen(false)}
+            savedViews={savedViews}
+            onDelete={deleteSavedView}
+            current={{ query, risk, stageFilter, statusFilter, sortBy, view }}
+          />
+        ) : null}
 
         <div className="crm-ai-workstrip" aria-label="Deal intelligence actions">
           <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'Review the open pipeline and identify deals with weak next steps, stale activity, or optimistic close dates.' } }))}>Analyse pipeline health</button>
@@ -189,6 +257,63 @@ function DealsContent() {
       </CrmPanel>
     </CrmPage>
   )
+}
+
+function SaveDealViewPanel({ onSave, onCancel, savedViews, onDelete, current }: {
+  onSave: (label: string) => void
+  onCancel: () => void
+  savedViews: DealSavedView[]
+  onDelete: (id: string) => void
+  current: Pick<DealSavedView, 'query' | 'risk' | 'stageFilter' | 'statusFilter' | 'sortBy' | 'view'>
+}) {
+  const [label, setLabel] = useState('')
+  return (
+    <div className="crm-save-view-panel">
+      <form onSubmit={(event) => { event.preventDefault(); if (label.trim()) onSave(label.trim()) }}>
+        <div>
+          <strong>Save this deal view</strong>
+          <p>Stores the current search, status, stage, risk, sort, and list/pipeline mode on this device.</p>
+        </div>
+        <input className="crm-input" value={label} onChange={event => setLabel(event.target.value)} placeholder="e.g. Founder follow-ups" autoFocus />
+        <CrmButton type="submit" tone="primary" disabled={!label.trim()}>Save view</CrmButton>
+        <CrmButton onClick={onCancel}>Cancel</CrmButton>
+      </form>
+      <div className="crm-save-view-summary">
+        <span>Current lens</span>
+        <p>{describeSavedView(current)}</p>
+      </div>
+      {savedViews.length ? (
+        <div className="crm-save-view-list">
+          {savedViews.map(savedView => (
+            <article key={savedView.id}>
+              <div><strong>{savedView.label}</strong><p>{describeSavedView(savedView)}</p></div>
+              <button type="button" onClick={() => onDelete(savedView.id)}>Remove</button>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function isSavedViewActive(savedView: DealSavedView, current: Pick<DealSavedView, 'query' | 'risk' | 'stageFilter' | 'statusFilter' | 'sortBy' | 'view'>) {
+  return savedView.query === current.query
+    && savedView.risk === current.risk
+    && savedView.stageFilter === current.stageFilter
+    && savedView.statusFilter === current.statusFilter
+    && savedView.sortBy === current.sortBy
+    && savedView.view === current.view
+}
+
+function describeSavedView(view: Pick<DealSavedView, 'query' | 'risk' | 'stageFilter' | 'statusFilter' | 'sortBy' | 'view'>) {
+  return [
+    view.view === 'pipeline' ? 'Pipeline' : 'List',
+    view.statusFilter !== 'open' ? `${view.statusFilter} status` : 'open deals',
+    view.risk !== 'all' ? `${view.risk} risk` : null,
+    view.stageFilter !== 'all' ? 'specific stage' : null,
+    view.query ? `search "${view.query}"` : null,
+    `sort ${view.sortBy}`,
+  ].filter(Boolean).join(' · ')
 }
 
 function QuickAddDeal({ onCancel, onCreated }: { onCancel: () => void; onCreated: (id: string) => void }) {
