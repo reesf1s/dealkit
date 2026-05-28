@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { Suspense, useEffect, useState } from 'react'
 import useSWR from 'swr'
 import { useSearchParams } from 'next/navigation'
-import { Building2, CalendarDays, Check, Copy, CreditCard, Loader2, Settings, UsersRound } from 'lucide-react'
+import { Bot, Building2, CalendarDays, Check, CheckCircle2, Copy, CreditCard, Database, LayoutGrid, Loader2, NotebookPen, Settings, UsersRound } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
 import { CrmBadge, CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, WorkspaceBriefing } from '@/components/crm/CrmShell'
 
@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic'
 
 const sections = [
   { key: 'workspace', label: 'Workspace' },
+  { key: 'objects', label: 'Objects' },
   { key: 'members', label: 'Members' },
   { key: 'pipelines', label: 'Pipelines' },
   { key: 'imports', label: 'Imports' },
@@ -57,14 +58,14 @@ function SettingsContent() {
         actions={googleConnected ? <CrmButton href="/settings?section=integrations">Calendar connected</CrmButton> : <CrmButton tone="primary" href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'}>{googleConfigured ? 'Connect Google Calendar' : 'Set up Calendar'}</CrmButton>}
         stats={<>
         <CrmStat label="Calendar" value={googleConnected ? 'Connected' : 'Not connected'} />
-        <CrmStat label="Sections" value={sections.length} />
+        <CrmStat label="Objects" value="6" hint="Records + work" />
         <CrmStat label="AI model" value="5.4 mini" hint="Pro can use 5.5" />
         </>}
       />
 
       <WorkspaceBriefing items={[
         { label: 'Admin', title: 'Keep configuration separate', text: 'Settings holds setup work so Deals, Companies, People, and Tasks remain focused and fast.' },
-        { label: 'Pipeline', title: 'Tune the object model', text: 'Stages, members, imports, and billing support the CRM without becoming the CRM.' },
+        { label: 'Objects', title: 'Tune the object model', text: 'Companies, people, deals, tasks, notes, and AI recommendations stay connected instead of becoming loose pages.' },
         { label: 'AI', title: 'Premium intelligence is contextual', text: 'Model and integration controls live here; recommendations still appear beside records where decisions happen.' },
       ]} />
 
@@ -77,6 +78,7 @@ function SettingsContent() {
       </CrmPanel>
 
       {active === 'workspace' ? <WorkspaceSection /> : null}
+      {active === 'objects' ? <ObjectsSection /> : null}
       {active === 'members' ? <MembersSection /> : null}
       {active === 'pipelines' ? <PipelinesSection /> : null}
       {active === 'imports' ? <ImportsSection /> : null}
@@ -119,6 +121,132 @@ function WorkspaceSection() {
         </div>
       )}
     </CrmPanel>
+  )
+}
+
+function ObjectsSection() {
+  const objects = [
+    {
+      key: 'company',
+      icon: <Building2 size={17} />,
+      title: 'Companies',
+      description: 'The account object. Owns domain, industry, size, lifecycle, linked people, deals, tasks, notes, and account-level AI reads.',
+      fields: ['Name', 'Domain', 'Industry', 'Size', 'Owner', 'Lifecycle'],
+      href: '/companies',
+      status: 'First-class',
+    },
+    {
+      key: 'person',
+      icon: <UsersRound size={17} />,
+      title: 'People',
+      description: 'The relationship object. Stores role, email, phone, company, linked deals, notes, tasks, and buyer context.',
+      fields: ['Name', 'Email', 'Role', 'Company', 'Relationship', 'Linked deals'],
+      href: '/people',
+      status: 'First-class',
+    },
+    {
+      key: 'deal',
+      icon: <LayoutGrid size={17} />,
+      title: 'Deals',
+      description: 'The revenue object. Tracks stage, value, probability, close date, owner, priority, source, next step, people, tasks, notes, activity, and risk.',
+      fields: ['Name', 'Company', 'People', 'Stage', 'Value', 'Close date', 'Next step'],
+      href: '/deals',
+      status: 'Primary',
+    },
+    {
+      key: 'task',
+      icon: <CheckCircle2 size={17} />,
+      title: 'Tasks',
+      description: 'The commitment object. Work can link to a deal, company, or person and appears on Home plus record pages.',
+      fields: ['Title', 'Due date', 'Priority', 'Owner', 'Status', 'Linked record'],
+      href: '/tasks',
+      status: 'Manual-first',
+    },
+    {
+      key: 'note',
+      icon: <NotebookPen size={17} />,
+      title: 'Notes',
+      description: 'The memory object. Notes stay attached to records and can be used by Halvex to propose structured CRM updates.',
+      fields: ['Body', 'Author', 'Timestamp', 'Deal', 'Company', 'Person'],
+      href: '/deals',
+      status: 'Contextual',
+    },
+    {
+      key: 'ai',
+      icon: <Bot size={17} />,
+      title: 'AI recommendations',
+      description: 'The advisory layer. Recommendations explain evidence, risk, confidence, and suggested action, then wait for user confirmation.',
+      fields: ['Question', 'Evidence', 'Confidence', 'Action', 'Status', 'Linked record'],
+      href: '/deals',
+      status: 'On demand',
+    },
+  ]
+
+  const links = [
+    ['Company', 'People', 'contacts belong to accounts'],
+    ['Company', 'Deals', 'pipeline rolls up to account'],
+    ['People', 'Deals', 'buyers and champions attach to revenue'],
+    ['Deals', 'Tasks', 'next steps become dated commitments'],
+    ['Deals', 'Notes', 'messy context becomes record memory'],
+    ['Notes', 'AI', 'analysis proposes updates, never auto-applies'],
+  ]
+
+  return (
+    <div className="crm-settings-object-space">
+      <CrmPanel>
+        <CrmSectionHeader
+          title="Object model"
+          description="The shape of the CRM workspace. These are the records a small sales team can manage manually all day, with AI only as a contextual layer."
+          action={<CrmButton href="/deals" tone="primary"><LayoutGrid size={16} /> Open records</CrmButton>}
+        />
+        <div className="crm-object-model-map">
+          {objects.map(object => (
+            <a key={object.key} href={object.href} className={`crm-object-model-node ${object.key}`}>
+              <span className="crm-icon">{object.icon}</span>
+              <small>{object.status}</small>
+              <strong>{object.title}</strong>
+              <p>{object.description}</p>
+              <div>{object.fields.slice(0, 4).map(field => <em key={field}>{field}</em>)}</div>
+            </a>
+          ))}
+        </div>
+      </CrmPanel>
+
+      <div className="crm-grid-2">
+        <CrmPanel>
+          <CrmSectionHeader title="Relationship graph" description="How records are expected to connect. This keeps Halvex closer to an object workspace than a collection of unrelated pages." />
+          <div className="crm-object-link-list">
+            {links.map(([from, to, why]) => (
+              <article key={`${from}-${to}`}>
+                <span>{from}</span>
+                <strong>→</strong>
+                <span>{to}</span>
+                <p>{why}</p>
+              </article>
+            ))}
+          </div>
+        </CrmPanel>
+
+        <CrmPanel>
+          <CrmSectionHeader title="CRM jobs covered" description="A concise operating checklist for the jobs every CRM must handle before AI matters." />
+          <div className="crm-object-job-list">
+            {[
+              ['Capture', 'Create companies, people, deals, tasks, and notes manually.'],
+              ['Connect', 'Link deals to companies and people; link work back to any record.'],
+              ['Progress', 'Move deals by stage, next step, close date, value, probability, owner, risk, and priority.'],
+              ['Remember', 'Keep notes, activity, changes, and tasks visible on record pages.'],
+              ['Decide', 'Use reports and saved views to find stale work, data gaps, and forecast risk.'],
+              ['Assist', 'Ask Halvex for evidence-based analysis, field updates, tasks, notes, and drafts only when requested.'],
+            ].map(([title, text]) => (
+              <article key={title}>
+                <span className="crm-icon"><Database size={15} /></span>
+                <div><strong>{title}</strong><p>{text}</p></div>
+              </article>
+            ))}
+          </div>
+        </CrmPanel>
+      </div>
+    </div>
   )
 }
 
