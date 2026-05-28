@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 
 export default function CompanyPage() {
   const params = useParams<{ id: string }>()
-  const { data: companiesData, isLoading } = useSWR('/api/crm/companies', fetcher, { revalidateOnFocus: false })
+  const { data: companiesData, isLoading, mutate: mutateCompanies } = useSWR('/api/crm/companies', fetcher, { revalidateOnFocus: false })
   const { data: pipelineData } = useSWR('/api/crm/pipeline', fetcher, { revalidateOnFocus: false })
   const { data: peopleData } = useSWR('/api/crm/contacts', fetcher, { revalidateOnFocus: false })
   const { data: tasksData, mutate: mutateTasks } = useSWR('/api/crm/tasks?status=todo', fetcher, { revalidateOnFocus: false })
@@ -51,14 +51,7 @@ export default function CompanyPage() {
         <main className="crm-record-main">
           <CrmPanel>
             <CrmSectionHeader title="Account details" description="The base CRM account record." />
-            <div className="crm-fact-grid">
-              <div className="crm-fact"><small>Domain</small><strong>{company.domain ?? 'Missing'}</strong></div>
-              <div className="crm-fact"><small>Open deals</small><strong>{company.openDeals ?? 0}</strong></div>
-              <div className="crm-fact"><small>People</small><strong>{people.length}</strong></div>
-              <div className="crm-fact"><small>Open tasks</small><strong>{tasks.length}</strong></div>
-              <div className="crm-fact"><small>Last activity</small><strong>{company.lastActivityAt ? shortDate(company.lastActivityAt) : 'No activity'}</strong></div>
-              <div className="crm-fact"><small>Next action</small><strong>{company.nextAction ?? 'Missing'}</strong></div>
-            </div>
+            <CompanyDetailsForm company={company} peopleCount={people.length} taskCount={tasks.length} onSaved={mutateCompanies} />
           </CrmPanel>
           <CrmPanel>
             <CrmSectionHeader title="People" description="Contacts attached to this account, so company memory is not trapped inside individual deals." action={<CrmButton href="/people?quick=person"><Plus size={16} /> Add person</CrmButton>} />
@@ -131,6 +124,74 @@ export default function CompanyPage() {
         </aside>
       </div>
     </CrmPage>
+  )
+}
+
+function CompanyDetailsForm({ company, peopleCount, taskCount, onSaved }: { company: any; peopleCount: number; taskCount: number; onSaved: () => void }) {
+  const [draft, setDraft] = useState({
+    name: company.name ?? '',
+    domain: company.domain ?? '',
+    website: company.website ?? '',
+    industry: company.industry ?? '',
+    sizeLabel: company.sizeLabel ?? '',
+    description: company.description ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const changed = draft.name !== (company.name ?? '')
+    || draft.domain !== (company.domain ?? '')
+    || draft.website !== (company.website ?? '')
+    || draft.industry !== (company.industry ?? '')
+    || draft.sizeLabel !== (company.sizeLabel ?? '')
+    || draft.description !== (company.description ?? '')
+
+  function update(field: keyof typeof draft, value: string) {
+    setDraft(prev => ({ ...prev, [field]: value }))
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!draft.name.trim() || !changed) return
+    setSaving(true)
+    try {
+      await fetch('/api/crm/companies', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: company.id,
+          name: draft.name,
+          domain: draft.domain || null,
+          website: draft.website || null,
+          industry: draft.industry || null,
+          sizeLabel: draft.sizeLabel || null,
+          description: draft.description || null,
+        }),
+      })
+      await onSaved()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form className="crm-record-edit-form" onSubmit={submit}>
+      <div className="crm-record-edit-grid">
+        <label className="wide">Company name<input className="crm-input" value={draft.name} onChange={event => update('name', event.target.value)} required /></label>
+        <label>Domain<input className="crm-input" value={draft.domain} onChange={event => update('domain', event.target.value)} placeholder="company.com" /></label>
+        <label>Website<input className="crm-input" value={draft.website} onChange={event => update('website', event.target.value)} placeholder="https://company.com" /></label>
+        <label>Industry<input className="crm-input" value={draft.industry} onChange={event => update('industry', event.target.value)} placeholder="SaaS" /></label>
+        <label>Size<input className="crm-input" value={draft.sizeLabel} onChange={event => update('sizeLabel', event.target.value)} placeholder="11-50" /></label>
+        <label className="full">Description<textarea className="crm-textarea compact" value={draft.description} onChange={event => update('description', event.target.value)} placeholder="What does this account do, and why does it matter?" /></label>
+      </div>
+      <div className="crm-record-edit-footer">
+        <div className="crm-fact-grid compact">
+          <div className="crm-fact"><small>Open deals</small><strong>{company.openDeals ?? 0}</strong></div>
+          <div className="crm-fact"><small>People</small><strong>{peopleCount}</strong></div>
+          <div className="crm-fact"><small>Open tasks</small><strong>{taskCount}</strong></div>
+          <div className="crm-fact"><small>Last activity</small><strong>{company.lastActivityAt ? shortDate(company.lastActivityAt) : 'No activity'}</strong></div>
+        </div>
+        <CrmButton type="submit" tone="primary" disabled={saving || !draft.name.trim() || !changed}>{saving ? 'Saving...' : changed ? 'Save account' : 'Saved'}</CrmButton>
+      </div>
+    </form>
   )
 }
 

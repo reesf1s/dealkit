@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 
 export default function PersonPage() {
   const params = useParams<{ id: string }>()
-  const { data, isLoading } = useSWR('/api/crm/contacts', fetcher, { revalidateOnFocus: false })
+  const { data, isLoading, mutate: mutatePeople } = useSWR('/api/crm/contacts', fetcher, { revalidateOnFocus: false })
   const { data: pipelineData } = useSWR('/api/crm/pipeline', fetcher, { revalidateOnFocus: false })
   const { data: tasksData, mutate: mutateTasks } = useSWR('/api/crm/tasks?status=todo', fetcher, { revalidateOnFocus: false })
   const { data: notesData, mutate: mutateNotes } = useSWR(params?.id ? `/api/crm/notes?contactId=${params.id}` : null, fetcher, { revalidateOnFocus: false })
@@ -49,14 +49,7 @@ export default function PersonPage() {
         <main className="crm-record-main">
           <CrmPanel>
             <CrmSectionHeader title="Profile" description="The base CRM relationship record." />
-            <div className="crm-fact-grid">
-              <div className="crm-fact"><small>Email</small><strong>{person.email ?? 'Missing'}</strong></div>
-              <div className="crm-fact"><small>Company</small><strong>{person.companyName ?? 'No company linked'}</strong></div>
-              <div className="crm-fact"><small>Role</small><strong>{person.jobTitle ?? 'Missing'}</strong></div>
-              <div className="crm-fact"><small>Open deals</small><strong>{deals.length}</strong></div>
-              <div className="crm-fact"><small>Open tasks</small><strong>{tasks.length}</strong></div>
-              <div className="crm-fact"><small>Last touch</small><strong>{person.lastContactedAt ? shortDate(person.lastContactedAt) : 'No recent touch'}</strong></div>
-            </div>
+            <PersonDetailsForm person={person} dealCount={deals.length} taskCount={tasks.length} onSaved={mutatePeople} />
           </CrmPanel>
           <CrmPanel>
             <CrmSectionHeader title="Relationship work" description="Create the next manual step or start an opportunity from this person." />
@@ -125,6 +118,73 @@ export default function PersonPage() {
         </aside>
       </div>
     </CrmPage>
+  )
+}
+
+function PersonDetailsForm({ person, dealCount, taskCount, onSaved }: { person: any; dealCount: number; taskCount: number; onSaved: () => void }) {
+  const [draft, setDraft] = useState({
+    fullName: person.fullName ?? '',
+    email: person.email ?? '',
+    phone: person.phone ?? '',
+    companyName: person.companyName ?? '',
+    jobTitle: person.jobTitle ?? '',
+    linkedinUrl: person.linkedinUrl ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const changed = draft.fullName !== (person.fullName ?? '')
+    || draft.email !== (person.email ?? '')
+    || draft.phone !== (person.phone ?? '')
+    || draft.companyName !== (person.companyName ?? '')
+    || draft.jobTitle !== (person.jobTitle ?? '')
+    || draft.linkedinUrl !== (person.linkedinUrl ?? '')
+
+  function update(field: keyof typeof draft, value: string) {
+    setDraft(prev => ({ ...prev, [field]: value }))
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!draft.fullName.trim() || !changed) return
+    setSaving(true)
+    try {
+      await fetch('/api/crm/contacts', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: person.id,
+          fullName: draft.fullName,
+          email: draft.email || null,
+          phone: draft.phone || null,
+          companyName: draft.companyName || null,
+          jobTitle: draft.jobTitle || null,
+          linkedinUrl: draft.linkedinUrl || null,
+        }),
+      })
+      await onSaved()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form className="crm-record-edit-form" onSubmit={submit}>
+      <div className="crm-record-edit-grid">
+        <label className="wide">Name<input className="crm-input" value={draft.fullName} onChange={event => update('fullName', event.target.value)} required /></label>
+        <label>Email<input className="crm-input" value={draft.email} onChange={event => update('email', event.target.value)} type="email" placeholder="person@company.com" /></label>
+        <label>Phone<input className="crm-input" value={draft.phone} onChange={event => update('phone', event.target.value)} placeholder="+44..." /></label>
+        <label>Company<input className="crm-input" value={draft.companyName} onChange={event => update('companyName', event.target.value)} placeholder="Company name" /></label>
+        <label>Role<input className="crm-input" value={draft.jobTitle} onChange={event => update('jobTitle', event.target.value)} placeholder="Economic buyer, champion..." /></label>
+        <label className="wide">LinkedIn<input className="crm-input" value={draft.linkedinUrl} onChange={event => update('linkedinUrl', event.target.value)} placeholder="https://linkedin.com/in/..." /></label>
+      </div>
+      <div className="crm-record-edit-footer">
+        <div className="crm-fact-grid compact">
+          <div className="crm-fact"><small>Open deals</small><strong>{dealCount}</strong></div>
+          <div className="crm-fact"><small>Open tasks</small><strong>{taskCount}</strong></div>
+          <div className="crm-fact"><small>Last touch</small><strong>{person.lastContactedAt ? shortDate(person.lastContactedAt) : 'No recent touch'}</strong></div>
+        </div>
+        <CrmButton type="submit" tone="primary" disabled={saving || !draft.fullName.trim() || !changed}>{saving ? 'Saving...' : changed ? 'Save person' : 'Saved'}</CrmButton>
+      </div>
+    </form>
   )
 }
 
