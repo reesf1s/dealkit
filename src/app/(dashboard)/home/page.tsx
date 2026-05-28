@@ -17,6 +17,7 @@ import {
   CrmSkeleton,
   CrmStat,
   ObjectWorkspaceHeader,
+  WorkspaceBriefing,
   money,
 } from '@/components/crm/CrmShell'
 
@@ -60,8 +61,8 @@ export default function HomePage() {
     <CrmPage wide>
       <ObjectWorkspaceHeader
         object="Home"
-        title="Today"
-        description="A calm operating view for manual CRM work: finish tasks, open active records, and ask for help only when a deal needs another read."
+        title="Revenue desk"
+        description="The working surface for the day: commitments first, active records second, and Halvex available as a quiet analyst when a deal needs a sharper read."
         actions={<><CrmButton href="/tasks?quick=task" tone="primary"><Plus size={16} /> Add task</CrmButton><CrmButton href="/deals?quick=deal"><Plus size={16} /> Add deal</CrmButton></>}
         stats={<>
         <CrmStat label="Tasks due" value={priorities.length} hint={priorities.length ? 'Review or complete' : 'Clear'} />
@@ -70,6 +71,12 @@ export default function HomePage() {
         <CrmStat label="At risk" value={(home?.atRiskDeals ?? []).length} />
         </>}
       />
+
+      <WorkspaceBriefing items={[
+        { label: '1', title: 'Finish committed work', text: 'Due tasks are the primary operating queue. Complete, snooze, or open the linked record before adding more activity.', action: <CrmButton href="/tasks">Open tasks</CrmButton> },
+        { label: '2', title: 'Keep records complete', text: 'Companies, people, and deals stay useful when owner, next step, value, and relationship context are current.', action: <CrmButton href="/deals">Review deals</CrmButton> },
+        { label: 'AI', title: 'Ask only when it helps', text: 'Use Halvex to explain risk, extract updates from notes, or draft follow-ups. It suggests; you decide.', action: <CrmButton onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'What should I focus on in the CRM today?' } }))}>Ask Halvex</CrmButton> },
+      ]} />
 
       <div className="crm-home-desk">
         <CrmPanel className="crm-home-primary">

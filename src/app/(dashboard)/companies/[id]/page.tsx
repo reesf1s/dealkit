@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { Building2, CheckCircle2, Plus } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmRiskBadge, CrmSectionHeader, CrmSkeleton, RecordBanner, money, shortDate } from '@/components/crm/CrmShell'
+import { CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmRiskBadge, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, WorkspaceBriefing, money, shortDate } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,18 +20,28 @@ export default function CompanyPage() {
   const deals = (pipelineData?.data?.deals ?? []).filter((deal: any) => deal.companyId === params.id)
   const notes = notesData?.data ?? []
 
-  if (isLoading) return <CrmPage><CrmSkeleton rows={6} /></CrmPage>
+  if (isLoading) return <CrmPage wide><CrmSkeleton rows={6} /></CrmPage>
   if (!company) return <CrmPage><CrmEmpty title="Company not found">This account may not exist in this workspace.</CrmEmpty></CrmPage>
 
   return (
-    <CrmPage>
-      <RecordBanner
-        eyebrow="Company"
+    <CrmPage wide>
+      <ObjectWorkspaceHeader
+        object="Company"
         title={company.name}
         description={`${company.openDeals} open deals · ${money(company.pipelineValue)} pipeline. Account memory connects people, meetings, tasks, and deals.`}
-        meta={<><CrmRiskBadge risk={company.riskCount ? 'high' : 'unknown'} /></>}
         actions={<><CrmButton href="/deals?quick=deal" tone="primary"><Plus size={16} /> Add deal</CrmButton><CrmButton href="/tasks?quick=task"><CheckCircle2 size={16} /> Add task</CrmButton></>}
+        stats={<>
+          <CrmStat label="Open deals" value={company.openDeals ?? 0} />
+          <CrmStat label="Pipeline" value={money(company.pipelineValue)} />
+          <CrmStat label="Last activity" value={company.lastActivityAt ? shortDate(company.lastActivityAt) : 'None'} />
+          <CrmStat label="Risk" value={<CrmRiskBadge risk={company.riskCount ? 'high' : 'unknown'} />} />
+        </>}
       />
+      <WorkspaceBriefing items={[
+        { label: 'Account', title: 'One account record', text: 'Company fields, notes, linked deals, and tasks stay attached to the same account object.' },
+        { label: 'Work', title: 'Act from context', text: 'Create a deal or task from the account after checking pipeline, recent activity, and existing notes.' },
+        { label: 'AI', title: 'Ask for an account read', text: 'Halvex can summarize risks and suggested next steps, but changes stay manual until accepted.' },
+      ]} />
       <div className="crm-record-layout">
         <main className="crm-record-main">
           <CrmPanel>

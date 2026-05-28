@@ -26,6 +26,7 @@ import {
   CrmPanel,
   CrmRiskBadge,
   CrmSkeleton,
+  WorkspaceBriefing,
   LinkedRecordChip,
   compact,
   money,
@@ -90,6 +91,12 @@ export default function DealRecordPage() {
         onAddNote={() => setActiveTab('notes')}
         onAddTask={() => setActiveTab('tasks')}
       />
+
+      <WorkspaceBriefing items={[
+        { label: 'Record', title: 'Operate from saved fields', text: 'Stage, value, probability, close date, owner, people, notes, and tasks are usable without AI.' },
+        { label: 'Evidence', title: 'Timeline tells the truth', text: 'Notes, task changes, and activity create the evidence layer behind every risk or next-step recommendation.' },
+        { label: 'Analyst', title: 'Ask precise sales questions', text: 'Analyse risk, find missing buyer info, extract note updates, explain score, or draft a follow-up from this deal context.' },
+      ]} />
 
       <div className="crm-record2-tabs" aria-label="Deal record sections">
         {tabs.map(tab => (

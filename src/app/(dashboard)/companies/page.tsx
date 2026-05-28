@@ -6,7 +6,7 @@ import useSWR from 'swr'
 import Link from 'next/link'
 import { Building2, Globe2, Plus, Search } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmSegmentedFilters, FilterBar, CrmPage, CrmPanel, CrmRiskBadge, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, SavedViewBar, money, shortDate } from '@/components/crm/CrmShell'
+import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmSegmentedFilters, FilterBar, CrmPage, CrmPanel, CrmRiskBadge, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, SavedViewBar, WorkspaceBriefing, money, shortDate } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,8 +43,8 @@ export default function CompaniesPage() {
     <CrmPage wide>
       <ObjectWorkspaceHeader
         object="Companies"
-        title="Accounts"
-        description="Structured company records with linked people, active deals, notes, tasks, and relationship history."
+        title="Company objects"
+        description="The account layer of the CRM: one record for every business, with linked people, open deals, tasks, notes, activity, and account risk."
         actions={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add company</CrmButton>}
         stats={<>
         <CrmStat label="Companies" value={allCompanies.length} />
@@ -53,6 +53,11 @@ export default function CompaniesPage() {
         <CrmStat label="Need attention" value={riskAccounts} />
         </>}
       />
+      <WorkspaceBriefing items={[
+        { label: 'Object model', title: 'Companies anchor the workspace', text: 'Open a company to understand the people, opportunities, activity, and outstanding work attached to that account.' },
+        { label: 'Data quality', title: 'Missing fields are visible', text: 'Domain, industry, owner context, open value, last activity, and next action should be obvious from the list.' },
+        { label: 'AI assist', title: 'Summaries stay contextual', text: 'Use Halvex from the linked deal or command menu when you want an account read, not as a separate destination.' },
+      ]} />
       {quickAddOpen ? <QuickAddCompany onCancel={() => setQuickAddOpen(false)} onCreated={async () => { setQuickAddOpen(false); await mutate() }} /> : null}
       <CrmPanel>
         <CrmSectionHeader title="Company records" description="Saved views over the same account objects. Open the record for connected deals, people, notes, and tasks." action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add company</CrmButton>} />

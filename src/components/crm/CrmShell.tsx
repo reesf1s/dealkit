@@ -12,6 +12,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Command,
+  GalleryVerticalEnd,
   Home,
   LayoutGrid,
   Loader2,
@@ -19,6 +20,7 @@ import {
   Search,
   Send,
   Settings,
+  Sparkles,
   UsersRound,
   X,
 } from 'lucide-react'
@@ -126,11 +128,14 @@ export function CrmShell({ children }: { children: ReactNode }) {
         <button type="button" className="crm-workspace-switcher" onClick={() => router.push('/settings?section=workspace')}>
           <span className="crm-avatar">R</span>
           <div>
-            <strong>Workspace</strong>
-            <small>Sales team</small>
+            <strong>Basepoint</strong>
+            <small>Revenue workspace</small>
           </div>
         </button>
 
+        <div className="crm-sidebar-section">
+          <small>Objects</small>
+        </div>
         <nav className="crm-nav" aria-label="Primary navigation">
           {nav.map(item => {
             const Icon = item.icon
@@ -142,6 +147,12 @@ export function CrmShell({ children }: { children: ReactNode }) {
             )
           })}
         </nav>
+
+        <div className="crm-sidebar-section lower">
+          <small>Views</small>
+          <Link href="/deals?view=pipeline"><GalleryVerticalEnd size={15} /> Pipeline board</Link>
+          <Link href="/tasks?view=overdue"><CheckCircle2 size={15} /> Overdue work</Link>
+        </div>
 
         <div className="crm-sidebar-footer">
           <Link href="/settings" className={active(pathname, '/settings') ? 'active' : ''} title="Settings">
@@ -160,10 +171,19 @@ export function CrmShell({ children }: { children: ReactNode }) {
 
       <div className="crm-main">
         <header className="crm-topbar">
+          <div className="crm-topbar-crumb">
+            <span>CRM</span>
+            <ChevronRight size={14} />
+            <strong>{currentPageLabel(pathname)}</strong>
+          </div>
           <button type="button" className="crm-search-button" onClick={() => setCommandOpen(true)}>
             <Search size={16} />
-            <span>Search records or create something...</span>
+            <span>Search records, create objects, or ask Halvex...</span>
             <kbd>⌘K</kbd>
+          </button>
+          <button type="button" className="crm-topbar-ai" onClick={() => setAssistantOpen(true)}>
+            <Sparkles size={16} />
+            <span>Ask Halvex</span>
           </button>
         </header>
         <main className="crm-content">{children}</main>
@@ -187,6 +207,18 @@ export function CrmShell({ children }: { children: ReactNode }) {
   )
 }
 
+function currentPageLabel(pathname: string) {
+  if (pathname.startsWith('/deals/')) return 'Deal record'
+  if (pathname.startsWith('/companies/')) return 'Company record'
+  if (pathname.startsWith('/people/')) return 'Person record'
+  if (pathname.startsWith('/deals')) return 'Deals'
+  if (pathname.startsWith('/companies')) return 'Companies'
+  if (pathname.startsWith('/people')) return 'People'
+  if (pathname.startsWith('/tasks')) return 'Tasks'
+  if (pathname.startsWith('/settings')) return 'Settings'
+  return 'Home'
+}
+
 function CrmCommandMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter()
   const [query, setQuery] = useState('')
@@ -196,6 +228,12 @@ function CrmCommandMenu({ open, onClose }: { open: boolean; onClose: () => void 
     { label: 'Add company', href: '/companies?quick=company', icon: Building2 },
     { label: 'Add person', href: '/people?quick=person', icon: UsersRound },
     { label: 'Add task', href: '/tasks?quick=task', icon: CheckCircle2 },
+  ]
+  const intelligenceActions = [
+    'Analyse a deal and show evidence',
+    'Find missing buyer information',
+    'Draft a follow-up from CRM context',
+    'Extract CRM updates from a note',
   ]
   if (!open) return null
   return (
@@ -217,7 +255,8 @@ function CrmCommandMenu({ open, onClose }: { open: boolean; onClose: () => void 
             }}
           />
         </label>
-        <div>
+        <div className="crm-command-results">
+          <small>Quick create</small>
           {!query.trim() ? actions.map(item => {
             const Icon = item.icon
             return (
@@ -228,6 +267,19 @@ function CrmCommandMenu({ open, onClose }: { open: boolean; onClose: () => void 
               </button>
             )
           }) : null}
+          {!query.trim() ? (
+            <>
+              <small>Contextual AI</small>
+              {intelligenceActions.map(prompt => (
+                <button key={prompt} type="button" onClick={() => { window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: prompt } })); onClose() }}>
+                  <Sparkles size={16} />
+                  <span>{prompt}</span>
+                  <ChevronRight size={15} />
+                </button>
+              ))}
+            </>
+          ) : null}
+          {matches.length ? <small>Navigate</small> : null}
           {matches.map(item => {
             const Icon = item.icon
             return (
@@ -333,8 +385,8 @@ function CrmAssistantDrawer({ open, onClose, contextDealId }: { open: boolean; o
     <aside className="crm-assistant-drawer" aria-label="Halvex assistant">
       <header>
         <div>
-          <small>Halvex assistant</small>
-          <h2>Ask, prepare, confirm.</h2>
+          <small>Contextual analyst</small>
+          <h2>Ask, prepare, confirm</h2>
         </div>
         <button type="button" onClick={onClose} aria-label="Close assistant"><X size={20} /></button>
       </header>
@@ -344,7 +396,7 @@ function CrmAssistantDrawer({ open, onClose, contextDealId }: { open: boolean; o
         <span>Confirm before changes</span>
       </div>
       <div className="crm-assistant-prompts">
-        {['Which tasks are overdue?', 'Move BOE to proposal', 'Create a task for BOE to follow up Friday', 'Draft a follow-up'].map(prompt => (
+        {['Analyse current deal', 'Find missing buyer info', 'Extract CRM updates', 'Draft follow-up'].map(prompt => (
           <button key={prompt} type="button" onClick={() => submit(prompt)}>{prompt}</button>
         ))}
       </div>
@@ -441,6 +493,21 @@ export function ObjectWorkspaceHeader({ object, title, description, actions, sta
       </div>
       {stats ? <div className="crm-object-stats">{stats}</div> : null}
       {actions ? <div className="crm-object-actions">{actions}</div> : null}
+    </section>
+  )
+}
+
+export function WorkspaceBriefing({ items }: { items: Array<{ label: string; title: string; text: string; action?: ReactNode }> }) {
+  return (
+    <section className="crm-workspace-briefing" aria-label="Workspace briefing">
+      {items.map(item => (
+        <article key={item.title}>
+          <small>{item.label}</small>
+          <strong>{item.title}</strong>
+          <p>{item.text}</p>
+          {item.action ? <div>{item.action}</div> : null}
+        </article>
+      ))}
     </section>
   )
 }

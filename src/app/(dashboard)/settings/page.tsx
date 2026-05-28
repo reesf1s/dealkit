@@ -6,7 +6,7 @@ import useSWR from 'swr'
 import { useSearchParams } from 'next/navigation'
 import { Building2, CalendarDays, Check, Copy, CreditCard, Loader2, Settings, UsersRound } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { CrmBadge, CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader } from '@/components/crm/CrmShell'
+import { CrmBadge, CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, WorkspaceBriefing } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,8 +52,8 @@ function SettingsContent() {
     <CrmPage wide>
       <ObjectWorkspaceHeader
         object="Settings"
-        title="Workspace settings"
-        description="Admin controls live here so the everyday CRM stays focused on records, views, and manual customer work."
+        title="Control room"
+        description="Administration, team access, pipeline configuration, imports, billing, and optional integrations without cluttering the daily record workspace."
         actions={googleConnected ? <CrmButton href="/settings?section=integrations">Calendar connected</CrmButton> : <CrmButton tone="primary" href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'}>{googleConfigured ? 'Connect Google Calendar' : 'Set up Calendar'}</CrmButton>}
         stats={<>
         <CrmStat label="Calendar" value={googleConnected ? 'Connected' : 'Not connected'} />
@@ -61,6 +61,12 @@ function SettingsContent() {
         <CrmStat label="AI model" value="5.4 mini" hint="Pro can use 5.5" />
         </>}
       />
+
+      <WorkspaceBriefing items={[
+        { label: 'Admin', title: 'Keep configuration separate', text: 'Settings holds setup work so Deals, Companies, People, and Tasks remain focused and fast.' },
+        { label: 'Pipeline', title: 'Tune the object model', text: 'Stages, members, imports, and billing support the CRM without becoming the CRM.' },
+        { label: 'AI', title: 'Premium intelligence is contextual', text: 'Model and integration controls live here; recommendations still appear beside records where decisions happen.' },
+      ]} />
 
       <CrmPanel>
         <div className="crm-view-tabs">

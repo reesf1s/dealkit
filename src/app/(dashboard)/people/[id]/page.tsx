@@ -6,7 +6,7 @@ import useSWR from 'swr'
 import { useParams } from 'next/navigation'
 import { CheckCircle2, MailPlus, Plus, UsersRound } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, RecordBanner, shortDate } from '@/components/crm/CrmShell'
+import { CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, WorkspaceBriefing, shortDate } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,17 +17,28 @@ export default function PersonPage() {
   const person = (data?.data ?? []).find((item: any) => item.id === params.id)
   const notes = notesData?.data ?? []
 
-  if (isLoading) return <CrmPage><CrmSkeleton rows={6} /></CrmPage>
+  if (isLoading) return <CrmPage wide><CrmSkeleton rows={6} /></CrmPage>
   if (!person) return <CrmPage><CrmEmpty title="Person not found">This contact may not exist in this workspace.</CrmEmpty></CrmPage>
 
   return (
-    <CrmPage>
-      <RecordBanner
-        eyebrow="Person"
+    <CrmPage wide>
+      <ObjectWorkspaceHeader
+        object="Person"
         title={person.fullName}
         description={`${person.jobTitle ?? 'Role unknown'}${person.companyName ? ` at ${person.companyName}` : ''}. Keep relationship context attached to the person, not scattered across notes.`}
         actions={<><CrmButton href="/deals?quick=deal" tone="primary"><Plus size={16} /> Create deal</CrmButton><CrmButton href="/tasks?quick=task"><CheckCircle2 size={16} /> Add task</CrmButton></>}
+        stats={<>
+          <CrmStat label="Company" value={person.companyName ?? 'Missing'} />
+          <CrmStat label="Role" value={person.jobTitle ?? 'Missing'} />
+          <CrmStat label="Email" value={person.email ?? 'Missing'} />
+          <CrmStat label="Last touch" value={person.lastContactedAt ? shortDate(person.lastContactedAt) : 'None'} />
+        </>}
       />
+      <WorkspaceBriefing items={[
+        { label: 'Relationship', title: 'Keep buyer context attached', text: 'Role, company, email, notes, and work history belong on the person record.' },
+        { label: 'Action', title: 'Move from memory to work', text: 'Create a follow-up, open a linked deal, or draft a note from the record instead of jumping between pages.' },
+        { label: 'AI', title: 'Ask for the next useful touch', text: 'Halvex can draft follow-ups or summarize context, but it should support the relationship record, not replace it.' },
+      ]} />
       <div className="crm-record-layout">
         <main className="crm-record-main">
           <CrmPanel>

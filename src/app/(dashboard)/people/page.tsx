@@ -6,7 +6,7 @@ import useSWR from 'swr'
 import Link from 'next/link'
 import { Mail, Plus, Search } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmSegmentedFilters, FilterBar, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, SavedViewBar, shortDate } from '@/components/crm/CrmShell'
+import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmSegmentedFilters, FilterBar, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, SavedViewBar, WorkspaceBriefing, shortDate } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,8 +43,8 @@ export default function PeoplePage() {
     <CrmPage wide>
       <ObjectWorkspaceHeader
         object="People"
-        title="Contacts"
-        description="First-class relationship records for buyers, champions, blockers, and day-to-day customer contacts."
+        title="People objects"
+        description="Relationship memory for buyers, champions, blockers, and day-to-day contacts. Every person should connect back to a company, deal, note, or task."
         actions={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add person</CrmButton>}
         stats={<>
         <CrmStat label="People" value={allPeople.length} />
@@ -52,6 +52,11 @@ export default function PeoplePage() {
         <CrmStat label="Need company" value={missingCompany} />
         </>}
       />
+      <WorkspaceBriefing items={[
+        { label: 'Relationships', title: 'Know who matters', text: 'Use people records to track role, company, contactability, open deals, and relationship freshness.' },
+        { label: 'Clean data', title: 'Missing company is a workflow', text: 'Contacts without company or role context are surfaced so the CRM stays useful for follow-up and forecasting.' },
+        { label: 'AI assist', title: 'Turn messy notes into structure', text: 'From a deal or command menu, ask Halvex to identify buyer roles, missing stakeholders, and follow-up drafts.' },
+      ]} />
       {quickAddOpen ? <QuickAddPerson onCancel={() => setQuickAddOpen(false)} onCreated={async () => { setQuickAddOpen(false); await mutate() }} /> : null}
       <CrmPanel>
         <CrmSectionHeader title="People records" description="Search, filter, and open the person record before taking action." action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add person</CrmButton>} />

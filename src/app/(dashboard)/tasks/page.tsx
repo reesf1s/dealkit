@@ -20,6 +20,7 @@ import {
   CrmStat,
   ObjectWorkspaceHeader,
   ViewTabs,
+  WorkspaceBriefing,
   shortDate,
 } from '@/components/crm/CrmShell'
 
@@ -103,8 +104,8 @@ function TasksContent() {
     <CrmPage wide>
       <ObjectWorkspaceHeader
         object="Tasks"
-        title="Work list"
-        description="Manual commitments across deals, companies, and people. Complete, snooze, or open the linked record before acting."
+        title="Execution board"
+        description="A focused work system for customer commitments across deals, companies, and people. Halvex can recommend tasks, but the list stays user-owned."
         actions={<><CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add task</CrmButton><CrmButton href="/deals">Deals</CrmButton></>}
         stats={<>
         <CrmStat label="Due today" value={today} />
@@ -113,6 +114,12 @@ function TasksContent() {
         <CrmStat label="Completed" value={doneTasks.length} />
         </>}
       />
+
+      <WorkspaceBriefing items={[
+        { label: 'Today', title: 'Work from due commitments', text: 'Overdue and today lanes make the next customer action obvious without needing a dashboard.' },
+        { label: 'Context', title: 'Open linked records', text: 'Tasks tied to deals should be handled from the record so the follow-up uses current notes and buyer context.' },
+        { label: 'AI assist', title: 'Convert recommendations deliberately', text: 'Deal insights can become tasks only when accepted, keeping the work list clean and trustworthy.' },
+      ]} />
 
       {quickAddOpen ? <QuickAddTask onCancel={() => setQuickAddOpen(false)} onCreated={async () => { setQuickAddOpen(false); await refresh() }} /> : null}
 

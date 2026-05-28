@@ -25,6 +25,7 @@ import {
   ObjectWorkspaceHeader,
   SavedViewBar,
   ViewTabs,
+  WorkspaceBriefing,
   money,
   shortDate,
 } from '@/components/crm/CrmShell'
@@ -99,8 +100,8 @@ function DealsContent() {
     <CrmPage wide>
       <ObjectWorkspaceHeader
         object="Deals"
-        title="Opportunities"
-        description="A list-first workspace for active sales work. Keep fields current, then ask for analysis when a record needs a second read."
+        title="Pipeline records"
+        description="Spreadsheet-grade deal control with a secondary board for stage movement. Manual fields stay first-class; Halvex adds evidence-based judgement on demand."
         actions={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> New deal</CrmButton>}
         stats={<>
         <CrmStat label="Open deals" value={openDeals.length} />
@@ -109,6 +110,12 @@ function DealsContent() {
         <CrmStat label="Needs review" value={needsReview} />
         </>}
       />
+
+      <WorkspaceBriefing items={[
+        { label: 'Manual first', title: 'Run deals from the table', text: 'Scan stage, value, close date, people, last activity, next step, risk, and priority without opening every record.' },
+        { label: 'Views', title: 'Saved operating lenses', text: 'Open, closing soon, no next step, at risk, and all deals are filters over the same object data, not disconnected reports.' },
+        { label: 'AI layer', title: 'Ask for the missing read', text: 'Open a deal to analyse risk, find missing buyer information, extract note updates, or draft a follow-up with evidence.' },
+      ]} />
 
       {quickAddOpen ? <QuickAddDeal onCancel={() => setQuickAddOpen(false)} onCreated={async (id) => { await mutate(); router.push(`/deals/${id}`) }} /> : null}
 
@@ -133,6 +140,12 @@ function DealsContent() {
         >
           <span><SlidersHorizontal size={14} /> Views</span>
         </SavedViewBar>
+
+        <div className="crm-ai-workstrip" aria-label="Deal intelligence actions">
+          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'Review the open pipeline and identify deals with weak next steps, stale activity, or optimistic close dates.' } }))}>Analyse pipeline health</button>
+          <button type="button" onClick={() => setQuery('no-next-step')}>Show missing next steps</button>
+          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'Which active deals need buyer information before the next call?' } }))}>Find missing buyer info</button>
+        </div>
 
         <FilterBar>
           <label className="crm-search-button">
