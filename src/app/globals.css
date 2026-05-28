@@ -12892,6 +12892,50 @@ body:has(.crm-shell) {
   border-bottom: 0 !important;
 }
 
+.crm-command-record {
+  grid-template-columns: 28px minmax(0, 1fr) auto !important;
+  align-items: center !important;
+  min-height: 54px !important;
+}
+
+.crm-command-record > span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.crm-command-record strong {
+  overflow: hidden;
+  color: var(--halvex-ink);
+  font-size: 13px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crm-command-record small {
+  overflow: hidden;
+  color: rgba(21,25,22,.52);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.crm-command-hint {
+  margin: 2px 8px 8px;
+  border: 1px solid rgba(28,34,28,.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,.62);
+  color: rgba(21,25,22,.56);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
 .crm-assistant-drawer {
   width: min(560px, 100vw) !important;
   background:

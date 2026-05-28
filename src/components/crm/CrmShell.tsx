@@ -57,6 +57,14 @@ type AssistantMessage = {
   proposedActions?: AssistantProposedAction[]
 }
 
+type CommandRecord = {
+  id: string
+  type: 'deal' | 'company' | 'person'
+  label: string
+  detail: string
+  href: string
+}
+
 function active(pathname: string, href: string) {
   if (href === '/home') return pathname === '/home'
   return pathname === href || pathname.startsWith(`${href}/`)
@@ -225,7 +233,18 @@ function currentPageLabel(pathname: string) {
 function CrmCommandMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter()
   const [query, setQuery] = useState('')
+  const [records, setRecords] = useState<CommandRecord[]>([])
+  const [recordsLoading, setRecordsLoading] = useState(false)
+  const [recordsLoaded, setRecordsLoaded] = useState(false)
   const matches = useMemo(() => nav.filter(item => item.label.toLowerCase().includes(query.toLowerCase())), [query])
+  const recordMatches = useMemo(() => {
+    const term = query.trim().toLowerCase()
+    if (term.length < 2) return []
+    return records
+      .filter(record => `${record.label} ${record.detail} ${record.type}`.toLowerCase().includes(term))
+      .slice(0, 9)
+  }, [query, records])
+  const recentRecords = useMemo(() => records.slice(0, 6), [records])
   const actions = [
     { label: 'Add deal', href: '/deals?quick=deal', icon: Plus },
     { label: 'Add company', href: '/companies?quick=company', icon: Building2 },
@@ -238,6 +257,59 @@ function CrmCommandMenu({ open, onClose }: { open: boolean; onClose: () => void 
     'Draft a follow-up from CRM context',
     'Extract CRM updates from a note',
   ]
+
+  useEffect(() => {
+    if (!open || recordsLoaded || recordsLoading) return
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 3500)
+    setRecordsLoading(true)
+    Promise.all([
+      fetch('/api/crm/pipeline', { signal: controller.signal }).then(res => res.json()).catch(() => null),
+      fetch('/api/crm/companies', { signal: controller.signal }).then(res => res.json()).catch(() => null),
+      fetch('/api/crm/contacts', { signal: controller.signal }).then(res => res.json()).catch(() => null),
+    ]).then(([pipelinePayload, companyPayload, peoplePayload]) => {
+      const deals = pipelinePayload?.data?.deals ?? []
+      const companies = companyPayload?.data ?? []
+      const people = peoplePayload?.data ?? []
+      const nextRecords: CommandRecord[] = [
+        ...deals.map((deal: any) => ({
+          id: `deal-${deal.id}`,
+          type: 'deal' as const,
+          label: deal.title ?? deal.dealName ?? 'Untitled deal',
+          detail: [deal.companyName, deal.stageName, deal.aiRiskLevel ? `${deal.aiRiskLevel} risk` : null].filter(Boolean).join(' · ') || 'Deal record',
+          href: `/deals/${deal.id}`,
+        })),
+        ...companies.map((company: any) => ({
+          id: `company-${company.id}`,
+          type: 'company' as const,
+          label: company.name ?? company.companyName ?? 'Untitled company',
+          detail: [company.domain, company.industry, company.lifecycleStatus].filter(Boolean).join(' · ') || 'Company record',
+          href: `/companies/${company.id}`,
+        })),
+        ...people.map((person: any) => ({
+          id: `person-${person.id}`,
+          type: 'person' as const,
+          label: person.fullName ?? person.name ?? person.email ?? 'Unnamed person',
+          detail: [person.jobTitle, person.companyName, person.email].filter(Boolean).join(' · ') || 'Person record',
+          href: `/people/${person.id}`,
+        })),
+      ].filter(record => record.href && !record.href.endsWith('/undefined'))
+      setRecords(nextRecords)
+      setRecordsLoaded(true)
+    }).finally(() => {
+      window.clearTimeout(timeout)
+      if (!controller.signal.aborted) setRecordsLoading(false)
+      else {
+        setRecordsLoaded(true)
+        setRecordsLoading(false)
+      }
+    })
+    return () => {
+      window.clearTimeout(timeout)
+      controller.abort()
+    }
+  }, [open, recordsLoaded, recordsLoading])
+
   if (!open) return null
   return (
     <div className="crm-modal-backdrop" onMouseDown={onClose}>
@@ -270,6 +342,22 @@ function CrmCommandMenu({ open, onClose }: { open: boolean; onClose: () => void 
               </button>
             )
           }) : null}
+          {!query.trim() && recentRecords.length ? (
+            <>
+              <small>Recent records</small>
+              {recentRecords.map(record => <CommandRecordRow key={record.id} record={record} onSelect={() => { router.push(record.href); onClose() }} />)}
+            </>
+          ) : null}
+          {query.trim().length >= 2 ? (
+            <>
+              <small>Records</small>
+              {recordsLoading ? <div className="crm-command-hint">Searching CRM records...</div> : null}
+              {!recordsLoading && recordMatches.length ? recordMatches.map(record => (
+                <CommandRecordRow key={record.id} record={record} onSelect={() => { router.push(record.href); onClose() }} />
+              )) : null}
+              {!recordsLoading && !recordMatches.length ? <div className="crm-command-hint">No matching records yet. Press enter to ask Halvex, or create a new object.</div> : null}
+            </>
+          ) : null}
           {!query.trim() ? (
             <>
               <small>Contextual AI</small>
@@ -303,6 +391,20 @@ function CrmCommandMenu({ open, onClose }: { open: boolean; onClose: () => void 
         </div>
       </div>
     </div>
+  )
+}
+
+function CommandRecordRow({ record, onSelect }: { record: CommandRecord; onSelect: () => void }) {
+  const Icon = record.type === 'deal' ? LayoutGrid : record.type === 'company' ? Building2 : UsersRound
+  return (
+    <button type="button" onClick={onSelect} className="crm-command-record">
+      <Icon size={16} />
+      <span>
+        <strong>{record.label}</strong>
+        <small>{record.type} · {record.detail}</small>
+      </span>
+      <ChevronRight size={15} />
+    </button>
   )
 }
 
