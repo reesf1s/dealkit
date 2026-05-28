@@ -402,7 +402,7 @@ export async function listPipeline(workspaceId: string, userId: string) {
     .orderBy(desc(crmDeals.updatedAt))
 
   const dealIds = rows.map(deal => deal.id)
-  const [signalRows, taskRows] = dealIds.length ? await Promise.all([
+  const [signalRows, taskRows, participantRows] = dealIds.length ? await Promise.all([
     db.select({
       id: crmSignals.id,
       dealId: crmSignals.dealId,
@@ -429,7 +429,20 @@ export async function listPipeline(workspaceId: string, userId: string) {
       .where(and(eq(crmTasks.workspaceId, workspaceId), inArray(crmTasks.dealId, dealIds), eq(crmTasks.status, 'todo')))
       .orderBy(asc(crmTasks.dueAt), desc(crmTasks.updatedAt))
       .limit(Math.min(500, Math.max(100, dealIds.length * 5))),
-  ]) : [[], []]
+    db.select({
+      dealId: crmDealParticipants.dealId,
+      contactId: crmContacts.id,
+      fullName: crmContacts.fullName,
+      email: crmContacts.email,
+      role: crmDealParticipants.role,
+      isPrimary: crmDealParticipants.isPrimary,
+    })
+      .from(crmDealParticipants)
+      .innerJoin(crmContacts, eq(crmContacts.id, crmDealParticipants.contactId))
+      .where(and(eq(crmDealParticipants.workspaceId, workspaceId), inArray(crmDealParticipants.dealId, dealIds)))
+      .orderBy(desc(crmDealParticipants.isPrimary), asc(crmContacts.fullName))
+      .limit(Math.min(500, Math.max(100, dealIds.length * 4))),
+  ]) : [[], [], []]
 
   const signalsByDeal = new Map<string, typeof signalRows>()
   for (const signal of signalRows) {
@@ -448,6 +461,15 @@ export async function listPipeline(workspaceId: string, userId: string) {
     if (existing.length < 6) {
       existing.push(task)
       tasksByDeal.set(task.dealId, existing)
+    }
+  }
+
+  const peopleByDeal = new Map<string, typeof participantRows>()
+  for (const person of participantRows) {
+    const existing = peopleByDeal.get(person.dealId) ?? []
+    if (existing.length < 4) {
+      existing.push(person)
+      peopleByDeal.set(person.dealId, existing)
     }
   }
 
@@ -473,6 +495,7 @@ export async function listPipeline(workspaceId: string, userId: string) {
 
     return {
       ...deal,
+      people: peopleByDeal.get(deal.id) ?? [],
       nextStepDueAt: deal.nextStepDueAt ?? nextTask?.dueAt ?? null,
       aiNextAction: nextAction,
       intelligence: {

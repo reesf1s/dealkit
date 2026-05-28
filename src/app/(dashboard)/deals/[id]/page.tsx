@@ -8,10 +8,8 @@ import { useParams } from 'next/navigation'
 import {
   Bot,
   BriefcaseBusiness,
-  CalendarDays,
   CheckCircle2,
   Clock3,
-  FileCheck2,
   FileText,
   MailPlus,
   NotebookPen,
@@ -36,7 +34,7 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-type DealTab = 'overview' | 'activity' | 'notes' | 'tasks' | 'people' | 'insights' | 'meetings'
+type DealTab = 'overview' | 'activity' | 'notes' | 'tasks' | 'people'
 type DealInsight = {
   id: string
   type: string
@@ -54,8 +52,6 @@ const tabs: Array<{ id: DealTab; label: string }> = [
   { id: 'notes', label: 'Notes' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'people', label: 'People' },
-  { id: 'insights', label: 'AI Insights' },
-  { id: 'meetings', label: 'Meetings' },
 ]
 
 export default function DealRecordPage() {
@@ -111,14 +107,12 @@ export default function DealRecordPage() {
           {activeTab === 'tasks' ? <TasksTab context={context} onChanged={mutate} /> : null}
           {activeTab === 'notes' ? <NotesTab deal={deal} activities={context.latestActivities ?? []} onSaved={mutate} /> : null}
           {activeTab === 'people' ? <PeopleTab context={context} /> : null}
-          {activeTab === 'insights' ? <InsightsTab context={context} onChanged={mutate} /> : null}
           {activeTab === 'activity' ? <ActivityTab activities={context.latestActivities ?? []} completedTasks={context.completedTasks ?? []} /> : null}
-          {activeTab === 'meetings' ? <MeetingsTab meetings={context.meetings ?? []} deal={deal} /> : null}
         </main>
 
         <aside className="crm-record2-side">
-          <DealHealthAdvisor deal={deal} health={health} context={context} onRefresh={refreshHealth} />
-          <RelationshipSnapshot context={context} />
+          <RecordContextPanel context={context} deal={deal} health={health} onTab={setActiveTab} />
+          <DealAnalystPanel context={context} health={health} onChanged={mutate} onRefresh={refreshHealth} />
         </aside>
       </div>
     </CrmPage>
@@ -155,35 +149,9 @@ function OverviewTab({ context, deal, stages, health, onUpdate, onTab }: { conte
     <div className="crm-record2-stack">
       <DealFieldsCard deal={deal} stages={stages} onUpdate={onUpdate} />
       <NextStepCard deal={deal} health={health} onEdit={() => onTab('overview')} />
-      <AiPreviewCard context={context} onOpen={() => onTab('insights')} />
       <OverviewGrid context={context} onTab={onTab} />
       <RecentActivityCard activities={context.latestActivities ?? []} onOpen={() => onTab('activity')} />
     </div>
-  )
-}
-
-function AiPreviewCard({ context, onOpen }: { context: any; onOpen: () => void }) {
-  const insights = buildInsights(context).slice(0, 2)
-  return (
-    <CrmPanel className="crm-record2-card crm-ai-preview">
-      <div className="crm-record2-card-head">
-        <div>
-          <h2>AI insights</h2>
-          <p>Optional analysis from the current CRM evidence. Open the full view before acting.</p>
-        </div>
-        <CrmButton onClick={onOpen}>Open insights</CrmButton>
-      </div>
-      {insights.length ? (
-        <div className="crm-ai-preview-list">
-          {insights.map(insight => (
-            <article key={insight.id}>
-              <strong>{insight.title}</strong>
-              <p>{insight.explanation}</p>
-            </article>
-          ))}
-        </div>
-      ) : <CrmEmpty title="No analysis yet">Add notes or click Analyse to generate useful deal intelligence.</CrmEmpty>}
-    </CrmPanel>
   )
 }
 
@@ -500,14 +468,14 @@ function NoteComposer({ dealId, dealTitle, onSaved }: { dealId: string; dealTitl
       <div className="crm-record2-card-head">
         <div>
           <h2>Add note</h2>
-          <p>Log the customer truth first. Ask Halvex only if you want a second read.</p>
+          <p>Log the customer truth first. Ask for extraction only when you want suggested CRM updates.</p>
         </div>
       </div>
       <form className="crm-record2-note-form" onSubmit={saveNote}>
         <textarea className="crm-textarea" value={note} onChange={event => setNote(event.target.value)} placeholder="Add meeting notes, customer context, blockers, or commitments..." />
         <div className="crm-record2-note-actions">
           <CrmButton type="submit" tone="primary" disabled={saving || !note.trim()}>{saving ? 'Saving...' : 'Save note'}</CrmButton>
-          <CrmButton onClick={() => askHalvex(`Review this note for ${dealTitle} as suggestions only: ${note}`, dealId)} disabled={!note.trim()}><Bot size={16} /> Ask Halvex about this</CrmButton>
+          <CrmButton onClick={() => askHalvex(`Extract CRM updates from this note for ${dealTitle}. Suggest field changes, tasks, and notes without applying them: ${note}`, dealId)} disabled={!note.trim()}><Bot size={16} /> Extract updates</CrmButton>
         </div>
       </form>
     </CrmPanel>
@@ -550,7 +518,7 @@ function ActivityTab({ activities, completedTasks }: { activities: any[]; comple
         <div className="crm-record2-card-head">
           <div>
             <h2>Timeline</h2>
-            <p>The evidence layer: notes, meetings, imports, stage changes, tasks, and AI summaries.</p>
+            <p>The evidence layer: notes, imports, stage changes, tasks, and saved recommendations.</p>
           </div>
         </div>
         <ActivityList activities={activities} />
@@ -570,7 +538,7 @@ function ActivityTab({ activities, completedTasks }: { activities: any[]; comple
   )
 }
 
-function InsightsTab({ context, onChanged }: { context: any; onChanged: () => void }) {
+function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: any; health: ReturnType<typeof buildHealth>; onChanged: () => void; onRefresh: () => void }) {
   const deal = context.deal
   const insights = buildInsights(context)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -619,69 +587,69 @@ function InsightsTab({ context, onChanged }: { context: any; onChanged: () => vo
   }
 
   return (
-    <div className="crm-record2-stack">
-      <CrmPanel className="crm-record2-card crm-insights-command">
-        <div className="crm-record2-card-head">
-          <div>
-            <h2>AI deal intelligence</h2>
-            <p>Run analysis on demand, read the evidence, then accept, dismiss, edit into a note, or turn into a task.</p>
-          </div>
+    <CrmPanel className="crm-analyst-panel">
+      <div className="crm-analyst-head">
+        <div>
+          <span>Deal analyst</span>
+          <h2>Optional intelligence</h2>
+          <p>Run analysis only when useful. Recommendations stay advisory until you turn them into CRM work.</p>
         </div>
-        <div className="crm-insight-actions">
-          <CrmButton tone="primary" onClick={() => askHalvex(`Analyse ${deal.title}. Include risks, evidence, confidence, and recommended manual CRM updates.`, deal.id)}><Bot size={16} /> Analyse this deal</CrmButton>
-          <CrmButton onClick={() => askHalvex(`Suggest the next step for ${deal.title}. Explain why.`, deal.id)}><CheckCircle2 size={16} /> Suggest next step</CrmButton>
-          <CrmButton onClick={() => askHalvex(`Summarise recent activity for ${deal.title}.`, deal.id)}><FileText size={16} /> Summarise activity</CrmButton>
-          <CrmButton onClick={() => askHalvex(`Find risks in ${deal.title} with evidence and confidence.`, deal.id)}><RefreshCw size={16} /> Find risks</CrmButton>
-        </div>
-      </CrmPanel>
+        <button type="button" onClick={onRefresh} aria-label="Refresh deal analysis"><RefreshCw size={16} /></button>
+      </div>
 
-      {insights.length ? insights.map(insight => (
-        <CrmPanel key={insight.id} className={`crm-insight-record ${dismissed.has(insight.id) ? 'dismissed' : ''}`}>
-          <div className="crm-insight-record-head">
-            <div>
-              <span>{insight.type}</span>
-              <h2>{insight.title}</h2>
-            </div>
-            <div className="crm-insight-confidence">
-              <small>Confidence</small>
+      <div className="crm-analyst-score-grid">
+        <div><span>Score</span><strong>{health.score ?? '—'}</strong></div>
+        <div><span>Confidence</span><strong>{health.confidence ? `${health.confidence}%` : '—'}</strong></div>
+        <div><span>Risk</span><CrmRiskBadge risk={health.risk} /></div>
+      </div>
+
+      <div className="crm-analyst-actions">
+        <CrmButton tone="primary" onClick={() => askHalvex(`Analyse ${deal.title}. Include what changed, what is risky, what is missing, evidence, confidence, and recommended manual CRM updates.`, deal.id)}><Bot size={16} /> Analyse deal</CrmButton>
+        <CrmButton onClick={() => askHalvex(`Suggest the next step for ${deal.title}. Explain why and what evidence supports it.`, deal.id)}><CheckCircle2 size={16} /> Suggest next step</CrmButton>
+        <CrmButton onClick={() => askHalvex(`Summarise the record for ${deal.title}: fields, notes, tasks, people, risks, and current next step.`, deal.id)}><FileText size={16} /> Summarise record</CrmButton>
+        <CrmButton onClick={() => askHalvex(`Extract CRM updates from the latest note on ${deal.title}. Suggest field changes, tasks, and notes without applying them.`, deal.id)}><NotebookPen size={16} /> Extract updates</CrmButton>
+        <CrmButton onClick={() => askHalvex(`Draft a concise follow-up for ${deal.title} based only on saved CRM context.`, deal.id)}><MailPlus size={16} /> Draft follow-up</CrmButton>
+        <CrmButton onClick={() => askHalvex(`Find missing buyer information for ${deal.title}: economic buyer, champion, decision process, urgency, and blockers.`, deal.id)}><UserRound size={16} /> Missing buyer info</CrmButton>
+        <CrmButton onClick={() => askHalvex(`Explain the risk score for ${deal.title} using evidence and confidence.`, deal.id)}><RefreshCw size={16} /> Explain risk</CrmButton>
+      </div>
+
+      <div className="crm-analyst-insights">
+        {insights.length ? insights.filter(insight => !dismissed.has(insight.id)).map(insight => (
+          <article key={insight.id} className="crm-analyst-insight">
+            <header>
+              <div>
+                <span>{insight.type}</span>
+                <h3>{insight.title}</h3>
+              </div>
               <strong>{insight.confidence}%</strong>
-            </div>
-          </div>
-          <p className="crm-insight-explanation">{insight.explanation}</p>
-          <div className="crm-insight-detail-grid">
+            </header>
+            <p>{insight.explanation}</p>
             <section>
-              <h3>Evidence</h3>
+              <h4>Evidence</h4>
               <p>{insight.evidence}</p>
             </section>
             <section>
-              <h3>Suggested action</h3>
+              <h4>Suggested action</h4>
               <p>{insight.suggestedAction}</p>
             </section>
-            <section>
-              <h3>Risk</h3>
-              <p>{insight.risk === 'high' ? 'This needs owner attention before the deal advances.' : insight.risk === 'medium' ? 'Worth checking before the next customer touch.' : 'Low urgency; keep the record complete.'}</p>
-            </section>
-          </div>
-          <div className="crm-insight-footer">
-            <CrmButton onClick={() => createNote(insight, 'accepted')} disabled={busyId === insight.id}><FileCheck2 size={16} /> Accept</CrmButton>
-            <CrmButton onClick={() => createNote(insight, 'dismissed')} disabled={busyId === insight.id}>Dismiss</CrmButton>
-            <CrmButton onClick={() => createTask(insight)} disabled={busyId === insight.id}><CheckCircle2 size={16} /> Turn into task</CrmButton>
-            <CrmButton onClick={() => createNote(insight, 'noted')} disabled={busyId === insight.id}><NotebookPen size={16} /> Save as note</CrmButton>
-          </div>
-        </CrmPanel>
-      )) : (
-        <CrmPanel className="crm-record2-card">
-          <CrmEmpty title="No AI insights yet" action={<CrmButton tone="primary" onClick={() => askHalvex(`Analyse ${deal.title}.`, deal.id)}>Analyse this deal</CrmButton>}>
-            Add a note, task, meeting, or stage change, then ask for analysis when you want a second read.
-          </CrmEmpty>
-        </CrmPanel>
-      )}
-    </div>
+            <div className="crm-analyst-insight-actions">
+              <CrmButton onClick={() => createTask(insight)} disabled={busyId === insight.id}>Create task</CrmButton>
+              <CrmButton onClick={() => createNote(insight, 'noted')} disabled={busyId === insight.id}>Save note</CrmButton>
+              <CrmButton onClick={() => createNote(insight, 'accepted')} disabled={busyId === insight.id}>Accept</CrmButton>
+              <CrmButton onClick={() => createNote(insight, 'dismissed')} disabled={busyId === insight.id}>Dismiss</CrmButton>
+            </div>
+          </article>
+        )) : (
+          <CrmEmpty title="No recommendations yet">Add notes, tasks, people, or deal fields, then run analysis when you want a second read.</CrmEmpty>
+        )}
+        {insights.length > 0 && insights.every(insight => dismissed.has(insight.id)) ? <CrmEmpty title="All recommendations dismissed">Run analysis again when the record changes.</CrmEmpty> : null}
+      </div>
+    </CrmPanel>
   )
 }
 
 function ActivityList({ activities, compactMode = false }: { activities: any[]; compactMode?: boolean }) {
-  if (!activities.length) return <CrmEmpty title="No activity yet">Notes, meetings, tasks, and changes will appear here.</CrmEmpty>
+  if (!activities.length) return <CrmEmpty title="No activity yet">Notes, tasks, and changes will appear here.</CrmEmpty>
   return (
     <div className={`crm-record2-activity ${compactMode ? 'compact' : ''}`}>
       {activities.map(activity => {
@@ -703,105 +671,24 @@ function ActivityList({ activities, compactMode = false }: { activities: any[]; 
   )
 }
 
-function MeetingsTab({ meetings, deal }: { meetings: any[]; deal: any }) {
-  return (
-    <div className="crm-record2-stack">
-      <CrmPanel className="crm-record2-card">
-        <div className="crm-record2-card-head">
-          <div>
-            <h2>Meetings</h2>
-            <p>Calendar context linked to this opportunity.</p>
-          </div>
-          <CrmButton href="/calendar">Calendar</CrmButton>
-        </div>
-        {meetings.length ? (
-          <div className="crm-record2-meeting-list">
-            {meetings.map((meeting: any) => (
-              <article key={meeting.id}>
-                <span><CalendarDays size={18} /></span>
-                <div>
-                  <strong>{meeting.title}</strong>
-                  <p>{meeting.startsAt ? shortDate(meeting.startsAt) : 'No date'} · {meeting.attendees?.length ?? 0} attendees</p>
-                </div>
-                <CrmButton onClick={() => askHalvex(`Prep me for ${meeting.title} on ${deal.title}`, deal.id)}><Bot size={16} /> Prep</CrmButton>
-              </article>
-            ))}
-          </div>
-        ) : <CrmEmpty title="No meetings linked">Connect Calendar or add meeting notes to build meeting context.</CrmEmpty>}
-      </CrmPanel>
-    </div>
-  )
-}
-
-function DealHealthAdvisor({ deal, health, context, onRefresh }: { deal: any; health: ReturnType<typeof buildHealth>; context: any; onRefresh: () => void }) {
-  const evidence = context?.intelligence?.evidence ?? []
-  const inferenceSteps = context?.intelligence?.inferenceSteps ?? []
-  const ignoredEvidence = context?.intelligence?.ignoredEvidence ?? []
-  return (
-    <CrmPanel className="crm-record2-health">
-      <div className="crm-record2-health-head">
-        <div>
-          <h2>Deal health</h2>
-          <p>Advisory only. CRM fields stay manual.</p>
-        </div>
-        <button type="button" onClick={onRefresh} aria-label="Refresh health"><RefreshCw size={16} /></button>
-      </div>
-      <div className="crm-record2-score-grid">
-        <div><span>Score</span><strong>{health.score ?? '—'}</strong></div>
-        <div><span>Confidence</span><strong>{health.confidence ? `${health.confidence}%` : '—'}</strong></div>
-        <div><span>Risk</span><CrmRiskBadge risk={health.risk} /></div>
-      </div>
-      <section className="crm-record2-health-summary">
-        <span>Current read</span>
-        <p>{health.summary || 'Add recent notes, tasks, or meetings to give Halvex evidence.'}</p>
-      </section>
-      {health.reasons.length ? (
-        <section>
-          <span className="crm-record2-eyebrow">Why</span>
-          <ul className="crm-record2-reason-list">
-            {health.reasons.slice(0, 3).map((reason, index) => <li key={`${reason}-${index}`}>{reason}</li>)}
-          </ul>
-        </section>
-      ) : null}
-      <section className="crm-record2-health-next">
-        <span>Suggested next step</span>
-        <p>{health.nextAction || 'Set a manual next step when one is known.'}</p>
-      </section>
-      {health.cleanupItems.length ? (
-        <details className="crm-record2-disclosure">
-          <summary>Old context to review</summary>
-          {health.cleanupItems.map((item: string) => <p key={item}>{item}</p>)}
-        </details>
-      ) : null}
-      {evidence.length || inferenceSteps.length || ignoredEvidence.length ? (
-        <details className="crm-record2-disclosure">
-          <summary>Why?</summary>
-          {evidence.slice(0, 3).map((item: any) => <p key={item.id}><strong>{item.title}:</strong> {compact(item.text, 180)}</p>)}
-          {inferenceSteps.slice(0, 3).map((step: string, index: number) => <p key={`${step}-${index}`}>{step}</p>)}
-          {ignoredEvidence.length ? <p>{ignoredEvidence.length} weak timeline item{ignoredEvidence.length === 1 ? '' : 's'} ignored.</p> : null}
-        </details>
-      ) : null}
-      <div className="crm-record2-health-actions">
-        <CrmButton onClick={() => askHalvex(`Explain the risk on ${deal.title}`, deal.id)}><Bot size={16} /> Explain</CrmButton>
-        <CrmButton onClick={() => askHalvex(`Draft a concise follow-up for ${deal.title}`, deal.id)}><MailPlus size={16} /> Draft</CrmButton>
-      </div>
-    </CrmPanel>
-  )
-}
-
-function RelationshipSnapshot({ context }: { context: any }) {
+function RecordContextPanel({ context, deal, health, onTab }: { context: any; deal: any; health: ReturnType<typeof buildHealth>; onTab: (tab: DealTab) => void }) {
   const contacts = context.contacts ?? []
+  const openTasks = splitTasks(context.openTasks ?? []).active
+  const lastActivity = context.latestActivities?.[0]
   return (
-    <CrmPanel className="crm-record2-snapshot">
-      <h2>Relationship context</h2>
-      <div className="crm-record2-snapshot-row">
+    <CrmPanel className="crm-record-context">
+      <div className="crm-record-context-head">
+        <h2>Record context</h2>
+        <CrmRiskBadge risk={health.risk} />
+      </div>
+      <div className="crm-record-context-row">
         <span><BriefcaseBusiness size={16} /></span>
         <div>
           <small>Company</small>
           {context.company?.id ? <Link href={`/companies/${context.company.id}`}>{context.company.name}</Link> : <strong>{context.company?.name ?? 'Unknown company'}</strong>}
         </div>
       </div>
-      <div className="crm-record2-snapshot-row">
+      <div className="crm-record-context-row">
         <span><UserRound size={16} /></span>
         <div>
           <small>People</small>
@@ -811,6 +698,20 @@ function RelationshipSnapshot({ context }: { context: any }) {
       {contacts.slice(0, 4).map((contact: any) => (
         <LinkedRecordChip key={contact.id} href={`/people/${contact.id}`}><UserRound size={14} /> {contact.fullName}</LinkedRecordChip>
       ))}
+      <div className="crm-record-context-grid">
+        <div><span>Value</span><strong>{money(deal.valueAmount)}</strong></div>
+        <div><span>Close</span><strong>{shortDate(deal.expectedCloseDate) ?? 'Missing'}</strong></div>
+        <div><span>Open tasks</span><strong>{openTasks.length}</strong></div>
+        <div><span>Last activity</span><strong>{lastActivity?.occurredAt ? shortDate(lastActivity.occurredAt) : 'None'}</strong></div>
+      </div>
+      <section className="crm-record-context-next">
+        <span>Next step</span>
+        <p>{deal.aiNextAction || health.nextAction || 'No next step set.'}</p>
+      </section>
+      <div className="crm-record-context-actions">
+        <CrmButton onClick={() => onTab('notes')}>Add note</CrmButton>
+        <CrmButton onClick={() => onTab('tasks')}>Add task</CrmButton>
+      </div>
     </CrmPanel>
   )
 }

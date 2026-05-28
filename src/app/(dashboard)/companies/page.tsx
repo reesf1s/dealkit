@@ -6,7 +6,7 @@ import useSWR from 'swr'
 import Link from 'next/link'
 import { Building2, Globe2, Plus, Search } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmSegmentedFilters, FilterBar, CrmPage, CrmPanel, CrmRiskBadge, CrmSectionHeader, CrmSkeleton, CrmStat, PageIntent, ScenicPanel, money, shortDate } from '@/components/crm/CrmShell'
+import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmSegmentedFilters, FilterBar, CrmPage, CrmPanel, CrmRiskBadge, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, SavedViewBar, money, shortDate } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,27 +36,31 @@ export default function CompaniesPage() {
   const pipelineValue = allCompanies.reduce((sum: number, company: any) => sum + Number(company.pipelineValue ?? 0), 0)
 
   return (
-    <CrmPage>
-      <ScenicPanel
-        eyebrow="Companies"
-        title="What is our account relationship?"
-        description="Account memory with linked people, active deals, last touch, pipeline value, and risk in one view."
-        actions={<><CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add company</CrmButton><CrmButton href="/settings?section=imports">Import</CrmButton></>}
-        compact
-      >
+    <CrmPage wide>
+      <ObjectWorkspaceHeader
+        object="Companies"
+        title="Accounts"
+        description="Structured company records with linked people, active deals, notes, tasks, and relationship history."
+        actions={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add company</CrmButton>}
+        stats={<>
         <CrmStat label="Companies" value={allCompanies.length} />
         <CrmStat label="With open deals" value={openDealAccounts} />
         <CrmStat label="Open pipeline" value={money(pipelineValue)} />
         <CrmStat label="Need attention" value={riskAccounts} />
-      </ScenicPanel>
-      <PageIntent items={[
-        { label: 'Account', title: 'See the relationship at a glance', text: 'Companies connect people, open deals, last activity, pipeline value, and risk.' },
-        { label: 'Prioritise', title: 'Spot accounts needing attention', text: 'Use risk and last activity as prompts to open the account, not as automatic truth.' },
-        { label: 'Grow', title: 'Add people, tasks, and deals', text: 'Company records should become the home for account memory and next actions.' },
-      ]} />
+        </>}
+      />
       {quickAddOpen ? <QuickAddCompany onCancel={() => setQuickAddOpen(false)} onCreated={async () => { setQuickAddOpen(false); await mutate() }} /> : null}
       <CrmPanel>
-        <CrmSectionHeader title="Account directory" description="Prioritise accounts by open opportunity, risk, and missing relationship data." action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add company</CrmButton>} />
+        <CrmSectionHeader title="Company records" description="Saved views over the same account objects. Open the record for connected deals, people, notes, and tasks." action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add company</CrmButton>} />
+        <SavedViewBar
+          views={[
+            { label: 'All companies', active: segment === 'all', onClick: () => setSegment('all'), count: allCompanies.length },
+            { label: 'Open deals', active: segment === 'open', onClick: () => setSegment('open'), count: openDealAccounts },
+            { label: 'At risk', active: segment === 'risk', onClick: () => setSegment('risk'), count: riskAccounts },
+            { label: 'Missing data', active: segment === 'missing', onClick: () => setSegment('missing') },
+            { label: 'No next action', active: segment === 'no_next', onClick: () => setSegment('no_next') },
+          ]}
+        />
         <FilterBar>
           <label className="crm-search-button"><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search companies..." /></label>
           <CrmSegmentedFilters
@@ -73,21 +77,6 @@ export default function CompaniesPage() {
             ]}
           />
         </FilterBar>
-        {companies.some((company: any) => Number(company.pipelineValue ?? 0) > 0 || Number(company.riskCount ?? 0) > 0) ? (
-          <div className="crm-account-highlight-grid">
-            {companies
-              .filter((company: any) => Number(company.pipelineValue ?? 0) > 0 || Number(company.riskCount ?? 0) > 0)
-              .sort((a: any, b: any) => Number(b.pipelineValue ?? 0) - Number(a.pipelineValue ?? 0))
-              .slice(0, 3)
-              .map((company: any) => (
-                <Link key={company.id} href={`/companies/${company.id}`} className="crm-account-highlight">
-                  <strong><ClampedText lines={1}>{company.name}</ClampedText></strong>
-                  <p>{money(company.pipelineValue)} · {company.openDeals ?? 0} open deals</p>
-                  <CrmRiskBadge risk={company.riskCount ? 'high' : 'unknown'} />
-                </Link>
-              ))}
-          </div>
-        ) : null}
         <div className="crm-directory-heading account">
           <span>Company</span>
           <span>Deals</span>

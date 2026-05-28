@@ -12,7 +12,6 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Command,
-  FileText,
   Home,
   LayoutGrid,
   Loader2,
@@ -20,7 +19,6 @@ import {
   Search,
   Send,
   Settings,
-  Sparkles,
   UsersRound,
   X,
 } from 'lucide-react'
@@ -34,8 +32,6 @@ const nav = [
   { href: '/companies', label: 'Companies', icon: Building2 },
   { href: '/people', label: 'People', icon: UsersRound },
   { href: '/tasks', label: 'Tasks', icon: CheckCircle2 },
-  { href: '/activity', label: 'Activity', icon: FileText },
-  { href: '/assistant', label: 'AI Assistant', icon: Bot },
 ]
 
 type AssistantProposedAction = {
@@ -166,7 +162,7 @@ export function CrmShell({ children }: { children: ReactNode }) {
         <header className="crm-topbar">
           <button type="button" className="crm-search-button" onClick={() => setCommandOpen(true)}>
             <Search size={16} />
-            <span>Search deals, people, companies, tasks...</span>
+            <span>Search records or create something...</span>
             <kbd>⌘K</kbd>
           </button>
         </header>
@@ -185,14 +181,6 @@ export function CrmShell({ children }: { children: ReactNode }) {
         })}
       </nav>
 
-      <button
-        type="button"
-        className={`crm-assistant-orb ${assistantOpen ? 'open' : ''}`}
-        onClick={() => setAssistantOpen(true)}
-        aria-label="Open Halvex assistant"
-      >
-        <Sparkles size={24} />
-      </button>
       <CrmAssistantDrawer open={assistantOpen} onClose={() => setAssistantOpen(false)} contextDealId={effectiveDealId} />
       <CrmCommandMenu open={commandOpen} onClose={() => setCommandOpen(false)} />
     </div>
@@ -205,9 +193,9 @@ function CrmCommandMenu({ open, onClose }: { open: boolean; onClose: () => void 
   const matches = useMemo(() => nav.filter(item => item.label.toLowerCase().includes(query.toLowerCase())), [query])
   const actions = [
     { label: 'Add deal', href: '/deals?quick=deal', icon: Plus },
+    { label: 'Add company', href: '/companies?quick=company', icon: Building2 },
+    { label: 'Add person', href: '/people?quick=person', icon: UsersRound },
     { label: 'Add task', href: '/tasks?quick=task', icon: CheckCircle2 },
-    { label: 'Import data', href: '/settings?section=imports', icon: LayoutGrid },
-    { label: 'Open AI Assistant', href: '/assistant', icon: Bot },
   ]
   if (!open) return null
   return (
@@ -427,6 +415,38 @@ export function CrmHeader({ eyebrow, title, description, actions, meta }: { eyeb
       </div>
       {actions ? <div className="crm-header-actions">{actions}</div> : null}
     </section>
+  )
+}
+
+export function ObjectWorkspaceHeader({ object, title, description, actions, stats }: { object: string; title: string; description?: string; actions?: ReactNode; stats?: ReactNode }) {
+  return (
+    <section className="crm-object-header">
+      <div className="crm-object-header-copy">
+        <small className="crm-object-label">{object}</small>
+        <h1>{title}</h1>
+        {description ? <p>{description}</p> : null}
+      </div>
+      {stats ? <div className="crm-object-stats">{stats}</div> : null}
+      {actions ? <div className="crm-object-actions">{actions}</div> : null}
+    </section>
+  )
+}
+
+export function SavedViewBar({ views, children }: { views: Array<{ label: string; active?: boolean; href?: string; onClick?: () => void; count?: number }>; children?: ReactNode }) {
+  return (
+    <div className="crm-saved-view-bar">
+      <div className="crm-saved-views">
+        {views.map(view => {
+          const content = <><span>{view.label}</span>{typeof view.count === 'number' ? <small>{view.count}</small> : null}</>
+          return view.href ? (
+            <Link key={view.label} href={view.href} className={`crm-saved-view ${view.active ? 'active' : ''}`}>{content}</Link>
+          ) : (
+            <button key={view.label} type="button" className={`crm-saved-view ${view.active ? 'active' : ''}`} onClick={view.onClick}>{content}</button>
+          )
+        })}
+      </div>
+      {children ? <div className="crm-view-tools">{children}</div> : null}
+    </div>
   )
 }
 

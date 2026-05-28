@@ -6,7 +6,7 @@ import useSWR from 'swr'
 import Link from 'next/link'
 import { Mail, Plus, Search } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmSegmentedFilters, FilterBar, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, PageIntent, ScenicPanel, shortDate } from '@/components/crm/CrmShell'
+import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmSegmentedFilters, FilterBar, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, SavedViewBar, shortDate } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,26 +36,30 @@ export default function PeoplePage() {
   const recentlyTouched = allPeople.filter((person: any) => person.lastContactedAt && now - new Date(person.lastContactedAt).getTime() <= 30 * 86_400_000).length
 
   return (
-    <CrmPage>
-      <ScenicPanel
-        eyebrow="People"
-        title="Who are we talking to?"
-        description="Relationship memory for the people behind deals, meetings, notes, and follow-ups."
-        actions={<><CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add person</CrmButton><CrmButton href="/settings?section=imports">Import</CrmButton></>}
-        compact
-      >
+    <CrmPage wide>
+      <ObjectWorkspaceHeader
+        object="People"
+        title="Contacts"
+        description="First-class relationship records for buyers, champions, blockers, and day-to-day customer contacts."
+        actions={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add person</CrmButton>}
+        stats={<>
         <CrmStat label="People" value={allPeople.length} />
         <CrmStat label="Touched this month" value={recentlyTouched} />
         <CrmStat label="Need company" value={missingCompany} />
-      </ScenicPanel>
-      <PageIntent items={[
-        { label: 'Find', title: 'Search relationships quickly', text: 'People is for finding the human context behind a deal, meeting, or follow-up.' },
-        { label: 'Clean', title: 'Fill missing company/email', text: 'Missing relationship fields make calendar matching and deal context weaker.' },
-        { label: 'Act', title: 'Create follow-ups from records', text: 'Open a person to add a task, start a deal, or ask Halvex for relationship context.' },
-      ]} />
+        </>}
+      />
       {quickAddOpen ? <QuickAddPerson onCancel={() => setQuickAddOpen(false)} onCreated={async () => { setQuickAddOpen(false); await mutate() }} /> : null}
       <CrmPanel>
-        <CrmSectionHeader title="Relationship directory" description="Find people, clean missing data, and open the record before taking action." action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add person</CrmButton>} />
+        <CrmSectionHeader title="People records" description="Search, filter, and open the person record before taking action." action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add person</CrmButton>} />
+        <SavedViewBar
+          views={[
+            { label: 'All people', active: segment === 'all', onClick: () => setSegment('all'), count: allPeople.length },
+            { label: 'Recent', active: segment === 'recent', onClick: () => setSegment('recent'), count: recentlyTouched },
+            { label: 'Cold', active: segment === 'cold', onClick: () => setSegment('cold') },
+            { label: 'Missing data', active: segment === 'missing', onClick: () => setSegment('missing') },
+            { label: 'No company', active: segment === 'no_company', onClick: () => setSegment('no_company'), count: missingCompany },
+          ]}
+        />
         <FilterBar>
           <label className="crm-search-button"><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search people..." /></label>
           <CrmSegmentedFilters
