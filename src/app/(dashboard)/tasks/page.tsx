@@ -3,8 +3,8 @@
 import type { FormEvent } from 'react'
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
-import { useSearchParams } from 'next/navigation'
-import { CheckCircle2, Clock3, Plus, Search, XCircle } from 'lucide-react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { CheckCircle2, Clock3, Plus, Search, SlidersHorizontal, XCircle } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
 import {
   CrmBadge,
@@ -18,7 +18,9 @@ import {
   CrmSegmentedFilters,
   CrmSkeleton,
   CrmStat,
+  ObjectStartState,
   ObjectWorkspaceHeader,
+  SavedViewBar,
   ViewTabs,
   WorkspaceBriefing,
   shortDate,
@@ -39,6 +41,21 @@ type Task = {
   companyName?: string | null
 }
 
+type TaskView = 'today' | 'upcoming' | 'overdue' | 'completed'
+type TaskPriorityFilter = 'all' | 'urgent' | 'high' | 'normal'
+type TaskLinkFilter = 'all' | 'linked' | 'unlinked'
+
+type TaskSavedView = {
+  id: string
+  label: string
+  view: TaskView
+  query: string
+  priorityFilter: TaskPriorityFilter
+  linkFilter: TaskLinkFilter
+}
+
+const TASK_SAVED_VIEWS_KEY = 'halvex-task-saved-views'
+
 export default function TasksPage() {
   return (
     <Suspense fallback={<CrmPage><CrmSkeleton rows={6} /></CrmPage>}>
@@ -48,13 +65,17 @@ export default function TasksPage() {
 }
 
 function TasksContent() {
+  const router = useRouter()
   const search = useSearchParams()
   const [quickAddOpen, setQuickAddOpen] = useState(search.get('quick') === 'task')
   const [query, setQuery] = useState('')
-  const [priorityFilter, setPriorityFilter] = useState<'all' | 'urgent' | 'high' | 'normal'>('all')
-  const [linkFilter, setLinkFilter] = useState<'all' | 'linked' | 'unlinked'>('all')
+  const [priorityFilter, setPriorityFilter] = useState<TaskPriorityFilter>('all')
+  const [linkFilter, setLinkFilter] = useState<TaskLinkFilter>('all')
+  const [savedViews, setSavedViews] = useState<TaskSavedView[]>([])
+  const [saveViewOpen, setSaveViewOpen] = useState(false)
   const [now] = useState(() => Date.now())
-  const view = search.get('view') ?? 'today'
+  const rawView = search.get('view')
+  const view: TaskView = rawView === 'upcoming' || rawView === 'overdue' || rawView === 'completed' ? rawView : 'today'
   const { data: todoData, isLoading, mutate: mutateTodo } = useSWR('/api/crm/tasks?status=todo', fetcher, { revalidateOnFocus: false })
   const { data: doneData, mutate: mutateDone } = useSWR('/api/crm/tasks?status=done', fetcher, { revalidateOnFocus: false })
   const todoTasks: Task[] = useMemo(() => todoData?.data ?? [], [todoData])
@@ -63,6 +84,15 @@ function TasksContent() {
   useEffect(() => {
     if (search.get('quick') === 'task') setQuickAddOpen(true)
   }, [search])
+
+  useEffect(() => {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(TASK_SAVED_VIEWS_KEY) || '[]')
+      if (Array.isArray(parsed)) setSavedViews(parsed.filter(Boolean).slice(0, 8))
+    } catch {
+      setSavedViews([])
+    }
+  }, [])
 
   async function refresh() {
     await Promise.all([mutateTodo(), mutateDone()])
@@ -78,8 +108,9 @@ function TasksContent() {
       const haystack = [task.title, task.dealTitle, task.companyName, task.priority].filter(Boolean).join(' ').toLowerCase()
       if (q && !haystack.includes(q)) return false
       if (priorityFilter !== 'all' && (task.priority ?? 'normal') !== priorityFilter) return false
-      if (linkFilter === 'linked' && !task.dealId) return false
-      if (linkFilter === 'unlinked' && task.dealId) return false
+      const hasLinkedRecord = Boolean(task.dealId || task.companyId || task.contactId)
+      if (linkFilter === 'linked' && !hasLinkedRecord) return false
+      if (linkFilter === 'unlinked' && hasLinkedRecord) return false
       const dueAt = task.dueAt ? new Date(task.dueAt).getTime() : null
       if (view === 'overdue') return Boolean(dueAt && dueAt < now)
       if (view === 'upcoming') return Boolean(dueAt && dueAt >= now && dueAt <= upcomingEnd.getTime())
@@ -91,6 +122,35 @@ function TasksContent() {
   const overdue = todoTasks.filter(task => task.dueAt && new Date(task.dueAt).getTime() < now).length
   const today = todoTasks.filter(task => !task.dueAt || new Date(task.dueAt).getTime() <= endOfToday(now)).length
   const upcoming = todoTasks.filter(task => task.dueAt && new Date(task.dueAt).getTime() >= now).length
+
+  function persistSavedViews(next: TaskSavedView[]) {
+    setSavedViews(next)
+    window.localStorage.setItem(TASK_SAVED_VIEWS_KEY, JSON.stringify(next))
+  }
+
+  function applySavedView(savedView: TaskSavedView) {
+    setQuery(savedView.query)
+    setPriorityFilter(savedView.priorityFilter)
+    setLinkFilter(savedView.linkFilter)
+    if (savedView.view !== view) router.push(`/tasks?view=${savedView.view}`)
+  }
+
+  function deleteSavedView(id: string) {
+    persistSavedViews(savedViews.filter(savedView => savedView.id !== id))
+  }
+
+  function saveCurrentView(label: string) {
+    const nextView: TaskSavedView = {
+      id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `view-${Date.now()}`,
+      label,
+      view,
+      query,
+      priorityFilter,
+      linkFilter,
+    }
+    persistSavedViews([nextView, ...savedViews.filter(savedView => savedView.label.toLowerCase() !== label.toLowerCase())].slice(0, 8))
+    setSaveViewOpen(false)
+  }
 
   async function act(taskId: string, action: 'complete' | 'cancel' | 'snooze' | 'edit', patch: Partial<Task> = {}) {
     const dueAt = action === 'snooze' ? new Date(now + 3 * 86_400_000).toISOString() : undefined
@@ -146,6 +206,27 @@ function TasksContent() {
             description="Create, complete, snooze, cancel, and open the linked deal when work belongs to an opportunity."
             action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add task</CrmButton>}
           />
+          <SavedViewBar
+            views={[
+              { label: 'Today', active: view === 'today' && priorityFilter === 'all' && linkFilter === 'all' && !query, onClick: () => { router.push('/tasks?view=today'); setPriorityFilter('all'); setLinkFilter('all'); setQuery('') }, count: today },
+              { label: 'Overdue', active: view === 'overdue' && priorityFilter === 'all' && linkFilter === 'all' && !query, onClick: () => { router.push('/tasks?view=overdue'); setPriorityFilter('all'); setLinkFilter('all'); setQuery('') }, count: overdue },
+              { label: 'Upcoming', active: view === 'upcoming' && priorityFilter === 'all' && linkFilter === 'all' && !query, onClick: () => { router.push('/tasks?view=upcoming'); setPriorityFilter('all'); setLinkFilter('all'); setQuery('') }, count: upcoming },
+              { label: 'High priority', active: priorityFilter === 'high', onClick: () => setPriorityFilter('high'), count: todoTasks.filter(task => task.priority === 'high').length },
+              { label: 'Unlinked', active: linkFilter === 'unlinked', onClick: () => setLinkFilter('unlinked'), count: todoTasks.filter(task => !(task.dealId || task.companyId || task.contactId)).length },
+              ...savedViews.map(savedView => ({ label: savedView.label, active: isTaskSavedViewActive(savedView, { view, query, priorityFilter, linkFilter }), onClick: () => applySavedView(savedView) })),
+            ]}
+          >
+            <button type="button" className="crm-saved-view-save" onClick={() => setSaveViewOpen(prev => !prev)}><SlidersHorizontal size={14} /> Save view</button>
+          </SavedViewBar>
+          {saveViewOpen ? (
+            <TaskSaveViewPanel
+              onSave={saveCurrentView}
+              onCancel={() => setSaveViewOpen(false)}
+              savedViews={savedViews}
+              onDelete={deleteSavedView}
+              current={{ view, query, priorityFilter, linkFilter }}
+            />
+          ) : null}
           <FilterBar>
             <label className="crm-search-button"><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search tasks, deals, companies, priorities..." /></label>
             <CrmSegmentedFilters
@@ -171,7 +252,24 @@ function TasksContent() {
             />
           </FilterBar>
           {isLoading ? <CrmSkeleton rows={6} /> : null}
-          {!isLoading && !visibleTasks.length ? <CrmEmpty title={query ? 'No matching tasks' : 'No tasks here'} action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary">Add task</CrmButton>}>{query ? 'Try a different search.' : 'Create the next action from a deal, meeting, or follow-up.'}</CrmEmpty> : null}
+          {!isLoading && !visibleTasks.length ? (
+            query || priorityFilter !== 'all' || linkFilter !== 'all' ? (
+              <CrmEmpty title="No matching tasks" action={<CrmButton onClick={() => { setQuery(''); setPriorityFilter('all'); setLinkFilter('all') }}>Clear filters</CrmButton>}>Try another search or reset the current task lens.</CrmEmpty>
+            ) : (
+              <ObjectStartState
+                label="First commitment"
+                title="Create the next action before the CRM becomes memory."
+                description="Tasks turn records into motion. Add one concrete follow-up, give it a due date, and link it to the deal, company, or person it belongs to."
+                primaryAction={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary">Add task</CrmButton>}
+                secondaryAction={<CrmButton href="/deals?quick=deal">Create deal</CrmButton>}
+                steps={[
+                  { label: 'Action', title: 'Write the customer commitment', text: 'Use a verb: follow up, send pricing, book demo, confirm buyer, or chase signature.' },
+                  { label: 'Date', title: 'Give it a due date', text: 'Today, overdue, and upcoming views only work when commitments are dated.' },
+                  { label: 'Context', title: 'Link the record', text: 'Attach the task to a deal, company, or person so the work has full CRM context.' },
+                ]}
+              />
+            )
+          ) : null}
           {!isLoading && visibleTasks.length ? (
             view === 'today' && !query.trim() && priorityFilter === 'all' && linkFilter === 'all'
               ? <TaskExecutionBoard tasks={todoTasks} now={now} onAction={act} />
@@ -228,6 +326,59 @@ function TaskExecutionBoard({ tasks, now, onAction }: { tasks: Task[]; now: numb
       ))}
     </div>
   )
+}
+
+function TaskSaveViewPanel({ onSave, onCancel, savedViews, onDelete, current }: {
+  onSave: (label: string) => void
+  onCancel: () => void
+  savedViews: TaskSavedView[]
+  onDelete: (id: string) => void
+  current: Pick<TaskSavedView, 'view' | 'query' | 'priorityFilter' | 'linkFilter'>
+}) {
+  const [label, setLabel] = useState('')
+  return (
+    <div className="crm-save-view-panel">
+      <form onSubmit={(event) => { event.preventDefault(); if (label.trim()) onSave(label.trim()) }}>
+        <div>
+          <strong>Save this task view</strong>
+          <p>Stores the current task lane, search, priority, and linked-record filter for repeatable execution.</p>
+        </div>
+        <input className="crm-input" value={label} onChange={event => setLabel(event.target.value)} placeholder="e.g. Unlinked urgent work" autoFocus />
+        <CrmButton type="submit" tone="primary" disabled={!label.trim()}>Save view</CrmButton>
+        <CrmButton onClick={onCancel}>Cancel</CrmButton>
+      </form>
+      <div className="crm-save-view-summary">
+        <span>Current lens</span>
+        <p>{describeTaskView(current)}</p>
+      </div>
+      {savedViews.length ? (
+        <div className="crm-save-view-list">
+          {savedViews.map(savedView => (
+            <article key={savedView.id}>
+              <div><strong>{savedView.label}</strong><p>{describeTaskView(savedView)}</p></div>
+              <button type="button" onClick={() => onDelete(savedView.id)}>Remove</button>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function isTaskSavedViewActive(savedView: TaskSavedView, current: Pick<TaskSavedView, 'view' | 'query' | 'priorityFilter' | 'linkFilter'>) {
+  return savedView.view === current.view
+    && savedView.query === current.query
+    && savedView.priorityFilter === current.priorityFilter
+    && savedView.linkFilter === current.linkFilter
+}
+
+function describeTaskView(view: Pick<TaskSavedView, 'view' | 'query' | 'priorityFilter' | 'linkFilter'>) {
+  return [
+    `${view.view} tasks`,
+    view.priorityFilter !== 'all' ? `${view.priorityFilter} priority` : null,
+    view.linkFilter !== 'all' ? `${view.linkFilter} records` : null,
+    view.query ? `search "${view.query}"` : null,
+  ].filter(Boolean).join(' · ')
 }
 
 function QuickAddTask({ onCancel, onCreated }: { onCancel: () => void; onCreated: () => void }) {
