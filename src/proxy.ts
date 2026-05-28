@@ -11,7 +11,7 @@ const isPublicRoute = createRouteMatcher([
 ])
 
 const legacyDashboardRedirects: Array<[RegExp, string]> = [
-  [/^\/analytics(?:\/.*)?$/, '/home'],
+  [/^\/analytics(?:\/.*)?$/, '/reports'],
   [/^\/activity(?:\/.*)?$/, '/home'],
   [/^\/assistant(?:\/.*)?$/, '/home'],
   [/^\/automations(?:\/.*)?$/, '/home'],

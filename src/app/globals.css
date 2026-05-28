@@ -12092,6 +12092,180 @@ body:has(.crm-shell) {
   padding-top: 10px;
 }
 
+.crm-report-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(360px, .7fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.crm-report-grid.lower {
+  grid-template-columns: minmax(0, 1fr) minmax(420px, .82fr);
+}
+
+.crm-report-stage-list,
+.crm-health-checks,
+.crm-report-ai-list {
+  display: grid;
+  gap: 10px;
+}
+
+.crm-report-stage-row {
+  display: grid;
+  grid-template-columns: minmax(160px, .75fr) minmax(220px, 1fr) 46px;
+  gap: 12px;
+  align-items: center;
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid rgba(28,34,28,.09);
+  border-radius: 8px;
+  background: rgba(255,255,255,.68);
+}
+
+.crm-report-stage-row strong,
+.crm-health-check strong,
+.crm-report-ai-read strong,
+.crm-jtbd-grid strong {
+  color: var(--halvex-ink);
+}
+
+.crm-report-stage-row p,
+.crm-health-check p,
+.crm-report-ai-read p,
+.crm-jtbd-grid p {
+  margin: 4px 0 0;
+  color: rgba(21,25,22,.62);
+  font-size: 13px;
+  line-height: 1.48;
+}
+
+.crm-report-bar {
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(21,25,22,.08);
+}
+
+.crm-report-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgba(31,122,77,.86), rgba(66,103,178,.68));
+}
+
+.crm-report-stage-row small {
+  color: rgba(21,25,22,.54);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.crm-health-check {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(28,34,28,.09);
+  border-radius: 8px;
+  background: rgba(255,255,255,.7);
+}
+
+.crm-health-check > span {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(31,122,77,.12);
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: rgba(31,122,77,.08);
+  color: var(--halvex-green);
+}
+
+.crm-health-check strong {
+  display: block;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.crm-report-attention-row {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 70px;
+  padding: 12px;
+  border: 1px solid rgba(28,34,28,.09);
+  border-radius: 8px;
+  background: rgba(255,255,255,.72);
+  color: inherit;
+  text-decoration: none;
+}
+
+.crm-report-attention-row:hover {
+  border-color: rgba(31,122,77,.24);
+  box-shadow: 0 16px 34px rgba(12,17,13,.08);
+}
+
+.crm-report-attention-row > span {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: rgba(21,25,22,.06);
+  color: rgba(21,25,22,.62);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.crm-report-attention-row strong {
+  color: var(--halvex-ink);
+}
+
+.crm-report-attention-row p {
+  margin: 4px 0 0;
+  color: rgba(21,25,22,.62);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.crm-report-ai-read {
+  display: grid;
+  gap: 8px;
+  padding: 13px;
+  border: 1px solid rgba(66,103,178,.12);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.9), rgba(246,249,255,.72));
+}
+
+.crm-report-ai-read small {
+  color: var(--halvex-blue);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.crm-report-ai-read strong {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.crm-jtbd-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.crm-jtbd-grid article {
+  min-height: 120px;
+  padding: 14px;
+  border: 1px solid rgba(28,34,28,.09);
+  border-radius: 8px;
+  background: rgba(255,255,255,.68);
+}
+
 .crm-command-menu {
   border-radius: 10px !important;
   background: rgba(255,255,255,.9) !important;
@@ -12181,7 +12355,10 @@ body:has(.crm-shell) {
   .crm-record2-hero,
   .crm-record2-layout,
   .crm-workspace-briefing,
-  .crm-task-board {
+  .crm-task-board,
+  .crm-report-grid,
+  .crm-report-grid.lower,
+  .crm-jtbd-grid {
     grid-template-columns: 1fr !important;
   }
   .crm-object-header {
@@ -12218,6 +12395,11 @@ body:has(.crm-shell) {
   .crm-object-stats,
   .crm-record2-hero-facts,
   .crm-analyst-actions {
+    grid-template-columns: 1fr !important;
+  }
+  .crm-report-stage-row,
+  .crm-report-attention-row,
+  .crm-health-check {
     grid-template-columns: 1fr !important;
   }
 }

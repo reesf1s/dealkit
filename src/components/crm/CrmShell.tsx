@@ -6,6 +6,7 @@ import type { DetailsHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLA
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bot,
+  BarChart3,
   Building2,
   CheckCircle2,
   ChevronRight,
@@ -34,6 +35,7 @@ const nav = [
   { href: '/companies', label: 'Companies', icon: Building2 },
   { href: '/people', label: 'People', icon: UsersRound },
   { href: '/tasks', label: 'Tasks', icon: CheckCircle2 },
+  { href: '/reports', label: 'Reports', icon: BarChart3 },
 ]
 
 type AssistantProposedAction = {
@@ -215,6 +217,7 @@ function currentPageLabel(pathname: string) {
   if (pathname.startsWith('/companies')) return 'Companies'
   if (pathname.startsWith('/people')) return 'People'
   if (pathname.startsWith('/tasks')) return 'Tasks'
+  if (pathname.startsWith('/reports')) return 'Reports'
   if (pathname.startsWith('/settings')) return 'Settings'
   return 'Home'
 }
