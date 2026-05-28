@@ -21,6 +21,7 @@ import { fetcher } from '@/lib/fetcher'
 import {
   ClampedText,
   CrmButton,
+  CrmBadge,
   CrmEmpty,
   CrmPage,
   CrmPanel,
@@ -113,7 +114,7 @@ export default function DealRecordPage() {
           ) : null}
           {activeTab === 'tasks' ? <TasksTab context={context} onChanged={mutate} /> : null}
           {activeTab === 'notes' ? <NotesTab deal={deal} activities={context.latestActivities ?? []} onSaved={mutate} /> : null}
-          {activeTab === 'people' ? <PeopleTab context={context} /> : null}
+          {activeTab === 'people' ? <PeopleTab context={context} onChanged={mutate} /> : null}
           {activeTab === 'activity' ? <ActivityTab activities={context.latestActivities ?? []} completedTasks={context.completedTasks ?? []} /> : null}
         </main>
 
@@ -489,27 +490,97 @@ function NoteComposer({ dealId, dealTitle, onSaved }: { dealId: string; dealTitl
   )
 }
 
-function PeopleTab({ context }: { context: any }) {
+function PeopleTab({ context, onChanged }: { context: any; onChanged: () => void }) {
   const contacts = context.contacts ?? []
+  const { data: peopleData } = useSWR('/api/crm/contacts', fetcher, { revalidateOnFocus: false })
+  const people = peopleData?.data ?? []
+  const linkedIds = new Set(contacts.map((contact: any) => contact.id))
+  const candidates = people.filter((person: any) => !linkedIds.has(person.id))
+  const [contactId, setContactId] = useState('')
+  const [role, setRole] = useState('')
+  const [isPrimary, setIsPrimary] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  async function linkPerson(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!contactId) return
+    setSaving(true)
+    try {
+      await fetch(`/api/crm/deals/${context.deal.id}/people`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId, role: role.trim() || null, isPrimary }),
+      })
+      setContactId('')
+      setRole('')
+      setIsPrimary(false)
+      await onChanged()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function unlinkPerson(id: string) {
+    setSaving(true)
+    try {
+      await fetch(`/api/crm/deals/${context.deal.id}/people`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId: id }),
+      })
+      await onChanged()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function markPrimary(contact: any) {
+    setSaving(true)
+    try {
+      await fetch(`/api/crm/deals/${context.deal.id}/people`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contactId: contact.id, role: contact.role ?? null, isPrimary: true }),
+      })
+      await onChanged()
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="crm-record2-stack">
       <CrmPanel className="crm-record2-card">
         <div className="crm-record2-card-head">
           <div>
             <h2>People</h2>
-            <p>The relationship memory attached to this deal.</p>
+            <p>Link buyers, champions, evaluators, and blockers directly to this deal.</p>
           </div>
           <CrmButton href="/people">People directory</CrmButton>
         </div>
+        <form className="crm-link-person-form" onSubmit={linkPerson}>
+          <select className="crm-select" value={contactId} onChange={event => setContactId(event.target.value)}>
+            <option value="">{candidates.length ? 'Choose existing person' : 'No unlinked people available'}</option>
+            {candidates.map((person: any) => <option key={person.id} value={person.id}>{person.fullName}{person.companyName ? ` · ${person.companyName}` : ''}</option>)}
+          </select>
+          <input className="crm-input" value={role} onChange={event => setRole(event.target.value)} placeholder="Role in deal, e.g. Champion" />
+          <label className="crm-checkbox-row"><input type="checkbox" checked={isPrimary} onChange={event => setIsPrimary(event.target.checked)} /> Primary</label>
+          <CrmButton type="submit" tone="primary" disabled={saving || !contactId}><Plus size={16} /> Link person</CrmButton>
+          <CrmButton href="/people?quick=person">Add new person</CrmButton>
+        </form>
         {contacts.length ? (
           <div className="crm-record2-people-grid">
             {contacts.map((contact: any) => (
-              <Link key={contact.id} href={`/people/${contact.id}`} className="crm-record2-person-card">
+              <article key={contact.id} className="crm-record2-person-card">
                 <span><UserRound size={18} /></span>
-                <strong>{contact.fullName}</strong>
+                <Link href={`/people/${contact.id}`}><strong>{contact.fullName}</strong></Link>
                 <p>{contact.jobTitle ?? contact.role ?? 'Role missing'}</p>
                 <small>{contact.email ?? 'No email'}</small>
-              </Link>
+                <div className="crm-person-link-actions">
+                  {contact.isPrimary ? <CrmBadge tone="good">Primary</CrmBadge> : <CrmButton onClick={() => markPrimary(contact)} disabled={saving}>Make primary</CrmButton>}
+                  <CrmButton onClick={() => unlinkPerson(contact.id)} disabled={saving}>Unlink</CrmButton>
+                </div>
+              </article>
             ))}
           </div>
         ) : <CrmEmpty title="No people linked">Link contacts so notes, meetings, and follow-ups have real relationship context.</CrmEmpty>}
