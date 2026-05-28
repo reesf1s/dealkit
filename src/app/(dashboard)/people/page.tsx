@@ -1,7 +1,7 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
 import { Mail, Plus, Search } from 'lucide-react'
@@ -34,6 +34,10 @@ export default function PeoplePage() {
   }, [allPeople, now, query, segment])
   const missingCompany = allPeople.filter((person: any) => !person.companyName).length
   const recentlyTouched = allPeople.filter((person: any) => person.lastContactedAt && now - new Date(person.lastContactedAt).getTime() <= 30 * 86_400_000).length
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('quick') === 'person') setQuickAddOpen(true)
+  }, [])
 
   return (
     <CrmPage wide>

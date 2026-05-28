@@ -1,7 +1,7 @@
 'use client'
 
 import type { FormEvent } from 'react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
 import { Building2, Globe2, Plus, Search } from 'lucide-react'
@@ -34,6 +34,10 @@ export default function CompaniesPage() {
   const openDealAccounts = allCompanies.filter((company: any) => Number(company.openDeals ?? 0) > 0).length
   const riskAccounts = allCompanies.filter((company: any) => Number(company.riskCount ?? 0) > 0).length
   const pipelineValue = allCompanies.reduce((sum: number, company: any) => sum + Number(company.pipelineValue ?? 0), 0)
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('quick') === 'company') setQuickAddOpen(true)
+  }, [])
 
   return (
     <CrmPage wide>
@@ -139,7 +143,7 @@ function QuickAddCompany({ onCancel, onCreated }: { onCancel: () => void; onCrea
 
   return (
     <CrmPanel>
-      <CrmSectionHeader title="Add company" description="Create an account. People, deals, tasks, and meetings can attach to it later." />
+      <CrmSectionHeader title="Add company" description="Create an account. People, deals, tasks, and notes can attach to it later." />
       <form className="crm-form-grid" onSubmit={submit}>
         <label>Name<input className="crm-input" value={name} onChange={event => setName(event.target.value)} placeholder="Finch Studio" required /></label>
         <label>Domain<input className="crm-input" value={domain} onChange={event => setDomain(event.target.value)} placeholder="finchstudio.com" /></label>

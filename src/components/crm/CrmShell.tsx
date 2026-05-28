@@ -404,6 +404,19 @@ export function CrmPage({ children, wide = false }: { children: ReactNode; wide?
   return <div className={`crm-page ${wide ? 'wide' : ''}`}>{children}</div>
 }
 
+export function RouteStatePage({ eyebrow = 'Workspace', title, description, action }: { eyebrow?: string; title: string; description: string; action?: ReactNode }) {
+  return (
+    <CrmPage>
+      <section className="crm-route-state">
+        <small>{eyebrow}</small>
+        <h1>{title}</h1>
+        <p>{description}</p>
+        {action ? <div className="crm-route-state-actions">{action}</div> : null}
+      </section>
+    </CrmPage>
+  )
+}
+
 export function CrmHeader({ eyebrow, title, description, actions, meta }: { eyebrow?: string; title: string; description?: string; actions?: ReactNode; meta?: ReactNode }) {
   return (
     <section className="crm-header">

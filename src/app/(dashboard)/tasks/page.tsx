@@ -18,8 +18,7 @@ import {
   CrmSegmentedFilters,
   CrmSkeleton,
   CrmStat,
-  PageIntent,
-  ScenicPanel,
+  ObjectWorkspaceHeader,
   ViewTabs,
   shortDate,
 } from '@/components/crm/CrmShell'
@@ -101,25 +100,19 @@ function TasksContent() {
   }
 
   return (
-    <CrmPage>
-      <ScenicPanel
-        eyebrow="Tasks"
-        title="What work needs finishing?"
-        description="A clean execution list for follow-ups, reminders, and customer commitments across every record."
+    <CrmPage wide>
+      <ObjectWorkspaceHeader
+        object="Tasks"
+        title="Work list"
+        description="Manual commitments across deals, companies, and people. Complete, snooze, or open the linked record before acting."
         actions={<><CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add task</CrmButton><CrmButton href="/deals">Deals</CrmButton></>}
-        compact
-      >
+        stats={<>
         <CrmStat label="Due today" value={today} />
         <CrmStat label="Overdue" value={overdue} />
         <CrmStat label="Upcoming" value={upcoming} />
         <CrmStat label="Completed" value={doneTasks.length} />
-      </ScenicPanel>
-
-      <PageIntent items={[
-        { label: 'Focus', title: 'Do the next customer action', text: 'Tasks are manual commitments, not AI-created noise. Complete the real work and keep old imported tasks tidy.' },
-        { label: 'Context', title: 'Open the linked record', text: 'When a task belongs to a deal or company, open it before acting so the follow-up is grounded.' },
-        { label: 'Control', title: 'Snooze or cancel stale work', text: 'If an old task is no longer true, remove it from today instead of letting it pollute priorities.' },
-      ]} />
+        </>}
+      />
 
       {quickAddOpen ? <QuickAddTask onCancel={() => setQuickAddOpen(false)} onCreated={async () => { setQuickAddOpen(false); await refresh() }} /> : null}
 

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
 export default function IntelligencePlaybookRedirect() {
-  redirect('/deals?view=intelligence')
+  redirect('/deals')
 }

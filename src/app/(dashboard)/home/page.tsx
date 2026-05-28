@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { useState } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
-import { CalendarDays, CheckCircle2, Clock3, LayoutGrid, Plus } from 'lucide-react'
+import { CheckCircle2, Clock3, LayoutGrid, Plus, UsersRound } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
 import {
   CrmButton,
@@ -16,10 +16,8 @@ import {
   CrmSectionHeader,
   CrmSkeleton,
   CrmStat,
-  PageIntent,
-  ScenicPanel,
+  ObjectWorkspaceHeader,
   money,
-  shortDate,
 } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
@@ -36,15 +34,12 @@ type HomeData = {
 
 export default function HomePage() {
   const { data, isLoading, mutate } = useSWR<{ data: HomeData }>('/api/crm/today', fetcher, { revalidateOnFocus: false })
-  const { data: googleData } = useSWR('/api/integrations/google/status', fetcher, { revalidateOnFocus: false })
   const [completingId, setCompletingId] = useState<string | null>(null)
   const home = data?.data
   const priorities = home?.priorities ?? []
-  const meetings = home?.upcomingMeetings ?? []
   const activeDeals = [...(home?.likelyClosers ?? []), ...(home?.atRiskDeals ?? []), ...(home?.staleDeals ?? []), ...(home?.dealIntelligence ?? [])]
     .filter((deal, index, all) => all.findIndex(item => item.id === deal.id) === index)
     .slice(0, 6)
-  const calendarConfigured = googleData?.data?.configured !== false
 
   async function completePriority(priority: HomeData['priorities'][number]) {
     if (priority.linkedType !== 'task') return
@@ -62,25 +57,19 @@ export default function HomePage() {
   }
 
   return (
-    <CrmPage>
-      <ScenicPanel
-        eyebrow="Home"
-        title="What needs attention today?"
-        description="Tasks, meetings, active deals, and Halvex suggestions arranged into one calm revenue desk."
+    <CrmPage wide>
+      <ObjectWorkspaceHeader
+        object="Home"
+        title="Today"
+        description="A calm operating view for manual CRM work: finish tasks, open active records, and ask for help only when a deal needs another read."
         actions={<><CrmButton href="/tasks?quick=task" tone="primary"><Plus size={16} /> Add task</CrmButton><CrmButton href="/deals?quick=deal"><Plus size={16} /> Add deal</CrmButton></>}
-        compact
-      >
+        stats={<>
         <CrmStat label="Tasks due" value={priorities.length} hint={priorities.length ? 'Review or complete' : 'Clear'} />
-        <CrmStat label="Meetings" value={meetings.length} hint="Next 7 days" />
         <CrmStat label="Open pipeline" value={money(home?.openPipelineValue ?? 0)} />
         <CrmStat label="Likely closers" value={(home?.likelyClosers ?? []).length} />
-      </ScenicPanel>
-
-      <PageIntent items={[
-        { label: 'Start here', title: 'Finish today’s commitments', text: 'Tasks are the main operating list. Complete, snooze, or open the linked record before adding more work.', action: <CrmButton href="/tasks">Open tasks</CrmButton> },
-        { label: 'Then', title: 'Prepare for meetings', text: 'Calendar items should lead you to the right person, company, or deal before the call.', action: <CrmButton href="/calendar">Open calendar</CrmButton> },
-        { label: 'Finally', title: 'Review deal health', text: 'Halvex highlights missing fields and risk, but the CRM record remains manually owned.', action: <CrmButton href="/deals?view=health">Review health</CrmButton> },
-      ]} />
+        <CrmStat label="At risk" value={(home?.atRiskDeals ?? []).length} />
+        </>}
+      />
 
       <div className="crm-home-desk">
         <CrmPanel className="crm-home-primary">
@@ -107,25 +96,12 @@ export default function HomePage() {
         </CrmPanel>
 
         <CrmPanel className="crm-home-side">
-          <CrmSectionHeader title="Meetings" description="Calendar is a CRM workflow: open the record, take notes, create follow-up." action={<CrmButton href="/calendar">Calendar</CrmButton>} />
+          <CrmSectionHeader title="Record shortcuts" description="Create or open the objects that keep the CRM useful." action={<CrmButton href="/deals">Deals</CrmButton>} />
           <div className="crm-stack">
-            {isLoading ? <CrmSkeleton rows={3} /> : meetings.length ? meetings.slice(0, 5).map(meeting => (
-              <article key={meeting.id} className="crm-work-row compact">
-                <span className="crm-icon"><CalendarDays size={17} /></span>
-                <div>
-                  <strong><ClampedText lines={2}>{meeting.title}</ClampedText></strong>
-                  <p><ClampedText lines={1}>{shortDate(meeting.startsAt)} · {meeting.companyName ?? 'No company matched'}{meeting.dealTitle ? ` · ${meeting.dealTitle}` : ''}</ClampedText></p>
-                </div>
-                <CrmButton href={meeting.dealId ? `/deals/${meeting.dealId}` : '/calendar'} tone="ghost">{meeting.dealId ? 'Open deal' : 'Open'}</CrmButton>
-              </article>
-            )) : (
-              <CrmEmpty
-                title="No meetings connected"
-                action={<CrmButton href={calendarConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'} tone="primary">Connect Calendar</CrmButton>}
-              >
-                Bring Google Calendar in so meetings link back to people, companies, and deals.
-              </CrmEmpty>
-            )}
+            <Shortcut href="/deals?quick=deal" icon={<LayoutGrid size={17} />} title="New deal" text="Capture an opportunity, then add people, tasks, and notes from the record." />
+            <Shortcut href="/companies?quick=company" icon={<Plus size={17} />} title="New company" text="Create the account object before tracking relationship context." />
+            <Shortcut href="/people?quick=person" icon={<UsersRound size={17} />} title="New person" text="Keep buyer and champion context attached to a first-class record." />
+            <Shortcut href="/tasks?quick=task" icon={<CheckCircle2 size={17} />} title="New task" text="Add the next manual customer action with a due date." />
           </div>
         </CrmPanel>
       </div>
@@ -160,13 +136,17 @@ export default function HomePage() {
       <CrmPanel className="crm-suggestion-panel">
         <CrmSectionHeader title="Halvex suggestions" description="Optional intelligence. Nothing changes your CRM unless you choose to act." />
         <div className="crm-grid-3">
-          <Suggestion href="/deals?view=health" icon={<Clock3 size={17} />} title="Review deal health" text="See records with missing data, stale activity, or unclear next steps." />
+          <Suggestion href="/deals" icon={<Clock3 size={17} />} title="Review deal health" text="See records with missing data, stale activity, or unclear next steps." />
           <Suggestion href="/tasks?view=overdue" icon={<CheckCircle2 size={17} />} title="Clean up old tasks" text="Old imported tasks should be marked done, snoozed, or replaced with current actions." />
-          <Suggestion href="/assistant" icon={<CalendarDays size={17} />} title="Ask for a summary" text="Use the assistant when you need a founder-level read across the CRM." />
+          <Suggestion href="/deals" icon={<LayoutGrid size={17} />} title="Analyse a deal" text="Open a record and ask for evidence-based risks, missing buyer info, or next steps." />
         </div>
       </CrmPanel>
     </CrmPage>
   )
+}
+
+function Shortcut({ href, icon, title, text }: { href: string; icon: ReactNode; title: string; text: string }) {
+  return <Link href={href} className="crm-work-row compact"><span className="crm-icon">{icon}</span><div><strong>{title}</strong><p>{text}</p></div></Link>
 }
 
 function Suggestion({ href, icon, title, text }: { href: string; icon: ReactNode; title: string; text: string }) {

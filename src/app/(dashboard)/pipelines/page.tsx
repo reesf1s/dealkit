@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
 export default function PipelinesSettingsRedirect() {
-  redirect('/settings?section=pipelines')
+  redirect('/deals')
 }

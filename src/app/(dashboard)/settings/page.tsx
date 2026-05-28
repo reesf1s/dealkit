@@ -6,7 +6,7 @@ import useSWR from 'swr'
 import { useSearchParams } from 'next/navigation'
 import { Building2, CalendarDays, Check, Copy, CreditCard, Loader2, Settings, UsersRound } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { CrmBadge, CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, PageIntent, ScenicPanel } from '@/components/crm/CrmShell'
+import { CrmBadge, CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,24 +49,18 @@ function SettingsContent() {
   const googleConfigured = googleData?.data?.configured !== false
 
   return (
-    <CrmPage>
-      <ScenicPanel
-        eyebrow="Settings"
-        title="Keep the CRM configured."
-        description="Workspace, team, pipeline, imports, integrations, and billing controls without cluttering daily sales work."
-        actions={googleConnected ? <CrmButton href="/calendar">Open Calendar</CrmButton> : <CrmButton tone="primary" href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'}><CalendarDays size={16} /> {googleConfigured ? 'Connect Google Calendar' : 'Set up Calendar'}</CrmButton>}
-        compact
-      >
+    <CrmPage wide>
+      <ObjectWorkspaceHeader
+        object="Settings"
+        title="Workspace settings"
+        description="Admin controls live here so the everyday CRM stays focused on records, views, and manual customer work."
+        actions={googleConnected ? <CrmButton href="/settings?section=integrations">Calendar connected</CrmButton> : <CrmButton tone="primary" href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'}>{googleConfigured ? 'Connect Google Calendar' : 'Set up Calendar'}</CrmButton>}
+        stats={<>
         <CrmStat label="Calendar" value={googleConnected ? 'Connected' : 'Not connected'} />
         <CrmStat label="Sections" value={sections.length} />
         <CrmStat label="AI model" value="5.4 mini" hint="Pro can use 5.5" />
-      </ScenicPanel>
-
-      <PageIntent items={[
-        { label: 'Workspace', title: 'Keep setup out of sales work', text: 'Settings holds admin actions so Home, Deals, Tasks, and Calendar stay focused.' },
-        { label: 'Team', title: 'Control access deliberately', text: 'Members and invites should be obvious, auditable, and separate from daily CRM use.' },
-        { label: 'Integrations', title: 'Connect only what adds context', text: 'Calendar and imports improve the CRM, but the product still works manually first.' },
-      ]} />
+        </>}
+      />
 
       <CrmPanel>
         <div className="crm-view-tabs">
@@ -287,7 +281,7 @@ function IntegrationsSection({ googleConnected, googleConfigured }: { googleConn
         <InfoRow
           icon={<CalendarDays size={16} />}
           title="Google Calendar"
-          text={googleConnected ? 'Connected. Upcoming meetings appear in Home, Calendar, and linked deal records.' : googleConfigured ? 'Not connected. Connect it to make the CRM meeting-led.' : 'OAuth credentials are missing in production. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Vercel.'}
+          text={googleConnected ? 'Connected. Calendar context stays available as supporting record intelligence.' : googleConfigured ? 'Not connected. Connect it only if calendar context helps your CRM workflow.' : 'OAuth credentials are missing in production. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Vercel.'}
         />
         <div className="crm-form-actions">
           {googleConnected ? <CrmButton tone="primary" onClick={sync}>Sync now</CrmButton> : <CrmButton tone="primary" href={googleConfigured ? '/api/integrations/google/auth' : '/settings?section=integrations'}>{googleConfigured ? 'Connect Google' : 'Waiting for credentials'}</CrmButton>}
