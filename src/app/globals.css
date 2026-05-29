@@ -13197,3 +13197,539 @@ body:has(.crm-shell) {
     min-height: 0;
   }
 }
+
+/* Attio-grade finish pass: restore brand depth without sacrificing dense CRM work. */
+:root {
+  --crm-ink: #171916;
+  --crm-muted: #6d7169;
+  --crm-subtle: #8b9087;
+  --crm-line: rgba(32, 36, 30, .12);
+  --crm-line-strong: rgba(32, 36, 30, .18);
+  --crm-paper: rgba(255, 255, 252, .94);
+  --crm-paper-solid: #fffefa;
+  --crm-soft: rgba(247, 248, 244, .86);
+  --crm-green: #245f46;
+  --crm-green-soft: rgba(36, 95, 70, .1);
+  --crm-gold: #a66b2a;
+  --crm-shadow-sm: 0 1px 2px rgba(23, 25, 22, .06), 0 10px 28px rgba(23, 25, 22, .06);
+  --crm-shadow-md: 0 18px 60px rgba(23, 25, 22, .12);
+}
+
+body {
+  background:
+    linear-gradient(180deg, rgba(247, 248, 244, .76), rgba(239, 241, 234, .9) 42%, rgba(250, 250, 247, .96)),
+    url('/images/halvex-mountain-bg.jpg') center top / cover fixed no-repeat !important;
+}
+
+.crm-shell {
+  min-height: 100vh;
+  background:
+    linear-gradient(90deg, rgba(253, 253, 250, .9), rgba(253, 253, 250, .72) 34%, rgba(253, 253, 250, .9)),
+    radial-gradient(circle at 52% 0%, rgba(255, 255, 255, .42), transparent 34%) !important;
+  color: var(--crm-ink) !important;
+}
+
+.crm-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.32), rgba(255,255,255,.86) 52%, rgba(247,248,244,.96)),
+    rgba(241, 242, 237, .28);
+  z-index: -1;
+}
+
+.crm-sidebar {
+  background: rgba(255, 255, 252, .72) !important;
+  border-right: 1px solid rgba(255, 255, 255, .72) !important;
+  box-shadow: 1px 0 0 rgba(32, 36, 30, .08), 18px 0 52px rgba(23, 25, 22, .08) !important;
+  backdrop-filter: blur(24px) saturate(1.14) !important;
+}
+
+.crm-brand {
+  color: var(--crm-ink) !important;
+}
+
+.crm-brand span,
+.crm-avatar {
+  background: linear-gradient(145deg, #111713, #2f3c31) !important;
+  border-radius: 8px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 8px 20px rgba(17,23,19,.18) !important;
+}
+
+.crm-workspace-switcher,
+.crm-profile-button,
+.crm-nav a,
+.crm-sidebar-section.lower a {
+  border-radius: 9px !important;
+}
+
+.crm-workspace-switcher {
+  background: rgba(255, 255, 252, .58) !important;
+  border: 1px solid rgba(32, 36, 30, .1) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.75) !important;
+}
+
+.crm-nav a,
+.crm-sidebar-section.lower a {
+  color: rgba(23, 25, 22, .68) !important;
+}
+
+.crm-nav a:hover,
+.crm-sidebar-section.lower a:hover {
+  background: rgba(255, 255, 252, .7) !important;
+  color: var(--crm-ink) !important;
+}
+
+.crm-nav a.active,
+.crm-sidebar-footer > a.active {
+  background: rgba(255, 255, 252, .92) !important;
+  color: var(--crm-ink) !important;
+  border: 1px solid rgba(32, 36, 30, .1) !important;
+  box-shadow: var(--crm-shadow-sm) !important;
+}
+
+.crm-topbar {
+  background: rgba(255, 255, 252, .72) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, .72) !important;
+  box-shadow: 0 1px 0 rgba(32, 36, 30, .08), 0 16px 48px rgba(23, 25, 22, .06) !important;
+  backdrop-filter: blur(22px) saturate(1.18) !important;
+}
+
+.crm-content {
+  padding: 26px clamp(18px, 2.4vw, 34px) 34px !important;
+}
+
+.crm-page,
+.crm-reset-shell {
+  gap: 18px !important;
+}
+
+.crm-object-header,
+.crm-scenic-hero,
+.crm-scenic-hero.compact,
+.crm-shell .crm-scenic-panel,
+.crm-shell .crm-record-banner,
+.crm-record2-hero,
+.crm-route-state {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .72) !important;
+  border-radius: 16px !important;
+  background:
+    linear-gradient(90deg, rgba(15, 19, 16, .78), rgba(27, 42, 31, .46) 52%, rgba(255, 255, 252, .5)),
+    url('/images/halvex-mountain-bg.jpg') center 47% / cover no-repeat !important;
+  box-shadow: var(--crm-shadow-md) !important;
+  color: #fff !important;
+}
+
+.crm-object-header::after,
+.crm-scenic-hero::after,
+.crm-record2-hero::after,
+.crm-route-state::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,0) 42%),
+    linear-gradient(90deg, rgba(0,0,0,.16), rgba(255,255,255,.14));
+  pointer-events: none;
+}
+
+.crm-object-header > *,
+.crm-scenic-hero > *,
+.crm-record2-hero > *,
+.crm-route-state > * {
+  position: relative;
+  z-index: 1;
+}
+
+.crm-object-label,
+.crm-scenic-copy small,
+.crm-record2-hero-copy small,
+.crm-shell .crm-record-banner small,
+.crm-route-state small {
+  color: rgba(255, 255, 255, .72) !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+}
+
+.crm-object-header h1,
+.crm-scenic-copy h1,
+.crm-scenic-hero.compact .crm-scenic-copy h1,
+.crm-record2-hero-copy h1,
+.crm-shell .crm-record-banner h1,
+.crm-route-state h1 {
+  color: #fff !important;
+  font-size: clamp(2rem, 3.3vw, 3.65rem) !important;
+  line-height: .98 !important;
+  letter-spacing: 0 !important;
+  text-wrap: balance;
+}
+
+.crm-object-header p,
+.crm-scenic-copy p,
+.crm-record2-hero-copy p,
+.crm-shell .crm-record-banner p,
+.crm-route-state p {
+  color: rgba(255, 255, 255, .78) !important;
+  font-size: 14px !important;
+  line-height: 1.55 !important;
+  max-width: 740px !important;
+}
+
+.crm-object-stats,
+.crm-scenic-value,
+.crm-record2-hero-facts {
+  background: rgba(255, 255, 252, .14) !important;
+  border: 1px solid rgba(255,255,255,.22) !important;
+  border-radius: 14px !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16) !important;
+  backdrop-filter: blur(18px) saturate(1.15) !important;
+}
+
+.crm-object-stats .crm-stat,
+.crm-scenic-value .crm-stat,
+.crm-record2-fact,
+.crm-record2-score-grid > div,
+.crm-hero-chip-grid > * {
+  background: rgba(255, 255, 252, .9) !important;
+  border: 1px solid rgba(255, 255, 255, .66) !important;
+  border-radius: 11px !important;
+  box-shadow: 0 10px 30px rgba(17, 23, 19, .12) !important;
+  color: var(--crm-ink) !important;
+}
+
+.crm-panel,
+.crm-shell .crm-panel,
+.crm-table-wrap,
+.crm-shell .crm-table-wrap,
+.crm-record2-card,
+.crm-record2-health,
+.crm-record2-snapshot,
+.crm-stage,
+.crm-task-column,
+.crm-insight-record,
+.crm-data-workspace > aside,
+.crm-workspace-rail .crm-panel,
+.crm-command-menu,
+.crm-assistant-drawer {
+  background: var(--crm-paper) !important;
+  border: 1px solid rgba(255, 255, 255, .74) !important;
+  border-radius: 14px !important;
+  box-shadow: var(--crm-shadow-sm) !important;
+  backdrop-filter: blur(18px) saturate(1.1) !important;
+}
+
+.crm-section-header h2,
+.crm-panel-head h2,
+.crm-record2-card-head h2,
+.crm-record2-health-head h2,
+.crm-record2-snapshot h2 {
+  color: var(--crm-ink) !important;
+  letter-spacing: 0 !important;
+}
+
+.crm-section-header p,
+.crm-panel-head p,
+.crm-record2-card-head p,
+.crm-record2-health-head p {
+  color: var(--crm-muted) !important;
+}
+
+.crm-button,
+.crm-shell .crm-button:not(.primary),
+.crm-saved-view-save,
+.crm-action-button.secondary {
+  min-height: 34px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(32, 36, 30, .13) !important;
+  background: rgba(255, 255, 252, .84) !important;
+  color: var(--crm-ink) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,.72), 0 8px 20px rgba(23,25,22,.05) !important;
+}
+
+.crm-button:hover,
+.crm-saved-view-save:hover,
+.crm-action-button.secondary:hover {
+  border-color: rgba(36, 95, 70, .26) !important;
+  background: #fffefa !important;
+  transform: translateY(-1px);
+}
+
+.crm-button.primary,
+.crm-shell .crm-button.primary,
+.crm-record2-hero .crm-button.primary,
+.crm-action-button.primary {
+  background: linear-gradient(180deg, #21382b, #142018) !important;
+  border-color: rgba(255,255,255,.18) !important;
+  color: #fff !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), 0 14px 32px rgba(20,32,24,.24) !important;
+}
+
+.crm-object-header .crm-button,
+.crm-scenic-hero .crm-button,
+.crm-record2-hero .crm-button {
+  background: rgba(255, 255, 252, .14) !important;
+  border-color: rgba(255,255,255,.22) !important;
+  color: #fff !important;
+}
+
+.crm-object-header .crm-button.primary,
+.crm-scenic-hero .crm-button.primary,
+.crm-record2-hero .crm-button.primary {
+  background: rgba(255, 255, 252, .92) !important;
+  border-color: rgba(255,255,255,.7) !important;
+  color: #142018 !important;
+}
+
+.crm-input,
+.crm-select,
+.crm-textarea,
+.crm-search-button,
+label.crm-search-button {
+  border-radius: 9px !important;
+  border: 1px solid rgba(32, 36, 30, .13) !important;
+  background: rgba(255, 255, 252, .86) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.72) !important;
+}
+
+.crm-search-button {
+  background: rgba(255, 255, 252, .66) !important;
+}
+
+.crm-input:focus,
+.crm-select:focus,
+.crm-textarea:focus,
+.crm-search-button:focus-within,
+label.crm-search-button:focus-within {
+  border-color: rgba(36, 95, 70, .44) !important;
+  box-shadow: 0 0 0 4px rgba(36, 95, 70, .09), inset 0 1px 0 rgba(255,255,255,.72) !important;
+}
+
+.crm-filter-bar,
+.crm-saved-view-bar {
+  background: rgba(255, 255, 252, .66) !important;
+  border: 1px solid rgba(255, 255, 255, .72) !important;
+  border-radius: 13px !important;
+  box-shadow: var(--crm-shadow-sm) !important;
+  backdrop-filter: blur(18px) saturate(1.1) !important;
+}
+
+.crm-filter-chips button,
+.crm-view-tabs a,
+.crm-view-tabs button,
+.crm-record2-tabs button,
+.crm-saved-view {
+  border-radius: 8px !important;
+  color: rgba(23, 25, 22, .64) !important;
+}
+
+.crm-filter-chips button.active,
+.crm-view-tabs .active,
+.crm-record2-tabs button.active,
+.crm-saved-view.active {
+  background: #fffefa !important;
+  border-color: rgba(32, 36, 30, .13) !important;
+  color: var(--crm-ink) !important;
+  box-shadow: 0 8px 18px rgba(23,25,22,.07) !important;
+}
+
+.crm-table,
+.crm-shell table.crm-table {
+  background: var(--crm-paper-solid) !important;
+}
+
+.crm-table th,
+.crm-shell table.crm-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgba(249, 250, 246, .96) !important;
+  color: rgba(23, 25, 22, .54) !important;
+  font-size: 11px !important;
+  font-weight: 760 !important;
+  border-bottom: 1px solid var(--crm-line) !important;
+}
+
+.crm-table td,
+.crm-shell table.crm-table td {
+  color: rgba(23, 25, 22, .86) !important;
+  border-bottom: 1px solid rgba(32, 36, 30, .07) !important;
+}
+
+.crm-table tr:hover td,
+.crm-shell table.crm-table tr:hover td {
+  background: rgba(242, 246, 238, .74) !important;
+}
+
+.crm-deal-card,
+.crm-compact-deal-card,
+.crm-shell .crm-deal-card,
+.crm-shell .crm-compact-deal-card,
+.crm-work-row,
+.crm-directory-row,
+.crm-task-row,
+.crm-record2-task-row,
+.crm-pipeline-card,
+.crm-note-row,
+.crm-quality-row,
+.crm-save-view-list article,
+.crm-ai-preview-list article,
+.crm-insight-detail-grid section,
+.crm-record2-mini-card,
+.crm-record2-person-card,
+.crm-record2-meeting-list article {
+  border-radius: 12px !important;
+  border: 1px solid rgba(32, 36, 30, .1) !important;
+  background: rgba(255, 255, 252, .76) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,.72) !important;
+}
+
+.crm-deal-card:hover,
+.crm-compact-deal-card:hover,
+.crm-work-row:hover,
+.crm-directory-row:hover,
+.crm-task-row:hover,
+.crm-pipeline-card:hover {
+  border-color: rgba(36, 95, 70, .24) !important;
+  background: #fffefa !important;
+  box-shadow: 0 14px 34px rgba(23,25,22,.09) !important;
+}
+
+.crm-stage-header,
+.crm-task-column header {
+  border-bottom: 1px solid rgba(32, 36, 30, .08) !important;
+}
+
+.crm-badge,
+.crm-pill-reset {
+  border-radius: 999px !important;
+  border: 1px solid rgba(32, 36, 30, .1) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.5);
+}
+
+.crm-badge.good,
+.crm-pill-reset.good {
+  background: rgba(36, 95, 70, .1) !important;
+  color: #245f46 !important;
+}
+
+.crm-badge.warn,
+.crm-pill-reset.watch {
+  background: rgba(166, 107, 42, .12) !important;
+  color: #81551f !important;
+}
+
+.crm-badge.danger,
+.crm-pill-reset.risk {
+  background: rgba(151, 55, 55, .1) !important;
+  color: #8a3434 !important;
+}
+
+.crm-insight-record {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 252, .96), rgba(250, 250, 246, .92)) !important;
+}
+
+.crm-insight-record-head h2,
+.crm-insight-explanation,
+.crm-insight-detail-grid p,
+.crm-record2-health-summary p,
+.crm-record2-health-next p,
+.crm-message-structured p {
+  color: rgba(23, 25, 22, .88) !important;
+}
+
+.crm-insight-detail-grid h3,
+.crm-insight-record-head span,
+.crm-insight-confidence small,
+.crm-record2-eyebrow {
+  color: rgba(23, 25, 22, .56) !important;
+}
+
+.crm-assistant-drawer {
+  right: 18px !important;
+  bottom: 18px !important;
+  overflow: hidden;
+}
+
+.crm-assistant-drawer header {
+  background:
+    linear-gradient(90deg, rgba(17, 23, 19, .9), rgba(36, 58, 43, .72)),
+    url('/images/halvex-mountain-bg.jpg') center 48% / cover no-repeat !important;
+  color: #fff !important;
+}
+
+.crm-assistant-drawer header small,
+.crm-assistant-context,
+.crm-assistant-context span {
+  color: rgba(255,255,255,.68) !important;
+}
+
+.crm-assistant-prompts button {
+  border-radius: 999px !important;
+  background: rgba(36, 95, 70, .08) !important;
+  border: 1px solid rgba(36, 95, 70, .13) !important;
+  color: #245f46 !important;
+}
+
+.crm-message.assistant {
+  background: rgba(255, 255, 252, .88) !important;
+}
+
+.crm-message.user {
+  background: linear-gradient(180deg, #20362a, #121d16) !important;
+}
+
+.crm-command-menu {
+  overflow: hidden;
+}
+
+.crm-command-menu > label {
+  background: rgba(255, 255, 252, .88) !important;
+  border-bottom: 1px solid rgba(32, 36, 30, .08) !important;
+}
+
+.crm-command-results button:hover,
+.crm-command-record:hover {
+  background: rgba(242, 246, 238, .9) !important;
+}
+
+.crm-save-view-panel {
+  border-top: 1px solid rgba(32, 36, 30, .08) !important;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 252, .74), rgba(245, 247, 241, .82)),
+    rgba(255,255,255,.38) !important;
+}
+
+.crm-page-intent {
+  display: grid !important;
+  opacity: 1 !important;
+}
+
+@media (max-width: 760px) {
+  body {
+    background:
+      linear-gradient(180deg, rgba(247, 248, 244, .86), rgba(250, 250, 247, .96)),
+      url('/images/halvex-mountain-bg.jpg') center top / auto 420px no-repeat !important;
+  }
+
+  .crm-content {
+    padding: 14px 12px 88px !important;
+  }
+
+  .crm-object-header,
+  .crm-scenic-hero,
+  .crm-record2-hero {
+    border-radius: 14px !important;
+    padding: 20px !important;
+  }
+
+  .crm-object-header h1,
+  .crm-scenic-copy h1,
+  .crm-record2-hero-copy h1 {
+    font-size: clamp(2rem, 13vw, 2.8rem) !important;
+  }
+}
