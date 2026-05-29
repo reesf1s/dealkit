@@ -27,7 +27,6 @@ import {
   CrmPanel,
   CrmRiskBadge,
   CrmSkeleton,
-  WorkspaceBriefing,
   LinkedRecordChip,
   compact,
   money,
@@ -102,11 +101,7 @@ export default function DealRecordPage() {
         onAddTask={() => setActiveTab('tasks')}
       />
 
-      <WorkspaceBriefing items={[
-        { label: 'Record', title: 'Operate from saved fields', text: 'Stage, value, probability, close date, owner, people, notes, and tasks are usable without AI.' },
-        { label: 'Evidence', title: 'Timeline tells the truth', text: 'Notes, task changes, and activity create the evidence layer behind every risk or next-step recommendation.' },
-        { label: 'Analyst', title: 'Ask precise sales questions', text: 'Analyse risk, find missing buyer info, extract note updates, explain score, or draft a follow-up from this deal context.' },
-      ]} />
+      <DealRecordPulse context={context} health={health} onTab={setActiveTab} />
 
       <div className="crm-record2-tabs" aria-label="Deal record sections">
         {tabs.map(tab => (
@@ -157,6 +152,45 @@ function DealRecordHero({ deal, context, health, onAddNote, onAddTask }: { deal:
         <Fact label="Probability" value={deal.probability ? `${deal.probability}%` : 'Not set'} empty={!deal.probability} />
         <div className="crm-record2-fact"><span>Risk</span><CrmRiskBadge risk={health.risk} /></div>
       </div>
+    </section>
+  )
+}
+
+function DealRecordPulse({ context, health, onTab }: { context: any; health: ReturnType<typeof buildHealth>; onTab: (tab: DealTab) => void }) {
+  const deal = context.deal
+  const contacts = context.contacts ?? []
+  const openTasks = splitTasks(context.openTasks ?? []).active
+  const latestActivity = context.latestActivities?.[0]
+  const missing = [
+    !deal.aiNextAction ? 'Next step' : null,
+    !deal.expectedCloseDate ? 'Close date' : null,
+    !deal.valueAmount ? 'Value' : null,
+    !contacts.length ? 'Buyer' : null,
+    !openTasks.length ? 'Task' : null,
+  ].filter(Boolean)
+
+  return (
+    <section className="crm-record-pulse" aria-label="Deal operating pulse">
+      <article className="primary">
+        <span>Record pulse</span>
+        <strong>{health.summary || 'Keep fields, notes, people, and tasks current before asking for intelligence.'}</strong>
+        <p>{latestActivity?.summary || latestActivity?.body || 'No recent customer evidence has been saved yet.'}</p>
+      </article>
+      <button type="button" onClick={() => onTab('people')}>
+        <span>Buying group</span>
+        <strong>{contacts.length}</strong>
+        <small>{contacts[0]?.fullName ?? 'Link buyer roles'}</small>
+      </button>
+      <button type="button" onClick={() => onTab('tasks')}>
+        <span>Open work</span>
+        <strong>{openTasks.length}</strong>
+        <small>{openTasks[0]?.title ?? 'Create next action'}</small>
+      </button>
+      <button type="button" onClick={() => askHalvex(`Find missing fields and buyer information for ${deal.title}. Return evidence, confidence, and suggested manual updates.`, deal.id)}>
+        <span>Missing context</span>
+        <strong>{missing.length}</strong>
+        <small>{missing.length ? missing.join(', ') : 'Record looks complete'}</small>
+      </button>
     </section>
   )
 }

@@ -6,7 +6,7 @@ import useSWR from 'swr'
 import Link from 'next/link'
 import { Building2, Globe2, Plus, Search, SlidersHorizontal } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmSegmentedFilters, FilterBar, CrmPage, CrmPanel, CrmRiskBadge, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectStartState, ObjectWorkspaceHeader, SavedViewBar, WorkspaceBriefing, money, shortDate } from '@/components/crm/CrmShell'
+import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmSegmentedFilters, FilterBar, CrmPage, CrmPanel, CrmRiskBadge, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectStartState, ObjectWorkspaceHeader, SavedViewBar, money, shortDate } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -118,11 +118,13 @@ export default function CompaniesPage() {
         <CrmStat label="Need attention" value={riskAccounts} />
         </>}
       />
-      <WorkspaceBriefing items={[
-        { label: 'Object model', title: 'Companies anchor the workspace', text: 'Open a company to understand the people, opportunities, activity, and outstanding work attached to that account.' },
-        { label: 'Data quality', title: 'Missing fields are visible', text: 'Domain, industry, owner context, open value, last activity, and next action should be obvious from the list.' },
-        { label: 'AI assist', title: 'Summaries stay contextual', text: 'Use Halvex from the linked deal or command menu when you want an account read, not as a separate destination.' },
-      ]} />
+      <CompanyOperatingMap
+        companies={allCompanies}
+        pipelineValue={pipelineValue}
+        openDealAccounts={openDealAccounts}
+        riskAccounts={riskAccounts}
+        onMissingData={() => setSegment('missing')}
+      />
       {quickAddOpen ? <QuickAddCompany onCancel={() => setQuickAddOpen(false)} onCreated={async () => { setQuickAddOpen(false); await mutate() }} /> : null}
       <CrmPanel>
         <CrmSectionHeader title="Company records" description="Saved views over the same account objects. Open the record for connected deals, people, notes, and tasks." action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add company</CrmButton>} />
@@ -259,6 +261,39 @@ function describeCompanyView(view: Pick<CompanySavedView, 'query' | 'segment'>) 
     no_next: 'open accounts without next action',
   }
   return [segmentLabel[view.segment], view.query ? `search "${view.query}"` : null].filter(Boolean).join(' · ')
+}
+
+function CompanyOperatingMap({ companies, pipelineValue, openDealAccounts, riskAccounts, onMissingData }: { companies: any[]; pipelineValue: number; openDealAccounts: number; riskAccounts: number; onMissingData: () => void }) {
+  const missingData = companies.filter((company: any) => !company.domain || !company.industry).length
+  const noNextAction = companies.filter((company: any) => Number(company.openDeals ?? 0) > 0 && !company.nextAction).length
+  const topAccounts = [...companies]
+    .sort((a: any, b: any) => Number(b.pipelineValue ?? 0) - Number(a.pipelineValue ?? 0))
+    .slice(0, 4)
+
+  return (
+    <section className="crm-operating-map accounts" aria-label="Account operating map">
+      <div className="crm-operating-map-main">
+        <div className="crm-operating-map-head">
+          <span>Account map</span>
+          <strong>{openDealAccounts} selling accounts · {money(pipelineValue)}</strong>
+        </div>
+        <div className="crm-operating-account-strip">
+          {topAccounts.length ? topAccounts.map((company: any) => (
+            <article key={company.id}>
+              <strong><ClampedText lines={1}>{company.name}</ClampedText></strong>
+              <span>{company.openDeals ?? 0} open deals</span>
+              <small>{money(company.pipelineValue)} pipeline</small>
+            </article>
+          )) : <article><strong>No accounts yet</strong><span>Create the first company</span><small>Then add people and deals</small></article>}
+        </div>
+      </div>
+      <div className="crm-operating-map-side">
+        <button type="button" onClick={onMissingData}><span>Missing data</span><strong>{missingData}</strong></button>
+        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'Find company records with missing account data, stale activity, or unclear next actions.' } }))}><span>No next action</span><strong>{noNextAction}</strong></button>
+        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'Summarise the riskiest accounts with evidence and recommended manual actions.' } }))}><span>At risk</span><strong>{riskAccounts}</strong></button>
+      </div>
+    </section>
+  )
 }
 
 function isCompanySavedView(view: any): view is CompanySavedView {

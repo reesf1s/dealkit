@@ -199,20 +199,42 @@ export function CrmShell({ children }: { children: ReactNode }) {
 
       <div className="crm-main">
         <header className="crm-topbar">
-          <div className="crm-topbar-crumb">
-            <span>CRM</span>
-            <ChevronRight size={14} />
-            <strong>{currentPageLabel(pathname)}</strong>
+          <Link href="/home" className="crm-topbar-brand" aria-label="Halvex home">
+            <span>H</span>
+            <div>
+              <strong>Halvex</strong>
+              <small>{currentPageLabel(pathname)}</small>
+            </div>
+          </Link>
+          <nav className="crm-topbar-nav" aria-label="Primary navigation">
+            {nav.map(item => {
+              const Icon = item.icon
+              return (
+                <Link key={item.href} href={item.href} className={active(pathname, item.href) ? 'active' : ''}>
+                  <Icon size={15} />
+                  <span>{item.label}</span>
+                </Link>
+              )
+            })}
+          </nav>
+          <div className="crm-topbar-utility">
+            <button type="button" className="crm-search-button" onClick={() => setCommandOpen(true)}>
+              <Search size={16} />
+              <span>Search, create, or ask Halvex...</span>
+              <kbd>⌘K</kbd>
+            </button>
+            <button type="button" className="crm-topbar-new" onClick={() => router.push('/deals?quick=deal')}>
+              <Plus size={15} />
+              <span>New</span>
+            </button>
+            <button type="button" className="crm-topbar-ai" onClick={() => setAssistantOpen(true)}>
+              <Sparkles size={16} />
+              <span>Ask Halvex</span>
+            </button>
+            <button type="button" className="crm-topbar-settings" onClick={() => router.push('/settings')} aria-label="Settings">
+              <Settings size={16} />
+            </button>
           </div>
-          <button type="button" className="crm-search-button" onClick={() => setCommandOpen(true)}>
-            <Search size={16} />
-            <span>Search records, create objects, or ask Halvex...</span>
-            <kbd>⌘K</kbd>
-          </button>
-          <button type="button" className="crm-topbar-ai" onClick={() => setAssistantOpen(true)}>
-            <Sparkles size={16} />
-            <span>Ask Halvex</span>
-          </button>
         </header>
         <main className="crm-content">{children}</main>
       </div>

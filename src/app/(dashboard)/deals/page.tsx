@@ -25,7 +25,6 @@ import {
   ObjectWorkspaceHeader,
   SavedViewBar,
   ViewTabs,
-  WorkspaceBriefing,
   money,
   shortDate,
 } from '@/components/crm/CrmShell'
@@ -186,11 +185,14 @@ function DealsContent() {
         </>}
       />
 
-      <WorkspaceBriefing items={[
-        { label: 'Manual first', title: 'Run deals from the table', text: 'Scan stage, value, close date, people, last activity, next step, risk, and priority without opening every record.' },
-        { label: 'Views', title: 'Saved operating lenses', text: 'Open, closing soon, no next step, at risk, and all deals are filters over the same object data, not disconnected reports.' },
-        { label: 'AI layer', title: 'Ask for the missing read', text: 'Open a deal to analyse risk, find missing buyer information, extract note updates, or draft a follow-up with evidence.' },
-      ]} />
+      <DealOperatingMap
+        deals={allDeals}
+        stages={stages}
+        openValue={openValue}
+        noNext={noNext}
+        needsReview={needsReview}
+        onMissingNext={() => setQuery('no-next-step')}
+      />
 
       {quickAddOpen ? <QuickAddDeal onCancel={() => setQuickAddOpen(false)} onCreated={async (id) => { await mutate(); router.push(`/deals/${id}`) }} /> : null}
 
@@ -386,6 +388,55 @@ function QuickAddDeal({ onCancel, onCreated }: { onCancel: () => void; onCreated
         </div>
       </form>
     </CrmPanel>
+  )
+}
+
+function DealOperatingMap({ deals, stages, openValue, noNext, needsReview, onMissingNext }: { deals: any[]; stages: any[]; openValue: number; noNext: number; needsReview: number; onMissingNext: () => void }) {
+  const openDeals = deals.filter((deal: any) => deal.status === 'open')
+  const highRisk = openDeals.filter((deal: any) => deal.aiRiskLevel === 'high').length
+  const stageCards = stages.length ? stages.slice(0, 6).map((stage: any) => {
+    const stageDeals = openDeals.filter((deal: any) => deal.stageId === stage.id)
+    const value = stageDeals.reduce((sum: number, deal: any) => sum + Number(deal.valueAmount ?? 0), 0)
+    return { id: stage.id, name: stage.name, count: stageDeals.length, value }
+  }) : [
+    { id: 'company', name: 'Company', count: 1, value: 0, setup: 'Add account' },
+    { id: 'person', name: 'Person', count: 2, value: 0, setup: 'Link buyer' },
+    { id: 'deal', name: 'Deal', count: 3, value: 0, setup: 'Set value' },
+    { id: 'task', name: 'Task', count: 4, value: 0, setup: 'Create next step' },
+  ]
+
+  return (
+    <section className="crm-operating-map deals" aria-label="Pipeline operating map">
+      <div className="crm-operating-map-main">
+        <div className="crm-operating-map-head">
+          <span>Pipeline map</span>
+          <strong>{openDeals.length} active records · {money(openValue)}</strong>
+        </div>
+        <div className="crm-operating-stage-strip">
+          {stageCards.map(stage => (
+            <article key={stage.id}>
+              <span>{stage.name}</span>
+              <strong>{stage.count}</strong>
+              <small>{'setup' in stage ? stage.setup : money(stage.value)}</small>
+            </article>
+          ))}
+        </div>
+      </div>
+      <div className="crm-operating-map-side">
+        <button type="button" onClick={onMissingNext}>
+          <span>Missing next step</span>
+          <strong>{noNext}</strong>
+        </button>
+        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'Review the open pipeline and identify the highest leverage manual actions. Use evidence from deal records only.' } }))}>
+          <span>Needs review</span>
+          <strong>{needsReview}</strong>
+        </button>
+        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'Explain the highest risk open deals with evidence, missing buyer information, and suggested next steps.' } }))}>
+          <span>High risk</span>
+          <strong>{highRisk}</strong>
+        </button>
+      </div>
+    </section>
   )
 }
 

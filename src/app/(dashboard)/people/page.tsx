@@ -6,7 +6,7 @@ import useSWR from 'swr'
 import Link from 'next/link'
 import { Mail, Plus, Search, SlidersHorizontal } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmSegmentedFilters, FilterBar, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectStartState, ObjectWorkspaceHeader, SavedViewBar, WorkspaceBriefing, shortDate } from '@/components/crm/CrmShell'
+import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmSegmentedFilters, FilterBar, CrmPage, CrmPanel, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectStartState, ObjectWorkspaceHeader, SavedViewBar, shortDate } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -117,11 +117,12 @@ export default function PeoplePage() {
         <CrmStat label="Need company" value={missingCompany} />
         </>}
       />
-      <WorkspaceBriefing items={[
-        { label: 'Relationships', title: 'Know who matters', text: 'Use people records to track role, company, contactability, open deals, and relationship freshness.' },
-        { label: 'Clean data', title: 'Missing company is a workflow', text: 'Contacts without company or role context are surfaced so the CRM stays useful for follow-up and forecasting.' },
-        { label: 'AI assist', title: 'Turn messy notes into structure', text: 'From a deal or command menu, ask Halvex to identify buyer roles, missing stakeholders, and follow-up drafts.' },
-      ]} />
+      <PeopleOperatingMap
+        people={allPeople}
+        recentlyTouched={recentlyTouched}
+        missingCompany={missingCompany}
+        onMissingData={() => setSegment('missing')}
+      />
       {quickAddOpen ? <QuickAddPerson onCancel={() => setQuickAddOpen(false)} onCreated={async () => { setQuickAddOpen(false); await mutate() }} /> : null}
       <CrmPanel>
         <CrmSectionHeader title="People records" description="Search, filter, and open the person record before taking action." action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add person</CrmButton>} />
@@ -257,6 +258,45 @@ function describePeopleView(view: Pick<PeopleSavedView, 'query' | 'segment'>) {
     open: 'people attached to open deals',
   }
   return [segmentLabel[view.segment], view.query ? `search "${view.query}"` : null].filter(Boolean).join(' · ')
+}
+
+function PeopleOperatingMap({ people, recentlyTouched, missingCompany, onMissingData }: { people: any[]; recentlyTouched: number; missingCompany: number; onMissingData: () => void }) {
+  const openDealPeople = people.filter((person: any) => Number(person.openDeals ?? person.openDealCount ?? 0) > 0).length
+  const missingRole = people.filter((person: any) => !person.jobTitle).length
+  const recent = [...people]
+    .sort((a: any, b: any) => dateValue(b.lastContactedAt) - dateValue(a.lastContactedAt))
+    .slice(0, 4)
+
+  return (
+    <section className="crm-operating-map people" aria-label="Relationship operating map">
+      <div className="crm-operating-map-main">
+        <div className="crm-operating-map-head">
+          <span>Relationship map</span>
+          <strong>{people.length} people · {recentlyTouched} touched this month</strong>
+        </div>
+        <div className="crm-operating-account-strip">
+          {recent.length ? recent.map((person: any) => (
+            <article key={person.id}>
+              <strong><ClampedText lines={1}>{person.fullName}</ClampedText></strong>
+              <span>{person.jobTitle ?? 'Role missing'}</span>
+              <small>{person.lastContactedAt ? `Touched ${shortDate(person.lastContactedAt)}` : 'No recent touch'}</small>
+            </article>
+          )) : <article><strong>No people yet</strong><span>Add the first buyer</span><small>Then link them to a company or deal</small></article>}
+        </div>
+      </div>
+      <div className="crm-operating-map-side">
+        <button type="button" onClick={onMissingData}><span>Missing role</span><strong>{missingRole}</strong></button>
+        <button type="button" onClick={onMissingData}><span>No company</span><strong>{missingCompany}</strong></button>
+        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'Find people records with missing buyer role, missing company, weak relationship context, or follow-up gaps.' } }))}><span>Open deals</span><strong>{openDealPeople}</strong></button>
+      </div>
+    </section>
+  )
+}
+
+function dateValue(value?: string | null) {
+  if (!value) return 0
+  const time = new Date(value).getTime()
+  return Number.isFinite(time) ? time : 0
 }
 
 function isPeopleSavedView(view: any): view is PeopleSavedView {
