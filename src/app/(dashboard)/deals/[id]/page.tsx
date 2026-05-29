@@ -164,50 +164,10 @@ function OverviewTab({ context, deal, stages, health, onUpdate, onTab }: { conte
   return (
     <div className="crm-record2-stack">
       <DealFieldsCard deal={deal} stages={stages} onUpdate={onUpdate} />
-      <DealPerformancePanel context={context} deal={deal} health={health} onTab={onTab} />
       <NextStepCard deal={deal} health={health} onEdit={() => onTab('overview')} />
       <OverviewGrid context={context} onTab={onTab} />
       <RecentActivityCard activities={context.latestActivities ?? []} onOpen={() => onTab('activity')} />
     </div>
-  )
-}
-
-function DealPerformancePanel({ context, deal, health, onTab }: { context: any; deal: any; health: ReturnType<typeof buildHealth>; onTab: (tab: DealTab) => void }) {
-  const contacts = context.contacts ?? []
-  const tasks = splitTasks(context.openTasks ?? []).active
-  const value = Number(deal.valueAmount ?? 0)
-  const probability = Number(deal.probability ?? 0)
-  const weighted = Math.round(value * (probability / 100))
-  const fields = [
-    { label: 'Buyer', value: contacts.length ? contacts.length : 0, complete: contacts.length > 0 },
-    { label: 'Value', value: value ? money(value) : 'Missing', complete: value > 0 },
-    { label: 'Close', value: deal.expectedCloseDate ? shortDate(deal.expectedCloseDate) : 'Missing', complete: Boolean(deal.expectedCloseDate) },
-    { label: 'Next', value: deal.aiNextAction ? 'Set' : 'Missing', complete: Boolean(deal.aiNextAction) },
-  ]
-  const completeCount = fields.filter(field => field.complete).length
-  return (
-    <CrmPanel className="deal-performance-panel">
-      <div className="deal-performance-main">
-        <div>
-          <span>Deal model</span>
-          <h2>{money(weighted)} weighted</h2>
-          <p>{probability || 0}% probability · {health.confidence ? `${health.confidence}% AI confidence` : 'confidence pending'}</p>
-        </div>
-        <div className="deal-performance-path" style={{ '--complete': `${(completeCount / fields.length) * 100}%` } as any}>
-          {fields.map(field => (
-            <button key={field.label} type="button" className={field.complete ? 'complete' : ''} onClick={() => onTab(field.label === 'Buyer' ? 'people' : field.label === 'Next' ? 'tasks' : 'overview')}>
-              <span>{field.label}</span>
-              <strong>{field.value}</strong>
-            </button>
-          ))}
-        </div>
-      </div>
-      <aside>
-        <small>Work queue</small>
-        <strong>{tasks.length ? `${tasks.length} open task${tasks.length === 1 ? '' : 's'}` : 'No task set'}</strong>
-        <p>{tasks[0]?.title ?? health.nextAction ?? 'Create the next action before relying on AI recommendations.'}</p>
-      </aside>
-    </CrmPanel>
   )
 }
 
