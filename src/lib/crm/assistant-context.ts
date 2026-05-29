@@ -89,7 +89,10 @@ export function enforceAssistantStructure(answer: string, fallback: string, opts
   if (!text) return fallback
   if (opts.draft) return text
   const lower = text.toLowerCase()
-  const hasStructure = lower.includes('what happened') && (lower.includes('what it means') || lower.includes('meaning')) && lower.includes('next')
+  const hasNormalStructure = lower.includes('what happened') && (lower.includes('what it means') || lower.includes('meaning')) && lower.includes('next')
+  const hasDealMemoStructure = lower.includes('what changed') && lower.includes('risk') && lower.includes('evidence') && lower.includes('recommended action')
+  const hasExtractionStructure = lower.includes('field updates') && lower.includes('tasks') && lower.includes('notes')
+  const hasStructure = hasNormalStructure || hasDealMemoStructure || hasExtractionStructure
   if (hasStructure) return text
   return fallback
 }

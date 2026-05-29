@@ -132,12 +132,18 @@ export default function DealRecordPage() {
 
 function DealRecordHero({ deal, context, health, onAddNote, onAddTask }: { deal: any; context: any; health: ReturnType<typeof buildHealth>; onAddNote: () => void; onAddTask: () => void }) {
   const companyName = context.company?.name ?? deal.companyName ?? 'Unknown company'
+  const summary = [
+    companyName,
+    deal.stageName ?? 'No stage',
+    money(deal.valueAmount),
+    deal.expectedCloseDate ? `Close ${shortDate(deal.expectedCloseDate)}` : 'Close date missing',
+  ].filter(Boolean).join(' · ')
   return (
     <section className="app-record-hero">
       <div className="app-record-hero-copy">
         <small>Deal</small>
         <h1><ClampedText lines={2} title={deal.title}>{deal.title}</ClampedText></h1>
-        <p>{companyName} · {deal.stageName ?? 'No stage'} · {deal.status ?? 'open'}</p>
+        <p>{summary}</p>
         <div className="crm-record2-actions">
           <CrmButton tone="primary" onClick={onAddNote}><NotebookPen size={16} /> Add note</CrmButton>
           <CrmButton onClick={onAddTask}><CheckCircle2 size={16} /> Add task</CrmButton>
@@ -204,7 +210,7 @@ function DealFieldsCard({ deal, stages, onUpdate }: { deal: any; stages: any[]; 
     <CrmPanel className="crm-record2-card">
       <div className="crm-record2-card-head">
         <div>
-          <h2>Deal details</h2>
+          <h2>Record fields</h2>
         </div>
         {changed ? <CrmButton form="deal-fields-form" type="submit" tone="primary" disabled={saving || !draft.title.trim()}>{saving ? 'Saving...' : 'Save changes'}</CrmButton> : <span className="crm-record2-saved">Saved</span>}
       </div>
@@ -214,7 +220,7 @@ function DealFieldsCard({ deal, stages, onUpdate }: { deal: any; stages: any[]; 
         <label>Status<select className="crm-select" value={draft.status} onChange={event => setField('status', event.target.value)}><option value="open">Open</option><option value="won">Won</option><option value="lost">Lost</option><option value="archived">Archived</option></select></label>
         <label>Value<input className="crm-input" value={draft.valueAmount} onChange={event => setField('valueAmount', event.target.value)} type="number" placeholder="Add value" /></label>
         <label>Close date<input className="crm-input" value={draft.expectedCloseDate} onChange={event => setField('expectedCloseDate', event.target.value)} type="date" /></label>
-        <label className="full">Next step<textarea className="crm-textarea compact" value={draft.nextAction} onChange={event => setField('nextAction', event.target.value)} placeholder="Add the next concrete step..." /></label>
+        <label className="full">Next step<textarea className="crm-textarea compact" value={draft.nextAction} onChange={event => setField('nextAction', event.target.value)} placeholder="Book buyer call, confirm budget, send proposal..." /></label>
       </form>
     </CrmPanel>
   )
@@ -227,7 +233,7 @@ function NextStepCard({ deal, health, onEdit }: { deal: any; health: ReturnType<
       <div className="crm-record2-next-icon"><Clock3 size={18} /></div>
       <div>
         <span>Next step</span>
-        <strong>{next ? <ClampedText lines={2} title={next}>{next}</ClampedText> : '—'}</strong>
+        <strong>{next ? <ClampedText lines={2} title={next}>{next}</ClampedText> : 'No next step saved'}</strong>
       </div>
       <CrmButton onClick={onEdit}>{next ? 'Edit' : 'Add next step'}</CrmButton>
     </CrmPanel>
@@ -245,7 +251,7 @@ function OverviewGrid({ context, onTab }: { context: any; onTab: (tab: DealTab) 
           <h3>Company</h3>
         </div>
         <strong>{context.company?.name ?? 'Unknown company'}</strong>
-        <p>{context.company?.domain ?? context.company?.website ?? 'No domain saved'}</p>
+        <p>{context.company?.domain ?? context.company?.website ?? 'Domain missing'}</p>
         {context.company?.id ? <CrmButton href={`/companies/${context.company.id}`}>Open company</CrmButton> : <CrmButton href="/companies">Companies</CrmButton>}
       </CrmPanel>
       <CrmPanel className="crm-record2-mini-card">
@@ -254,7 +260,7 @@ function OverviewGrid({ context, onTab }: { context: any; onTab: (tab: DealTab) 
           <h3>People</h3>
         </div>
         <strong>{contacts.length ? `${contacts.length} linked` : 'No people linked'}</strong>
-        <p>{contacts[0]?.fullName ?? '—'}</p>
+        <p>{contacts[0]?.fullName ?? 'Buyer missing'}</p>
         <CrmButton onClick={() => onTab('people')}>View people</CrmButton>
       </CrmPanel>
       <CrmPanel className="crm-record2-mini-card">
@@ -263,7 +269,7 @@ function OverviewGrid({ context, onTab }: { context: any; onTab: (tab: DealTab) 
           <h3>Open tasks</h3>
         </div>
         <strong>{openTasks.length}</strong>
-        <p>{openTasks.length ? 'Open' : '—'}</p>
+        <p>{openTasks.length ? 'Open work' : 'No active task'}</p>
         <CrmButton onClick={() => onTab('tasks')}>Manage tasks</CrmButton>
       </CrmPanel>
     </div>
@@ -730,8 +736,8 @@ function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: 
     <CrmPanel className="crm-analyst-panel">
       <div className="crm-analyst-head">
         <div>
-          <span>Halvex</span>
-          <h2>Analysis</h2>
+          <span>Contextual AI</span>
+          <h2>Deal intelligence</h2>
         </div>
         <button type="button" onClick={onRefresh} aria-label="Refresh deal analysis"><RefreshCw size={16} /></button>
       </div>
@@ -742,11 +748,13 @@ function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: 
         <div><span>Risk</span><CrmRiskBadge risk={health.risk} /></div>
       </div>
 
+      <AnalystBrief context={context} health={health} />
+
       <div className="crm-analyst-actions">
-        <CrmButton tone="primary" onClick={() => runAnalysis('Deal analysis', `Analyse ${deal.title}. Include what changed, what is risky, what is missing, evidence, confidence, and recommended manual CRM updates.`)} disabled={Boolean(analysisLoading)}><Bot size={16} /> {analysisLoading === 'Deal analysis' ? 'Analysing...' : 'Analyse'}</CrmButton>
-        <CrmButton onClick={() => runAnalysis('Next step', `Suggest the next step for ${deal.title}. Explain why and what evidence supports it.`)} disabled={Boolean(analysisLoading)}><CheckCircle2 size={16} /> Next step</CrmButton>
-        <CrmButton onClick={() => runAnalysis('Follow-up draft', `Draft a concise follow-up for ${deal.title} based only on saved CRM context.`)} disabled={Boolean(analysisLoading)}><MailPlus size={16} /> Follow-up</CrmButton>
-        <CrmButton onClick={() => runAnalysis('CRM extraction', `Extract CRM updates from the latest note on ${deal.title}. Suggest field changes, tasks, and notes without applying them.`)} disabled={Boolean(analysisLoading)}><NotebookPen size={16} /> Extract</CrmButton>
+        <CrmButton tone="primary" onClick={() => runAnalysis('Deal analysis', `Analyse ${deal.title}. Use only this deal record. Return sections exactly: What changed:, Risk:, Evidence:, Recommended action:. Include confidence limits when CRM evidence is thin. Do not use generic sales language.`)} disabled={Boolean(analysisLoading)}><Bot size={16} /> {analysisLoading === 'Deal analysis' ? 'Analysing...' : 'Analyse deal'}</CrmButton>
+        <CrmButton onClick={() => runAnalysis('Next step', `Suggest the next step for ${deal.title}. Return sections exactly: Evidence:, Recommended action:, Confidence:. Make the action a concrete CRM task or field update.`)} disabled={Boolean(analysisLoading)}><CheckCircle2 size={16} /> Next step</CrmButton>
+        <CrmButton onClick={() => runAnalysis('Follow-up draft', `Draft a concise follow-up for ${deal.title} based only on saved CRM context. Return Subject: and Body:. Do not invent names or commitments.`)} disabled={Boolean(analysisLoading)}><MailPlus size={16} /> Follow-up</CrmButton>
+        <CrmButton onClick={() => runAnalysis('CRM extraction', `Extract CRM updates from the latest note on ${deal.title}. Return sections exactly: Field updates:, Tasks:, Notes:. Do not apply anything automatically.`)} disabled={Boolean(analysisLoading)}><NotebookPen size={16} /> Extract note</CrmButton>
       </div>
 
       {analysisError ? <div className="crm-analyst-error">{analysisError}</div> : null}
@@ -762,6 +770,7 @@ function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: 
       ) : null}
 
       <div className="crm-analyst-insights">
+        {insights.length ? <div className="crm-analyst-insights-head"><strong>Recommended checks</strong><span>{insights.filter(insight => !dismissed.has(insight.id)).length}</span></div> : null}
         {insights.length ? insights.filter(insight => !dismissed.has(insight.id)).map(insight => (
           <article key={insight.id} className="crm-analyst-insight">
             <header>
@@ -769,7 +778,7 @@ function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: 
                 <span>{insight.type}</span>
                 <h3>{insight.title}</h3>
               </div>
-              <strong>{insight.confidence}%</strong>
+              <div className="crm-analyst-insight-meta"><CrmRiskBadge risk={insight.risk} /><strong>{insight.confidence}%</strong></div>
             </header>
             <p>{insight.explanation}</p>
             <section>
@@ -781,14 +790,14 @@ function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: 
               <p>{insight.suggestedAction}</p>
             </section>
             <div className="crm-analyst-insight-actions">
-              <CrmButton onClick={() => createTask(insight)} disabled={busyId === insight.id}>Create task</CrmButton>
+              <CrmButton onClick={() => createTask(insight)} disabled={busyId === insight.id}>Make task</CrmButton>
               <CrmButton onClick={() => createNote(insight, 'noted')} disabled={busyId === insight.id}>Save note</CrmButton>
               <CrmButton onClick={() => createNote(insight, 'accepted')} disabled={busyId === insight.id}>Accept</CrmButton>
               <CrmButton onClick={() => createNote(insight, 'dismissed')} disabled={busyId === insight.id}>Dismiss</CrmButton>
             </div>
           </article>
         )) : (
-          <CrmEmpty title="No analysis saved" />
+          <CrmEmpty title="No active risks">Run analysis after adding notes or tasks if you want Halvex to review the record.</CrmEmpty>
         )}
         {insights.length > 0 && insights.every(insight => dismissed.has(insight.id)) ? <CrmEmpty title="No active analysis" /> : null}
       </div>
@@ -807,6 +816,34 @@ function InlineAnalysisSkeleton({ label }: { label: string }) {
       </header>
       <p>Reading deal context.</p>
     </article>
+  )
+}
+
+function AnalystBrief({ context, health }: { context: any; health: ReturnType<typeof buildHealth> }) {
+  const brief = buildAnalystBrief(context, health)
+  return (
+    <section className="crm-analyst-brief">
+      <span>{brief.label}</span>
+      <h3>{brief.title}</h3>
+      <p>{brief.body}</p>
+      <div className="crm-analyst-brief-grid">
+        <div>
+          <small>Evidence</small>
+          <strong>{brief.evidence}</strong>
+        </div>
+        <div>
+          <small>Missing</small>
+          <strong>{brief.missing}</strong>
+        </div>
+      </div>
+      {brief.next ? <div className="crm-analyst-brief-next"><small>Next</small><p>{brief.next}</p></div> : null}
+      {brief.questions.length ? (
+        <div className="crm-analyst-brief-questions">
+          <small>Ask next</small>
+          {brief.questions.map(question => <p key={question}>{question}</p>)}
+        </div>
+      ) : null}
+    </section>
   )
 }
 
@@ -837,8 +874,8 @@ function InlineAnalysisResult({ analysis, busy, onSaveNote, onCreateTask, onOpen
         </div>
       ) : null}
       <div className="crm-inline-analysis-actions">
-        <CrmButton onClick={onCreateTask} disabled={busy === `analysis-task-${analysis.id}`}>Create task from next action</CrmButton>
-        <CrmButton onClick={onSaveNote} disabled={busy === `analysis-note-${analysis.id}`}>Save as note</CrmButton>
+        <CrmButton onClick={onCreateTask} disabled={busy === `analysis-task-${analysis.id}`}>Create task</CrmButton>
+        <CrmButton onClick={onSaveNote} disabled={busy === `analysis-note-${analysis.id}`}>Save note</CrmButton>
       </div>
     </article>
   )
@@ -923,7 +960,23 @@ function askHalvex(query: string, dealId: string) {
 function parseInlineAnalysisSections(answer: string) {
   const sections: Array<{ label: string; body: string }> = []
   let current: { label: string; body: string } | null = null
-  const knownLabels = new Set(['what happened', 'what it means', 'next', 'check', 'evidence', 'suggested action', 'confidence', 'subject', 'body'])
+  const knownLabels = new Set([
+    'what happened',
+    'what changed',
+    'what it means',
+    'risk',
+    'next',
+    'check',
+    'evidence',
+    'recommended action',
+    'suggested action',
+    'confidence',
+    'field updates',
+    'tasks',
+    'notes',
+    'subject',
+    'body',
+  ])
 
   for (const rawLine of answer.split('\n')) {
     const line = rawLine.trim()
@@ -947,7 +1000,7 @@ function parseInlineAnalysisSections(answer: string) {
 
 function extractSuggestedAction(answer: string) {
   const sections = parseInlineAnalysisSections(answer)
-  const preferred = sections.find(section => /next|suggested action/i.test(section.label))
+  const preferred = sections.find(section => /next|recommended action|suggested action|tasks/i.test(section.label))
   const source = preferred?.body || sections[0]?.body || answer
   const firstSentence = source.split(/\n|(?<=\.)\s+/).map(line => line.trim()).find(Boolean)
   return firstSentence ? compact(firstSentence.replace(/^[-•]\s*/, ''), 140) : null
@@ -963,6 +1016,20 @@ function toInputDate(value?: string | Date | null) {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return date.toISOString().slice(0, 10)
+}
+
+function daysSince(value?: string | Date | null) {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return Math.max(0, Math.floor((Date.now() - date.getTime()) / 86_400_000))
+}
+
+function daysUntil(value?: string | Date | null) {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return Math.ceil((date.getTime() - Date.now()) / 86_400_000)
 }
 
 function splitTasks(tasks: any[]) {
@@ -991,6 +1058,8 @@ function isGenericActivity(activity: any) {
 function buildInsights(context: any): DealInsight[] {
   const deal = context?.deal ?? {}
   const intelligence = context?.intelligence ?? {}
+  const contacts = context?.contacts ?? []
+  const openTasks = splitTasks(context?.openTasks ?? []).active
   const latestEvidence = intelligence.latestEvidence?.text || context?.latestActivities?.[0]?.summary || context?.latestActivities?.[0]?.body || ''
   const confidence = clampConfidence(intelligence.confidence ?? deal.aiConfidence ?? 62)
   const insights: DealInsight[] = []
@@ -999,12 +1068,62 @@ function buildInsights(context: any): DealInsight[] {
     insights.push({
       id: 'no-next-step',
       type: 'Next step',
-      title: 'No next step saved',
-      explanation: 'The deal has no concrete next action saved on the record.',
+      title: 'Next step is missing',
+      explanation: 'The record does not have a concrete next action. That makes ownership, timing, and forecast confidence weaker even if the opportunity is real.',
       evidence: latestEvidence ? `Recent evidence reviewed: ${latestEvidence}` : 'No current task or next-step field is available on this deal.',
-      suggestedAction: `Add a dated follow-up task for ${deal.companyName ?? 'this company'} and update the next-step field.`,
+      suggestedAction: `Add a dated task for ${deal.companyName ?? 'this company'} and update the next-step field with the same action.`,
       confidence,
       risk: 'high',
+    })
+  }
+
+  if (!contacts.length) {
+    insights.push({
+      id: 'no-buyer-linked',
+      type: 'Buyer',
+      title: 'No buyer linked',
+      explanation: 'The deal has no linked person, so the record cannot show who owns the decision, who champions the work, or who should receive follow-up.',
+      evidence: `Linked people: 0. Company: ${context?.company?.name ?? deal.companyName ?? 'unknown'}.`,
+      suggestedAction: 'Link the main buyer or champion, then mark their role on the deal.',
+      confidence: Math.max(70, confidence - 4),
+      risk: 'high',
+    })
+  } else if (!contacts.some((contact: any) => contact.isPrimary || /buyer|decision|economic|owner|champion/i.test(`${contact.role ?? ''} ${contact.jobTitle ?? ''}`))) {
+    insights.push({
+      id: 'buyer-role-unclear',
+      type: 'Buyer',
+      title: 'Buyer role is unclear',
+      explanation: 'People are linked, but the buying role is not explicit. Forecast quality improves when the champion, decision maker, or economic buyer is visible.',
+      evidence: `Linked people: ${contacts.map((contact: any) => contact.fullName).filter(Boolean).join(', ') || contacts.length}. No primary buyer role is saved.`,
+      suggestedAction: 'Mark the primary buyer or update a linked person role before the next sales activity.',
+      confidence: Math.max(58, confidence - 8),
+      risk: 'medium',
+    })
+  }
+
+  if (!deal.valueAmount) {
+    insights.push({
+      id: 'value-missing',
+      type: 'Forecast',
+      title: 'Deal value is missing',
+      explanation: 'The record can move through the pipeline manually, but pipeline totals and prioritisation will be unreliable until value is saved.',
+      evidence: `Value field: ${money(deal.valueAmount)}. Stage: ${deal.stageName ?? 'no stage'}.`,
+      suggestedAction: 'Add the expected value or mark it as unknown in a note if pricing is still being scoped.',
+      confidence: 86,
+      risk: 'medium',
+    })
+  }
+
+  if (!deal.expectedCloseDate && deal.status === 'open') {
+    insights.push({
+      id: 'close-date-missing',
+      type: 'Forecast',
+      title: 'Close date is missing',
+      explanation: 'Without an expected close date, the deal is hard to sequence against the rest of the pipeline.',
+      evidence: `Close date: missing. Status: ${deal.status ?? 'open'}.`,
+      suggestedAction: 'Set a realistic expected close date, or add a note explaining why timing is unknown.',
+      confidence: 84,
+      risk: 'medium',
     })
   }
 
@@ -1012,7 +1131,7 @@ function buildInsights(context: any): DealInsight[] {
     insights.push({
       id: 'risk-drivers',
       type: 'Risk',
-      title: 'Risk drivers',
+      title: 'Risk needs attention',
       explanation: intelligence.riskDrivers.join(' '),
       evidence: latestEvidence ? `Most relevant recent evidence: ${latestEvidence}` : 'Risk was derived from saved CRM fields, tasks, signals, and recent activity.',
       suggestedAction: intelligence.nextAction || deal.aiNextAction || 'Update the next step or adjust the forecast fields.',
@@ -1044,18 +1163,34 @@ function buildInsights(context: any): DealInsight[] {
       type: 'Activity',
       title: 'High value deal has no open task',
       explanation: 'This deal has a material value and no open task attached.',
-      evidence: `Deal value: ${money(deal.valueAmount)}. Open tasks: ${context?.openTasks?.length ?? 0}. Last activity: ${deal.lastActivityAt ? shortDate(deal.lastActivityAt) : 'not recorded'}.`,
+      evidence: `Deal value: ${money(deal.valueAmount)}. Open tasks: ${openTasks.length}. Last activity: ${deal.lastActivityAt ? shortDate(deal.lastActivityAt) : 'not recorded'}.`,
       suggestedAction: 'Add a task for the buying process, next meeting, or blocker.',
       confidence: Math.max(60, confidence - 5),
       risk: 'medium',
     })
   }
 
+  if (deal.lastActivityAt && deal.status === 'open') {
+    const daysIdle = daysSince(deal.lastActivityAt)
+    if (daysIdle != null && daysIdle >= 14) {
+      insights.push({
+        id: 'stale-activity',
+        type: 'Activity',
+        title: 'Activity is stale',
+        explanation: `The last recorded activity was ${daysIdle} days ago. Open opportunities need a visible follow-up rhythm to remain forecastable.`,
+        evidence: `Last activity: ${shortDate(deal.lastActivityAt)}. Next step: ${deal.aiNextAction || 'missing'}.`,
+        suggestedAction: 'Create a follow-up task for this week or update the stage if the opportunity has gone quiet.',
+        confidence: Math.max(62, confidence - 6),
+        risk: daysIdle >= 30 ? 'high' : 'medium',
+      })
+    }
+  }
+
   if (intelligence.positiveSignals?.length && !intelligence.riskDrivers?.length) {
     insights.push({
       id: 'positive-fit-urgency',
       type: 'Opportunity',
-      title: 'Fit looks positive; urgency still needs proof',
+      title: 'Fit is visible; urgency is not proven',
       explanation: intelligence.positiveSignals.join(' '),
       evidence: latestEvidence ? `Positive signal source: ${latestEvidence}` : 'Positive signals were found in saved deal context.',
       suggestedAction: intelligence.nextAction || 'Ask what happens if the customer does nothing this quarter and record the urgency driver.',
@@ -1079,6 +1214,50 @@ function buildInsights(context: any): DealInsight[] {
   }
 
   return dedupeInsights(insights).slice(0, 8)
+}
+
+function buildAnalystBrief(context: any, health: ReturnType<typeof buildHealth>) {
+  const deal = context?.deal ?? {}
+  const intelligence = context?.intelligence ?? {}
+  const contacts = context?.contacts ?? []
+  const openTasks = splitTasks(context?.openTasks ?? []).active
+  const latestEvidence = intelligence.latestEvidence?.text
+    || context?.latestActivities?.[0]?.summary
+    || context?.latestActivities?.[0]?.body
+    || ''
+  const missing = [
+    ...(intelligence.missingData ?? []),
+    !contacts.length ? 'Buyer' : null,
+    !deal.valueAmount ? 'Value' : null,
+    !deal.expectedCloseDate ? 'Close date' : null,
+    !deal.aiNextAction ? 'Next step' : null,
+  ].filter(Boolean)
+  const primaryRisk = health.reasons[0] || (missing.length ? `${missing[0]} is missing.` : '')
+  const hasEvidence = Boolean(latestEvidence)
+  const daysToClose = daysUntil(deal.expectedCloseDate)
+  const questions = [
+    !contacts.length ? 'Who is the buyer or champion?' : null,
+    !deal.valueAmount ? 'What value should this deal carry in forecast?' : null,
+    !deal.aiNextAction ? 'What exact action should happen next?' : null,
+    daysToClose != null && daysToClose <= 14 && (deal.probability ?? 0) < 60 ? 'What has to be true for this to close on time?' : null,
+    openTasks.length ? null : 'Which task keeps this deal moving this week?',
+  ].filter(Boolean) as string[]
+  const title = health.summary
+    || (missing.length ? `${missing[0]} needs attention` : deal.status === 'won' ? 'Closed deal context is complete' : 'Record is ready for review')
+  const body = primaryRisk
+    ? compact(primaryRisk, 180)
+    : openTasks.length
+      ? `${openTasks.length} open task${openTasks.length === 1 ? '' : 's'} keep the deal moving. Review evidence before changing the forecast.`
+      : 'Core fields look workable. Add fresh notes or tasks before asking Halvex for a deeper read.'
+  return {
+    label: health.risk === 'high' ? 'Needs review' : health.risk === 'medium' ? 'Watch' : 'Current read',
+    title: compact(title, 118),
+    body,
+    evidence: hasEvidence ? compact(latestEvidence, 130) : 'No recent evidence saved',
+    missing: missing.length ? missing.slice(0, 3).join(', ') : 'Nothing obvious',
+    next: health.nextAction || deal.aiNextAction || (missing.length ? `Fill ${String(missing[0]).toLowerCase()} and add a dated follow-up.` : ''),
+    questions: questions.slice(0, 3),
+  }
 }
 
 function dedupeInsights(insights: DealInsight[]) {

@@ -239,7 +239,7 @@ export async function answerAssistantWithAI(input: {
         'If dealContext is provided, answer only about that deal. Do not use other deals, priorities, or activity unless they are explicitly included inside dealContext.',
         'If dealContext.contextPolicy exists, obey it over all other CRM data.',
         'Prioritise dealContext.latestActivities and current openTasks. Treat staleOpenTasks and staleActivities as historical context that may need user confirmation.',
-        'For normal answers, use exactly these labels: What happened:, What it means:, Next:.',
+        'For normal answers, use exactly these labels: What happened:, What it means:, Next:. If the user explicitly asks for deal memo sections, use exactly the requested labels such as What changed:, Risk:, Evidence:, Recommended action:.',
         'For follow-up email drafts, use only Subject: and Body:.',
         'Use specific deal names, newest activity, risk drivers, next actions, and links described in the data.',
         'Avoid generic phrases such as promising opportunity, strong engagement, or high potential unless the provided CRM data proves the claim.',

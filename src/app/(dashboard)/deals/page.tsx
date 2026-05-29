@@ -172,7 +172,7 @@ function DealsContent() {
       <section className="app-page-head">
         <div>
           <span className="app-kicker">Pipeline</span>
-          <h1>Deals</h1>
+          <h1>Pipeline</h1>
           <p>{openDeals.length} open · {money(openValue)} · {noNext} without next step</p>
         </div>
         <div className="app-page-actions">
@@ -188,14 +188,14 @@ function DealsContent() {
       <section className="app-metric-grid">
         <MetricCard label="Open deals" value={openDeals.length} />
         <MetricCard label="Open value" value={money(openValue)} />
-        <MetricCard label="No next step" value={noNext} />
-        <MetricCard label="Needs review" value={needsReview} />
+        <MetricCard label="Next step missing" value={noNext} />
+        <MetricCard label="Review" value={needsReview} />
       </section>
 
       <section className="app-card app-pipeline-shell">
         <CardHeader
           icon={<LayoutGrid size={18} />}
-          title="Records"
+          title="Deal records"
           action={<ViewTabs tabs={[
             { href: '/deals?view=list', label: 'List', active: view === 'list', icon: <List size={14} /> },
             { href: '/deals?view=pipeline', label: 'Pipeline', active: view === 'pipeline', icon: <LayoutGrid size={14} /> },
@@ -212,7 +212,7 @@ function DealsContent() {
             ...savedViews.map(savedView => ({ label: savedView.label, active: isSavedViewActive(savedView, { query, risk, stageFilter, statusFilter, sortBy, view }), onClick: () => applySavedView(savedView) })),
           ]}
         >
-          <button type="button" className="crm-saved-view-save" onClick={() => setSaveViewOpen(prev => !prev)}><SlidersHorizontal size={14} /> Save view</button>
+          <button type="button" className="crm-saved-view-save" onClick={() => setSaveViewOpen(prev => !prev)}><SlidersHorizontal size={14} /> Save</button>
         </SavedViewBar> : null}
 
         {showDealControls && saveViewOpen ? (
@@ -262,7 +262,11 @@ function DealsContent() {
 
         {isLoading ? <CrmSkeleton rows={8} /> : null}
         {!isLoading && !deals.length && query ? <CrmEmpty title="No matching deals" action={<CrmButton onClick={() => { setQuery(''); setRisk('all'); setStageFilter('all') }} tone="primary">Clear filters</CrmButton>} /> : null}
-        {!isLoading && !deals.length && !query && !quickAddOpen ? <CrmEmpty title="No deals yet" action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={15} /> New deal</CrmButton>} /> : null}
+        {!isLoading && !deals.length && !query && !quickAddOpen ? (
+          <CrmEmpty title="No deals yet" action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={15} /> New deal</CrmButton>}>
+            Create the first opportunity with a company, value, close date, and next step. The list and board will build from the same record.
+          </CrmEmpty>
+        ) : null}
         {!isLoading && deals.length > 0 && view === 'list' ? <ListView deals={deals} stages={stages} onMove={moveDeal} movingId={movingId} /> : null}
         {!isLoading && deals.length > 0 && view === 'pipeline' ? <PipelineView stages={stages} deals={deals} onMove={moveDeal} movingId={movingId} /> : null}
       </section>
@@ -294,8 +298,8 @@ function SaveDealViewPanel({ onSave, onCancel, savedViews, onDelete, current }: 
     <div className="crm-save-view-panel">
       <form onSubmit={(event) => { event.preventDefault(); if (label.trim()) onSave(label.trim()) }}>
         <div>
-          <strong>Save this deal view</strong>
-          <p>Search, filters, sort, and view mode.</p>
+          <strong>Save view</strong>
+          <p>Search, filters, sort, and layout.</p>
         </div>
         <input className="crm-input" value={label} onChange={event => setLabel(event.target.value)} placeholder="e.g. Founder follow-ups" autoFocus />
         <CrmButton type="submit" tone="primary" disabled={!label.trim()}>Save view</CrmButton>
