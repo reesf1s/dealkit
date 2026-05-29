@@ -101,8 +101,6 @@ export default function DealRecordPage() {
         onAddTask={() => setActiveTab('tasks')}
       />
 
-      <DealRecordPulse context={context} health={health} onTab={setActiveTab} />
-
       <div className="crm-record2-tabs" aria-label="Deal record sections">
         {tabs.map(tab => (
           <button key={tab.id} type="button" className={activeTab === tab.id ? 'active' : ''} onClick={() => setActiveTab(tab.id)}>
@@ -152,45 +150,6 @@ function DealRecordHero({ deal, context, health, onAddNote, onAddTask }: { deal:
         <Fact label="Probability" value={deal.probability ? `${deal.probability}%` : 'Not set'} empty={!deal.probability} />
         <div className="crm-record2-fact"><span>Risk</span><CrmRiskBadge risk={health.risk} /></div>
       </div>
-    </section>
-  )
-}
-
-function DealRecordPulse({ context, health, onTab }: { context: any; health: ReturnType<typeof buildHealth>; onTab: (tab: DealTab) => void }) {
-  const deal = context.deal
-  const contacts = context.contacts ?? []
-  const openTasks = splitTasks(context.openTasks ?? []).active
-  const latestActivity = context.latestActivities?.[0]
-  const missing = [
-    !deal.aiNextAction ? 'Next step' : null,
-    !deal.expectedCloseDate ? 'Close date' : null,
-    !deal.valueAmount ? 'Value' : null,
-    !contacts.length ? 'Buyer' : null,
-    !openTasks.length ? 'Task' : null,
-  ].filter(Boolean)
-
-  return (
-    <section className="crm-record-pulse" aria-label="Deal operating pulse">
-      <article className="primary">
-        <span>Record pulse</span>
-        <strong>{health.summary || 'Keep fields, notes, people, and tasks current before asking for intelligence.'}</strong>
-        <p>{latestActivity?.summary || latestActivity?.body || 'No recent customer evidence has been saved yet.'}</p>
-      </article>
-      <button type="button" onClick={() => onTab('people')}>
-        <span>Buying group</span>
-        <strong>{contacts.length}</strong>
-        <small>{contacts[0]?.fullName ?? 'Link buyer roles'}</small>
-      </button>
-      <button type="button" onClick={() => onTab('tasks')}>
-        <span>Open work</span>
-        <strong>{openTasks.length}</strong>
-        <small>{openTasks[0]?.title ?? 'Create next action'}</small>
-      </button>
-      <button type="button" onClick={() => askHalvex(`Find missing fields and buyer information for ${deal.title}. Return evidence, confidence, and suggested manual updates.`, deal.id)}>
-        <span>Missing context</span>
-        <strong>{missing.length}</strong>
-        <small>{missing.length ? missing.join(', ') : 'Record looks complete'}</small>
-      </button>
     </section>
   )
 }
@@ -246,7 +205,6 @@ function DealFieldsCard({ deal, stages, onUpdate }: { deal: any; stages: any[]; 
       <div className="crm-record2-card-head">
         <div>
           <h2>Deal details</h2>
-          <p>Manual CRM fields. Halvex comments on them, but never owns them.</p>
         </div>
         {changed ? <CrmButton form="deal-fields-form" type="submit" tone="primary" disabled={saving || !draft.title.trim()}>{saving ? 'Saving...' : 'Save changes'}</CrmButton> : <span className="crm-record2-saved">Saved</span>}
       </div>
@@ -269,8 +227,7 @@ function NextStepCard({ deal, health, onEdit }: { deal: any; health: ReturnType<
       <div className="crm-record2-next-icon"><Clock3 size={18} /></div>
       <div>
         <span>Next step</span>
-        <strong>{next ? <ClampedText lines={2} title={next}>{next}</ClampedText> : 'No next step set'}</strong>
-        <p>{next ? 'This is a manual CRM field. Keep it short, concrete, and dated where possible.' : 'Add the next action so the deal is not just a record of old activity.'}</p>
+        <strong>{next ? <ClampedText lines={2} title={next}>{next}</ClampedText> : '—'}</strong>
       </div>
       <CrmButton onClick={onEdit}>{next ? 'Edit' : 'Add next step'}</CrmButton>
     </CrmPanel>
@@ -297,7 +254,7 @@ function OverviewGrid({ context, onTab }: { context: any; onTab: (tab: DealTab) 
           <h3>People</h3>
         </div>
         <strong>{contacts.length ? `${contacts.length} linked` : 'No people linked'}</strong>
-        <p>{contacts[0]?.fullName ? `Primary context starts with ${contacts[0].fullName}.` : 'Link contacts so meetings and notes have relationship context.'}</p>
+        <p>{contacts[0]?.fullName ?? '—'}</p>
         <CrmButton onClick={() => onTab('people')}>View people</CrmButton>
       </CrmPanel>
       <CrmPanel className="crm-record2-mini-card">
@@ -306,7 +263,7 @@ function OverviewGrid({ context, onTab }: { context: any; onTab: (tab: DealTab) 
           <h3>Open tasks</h3>
         </div>
         <strong>{openTasks.length}</strong>
-        <p>{openTasks.length ? 'Manual next steps attached to this deal.' : 'No active task is attached.'}</p>
+        <p>{openTasks.length ? 'Open' : '—'}</p>
         <CrmButton onClick={() => onTab('tasks')}>Manage tasks</CrmButton>
       </CrmPanel>
     </div>
@@ -320,7 +277,6 @@ function RecentActivityCard({ activities, onOpen }: { activities: any[]; onOpen:
       <div className="crm-record2-card-head">
         <div>
           <h2>Recent activity</h2>
-          <p>Newest useful evidence first. Generic field-change records are kept out of the way.</p>
         </div>
         <CrmButton onClick={onOpen}>Full timeline</CrmButton>
       </div>
@@ -338,18 +294,16 @@ function TasksTab({ context, onChanged }: { context: any; onChanged: () => void 
         <div className="crm-record2-card-head">
           <div>
             <h2>Active tasks</h2>
-            <p>Manual next steps for this deal.</p>
           </div>
           <CrmButton href="/tasks">All tasks</CrmButton>
         </div>
-        <TaskList tasks={active} onChanged={onChanged} empty="No active tasks. Add the next concrete step when you know it." />
+        <TaskList tasks={active} onChanged={onChanged} empty="No active tasks." />
       </CrmPanel>
       {stale.length ? (
         <CrmPanel className="crm-record2-card muted">
           <div className="crm-record2-card-head">
             <div>
-              <h2>Old actions to review</h2>
-              <p>These may be complete or stale. Confirm them before treating them as live work.</p>
+            <h2>Older tasks</h2>
             </div>
           </div>
           <TaskList tasks={stale} onChanged={onChanged} stale empty="" />
@@ -389,7 +343,6 @@ function TaskComposer({ dealId, onChanged }: { dealId: string; onChanged: () => 
       <div className="crm-record2-card-head">
         <div>
           <h2>Add task</h2>
-          <p>Tasks are user-owned. Halvex can suggest, but only you create them.</p>
         </div>
       </div>
       <form className="crm-record2-task-compose" onSubmit={createTask}>
@@ -463,7 +416,7 @@ function TaskRow({ task, onChanged, stale }: { task: any; onChanged: () => void;
         <>
           <div>
             <strong><ClampedText lines={2} title={task.title}>{task.title}</ClampedText></strong>
-            <p>{task.dueAt ? `Due ${shortDate(task.dueAt)}` : 'No due date'} · {task.priority ?? 'normal'}{stale ? ' · needs review' : ''}</p>
+              <p>{task.dueAt ? `Due ${shortDate(task.dueAt)}` : 'No due date'} · {task.priority ?? 'normal'}</p>
           </div>
           <div className="crm-record2-row-actions">
             <CrmButton onClick={() => setEditing(true)}>Edit</CrmButton>
@@ -484,7 +437,6 @@ function NotesTab({ deal, activities, onSaved }: { deal: any; activities: any[];
         <div className="crm-record2-card-head">
           <div>
             <h2>Notes history</h2>
-            <p>Plain CRM history: meeting notes, blockers, customer comments, and commitments.</p>
           </div>
         </div>
         <ActivityList activities={notes} />
@@ -519,7 +471,6 @@ function NoteComposer({ dealId, dealTitle, onSaved }: { dealId: string; dealTitl
       <div className="crm-record2-card-head">
         <div>
           <h2>Add note</h2>
-          <p>Log the customer truth first. Ask for extraction only when you want suggested CRM updates.</p>
         </div>
       </div>
       <form className="crm-record2-note-form" onSubmit={saveNote}>
@@ -597,7 +548,6 @@ function PeopleTab({ context, onChanged }: { context: any; onChanged: () => void
         <div className="crm-record2-card-head">
           <div>
             <h2>People</h2>
-            <p>Link buyers, champions, evaluators, and blockers directly to this deal.</p>
           </div>
           <CrmButton href="/people">People directory</CrmButton>
         </div>
@@ -626,7 +576,7 @@ function PeopleTab({ context, onChanged }: { context: any; onChanged: () => void
               </article>
             ))}
           </div>
-        ) : <CrmEmpty title="No people linked">Link contacts so notes, meetings, and follow-ups have real relationship context.</CrmEmpty>}
+        ) : <CrmEmpty title="No people linked" />}
       </CrmPanel>
     </div>
   )
@@ -639,7 +589,6 @@ function ActivityTab({ activities, completedTasks }: { activities: any[]; comple
         <div className="crm-record2-card-head">
           <div>
             <h2>Timeline</h2>
-            <p>The evidence layer: notes, imports, stage changes, tasks, and saved recommendations.</p>
           </div>
         </div>
         <ActivityList activities={activities} />
@@ -649,7 +598,6 @@ function ActivityTab({ activities, completedTasks }: { activities: any[]; comple
           <div className="crm-record2-card-head">
             <div>
               <h2>Completed tasks</h2>
-              <p>Recently completed manual work.</p>
             </div>
           </div>
           <TaskList tasks={completedTasks} onChanged={() => {}} empty="" />
@@ -782,9 +730,8 @@ function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: 
     <CrmPanel className="crm-analyst-panel">
       <div className="crm-analyst-head">
         <div>
-          <span>Deal analyst</span>
-          <h2>Optional intelligence</h2>
-          <p>Run analysis only when useful. Recommendations stay advisory until you turn them into CRM work.</p>
+          <span>Halvex</span>
+          <h2>Analysis</h2>
         </div>
         <button type="button" onClick={onRefresh} aria-label="Refresh deal analysis"><RefreshCw size={16} /></button>
       </div>
@@ -844,9 +791,9 @@ function DealAnalystPanel({ context, health, onChanged, onRefresh }: { context: 
             </div>
           </article>
         )) : (
-          <CrmEmpty title="No recommendations yet">Add notes, tasks, people, or deal fields, then run analysis when you want a second read.</CrmEmpty>
+          <CrmEmpty title="No analysis saved" />
         )}
-        {insights.length > 0 && insights.every(insight => dismissed.has(insight.id)) ? <CrmEmpty title="All recommendations dismissed">Run analysis again when the record changes.</CrmEmpty> : null}
+        {insights.length > 0 && insights.every(insight => dismissed.has(insight.id)) ? <CrmEmpty title="No active analysis" /> : null}
       </div>
     </CrmPanel>
   )
@@ -861,7 +808,7 @@ function InlineAnalysisSkeleton({ label }: { label: string }) {
           <h3>{label}</h3>
         </div>
       </header>
-      <p>Reading saved deal fields, linked people, tasks, notes, and activity before returning an evidence-based answer.</p>
+      <p>Reading deal context.</p>
     </article>
   )
 }
@@ -901,7 +848,7 @@ function InlineAnalysisResult({ analysis, busy, onSaveNote, onCreateTask, onOpen
 }
 
 function ActivityList({ activities, compactMode = false }: { activities: any[]; compactMode?: boolean }) {
-  if (!activities.length) return <CrmEmpty title="No activity yet">Notes, tasks, and changes will appear here.</CrmEmpty>
+  if (!activities.length) return <CrmEmpty title="No activity yet" />
   return (
     <div className={`crm-record2-activity ${compactMode ? 'compact' : ''}`}>
       {activities.map(activity => {
@@ -958,7 +905,7 @@ function RecordContextPanel({ context, deal, health, onTab }: { context: any; de
       </div>
       <section className="crm-record-context-next">
         <span>Next step</span>
-        <p>{deal.aiNextAction || health.nextAction || 'No next step set.'}</p>
+        <p>{deal.aiNextAction || health.nextAction || '—'}</p>
       </section>
       <div className="crm-record-context-actions">
         <CrmButton onClick={() => onTab('notes')}>Add note</CrmButton>
@@ -1055,10 +1002,10 @@ function buildInsights(context: any): DealInsight[] {
     insights.push({
       id: 'no-next-step',
       type: 'Next step',
-      title: 'No next step is clearly owned',
-      explanation: 'The deal has no concrete next action saved on the record. That makes the opportunity hard to run manually and weakens any forecast or follow-up workflow.',
+      title: 'No next step saved',
+      explanation: 'The deal has no concrete next action saved on the record.',
       evidence: latestEvidence ? `Recent evidence reviewed: ${latestEvidence}` : 'No current task or next-step field is available on this deal.',
-      suggestedAction: `Create a dated follow-up task for ${deal.companyName ?? 'this company'} and write the expected customer action in the next-step field.`,
+      suggestedAction: `Add a dated follow-up task for ${deal.companyName ?? 'this company'} and update the next-step field.`,
       confidence,
       risk: 'high',
     })
@@ -1068,10 +1015,10 @@ function buildInsights(context: any): DealInsight[] {
     insights.push({
       id: 'risk-drivers',
       type: 'Risk',
-      title: 'Deal risk needs owner review',
+      title: 'Risk drivers',
       explanation: intelligence.riskDrivers.join(' '),
       evidence: latestEvidence ? `Most relevant recent evidence: ${latestEvidence}` : 'Risk was derived from saved CRM fields, tasks, signals, and recent activity.',
-      suggestedAction: intelligence.nextAction || deal.aiNextAction || 'Review the risk with the owner and capture a concrete next step.',
+      suggestedAction: intelligence.nextAction || deal.aiNextAction || 'Update the next step or adjust the forecast fields.',
       confidence,
       risk: intelligence.riskLevel === 'high' ? 'high' : 'medium',
     })
@@ -1085,9 +1032,9 @@ function buildInsights(context: any): DealInsight[] {
         id: 'close-date-optimistic',
         type: 'Forecast',
         title: 'Close date may be optimistic',
-        explanation: `The close date is within ${Math.max(days, 0)} days, but probability is only ${deal.probability ?? 0}%. That combination usually needs stronger evidence or a forecast adjustment.`,
+        explanation: `The close date is within ${Math.max(days, 0)} days and probability is ${deal.probability ?? 0}%.`,
         evidence: `Close date: ${shortDate(deal.expectedCloseDate) ?? 'set'}. Probability: ${deal.probability ?? 'not set'}%. Stage: ${deal.stageName ?? 'no stage'}.`,
-        suggestedAction: 'Confirm the decision process, identify what must happen before signature, or move the close date to a realistic date.',
+        suggestedAction: 'Confirm the decision process or update the close date.',
         confidence: Math.max(58, confidence - 8),
         risk: 'medium',
       })
@@ -1099,9 +1046,9 @@ function buildInsights(context: any): DealInsight[] {
       id: 'high-value-low-activity',
       type: 'Activity',
       title: 'High value deal has no open task',
-      explanation: 'This is a meaningful opportunity, but there is no open task attached. High-value deals should have visible owner action even when the next customer step is uncertain.',
+      explanation: 'This deal has a material value and no open task attached.',
       evidence: `Deal value: ${money(deal.valueAmount)}. Open tasks: ${context?.openTasks?.length ?? 0}. Last activity: ${deal.lastActivityAt ? shortDate(deal.lastActivityAt) : 'not recorded'}.`,
-      suggestedAction: 'Create an owner task to confirm the buying process, next meeting, or blocker.',
+      suggestedAction: 'Add a task for the buying process, next meeting, or blocker.',
       confidence: Math.max(60, confidence - 5),
       risk: 'medium',
     })

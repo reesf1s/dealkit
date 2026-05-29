@@ -49,6 +49,8 @@ export default function PeoplePage() {
   }, [allPeople, now, query, segment])
   const missingCompany = allPeople.filter((person: any) => !person.companyName).length
   const recentlyTouched = allPeople.filter((person: any) => person.lastContactedAt && now - new Date(person.lastContactedAt).getTime() <= 30 * 86_400_000).length
+  const showPeopleControls = allPeople.length > 0 || Boolean(query) || segment !== 'all'
+  const showRecordsPanel = !(quickAddOpen && !allPeople.length && !query && segment === 'all')
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('quick') === 'person') setQuickAddOpen(true)
@@ -108,25 +110,18 @@ export default function PeoplePage() {
     <CrmPage wide>
       <ObjectWorkspaceHeader
         object="People"
-        title="People objects"
-        description="Relationship memory for buyers, champions, blockers, contacts, and everyone tied to revenue work."
-        actions={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add person</CrmButton>}
-        stats={<>
+        title="People"
+        actions={allPeople.length ? <CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add person</CrmButton> : undefined}
+        stats={allPeople.length ? <>
         <CrmStat label="People" value={allPeople.length} />
         <CrmStat label="Touched this month" value={recentlyTouched} />
-        <CrmStat label="Need company" value={missingCompany} />
-        </>}
-      />
-      <PeopleOperatingMap
-        people={allPeople}
-        recentlyTouched={recentlyTouched}
-        missingCompany={missingCompany}
-        onMissingData={() => setSegment('missing')}
+        {missingCompany ? <CrmStat label="No company" value={missingCompany} /> : null}
+        </> : undefined}
       />
       {quickAddOpen ? <QuickAddPerson onCancel={() => setQuickAddOpen(false)} onCreated={async () => { setQuickAddOpen(false); await mutate() }} /> : null}
-      <CrmPanel>
-        <CrmSectionHeader title="People records" description="Search, filter, and open the person record before taking action." action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add person</CrmButton>} />
-        <SavedViewBar
+      {showRecordsPanel ? <CrmPanel className="crm-record-workbench">
+        <CrmSectionHeader title="Records" action={showPeopleControls ? <CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add person</CrmButton> : undefined} />
+        {showPeopleControls ? <SavedViewBar
           views={[
             { label: 'All people', active: segment === 'all', onClick: () => setSegment('all'), count: allPeople.length },
             { label: 'Recent', active: segment === 'recent', onClick: () => setSegment('recent'), count: recentlyTouched },
@@ -137,8 +132,8 @@ export default function PeoplePage() {
           ]}
         >
           <button type="button" className="crm-saved-view-save" onClick={() => setSaveViewOpen(prev => !prev)}><SlidersHorizontal size={14} /> Save view</button>
-        </SavedViewBar>
-        {saveViewOpen ? (
+        </SavedViewBar> : null}
+        {showPeopleControls && saveViewOpen ? (
           <PeopleSaveViewPanel
             onSave={saveCurrentView}
             onCancel={() => setSaveViewOpen(false)}
@@ -147,7 +142,7 @@ export default function PeoplePage() {
             current={{ query, segment }}
           />
         ) : null}
-        <FilterBar>
+        {showPeopleControls ? <FilterBar>
           <label className="crm-search-button"><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search people..." /></label>
           <CrmSegmentedFilters
             value={segment}
@@ -162,30 +157,26 @@ export default function PeoplePage() {
               { value: 'open', label: 'Open deals' },
             ]}
           />
-        </FilterBar>
-        <div className="crm-directory-heading">
+        </FilterBar> : null}
+        {showPeopleControls ? <div className="crm-directory-heading">
           <span>Person</span>
           <span>Email</span>
           <span>Last touch</span>
-        </div>
+        </div> : null}
         {isLoading ? <CrmSkeleton rows={8} /> : null}
         {!isLoading && !people.length ? (
           query || segment !== 'all' ? (
-            <CrmEmpty title="No matching people" action={<CrmButton onClick={() => { setQuery(''); setSegment('all') }}>Clear filters</CrmButton>}>Try another search or reset the current people lens.</CrmEmpty>
-          ) : (
+            <CrmEmpty title="No matching people" action={<CrmButton onClick={() => { setQuery(''); setSegment('all') }}>Clear filters</CrmButton>} />
+          ) : !quickAddOpen ? (
             <ObjectStartState
-              label="First relationship"
-              title="Add the person you actually need to follow up with."
-              description="People records keep buyer role, contact details, company context, linked deals, notes, and tasks together so follow-up does not depend on memory."
+              label=""
+              title="No people yet"
+              description=""
               primaryAction={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary">Add person</CrmButton>}
               secondaryAction={<CrmButton href="/companies?quick=company">Add company</CrmButton>}
-              steps={[
-                { label: 'Identity', title: 'Name, role, and email', text: 'Capture the basics needed for real sales follow-up.' },
-                { label: 'Context', title: 'Connect to company', text: 'Keep every relationship attached to the account it belongs to.' },
-                { label: 'Momentum', title: 'Link deal, note, or task', text: 'Turn the relationship into a next step instead of a static contact.' },
-              ]}
+              steps={[]}
             />
-          )
+          ) : null
         ) : null}
         {people.length ? (
           <div className="crm-directory-list">
@@ -206,7 +197,7 @@ export default function PeoplePage() {
             ))}
           </div>
         ) : null}
-      </CrmPanel>
+      </CrmPanel> : null}
     </CrmPage>
   )
 }
@@ -224,7 +215,7 @@ function PeopleSaveViewPanel({ onSave, onCancel, savedViews, onDelete, current }
       <form onSubmit={(event) => { event.preventDefault(); if (label.trim()) onSave(label.trim()) }}>
         <div>
           <strong>Save this people view</strong>
-          <p>Stores the current relationship segment and search so follow-up work can be revisited quickly.</p>
+          <p>Search and segment filters.</p>
         </div>
         <input className="crm-input" value={label} onChange={event => setLabel(event.target.value)} placeholder="e.g. Cold founders" autoFocus />
         <CrmButton type="submit" tone="primary" disabled={!label.trim()}>Save view</CrmButton>
@@ -258,45 +249,6 @@ function describePeopleView(view: Pick<PeopleSavedView, 'query' | 'segment'>) {
     open: 'people attached to open deals',
   }
   return [segmentLabel[view.segment], view.query ? `search "${view.query}"` : null].filter(Boolean).join(' · ')
-}
-
-function PeopleOperatingMap({ people, recentlyTouched, missingCompany, onMissingData }: { people: any[]; recentlyTouched: number; missingCompany: number; onMissingData: () => void }) {
-  const openDealPeople = people.filter((person: any) => Number(person.openDeals ?? person.openDealCount ?? 0) > 0).length
-  const missingRole = people.filter((person: any) => !person.jobTitle).length
-  const recent = [...people]
-    .sort((a: any, b: any) => dateValue(b.lastContactedAt) - dateValue(a.lastContactedAt))
-    .slice(0, 4)
-
-  return (
-    <section className="crm-operating-map people" aria-label="Relationship operating map">
-      <div className="crm-operating-map-main">
-        <div className="crm-operating-map-head">
-          <span>Relationship map</span>
-          <strong>{people.length} people · {recentlyTouched} touched this month</strong>
-        </div>
-        <div className="crm-operating-account-strip">
-          {recent.length ? recent.map((person: any) => (
-            <article key={person.id}>
-              <strong><ClampedText lines={1}>{person.fullName}</ClampedText></strong>
-              <span>{person.jobTitle ?? 'Role missing'}</span>
-              <small>{person.lastContactedAt ? `Touched ${shortDate(person.lastContactedAt)}` : 'No recent touch'}</small>
-            </article>
-          )) : <article><strong>No people yet</strong><span>Add the first buyer</span><small>Then link them to a company or deal</small></article>}
-        </div>
-      </div>
-      <div className="crm-operating-map-side">
-        <button type="button" onClick={onMissingData}><span>Missing role</span><strong>{missingRole}</strong></button>
-        <button type="button" onClick={onMissingData}><span>No company</span><strong>{missingCompany}</strong></button>
-        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'Find people records with missing buyer role, missing company, weak relationship context, or follow-up gaps.' } }))}><span>Open deals</span><strong>{openDealPeople}</strong></button>
-      </div>
-    </section>
-  )
-}
-
-function dateValue(value?: string | null) {
-  if (!value) return 0
-  const time = new Date(value).getTime()
-  return Number.isFinite(time) ? time : 0
 }
 
 function isPeopleSavedView(view: any): view is PeopleSavedView {
@@ -338,7 +290,7 @@ function QuickAddPerson({ onCancel, onCreated }: { onCancel: () => void; onCreat
 
   return (
     <CrmPanel>
-      <CrmSectionHeader title="Add person" description="Create the contact now. Link deals and tasks as the relationship grows." />
+      <CrmSectionHeader title="Add person" />
       <form className="crm-form-grid" onSubmit={submit}>
         <label>Name<input className="crm-input" value={fullName} onChange={event => setFullName(event.target.value)} placeholder="Darren Smith" required /></label>
         <label>Email<input className="crm-input" value={email} onChange={event => setEmail(event.target.value)} type="email" placeholder="darren@company.com" /></label>

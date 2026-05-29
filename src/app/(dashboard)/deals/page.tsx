@@ -23,6 +23,7 @@ import {
   CrmSkeleton,
   CrmStat,
   ObjectWorkspaceHeader,
+  ObjectStartState,
   SavedViewBar,
   ViewTabs,
   money,
@@ -93,6 +94,8 @@ function DealsContent() {
   const openValue = openDeals.reduce((sum: number, deal: any) => sum + (deal.valueAmount ?? 0), 0)
   const noNext = openDeals.filter((deal: any) => !deal.aiNextAction && !deal.nextStepDueAt).length
   const needsReview = openDeals.filter((deal: any) => deal.aiRiskLevel === 'high' || !deal.valueAmount || !deal.expectedCloseDate).length
+  const showDealControls = allDeals.length > 0 || Boolean(query) || risk !== 'all' || stageFilter !== 'all' || statusFilter !== 'open'
+  const showRecordsPanel = !(quickAddOpen && !allDeals.length && !query)
 
   useEffect(() => {
     if (search.get('quick') === 'deal') setQuickAddOpen(true)
@@ -174,39 +177,28 @@ function DealsContent() {
     <CrmPage wide>
       <ObjectWorkspaceHeader
         object="Deals"
-        title="Pipeline records"
-        description="Track every opportunity by company, people, stage, value, close date, owner, next step, risk, and priority."
-        actions={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> New deal</CrmButton>}
-        stats={<>
+        title="Deals"
+        actions={allDeals.length ? <CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> New deal</CrmButton> : undefined}
+        stats={allDeals.length ? <>
         <CrmStat label="Open deals" value={openDeals.length} />
         <CrmStat label="Open value" value={money(openValue)} />
-        <CrmStat label="No next step" value={noNext} />
-        <CrmStat label="Needs review" value={needsReview} />
-        </>}
-      />
-
-      <DealOperatingMap
-        deals={allDeals}
-        stages={stages}
-        openValue={openValue}
-        noNext={noNext}
-        needsReview={needsReview}
-        onMissingNext={() => setQuery('no-next-step')}
+        {noNext ? <CrmStat label="No next step" value={noNext} /> : null}
+        {needsReview ? <CrmStat label="Review" value={needsReview} /> : null}
+        </> : undefined}
       />
 
       {quickAddOpen ? <QuickAddDeal onCancel={() => setQuickAddOpen(false)} onCreated={async (id) => { await mutate(); router.push(`/deals/${id}`) }} /> : null}
 
-      <CrmPanel>
+      {showRecordsPanel ? <CrmPanel className="crm-record-workbench">
         <CrmSectionHeader
           title="Records"
-          description="Saved views over the same deal objects. The table is the primary workspace; the board is for stage movement."
           action={<ViewTabs tabs={[
             { href: '/deals?view=list', label: 'List', active: view === 'list', icon: <List size={14} /> },
             { href: '/deals?view=pipeline', label: 'Pipeline', active: view === 'pipeline', icon: <LayoutGrid size={14} /> },
           ]} />}
         />
 
-        <SavedViewBar
+        {showDealControls ? <SavedViewBar
           views={[
             { label: 'Open', active: statusFilter === 'open' && risk === 'all' && stageFilter === 'all', onClick: () => { setStatusFilter('open'); setRisk('all'); setStageFilter('all') }, count: allDeals.filter((deal: any) => deal.status === 'open').length },
             { label: 'Closing soon', active: sortBy === 'close' && statusFilter === 'open', onClick: () => { setStatusFilter('open'); setSortBy('close') } },
@@ -217,9 +209,9 @@ function DealsContent() {
           ]}
         >
           <button type="button" className="crm-saved-view-save" onClick={() => setSaveViewOpen(prev => !prev)}><SlidersHorizontal size={14} /> Save view</button>
-        </SavedViewBar>
+        </SavedViewBar> : null}
 
-        {saveViewOpen ? (
+        {showDealControls && saveViewOpen ? (
           <SaveDealViewPanel
             onSave={saveCurrentView}
             onCancel={() => setSaveViewOpen(false)}
@@ -229,13 +221,7 @@ function DealsContent() {
           />
         ) : null}
 
-        <div className="crm-ai-workstrip" aria-label="Deal intelligence actions">
-          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'Review the open pipeline and identify deals with weak next steps, stale activity, or optimistic close dates.' } }))}>Analyse pipeline health</button>
-          <button type="button" onClick={() => setQuery('no-next-step')}>Show missing next steps</button>
-          <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'Which active deals need buyer information before the next call?' } }))}>Find missing buyer info</button>
-        </div>
-
-        <FilterBar>
+        {showDealControls ? <FilterBar>
           <label className="crm-search-button">
             <Search size={16} />
             <input value={query === 'no-next-step' ? '' : query} onChange={event => setQuery(event.target.value)} placeholder="Search deals, companies, people, next steps..." />
@@ -268,13 +254,23 @@ function DealsContent() {
               { value: 'low', label: 'Low', count: allDeals.filter((deal: any) => deal.aiRiskLevel === 'low').length },
             ]}
           />
-        </FilterBar>
+        </FilterBar> : null}
 
         {isLoading ? <CrmSkeleton rows={8} /> : null}
-        {!isLoading && !deals.length ? <CrmEmpty title={query ? 'No matching deals' : 'No deals yet'} action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary">Add deal</CrmButton>}>{query ? 'Clear filters or try another search.' : 'Create or import opportunities to start managing your pipeline.'}</CrmEmpty> : null}
+        {!isLoading && !deals.length && query ? <CrmEmpty title="No matching deals" action={<CrmButton onClick={() => { setQuery(''); setRisk('all'); setStageFilter('all') }} tone="primary">Clear filters</CrmButton>} /> : null}
+        {!isLoading && !deals.length && !query && !quickAddOpen ? (
+          <ObjectStartState
+            label=""
+            title="No deals yet"
+            description=""
+            primaryAction={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={15} /> New deal</CrmButton>}
+            secondaryAction={<CrmButton href="/companies" tone="ghost">Companies</CrmButton>}
+            steps={[]}
+          />
+        ) : null}
         {!isLoading && deals.length > 0 && view === 'list' ? <ListView deals={deals} stages={stages} onMove={moveDeal} movingId={movingId} /> : null}
         {!isLoading && deals.length > 0 && view === 'pipeline' ? <PipelineView stages={stages} deals={deals} onMove={moveDeal} movingId={movingId} /> : null}
-      </CrmPanel>
+      </CrmPanel> : null}
     </CrmPage>
   )
 }
@@ -292,7 +288,7 @@ function SaveDealViewPanel({ onSave, onCancel, savedViews, onDelete, current }: 
       <form onSubmit={(event) => { event.preventDefault(); if (label.trim()) onSave(label.trim()) }}>
         <div>
           <strong>Save this deal view</strong>
-          <p>Stores the current search, status, stage, risk, sort, and list/pipeline mode on this device.</p>
+          <p>Search, filters, sort, and view mode.</p>
         </div>
         <input className="crm-input" value={label} onChange={event => setLabel(event.target.value)} placeholder="e.g. Founder follow-ups" autoFocus />
         <CrmButton type="submit" tone="primary" disabled={!label.trim()}>Save view</CrmButton>
@@ -375,7 +371,7 @@ function QuickAddDeal({ onCancel, onCreated }: { onCancel: () => void; onCreated
 
   return (
     <CrmPanel>
-      <CrmSectionHeader title="Add deal" description="Capture the opportunity. Add people, tasks, and notes from the record page." />
+      <CrmSectionHeader title="Add deal" />
       <form className="crm-form-grid" onSubmit={submit}>
         <label>Deal<input className="crm-input" value={title} onChange={event => setTitle(event.target.value)} placeholder="Website rebuild" required /></label>
         <label>Company<input className="crm-input" value={companyName} onChange={event => setCompanyName(event.target.value)} placeholder="Finch Studio" required /></label>
@@ -388,55 +384,6 @@ function QuickAddDeal({ onCancel, onCreated }: { onCancel: () => void; onCreated
         </div>
       </form>
     </CrmPanel>
-  )
-}
-
-function DealOperatingMap({ deals, stages, openValue, noNext, needsReview, onMissingNext }: { deals: any[]; stages: any[]; openValue: number; noNext: number; needsReview: number; onMissingNext: () => void }) {
-  const openDeals = deals.filter((deal: any) => deal.status === 'open')
-  const highRisk = openDeals.filter((deal: any) => deal.aiRiskLevel === 'high').length
-  const stageCards = stages.length ? stages.slice(0, 6).map((stage: any) => {
-    const stageDeals = openDeals.filter((deal: any) => deal.stageId === stage.id)
-    const value = stageDeals.reduce((sum: number, deal: any) => sum + Number(deal.valueAmount ?? 0), 0)
-    return { id: stage.id, name: stage.name, count: stageDeals.length, value }
-  }) : [
-    { id: 'company', name: 'Company', count: 1, value: 0, setup: 'Add account' },
-    { id: 'person', name: 'Person', count: 2, value: 0, setup: 'Link buyer' },
-    { id: 'deal', name: 'Deal', count: 3, value: 0, setup: 'Set value' },
-    { id: 'task', name: 'Task', count: 4, value: 0, setup: 'Create next step' },
-  ]
-
-  return (
-    <section className="crm-operating-map deals" aria-label="Pipeline operating map">
-      <div className="crm-operating-map-main">
-        <div className="crm-operating-map-head">
-          <span>Pipeline map</span>
-          <strong>{openDeals.length} active records · {money(openValue)}</strong>
-        </div>
-        <div className="crm-operating-stage-strip">
-          {stageCards.map(stage => (
-            <article key={stage.id}>
-              <span>{stage.name}</span>
-              <strong>{stage.count}</strong>
-              <small>{'setup' in stage ? stage.setup : money(stage.value)}</small>
-            </article>
-          ))}
-        </div>
-      </div>
-      <div className="crm-operating-map-side">
-        <button type="button" onClick={onMissingNext}>
-          <span>Missing next step</span>
-          <strong>{noNext}</strong>
-        </button>
-        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'Review the open pipeline and identify the highest leverage manual actions. Use evidence from deal records only.' } }))}>
-          <span>Needs review</span>
-          <strong>{needsReview}</strong>
-        </button>
-        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'Explain the highest risk open deals with evidence, missing buyer information, and suggested next steps.' } }))}>
-          <span>High risk</span>
-          <strong>{highRisk}</strong>
-        </button>
-      </div>
-    </section>
   )
 }
 
@@ -495,7 +442,7 @@ function ListView({ deals, stages, onMove, movingId }: { deals: any[]; stages: a
                     </Link>
                   ))}
                   {(deal.people ?? []).length > 2 ? <span className="crm-person-more">+{(deal.people ?? []).length - 2}</span> : null}
-                  {!(deal.people ?? []).length ? <span className="crm-muted-cell">No people</span> : null}
+                  {!(deal.people ?? []).length ? <span className="crm-muted-cell">None</span> : null}
                 </div>
               </td>
               <td>
@@ -504,10 +451,10 @@ function ListView({ deals, stages, onMove, movingId }: { deals: any[]; stages: a
                 </select>
               </td>
               <td>{money(deal.valueAmount)}</td>
-              <td>{shortDate(deal.expectedCloseDate) ?? 'Missing'}</td>
+              <td>{shortDate(deal.expectedCloseDate) ?? '—'}</td>
               <td><span className="crm-muted-cell">{ownerLabel(deal.ownerEmail)}</span></td>
-              <td>{shortDate(deal.lastActivityAt) ?? 'No activity'}</td>
-              <td><ClampedText lines={2} title={deal.aiNextAction ?? 'No next step'}>{deal.aiNextAction ?? 'No next step'}</ClampedText></td>
+              <td>{shortDate(deal.lastActivityAt) ?? '—'}</td>
+              <td><ClampedText lines={2} title={deal.aiNextAction ?? '—'}>{deal.aiNextAction ?? '—'}</ClampedText></td>
               <td><CrmRiskBadge risk={deal.aiRiskLevel} /></td>
               <td><span className={`crm-priority-pill ${dealPriority(deal).toLowerCase()}`}>{dealPriority(deal)}</span></td>
             </tr>

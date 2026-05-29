@@ -5,9 +5,9 @@ import { useState } from 'react'
 import useSWR from 'swr'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { Bot, BriefcaseBusiness, CheckCircle2, Clock3, MailPlus, Plus, UsersRound } from 'lucide-react'
+import { Bot, BriefcaseBusiness, CheckCircle2, Clock3, Plus } from 'lucide-react'
 import { fetcher } from '@/lib/fetcher'
-import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmRiskBadge, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, RecordAssistantPanel, WorkspaceBriefing, money, shortDate } from '@/components/crm/CrmShell'
+import { ClampedText, CrmBadge, CrmButton, CrmEmpty, CrmPage, CrmPanel, CrmRiskBadge, CrmSectionHeader, CrmSkeleton, CrmStat, ObjectWorkspaceHeader, RecordAssistantPanel, money, shortDate } from '@/components/crm/CrmShell'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,15 +23,14 @@ export default function PersonPage() {
   const notes = notesData?.data ?? []
 
   if (isLoading) return <CrmPage wide><CrmSkeleton rows={6} /></CrmPage>
-  if (!person) return <CrmPage><CrmEmpty title="Person not found">This contact may not exist in this workspace.</CrmEmpty></CrmPage>
+  if (!person) return <CrmPage><CrmEmpty title="Person not found" /></CrmPage>
 
   return (
     <CrmPage wide>
       <ObjectWorkspaceHeader
         object="Person"
         title={person.fullName}
-        description={`${person.jobTitle ?? 'Role unknown'}${person.companyName ? ` at ${person.companyName}` : ''}. Keep relationship context attached to the person, not scattered across notes.`}
-        actions={<><CrmButton href="/deals?quick=deal" tone="primary"><Plus size={16} /> Create deal</CrmButton><CrmButton onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: `Summarise ${person.fullName}: company, role, linked deals, open tasks, notes, and suggested next touch.` } }))}><Bot size={16} /> Relationship read</CrmButton></>}
+        actions={<><CrmButton href="/deals?quick=deal" tone="primary"><Plus size={16} /> Create deal</CrmButton><CrmButton onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: `Summarise ${person.fullName}: company, role, linked deals, open tasks, notes, and suggested next touch.` } }))}><Bot size={16} /> Analyse</CrmButton></>}
         stats={<>
           <CrmStat label="Company" value={person.companyName ?? 'Missing'} />
           <CrmStat label="Role" value={person.jobTitle ?? 'Missing'} />
@@ -40,27 +39,14 @@ export default function PersonPage() {
           <CrmStat label="Last touch" value={person.lastContactedAt ? shortDate(person.lastContactedAt) : 'None'} />
         </>}
       />
-      <WorkspaceBriefing items={[
-        { label: 'Relationship', title: 'Keep buyer context attached', text: 'Role, company, email, notes, and work history belong on the person record.' },
-        { label: 'Action', title: 'Move from memory to work', text: 'Create a follow-up, open a linked deal, or draft a note from the record instead of jumping between pages.' },
-        { label: 'AI', title: 'Ask for the next useful touch', text: 'Halvex can draft follow-ups or summarize context, but it should support the relationship record, not replace it.' },
-      ]} />
       <div className="crm-record-layout">
         <main className="crm-record-main">
           <CrmPanel>
-            <CrmSectionHeader title="Profile" description="The base CRM relationship record." />
+            <CrmSectionHeader title="Profile" />
             <PersonDetailsForm person={person} dealCount={deals.length} taskCount={tasks.length} onSaved={mutatePeople} />
           </CrmPanel>
           <CrmPanel>
-            <CrmSectionHeader title="Relationship work" description="Create the next manual step or start an opportunity from this person." />
-            <div className="crm-grid-3">
-              <CrmButton onClick={() => document.getElementById('person-task-title')?.focus()} tone="primary"><CheckCircle2 size={16} /> Add follow-up</CrmButton>
-              <CrmButton href="/deals?quick=deal"><Plus size={16} /> Create deal</CrmButton>
-              <CrmButton onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: `Draft a concise follow-up to ${person.fullName}.` } }))}><MailPlus size={16} /> Draft email</CrmButton>
-            </div>
-          </CrmPanel>
-          <CrmPanel>
-            <CrmSectionHeader title="Linked deals" description="Opportunities where this person is part of the buying context." />
+            <CrmSectionHeader title="Linked deals" />
             <div className="crm-stack">
               {deals.length ? deals.map((deal: any) => (
                 <Link key={deal.id} href={`/deals/${deal.id}`} className="crm-list-row">
@@ -68,11 +54,11 @@ export default function PersonPage() {
                   <div><strong><ClampedText lines={1}>{deal.title}</ClampedText></strong><p>{deal.companyName ?? 'No company'} · {deal.stageName ?? 'No stage'} · {money(deal.valueAmount)}</p></div>
                   <CrmRiskBadge risk={deal.aiRiskLevel} />
                 </Link>
-              )) : <CrmEmpty title="No linked deals">Create or link a deal so this relationship has revenue context.</CrmEmpty>}
+              )) : <CrmEmpty title="No linked deals" />}
             </div>
           </CrmPanel>
           <CrmPanel>
-            <CrmSectionHeader title="Open work" description="Follow-ups tied to this person or to deals where they are involved." />
+            <CrmSectionHeader title="Open work" />
             <PersonTaskComposer contactId={person.id} onSaved={mutateTasks} />
             <div className="crm-stack">
               {tasks.length ? tasks.map((task: any) => (
@@ -81,11 +67,11 @@ export default function PersonPage() {
                   <div><strong><ClampedText lines={2}>{task.title}</ClampedText></strong><p><Clock3 size={13} /> {task.dueAt ? shortDate(task.dueAt) : 'No due date'}{task.dealTitle ? ` · ${task.dealTitle}` : ''}</p></div>
                   <CrmBadge tone={task.isOverdue ? 'danger' : task.priority === 'high' || task.priority === 'urgent' ? 'warn' : 'neutral'}>{task.isOverdue ? 'Overdue' : task.priority ?? 'normal'}</CrmBadge>
                 </article>
-              )) : <CrmEmpty title="No open relationship tasks">Create a follow-up so this contact does not become passive CRM memory.</CrmEmpty>}
+              )) : <CrmEmpty title="No open tasks" />}
             </div>
           </CrmPanel>
           <CrmPanel>
-            <CrmSectionHeader title="Notes" description="Manual relationship context, preferences, commitments, and follow-up details." />
+            <CrmSectionHeader title="Notes" />
             <PersonNoteComposer contactId={person.id} onSaved={mutateNotes} />
             <div className="crm-stack">
               {notes.length ? notes.map((note: any) => (
@@ -93,14 +79,14 @@ export default function PersonPage() {
                   <strong>{note.createdAt ? shortDate(note.createdAt) : 'Note'}</strong>
                   <p>{note.body}</p>
                 </article>
-              )) : <CrmEmpty title="No notes yet">Add a relationship note to keep context attached to this person.</CrmEmpty>}
+              )) : <CrmEmpty title="No notes yet" />}
             </div>
           </CrmPanel>
         </main>
         <aside className="crm-record-side">
           <RecordAssistantPanel
             title="Relationship analyst"
-            description="Read this person in context, then save useful output as relationship memory or a follow-up task."
+            description=""
             recordName={person.fullName}
             notePayload={{ contactId: person.id }}
             taskPayload={{ contactId: person.id }}
@@ -111,23 +97,6 @@ export default function PersonPage() {
               { label: 'Draft follow-up', prompt: `Draft a concise follow-up to ${person.fullName} using saved CRM context only.` },
             ]}
           />
-          <CrmPanel>
-            <CrmSectionHeader title="Relationship quality" description="What makes this person useful inside the CRM." />
-            <div className="crm-stack">
-              <QualityRow label="Company" ok={Boolean(person.companyName)} help="Link this person to an account so history rolls up." />
-              <QualityRow label="Role" ok={Boolean(person.jobTitle)} help="Capture whether they are buyer, champion, evaluator, or blocker." />
-              <QualityRow label="Email" ok={Boolean(person.email)} help="Save a reachable address before drafting follow-up." />
-              <QualityRow label="Work" ok={Boolean(tasks.length || deals.length)} help="Attach a deal or task so the relationship has a next use." />
-            </div>
-          </CrmPanel>
-          <CrmPanel>
-            <CrmSectionHeader title="Halvex" description="Optional sidecar help." />
-            <div className="crm-stack">
-              <CrmButton onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: `What should I know about ${person.fullName}? Include evidence, missing CRM fields, and next touch.` } }))}><UsersRound size={16} /> Ask about this person</CrmButton>
-              <CrmButton onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: `Find missing buyer information for ${person.fullName}.` } }))}>Find buyer gaps</CrmButton>
-              <CrmButton onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: `Draft a concise follow-up to ${person.fullName} using saved CRM context only.` } }))}>Draft follow-up</CrmButton>
-            </div>
-          </CrmPanel>
         </aside>
       </div>
     </CrmPage>
@@ -228,16 +197,6 @@ function PersonTaskComposer({ contactId, onSaved }: { contactId: string; onSaved
       <input className="crm-input" type="date" value={dueAt} onChange={event => setDueAt(event.target.value)} />
       <CrmButton type="submit" tone="primary" disabled={saving || !title.trim()}>{saving ? 'Adding...' : 'Add task'}</CrmButton>
     </form>
-  )
-}
-
-function QualityRow({ label, ok, help }: { label: string; ok: boolean; help: string }) {
-  return (
-    <article className="crm-quality-row">
-      <CheckCircle2 size={16} />
-      <div><strong>{label}</strong><p>{help}</p></div>
-      <CrmBadge tone={ok ? 'good' : 'warn'}>{ok ? 'Set' : 'Missing'}</CrmBadge>
-    </article>
   )
 }
 

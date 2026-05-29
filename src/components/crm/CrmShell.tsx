@@ -220,7 +220,7 @@ export function CrmShell({ children }: { children: ReactNode }) {
           <div className="crm-topbar-utility">
             <button type="button" className="crm-search-button" onClick={() => setCommandOpen(true)}>
               <Search size={16} />
-              <span>Search, create, or ask Halvex...</span>
+            <span>Search records...</span>
               <kbd>⌘K</kbd>
             </button>
             <button type="button" className="crm-topbar-new" onClick={() => router.push('/deals?quick=deal')}>
@@ -360,7 +360,7 @@ function CrmCommandMenu({ open, onClose }: { open: boolean; onClose: () => void 
             autoFocus
             value={query}
             onChange={event => setQuery(event.target.value)}
-            placeholder="Jump to a page, create something, or ask Halvex..."
+            placeholder="Search records or actions..."
             onKeyDown={event => {
               if (event.key === 'Escape') onClose()
               if (event.key === 'Enter' && query.trim().length > 2) {
@@ -395,12 +395,12 @@ function CrmCommandMenu({ open, onClose }: { open: boolean; onClose: () => void 
               {!recordsLoading && recordMatches.length ? recordMatches.map(record => (
                 <CommandRecordRow key={record.id} record={record} onSelect={() => { router.push(record.href); onClose() }} />
               )) : null}
-              {!recordsLoading && !recordMatches.length ? <div className="crm-command-hint">No matching records yet. Press enter to ask Halvex, or create a new object.</div> : null}
+              {!recordsLoading && !recordMatches.length ? <div className="crm-command-hint">No matching records.</div> : null}
             </>
           ) : null}
           {!query.trim() ? (
             <>
-              <small>Contextual AI</small>
+              <small>Halvex</small>
               {intelligenceActions.map(prompt => (
                 <button key={prompt} type="button" onClick={() => { window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: prompt } })); onClose() }}>
                   <Sparkles size={16} />
@@ -451,7 +451,7 @@ function CommandRecordRow({ record, onSelect }: { record: CommandRecord; onSelec
 function CrmAssistantDrawer({ open, onClose, contextDealId }: { open: boolean; onClose: () => void; contextDealId?: string | null }) {
   const router = useRouter()
   const [messages, setMessages] = useState<AssistantMessage[]>([
-    { role: 'assistant', text: 'I can search, explain, draft, and prepare CRM changes. Anything that edits records waits for your confirmation.' },
+    { role: 'assistant', text: 'Pipeline, records, follow-ups, risks, and note extraction.' },
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -526,22 +526,25 @@ function CrmAssistantDrawer({ open, onClose, contextDealId }: { open: boolean; o
   }, [submit])
 
   if (!open) return null
+  const prompts = contextDealId
+    ? ['Analyse current deal', 'Find missing buyer info', 'Extract CRM updates', 'Draft follow-up']
+    : ['Analyse pipeline', 'Find missing fields', 'Summarise records', 'Draft follow-up']
+
   return (
     <aside className="crm-assistant-drawer" aria-label="Halvex assistant">
       <header>
         <div>
           <small>Contextual analyst</small>
-          <h2>Ask, prepare, confirm</h2>
+          <h2>Halvex</h2>
         </div>
         <button type="button" onClick={onClose} aria-label="Close assistant"><X size={20} /></button>
       </header>
       <div className="crm-assistant-context">
-        <span>Chat</span>
-        {contextDealId ? <Link href={`/deals/${contextDealId}`}>Current deal</Link> : <span>Workspace context</span>}
-        <span>Confirm before changes</span>
+        {contextDealId ? <Link href={`/deals/${contextDealId}`}>Current deal</Link> : <span>Workspace</span>}
+        <span>Confirm changes</span>
       </div>
       <div className="crm-assistant-prompts">
-        {['Analyse current deal', 'Find missing buyer info', 'Extract CRM updates', 'Draft follow-up'].map(prompt => (
+        {prompts.map(prompt => (
           <button key={prompt} type="button" onClick={() => submit(prompt)}>{prompt}</button>
         ))}
       </div>
@@ -1010,7 +1013,7 @@ export function CrmEmpty({ title, children, action }: { title: string; children?
     <div className="crm-empty">
       <strong>{title}</strong>
       {children ? <p>{children}</p> : null}
-      {action}
+      {action ? <div className="crm-empty-actions">{action}</div> : null}
     </div>
   )
 }
@@ -1018,34 +1021,36 @@ export function CrmEmpty({ title, children, action }: { title: string; children?
 export function ObjectStartState({ label, title, description, primaryAction, secondaryAction, steps }: {
   label: string
   title: string
-  description: string
+  description?: string
   primaryAction: ReactNode
   secondaryAction?: ReactNode
   steps: Array<{ label: string; title: string; text: string }>
 }) {
   return (
-    <section className="crm-object-start" aria-label={`${label} setup`}>
+    <section className="crm-object-start" aria-label={label ? `${label} records` : title}>
       <div className="crm-object-start-copy">
-        <small>{label}</small>
+        {label ? <small>{label}</small> : null}
         <h3>{title}</h3>
-        <p>{description}</p>
+        {description ? <p>{description}</p> : null}
         <div className="crm-object-start-actions">
           {primaryAction}
           {secondaryAction}
         </div>
       </div>
-      <div className="crm-object-start-steps">
-        {steps.map((step, index) => (
-          <article key={step.title}>
-            <span>{index + 1}</span>
-            <div>
-              <small>{step.label}</small>
-              <strong>{step.title}</strong>
-              <p>{step.text}</p>
-            </div>
-          </article>
-        ))}
-      </div>
+      {steps.length ? (
+        <div className="crm-object-start-steps">
+          {steps.map((step, index) => (
+            <article key={step.title}>
+              <span>{index + 1}</span>
+              <div>
+                <small>{step.label}</small>
+                <strong>{step.title}</strong>
+                <p>{step.text}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
     </section>
   )
 }
@@ -1139,9 +1144,9 @@ export function RecordAssistantPanel({
     <CrmPanel className="crm-record-assistant">
       <div className="crm-record-assistant-head">
         <div>
-          <span>Contextual AI</span>
+          <span>Halvex</span>
           <h2>{title}</h2>
-          <p>{description}</p>
+          {description ? <p>{description}</p> : null}
         </div>
       </div>
       <div className="crm-record-assistant-actions">
@@ -1156,7 +1161,7 @@ export function RecordAssistantPanel({
       {loading && !result ? (
         <article className="crm-inline-analysis loading">
           <header><div><span>Running</span><h3>{loading}</h3></div></header>
-          <p>Reading saved CRM context before returning an evidence-based recommendation.</p>
+          <p>Reading saved CRM context.</p>
         </article>
       ) : null}
       {result ? (

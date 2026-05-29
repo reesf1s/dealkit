@@ -21,8 +21,6 @@ import {
   ObjectStartState,
   ObjectWorkspaceHeader,
   SavedViewBar,
-  ViewTabs,
-  WorkspaceBriefing,
   shortDate,
 } from '@/components/crm/CrmShell'
 
@@ -132,6 +130,8 @@ function TasksContent() {
   const overdue = todoTasks.filter(task => task.dueAt && new Date(task.dueAt).getTime() < now).length
   const today = todoTasks.filter(task => !task.dueAt || new Date(task.dueAt).getTime() <= endOfToday(now)).length
   const upcoming = todoTasks.filter(task => task.dueAt && new Date(task.dueAt).getTime() >= now).length
+  const showTaskControls = todoTasks.length > 0 || doneTasks.length > 0 || Boolean(query) || priorityFilter !== 'all' || linkFilter !== 'all' || view !== 'today'
+  const showRecordsPanel = !(quickAddOpen && !todoTasks.length && !doneTasks.length && !query && priorityFilter === 'all' && linkFilter === 'all' && view === 'today')
 
   function persistSavedViews(next: TaskSavedView[]) {
     setSavedViews(next)
@@ -184,47 +184,25 @@ function TasksContent() {
     <CrmPage wide>
       <ObjectWorkspaceHeader
         object="Tasks"
-        title="Execution board"
-        description="Customer commitments across deals, companies, and people, kept manual and accountable."
-        actions={<><CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add task</CrmButton><CrmButton href="/deals">Deals</CrmButton></>}
-        stats={<>
+        title="Tasks"
+        actions={todoTasks.length || doneTasks.length ? <CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add task</CrmButton> : undefined}
+        stats={todoTasks.length || doneTasks.length ? <>
         <CrmStat label="Due today" value={today} />
         <CrmStat label="Overdue" value={overdue} />
         <CrmStat label="Upcoming" value={upcoming} />
         <CrmStat label="Completed" value={doneTasks.length} />
-        </>}
+        </> : undefined}
       />
-
-      <WorkspaceBriefing items={[
-        { label: 'Today', title: 'Work from due commitments', text: 'Overdue and today lanes make the next customer action obvious without needing a dashboard.' },
-        { label: 'Context', title: 'Open linked records', text: 'Tasks tied to deals should be handled from the record so the follow-up uses current notes and buyer context.' },
-        { label: 'AI assist', title: 'Convert recommendations deliberately', text: 'Deal insights can become tasks only when accepted, keeping the work list clean and trustworthy.' },
-      ]} />
 
       {quickAddOpen ? <QuickAddTask onCancel={() => setQuickAddOpen(false)} onCreated={async () => { setQuickAddOpen(false); await refresh() }} /> : null}
 
-      <div className="crm-task-workspace">
-        <CrmPanel className="crm-task-sidebar">
-          <CrmSectionHeader title="Views" description="Keep the day’s execution tight." />
-          <ViewTabs tabs={[
-            { href: '/tasks?view=today', label: 'Today', active: view === 'today' },
-            { href: '/tasks?view=upcoming', label: 'Upcoming', active: view === 'upcoming' },
-            { href: '/tasks?view=overdue', label: 'Overdue', active: view === 'overdue' },
-            { href: '/tasks?view=completed', label: 'Completed', active: view === 'completed' },
-          ]} />
-          <div className="crm-task-help">
-            <strong>CRM task rules</strong>
-            <p>Tasks are manual. Halvex can suggest next steps, but users decide what belongs on the work list.</p>
-          </div>
-        </CrmPanel>
-
-        <CrmPanel className="crm-task-main">
+      {showRecordsPanel ? <div className="crm-task-workspace">
+        <CrmPanel className="crm-task-main crm-record-workbench">
           <CrmSectionHeader
             title="Tasks"
-            description="Create, complete, snooze, cancel, and open the linked deal when work belongs to an opportunity."
-            action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add task</CrmButton>}
+            action={showTaskControls ? <CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add task</CrmButton> : undefined}
           />
-          <SavedViewBar
+          {showTaskControls ? <SavedViewBar
             views={[
               { label: 'Today', active: view === 'today' && priorityFilter === 'all' && linkFilter === 'all' && !query, onClick: () => { router.push('/tasks?view=today'); setPriorityFilter('all'); setLinkFilter('all'); setQuery('') }, count: today },
               { label: 'Overdue', active: view === 'overdue' && priorityFilter === 'all' && linkFilter === 'all' && !query, onClick: () => { router.push('/tasks?view=overdue'); setPriorityFilter('all'); setLinkFilter('all'); setQuery('') }, count: overdue },
@@ -235,8 +213,8 @@ function TasksContent() {
             ]}
           >
             <button type="button" className="crm-saved-view-save" onClick={() => setSaveViewOpen(prev => !prev)}><SlidersHorizontal size={14} /> Save view</button>
-          </SavedViewBar>
-          {saveViewOpen ? (
+          </SavedViewBar> : null}
+          {showTaskControls && saveViewOpen ? (
             <TaskSaveViewPanel
               onSave={saveCurrentView}
               onCancel={() => setSaveViewOpen(false)}
@@ -245,7 +223,7 @@ function TasksContent() {
               current={{ view, query, priorityFilter, linkFilter }}
             />
           ) : null}
-          <FilterBar>
+          {showTaskControls ? <FilterBar>
             <label className="crm-search-button"><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search tasks, deals, companies, priorities..." /></label>
             <CrmSegmentedFilters
               label="Priority"
@@ -268,25 +246,21 @@ function TasksContent() {
                 { value: 'unlinked', label: 'Unlinked' },
               ]}
             />
-          </FilterBar>
+          </FilterBar> : null}
           {isLoading ? <CrmSkeleton rows={6} /> : null}
           {!isLoading && !visibleTasks.length ? (
             query || priorityFilter !== 'all' || linkFilter !== 'all' ? (
-              <CrmEmpty title="No matching tasks" action={<CrmButton onClick={() => { setQuery(''); setPriorityFilter('all'); setLinkFilter('all') }}>Clear filters</CrmButton>}>Try another search or reset the current task lens.</CrmEmpty>
-            ) : (
-              <ObjectStartState
-                label="First commitment"
-                title="Create the next action before the CRM becomes memory."
-                description="Tasks turn records into motion. Add one concrete follow-up, give it a due date, and link it to the deal, company, or person it belongs to."
+              <CrmEmpty title="No matching tasks" action={<CrmButton onClick={() => { setQuery(''); setPriorityFilter('all'); setLinkFilter('all') }}>Clear filters</CrmButton>} />
+            ) : !quickAddOpen ? (
+            <ObjectStartState
+                label=""
+                title="No tasks yet"
+                description=""
                 primaryAction={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary">Add task</CrmButton>}
                 secondaryAction={<CrmButton href="/deals?quick=deal">Create deal</CrmButton>}
-                steps={[
-                  { label: 'Action', title: 'Write the customer commitment', text: 'Use a verb: follow up, send pricing, book demo, confirm buyer, or chase signature.' },
-                  { label: 'Date', title: 'Give it a due date', text: 'Today, overdue, and upcoming views only work when commitments are dated.' },
-                  { label: 'Context', title: 'Link the record', text: 'Attach the task to a deal, company, or person so the work has full CRM context.' },
-                ]}
+                steps={[]}
               />
-            )
+            ) : null
           ) : null}
           {!isLoading && visibleTasks.length ? (
             view === 'today' && !query.trim() && priorityFilter === 'all' && linkFilter === 'all'
@@ -294,7 +268,7 @@ function TasksContent() {
               : <div className="crm-task-list">{visibleTasks.map(task => <TaskRow key={task.id} task={task} now={now} onAction={act} />)}</div>
           ) : null}
         </CrmPanel>
-      </div>
+      </div> : null}
     </CrmPage>
   )
 }
@@ -304,22 +278,22 @@ function TaskExecutionBoard({ tasks, now, onAction }: { tasks: Task[]; now: numb
   const columns = [
     {
       title: 'Overdue',
-      help: 'Clean these up first.',
+      help: '',
       tasks: tasks.filter(task => task.dueAt && new Date(task.dueAt).getTime() < now),
     },
     {
       title: 'Today',
-      help: 'Commitments due today.',
+      help: '',
       tasks: tasks.filter(task => task.dueAt && new Date(task.dueAt).getTime() >= now && new Date(task.dueAt).getTime() <= todayEnd),
     },
     {
       title: 'No date',
-      help: 'Decide a due date or remove.',
+      help: '',
       tasks: tasks.filter(task => !task.dueAt),
     },
     {
       title: 'Upcoming',
-      help: 'Next two weeks.',
+      help: '',
       tasks: tasks.filter(task => task.dueAt && new Date(task.dueAt).getTime() > todayEnd).slice(0, 8),
     },
   ]
@@ -331,14 +305,14 @@ function TaskExecutionBoard({ tasks, now, onAction }: { tasks: Task[]; now: numb
           <header>
             <div>
               <h3>{column.title}</h3>
-              <p>{column.help}</p>
+              {column.help ? <p>{column.help}</p> : null}
             </div>
             <CrmBadge tone={column.title === 'Overdue' && column.tasks.length ? 'danger' : 'neutral'}>{column.tasks.length}</CrmBadge>
           </header>
           <div className="crm-task-column-list">
             {column.tasks.length ? column.tasks.map(task => (
               <TaskRow key={task.id} task={task} now={now} onAction={onAction} compact />
-            )) : <CrmEmpty title="Clear">No work in this lane.</CrmEmpty>}
+            )) : <CrmEmpty title="Empty" />}
           </div>
         </section>
       ))}
@@ -359,7 +333,7 @@ function TaskSaveViewPanel({ onSave, onCancel, savedViews, onDelete, current }: 
       <form onSubmit={(event) => { event.preventDefault(); if (label.trim()) onSave(label.trim()) }}>
         <div>
           <strong>Save this task view</strong>
-          <p>Stores the current task lane, search, priority, and linked-record filter for repeatable execution.</p>
+          <p>View, search, priority, and record link filters.</p>
         </div>
         <input className="crm-input" value={label} onChange={event => setLabel(event.target.value)} placeholder="e.g. Unlinked urgent work" autoFocus />
         <CrmButton type="submit" tone="primary" disabled={!label.trim()}>Save view</CrmButton>
@@ -452,7 +426,7 @@ function QuickAddTask({ onCancel, onCreated }: { onCancel: () => void; onCreated
 
   return (
     <CrmPanel>
-      <CrmSectionHeader title="Add task" description="Capture a concrete next action and link it to a deal, company, or person when useful." />
+      <CrmSectionHeader title="Add task" />
       <form className="crm-form-grid" onSubmit={submit}>
         <label style={{ gridColumn: 'span 2' }}>Task<input className="crm-input" value={title} onChange={event => setTitle(event.target.value)} placeholder="Follow up about requirements" required /></label>
         <label>Due<input className="crm-input" value={dueAt} onChange={event => setDueAt(event.target.value)} type="date" /></label>

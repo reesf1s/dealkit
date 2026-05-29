@@ -49,6 +49,8 @@ export default function CompaniesPage() {
   const openDealAccounts = allCompanies.filter((company: any) => Number(company.openDeals ?? 0) > 0).length
   const riskAccounts = allCompanies.filter((company: any) => Number(company.riskCount ?? 0) > 0).length
   const pipelineValue = allCompanies.reduce((sum: number, company: any) => sum + Number(company.pipelineValue ?? 0), 0)
+  const showCompanyControls = allCompanies.length > 0 || Boolean(query) || segment !== 'all'
+  const showRecordsPanel = !(quickAddOpen && !allCompanies.length && !query && segment === 'all')
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('quick') === 'company') setQuickAddOpen(true)
@@ -108,27 +110,19 @@ export default function CompaniesPage() {
     <CrmPage wide>
       <ObjectWorkspaceHeader
         object="Companies"
-        title="Company objects"
-        description="The account layer: linked people, open deals, notes, tasks, activity, ownership, and account risk."
-        actions={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add company</CrmButton>}
-        stats={<>
+        title="Companies"
+        actions={allCompanies.length ? <CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add company</CrmButton> : undefined}
+        stats={allCompanies.length ? <>
         <CrmStat label="Companies" value={allCompanies.length} />
         <CrmStat label="With open deals" value={openDealAccounts} />
         <CrmStat label="Open pipeline" value={money(pipelineValue)} />
-        <CrmStat label="Need attention" value={riskAccounts} />
-        </>}
-      />
-      <CompanyOperatingMap
-        companies={allCompanies}
-        pipelineValue={pipelineValue}
-        openDealAccounts={openDealAccounts}
-        riskAccounts={riskAccounts}
-        onMissingData={() => setSegment('missing')}
+        {riskAccounts ? <CrmStat label="Review" value={riskAccounts} /> : null}
+        </> : undefined}
       />
       {quickAddOpen ? <QuickAddCompany onCancel={() => setQuickAddOpen(false)} onCreated={async () => { setQuickAddOpen(false); await mutate() }} /> : null}
-      <CrmPanel>
-        <CrmSectionHeader title="Company records" description="Saved views over the same account objects. Open the record for connected deals, people, notes, and tasks." action={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add company</CrmButton>} />
-        <SavedViewBar
+      {showRecordsPanel ? <CrmPanel className="crm-record-workbench">
+        <CrmSectionHeader title="Records" action={showCompanyControls ? <CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add company</CrmButton> : undefined} />
+        {showCompanyControls ? <SavedViewBar
           views={[
             { label: 'All companies', active: segment === 'all', onClick: () => setSegment('all'), count: allCompanies.length },
             { label: 'Open deals', active: segment === 'open', onClick: () => setSegment('open'), count: openDealAccounts },
@@ -139,8 +133,8 @@ export default function CompaniesPage() {
           ]}
         >
           <button type="button" className="crm-saved-view-save" onClick={() => setSaveViewOpen(prev => !prev)}><SlidersHorizontal size={14} /> Save view</button>
-        </SavedViewBar>
-        {saveViewOpen ? (
+        </SavedViewBar> : null}
+        {showCompanyControls && saveViewOpen ? (
           <CompanySaveViewPanel
             onSave={saveCurrentView}
             onCancel={() => setSaveViewOpen(false)}
@@ -149,7 +143,7 @@ export default function CompaniesPage() {
             current={{ query, segment }}
           />
         ) : null}
-        <FilterBar>
+        {showCompanyControls ? <FilterBar>
           <label className="crm-search-button"><Search size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search companies..." /></label>
           <CrmSegmentedFilters
             value={segment}
@@ -164,32 +158,28 @@ export default function CompaniesPage() {
               { value: 'no_next', label: 'No next action' },
             ]}
           />
-        </FilterBar>
-        <div className="crm-directory-heading account">
+        </FilterBar> : null}
+        {showCompanyControls ? <div className="crm-directory-heading account">
           <span>Company</span>
           <span>Deals</span>
           <span>Pipeline</span>
           <span>Activity</span>
           <span>Health</span>
-        </div>
+        </div> : null}
         {isLoading ? <CrmSkeleton rows={8} /> : null}
         {!isLoading && !companies.length ? (
           query || segment !== 'all' ? (
-            <CrmEmpty title="No matching companies" action={<CrmButton onClick={() => { setQuery(''); setSegment('all') }}>Clear filters</CrmButton>}>Try another search or reset the current company lens.</CrmEmpty>
-          ) : (
+            <CrmEmpty title="No matching companies" action={<CrmButton onClick={() => { setQuery(''); setSegment('all') }}>Clear filters</CrmButton>} />
+          ) : !quickAddOpen ? (
             <ObjectStartState
-              label="First account"
-              title="Create the company record that everything else attaches to."
-              description="A good account record gives every person, deal, note, and task a shared home. Start with the company, then add the buyer and opportunity from there."
+              label=""
+              title="No companies yet"
+              description=""
               primaryAction={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary">Add company</CrmButton>}
-              secondaryAction={<CrmButton href="/people?quick=person">Add person</CrmButton>}
-              steps={[
-                { label: 'Account', title: 'Name and domain', text: 'Capture the business, website, industry, size, and owner context.' },
-                { label: 'Relationship', title: 'Link people', text: 'Add buyers, champions, finance contacts, or blockers as first-class people records.' },
-                { label: 'Revenue', title: 'Attach deals and work', text: 'Create opportunities, notes, tasks, and next steps from the connected record.' },
-              ]}
+              secondaryAction={<CrmButton href="/people?quick=person">People</CrmButton>}
+              steps={[]}
             />
-          )
+          ) : null
         ) : null}
         {companies.length ? (
           <div className="crm-directory-list">
@@ -209,7 +199,7 @@ export default function CompaniesPage() {
             ))}
           </div>
         ) : null}
-      </CrmPanel>
+      </CrmPanel> : null}
     </CrmPage>
   )
 }
@@ -227,7 +217,7 @@ function CompanySaveViewPanel({ onSave, onCancel, savedViews, onDelete, current 
       <form onSubmit={(event) => { event.preventDefault(); if (label.trim()) onSave(label.trim()) }}>
         <div>
           <strong>Save this company view</strong>
-          <p>Stores the current account segment and search so each team member can keep their own working lenses.</p>
+          <p>Search and segment filters.</p>
         </div>
         <input className="crm-input" value={label} onChange={event => setLabel(event.target.value)} placeholder="e.g. Accounts without next action" autoFocus />
         <CrmButton type="submit" tone="primary" disabled={!label.trim()}>Save view</CrmButton>
@@ -261,39 +251,6 @@ function describeCompanyView(view: Pick<CompanySavedView, 'query' | 'segment'>) 
     no_next: 'open accounts without next action',
   }
   return [segmentLabel[view.segment], view.query ? `search "${view.query}"` : null].filter(Boolean).join(' · ')
-}
-
-function CompanyOperatingMap({ companies, pipelineValue, openDealAccounts, riskAccounts, onMissingData }: { companies: any[]; pipelineValue: number; openDealAccounts: number; riskAccounts: number; onMissingData: () => void }) {
-  const missingData = companies.filter((company: any) => !company.domain || !company.industry).length
-  const noNextAction = companies.filter((company: any) => Number(company.openDeals ?? 0) > 0 && !company.nextAction).length
-  const topAccounts = [...companies]
-    .sort((a: any, b: any) => Number(b.pipelineValue ?? 0) - Number(a.pipelineValue ?? 0))
-    .slice(0, 4)
-
-  return (
-    <section className="crm-operating-map accounts" aria-label="Account operating map">
-      <div className="crm-operating-map-main">
-        <div className="crm-operating-map-head">
-          <span>Account map</span>
-          <strong>{openDealAccounts} selling accounts · {money(pipelineValue)}</strong>
-        </div>
-        <div className="crm-operating-account-strip">
-          {topAccounts.length ? topAccounts.map((company: any) => (
-            <article key={company.id}>
-              <strong><ClampedText lines={1}>{company.name}</ClampedText></strong>
-              <span>{company.openDeals ?? 0} open deals</span>
-              <small>{money(company.pipelineValue)} pipeline</small>
-            </article>
-          )) : <article><strong>No accounts yet</strong><span>Create the first company</span><small>Then add people and deals</small></article>}
-        </div>
-      </div>
-      <div className="crm-operating-map-side">
-        <button type="button" onClick={onMissingData}><span>Missing data</span><strong>{missingData}</strong></button>
-        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'Find company records with missing account data, stale activity, or unclear next actions.' } }))}><span>No next action</span><strong>{noNextAction}</strong></button>
-        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('openHalvexAssistant', { detail: { query: 'Summarise the riskiest accounts with evidence and recommended manual actions.' } }))}><span>At risk</span><strong>{riskAccounts}</strong></button>
-      </div>
-    </section>
-  )
 }
 
 function isCompanySavedView(view: any): view is CompanySavedView {
@@ -330,7 +287,7 @@ function QuickAddCompany({ onCancel, onCreated }: { onCancel: () => void; onCrea
 
   return (
     <CrmPanel>
-      <CrmSectionHeader title="Add company" description="Create an account. People, deals, tasks, and notes can attach to it later." />
+      <CrmSectionHeader title="Add company" />
       <form className="crm-form-grid" onSubmit={submit}>
         <label>Name<input className="crm-input" value={name} onChange={event => setName(event.target.value)} placeholder="Finch Studio" required /></label>
         <label>Domain<input className="crm-input" value={domain} onChange={event => setDomain(event.target.value)} placeholder="finchstudio.com" /></label>
