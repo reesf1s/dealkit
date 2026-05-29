@@ -109,7 +109,7 @@ export default function CompaniesPage() {
       <ObjectWorkspaceHeader
         object="Companies"
         title="Company objects"
-        description="The account layer of the CRM: one record for every business, with linked people, open deals, tasks, notes, activity, and account risk."
+        description="The account layer: linked people, open deals, notes, tasks, activity, ownership, and account risk."
         actions={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add company</CrmButton>}
         stats={<>
         <CrmStat label="Companies" value={allCompanies.length} />

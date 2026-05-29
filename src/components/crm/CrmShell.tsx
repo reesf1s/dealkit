@@ -6,7 +6,6 @@ import type { DetailsHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLA
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bot,
-  BarChart3,
   Building2,
   CheckCircle2,
   ChevronRight,
@@ -36,7 +35,6 @@ const nav = [
   { href: '/companies', label: 'Companies', icon: Building2 },
   { href: '/people', label: 'People', icon: UsersRound },
   { href: '/tasks', label: 'Tasks', icon: CheckCircle2 },
-  { href: '/reports', label: 'Reports', icon: BarChart3 },
 ]
 
 type AssistantProposedAction = {
@@ -169,6 +167,7 @@ export function CrmShell({ children }: { children: ReactNode }) {
           <small>Views</small>
           <Link href="/deals?view=pipeline"><GalleryVerticalEnd size={15} /> Pipeline board</Link>
           <Link href="/tasks?view=overdue"><CheckCircle2 size={15} /> Overdue work</Link>
+          <Link href="/reports"><LayoutGrid size={15} /> Reporting</Link>
         </div>
 
         <div className="crm-sidebar-footer">
@@ -660,12 +659,14 @@ export function ObjectWorkspaceHeader({ object, title, description, actions, sta
 
 export function WorkspaceBriefing({ items }: { items: Array<{ label: string; title: string; text: string; action?: ReactNode }> }) {
   return (
-    <section className="crm-workspace-briefing" aria-label="Workspace briefing">
+    <section className="crm-workspace-briefing" aria-label="Workspace operating principles">
       {items.map(item => (
         <article key={item.title}>
-          <small>{item.label}</small>
-          <strong>{item.title}</strong>
-          <p>{item.text}</p>
+          <span>{item.label}</span>
+          <div>
+            <strong>{item.title}</strong>
+            <p>{item.text}</p>
+          </div>
           {item.action ? <div>{item.action}</div> : null}
         </article>
       ))}

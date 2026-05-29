@@ -109,7 +109,7 @@ export default function PeoplePage() {
       <ObjectWorkspaceHeader
         object="People"
         title="People objects"
-        description="Relationship memory for buyers, champions, blockers, and day-to-day contacts. Every person should connect back to a company, deal, note, or task."
+        description="Relationship memory for buyers, champions, blockers, contacts, and everyone tied to revenue work."
         actions={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add person</CrmButton>}
         stats={<>
         <CrmStat label="People" value={allPeople.length} />

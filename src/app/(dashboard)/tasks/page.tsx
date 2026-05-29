@@ -185,7 +185,7 @@ function TasksContent() {
       <ObjectWorkspaceHeader
         object="Tasks"
         title="Execution board"
-        description="A focused work system for customer commitments across deals, companies, and people. Halvex can recommend tasks, but the list stays user-owned."
+        description="Customer commitments across deals, companies, and people, kept manual and accountable."
         actions={<><CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> Add task</CrmButton><CrmButton href="/deals">Deals</CrmButton></>}
         stats={<>
         <CrmStat label="Due today" value={today} />

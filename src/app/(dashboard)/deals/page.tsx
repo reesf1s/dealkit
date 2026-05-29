@@ -176,7 +176,7 @@ function DealsContent() {
       <ObjectWorkspaceHeader
         object="Deals"
         title="Pipeline records"
-        description="Spreadsheet-grade deal control with a secondary board for stage movement. Manual fields stay first-class; Halvex adds evidence-based judgement on demand."
+        description="Track every opportunity by company, people, stage, value, close date, owner, next step, risk, and priority."
         actions={<CrmButton onClick={() => setQuickAddOpen(true)} tone="primary"><Plus size={16} /> New deal</CrmButton>}
         stats={<>
         <CrmStat label="Open deals" value={openDeals.length} />

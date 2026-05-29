@@ -63,7 +63,7 @@ export default function HomePage() {
       <ObjectWorkspaceHeader
         object="Home"
         title="Revenue desk"
-        description="The working surface for the day: commitments first, active records second, and Halvex available as a quiet analyst when a deal needs a sharper read."
+        description="Today’s customer work, active records, and the next commitments that keep the pipeline moving."
         actions={<><CrmButton href="/tasks?quick=task" tone="primary"><Plus size={16} /> Add task</CrmButton><CrmButton href="/deals?quick=deal"><Plus size={16} /> Add deal</CrmButton></>}
         stats={<>
         <CrmStat label="Tasks due" value={priorities.length} hint={priorities.length ? 'Review or complete' : 'Clear'} />
