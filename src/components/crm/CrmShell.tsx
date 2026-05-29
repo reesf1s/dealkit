@@ -148,6 +148,18 @@ export function CrmShell({ children }: { children: ReactNode }) {
           </div>
         </button>
 
+        <div className="crm-sidebar-command-card" aria-label="Workspace actions">
+          <button type="button" onClick={() => setCommandOpen(true)}>
+            <Command size={14} />
+            <span>Command</span>
+            <kbd>⌘K</kbd>
+          </button>
+          <button type="button" onClick={() => router.push('/deals?quick=deal')}>
+            <Plus size={14} />
+            <span>New record</span>
+          </button>
+        </div>
+
         <div className="crm-sidebar-section">
           <small>Objects</small>
         </div>
